@@ -21,6 +21,8 @@ import {
   type WebSocketFactory,
 } from "./nostr/ws_relay.js";
 import { NoopSignatureVerifier } from "./nostr/signature.js";
+import type { SignatureVerifier } from "./nostr/signature.js";
+import { NobleSignatureVerifier } from "./nostr/noble_signature.js";
 import { ingestRawEvents } from "./ingest/ingest.js";
 import { buildThreads } from "./thread/thread.js";
 import { queryThreads } from "./query/thread_query.js";
@@ -154,10 +156,19 @@ async function renderSample(url: URL, now: number): Promise<string> {
   const result = buildThreads(accepted);
   const lead =
     renderNotice(
-      "Sample mode — fixed in-memory events. Signatures are NOT verified.",
+      "Sample mode — demo events are unsigned (no signature verification).",
       "info",
     ) + renderCacheStatus({ status: "bypass (sample mode)", ttlSeconds: 0 });
   return statusFor(parseQueryOptions(url), lead, result);
+}
+
+/**
+ * Chooses the signature verifier for the live relay path. Functionized so the
+ * choice (e.g. fail-open vs fail-closed, or a future env toggle) lives in one
+ * place. Defaults to real Schnorr verification.
+ */
+export function selectVerifier(): SignatureVerifier {
+  return NobleSignatureVerifier;
 }
 
 /** Builds the live read-only relay page for an allowlisted relay (with cache). */
@@ -167,6 +178,7 @@ async function renderLive(
   now: number,
   factory: WebSocketFactory,
   cache: EventCache,
+  verifier: SignatureVerifier,
 ): Promise<string> {
   const filters: NostrFilter[] = [{ kinds: [1], limit: 100 }];
   const ttlSeconds = parseTtlSeconds(url);
@@ -186,19 +198,20 @@ async function renderLive(
     },
   });
 
-  // Noop verifier: exercises the hook but does NOT verify signatures.
+  // Events failing signature verification are dropped by the ingest hook.
   const { accepted } = await ingestRawEvents(
     fetched.events,
     { relayUrl, now },
-    NoopSignatureVerifier,
+    verifier,
   );
   const result = buildThreads(accepted);
 
+  const verifyNote =
+    verifier === NoopSignatureVerifier
+      ? "signatures are NOT verified"
+      : "signature verification: enabled (Schnorr)";
   const lead =
-    renderNotice(
-      `Live relay (read-only): ${relayUrl} — signatures are NOT verified.`,
-      "info",
-    ) +
+    renderNotice(`Live relay (read-only): ${relayUrl} — ${verifyNote}.`, "info") +
     renderCacheStatus({
       status: fetched.status,
       ttlSeconds,
@@ -213,6 +226,7 @@ export async function handleRequest(
   request: Request,
   factory: WebSocketFactory = createWorkersWebSocket,
   cache: EventCache = liveCache,
+  verifier: SignatureVerifier = selectVerifier(),
 ): Promise<Response> {
   const url = new URL(request.url);
   const relayParam = url.searchParams.get("relay");
@@ -226,7 +240,7 @@ export async function handleRequest(
     }
     try {
       return htmlResponse(
-        await renderLive(url, relayParam, Date.now(), factory, cache),
+        await renderLive(url, relayParam, Date.now(), factory, cache, verifier),
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

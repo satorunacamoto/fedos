@@ -8,12 +8,12 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 7 — KV cache adapter.** Ingest, thread building, query policy,
-> an HTML view, a NIP-01 read-only WebSocket adapter, a `SignatureVerifier`
-> interface, and an `EventCache` boundary with both in-memory and Cloudflare KV
-> implementations. No posting, no key storage, no commerce, no ads. Default
-> rendering still uses a fixed in-memory sample; the live relay path is opt-in,
-> allowlisted, and cached (KV when bound, in-memory otherwise).
+> **Status: Stage 8 — real Schnorr signature verification.** Ingest, thread
+> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> `EventCache` boundary (in-memory + Cloudflare KV), and a real BIP-340 Schnorr
+> `SignatureVerifier` (@noble). The live relay path verifies signatures and drops
+> events that fail. No posting, no key storage, no commerce, no ads. Default
+> rendering still uses a fixed in-memory sample (unsigned demo events).
 
 ## What is implemented
 
@@ -30,7 +30,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   HTML-escaped before output).
 - `src/nostr/messages.ts` — pure NIP-01 relay-message parser (EVENT/EOSE/NOTICE).
 - `src/nostr/signature.ts` — `SignatureVerifier` interface + `Noop`/`RejectAll`
-  implementations. **No real signature verification is implemented yet.**
+  implementations.
+- `src/nostr/noble_signature.ts` — `NobleSignatureVerifier`: real BIP-340 Schnorr
+  verification via `@noble/curves` + `@noble/hashes`. Verify-only; no signing.
 - `src/nostr/ws_relay.ts` — read-only WebSocket relay adapter (REQ → collect →
   EOSE/timeout → CLOSE) with an injectable `WebSocketFactory`. Read-only: it
   never publishes events.
@@ -46,15 +48,25 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 
 ## Security scope (read before trusting anything here)
 
-This codebase makes **no** confidentiality or authorship guarantees yet.
+This codebase verifies event signatures on the live path but makes **no**
+confidentiality guarantees and is not a security audit of the wider system.
 
-- **Signature verification is NOT implemented.** There is a `SignatureVerifier`
-  interface, but the only shipped implementations are `NoopSignatureVerifier`
-  (accepts everything, no checking) and `RejectAllSignatureVerifier`. The live
-  relay path uses Noop, so **events from a relay are NOT authenticated**.
-  `verifyEventId` only checks that an event's `id` is a consistent SHA-256 of
-  its serialization — it does **not** prove the author. Real schnorr/secp256k1
-  verification is a later stage.
+- **Signature verification (live path).** `NobleSignatureVerifier` performs real
+  BIP-340 Schnorr verification: it recomputes the id from the event body and
+  checks `sig` against the author's x-only `pubkey`. Events that fail are dropped
+  during ingest. This proves an event is **authentic and untampered** — it does
+  NOT mean the content is true, safe, or endorsed, and it is not a guarantee
+  that the rest of the pipeline is free of bugs. Avoid words like "tamper-proof"
+  or "completely secure".
+- **`verifyEventId` is a different check.** It only confirms an event's `id` is a
+  consistent SHA-256 of its serialization (self-consistency), and does **not**
+  prove authorship. Signature verification is the separate `SignatureVerifier`
+  path.
+- **Sample mode is unsigned.** The default demo events are not signed and are
+  served with the Noop verifier; they exist only to exercise rendering.
+- **Cache ≠ verification.** `KvEventCache`/`InMemoryEventCache` store whatever
+  events were fetched. Caching does not re-verify; do not treat a cached entry as
+  a verified or trusted record.
 - The live relay path is **read-only** and limited to an allowlist; it never
   publishes events. Disallowed relays are rejected.
 - No private keys are handled or stored. Web replies will use NIP-07 / browser
@@ -113,9 +125,10 @@ KV caveats (do not over-promise on these):
 4. Query / sort / filter policy ✓
 5. Read-only relay WebSocket adapter + signature verifier boundary ✓
 6. Relay event cache boundary (in-memory) ✓
-7. Cloudflare KV cache adapter ✓ ← you are here
-8. Web reply posting (NIP-07 / external signer)
-9. Community / Channel (admin-post) / Group (open)
-10. Creator / digital-content hooks
-11. Ads / promotion hooks
-12. Vault / encrypted identity layer (AEAD, external signer)
+7. Cloudflare KV cache adapter ✓
+8. Real Schnorr signature verification ✓ ← you are here
+9. Web reply posting (NIP-07 / external signer)
+10. Community / Channel (admin-post) / Group (open)
+11. Creator / digital-content hooks
+12. Ads / promotion hooks
+13. Vault / encrypted identity layer (AEAD, external signer)

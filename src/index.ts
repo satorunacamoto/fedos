@@ -41,6 +41,10 @@ export {
   type SignatureVerifier,
 } from "./nostr/signature.js";
 export {
+  NobleSignatureVerifier,
+  isValidHex,
+} from "./nostr/noble_signature.js";
+export {
   WebSocketRelayAdapter,
   type WebSocketFactory,
   type WebSocketRelayOptions,
@@ -120,4 +124,4 @@ export {
   type CacheStatusView,
   type PageView,
 } from "./render/html.js";
-export { handleRequest, selectCache, type Env } from "./worker.js";
+export { handleRequest, selectCache, selectVerifier, type Env } from "./worker.js";

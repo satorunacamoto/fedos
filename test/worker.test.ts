@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import worker, { handleRequest, selectCache } from "../src/worker.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
+import { NoopSignatureVerifier } from "../src/nostr/signature.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
@@ -140,10 +141,13 @@ describe("worker live relay caching", () => {
     const counter = { calls: 0 };
     const factory = scriptedFactory([sampleEvent()], counter);
 
+    // Use the Noop verifier so the fake-signature sample event stays visible;
+    // this test is about caching, not signature verification.
     const first = await handleRequest(
       new Request(`http://localhost/?relay=${DAMUS}`),
       factory,
       cache,
+      NoopSignatureVerifier,
     );
     const firstBody = await first.text();
     expect(firstBody).toContain("cache=<strong>miss</strong>");
@@ -154,6 +158,7 @@ describe("worker live relay caching", () => {
       new Request(`http://localhost/?relay=${DAMUS}`),
       factory,
       cache,
+      NoopSignatureVerifier,
     );
     const secondBody = await second.text();
     expect(secondBody).toContain("cache=<strong>hit</strong>");
@@ -170,6 +175,7 @@ describe("worker live relay caching", () => {
       new Request(`http://localhost/?relay=${DAMUS}&cache=0`),
       factory,
       cache,
+      NoopSignatureVerifier,
     );
     const body = await res.text();
     expect(body).toContain("cache=<strong>bypass</strong>");
@@ -182,9 +188,47 @@ describe("worker live relay caching", () => {
       new Request(`http://localhost/?relay=${DAMUS}&ttl=99999`),
       scriptedFactory([sampleEvent()]),
       cache,
+      NoopSignatureVerifier,
     );
     const body = await res.text();
     expect(body).toContain("ttl=300s");
+  });
+});
+
+describe("worker live signature verification", () => {
+  const SIGNED_EVENT = {
+    id: "54e612edddef0b67e2e46b6cbe0c70368f4cc55a7a4efd774c08066bc74b7f0b",
+    pubkey: "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    created_at: 1700000000,
+    kind: 1,
+    tags: [] as string[][],
+    content: "hello nostr — Stage 8 vector",
+    sig: "9fafd52912c74d10ea33a981cc4e3d43789add77daaf31ed62b02c2760caa96d9b6393a007ad885810e75239cc87cbc859574fbfbc64d2ea795f1c097bfced59",
+  };
+
+  it("enables verification and shows a validly-signed event", async () => {
+    const res = await handleRequest(
+      new Request(`http://localhost/?relay=${DAMUS}`),
+      scriptedFactory([SIGNED_EVENT]),
+      new InMemoryEventCache(),
+      // default verifier (Noble) via no 4th arg
+    );
+    const body = await res.text();
+    expect(body).toContain("signature verification: enabled");
+    expect(body).toContain("hello nostr");
+  });
+
+  it("drops an event whose signature fails verification", async () => {
+    const forged = { ...SIGNED_EVENT, content: "forged content" };
+    const res = await handleRequest(
+      new Request(`http://localhost/?relay=${DAMUS}`),
+      scriptedFactory([forged]),
+      new InMemoryEventCache(),
+    );
+    const body = await res.text();
+    expect(body).toContain("signature verification: enabled");
+    expect(body).not.toContain("forged content");
+    expect(body).toContain("No threads to display.");
   });
 });
 
