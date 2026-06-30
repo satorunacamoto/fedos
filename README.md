@@ -8,20 +8,20 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 15 — D1 space directory adapter.** Ingest, thread building,
+> **Status: Stage 16 — chat / DM model boundary.** Ingest, thread building,
 > query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
 > (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, a
 > **preview-only** compose panel (`?compose=1`), a `MetadataIndex` boundary
-> (in-memory + Cloudflare D1) for search/listing/space navigation, and now a
-> **D1 space directory adapter** that persists Community/Channel/Group
-> definitions and their (pubkey, role) members. **D1 here is just the storage
-> location for space definitions** — not an authoritative permission oracle and
-> not an audit log; `canPost`/`canRead` decisions stay in the pure policy layer.
-> The admin/creation/join-approval UIs are still unbuilt. **Nothing publishes**
-> and no signer auto-runs. No key generation/storage, no commerce, no ads.
+> (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
+> directory adapter for Community/Channel/Group definitions, and now a **chat /
+> DM model boundary**: pure `ChatRoom`/`DMThread`/`GroupChat` types, read/post
+> policy, event→chat classification, and a space→chat bridge. **No chat is sent
+> and no DM is encrypted** — NIP-04/NIP-44 are out of scope, there is no
+> WebSocket publish, no signer auto-runs, and no key material is handled. No
+> commerce, no ads.
 
 ## What is implemented
 
@@ -49,6 +49,19 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   permission checks remain the pure policy layer's job. Schema:
   `schema/d1_space_directory.sql`. No storage of keys, no posting, and no
   membership/admin/creation/join-approval UI.
+- `src/chat/*` — pure chat / DM model boundary toward LINE/Telegram-style
+  conversations. `types.ts` defines `ChatRoom` (`DMThread` | `GroupChat`),
+  `ChatMessage`, `ChatVisibility`, `ChatPostPolicy`, and `ChatDecision`.
+  `policy.ts` decides `canReadChat`/`canPostChat`/`isChatParticipant` purely over
+  participant/admin lists and the chat's visibility/postPolicy (DM = participants
+  only; open group = guests may post; private group = participants; channel-like
+  = owners/admins only). `classify.ts` reads chat references from an event's tags
+  (`["chat", "<id>"]` / `["t", "chat:<id>"]`; malformed/unknown ignored) via
+  `getChatTags`/`eventMatchesChat`/`classifyEventToChats`. `space_bridge.ts`
+  derives a `GroupChat` from a Stage 9 space (`chatFromGroupSpace`) and reuses the
+  space's `canRead` for `canOpenChatFromSpace`. **Nothing is sent and no DM is
+  encrypted** — NIP-04/NIP-44 are out of scope; `ChatMessage.content` is plaintext
+  as supplied. No chat UI yet.
 - `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
   adapter over an injected NIP-07 provider, and pure builders for **unsigned**
   events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
@@ -173,6 +186,13 @@ confidentiality guarantees and is not a security audit of the wider system.
   run itself. Only the four assignable roles are stored ("guest" is never
   written); all access uses prepared-statement bindings, never SQL string
   interpolation. There is no admin, creation, or join/approval flow yet.
+- **The chat model is advisory and unencrypted.** `canReadChat`/`canPostChat`/
+  `isChatParticipant` are pure decisions over participant/admin lists; nothing
+  sends a message or gates a conversation. DMs are **not** encrypted — NIP-04 and
+  NIP-44 are out of scope for this stage, and `ChatMessage.content` is plaintext
+  as supplied. The space→chat bridge derives a chat definition only; it does not
+  open a socket or publish. Do not describe chats here as private/secure in any
+  cryptographic sense.
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -304,7 +324,8 @@ D1 space directory caveats (do not over-promise on these):
 12. Relay publish boundary (no UI) ✓
 13. Mock-only publish UI prototype (preview only) ✓
 14. D1 metadata/index adapter (discovery only) ✓
-15. D1 space directory adapter (definitions only) ✓ ← you are here
-16. Creator / digital-content hooks
-17. Ads / promotion hooks
-18. Vault / encrypted identity layer (AEAD, external signer)
+15. D1 space directory adapter (definitions only) ✓
+16. Chat / DM model boundary (no send, no encryption) ✓ ← you are here
+17. Creator / digital-content hooks
+18. Ads / promotion hooks
+19. Vault / encrypted identity layer (AEAD, external signer)
