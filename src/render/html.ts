@@ -246,6 +246,20 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px
 .asset-tags{list-style:none;padding:0;margin:4px 0 0;display:flex;gap:6px;flex-wrap:wrap}
 .asset-tag{font-size:.7rem;border:1px solid rgba(127,127,127,.4);border-radius:8px;padding:0 6px}
 .asset-note{font-size:.75rem;color:#888;margin:4px 0 0}
+.chat-directory,.chat-room,.chat-error{border:1px solid rgba(127,127,127,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px}
+.chat-directory ul{list-style:none;padding:0;margin:0}
+.chat-item{padding:4px 0;border-bottom:1px solid rgba(127,127,127,.15)}
+.chat-meta{font-size:.75rem;color:#888}
+.chat-label .chat-kind{font-size:.7rem;border:1px solid rgba(127,127,127,.4);border-radius:8px;padding:0 6px;text-transform:uppercase}
+.chat-post-hint{font-size:.85rem;margin:6px 0}
+.chat-post-hint.denied{color:#8a1f1f}
+.chat-post-note{color:#888}
+.chat-note{font-size:.75rem;color:#888;margin:6px 0}
+.chat-message-list{list-style:none;padding:0;margin:0}
+.chat-message{border:1px solid rgba(127,127,127,.2);border-radius:6px;padding:6px 10px;margin:6px 0}
+.chat-msg-meta{font-size:.75rem;color:#888;display:flex;gap:6px;align-items:center}
+.chat-author{font-family:monospace}
+.chat-msg-content{white-space:pre-wrap;word-break:break-word;margin-top:2px}
 `.trim();
 
 /**

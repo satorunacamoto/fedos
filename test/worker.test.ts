@@ -14,6 +14,7 @@ import type {
 import { NoopSignatureVerifier } from "../src/nostr/signature.js";
 import { SAMPLE_VAULT_MEMBER } from "../src/community/sample_spaces.js";
 import { SAMPLE_PRODUCT_BUYER } from "../src/commerce/sample_products.js";
+import { SAMPLE_DM_PARTICIPANT } from "../src/chat/sample_chats.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
@@ -514,6 +515,85 @@ describe("worker product route (read-only)", () => {
     expect(src).not.toContain("arrayBuffer");
     expect(src).not.toContain("createSignedUrl");
     expect(src).not.toContain("EdgeRecPromotionProvider");
+  });
+});
+
+describe("worker chat route (read-only)", () => {
+  it("1. the default board (sample mode) shows the chat directory", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('class="chat-directory"');
+    expect(body).toContain('href="?chat=lounge-chat"');
+    // A private DM is not surfaced to a guest.
+    expect(body).not.toContain('href="?chat=dm-alice-bob"');
+  });
+
+  it("2. ?chat=<public> renders the chat room with its messages", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?chat=lounge-chat"))
+    ).text();
+    expect(body).toContain('class="chat-room"');
+    expect(body).toContain("Welcome to the lounge chat");
+    expect(body).toContain('data-chat="lounge-chat"');
+  });
+
+  it("3. ?chat=<unknown> renders not-found with the escaped id", async () => {
+    const res = await handleRequest(
+      new Request("http://localhost/?chat=" + encodeURIComponent("<nope>")),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Chat not found");
+    expect(body).not.toContain("<nope>");
+    expect(body).toContain("&lt;nope&gt;");
+  });
+
+  it("4. a private DM denies a guest", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?chat=dm-alice-bob"))
+    ).text();
+    expect(body).toContain("Access denied");
+    expect(body).not.toContain("one-to-one thread"); // no message leaks
+  });
+
+  it("5. a participant may view the private DM via ?actor", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(`http://localhost/?chat=dm-alice-bob&actor=${SAMPLE_DM_PARTICIPANT}`),
+      )
+    ).text();
+    expect(body).toContain('class="chat-room"');
+    expect(body).toContain("one-to-one thread");
+  });
+
+  it("6. message content is escaped in the room view", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?chat=lounge-chat"))
+    ).text();
+    expect(body).not.toContain("<script>");
+    expect(body).toContain("&lt;script&gt;");
+  });
+
+  it("7. introduces no send/publish form, button, or wording on a chat page", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?chat=lounge-chat"))
+    ).text();
+    const lower = body.toLowerCase();
+    // The chat room itself exposes no compose/send affordance.
+    const room = lower.slice(lower.indexOf('class="chat-room"'));
+    expect(room).not.toContain("<form");
+    expect(room).not.toContain("<textarea");
+    expect(room).not.toContain("send message");
+    expect(room).not.toContain("encrypted");
+    expect(room).not.toContain("secure");
+  });
+
+  it("8. introduces no real chat send / NIP-07 / publisher wiring in the Worker", () => {
+    const src: string = workerSource;
+    expect(src).not.toContain("WebSocketRelayPublisher");
+    expect(src).not.toContain("Nip07EventSigner");
+    expect(src).not.toContain("validateBeforePublish");
+    expect(src).not.toContain("nip04");
+    expect(src).not.toContain("nip44");
   });
 });
 

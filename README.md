@@ -8,21 +8,19 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 26 — composite asset cache (fallback chain).** A new
-> `CompositeAssetCache implements AssetCache` chains an ORDERED list of layers
-> (each `{ name, cache, writable, volatile }`) behind one `AssetCache`. Reads fall
-> through the layers and return the first hit; an optional **warm-fill** (default)
-> back-populates the preceding writable layers (each re-gated by `canCacheAsset`,
-> failures ignored). Writes are policy-gated and go to the first writable layer
-> (or, opt-in, all writable layers); deletes fan out to every layer; `clear()`
-> defaults to a **no-op** (opt-in `"volatile"` clears only volatile layers, never
-> a durable origin). `createRuntime` now composes **R2 → MeshKV → in-memory** when
-> both an R2 bucket and a mesh client are bound (R2-only / MeshKV-only / in-memory
-> fall back as before). The composite opens no connection and issues no `fetch` of
-> its own — all I/O stays inside the wrapped adapters, and **private/paid/secret/
-> key/payment/entitlement bytes are still refused**. No signed URLs, downloads,
-> delivery, or payment. The earlier product `?product=<id>` route (Stage 25) and
-> base below are unchanged.
+> **Status: Stage 27 — chat read-only UI labels.** The Stage 16 chat model is now
+> viewable. A `ChatDirectory`/lookup helpers (`findChatById`, `listReadableChats`,
+> `getChatMessages`) feed read-only render helpers (`renderChatLabel`,
+> `renderChatDirectory`, `renderChatRoom`, `renderChatMessage`,
+> `renderChatNotFound`, `renderChatAccessDenied`) and a `?chat=<id>` Worker route
+> gated by `canReadChat` (unknown → not found, denied → access denied, allowed →
+> room + plaintext messages + a `canPostChat` hint). The default board (sample
+> mode) surfaces the readable chat directory. **Messages are PLAINTEXT labels
+> only** — nothing is sent, nothing is encrypted (no NIP-04/NIP-44), there is no
+> send form/button, no socket, and no message delivery. A private chat is shown
+> with a "participant-only view policy" label — an access note, **not** a
+> cryptographic guarantee; the views never claim to be "secure" or "encrypted".
+> The earlier composite asset cache (Stage 26) and base below are unchanged.
 >
 > Ingest, thread building, query
 > policy, an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache`
@@ -82,9 +80,15 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   (`["chat", "<id>"]` / `["t", "chat:<id>"]`; malformed/unknown ignored) via
   `getChatTags`/`eventMatchesChat`/`classifyEventToChats`. `space_bridge.ts`
   derives a `GroupChat` from a Stage 9 space (`chatFromGroupSpace`) and reuses the
-  space's `canRead` for `canOpenChatFromSpace`. **Nothing is sent and no DM is
-  encrypted** — NIP-04/NIP-44 are out of scope; `ChatMessage.content` is plaintext
-  as supplied. No chat UI yet.
+  space's `canRead` for `canOpenChatFromSpace`. `directory.ts` adds the read-only
+  directory/lookup layer: a `ChatDirectory` (`InMemoryChatDirectory`) plus pure
+  `findChatById`, `listReadableChats` (filters by `canReadChat`), and
+  `getChatMessages` (selects a chat's messages by `chatId`). `sample_chats.ts`
+  ships fixed `SAMPLE_CHATS`/`SAMPLE_CHAT_MESSAGES` (an open group, a channel-like
+  broadcast group, a private members group, and a one-to-one DM; one message
+  carries HTML-special characters to prove escaping). **Nothing is sent and no DM
+  is encrypted** — NIP-04/NIP-44 are out of scope; `ChatMessage.content` is
+  plaintext as supplied. The Stage 27 UI is read-only labels only.
 - `src/commerce/*` — pure creator / EC (digital-content) model boundary from a
   board/space/chat toward a creator's digital goods. `types.ts` defines `Product`
   (`kind` = pdf/zip/template/software/link/other, `status` = draft/active/archived,
@@ -157,7 +161,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `renderAssetPreviewList` (PUBLIC/UNLISTED asset metadata labels only —
   kind/visibility/contentType/size/source/checksum/tags; `private`/`paid` are
   filtered out, with no bytes and no download/link/button), `renderProductNotFound`,
-  and `renderProductAccessDenied`.
+  and `renderProductAccessDenied`. `chat.ts` (Stage 27) adds read-only chat views —
+  `renderChatLabel` (kind + id), `renderChatDirectory` (lists readable chats, each
+  linking to its `?chat=<id>` room), `renderChatRoom` (label + view-policy + read/
+  post hints + plaintext messages), `renderChatMessage` (author + timestamp +
+  escaped plaintext content), `renderChatNotFound`, and `renderChatAccessDenied`.
+  The chat views render **no send form/button, no socket, and no message
+  delivery**, and they never describe a chat as "secure"/"encrypted" — a private
+  chat is labeled "participant-only view policy" only.
   `promotion.ts`'s `renderPromotionPlaceholder` shows a disclosure label and the
   placement's own (escaped) label only. **No placeholder renders an ad candidate,
   destination link, price-to-pay, or download**, and none of these helpers call a
@@ -217,9 +228,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `?actor=<pubkey>` (viewer identity; guest when absent). `?product=<id>` renders
   a read-only product page over the fixed sample products — summary plus
   PUBLIC/UNLISTED asset PREVIEW metadata only, gated by `canViewProduct` (unknown
-  → not found, denied → access denied). The default board (sample mode) also
-  surfaces the product directory. No asset bytes, signed URLs, downloads, or
-  payment paths are introduced. On a readable space,
+  → not found, denied → access denied). `?chat=<id>` renders a read-only chat room
+  over the fixed sample chats, gated by `canReadChat` (unknown → not found, denied
+  → access denied, allowed → room + plaintext messages + a `canPostChat` hint).
+  The default board (sample mode) surfaces the product and readable-chat
+  directories. Chat messages are plaintext labels only — **nothing is sent,
+  nothing is encrypted, and there is no send form/button or message delivery**. No
+  asset bytes, signed URLs, downloads, or payment paths are introduced. On a
+  readable space,
   `?compose=1` adds a **preview-only** compose panel; `?content=<text>` previews
   the unsigned event for the `?actor` candidate. Posting is only ever a disabled
   mock-only preview — never signed, never sent. There is no POST endpoint (a POST
@@ -360,6 +376,15 @@ confidentiality guarantees and is not a security audit of the wider system.
   as supplied. The space→chat bridge derives a chat definition only; it does not
   open a socket or publish. Do not describe chats here as private/secure in any
   cryptographic sense.
+- **The chat UI (Stage 27) is read-only labels.** The `?chat=<id>` route, the chat
+  directory, and the room view only DISPLAY the Stage 16 model: a chat's id/kind,
+  its `canReadChat`/`canPostChat` decisions, and its messages as escaped plaintext.
+  There is **no send form, no send/publish button, no socket, no NIP-07 call, and
+  no message delivery** — a `?chat=` request renders exactly like any other GET. A
+  private chat is labeled **"participant-only view policy"** (an access note, not a
+  cryptographic claim); the views deliberately avoid the words "secure"/"encrypted"
+  because nothing here is. A readable-by-actor listing is a convenience filter, not
+  an authorization guarantee.
 - **The commerce model is advisory; no money moves and nothing is delivered.**
   `canViewProduct`/`canEditProduct`/`canAccessAsset` are pure decisions over a
   product's status/visibility/creator and the supplied grants; they do not charge,
@@ -586,6 +611,7 @@ D1 space directory caveats (do not over-promise on these):
 23. MeshKV adapter boundary (public previews/thumbnails/segments only; mock client) ✓
 24. R2 AssetCache adapter (origin storage for public media; no signed URLs/DRM) ✓
 25. Product read-only directory/page route + public asset preview ✓
-26. Asset cache composed fallback chain (R2 → MeshKV → in-memory) ✓ ← you are here
-27. Chat read-only UI labels
-28. Vault / encrypted identity layer (AEAD, external signer)
+26. Asset cache composed fallback chain (R2 → MeshKV → in-memory) ✓
+27. Chat read-only UI labels ✓ ← you are here
+28. Product / Chat / Space unified directory page
+29. Vault / encrypted identity layer (AEAD, external signer)

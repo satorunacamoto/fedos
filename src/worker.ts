@@ -16,6 +16,10 @@
  * products: a summary plus PUBLIC/UNLISTED asset PREVIEW metadata only. There is
  * NO body delivery, signed URL, download, or payment — `private`/`paid` assets
  * are never shown and no asset bytes are embedded.
+ *
+ * `?chat=<id>` renders a read-only chat room over the fixed sample chats, gated
+ * by `canReadChat`. Messages are PLAINTEXT labels only — nothing is sent, nothing
+ * is encrypted, and there is no send form/button or message delivery.
  */
 
 import { InMemoryRelayAdapter } from "./nostr/relay.js";
@@ -83,6 +87,19 @@ import {
   SAMPLE_GRANTS,
   SAMPLE_ASSET_METADATA,
 } from "./commerce/sample_products.js";
+import {
+  renderChatDirectory,
+  renderChatRoom,
+  renderChatNotFound,
+  renderChatAccessDenied,
+} from "./render/chat.js";
+import {
+  findChatById,
+  getChatMessages,
+  listReadableChats,
+} from "./chat/directory.js";
+import { canPostChat, canReadChat } from "./chat/policy.js";
+import { SAMPLE_CHATS, SAMPLE_CHAT_MESSAGES } from "./chat/sample_chats.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -271,17 +288,60 @@ function renderProductRoute(data: BoardData, productId: string, actor: string): 
 }
 
 /**
+ * Read-only directory of the sample chats readable by the actor. Sample mode
+ * only — there is no live chat lookup, and nothing is sent.
+ */
+function chatDirectoryView(actor: string): string {
+  return renderChatDirectory(
+    listReadableChats(SAMPLE_CHATS, actor),
+    actor || undefined,
+  );
+}
+
+/**
+ * Routes `?chat=<id>` against the fixed sample chats (read-only):
+ * - unknown id     -> not-found page (+ the readable directory).
+ * - read denied    -> access-denied page.
+ * - read allowed   -> chat room + plaintext messages + a post hint.
+ *
+ * Messages are PLAINTEXT labels only — nothing is sent, nothing is encrypted,
+ * and there is no send form/button or message delivery.
+ */
+function renderChatRoute(data: BoardData, chatId: string, actor: string): string {
+  const chat = findChatById(SAMPLE_CHATS, chatId);
+  if (!chat) {
+    return renderPage(buildThreads([]), {
+      status: data.lead + renderChatNotFound(chatId) + chatDirectoryView(actor),
+    });
+  }
+
+  const readDecision = canReadChat(actor, chat);
+  if (!readDecision.allowed) {
+    return renderPage(buildThreads([]), {
+      status: data.lead + renderChatAccessDenied(chat, readDecision),
+    });
+  }
+
+  const postDecision = canPostChat(actor, chat);
+  const messages = getChatMessages(chat, SAMPLE_CHAT_MESSAGES);
+  return renderPage(buildThreads([]), {
+    status: data.lead + renderChatRoom(chat, readDecision, postDecision, messages),
+  });
+}
+
+/**
  * Routes a board through the space directory:
  * - no `?space`        -> all threads + a directory of readable spaces.
  * - `?space=<unknown>` -> not-found page.
  * - read denied        -> access-denied page.
  * - read allowed       -> only that space's threads + a landing header.
  *
- * `?product=<id>` takes precedence and renders the read-only product page.
- * `?actor=<pubkey>` selects the viewer (guest when absent).
+ * `?product=<id>` and `?chat=<id>` take precedence and render their read-only
+ * pages. `?actor=<pubkey>` selects the viewer (guest when absent).
  */
 function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): string {
   const productId = url.searchParams.get("product");
+  const chatId = url.searchParams.get("chat");
   const spaceId = url.searchParams.get("space");
   const actor = url.searchParams.get("actor") ?? "";
   const spaces = directory.list();
@@ -291,11 +351,15 @@ function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): stri
     return renderProductRoute(data, productId, actor);
   }
 
+  if (chatId !== null) {
+    return renderChatRoute(data, chatId, actor);
+  }
+
   if (spaceId === null) {
     let lead =
       data.lead + renderSpaceDirectory(listReadableSpaces(spaces, actor), actor || undefined);
-    // Sample mode surfaces the product directory below the space directory.
-    if (data.showPromotions) lead += productDirectoryView(actor);
+    // Sample mode surfaces the product and chat directories below the spaces.
+    if (data.showPromotions) lead += productDirectoryView(actor) + chatDirectoryView(actor);
     return statusFor(queryOptions, lead, buildThreads(data.accepted));
   }
 
