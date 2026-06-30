@@ -87,7 +87,8 @@ export type PromotionReason =
   | "limit_zero"
   | "viewer_opted_out"
   | "placement_disabled"
-  | "context_filtered";
+  | "context_filtered"
+  | "provider_error";
 
 /** A provider's answer for one request: the chosen candidates plus a reason. */
 export interface PromotionDecision {

@@ -8,8 +8,8 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 18 — promotion integration boundary.** Ingest, thread
-> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 19 — edge-rec promotion adapter.** Ingest, thread building,
+> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
@@ -17,14 +17,16 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > **preview-only** compose panel (`?compose=1`), a `MetadataIndex` boundary
 > (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
 > directory adapter for Community/Channel/Group definitions, a chat / DM model
-> boundary, a creator commerce model boundary, and now a **promotion integration
-> boundary**: pure `Placement`/`PromotionRequest`/`PromotionDecision` types,
-> placement policy, surface→placement bridges, and a `PromotionProvider` /
-> `RecommendationProvider` seam toward the EXISTING Cloudflare ad system
-> (edge-rec-middleware / recommendation-rewriter). **No ad engine is built** —
-> this layer only forwards "place a promotion here" requests; it does not select,
-> rank, auction, serve, or track ads, charge money, or rewrite HTML. The only
-> provider shipped is an in-memory mock returning fixed candidates.
+> boundary, a creator commerce model boundary, a promotion integration boundary,
+> and now an **edge-rec promotion adapter**: `EdgeRecPromotionProvider` plus pure
+> request/response mappers that connect the `PromotionProvider` /
+> `RecommendationProvider` seams to the EXISTING Cloudflare ad system
+> (edge-rec-middleware / recommendation-rewriter) over an INJECTED fetch client.
+> **No ad logic is duplicated** — the adapter only translates and transports; it
+> does not rank, auction, compute CTR, track clicks, or bill, and it does not call
+> Stripe/Telegram/HTMLRewriter or the global `fetch`. The viewer pubkey is not
+> sent by default, and every transport failure resolves to a `provider_error`
+> decision instead of throwing. Tests never touch the network.
 
 ## What is implemented
 
@@ -94,11 +96,22 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   request: `buildThreadPlacement`/`buildSpacePlacement`/`buildChatPlacement`/
   `buildProductPlacement`/`buildSearchPlacement`. `adapter.ts` defines the
   `PromotionProvider`/`RecommendationProvider` seams plus `MockPromotionProvider`
-  (returns fixed candidates, NO network). `src/render/promotion.ts`'s
+  (returns fixed candidates, NO network). `edge_rec_adapter.ts` connects those
+  seams to the existing Cloudflare ad system: `EdgeRecPromotionProvider` posts an
+  `EdgeRecAdapterOptions.endpoint` through an INJECTED `EdgeRecFetchLike` client
+  (never the global `fetch`) and adapts the reply. The mapping is pure and split
+  out as `mapPromotionRequestToEdgeRec` (re-filters context, attaches the viewer
+  only on opt-in), `mapEdgeRecResponseToDecision` (stamps `metadata.provider =
+  "edge-rec"`), and the `isEdgeRecResponseLike` guard; a malformed body, non-200,
+  rejection, or timeout all resolve to a `provider_error` decision. It duplicates
+  no ad logic — no ranking, auction, CTR, click tracking, or billing — and the
+  viewer pubkey is omitted unless a caller opts in (raw via `sendViewerPubkey`, or
+  opaque via `hashViewerPubkey`). `src/render/promotion.ts`'s
   `renderPromotionPlaceholder` emits a labeled "Sponsored" placeholder only — it
   renders no candidate title/image/`destination` and links nothing. **This layer
   does not select, rank, auction, serve, or track ads, charge money, call
-  fetch/Stripe/Telegram, or rewrite HTML** — it only hands a request to a provider.
+  Stripe/Telegram, or rewrite HTML** — it only hands requests to an injected
+  provider, and only ever reaches the network through that injected client.
 - `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
   adapter over an injected NIP-07 provider, and pure builders for **unsigned**
   events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
@@ -242,12 +255,19 @@ confidentiality guarantees and is not a security audit of the wider system.
 - **The promotion layer is a request boundary, not an ad system.** It builds and
   normalizes "place a promotion here" requests and hands them to an injected
   `PromotionProvider` — it does not select, rank, auction, or weight ads, run
-  CTR/A-B tests, track clicks, charge money, or call Stripe/Telegram. It performs
-  no `fetch`/HTTP, touches no Cloudflare Worker/D1/KV, and does no HTMLRewriting.
-  The only provider here is `MockPromotionProvider`, which returns fixed inert
-  candidates; `renderPromotionPlaceholder` shows a "Sponsored" label only and
-  never a real ad. Wiring to the actual edge-rec-middleware / recommendation-
-  rewriter is a later stage. Do not describe this as ad serving or measurement.
+  CTR/A-B tests, track clicks, charge money, or call Stripe/Telegram, and it does
+  no HTMLRewriting. It adds no D1/KV and is not wired into the Worker. The pure
+  layer (policy/bridge) and `MockPromotionProvider` touch no network at all;
+  `renderPromotionPlaceholder` shows a "Sponsored" label only and never a real ad.
+- **The edge-rec adapter only translates and transports.** `EdgeRecPromotionProvider`
+  forwards a request to the existing edge-rec-middleware / recommendation-rewriter
+  through an INJECTED fetch client (never the global `fetch`), then maps the reply
+  back. It duplicates none of the ad engine: no ranking, auction, CTR, click
+  tracking, or billing live here. The viewer pubkey is NOT sent unless a caller
+  explicitly opts in (raw via `sendViewerPubkey`, or opaque via `hashViewerPubkey`),
+  and any transport failure (rejection, non-200, malformed body, timeout) becomes
+  a `provider_error` decision rather than throwing. Do not describe this as ad
+  serving or measurement — the selection logic stays in the external system.
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -382,6 +402,7 @@ D1 space directory caveats (do not over-promise on these):
 15. D1 space directory adapter (definitions only) ✓
 16. Chat / DM model boundary (no send, no encryption) ✓
 17. Creator commerce model boundary (no payment, no delivery) ✓
-18. Promotion integration boundary (request seam only, no ad engine) ✓ ← you are here
-19. edge-rec-middleware adapter (connect the existing ad system)
-20. Vault / encrypted identity layer (AEAD, external signer)
+18. Promotion integration boundary (request seam only, no ad engine) ✓
+19. edge-rec-middleware adapter (inject-only transport to the existing ad system) ✓ ← you are here
+20. Read-only UI labels/placeholders (product, chat, promotion)
+21. Vault / encrypted identity layer (AEAD, external signer)
