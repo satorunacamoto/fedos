@@ -8,7 +8,7 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 17 — creator commerce model boundary.** Ingest, thread
+> **Status: Stage 18 — promotion integration boundary.** Ingest, thread
 > building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
@@ -17,13 +17,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > **preview-only** compose panel (`?compose=1`), a `MetadataIndex` boundary
 > (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
 > directory adapter for Community/Channel/Group definitions, a chat / DM model
-> boundary, and now a **creator commerce model boundary**: pure `Product`/
-> `DigitalAsset`/`PurchaseGrant` types, product view/edit/asset-access policy,
-> event→product classification, and a space/event→product bridge. **No money
-> moves and nothing is delivered** — there is no payment, checkout, download
-> serving, inventory, or real Stripe/crypto/R2/D1 wiring; a `PurchaseGrant`
-> records an external entitlement result only, `priceCents` is display metadata,
-> and there is no DRM or "purchase guarantee". No ads.
+> boundary, a creator commerce model boundary, and now a **promotion integration
+> boundary**: pure `Placement`/`PromotionRequest`/`PromotionDecision` types,
+> placement policy, surface→placement bridges, and a `PromotionProvider` /
+> `RecommendationProvider` seam toward the EXISTING Cloudflare ad system
+> (edge-rec-middleware / recommendation-rewriter). **No ad engine is built** —
+> this layer only forwards "place a promotion here" requests; it does not select,
+> rank, auction, serve, or track ads, charge money, or rewrite HTML. The only
+> provider shipped is an in-memory mock returning fixed candidates.
 
 ## What is implemented
 
@@ -82,6 +83,22 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   who may post in the space). **No money moves and nothing is delivered** — no
   payment, checkout, download serving, inventory, or real Stripe/crypto/R2/D1;
   `priceCents` is display-only and there is no DRM. No commerce UI yet.
+- `src/promotion/*` — pure INTEGRATION BOUNDARY toward the existing Cloudflare ad
+  system (edge-rec-middleware / recommendation-rewriter); it is NOT an ad engine.
+  `types.ts` defines `PlacementType` (11 slots across thread/space/chat/product/
+  search), `PlacementContext`, `Placement`, `PromotionRequest`, `PromotionCandidate`,
+  `PromotionDecision`, and `PromotionReason`. `policy.ts` purely resolves a slot
+  (`resolvePlacement`), assembles a request (`buildPromotionRequest`), strips
+  context ids irrelevant to a slot (`filterPromotionContext`), and gates on a
+  positive limit (`canShowPromotion`). `bridge.ts` maps a surface to a normalized
+  request: `buildThreadPlacement`/`buildSpacePlacement`/`buildChatPlacement`/
+  `buildProductPlacement`/`buildSearchPlacement`. `adapter.ts` defines the
+  `PromotionProvider`/`RecommendationProvider` seams plus `MockPromotionProvider`
+  (returns fixed candidates, NO network). `src/render/promotion.ts`'s
+  `renderPromotionPlaceholder` emits a labeled "Sponsored" placeholder only — it
+  renders no candidate title/image/`destination` and links nothing. **This layer
+  does not select, rank, auction, serve, or track ads, charge money, call
+  fetch/Stripe/Telegram, or rewrite HTML** — it only hands a request to a provider.
 - `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
   adapter over an injected NIP-07 provider, and pure builders for **unsigned**
   events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
@@ -222,6 +239,15 @@ confidentiality guarantees and is not a security audit of the wider system.
   metadata; there is no checkout, inventory, R2/D1 storage, or DRM, and
   `canAccessAsset` is NOT content protection. Do not describe products here as
   "purchased", "protected", or "DRM-secured".
+- **The promotion layer is a request boundary, not an ad system.** It builds and
+  normalizes "place a promotion here" requests and hands them to an injected
+  `PromotionProvider` — it does not select, rank, auction, or weight ads, run
+  CTR/A-B tests, track clicks, charge money, or call Stripe/Telegram. It performs
+  no `fetch`/HTTP, touches no Cloudflare Worker/D1/KV, and does no HTMLRewriting.
+  The only provider here is `MockPromotionProvider`, which returns fixed inert
+  candidates; `renderPromotionPlaceholder` shows a "Sponsored" label only and
+  never a real ad. Wiring to the actual edge-rec-middleware / recommendation-
+  rewriter is a later stage. Do not describe this as ad serving or measurement.
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -355,6 +381,7 @@ D1 space directory caveats (do not over-promise on these):
 14. D1 metadata/index adapter (discovery only) ✓
 15. D1 space directory adapter (definitions only) ✓
 16. Chat / DM model boundary (no send, no encryption) ✓
-17. Creator commerce model boundary (no payment, no delivery) ✓ ← you are here
-18. Ads / promotion hooks
-19. Vault / encrypted identity layer (AEAD, external signer)
+17. Creator commerce model boundary (no payment, no delivery) ✓
+18. Promotion integration boundary (request seam only, no ad engine) ✓ ← you are here
+19. edge-rec-middleware adapter (connect the existing ad system)
+20. Vault / encrypted identity layer (AEAD, external signer)
