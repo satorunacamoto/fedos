@@ -8,17 +8,21 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 25 — product read-only route + public asset preview.** A
-> `?product=<id>` route now renders a read-only product page over the fixed
-> sample products: a `ProductDirectory`/lookup helpers (`findProductById`,
-> `listViewableProducts`, `getProductAssets`) feed render helpers
-> (`renderProductDirectory`/`renderProductPage`/`renderAssetPreviewList`/
-> `renderProductNotFound`/`renderProductAccessDenied`). `canViewProduct` gates the
-> page (unknown → not found, denied → access denied), and the asset preview list
-> shows `AssetMetadata` for **public/unlisted assets only** — `private`/`paid`
-> assets are filtered out, no asset bytes are embedded, and there is **no signed
-> URL, download, payment, or DRM**. The default board surfaces the product
-> directory (sample mode). Below is the earlier base.
+> **Status: Stage 26 — composite asset cache (fallback chain).** A new
+> `CompositeAssetCache implements AssetCache` chains an ORDERED list of layers
+> (each `{ name, cache, writable, volatile }`) behind one `AssetCache`. Reads fall
+> through the layers and return the first hit; an optional **warm-fill** (default)
+> back-populates the preceding writable layers (each re-gated by `canCacheAsset`,
+> failures ignored). Writes are policy-gated and go to the first writable layer
+> (or, opt-in, all writable layers); deletes fan out to every layer; `clear()`
+> defaults to a **no-op** (opt-in `"volatile"` clears only volatile layers, never
+> a durable origin). `createRuntime` now composes **R2 → MeshKV → in-memory** when
+> both an R2 bucket and a mesh client are bound (R2-only / MeshKV-only / in-memory
+> fall back as before). The composite opens no connection and issues no `fetch` of
+> its own — all I/O stays inside the wrapped adapters, and **private/paid/secret/
+> key/payment/entitlement bytes are still refused**. No signed URLs, downloads,
+> delivery, or payment. The earlier product `?product=<id>` route (Stage 25) and
+> base below are unchanged.
 >
 > Ingest, thread building, query
 > policy, an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache`
@@ -258,6 +262,21 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   has no safe atomic bulk wipe and the bucket may hold objects this adapter did not
   write. **No signed URLs, download delivery, payment, or DRM, and no external
   `fetch`** — origin storage for public previews only.
+  `composite_asset_cache.ts` composes the three into one: `CompositeAssetCache
+  implements AssetCache` over an ordered list of `AssetCacheLayer`s
+  (`{ name, cache, writable, volatile }`). `get` falls through the layers and
+  returns the first hit; a `CompositeReadStrategy` of `"warm-fill"` (default)
+  back-populates the preceding writable layers (each re-checked by `canCacheAsset`,
+  failures swallowed), `"fallback"` skips that. `put` is policy-gated **before any
+  layer is touched**, then a `CompositeWriteStrategy` writes the first writable
+  layer (`"first-writable"`, default) or every writable layer (`"all-writable"`).
+  `delete` fans out to all layers; `has` is true if any layer has the key;
+  `clear()` defaults to a **no-op** (`"none"`) and the opt-in `"volatile"` strategy
+  clears only volatile layers so a durable origin (R2) is never bulk-wiped. The
+  composite stores no bytes itself, mutates no input, opens no connection, and
+  issues no `fetch` — it is a cache hierarchy, NOT access control, payment,
+  entitlement, or DRM, and **private/paid/secret/key/payment/entitlement bytes are
+  refused at the gate** (warm-fill included).
 - `src/runtime/*` — the runtime integration layer: the single place that picks
   every boundary. `createRuntime(env?, overrides?)` returns an `AppRuntime`
   (`eventCache`, `assetCache`, `spaceDirectory`, `metadataIndex`,
@@ -269,13 +288,15 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT` **plus** an injected `fetch`) —
   and otherwise a test/local-safe in-memory or mock default (`InMemory*`,
   `MockPromotionProvider`/`MockRecommendationProvider`, `MockRelayPublisher`,
-  `NobleSignatureVerifier`). `selectAssetCache` prefers an `R2AssetCache` when an
-  `NOSTR_ASSET_R2` bucket is bound, else a `MeshKVAssetCache` when
-  `MESHKV_ASSET_CACHE` is bound, else the in-memory cache. `overrides` win over
-  `env`. **Constructing a runtime starts no external work**: no socket, no
-  `fetch`, no publish, no signer, no asset/mesh/R2 I/O — selecting the EdgeRec,
-  MeshKV, or R2 adapter only makes it *ready* to call out behind its injected
-  client. The runtime never reaches for a global `fetch`.
+  `NobleSignatureVerifier`). `selectAssetCache` composes a `CompositeAssetCache`
+  (R2 origin → MeshKV peer → in-memory fallback) when **both** an `NOSTR_ASSET_R2`
+  bucket and a `MESHKV_ASSET_CACHE` client are bound, else a plain `R2AssetCache`
+  (R2 only), else a `MeshKVAssetCache` (mesh only), else the shared in-memory
+  cache. `overrides` win over `env`. **Constructing a runtime starts no external
+  work**: no socket, no `fetch`, no publish, no signer, no asset/mesh/R2 I/O —
+  selecting the EdgeRec, MeshKV, or R2 adapter (or composing the chain) only makes
+  it *ready* to call out behind its injected client. The runtime never reaches for
+  a global `fetch`.
 
 ## Security scope (read before trusting anything here)
 
@@ -417,6 +438,17 @@ confidentiality guarantees and is not a security audit of the wider system.
   bucket), and `clear()` is a deliberate no-op because R2 has no safe atomic bulk
   wipe. A stored object is not proof of authorization — this is a cache, not an
   entitlement oracle.
+- **The composite asset cache is a chain of the same gated layers — it weakens
+  nothing.** `CompositeAssetCache` only orders/forwards to the layers it is given;
+  it stores no bytes itself and adds no transport. Every write it performs — direct
+  puts AND warm-fills — is gated by `canCacheAsset` first, so private/paid content,
+  DMs, secrets, key material, and payment/entitlement data are refused before any
+  layer is touched. **Warm-fill is a read-path optimization, not an authorization
+  signal**: a key being present in (or copied into) a layer is not proof anyone is
+  entitled to it. `clear()` defaults to a no-op and never bulk-wipes a durable
+  origin (the opt-in `"volatile"` strategy clears local/peer layers only, never
+  R2). There are still **no signed URLs, downloads, delivery, or payment**, and the
+  composite opens no connection and issues no `fetch` of its own.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -553,6 +585,7 @@ D1 space directory caveats (do not over-promise on these):
 22. Asset cache boundary (public media only; R2/HTTP/local/MeshKV-swappable) ✓
 23. MeshKV adapter boundary (public previews/thumbnails/segments only; mock client) ✓
 24. R2 AssetCache adapter (origin storage for public media; no signed URLs/DRM) ✓
-25. Product read-only directory/page route + public asset preview ✓ ← you are here
-26. Asset cache composed fallback chain (R2 → MeshKV → in-memory)
-27. Vault / encrypted identity layer (AEAD, external signer)
+25. Product read-only directory/page route + public asset preview ✓
+26. Asset cache composed fallback chain (R2 → MeshKV → in-memory) ✓ ← you are here
+27. Chat read-only UI labels
+28. Vault / encrypted identity layer (AEAD, external signer)

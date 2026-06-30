@@ -14,6 +14,7 @@
  * singletons so state survives across requests in one isolate.
  */
 
+import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
 import { InMemoryAssetCache } from "../asset/memory_asset_cache.js";
 import { MeshKVAssetCache } from "../asset/meshkv_asset_cache.js";
 import { R2AssetCache } from "../asset/r2_asset_cache.js";
@@ -78,18 +79,43 @@ export function selectMetadataIndex(env?: RuntimeEnv): MetadataIndex {
 }
 
 /**
- * The public asset cache. Priority: an `R2AssetCache` over a bound R2 bucket
- * (origin storage), else a `MeshKVAssetCache` over a bound mesh client (peer
- * cache), else the shared in-memory cache. Every choice holds public/unlisted
- * media only — the policy guardrail keeps private/paid/sensitive bytes out.
- * Selecting an adapter opens no connection and performs no I/O.
+ * The public asset cache. Priority:
+ *   1. both R2 and MeshKV bound → a `CompositeAssetCache` chaining
+ *      R2 (origin) → MeshKV (peer cache) → in-memory (local fallback),
+ *   2. R2 only   → an `R2AssetCache` (origin storage),
+ *   3. MeshKV only → a `MeshKVAssetCache` (peer cache),
+ *   4. neither   → the shared in-memory cache.
+ * Every choice holds public/unlisted media only — the policy guardrail keeps
+ * private/paid/sensitive bytes out. Selecting/composing performs no I/O: it
+ * opens no connection and reads/writes no asset.
  */
 export function selectAssetCache(env?: RuntimeEnv): AssetCache {
-  if (env?.NOSTR_ASSET_R2) {
-    return new R2AssetCache({ bucket: env.NOSTR_ASSET_R2 });
+  const r2 = env?.NOSTR_ASSET_R2;
+  const mesh = env?.MESHKV_ASSET_CACHE;
+  if (r2 && mesh) {
+    return new CompositeAssetCache({
+      layers: [
+        {
+          name: "r2",
+          cache: new R2AssetCache({ bucket: r2 }),
+          writable: true,
+          volatile: false,
+        },
+        {
+          name: "meshkv",
+          cache: new MeshKVAssetCache({ client: mesh }),
+          writable: true,
+          volatile: true,
+        },
+        { name: "memory", cache: defaultAssetCache, writable: true, volatile: true },
+      ],
+    });
   }
-  if (env?.MESHKV_ASSET_CACHE) {
-    return new MeshKVAssetCache({ client: env.MESHKV_ASSET_CACHE });
+  if (r2) {
+    return new R2AssetCache({ bucket: r2 });
+  }
+  if (mesh) {
+    return new MeshKVAssetCache({ client: mesh });
   }
   return defaultAssetCache;
 }

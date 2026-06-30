@@ -11,6 +11,7 @@ import {
 } from "../src/runtime/create_runtime.js";
 import type { RuntimeEnv } from "../src/runtime/types.js";
 import { InMemoryAssetCache } from "../src/asset/memory_asset_cache.js";
+import { CompositeAssetCache } from "../src/asset/composite_asset_cache.js";
 import {
   MeshKVAssetCache,
   MockMeshKVClient,
@@ -164,15 +165,30 @@ describe("createRuntime", () => {
     expect((rt.relayPublisher as MockRelayPublisher).published).toEqual([]);
   });
 
-  it("selects an R2AssetCache when an R2 bucket is bound (and R2 wins over mesh)", () => {
+  it("composes R2 + MeshKV + memory into a CompositeAssetCache (no I/O)", () => {
     const bucket = new MockR2Bucket();
+    const client = new MockMeshKVClient();
     const rt = createRuntime({
       NOSTR_ASSET_R2: bucket,
-      MESHKV_ASSET_CACHE: new MockMeshKVClient(),
+      MESHKV_ASSET_CACHE: client,
     });
+    expect(rt.assetCache).toBeInstanceOf(CompositeAssetCache);
+    expect((rt.assetCache as CompositeAssetCache).layerNames).toEqual([
+      "r2",
+      "meshkv",
+      "memory",
+    ]);
+    expect(rt.mode).toBe("cloudflare");
+    // Composing the chain performs no R2 or mesh I/O.
+    expect(bucket.calls).toEqual({ get: 0, put: 0, head: 0, delete: 0 });
+    expect(client.calls).toEqual({ get: 0, put: 0, has: 0, delete: 0, clear: 0 });
+  });
+
+  it("selects a plain R2AssetCache when only an R2 bucket is bound", () => {
+    const bucket = new MockR2Bucket();
+    const rt = createRuntime({ NOSTR_ASSET_R2: bucket });
     expect(rt.assetCache).toBeInstanceOf(R2AssetCache);
     expect(rt.mode).toBe("cloudflare");
-    // Construction performs no R2 I/O.
     expect(bucket.calls).toEqual({ get: 0, put: 0, head: 0, delete: 0 });
   });
 
@@ -185,7 +201,16 @@ describe("createRuntime", () => {
     expect(rt.assetCache).toBe(override);
   });
 
-  it("selects a MeshKVAssetCache when a mesh client is bound", () => {
+  it("an explicit assetCache override wins over R2 + MeshKV (no composite built)", () => {
+    const override = new InMemoryAssetCache();
+    const rt = createRuntime(
+      { NOSTR_ASSET_R2: new MockR2Bucket(), MESHKV_ASSET_CACHE: new MockMeshKVClient() },
+      { assetCache: override },
+    );
+    expect(rt.assetCache).toBe(override);
+  });
+
+  it("selects a MeshKVAssetCache when only a mesh client is bound", () => {
     const client = new MockMeshKVClient();
     const rt = createRuntime({ MESHKV_ASSET_CACHE: client });
     expect(rt.assetCache).toBeInstanceOf(MeshKVAssetCache);
