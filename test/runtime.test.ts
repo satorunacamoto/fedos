@@ -10,6 +10,7 @@ import {
   selectSpaceDirectory,
 } from "../src/runtime/create_runtime.js";
 import type { RuntimeEnv } from "../src/runtime/types.js";
+import { InMemoryAssetCache } from "../src/asset/memory_asset_cache.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
 import { InMemorySpaceDirectory } from "../src/community/directory.js";
@@ -66,6 +67,7 @@ describe("createRuntime", () => {
     const rt = createRuntime();
     expect(rt.mode).toBe("test");
     expect(rt.eventCache).toBeInstanceOf(InMemoryEventCache);
+    expect(rt.assetCache).toBeInstanceOf(InMemoryAssetCache);
     expect(rt.spaceDirectory).toBeInstanceOf(InMemorySpaceDirectory);
     expect(rt.metadataIndex).toBeInstanceOf(InMemoryMetadataIndex);
     expect(rt.signatureVerifier).toBe(NobleSignatureVerifier);
@@ -127,12 +129,19 @@ describe("createRuntime", () => {
 
   it("9. overrides win over anything selected from env", () => {
     const stubCache = new InMemoryEventCache();
+    const stubAssetCache = new InMemoryAssetCache();
     const stubPublisher = new MockRelayPublisher();
     const rt = createRuntime(
       { NOSTR_EVENT_CACHE: new FakeKv() },
-      { eventCache: stubCache, relayPublisher: stubPublisher, mode: "test" },
+      {
+        eventCache: stubCache,
+        assetCache: stubAssetCache,
+        relayPublisher: stubPublisher,
+        mode: "test",
+      },
     );
     expect(rt.eventCache).toBe(stubCache); // not the KvEventCache from env
+    expect(rt.assetCache).toBe(stubAssetCache);
     expect(rt.relayPublisher).toBe(stubPublisher);
     expect(rt.mode).toBe("test");
   });
@@ -148,6 +157,32 @@ describe("createRuntime", () => {
     expect(fetch.calls).toBe(0); // no promotion request issued
     // The mock publisher has published nothing.
     expect((rt.relayPublisher as MockRelayPublisher).published).toEqual([]);
+  });
+
+  it("createRuntime performs no asset-cache operations", async () => {
+    let calls = 0;
+    const spyAssetCache = {
+      get: async () => {
+        calls += 1;
+        return undefined;
+      },
+      put: async () => {
+        calls += 1;
+      },
+      has: async () => {
+        calls += 1;
+        return false;
+      },
+      delete: async () => {
+        calls += 1;
+      },
+      clear: async () => {
+        calls += 1;
+      },
+    };
+    const rt = createRuntime(undefined, { assetCache: spyAssetCache });
+    expect(rt.assetCache).toBe(spyAssetCache);
+    expect(calls).toBe(0); // nothing read or written during construction
   });
 
   it("11. does not mutate the input env", () => {

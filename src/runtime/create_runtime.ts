@@ -14,6 +14,8 @@
  * singletons so state survives across requests in one isolate.
  */
 
+import { InMemoryAssetCache } from "../asset/memory_asset_cache.js";
+import type { AssetCache } from "../asset/types.js";
 import { InMemoryEventCache } from "../cache/event_cache.js";
 import { KvEventCache } from "../cache/kv_event_cache.js";
 import type { EventCache } from "../cache/types.js";
@@ -43,6 +45,7 @@ import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./ty
 const defaultEventCache: EventCache = new InMemoryEventCache();
 const defaultSpaceDirectory: SpaceDirectory = new InMemorySpaceDirectory(SAMPLE_SPACES);
 const defaultMetadataIndex: MetadataIndex = new InMemoryMetadataIndex();
+const defaultAssetCache: AssetCache = new InMemoryAssetCache();
 
 /** KV-backed cache when bound, else the shared in-memory cache. */
 export function selectEventCache(env?: RuntimeEnv): EventCache {
@@ -70,6 +73,15 @@ export function selectMetadataIndex(env?: RuntimeEnv): MetadataIndex {
     return new D1MetadataIndex(env.NOSTR_INDEX);
   }
   return defaultMetadataIndex;
+}
+
+/**
+ * The public asset cache. Always the in-memory cache in Stage 22 — an R2 / HTTP /
+ * MeshKV adapter slots in here later (e.g. keyed off `NOSTR_ASSET_R2`). It only
+ * ever holds public/unlisted media; the policy guardrail keeps private/paid out.
+ */
+export function selectAssetCache(_env?: RuntimeEnv): AssetCache {
+  return defaultAssetCache;
 }
 
 /** Always real BIP-340 Schnorr verification (verify-only; no signing). */
@@ -145,6 +157,7 @@ export function createRuntime(
   return {
     mode: overrides.mode ?? resolveMode(env),
     eventCache: overrides.eventCache ?? selectEventCache(env),
+    assetCache: overrides.assetCache ?? selectAssetCache(env),
     spaceDirectory: overrides.spaceDirectory ?? selectSpaceDirectory(env),
     metadataIndex: overrides.metadataIndex ?? selectMetadataIndex(env),
     signatureVerifier: overrides.signatureVerifier ?? selectSignatureVerifier(env),

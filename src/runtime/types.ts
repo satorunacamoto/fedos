@@ -13,6 +13,7 @@
  * publish, no signer. MeshKV and asset caching are NOT implemented here.
  */
 
+import type { AssetCache } from "../asset/types.js";
 import type { EventCache } from "../cache/types.js";
 import type { KvLikeNamespace } from "../cache/kv_event_cache.js";
 import type { AsyncSpaceDirectory, SpaceDirectory } from "../community/directory.js";
@@ -38,6 +39,12 @@ export interface RuntimeEnv {
   readonly NOSTR_SPACE_DB?: D1LikeDatabase;
   /** D1 database backing the discovery metadata index. */
   readonly NOSTR_INDEX?: D1LikeDatabase;
+  /**
+   * Reserved for a future R2 bucket backing the public asset cache. Not used in
+   * Stage 22 (the asset cache is always in-memory); kept here so the binding has
+   * a stable name when the R2 adapter lands.
+   */
+  readonly NOSTR_ASSET_R2?: unknown;
   /** edge-rec-middleware endpoint for promotions (selection only; no auto-serve). */
   readonly PROMOTION_ENDPOINT?: string;
   /** Optional bearer token for the promotion endpoint. */
@@ -59,6 +66,7 @@ export interface RuntimeEnv {
 export interface RuntimeOverrides {
   readonly mode?: RuntimeMode;
   readonly eventCache?: EventCache;
+  readonly assetCache?: AssetCache;
   readonly spaceDirectory?: SpaceDirectory | AsyncSpaceDirectory;
   readonly metadataIndex?: MetadataIndex;
   readonly signatureVerifier?: SignatureVerifier;
@@ -71,6 +79,8 @@ export interface RuntimeOverrides {
 export interface AppRuntime {
   readonly mode: RuntimeMode;
   readonly eventCache: EventCache;
+  /** Public/unlisted media cache (previews, thumbnails, segments). In-memory only. */
+  readonly assetCache: AssetCache;
   /** Sync (in-memory) or async (D1) directory; the async one is not auto-wired. */
   readonly spaceDirectory: SpaceDirectory | AsyncSpaceDirectory;
   readonly metadataIndex: MetadataIndex;
