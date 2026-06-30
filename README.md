@@ -8,12 +8,13 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 9 — community space model.** Ingest, thread building, query
-> policy, an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache`
-> boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr `SignatureVerifier`
-> (@noble), and a pure community/channel/group space model with read/post/
-> moderate/admin policy and event→space classification. No posting, no key
-> storage, no membership UI, no commerce, no ads.
+> **Status: Stage 10 — signer boundary.** Ingest, thread building, query policy,
+> an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache` boundary
+> (in-memory + Cloudflare KV), a real BIP-340 Schnorr `SignatureVerifier`
+> (@noble), a community/channel/group policy model, and a NIP-07 `EventSigner`
+> boundary with pure unsigned-event builders. **Still no publishing** — signing
+> is delegated to an external signer and nothing is sent to a relay. No key
+> generation/storage, no commerce, no ads.
 
 ## What is implemented
 
@@ -29,6 +30,11 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/community/*` — pure space model: `Community`/`Channel`/`Group` types,
   role + read/post/moderate/admin policy decisions, and event→space
   classification from tags. No storage, no posting, no membership/admin UI.
+- `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
+  adapter over an injected NIP-07 provider, and pure builders for **unsigned**
+  events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
+  never holds, generates, or stores a private key, and never publishes; signing
+  is delegated to the external signer.
 - `src/render/*` — pure HTML render layer (every event-derived string is
   HTML-escaped before output).
 - `src/nostr/messages.ts` — pure NIP-01 relay-message parser (EVENT/EOSE/NOTICE).
@@ -76,8 +82,11 @@ confidentiality guarantees and is not a security audit of the wider system.
   decisions over pubkey allowlists; nothing posts or gates access yet, and the
   policy layer does not itself verify signatures (it assumes the caller passes
   pubkeys it already trusts). Treat it as a model, not an access-control system.
-- No private keys are handled or stored. Web replies will use NIP-07 / browser
-  signer / external signer in a later stage — keys stay client-side.
+- No private keys are handled, generated, or stored. The signer boundary
+  delegates to an external NIP-07 provider; the unsigned-event builders never
+  sign, and nothing here publishes to a relay. Signed events returned by a
+  provider are structurally validated and checked against the signer's pubkey,
+  but this app does not run a signer automatically.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -134,8 +143,10 @@ KV caveats (do not over-promise on these):
 6. Relay event cache boundary (in-memory) ✓
 7. Cloudflare KV cache adapter ✓
 8. Real Schnorr signature verification ✓
-9. Community / Channel / Group space model + policy ✓ ← you are here
-10. Web reply posting (NIP-07 / external signer)
-11. Creator / digital-content hooks
-12. Ads / promotion hooks
-13. Vault / encrypted identity layer (AEAD, external signer)
+9. Community / Channel / Group space model + policy ✓
+10. NIP-07 signer boundary + unsigned-event builders ✓ ← you are here
+11. Space directory / read-only landing pages
+12. Relay publish boundary (no UI)
+13. Creator / digital-content hooks
+14. Ads / promotion hooks
+15. Vault / encrypted identity layer (AEAD, external signer)

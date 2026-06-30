@@ -137,6 +137,26 @@ export type {
   SpaceDecision,
 } from "./community/types.js";
 
+// Signer boundary (Stage 10) — builds unsigned events; never holds keys
+export {
+  buildUnsignedTextNote,
+  buildReplyTags,
+  buildSpaceTags,
+  prepareSpacePost,
+  type PrepareSpacePostOptions,
+  type PrepareSpacePostResult,
+} from "./sign/build.js";
+export { Nip07EventSigner, isNip07Available } from "./sign/nip07.js";
+export { isSignedEventLike, assertSignerPubkeyMatches } from "./sign/validate.js";
+export type {
+  UnsignedNostrEvent,
+  SignedNostrEvent,
+  EventSigner,
+  Nip07Provider,
+  SignRequest,
+  BuildTextNoteOptions,
+} from "./sign/types.js";
+
 // Render layer (Stage 3, read-only demo)
 export {
   escapeHtml,
