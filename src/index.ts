@@ -98,6 +98,11 @@ export type {
   CacheLookupResult,
   EventCache,
 } from "./cache/types.js";
+export {
+  KvEventCache,
+  type KvLikeNamespace,
+  type KvEventCacheOptions,
+} from "./cache/kv_event_cache.js";
 
 // Render layer (Stage 3, read-only demo)
 export {
@@ -115,4 +120,4 @@ export {
   type CacheStatusView,
   type PageView,
 } from "./render/html.js";
-export { handleRequest } from "./worker.js";
+export { handleRequest, selectCache, type Env } from "./worker.js";

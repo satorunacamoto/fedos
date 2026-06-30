@@ -8,11 +8,12 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 6 — relay event cache boundary.** Ingest, thread building,
-> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, a
-> `SignatureVerifier` interface, and an `EventCache` boundary (in-memory only).
-> No posting, no key storage, no commerce, no ads. Default rendering still uses a
-> fixed in-memory sample; the live relay path is opt-in, allowlisted, and cached.
+> **Status: Stage 7 — KV cache adapter.** Ingest, thread building, query policy,
+> an HTML view, a NIP-01 read-only WebSocket adapter, a `SignatureVerifier`
+> interface, and an `EventCache` boundary with both in-memory and Cloudflare KV
+> implementations. No posting, no key storage, no commerce, no ads. Default
+> rendering still uses a fixed in-memory sample; the live relay path is opt-in,
+> allowlisted, and cached (KV when bound, in-memory otherwise).
 
 ## What is implemented
 
@@ -34,10 +35,10 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   EOSE/timeout → CLOSE) with an injectable `WebSocketFactory`. Read-only: it
   never publishes events.
 - `src/cache/*` — `EventCache` boundary + deterministic cache keys + a get-or-
-  fetch policy (hit / miss / stale fallback / bypass). Only `InMemoryEventCache`
-  ships; it is **process-local and lost on every isolate/process restart** (no
-  persistence). A Cloudflare KV/D1/R2-backed cache can drop in behind the same
-  interface later.
+  fetch policy (hit / miss / stale fallback / bypass). Two implementations ship:
+  `InMemoryEventCache` (**process-local, lost on every isolate/process restart**)
+  and `KvEventCache` (Cloudflare Workers KV). KV is **eventually consistent** and
+  a cache — not a verified or durable store.
 - `src/worker.ts` — Cloudflare Workers entry. Default = sample mode; `?relay=`
   switches to an **allowlisted** live read-only relay, served through the cache.
   Honors `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=`, plus
@@ -72,6 +73,38 @@ npm run typecheck   # tsc --noEmit (strict)
 npm test            # vitest run
 ```
 
+## Cloudflare KV cache (optional)
+
+The live relay path caches results through `EventCache`. Bind a KV namespace as
+`NOSTR_EVENT_CACHE` and the Worker uses `KvEventCache`; without the binding it
+falls back to the in-memory cache.
+
+```toml
+# wrangler.toml
+name = "nostr-window"
+main = "src/worker.ts"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "NOSTR_EVENT_CACHE"
+id = "<your-kv-namespace-id>"
+```
+
+KV caveats (do not over-promise on these):
+
+- **Eventually consistent.** Reads can briefly miss a recent write, and an
+  entry may be evicted before its logical expiry.
+- **TTL floor.** Cloudflare rejects `expirationTtl` below 60s, so logical TTLs
+  under a minute are stored at 60s; `get` still reports them stale at the real
+  `expiresAt`.
+- **Size limits.** KV values are capped (256 KB at time of writing); very large
+  batches will be rejected by KV.
+- **Not a clear-all.** `KvEventCache.clear()` is a deliberate no-op — there is no
+  safe atomic wipe of a shared namespace. Evict per key with `delete` or let
+  `expirationTtl` expire entries.
+- **It's a cache, not an audit log.** KV here stores unverified relay events for
+  speed; it is not durable, not authenticated, and not a security record.
+
 ## Roadmap (stages)
 
 1. Nostr event ingest ✓
@@ -79,9 +112,10 @@ npm test            # vitest run
 3. Reddit-style read-only render ✓
 4. Query / sort / filter policy ✓
 5. Read-only relay WebSocket adapter + signature verifier boundary ✓
-6. Relay event cache boundary (in-memory) ✓ ← you are here
-7. Web reply posting (NIP-07 / external signer)
-8. Community / Channel (admin-post) / Group (open)
-9. Creator / digital-content hooks
-10. Ads / promotion hooks
-11. Vault / encrypted identity layer (AEAD, external signer)
+6. Relay event cache boundary (in-memory) ✓
+7. Cloudflare KV cache adapter ✓ ← you are here
+8. Web reply posting (NIP-07 / external signer)
+9. Community / Channel (admin-post) / Group (open)
+10. Creator / digital-content hooks
+11. Ads / promotion hooks
+12. Vault / encrypted identity layer (AEAD, external signer)

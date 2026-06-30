@@ -29,6 +29,7 @@ import {
   InMemoryEventCache,
   getCachedOrFetchEvents,
 } from "./cache/event_cache.js";
+import { KvEventCache, type KvLikeNamespace } from "./cache/kv_event_cache.js";
 import type { EventCache } from "./cache/types.js";
 import type { NostrFilter } from "./nostr/relay.js";
 import {
@@ -239,8 +240,25 @@ export async function handleRequest(
   return htmlResponse(await renderSample(url, Date.now()));
 }
 
+/** Worker bindings. The KV namespace is optional; without it we fall back. */
+export interface Env {
+  /** Optional Workers KV namespace for caching live relay results. */
+  NOSTR_EVENT_CACHE?: KvLikeNamespace;
+}
+
+/**
+ * Picks the cache backend: KV when the binding is present, otherwise the
+ * process-local in-memory cache. Exported for tests.
+ */
+export function selectCache(env?: Env): EventCache {
+  if (env?.NOSTR_EVENT_CACHE) {
+    return new KvEventCache({ kv: env.NOSTR_EVENT_CACHE });
+  }
+  return liveCache;
+}
+
 export default {
-  fetch(request: Request): Promise<Response> {
-    return handleRequest(request);
+  fetch(request: Request, env?: Env): Promise<Response> {
+    return handleRequest(request, createWorkersWebSocket, selectCache(env));
   },
 };

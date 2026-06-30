@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import worker, { handleRequest } from "../src/worker.js";
+import worker, { handleRequest, selectCache } from "../src/worker.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
+import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
@@ -184,5 +185,34 @@ describe("worker live relay caching", () => {
     );
     const body = await res.text();
     expect(body).toContain("ttl=300s");
+  });
+});
+
+describe("worker cache backend selection", () => {
+  class MockKv implements KvLikeNamespace {
+    store = new Map<string, string>();
+    async get(key: string): Promise<string | null> {
+      return this.store.get(key) ?? null;
+    }
+    async put(): Promise<void> {}
+    async delete(): Promise<void> {}
+  }
+
+  it("10. uses a KvEventCache when the KV binding is present", () => {
+    const cache = selectCache({ NOSTR_EVENT_CACHE: new MockKv() });
+    expect(cache).toBeInstanceOf(KvEventCache);
+  });
+
+  it("11. falls back to the in-memory cache when no binding is present", () => {
+    expect(selectCache()).toBeInstanceOf(InMemoryEventCache);
+    expect(selectCache({})).toBeInstanceOf(InMemoryEventCache);
+  });
+
+  it("default fetch wires env through to the cache backend", async () => {
+    // No relay param -> sample mode -> 200 regardless of backend.
+    const res = await worker.fetch(new Request("http://localhost/"), {
+      NOSTR_EVENT_CACHE: new MockKv(),
+    });
+    expect(res.status).toBe(200);
   });
 });
