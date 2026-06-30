@@ -26,6 +26,13 @@ import { buildThreads } from "./thread/thread.js";
 import { queryThreads } from "./query/thread_query.js";
 import type { SortMode, ThreadQueryOptions } from "./query/types.js";
 import {
+  InMemoryEventCache,
+  getCachedOrFetchEvents,
+} from "./cache/event_cache.js";
+import type { EventCache } from "./cache/types.js";
+import type { NostrFilter } from "./nostr/relay.js";
+import {
+  renderCacheStatus,
   renderNotice,
   renderPage,
   renderQueryStatus,
@@ -33,6 +40,22 @@ import {
 import { SAMPLE_EVENTS } from "./render/sample.js";
 
 const DEMO_RELAY_URL = "wss://demo.invalid";
+
+/** Process-local cache for live relay results (lost on isolate restart). */
+const liveCache: EventCache = new InMemoryEventCache();
+
+const DEFAULT_TTL_SECONDS = 60;
+const MAX_TTL_SECONDS = 300;
+
+/** Resolves the cache TTL in seconds. `?cache=0` or non-positive `?ttl` bypasses. */
+function parseTtlSeconds(url: URL): number {
+  if (url.searchParams.get("cache") === "0") return 0;
+  const raw = url.searchParams.get("ttl");
+  if (raw === null) return DEFAULT_TTL_SECONDS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_TTL_SECONDS;
+  return Math.min(Math.floor(n), MAX_TTL_SECONDS);
+}
 
 /** Relays the demo Worker is permitted to connect to. */
 const RELAY_ALLOWLIST: ReadonlySet<string> = new Set([
@@ -122,42 +145,65 @@ interface WorkersWebSocket {
   addEventListener(type: string, listener: (ev: { data?: unknown }) => void): void;
 }
 
-/** Builds the sample-mode page (default). */
+/** Builds the sample-mode page (default). Sample mode never uses the cache. */
 async function renderSample(url: URL, now: number): Promise<string> {
   const adapter: RelayAdapter = new InMemoryRelayAdapter(DEMO_RELAY_URL, SAMPLE_EVENTS);
   const events = await adapter.query([{ kinds: [1] }]);
   const { accepted } = ingestRawEvents(events, { relayUrl: adapter.url, now });
   const result = buildThreads(accepted);
-  const lead = renderNotice(
-    "Sample mode — fixed in-memory events. Signatures are NOT verified.",
-    "info",
-  );
+  const lead =
+    renderNotice(
+      "Sample mode — fixed in-memory events. Signatures are NOT verified.",
+      "info",
+    ) + renderCacheStatus({ status: "bypass (sample mode)", ttlSeconds: 0 });
   return statusFor(parseQueryOptions(url), lead, result);
 }
 
-/** Builds the live read-only relay page for an allowlisted relay. */
+/** Builds the live read-only relay page for an allowlisted relay (with cache). */
 async function renderLive(
   url: URL,
   relayUrl: string,
   now: number,
   factory: WebSocketFactory,
+  cache: EventCache,
 ): Promise<string> {
-  const adapter = new WebSocketRelayAdapter(relayUrl, {
-    factory,
-    timeoutMs: clampTimeout(url.searchParams.get("timeout")),
+  const filters: NostrFilter[] = [{ kinds: [1], limit: 100 }];
+  const ttlSeconds = parseTtlSeconds(url);
+
+  const fetched = await getCachedOrFetchEvents({
+    cache,
+    relayUrl,
+    filters,
+    ttlSeconds,
+    now,
+    fetchEvents: () => {
+      const adapter = new WebSocketRelayAdapter(relayUrl, {
+        factory,
+        timeoutMs: clampTimeout(url.searchParams.get("timeout")),
+      });
+      return adapter.query(filters);
+    },
   });
-  const events = await adapter.query([{ kinds: [1], limit: 100 }]);
+
   // Noop verifier: exercises the hook but does NOT verify signatures.
   const { accepted } = await ingestRawEvents(
-    events,
+    fetched.events,
     { relayUrl, now },
     NoopSignatureVerifier,
   );
   const result = buildThreads(accepted);
-  const lead = renderNotice(
-    `Live relay (read-only): ${relayUrl} — signatures are NOT verified.`,
-    "info",
-  );
+
+  const lead =
+    renderNotice(
+      `Live relay (read-only): ${relayUrl} — signatures are NOT verified.`,
+      "info",
+    ) +
+    renderCacheStatus({
+      status: fetched.status,
+      ttlSeconds,
+      cacheKey: fetched.cacheKey,
+      error: fetched.error,
+    });
   return statusFor(parseQueryOptions(url), lead, result);
 }
 
@@ -165,6 +211,7 @@ async function renderLive(
 export async function handleRequest(
   request: Request,
   factory: WebSocketFactory = createWorkersWebSocket,
+  cache: EventCache = liveCache,
 ): Promise<Response> {
   const url = new URL(request.url);
   const relayParam = url.searchParams.get("relay");
@@ -177,7 +224,9 @@ export async function handleRequest(
       return htmlResponse(page, 400);
     }
     try {
-      return htmlResponse(await renderLive(url, relayParam, Date.now(), factory));
+      return htmlResponse(
+        await renderLive(url, relayParam, Date.now(), factory, cache),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const page = renderPage(buildThreads([]), {

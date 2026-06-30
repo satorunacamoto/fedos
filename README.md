@@ -8,11 +8,11 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 5 — read-only relay adapter + signature boundary.** Ingest,
-> thread building, query policy, an HTML view, a NIP-01 read-only WebSocket
-> adapter, and a `SignatureVerifier` interface. No posting, no key storage, no
-> commerce, no ads. Default rendering still uses a fixed in-memory sample; the
-> live relay path is opt-in and allowlisted.
+> **Status: Stage 6 — relay event cache boundary.** Ingest, thread building,
+> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, a
+> `SignatureVerifier` interface, and an `EventCache` boundary (in-memory only).
+> No posting, no key storage, no commerce, no ads. Default rendering still uses a
+> fixed in-memory sample; the live relay path is opt-in, allowlisted, and cached.
 
 ## What is implemented
 
@@ -33,9 +33,15 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/nostr/ws_relay.ts` — read-only WebSocket relay adapter (REQ → collect →
   EOSE/timeout → CLOSE) with an injectable `WebSocketFactory`. Read-only: it
   never publishes events.
+- `src/cache/*` — `EventCache` boundary + deterministic cache keys + a get-or-
+  fetch policy (hit / miss / stale fallback / bypass). Only `InMemoryEventCache`
+  ships; it is **process-local and lost on every isolate/process restart** (no
+  persistence). A Cloudflare KV/D1/R2-backed cache can drop in behind the same
+  interface later.
 - `src/worker.ts` — Cloudflare Workers entry. Default = sample mode; `?relay=`
-  switches to an **allowlisted** live read-only relay. Honors
-  `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=` (and `?timeout=`).
+  switches to an **allowlisted** live read-only relay, served through the cache.
+  Honors `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=`, plus
+  `?timeout=`, `?ttl=` (seconds, capped at 300) and `?cache=0` (bypass).
 
 ## Security scope (read before trusting anything here)
 
@@ -72,9 +78,10 @@ npm test            # vitest run
 2. Thread builder (NIP-10 reply graph → tree) ✓
 3. Reddit-style read-only render ✓
 4. Query / sort / filter policy ✓
-5. Read-only relay WebSocket adapter + signature verifier boundary ✓ ← you are here
-6. Web reply posting (NIP-07 / external signer)
-7. Community / Channel (admin-post) / Group (open)
-8. Creator / digital-content hooks
-9. Ads / promotion hooks
-10. Vault / encrypted identity layer (AEAD, external signer)
+5. Read-only relay WebSocket adapter + signature verifier boundary ✓
+6. Relay event cache boundary (in-memory) ✓ ← you are here
+7. Web reply posting (NIP-07 / external signer)
+8. Community / Channel (admin-post) / Group (open)
+9. Creator / digital-content hooks
+10. Ads / promotion hooks
+11. Vault / encrypted identity layer (AEAD, external signer)

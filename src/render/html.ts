@@ -123,6 +123,24 @@ export function renderNotice(message: string, variant = "info"): string {
   return `<p class="notice notice-${escapeHtml(variant)}">${escapeHtml(message)}</p>`;
 }
 
+/** Small status line describing how a fetch was served from cache. */
+export interface CacheStatusView {
+  readonly status: string;
+  readonly ttlSeconds: number;
+  readonly cacheKey?: string;
+  readonly error?: string;
+}
+
+export function renderCacheStatus(view: CacheStatusView): string {
+  const parts = [
+    `cache=<strong>${escapeHtml(view.status)}</strong>`,
+    `ttl=${view.ttlSeconds}s`,
+  ];
+  if (view.cacheKey) parts.push(`key=<code>${escapeHtml(view.cacheKey)}</code>`);
+  if (view.error) parts.push(`error=<code>${escapeHtml(view.error)}</code>`);
+  return `<div class="cache-status">${parts.join(" · ")}</div>`;
+}
+
 /** Renders a developer-facing panel of build warnings (escaped). */
 export function renderWarnings(warnings: readonly ThreadBuildWarning[]): string {
   if (warnings.length === 0) {
@@ -155,8 +173,8 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px
 .notice{font-size:.85rem;border-radius:6px;padding:8px 12px;margin:0 0 12px}
 .notice-info{background:rgba(40,120,200,.1);color:#1c4e7a}
 .notice-error{background:rgba(200,60,60,.12);color:#8a1f1f}
-.query-status{font-size:.8rem;color:#666;background:rgba(127,127,127,.08);border-radius:6px;padding:6px 10px;margin-bottom:12px}
-.query-status code{font-family:monospace}
+.query-status,.cache-status{font-size:.8rem;color:#666;background:rgba(127,127,127,.08);border-radius:6px;padding:6px 10px;margin-bottom:12px}
+.query-status code,.cache-status code{font-family:monospace}
 .thread-node{padding:8px 12px;margin:6px 0}
 .thread-node[data-depth="0"]{border:1px solid #ccc;border-radius:8px;background:rgba(127,127,127,.04);margin-bottom:16px}
 .children{border-left:2px solid rgba(127,127,127,.25)}

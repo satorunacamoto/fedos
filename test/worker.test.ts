@@ -1,5 +1,59 @@
 import { describe, it, expect } from "vitest";
 import worker, { handleRequest } from "../src/worker.js";
+import { InMemoryEventCache } from "../src/cache/event_cache.js";
+import type {
+  RelaySocketEvent,
+  RelaySocketEventType,
+  RelaySocketLike,
+  WebSocketFactory,
+} from "../src/nostr/ws_relay.js";
+import type { NostrEvent } from "../src/nostr/types.js";
+
+const DAMUS = "wss://relay.damus.io";
+
+function sampleEvent(): NostrEvent {
+  return {
+    id: "1".repeat(64),
+    pubkey: "a".repeat(64),
+    created_at: 1700000000,
+    kind: 1,
+    tags: [],
+    content: "live note from relay",
+    sig: "b".repeat(128),
+  };
+}
+
+/** A scripted socket that answers REQ with the given events then EOSE. */
+function scriptedFactory(
+  events: NostrEvent[],
+  counter?: { calls: number },
+): WebSocketFactory {
+  return () => {
+    if (counter) counter.calls++;
+    const listeners: Partial<
+      Record<RelaySocketEventType, ((ev: RelaySocketEvent) => void)[]>
+    > = {};
+    const socket: RelaySocketLike = {
+      send(data: string) {
+        const m = JSON.parse(data);
+        if (m[0] === "REQ") {
+          const subId = m[1] as string;
+          for (const l of listeners.message ?? []) {
+            for (const ev of events) {
+              l({ data: JSON.stringify(["EVENT", subId, ev]) });
+            }
+            l({ data: JSON.stringify(["EOSE", subId]) });
+          }
+        }
+      },
+      close() {},
+      addEventListener(type, listener) {
+        (listeners[type] ??= []).push(listener);
+      },
+    };
+    return socket;
+  };
+}
 
 describe("worker fetch handler", () => {
   it("returns 200 text/html", async () => {
@@ -56,13 +110,15 @@ describe("worker fetch handler", () => {
   });
 
   it("renders an error page (not a crash) when an allowlisted relay fails", async () => {
-    // Inject a factory that fails, so no real network is touched.
+    // Inject a factory that fails plus a fresh cache, so no real network is
+    // touched and no prior cache entry can mask the failure.
     const failingFactory = () => {
       throw new Error("connection refused");
     };
     const res = await handleRequest(
-      new Request("http://localhost/?relay=wss://relay.damus.io"),
+      new Request(`http://localhost/?relay=${DAMUS}`),
       failingFactory,
+      new InMemoryEventCache(),
     );
     expect(res.status).toBe(200);
     const body = await res.text();
@@ -74,5 +130,59 @@ describe("worker fetch handler", () => {
     const body = await res.text();
     expect(body).toContain("Sample mode");
     expect(body).toContain("Welcome to nostr-window");
+  });
+});
+
+describe("worker live relay caching", () => {
+  it("misses then hits: the second request does not re-open the socket", async () => {
+    const cache = new InMemoryEventCache();
+    const counter = { calls: 0 };
+    const factory = scriptedFactory([sampleEvent()], counter);
+
+    const first = await handleRequest(
+      new Request(`http://localhost/?relay=${DAMUS}`),
+      factory,
+      cache,
+    );
+    const firstBody = await first.text();
+    expect(firstBody).toContain("cache=<strong>miss</strong>");
+    expect(firstBody).toContain("live note from relay");
+    expect(counter.calls).toBe(1);
+
+    const second = await handleRequest(
+      new Request(`http://localhost/?relay=${DAMUS}`),
+      factory,
+      cache,
+    );
+    const secondBody = await second.text();
+    expect(secondBody).toContain("cache=<strong>hit</strong>");
+    expect(secondBody).toContain("live note from relay");
+    expect(counter.calls).toBe(1); // factory NOT called again
+  });
+
+  it("?cache=0 bypasses the cache", async () => {
+    const cache = new InMemoryEventCache();
+    const counter = { calls: 0 };
+    const factory = scriptedFactory([sampleEvent()], counter);
+
+    const res = await handleRequest(
+      new Request(`http://localhost/?relay=${DAMUS}&cache=0`),
+      factory,
+      cache,
+    );
+    const body = await res.text();
+    expect(body).toContain("cache=<strong>bypass</strong>");
+    expect(counter.calls).toBe(1);
+  });
+
+  it("clamps ?ttl to the maximum", async () => {
+    const cache = new InMemoryEventCache();
+    const res = await handleRequest(
+      new Request(`http://localhost/?relay=${DAMUS}&ttl=99999`),
+      scriptedFactory([sampleEvent()]),
+      cache,
+    );
+    const body = await res.text();
+    expect(body).toContain("ttl=300s");
   });
 });

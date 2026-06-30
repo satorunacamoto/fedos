@@ -82,6 +82,23 @@ export type {
   ThreadQueryResult,
 } from "./query/types.js";
 
+// Relay event cache (Stage 6)
+export {
+  InMemoryEventCache,
+  getCachedOrFetchEvents,
+  createRelayCacheKey,
+  normalizeFiltersForCache,
+  type GetCachedOrFetchOptions,
+  type GetCachedOrFetchResult,
+} from "./cache/event_cache.js";
+export type {
+  CacheKey,
+  CacheStatus,
+  CachedEventBatch,
+  CacheLookupResult,
+  EventCache,
+} from "./cache/types.js";
+
 // Render layer (Stage 3, read-only demo)
 export {
   escapeHtml,
@@ -92,8 +109,10 @@ export {
   renderWarnings,
   renderQueryStatus,
   renderNotice,
+  renderCacheStatus,
   renderPage,
   type QueryStatusView,
+  type CacheStatusView,
   type PageView,
 } from "./render/html.js";
 export { handleRequest } from "./worker.js";
