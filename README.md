@@ -8,18 +8,20 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 14 — D1 metadata/index adapter.** Ingest, thread building,
+> **Status: Stage 15 — D1 space directory adapter.** Ingest, thread building,
 > query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
 > (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, a
-> **preview-only** compose panel (`?compose=1`), and a `MetadataIndex` boundary
-> (in-memory + Cloudflare D1) for search/listing/space navigation. **The D1
-> index stores only small derived metadata** — never raw event bodies or
-> signatures — and is a rebuildable convenience index, not an audit log or
-> durable/authoritative store. **Nothing publishes** and no signer auto-runs. No
-> key generation/storage, no commerce, no ads.
+> **preview-only** compose panel (`?compose=1`), a `MetadataIndex` boundary
+> (in-memory + Cloudflare D1) for search/listing/space navigation, and now a
+> **D1 space directory adapter** that persists Community/Channel/Group
+> definitions and their (pubkey, role) members. **D1 here is just the storage
+> location for space definitions** — not an authoritative permission oracle and
+> not an audit log; `canPost`/`canRead` decisions stay in the pure policy layer.
+> The admin/creation/join-approval UIs are still unbuilt. **Nothing publishes**
+> and no signer auto-runs. No key generation/storage, no commerce, no ads.
 
 ## What is implemented
 
@@ -35,7 +37,18 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/community/*` — pure space model: `Community`/`Channel`/`Group` types,
   role + read/post/moderate/admin policy decisions, event→space classification,
   and a `SpaceDirectory` (in-memory) with readable-space and event-filtering
-  helpers. No storage, no posting, no membership/admin UI.
+  helpers. `directory.ts` also defines `AsyncSpaceDirectory`, the persisted
+  counterpart of the sync interface (a backing store cannot satisfy synchronous
+  reads). `d1_directory.ts` implements it as `D1SpaceDirectory` (Cloudflare D1):
+  it persists space DEFINITIONS and (pubkey, role) members through prepared
+  statements. `spaceToRows`/`rowsToSpace` map between a `Space` and its rows —
+  members are normalized to the highest role per pubkey (`listMemberships`),
+  "guest" is never stored, unknown member roles are ignored on read, and an
+  invalid space-level enum is rejected rather than silently defaulted. D1 is the
+  storage location for definitions only, **not** an access-control oracle;
+  permission checks remain the pure policy layer's job. Schema:
+  `schema/d1_space_directory.sql`. No storage of keys, no posting, and no
+  membership/admin/creation/join-approval UI.
 - `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
   adapter over an injected NIP-07 provider, and pure builders for **unsigned**
   events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
@@ -99,7 +112,11 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `?compose=1` adds a **preview-only** compose panel; `?content=<text>` previews
   the unsigned event for the `?actor` candidate. Posting is only ever a disabled
   mock-only preview — never signed, never sent. There is no POST endpoint (a POST
-  renders exactly like a GET).
+  renders exactly like a GET). `selectDirectory(env)` picks the space directory
+  backend — `D1SpaceDirectory` when `NOSTR_SPACE_DB` is bound, otherwise the
+  in-memory sample directory — but the synchronous render path still uses the
+  in-memory directory; D1 is not wired into request handling yet (Stage 15 ships
+  the adapter + selection seam only).
 
 ## Security scope (read before trusting anything here)
 
@@ -147,6 +164,15 @@ confidentiality guarantees and is not a security audit of the wider system.
   as proof an event is authentic — signature verification is a separate concern.
   All queries use prepared-statement bindings; user input is never interpolated
   into SQL text.
+- **The D1 space directory stores definitions, not permissions.**
+  `D1SpaceDirectory` persists what a space looks like (its type, settings, and
+  (pubkey, role) members) so the model can outlive a process restart. It is
+  **not** an authoritative permission oracle and **not** an audit log: a stored
+  row is not proof anyone is actually authorized to read or post. `canRead`/
+  `canPost` decisions stay in the pure Stage 9 policy layer, which the app must
+  run itself. Only the four assignable roles are stored ("guest" is never
+  written); all access uses prepared-statement bindings, never SQL string
+  interpolation. There is no admin, creation, or join/approval flow yet.
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -228,6 +254,40 @@ D1 caveats (do not over-promise on these):
 - **Bound parameters only.** Every query uses prepared-statement bindings; user
   input is never interpolated into SQL text.
 
+## Cloudflare D1 space directory (optional, not wired yet)
+
+`D1SpaceDirectory` persists Community/Channel/Group **definitions** and their
+(pubkey, role) members behind the `AsyncSpaceDirectory` interface. Apply
+`schema/d1_space_directory.sql` to a D1 database and construct
+`D1SpaceDirectory({ db })`; in tests/dev use the in-memory `SpaceDirectory`. The
+Worker selects it via `selectDirectory(env)` when `NOSTR_SPACE_DB` is bound, but
+does not yet route requests through it (Stage 15 ships the adapter + seam only).
+
+```toml
+# wrangler.toml
+[[d1_databases]]
+binding = "NOSTR_SPACE_DB"
+database_name = "nostr-spaces"
+database_id = "<your-d1-database-id>"
+```
+
+```bash
+wrangler d1 execute nostr-spaces --file=schema/d1_space_directory.sql
+```
+
+D1 space directory caveats (do not over-promise on these):
+
+- **Definitions, not permissions.** A stored space/member row records what a
+  space looks like; it is not proof anyone is authorized. `canRead`/`canPost`
+  are decided by the pure policy layer, not by the presence of a row.
+- **Not an audit log, not authoritative.** It is mutable storage for the current
+  space model, not a tamper-evident history.
+- **Stored roles only.** Just owner/admin/moderator/member are persisted; "guest"
+  is the absence of a row. A pubkey is normalized to its highest role on write,
+  and unknown roles are ignored on read.
+- **Bound parameters only.** Every query uses prepared-statement bindings; user
+  input is never interpolated into SQL text.
+
 ## Roadmap (stages)
 
 1. Nostr event ingest ✓
@@ -243,7 +303,8 @@ D1 caveats (do not over-promise on these):
 11. Space directory / read-only landing pages ✓
 12. Relay publish boundary (no UI) ✓
 13. Mock-only publish UI prototype (preview only) ✓
-14. D1 metadata/index adapter (discovery only) ✓ ← you are here
-15. Creator / digital-content hooks
-16. Ads / promotion hooks
-17. Vault / encrypted identity layer (AEAD, external signer)
+14. D1 metadata/index adapter (discovery only) ✓
+15. D1 space directory adapter (definitions only) ✓ ← you are here
+16. Creator / digital-content hooks
+17. Ads / promotion hooks
+18. Vault / encrypted identity layer (AEAD, external signer)

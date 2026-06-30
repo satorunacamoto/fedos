@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import worker, { handleRequest, selectCache } from "../src/worker.js";
+import worker, { handleRequest, selectCache, selectDirectory } from "../src/worker.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
+import { InMemorySpaceDirectory } from "../src/community/directory.js";
+import { D1SpaceDirectory } from "../src/community/d1_directory.js";
+import type {
+  D1LikeDatabase,
+  D1LikePreparedStatement,
+} from "../src/indexer/d1_index.js";
 import { NoopSignatureVerifier } from "../src/nostr/signature.js";
 import { SAMPLE_VAULT_MEMBER } from "../src/community/sample_spaces.js";
 import type {
@@ -391,5 +397,31 @@ describe("worker cache backend selection", () => {
       NOSTR_EVENT_CACHE: new MockKv(),
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("worker space directory selection", () => {
+  class StubD1 implements D1LikeDatabase {
+    prepare(): D1LikePreparedStatement {
+      const stmt: D1LikePreparedStatement = {
+        bind: () => stmt,
+        run: () => Promise.resolve({}),
+        all: () => Promise.resolve({ results: [] }),
+        first: () => Promise.resolve(null),
+      };
+      return stmt;
+    }
+    batch(): Promise<unknown[]> {
+      return Promise.resolve([]);
+    }
+  }
+
+  it("12. uses a D1SpaceDirectory when the D1 binding is present", () => {
+    expect(selectDirectory({ NOSTR_SPACE_DB: new StubD1() })).toBeInstanceOf(D1SpaceDirectory);
+  });
+
+  it("13. falls back to the in-memory sample directory without a binding", () => {
+    expect(selectDirectory()).toBeInstanceOf(InMemorySpaceDirectory);
+    expect(selectDirectory({})).toBeInstanceOf(InMemorySpaceDirectory);
   });
 });

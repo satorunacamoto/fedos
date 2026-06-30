@@ -43,6 +43,8 @@ import {
   listReadableSpaces,
   type SpaceDirectory,
 } from "./community/directory.js";
+import { D1SpaceDirectory } from "./community/d1_directory.js";
+import type { D1LikeDatabase } from "./indexer/d1_index.js";
 import { SAMPLE_SPACES } from "./community/sample_spaces.js";
 import {
   renderCacheStatus,
@@ -350,6 +352,8 @@ export async function handleRequest(
 export interface Env {
   /** Optional Workers KV namespace for caching live relay results. */
   NOSTR_EVENT_CACHE?: KvLikeNamespace;
+  /** Optional D1 database holding persisted space definitions + members. */
+  NOSTR_SPACE_DB?: D1LikeDatabase;
 }
 
 /**
@@ -361,6 +365,20 @@ export function selectCache(env?: Env): EventCache {
     return new KvEventCache({ kv: env.NOSTR_EVENT_CACHE });
   }
   return liveCache;
+}
+
+/**
+ * Picks the space directory: the D1-backed (async) adapter when a database is
+ * bound, otherwise the process-local in-memory directory of sample spaces. The
+ * two implement different interfaces (async vs sync), so this is not yet wired
+ * into the synchronous render path — it is the selection seam for a later stage.
+ * Exported for tests.
+ */
+export function selectDirectory(env?: Env): SpaceDirectory | D1SpaceDirectory {
+  if (env?.NOSTR_SPACE_DB) {
+    return new D1SpaceDirectory({ db: env.NOSTR_SPACE_DB });
+  }
+  return spaceDirectory;
 }
 
 export default {

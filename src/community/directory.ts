@@ -12,10 +12,24 @@ import { eventMatchesSpace } from "./classify.js";
 import type { Space } from "./types.js";
 import type { NostrEvent } from "../nostr/types.js";
 
-/** A source of space definitions. */
+/** A source of space definitions (synchronous, process-local). */
 export interface SpaceDirectory {
   list(): readonly Space[];
   get(id: string): Space | undefined;
+}
+
+/**
+ * The async/persisted counterpart of `SpaceDirectory`. A backing store like D1
+ * cannot satisfy the synchronous interface, so persistent adapters implement
+ * this one (reads return promises; `put`/`delete` mutate the store). It is the
+ * same conceptual role — a source of `Space` definitions — not an access-control
+ * system: `canRead`/`canPost` decisions still live in the pure policy layer.
+ */
+export interface AsyncSpaceDirectory {
+  list(): Promise<readonly Space[]>;
+  get(id: string): Promise<Space | undefined>;
+  put(space: Space): Promise<void>;
+  delete(id: string): Promise<void>;
 }
 
 /** Process-local directory backed by a fixed array. */
