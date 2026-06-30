@@ -85,3 +85,21 @@ export class MockPromotionProvider implements PromotionProvider {
     return Promise.resolve({ selected, reason, placement: request.placement });
   }
 }
+
+/**
+ * In-memory `RecommendationProvider` for tests and prototypes. Mirrors
+ * `MockPromotionProvider` over the recommendation seam; same fixed-candidate
+ * behaviour, NO network. Useful as a safe default when no real
+ * recommendation-rewriter endpoint is configured.
+ */
+export class MockRecommendationProvider implements RecommendationProvider {
+  readonly #inner: MockPromotionProvider;
+
+  constructor(options: MockPromotionProviderOptions = {}) {
+    this.#inner = new MockPromotionProvider(options);
+  }
+
+  getRecommendations(request: PromotionRequest): Promise<PromotionDecision> {
+    return this.#inner.getPromotions(request);
+  }
+}

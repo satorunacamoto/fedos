@@ -8,8 +8,8 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 20 — read-only promotion placeholders.** Ingest, thread
-> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 21 — runtime integration layer.** Ingest, thread building,
+> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
@@ -18,14 +18,15 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
 > directory adapter for Community/Channel/Group definitions, a chat / DM model
 > boundary, a creator commerce model boundary, a promotion integration boundary,
-> an edge-rec promotion adapter, and now **read-only promotion placeholders**:
-> sample-mode space landings bracket their content with EMPTY
-> `space_header`/`space_footer` slots, and new `src/render/product.ts` helpers
-> render a read-only product summary plus an EMPTY `product_sidebar` slot. **The
-> placeholders show only a "Sponsored"/"Promotion" disclosure label** — no ad
-> candidate, destination link, price-to-pay, or download. They are pure render
-> output: no `PromotionProvider`/`MockPromotionProvider`/`EdgeRecPromotionProvider`
-> is constructed and no network is touched.
+> an edge-rec promotion adapter, read-only promotion placeholders, and now a
+> **runtime integration layer**: `createRuntime(env, overrides?)` is the single
+> place that selects the event cache, space directory, metadata index, signature
+> verifier, promotion/recommendation providers, and relay publisher (Cloudflare
+> bindings → real adapters, otherwise in-memory/mock safe defaults). **Building a
+> runtime starts no external work** — no socket, no `fetch`, no publish, no
+> signer, no auto-served ads — and it never depends on a global `fetch` (the
+> promotion adapter's client is injected). MeshKV and asset caching are NOT
+> implemented yet; this is the seam they will plug into.
 
 ## What is implemented
 
@@ -188,7 +189,26 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   backend — `D1SpaceDirectory` when `NOSTR_SPACE_DB` is bound, otherwise the
   in-memory sample directory — but the synchronous render path still uses the
   in-memory directory; D1 is not wired into request handling yet (Stage 15 ships
-  the adapter + selection seam only).
+  the adapter + selection seam only). The default `fetch` now builds an
+  `AppRuntime` via `createRuntime(env)` and uses its event cache; the other
+  selected boundaries are not auto-wired (no real publish, no NIP-07, no
+  auto-served ads).
+- `src/runtime/*` — the runtime integration layer: the single place that picks
+  every boundary. `createRuntime(env?, overrides?)` returns an `AppRuntime`
+  (`eventCache`, `spaceDirectory`, `metadataIndex`, `signatureVerifier`,
+  `promotionProvider`, `recommendationProvider`, `relayPublisher`, plus a
+  `mode`). Each `select*` prefers a real Cloudflare-backed adapter when its
+  binding/config is present — `KvEventCache` (`NOSTR_EVENT_CACHE`),
+  `D1SpaceDirectory` (`NOSTR_SPACE_DB`), `D1MetadataIndex` (`NOSTR_INDEX`),
+  `EdgeRecPromotionProvider` (a `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT`
+  **plus** an injected `fetch`) — and otherwise a test/local-safe in-memory or
+  mock default (`InMemory*`, `MockPromotionProvider`/`MockRecommendationProvider`,
+  `MockRelayPublisher`, `NobleSignatureVerifier`). `overrides` win over `env`.
+  **Constructing a runtime starts no external work**: no socket, no `fetch`, no
+  publish, no signer — selecting the EdgeRec adapter only makes it *ready* to call
+  out behind its injected client. The runtime never reaches for a global `fetch`.
+  MeshKV and an `AssetCache` boundary are NOT implemented here; this is the seam
+  they will plug into.
 
 ## Security scope (read before trusting anything here)
 
@@ -291,6 +311,14 @@ confidentiality guarantees and is not a security audit of the wider system.
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
   The publish button is disabled. The `MockRelayPublisher` is referenced only in
   copy/tests and is never invoked from the request path — no network is touched.
+- **The runtime layer is selection/DI only — it starts nothing.** `createRuntime`
+  constructs adapters but opens no socket, issues no `fetch`, publishes nothing,
+  and invokes no signer; selecting `EdgeRecPromotionProvider` only makes it ready
+  to call its INJECTED client (the runtime never uses a global `fetch`). The
+  Worker uses the runtime's event cache but does not auto-wire the publisher,
+  providers, or async directory — there is still no real publish, no NIP-07
+  auto-run, and no auto-served ads. MeshKV and asset caching are unimplemented;
+  the default relay publisher is the mock.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -422,7 +450,10 @@ D1 space directory caveats (do not over-promise on these):
 17. Creator commerce model boundary (no payment, no delivery) ✓
 18. Promotion integration boundary (request seam only, no ad engine) ✓
 19. edge-rec-middleware adapter (inject-only transport to the existing ad system) ✓
-20. Read-only promotion placeholders + product render helpers ✓ ← you are here
-21. Product read-only directory/page route
-22. Chat read-only UI labels
-23. Vault / encrypted identity layer (AEAD, external signer)
+20. Read-only promotion placeholders + product render helpers ✓
+21. Runtime integration layer (`createRuntime` selection/DI seam) ✓ ← you are here
+22. Asset cache boundary (interface; R2/HTTP/local/MeshKV-swappable)
+23. MeshKV adapter boundary
+24. Product read-only directory/page route
+25. Chat read-only UI labels
+26. Vault / encrypted identity layer (AEAD, external signer)

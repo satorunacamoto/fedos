@@ -22,7 +22,6 @@ import {
 } from "./nostr/ws_relay.js";
 import { NoopSignatureVerifier } from "./nostr/signature.js";
 import type { SignatureVerifier } from "./nostr/signature.js";
-import { NobleSignatureVerifier } from "./nostr/noble_signature.js";
 import { ingestRawEvents } from "./ingest/ingest.js";
 import { buildThreads } from "./thread/thread.js";
 import { queryThreads } from "./query/thread_query.js";
@@ -31,7 +30,7 @@ import {
   InMemoryEventCache,
   getCachedOrFetchEvents,
 } from "./cache/event_cache.js";
-import { KvEventCache, type KvLikeNamespace } from "./cache/kv_event_cache.js";
+import type { KvLikeNamespace } from "./cache/kv_event_cache.js";
 import type { EventCache } from "./cache/types.js";
 import type { NostrFilter } from "./nostr/relay.js";
 import type { IngestedEvent } from "./ingest/types.js";
@@ -63,6 +62,11 @@ import {
   renderPublishPrototype,
 } from "./render/publish.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
+import {
+  createRuntime,
+  selectEventCache,
+  selectSignatureVerifier,
+} from "./runtime/create_runtime.js";
 
 const DEMO_RELAY_URL = "wss://demo.invalid";
 
@@ -264,7 +268,7 @@ function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): stri
  * place. Defaults to real Schnorr verification.
  */
 export function selectVerifier(): SignatureVerifier {
-  return NobleSignatureVerifier;
+  return selectSignatureVerifier();
 }
 
 /** Builds live-relay board data for an allowlisted relay (with cache). */
@@ -370,10 +374,7 @@ export interface Env {
  * process-local in-memory cache. Exported for tests.
  */
 export function selectCache(env?: Env): EventCache {
-  if (env?.NOSTR_EVENT_CACHE) {
-    return new KvEventCache({ kv: env.NOSTR_EVENT_CACHE });
-  }
-  return liveCache;
+  return selectEventCache(env);
 }
 
 /**
@@ -392,6 +393,10 @@ export function selectDirectory(env?: Env): SpaceDirectory | D1SpaceDirectory {
 
 export default {
   fetch(request: Request, env?: Env): Promise<Response> {
-    return handleRequest(request, createWorkersWebSocket, selectCache(env));
+    // Stage 21: the runtime is the single selection point. We use its event
+    // cache here; the directory/index/providers/publisher are selected too but
+    // not auto-wired (no real publish, no NIP-07, no auto-served ads).
+    const runtime = createRuntime(env);
+    return handleRequest(request, createWorkersWebSocket, runtime.eventCache);
   },
 };
