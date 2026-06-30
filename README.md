@@ -8,17 +8,18 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 13 — mock-only publish UI prototype.** Ingest, thread
-> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 14 — D1 metadata/index adapter.** Ingest, thread building,
+> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
-> (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, and a
-> **preview-only** compose panel (`?compose=1`) that shows whether you may post
-> and previews the *unsigned* event. **Nothing publishes** — the compose panel
-> never signs, never calls a signer, never calls a `RelayPublisher`, and there is
-> no publish endpoint (POST is rendered exactly like GET). The publish button is
-> always disabled/mock-only. No key generation/storage, no commerce, no ads.
+> (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, a
+> **preview-only** compose panel (`?compose=1`), and a `MetadataIndex` boundary
+> (in-memory + Cloudflare D1) for search/listing/space navigation. **The D1
+> index stores only small derived metadata** — never raw event bodies or
+> signatures — and is a rebuildable convenience index, not an audit log or
+> durable/authoritative store. **Nothing publishes** and no signer auto-runs. No
+> key generation/storage, no commerce, no ads.
 
 ## What is implemented
 
@@ -65,6 +66,18 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   denies if a supplied `actorPubkey` disagrees), and `preparePublishDecision`
   combines the signature gate with the space policy. Returns allowed/denied
   decisions only; the actual send stays in the `RelayPublisher` layer.
+- `src/indexer/*` — lightweight **metadata/index** boundary for discovery
+  (search, listing, space navigation), kept entirely separate from the event
+  cache. `types.ts` defines `IndexedEvent`/`IndexedThread`/`IndexedSpaceRef` and
+  the `MetadataIndex` interface (`putEvents`/`putThreads`/`putSpaceRefs`,
+  `queryEvents`/`queryThreads`, `getEvent`/`deleteEvent`). `build.ts` has pure
+  projectors (`buildIndexedEvents`/`buildIndexedThreads`/`buildIndexedSpaceRefs`)
+  that truncate content to a short preview (≤280 chars) and reuse the NIP-10
+  resolvers + Stage 9 classifier. Two implementations ship: `InMemoryMetadataIndex`
+  (**process-local, lost on restart**) and `D1MetadataIndex` (Cloudflare D1). The
+  D1 adapter stores only derived metadata (no raw bodies/sigs) and runs every
+  query through prepared-statement bindings (no user input in SQL text). Schema:
+  `schema/d1_index.sql`. Not wired into the Worker yet.
 - `src/render/publish.ts` — **mock-only** compose prototype (render layer).
   `buildPublishPrototypeView` consults `canPost` and `prepareSpacePost` to build
   an UNSIGNED event for display; `renderPublishPrototype` /
@@ -126,6 +139,14 @@ confidentiality guarantees and is not a security audit of the wider system.
   signer is auto-invoked. `validateBeforePublish` only gates what *would* be
   safe to publish (structure + a real signature check); it does not itself send,
   and a passing decision is not a guarantee the rest of the flow is bug-free.
+- **The D1 metadata index is not durable, not authoritative, not an audit log.**
+  `D1MetadataIndex` stores only small derived metadata (id, author, a truncated
+  content preview, reply/root links, space refs) — never raw event bodies or
+  signatures. It exists to make discovery fast and can be rebuilt from relays;
+  rows may be stale, incomplete, or absent. Do not treat the presence of a row
+  as proof an event is authentic — signature verification is a separate concern.
+  All queries use prepared-statement bindings; user input is never interpolated
+  into SQL text.
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -177,6 +198,36 @@ KV caveats (do not over-promise on these):
 - **It's a cache, not an audit log.** KV here stores unverified relay events for
   speed; it is not durable, not authenticated, and not a security record.
 
+## Cloudflare D1 metadata index (optional, not wired yet)
+
+`MetadataIndex` is a discovery index (search/listing/space navigation) that is
+**separate** from the event cache. Apply `schema/d1_index.sql` to a D1 database
+and construct `D1MetadataIndex(db)`; in tests/dev use `InMemoryMetadataIndex`.
+The Worker does not use it yet (Stage 14 ships the boundary + adapters only).
+
+```toml
+# wrangler.toml
+[[d1_databases]]
+binding = "NOSTR_INDEX"
+database_name = "nostr-index"
+database_id = "<your-d1-database-id>"
+```
+
+```bash
+wrangler d1 execute nostr-index --file=schema/d1_index.sql
+```
+
+D1 caveats (do not over-promise on these):
+
+- **Metadata only.** Stores derived fields (id, author, kind, a truncated
+  content preview, reply/root links, space refs) — never raw event bodies or
+  signatures.
+- **Rebuildable, not authoritative.** It is a convenience index, not an audit
+  log or durable source of truth; rows can be stale, incomplete, or rebuilt from
+  relays. A row is not proof an event is authentic.
+- **Bound parameters only.** Every query uses prepared-statement bindings; user
+  input is never interpolated into SQL text.
+
 ## Roadmap (stages)
 
 1. Nostr event ingest ✓
@@ -191,7 +242,8 @@ KV caveats (do not over-promise on these):
 10. NIP-07 signer boundary + unsigned-event builders ✓
 11. Space directory / read-only landing pages ✓
 12. Relay publish boundary (no UI) ✓
-13. Mock-only publish UI prototype (preview only) ✓ ← you are here
-14. Creator / digital-content hooks
-15. Ads / promotion hooks
-16. Vault / encrypted identity layer (AEAD, external signer)
+13. Mock-only publish UI prototype (preview only) ✓
+14. D1 metadata/index adapter (discovery only) ✓ ← you are here
+15. Creator / digital-content hooks
+16. Ads / promotion hooks
+17. Vault / encrypted identity layer (AEAD, external signer)
