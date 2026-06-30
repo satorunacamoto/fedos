@@ -109,3 +109,35 @@ describe("renderSpaceAccessDenied", () => {
     expect(html).toContain("Secret &lt;x&gt;");
   });
 });
+
+describe("renderSpaceLanding promotion placeholders", () => {
+  it("1. includes header and footer promotion placeholders by default", () => {
+    const html = renderSpaceLanding(space(), ALLOW, ALLOW);
+    expect(html).toContain('class="promotion-placeholder promotion-space"');
+    expect(html).toContain('data-placement="space_header"');
+    expect(html).toContain('data-placement="space_footer"');
+    expect(html).toContain("Sponsored slot");
+    expect(html).toContain("Promotion placeholder");
+  });
+
+  it("2. uses escaped placement attributes (no raw injection)", () => {
+    const html = renderSpaceLanding(space(), ALLOW, ALLOW);
+    // Placement values come from the resolver enum; assert they are emitted as
+    // safe, quoted attributes and the slot label is plain text.
+    expect(html).toContain('data-placement="space_header"');
+    expect(html).toContain("Space header");
+    expect(html).toContain("Space footer");
+  });
+
+  it("3. the placeholders render no external link or ad candidate", () => {
+    const html = renderSpaceLanding(space(), ALLOW, ALLOW);
+    expect(html).not.toContain("http"); // no external destination anywhere
+    expect(html).not.toContain("destination");
+  });
+
+  it("can be turned off via options.promotions = false", () => {
+    const html = renderSpaceLanding(space(), ALLOW, ALLOW, { promotions: false });
+    expect(html).not.toContain("promotion-placeholder");
+    expect(html).toContain('class="space-landing"');
+  });
+});

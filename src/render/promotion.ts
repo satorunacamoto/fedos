@@ -13,8 +13,9 @@ import { escapeHtml } from "./html.js";
 
 /**
  * Renders a labeled placeholder for a placement. `label` is the disclosure text
- * (e.g. "Sponsored" or "Promotion"); it is escaped, as is the placement. No
- * candidate data is accepted or rendered here.
+ * (e.g. "Sponsored" or "Promotion"); it is escaped, as are the placement's type,
+ * context, and human label. No candidate data is accepted or rendered here — the
+ * slot is empty by design.
  */
 export function renderPromotionPlaceholder(
   placement: Placement,
@@ -24,6 +25,7 @@ export function renderPromotionPlaceholder(
     `<aside class="promotion-placeholder promotion-${escapeHtml(placement.context)}" ` +
     `data-placement="${escapeHtml(placement.type)}">` +
     `<span class="promotion-tag">${escapeHtml(label)}</span>` +
+    `<span class="promotion-slot">${escapeHtml(placement.label)}</span>` +
     `</aside>`
   );
 }

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import worker, { handleRequest, selectCache, selectDirectory } from "../src/worker.js";
+// Worker source as a string for a static "no provider/fetch wiring" check.
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import workerSource from "../src/worker.ts?raw";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
 import { InMemorySpaceDirectory } from "../src/community/directory.js";
@@ -423,5 +426,34 @@ describe("worker space directory selection", () => {
   it("13. falls back to the in-memory sample directory without a binding", () => {
     expect(selectDirectory()).toBeInstanceOf(InMemorySpaceDirectory);
     expect(selectDirectory({})).toBeInstanceOf(InMemorySpaceDirectory);
+  });
+});
+
+describe("worker promotion placeholders (read-only)", () => {
+  it("1. ?space=general shows empty header/footer promotion placeholders", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?space=general"))
+    ).text();
+    expect(body).toContain('class="promotion-placeholder promotion-space"');
+    expect(body).toContain('data-placement="space_header"');
+    expect(body).toContain('data-placement="space_footer"');
+    // No ad candidate / destination is ever rendered.
+    expect(body).not.toContain("destination");
+  });
+
+  it("2. the no-space board shows the directory but no promotion placeholder", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('class="space-directory"');
+    expect(body).not.toContain("promotion-placeholder");
+  });
+
+  it("3. introduces no provider call or new fetch wiring in the Worker", () => {
+    const src: string = workerSource;
+    // The placeholders are rendered purely; no promotion provider is constructed.
+    expect(src).not.toContain("EdgeRecPromotionProvider");
+    expect(src).not.toContain("MockPromotionProvider");
+    expect(src).not.toContain("getPromotions");
+    expect(src).not.toContain("getRecommendations");
+    expect(src).not.toContain("edge_rec_adapter");
   });
 });

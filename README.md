@@ -8,8 +8,8 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 19 — edge-rec promotion adapter.** Ingest, thread building,
-> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 20 — read-only promotion placeholders.** Ingest, thread
+> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
@@ -18,15 +18,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
 > directory adapter for Community/Channel/Group definitions, a chat / DM model
 > boundary, a creator commerce model boundary, a promotion integration boundary,
-> and now an **edge-rec promotion adapter**: `EdgeRecPromotionProvider` plus pure
-> request/response mappers that connect the `PromotionProvider` /
-> `RecommendationProvider` seams to the EXISTING Cloudflare ad system
-> (edge-rec-middleware / recommendation-rewriter) over an INJECTED fetch client.
-> **No ad logic is duplicated** — the adapter only translates and transports; it
-> does not rank, auction, compute CTR, track clicks, or bill, and it does not call
-> Stripe/Telegram/HTMLRewriter or the global `fetch`. The viewer pubkey is not
-> sent by default, and every transport failure resolves to a `provider_error`
-> decision instead of throwing. Tests never touch the network.
+> an edge-rec promotion adapter, and now **read-only promotion placeholders**:
+> sample-mode space landings bracket their content with EMPTY
+> `space_header`/`space_footer` slots, and new `src/render/product.ts` helpers
+> render a read-only product summary plus an EMPTY `product_sidebar` slot. **The
+> placeholders show only a "Sponsored"/"Promotion" disclosure label** — no ad
+> candidate, destination link, price-to-pay, or download. They are pure render
+> output: no `PromotionProvider`/`MockPromotionProvider`/`EdgeRecPromotionProvider`
+> is constructed and no network is touched.
 
 ## What is implemented
 
@@ -118,7 +117,17 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   never holds, generates, or stores a private key, and never publishes; signing
   is delegated to the external signer.
 - `src/render/*` — pure HTML render layer (every event-derived string is
-  HTML-escaped before output).
+  HTML-escaped before output). `space.ts` renders the read-only space directory
+  and landing pages and, by default, brackets a landing with EMPTY
+  `space_header`/`space_footer` promotion placeholders (toggle via
+  `renderSpaceLanding`'s `{ promotions }` option). `product.ts` adds read-only
+  product views — `renderProductLabel` (kind + title), `renderProductSummary`
+  (price/currency/status/visibility/linked spaces, no links or actions), and
+  `renderProductPromotionPlaceholder` (an EMPTY `product_sidebar` slot).
+  `promotion.ts`'s `renderPromotionPlaceholder` shows a disclosure label and the
+  placement's own (escaped) label only. **No placeholder renders an ad candidate,
+  destination link, price-to-pay, or download**, and none of these helpers call a
+  promotion provider or the network.
 - `src/nostr/messages.ts` — pure NIP-01 relay-message parser (EVENT/EOSE/NOTICE).
 - `src/nostr/signature.ts` — `SignatureVerifier` interface + `Noop`/`RejectAll`
   implementations.
@@ -268,6 +277,15 @@ confidentiality guarantees and is not a security audit of the wider system.
   and any transport failure (rejection, non-200, malformed body, timeout) becomes
   a `provider_error` decision rather than throwing. Do not describe this as ad
   serving or measurement — the selection logic stays in the external system.
+- **Promotion placeholders are empty disclosure slots, not ads.** The space
+  landing (sample mode only) and the product render helpers emit
+  `renderPromotionPlaceholder` markup that shows a "Sponsored"/"Promotion" label
+  and the placement's name — never an ad candidate, destination link, image,
+  price-to-pay, or download button. They are produced purely from the Stage 18
+  `buildSpacePlacement`/`buildProductPlacement` bridges; the Worker constructs no
+  promotion provider and adds no `fetch`. Product views likewise render no
+  checkout/payment/download affordance. Do not describe these slots as serving,
+  selecting, or measuring ads.
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -403,6 +421,8 @@ D1 space directory caveats (do not over-promise on these):
 16. Chat / DM model boundary (no send, no encryption) ✓
 17. Creator commerce model boundary (no payment, no delivery) ✓
 18. Promotion integration boundary (request seam only, no ad engine) ✓
-19. edge-rec-middleware adapter (inject-only transport to the existing ad system) ✓ ← you are here
-20. Read-only UI labels/placeholders (product, chat, promotion)
-21. Vault / encrypted identity layer (AEAD, external signer)
+19. edge-rec-middleware adapter (inject-only transport to the existing ad system) ✓
+20. Read-only promotion placeholders + product render helpers ✓ ← you are here
+21. Product read-only directory/page route
+22. Chat read-only UI labels
+23. Vault / encrypted identity layer (AEAD, external signer)

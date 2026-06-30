@@ -177,6 +177,11 @@ interface WorkersWebSocket {
 interface BoardData {
   readonly accepted: IngestedEvent[];
   readonly lead: string;
+  /**
+   * Whether to show the (empty) promotion placeholders on a space landing. Only
+   * sample mode opts in; the live read-only path stays placeholder-free.
+   */
+  readonly showPromotions: boolean;
 }
 
 /** Builds sample-mode board data (default). Sample mode never uses the cache. */
@@ -189,7 +194,7 @@ async function buildSampleBoard(now: number): Promise<BoardData> {
       "Sample mode — demo events are unsigned (no signature verification).",
       "info",
     ) + renderCacheStatus({ status: "bypass (sample mode)", ttlSeconds: 0 });
-  return { accepted, lead };
+  return { accepted, lead, showPromotions: true };
 }
 
 /**
@@ -230,7 +235,11 @@ function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): stri
 
   const postDecision = canPost(actor, space);
   const spaceEvents = filterEventsForSpace(data.accepted, space);
-  let lead = data.lead + renderSpaceLanding(space, readDecision, postDecision);
+  let lead =
+    data.lead +
+    renderSpaceLanding(space, readDecision, postDecision, {
+      promotions: data.showPromotions,
+    });
 
   // `?compose=1` adds a MOCK-ONLY publish preview panel. It builds an unsigned
   // event for display but never signs and never sends — there is no publish
@@ -304,7 +313,7 @@ async function buildLiveBoard(
       cacheKey: fetched.cacheKey,
       error: fetched.error,
     });
-  return { accepted, lead };
+  return { accepted, lead, showPromotions: false };
 }
 
 /** Handles an HTTP request and returns a page. Exported for tests. */

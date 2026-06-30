@@ -9,6 +9,18 @@
 
 import { escapeHtml, shortenHex } from "./html.js";
 import type { Space, SpaceDecision } from "../community/types.js";
+import { buildSpacePlacement, type SpacePlacementType } from "../promotion/bridge.js";
+import { renderPromotionPlaceholder } from "./promotion.js";
+
+/** Builds an EMPTY space promotion placeholder (no candidate, no provider). */
+function spacePromotionPlaceholder(
+  space: Space,
+  slot: SpacePlacementType,
+  label: string,
+): string {
+  const request = buildSpacePlacement(space, slot);
+  return renderPromotionPlaceholder(request.placement, label);
+}
 
 /** Builds a safe `?space=<id>` href (URL-encoded then attribute-escaped). */
 function spaceHref(id: string, actorPubkey?: string): string {
@@ -60,17 +72,41 @@ function renderPostHint(postDecision: SpaceDecision): string {
   );
 }
 
-/** Landing header for a readable space, with read status and a post hint. */
+/** Options for `renderSpaceLanding`. */
+export interface SpaceLandingOptions {
+  /**
+   * Whether to render the (empty) promotion placeholders. Default true. The
+   * Worker turns this off outside sample mode so the read-only live path stays
+   * placeholder-free.
+   */
+  readonly promotions?: boolean;
+}
+
+/**
+ * Landing header for a readable space, with read status and a post hint. When
+ * `options.promotions` (default true), it brackets the content with EMPTY
+ * `space_header` / `space_footer` promotion placeholders — disclosure-only slots
+ * that render no ad candidate and call no provider.
+ */
 export function renderSpaceLanding(
   space: Space,
   readDecision: SpaceDecision,
   postDecision: SpaceDecision,
+  options: SpaceLandingOptions = {},
 ): string {
   const desc = space.description
     ? `<p class="space-desc">${escapeHtml(space.description)}</p>`
     : "";
+  const showPromotions = options.promotions ?? true;
+  const headerSlot = showPromotions
+    ? spacePromotionPlaceholder(space, "space_header", "Sponsored slot")
+    : "";
+  const footerSlot = showPromotions
+    ? spacePromotionPlaceholder(space, "space_footer", "Promotion placeholder")
+    : "";
   return (
     `<section class="space-landing">` +
+    headerSlot +
     `<h2>${escapeHtml(space.name)} ` +
     `<span class="space-type">${escapeHtml(space.type)}</span></h2>` +
     `<p class="space-meta">visibility: ${escapeHtml(space.visibility)} · ` +
@@ -78,6 +114,7 @@ export function renderSpaceLanding(
     desc +
     renderPostHint(postDecision) +
     `<p><a href="?">← all threads</a></p>` +
+    footerSlot +
     `</section>`
   );
 }
