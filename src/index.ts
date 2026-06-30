@@ -108,6 +108,35 @@ export {
   type KvEventCacheOptions,
 } from "./cache/kv_event_cache.js";
 
+// Community / channel / group spaces (Stage 9)
+export {
+  getRole,
+  listMemberships,
+  canRead,
+  canPost,
+  canModerate,
+  canAdmin,
+} from "./community/policy.js";
+export {
+  getSpaceTags,
+  eventMatchesSpace,
+  classifyEventToSpaces,
+} from "./community/classify.js";
+export type {
+  SpaceType,
+  SpaceVisibility,
+  MembershipPolicy,
+  PostPolicy,
+  SpaceRole,
+  SpaceMembership,
+  SpaceBase,
+  CommunitySpace,
+  ChannelSpace,
+  GroupSpace,
+  Space,
+  SpaceDecision,
+} from "./community/types.js";
+
 // Render layer (Stage 3, read-only demo)
 export {
   escapeHtml,
@@ -119,9 +148,12 @@ export {
   renderQueryStatus,
   renderNotice,
   renderCacheStatus,
+  renderSpaceLabel,
+  renderSpaceLabels,
   renderPage,
   type QueryStatusView,
   type CacheStatusView,
+  type SpaceLabelView,
   type PageView,
 } from "./render/html.js";
 export { handleRequest, selectCache, selectVerifier, type Env } from "./worker.js";

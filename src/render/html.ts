@@ -123,6 +123,30 @@ export function renderNotice(message: string, variant = "info"): string {
   return `<p class="notice notice-${escapeHtml(variant)}">${escapeHtml(message)}</p>`;
 }
 
+/**
+ * Minimal, escaped label for a space (community/channel/group). Takes a
+ * structural view rather than the community types so the render layer stays
+ * decoupled from that module.
+ */
+export interface SpaceLabelView {
+  readonly id: string;
+  readonly name: string;
+  readonly type: string;
+}
+
+export function renderSpaceLabel(space: SpaceLabelView): string {
+  return (
+    `<span class="space-label space-${escapeHtml(space.type)}" ` +
+    `title="${escapeHtml(space.id)}">${escapeHtml(space.name)}</span>`
+  );
+}
+
+/** Renders a row of space labels (empty string when there are none). */
+export function renderSpaceLabels(spaces: readonly SpaceLabelView[]): string {
+  if (spaces.length === 0) return "";
+  return `<div class="space-labels">${spaces.map(renderSpaceLabel).join("")}</div>`;
+}
+
 /** Small status line describing how a fetch was served from cache. */
 export interface CacheStatusView {
   readonly status: string;
@@ -186,6 +210,8 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px
 .warnings.empty{color:#888}
 .warnings code{background:rgba(127,127,127,.15);padding:0 4px;border-radius:4px}
 .sep{opacity:.5}
+.space-labels{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.space-label{font-size:.75rem;border:1px solid rgba(127,127,127,.4);border-radius:10px;padding:1px 8px}
 `.trim();
 
 /**

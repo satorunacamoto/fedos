@@ -6,6 +6,8 @@ import {
   renderThreadList,
   renderWarnings,
   renderQueryStatus,
+  renderSpaceLabel,
+  renderSpaceLabels,
   renderPage,
 } from "../src/render/html.js";
 import { buildThreads } from "../src/thread/thread.js";
@@ -111,6 +113,33 @@ describe("renderWarnings", () => {
 
   it("shows an empty-state when there are no warnings", () => {
     expect(renderWarnings([])).toContain("No build warnings.");
+  });
+});
+
+describe("renderSpaceLabel / renderSpaceLabels", () => {
+  it("escapes space name and id", () => {
+    const html = renderSpaceLabel({
+      id: "<id>",
+      name: "<b>Space</b>",
+      type: "community",
+    });
+    expect(html).not.toContain("<b>Space</b>");
+    expect(html).toContain("&lt;b&gt;Space&lt;/b&gt;");
+    expect(html).toContain('title="&lt;id&gt;"');
+  });
+
+  it("renders an empty string when there are no spaces", () => {
+    expect(renderSpaceLabels([])).toBe("");
+  });
+
+  it("renders one label per space", () => {
+    const html = renderSpaceLabels([
+      { id: "a", name: "Alpha", type: "channel" },
+      { id: "b", name: "Beta", type: "group" },
+    ]);
+    expect(html).toContain("Alpha");
+    expect(html).toContain("Beta");
+    expect(html).toContain('class="space-labels"');
   });
 });
 
