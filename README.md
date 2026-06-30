@@ -22,10 +22,13 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/nostr/relay.ts` — `RelayAdapter` interface, filter matching, in-memory adapter.
 - `src/ingest/*` — pure validate → dedupe → normalize pipeline.
 - `src/thread/*` — pure NIP-10 thread builder (reply graph → sorted trees).
+- `src/query/*` — pure query policy: sort (new/old/top/hot), filters
+  (author/text/minReplies/since/until) and pagination over root threads.
 - `src/render/*` — pure HTML render layer (every event-derived string is
   HTML-escaped before output).
 - `src/worker.ts` — minimal Cloudflare Workers entry that renders the fixed
-  sample read-only. **No live relay connection.**
+  sample read-only, honoring `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=`.
+  **No live relay connection.**
 
 ## Security scope (read before trusting anything here)
 
@@ -54,9 +57,11 @@ npm test            # vitest run
 
 1. Nostr event ingest ✓
 2. Thread builder (NIP-10 reply graph → tree) ✓
-3. Reddit-style read-only render ✓ ← you are here
-4. Web reply posting (NIP-07 / external signer)
-5. Community / Channel (admin-post) / Group (open)
-6. Creator / digital-content hooks
-7. Ads / promotion hooks
-8. Vault / encrypted identity layer (AEAD, external signer)
+3. Reddit-style read-only render ✓
+4. Query / sort / filter policy ✓ ← you are here
+5. Read-only real relay WebSocket adapter (+ signature verification adapter)
+6. Web reply posting (NIP-07 / external signer)
+7. Community / Channel (admin-post) / Group (open)
+8. Creator / digital-content hooks
+9. Ads / promotion hooks
+10. Vault / encrypted identity layer (AEAD, external signer)

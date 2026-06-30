@@ -22,4 +22,25 @@ describe("worker fetch handler", () => {
     const res = await worker.fetch(new Request("http://localhost/"));
     expect(res.status).toBe(200);
   });
+
+  it("reflects ?sort=top in the query status panel", async () => {
+    const res = await handleRequest(new Request("http://localhost/?sort=top"));
+    const body = await res.text();
+    expect(body).toContain("sort=<strong>top</strong>");
+  });
+
+  it("falls back to sort=new for an invalid sort param", async () => {
+    const res = await handleRequest(new Request("http://localhost/?sort=bogus"));
+    const body = await res.text();
+    expect(body).toContain("sort=<strong>new</strong>");
+  });
+
+  it("escapes the ?q search term in the status panel", async () => {
+    const res = await handleRequest(
+      new Request("http://localhost/?q=" + encodeURIComponent("<script>")),
+    );
+    const body = await res.text();
+    expect(body).not.toContain("<code><script></code>");
+    expect(body).toContain("&lt;script&gt;");
+  });
 });

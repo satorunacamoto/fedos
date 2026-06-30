@@ -47,13 +47,32 @@ export type {
   ThreadWarningKind,
 } from "./thread/types.js";
 
+// Query / sort / filter policy (Stage 4)
+export {
+  queryThreads,
+  scoreThread,
+  countDescendants,
+  filterThread,
+  MAX_LIMIT,
+} from "./query/thread_query.js";
+export type {
+  SortMode,
+  ThreadQueryOptions,
+  ResolvedQueryOptions,
+  ThreadQueryResult,
+} from "./query/types.js";
+
 // Render layer (Stage 3, read-only demo)
 export {
   escapeHtml,
   shortenHex,
   renderThreadNode,
+  renderRoots,
   renderThreadList,
   renderWarnings,
+  renderQueryStatus,
   renderPage,
+  type QueryStatusView,
+  type PageView,
 } from "./render/html.js";
 export { handleRequest } from "./worker.js";

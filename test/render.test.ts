@@ -5,6 +5,7 @@ import {
   renderThreadNode,
   renderThreadList,
   renderWarnings,
+  renderQueryStatus,
   renderPage,
 } from "../src/render/html.js";
 import { buildThreads } from "../src/thread/thread.js";
@@ -110,6 +111,28 @@ describe("renderWarnings", () => {
 
   it("shows an empty-state when there are no warnings", () => {
     expect(renderWarnings([])).toContain("No build warnings.");
+  });
+});
+
+describe("renderQueryStatus", () => {
+  it("shows the sort mode and total, escaping the search term", () => {
+    const html = renderQueryStatus({
+      sort: "top",
+      total: 3,
+      limit: 20,
+      offset: 0,
+      text: "<script>",
+    });
+    expect(html).toContain("sort=<strong>top</strong>");
+    expect(html).toContain("3 thread(s)");
+    expect(html).not.toContain("<code><script></code>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("omits inactive filters", () => {
+    const html = renderQueryStatus({ sort: "new", total: 0, limit: 20, offset: 0 });
+    expect(html).not.toContain("author=");
+    expect(html).not.toContain("q=");
   });
 });
 
