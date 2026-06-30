@@ -12,6 +12,7 @@
 
 import { validateEventStructure } from "../nostr/event.js";
 import type { NostrEvent } from "../nostr/types.js";
+import type { SignatureVerifier } from "../nostr/signature.js";
 import type {
   IngestContext,
   IngestResult,
@@ -33,12 +34,30 @@ export function dedupeById(events: NostrEvent[]): NostrEvent[] {
 
 /**
  * Runs a batch of raw values through validation + dedupe + normalization.
- * Pure: same inputs always yield the same result.
+ *
+ * Without a verifier this is pure and synchronous (Stage 1 behavior). When a
+ * `SignatureVerifier` is supplied, the result is a Promise and each structurally
+ * valid, non-duplicate event must also pass `verify`; events that fail are moved
+ * to `rejected` with a `sig` issue.
  */
 export function ingestRawEvents(
   raw: readonly unknown[],
   ctx: IngestContext,
-): IngestResult {
+): IngestResult;
+export function ingestRawEvents(
+  raw: readonly unknown[],
+  ctx: IngestContext,
+  signatureVerifier: SignatureVerifier,
+): Promise<IngestResult>;
+export function ingestRawEvents(
+  raw: readonly unknown[],
+  ctx: IngestContext,
+  signatureVerifier?: SignatureVerifier,
+): IngestResult | Promise<IngestResult> {
+  if (signatureVerifier) {
+    return ingestWithVerification(raw, ctx, signatureVerifier);
+  }
+
   const accepted: IngestedEvent[] = [];
   const rejected: RejectedEvent[] = [];
   const seen = new Set<string>(ctx.seenIds ?? []);
@@ -65,6 +84,47 @@ export function ingestRawEvents(
       relayUrl: ctx.relayUrl,
       ingestedAt: ctx.now,
     });
+  }
+
+  return { accepted, rejected, duplicates };
+}
+
+/** Async ingest variant that additionally enforces signature verification. */
+async function ingestWithVerification(
+  raw: readonly unknown[],
+  ctx: IngestContext,
+  verifier: SignatureVerifier,
+): Promise<IngestResult> {
+  const accepted: IngestedEvent[] = [];
+  const rejected: RejectedEvent[] = [];
+  const seen = new Set<string>(ctx.seenIds ?? []);
+  let duplicates = 0;
+
+  for (const value of raw) {
+    const issues = validateEventStructure(value);
+    if (issues.length > 0) {
+      rejected.push({ value, issues });
+      continue;
+    }
+
+    const event = value as NostrEvent;
+
+    if (seen.has(event.id)) {
+      duplicates++;
+      continue;
+    }
+    seen.add(event.id);
+
+    const verified = await verifier.verify(event);
+    if (!verified) {
+      rejected.push({
+        value,
+        issues: [{ field: "sig", reason: "signature verification failed" }],
+      });
+      continue;
+    }
+
+    accepted.push({ event, relayUrl: ctx.relayUrl, ingestedAt: ctx.now });
   }
 
   return { accepted, rejected, duplicates };

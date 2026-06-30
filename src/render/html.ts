@@ -118,6 +118,11 @@ export function renderQueryStatus(view: QueryStatusView): string {
   );
 }
 
+/** Renders a small escaped notice line (info/error mode banners, etc.). */
+export function renderNotice(message: string, variant = "info"): string {
+  return `<p class="notice notice-${escapeHtml(variant)}">${escapeHtml(message)}</p>`;
+}
+
 /** Renders a developer-facing panel of build warnings (escaped). */
 export function renderWarnings(warnings: readonly ThreadBuildWarning[]): string {
   if (warnings.length === 0) {
@@ -147,6 +152,9 @@ const PAGE_STYLE = `
 :root{color-scheme:light dark}
 body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px;line-height:1.5}
 .banner{border:1px solid #d0a000;background:#fff8e0;color:#5a4a00;padding:8px 12px;border-radius:8px;font-size:.85rem;margin-bottom:16px}
+.notice{font-size:.85rem;border-radius:6px;padding:8px 12px;margin:0 0 12px}
+.notice-info{background:rgba(40,120,200,.1);color:#1c4e7a}
+.notice-error{background:rgba(200,60,60,.12);color:#8a1f1f}
 .query-status{font-size:.8rem;color:#666;background:rgba(127,127,127,.08);border-radius:6px;padding:6px 10px;margin-bottom:12px}
 .query-status code{font-family:monospace}
 .thread-node{padding:8px 12px;margin:6px 0}

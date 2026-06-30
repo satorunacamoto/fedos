@@ -43,4 +43,36 @@ describe("worker fetch handler", () => {
     expect(body).not.toContain("<code><script></code>");
     expect(body).toContain("&lt;script&gt;");
   });
+
+  it("rejects a relay that is not on the allowlist with 400", async () => {
+    const res = await handleRequest(
+      new Request("http://localhost/?relay=wss://evil.example"),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toContain("Relay not allowed");
+    // The disallowed URL is shown escaped, not connected to.
+    expect(body).toContain("wss://evil.example");
+  });
+
+  it("renders an error page (not a crash) when an allowlisted relay fails", async () => {
+    // Inject a factory that fails, so no real network is touched.
+    const failingFactory = () => {
+      throw new Error("connection refused");
+    };
+    const res = await handleRequest(
+      new Request("http://localhost/?relay=wss://relay.damus.io"),
+      failingFactory,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Relay connection failed");
+  });
+
+  it("sample mode still works when no relay is given", async () => {
+    const res = await handleRequest(new Request("http://localhost/"));
+    const body = await res.text();
+    expect(body).toContain("Sample mode");
+    expect(body).toContain("Welcome to nostr-window");
+  });
 });

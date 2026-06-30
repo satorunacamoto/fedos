@@ -28,6 +28,26 @@ export {
   type RelayAdapter,
   type NostrFilter,
 } from "./nostr/relay.js";
+export {
+  parseRelayMessage,
+  isEventMessage,
+  isEoseMessage,
+  isNoticeMessage,
+  type RelayMessage,
+} from "./nostr/messages.js";
+export {
+  NoopSignatureVerifier,
+  RejectAllSignatureVerifier,
+  type SignatureVerifier,
+} from "./nostr/signature.js";
+export {
+  WebSocketRelayAdapter,
+  type WebSocketFactory,
+  type WebSocketRelayOptions,
+  type RelaySocketLike,
+  type RelaySocketEvent,
+  type RelaySocketEventType,
+} from "./nostr/ws_relay.js";
 
 // Ingest
 export { ingestRawEvents, dedupeById } from "./ingest/ingest.js";
@@ -71,6 +91,7 @@ export {
   renderThreadList,
   renderWarnings,
   renderQueryStatus,
+  renderNotice,
   renderPage,
   type QueryStatusView,
   type PageView,
