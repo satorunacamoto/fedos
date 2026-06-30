@@ -3,6 +3,7 @@ import worker, { handleRequest, selectCache } from "../src/worker.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
 import { NoopSignatureVerifier } from "../src/nostr/signature.js";
+import { SAMPLE_VAULT_MEMBER } from "../src/community/sample_spaces.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
@@ -229,6 +230,64 @@ describe("worker live signature verification", () => {
     expect(body).toContain("signature verification: enabled");
     expect(body).not.toContain("forged content");
     expect(body).toContain("No threads to display.");
+  });
+});
+
+describe("worker space directory routes", () => {
+  it("1. sample mode shows the space directory", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('class="space-directory"');
+    expect(body).toContain("General");
+    expect(body).toContain("Lounge");
+  });
+
+  it("2. ?space=general shows only that space's threads", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?space=general"))
+    ).text();
+    expect(body).toContain('class="space-landing"');
+    expect(body).toContain("General community thread.");
+    expect(body).not.toContain("Lounge chatter.");
+    expect(body).not.toContain("Secret vault note.");
+  });
+
+  it("3. ?space=<unknown> renders not-found with the escaped id", async () => {
+    const res = await handleRequest(
+      new Request("http://localhost/?space=" + encodeURIComponent("<nope>")),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Space not found");
+    expect(body).not.toContain("<nope>");
+    expect(body).toContain("&lt;nope&gt;");
+  });
+
+  it("4. private space denies a guest", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?space=vault"))
+    ).text();
+    expect(body).toContain("Access denied");
+    expect(body).not.toContain("Secret vault note.");
+  });
+
+  it("5. private space allows a member via ?actor", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(`http://localhost/?space=vault&actor=${SAMPLE_VAULT_MEMBER}`),
+      )
+    ).text();
+    expect(body).toContain('class="space-landing"');
+    expect(body).toContain("Secret vault note.");
+  });
+
+  it("6. escapes a malicious ?actor value", async () => {
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?actor=" + encodeURIComponent("<script>")),
+      )
+    ).text();
+    expect(body).not.toContain("viewing as <code><script>");
+    expect(body).toContain("&lt;script&gt;");
   });
 });
 

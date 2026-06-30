@@ -34,18 +34,37 @@ import {
 import { KvEventCache, type KvLikeNamespace } from "./cache/kv_event_cache.js";
 import type { EventCache } from "./cache/types.js";
 import type { NostrFilter } from "./nostr/relay.js";
+import type { IngestedEvent } from "./ingest/types.js";
+import { canPost, canRead } from "./community/policy.js";
+import {
+  InMemorySpaceDirectory,
+  findSpaceById,
+  filterEventsForSpace,
+  listReadableSpaces,
+  type SpaceDirectory,
+} from "./community/directory.js";
+import { SAMPLE_SPACES } from "./community/sample_spaces.js";
 import {
   renderCacheStatus,
   renderNotice,
   renderPage,
   renderQueryStatus,
 } from "./render/html.js";
+import {
+  renderSpaceAccessDenied,
+  renderSpaceDirectory,
+  renderSpaceLanding,
+  renderSpaceNotFound,
+} from "./render/space.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 
 const DEMO_RELAY_URL = "wss://demo.invalid";
 
 /** Process-local cache for live relay results (lost on isolate restart). */
 const liveCache: EventCache = new InMemoryEventCache();
+
+/** Process-local directory of demo spaces. */
+const spaceDirectory: SpaceDirectory = new InMemorySpaceDirectory(SAMPLE_SPACES);
 
 const DEFAULT_TTL_SECONDS = 60;
 const MAX_TTL_SECONDS = 300;
@@ -148,18 +167,65 @@ interface WorkersWebSocket {
   addEventListener(type: string, listener: (ev: { data?: unknown }) => void): void;
 }
 
-/** Builds the sample-mode page (default). Sample mode never uses the cache. */
-async function renderSample(url: URL, now: number): Promise<string> {
+/** Ingested events plus the mode-specific lead notice for a page. */
+interface BoardData {
+  readonly accepted: IngestedEvent[];
+  readonly lead: string;
+}
+
+/** Builds sample-mode board data (default). Sample mode never uses the cache. */
+async function buildSampleBoard(now: number): Promise<BoardData> {
   const adapter: RelayAdapter = new InMemoryRelayAdapter(DEMO_RELAY_URL, SAMPLE_EVENTS);
   const events = await adapter.query([{ kinds: [1] }]);
   const { accepted } = ingestRawEvents(events, { relayUrl: adapter.url, now });
-  const result = buildThreads(accepted);
   const lead =
     renderNotice(
       "Sample mode — demo events are unsigned (no signature verification).",
       "info",
     ) + renderCacheStatus({ status: "bypass (sample mode)", ttlSeconds: 0 });
-  return statusFor(parseQueryOptions(url), lead, result);
+  return { accepted, lead };
+}
+
+/**
+ * Routes a board through the space directory:
+ * - no `?space`        -> all threads + a directory of readable spaces.
+ * - `?space=<unknown>` -> not-found page.
+ * - read denied        -> access-denied page.
+ * - read allowed       -> only that space's threads + a landing header.
+ *
+ * `?actor=<pubkey>` selects the viewer (guest when absent).
+ */
+function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): string {
+  const spaceId = url.searchParams.get("space");
+  const actor = url.searchParams.get("actor") ?? "";
+  const spaces = directory.list();
+  const queryOptions = parseQueryOptions(url);
+
+  if (spaceId === null) {
+    const lead =
+      data.lead + renderSpaceDirectory(listReadableSpaces(spaces, actor), actor || undefined);
+    return statusFor(queryOptions, lead, buildThreads(data.accepted));
+  }
+
+  const space = findSpaceById(spaces, spaceId);
+  if (!space) {
+    const directoryView = renderSpaceDirectory(listReadableSpaces(spaces, actor), actor || undefined);
+    return renderPage(buildThreads([]), {
+      status: data.lead + renderSpaceNotFound(spaceId) + directoryView,
+    });
+  }
+
+  const readDecision = canRead(actor, space);
+  if (!readDecision.allowed) {
+    return renderPage(buildThreads([]), {
+      status: data.lead + renderSpaceAccessDenied(space, readDecision),
+    });
+  }
+
+  const postDecision = canPost(actor, space);
+  const spaceEvents = filterEventsForSpace(data.accepted, space);
+  const lead = data.lead + renderSpaceLanding(space, readDecision, postDecision);
+  return statusFor(queryOptions, lead, buildThreads(spaceEvents));
 }
 
 /**
@@ -171,15 +237,15 @@ export function selectVerifier(): SignatureVerifier {
   return NobleSignatureVerifier;
 }
 
-/** Builds the live read-only relay page for an allowlisted relay (with cache). */
-async function renderLive(
+/** Builds live-relay board data for an allowlisted relay (with cache). */
+async function buildLiveBoard(
   url: URL,
   relayUrl: string,
   now: number,
   factory: WebSocketFactory,
   cache: EventCache,
   verifier: SignatureVerifier,
-): Promise<string> {
+): Promise<BoardData> {
   const filters: NostrFilter[] = [{ kinds: [1], limit: 100 }];
   const ttlSeconds = parseTtlSeconds(url);
 
@@ -204,7 +270,6 @@ async function renderLive(
     { relayUrl, now },
     verifier,
   );
-  const result = buildThreads(accepted);
 
   const verifyNote =
     verifier === NoopSignatureVerifier
@@ -218,7 +283,7 @@ async function renderLive(
       cacheKey: fetched.cacheKey,
       error: fetched.error,
     });
-  return statusFor(parseQueryOptions(url), lead, result);
+  return { accepted, lead };
 }
 
 /** Handles an HTTP request and returns a page. Exported for tests. */
@@ -227,6 +292,7 @@ export async function handleRequest(
   factory: WebSocketFactory = createWorkersWebSocket,
   cache: EventCache = liveCache,
   verifier: SignatureVerifier = selectVerifier(),
+  directory: SpaceDirectory = spaceDirectory,
 ): Promise<Response> {
   const url = new URL(request.url);
   const relayParam = url.searchParams.get("relay");
@@ -239,9 +305,15 @@ export async function handleRequest(
       return htmlResponse(page, 400);
     }
     try {
-      return htmlResponse(
-        await renderLive(url, relayParam, Date.now(), factory, cache, verifier),
+      const data = await buildLiveBoard(
+        url,
+        relayParam,
+        Date.now(),
+        factory,
+        cache,
+        verifier,
       );
+      return htmlResponse(renderBoard(url, data, directory));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const page = renderPage(buildThreads([]), {
@@ -251,7 +323,8 @@ export async function handleRequest(
     }
   }
 
-  return htmlResponse(await renderSample(url, Date.now()));
+  const data = await buildSampleBoard(Date.now());
+  return htmlResponse(renderBoard(url, data, directory));
 }
 
 /** Worker bindings. The KV namespace is optional; without it we fall back. */

@@ -8,13 +8,14 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 10 — signer boundary.** Ingest, thread building, query policy,
-> an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache` boundary
-> (in-memory + Cloudflare KV), a real BIP-340 Schnorr `SignatureVerifier`
-> (@noble), a community/channel/group policy model, and a NIP-07 `EventSigner`
-> boundary with pure unsigned-event builders. **Still no publishing** — signing
-> is delegated to an external signer and nothing is sent to a relay. No key
-> generation/storage, no commerce, no ads.
+> **Status: Stage 11 — read-only space directory.** Ingest, thread building,
+> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
+> `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
+> `EventSigner` boundary, and read-only space directory + landing pages
+> (`?space=`/`?actor=`). **Still no publishing** — signing is delegated to an
+> external signer and nothing is sent to a relay. No key generation/storage, no
+> commerce, no ads.
 
 ## What is implemented
 
@@ -28,8 +29,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/query/*` — pure query policy: sort (new/old/top/hot), filters
   (author/text/minReplies/since/until) and pagination over root threads.
 - `src/community/*` — pure space model: `Community`/`Channel`/`Group` types,
-  role + read/post/moderate/admin policy decisions, and event→space
-  classification from tags. No storage, no posting, no membership/admin UI.
+  role + read/post/moderate/admin policy decisions, event→space classification,
+  and a `SpaceDirectory` (in-memory) with readable-space and event-filtering
+  helpers. No storage, no posting, no membership/admin UI.
 - `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
   adapter over an injected NIP-07 provider, and pure builders for **unsigned**
   events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
@@ -53,7 +55,10 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/worker.ts` — Cloudflare Workers entry. Default = sample mode; `?relay=`
   switches to an **allowlisted** live read-only relay, served through the cache.
   Honors `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=`, plus
-  `?timeout=`, `?ttl=` (seconds, capped at 300) and `?cache=0` (bypass).
+  `?timeout=`, `?ttl=` (seconds, capped at 300) and `?cache=0` (bypass). Also
+  `?space=<id>` (read-only landing for one space, gated by `canRead`) and
+  `?actor=<pubkey>` (viewer identity; guest when absent). Posting is only ever a
+  disabled "coming soon" hint — never executed.
 
 ## Security scope (read before trusting anything here)
 
@@ -144,8 +149,8 @@ KV caveats (do not over-promise on these):
 7. Cloudflare KV cache adapter ✓
 8. Real Schnorr signature verification ✓
 9. Community / Channel / Group space model + policy ✓
-10. NIP-07 signer boundary + unsigned-event builders ✓ ← you are here
-11. Space directory / read-only landing pages
+10. NIP-07 signer boundary + unsigned-event builders ✓
+11. Space directory / read-only landing pages ✓ ← you are here
 12. Relay publish boundary (no UI)
 13. Creator / digital-content hooks
 14. Ads / promotion hooks

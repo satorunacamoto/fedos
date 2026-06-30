@@ -122,6 +122,14 @@ export {
   eventMatchesSpace,
   classifyEventToSpaces,
 } from "./community/classify.js";
+export {
+  InMemorySpaceDirectory,
+  findSpaceById,
+  listReadableSpaces,
+  filterEventsForSpace,
+  type SpaceDirectory,
+} from "./community/directory.js";
+export { SAMPLE_SPACES, SAMPLE_VAULT_MEMBER } from "./community/sample_spaces.js";
 export type {
   SpaceType,
   SpaceVisibility,
@@ -176,4 +184,10 @@ export {
   type SpaceLabelView,
   type PageView,
 } from "./render/html.js";
+export {
+  renderSpaceDirectory,
+  renderSpaceLanding,
+  renderSpaceNotFound,
+  renderSpaceAccessDenied,
+} from "./render/space.js";
 export { handleRequest, selectCache, selectVerifier, type Env } from "./worker.js";
