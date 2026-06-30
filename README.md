@@ -8,20 +8,22 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 16 — chat / DM model boundary.** Ingest, thread building,
-> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 17 — creator commerce model boundary.** Ingest, thread
+> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
 > (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, a
 > **preview-only** compose panel (`?compose=1`), a `MetadataIndex` boundary
 > (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
-> directory adapter for Community/Channel/Group definitions, and now a **chat /
-> DM model boundary**: pure `ChatRoom`/`DMThread`/`GroupChat` types, read/post
-> policy, event→chat classification, and a space→chat bridge. **No chat is sent
-> and no DM is encrypted** — NIP-04/NIP-44 are out of scope, there is no
-> WebSocket publish, no signer auto-runs, and no key material is handled. No
-> commerce, no ads.
+> directory adapter for Community/Channel/Group definitions, a chat / DM model
+> boundary, and now a **creator commerce model boundary**: pure `Product`/
+> `DigitalAsset`/`PurchaseGrant` types, product view/edit/asset-access policy,
+> event→product classification, and a space/event→product bridge. **No money
+> moves and nothing is delivered** — there is no payment, checkout, download
+> serving, inventory, or real Stripe/crypto/R2/D1 wiring; a `PurchaseGrant`
+> records an external entitlement result only, `priceCents` is display metadata,
+> and there is no DRM or "purchase guarantee". No ads.
 
 ## What is implemented
 
@@ -62,6 +64,24 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   space's `canRead` for `canOpenChatFromSpace`. **Nothing is sent and no DM is
   encrypted** — NIP-04/NIP-44 are out of scope; `ChatMessage.content` is plaintext
   as supplied. No chat UI yet.
+- `src/commerce/*` — pure creator / EC (digital-content) model boundary from a
+  board/space/chat toward a creator's digital goods. `types.ts` defines `Product`
+  (`kind` = pdf/zip/template/software/link/other, `status` = draft/active/archived,
+  `visibility` = public/unlisted/private, linked space/event/asset ids),
+  `DigitalAsset` (opaque `storageRef`, no bytes), `PurchaseGrant` (an external
+  entitlement result with an optional `revokedAt`), and `AccessDecision`.
+  `policy.ts` decides `canViewProduct`/`canEditProduct`/`canAccessAsset`/
+  `hasPurchaseGrant` purely over status, visibility, the creator pubkey, and the
+  supplied grants (public/unlisted active → anyone; private → creator or a valid
+  grant holder; draft/archived → creator only; edit → creator only; asset access
+  → creator or valid grant). `classify.ts` reads product references from an
+  event's tags (`["product", "<id>"]` / `["t", "product:<id>"]`; malformed/unknown
+  ignored) via `getProductTags`/`eventMatchesProduct`/`classifyEventToProducts`.
+  `bridge.ts` builds a draft product from a Stage 9 space (`productFromSpace`) or a
+  Nostr event (`productFromEvent`) and decides `canPromoteProductInSpace` (creator
+  who may post in the space). **No money moves and nothing is delivered** — no
+  payment, checkout, download serving, inventory, or real Stripe/crypto/R2/D1;
+  `priceCents` is display-only and there is no DRM. No commerce UI yet.
 - `src/sign/*` — signer boundary: an `EventSigner` interface, a `Nip07EventSigner`
   adapter over an injected NIP-07 provider, and pure builders for **unsigned**
   events (`buildUnsignedTextNote`, reply/space tags, `prepareSpacePost`). The app
@@ -193,6 +213,15 @@ confidentiality guarantees and is not a security audit of the wider system.
   as supplied. The space→chat bridge derives a chat definition only; it does not
   open a socket or publish. Do not describe chats here as private/secure in any
   cryptographic sense.
+- **The commerce model is advisory; no money moves and nothing is delivered.**
+  `canViewProduct`/`canEditProduct`/`canAccessAsset` are pure decisions over a
+  product's status/visibility/creator and the supplied grants; they do not charge,
+  refund, gate a download, or serve a file. A `PurchaseGrant` records an EXTERNAL
+  entitlement result only — issuing one does not take payment and `source:
+  "payment"` does not mean this layer charged anyone. `priceCents` is display
+  metadata; there is no checkout, inventory, R2/D1 storage, or DRM, and
+  `canAccessAsset` is NOT content protection. Do not describe products here as
+  "purchased", "protected", or "DRM-secured".
 - **The compose panel (`?compose=1`) is preview-only.** It builds and displays
   an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
   does not sign, does not call a signer, and does not call a `RelayPublisher`.
@@ -325,7 +354,7 @@ D1 space directory caveats (do not over-promise on these):
 13. Mock-only publish UI prototype (preview only) ✓
 14. D1 metadata/index adapter (discovery only) ✓
 15. D1 space directory adapter (definitions only) ✓
-16. Chat / DM model boundary (no send, no encryption) ✓ ← you are here
-17. Creator / digital-content hooks
+16. Chat / DM model boundary (no send, no encryption) ✓
+17. Creator commerce model boundary (no payment, no delivery) ✓ ← you are here
 18. Ads / promotion hooks
 19. Vault / encrypted identity layer (AEAD, external signer)
