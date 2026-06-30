@@ -13,6 +13,7 @@ import type {
 } from "../src/indexer/d1_index.js";
 import { NoopSignatureVerifier } from "../src/nostr/signature.js";
 import { SAMPLE_VAULT_MEMBER } from "../src/community/sample_spaces.js";
+import { SAMPLE_PRODUCT_BUYER } from "../src/commerce/sample_products.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
@@ -426,6 +427,93 @@ describe("worker space directory selection", () => {
   it("13. falls back to the in-memory sample directory without a binding", () => {
     expect(selectDirectory()).toBeInstanceOf(InMemorySpaceDirectory);
     expect(selectDirectory({})).toBeInstanceOf(InMemorySpaceDirectory);
+  });
+});
+
+describe("worker product route (read-only)", () => {
+  it("1. ?product=<sample> renders the product page with public previews", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    expect(body).toContain('class="product-page"');
+    expect(body).toContain("Field Guide (PDF)");
+    // Public + unlisted previews are shown; the paid original is not.
+    expect(body).toContain('data-asset="asset-guide-thumb"');
+    expect(body).toContain('data-asset="asset-guide-preview"');
+    expect(body).not.toContain('data-asset="asset-guide-full"');
+  });
+
+  it("2. ?product=<unknown> renders not-found with the escaped id", async () => {
+    const res = await handleRequest(
+      new Request("http://localhost/?product=" + encodeURIComponent("<nope>")),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Product not found");
+    expect(body).not.toContain("<nope>");
+    expect(body).toContain("&lt;nope&gt;");
+  });
+
+  it("3. a private product denies a guest", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=pro-pack"))
+    ).text();
+    expect(body).toContain("Access denied");
+    expect(body).not.toContain('data-asset="asset-pro-preview"');
+    expect(body).not.toContain('data-asset="asset-pro-full"');
+  });
+
+  it("4. a grant holder may view the private product (previews only)", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(`http://localhost/?product=pro-pack&actor=${SAMPLE_PRODUCT_BUYER}`),
+      )
+    ).text();
+    expect(body).toContain('class="product-page"');
+    expect(body).toContain("Pro Pack (ZIP)");
+    expect(body).toContain('data-asset="asset-pro-preview"'); // public preview
+    expect(body).not.toContain('data-asset="asset-pro-full"'); // paid original hidden
+  });
+
+  it("5. escapes a malicious ?actor value on a product page", async () => {
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?product=guide-pdf&actor=" + encodeURIComponent("<script>")),
+      )
+    ).text();
+    expect(body).not.toContain("viewing as <code><script>");
+    expect(body).toContain("&lt;script&gt;");
+  });
+
+  it("6. the default board shows the product directory", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('class="product-directory"');
+    expect(body).toContain("Field Guide (PDF)");
+    expect(body).toContain('href="?product=guide-pdf"');
+  });
+
+  it("7. renders no signed URL / download / payment affordance on a product page", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    const lower = body.toLowerCase();
+    expect(lower).not.toContain("download");
+    expect(lower).not.toContain("signed url");
+    expect(lower).not.toContain("checkout");
+    expect(lower).not.toContain("stripe");
+    expect(lower).not.toContain("data:application"); // no inline asset bytes
+    expect(body).not.toContain("base64");
+    expect(body).not.toContain("<button"); // no buy/checkout action
+  });
+
+  it("8. introduces no asset-byte/delivery wiring in the Worker", () => {
+    const src: string = workerSource;
+    expect(src).not.toContain("R2AssetCache");
+    expect(src).not.toContain("MeshKVAssetCache");
+    expect(src).not.toContain("InMemoryAssetCache");
+    expect(src).not.toContain("arrayBuffer");
+    expect(src).not.toContain("createSignedUrl");
+    expect(src).not.toContain("EdgeRecPromotionProvider");
   });
 });
 

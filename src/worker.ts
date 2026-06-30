@@ -11,6 +11,11 @@
  *
  * Query params (sample and live): ?sort ?q ?author ?minReplies ?since ?until
  * ?limit ?offset. Live mode also reads ?relay and ?timeout (capped).
+ *
+ * `?product=<id>` renders a read-only product page over the fixed sample
+ * products: a summary plus PUBLIC/UNLISTED asset PREVIEW metadata only. There is
+ * NO body delivery, signed URL, download, or payment — `private`/`paid` assets
+ * are never shown and no asset bytes are embedded.
  */
 
 import { InMemoryRelayAdapter } from "./nostr/relay.js";
@@ -61,6 +66,23 @@ import {
   buildPublishPrototypeView,
   renderPublishPrototype,
 } from "./render/publish.js";
+import {
+  renderProductDirectory,
+  renderProductPage,
+  renderProductNotFound,
+  renderProductAccessDenied,
+} from "./render/product.js";
+import {
+  findProductById,
+  getProductAssets,
+  listViewableProducts,
+} from "./commerce/directory.js";
+import { canViewProduct } from "./commerce/policy.js";
+import {
+  SAMPLE_PRODUCTS,
+  SAMPLE_GRANTS,
+  SAMPLE_ASSET_METADATA,
+} from "./commerce/sample_products.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -202,23 +224,78 @@ async function buildSampleBoard(now: number): Promise<BoardData> {
 }
 
 /**
+ * Read-only product directory of the sample products viewable by the actor.
+ * Sample mode only — there is no live D1/asset product lookup yet.
+ */
+function productDirectoryView(actor: string): string {
+  return renderProductDirectory(
+    listViewableProducts(SAMPLE_PRODUCTS, actor, SAMPLE_GRANTS),
+    actor || undefined,
+  );
+}
+
+/**
+ * Routes `?product=<id>` against the fixed sample products (read-only):
+ * - unknown id       -> not-found page (+ the viewable directory).
+ * - view denied      -> access-denied page.
+ * - view allowed     -> product summary + public/unlisted asset previews + an
+ *                       EMPTY promotion placeholder.
+ *
+ * Asset previews are PUBLIC/UNLISTED metadata only — no bytes, no download, no
+ * signed URL, no payment. `private`/`paid` assets are never shown.
+ */
+function renderProductRoute(data: BoardData, productId: string, actor: string): string {
+  const product = findProductById(SAMPLE_PRODUCTS, productId);
+  if (!product) {
+    return renderPage(buildThreads([]), {
+      status: data.lead + renderProductNotFound(productId) + productDirectoryView(actor),
+    });
+  }
+
+  const decision = canViewProduct(actor, product, SAMPLE_GRANTS);
+  if (!decision.allowed) {
+    return renderPage(buildThreads([]), {
+      status: data.lead + renderProductAccessDenied(product, decision),
+    });
+  }
+
+  const assets = getProductAssets(product, SAMPLE_ASSET_METADATA);
+  return renderPage(buildThreads([]), {
+    status:
+      data.lead +
+      renderProductPage(product, decision, assets, {
+        promotions: data.showPromotions,
+        actorPubkey: actor || undefined,
+      }),
+  });
+}
+
+/**
  * Routes a board through the space directory:
  * - no `?space`        -> all threads + a directory of readable spaces.
  * - `?space=<unknown>` -> not-found page.
  * - read denied        -> access-denied page.
  * - read allowed       -> only that space's threads + a landing header.
  *
+ * `?product=<id>` takes precedence and renders the read-only product page.
  * `?actor=<pubkey>` selects the viewer (guest when absent).
  */
 function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): string {
+  const productId = url.searchParams.get("product");
   const spaceId = url.searchParams.get("space");
   const actor = url.searchParams.get("actor") ?? "";
   const spaces = directory.list();
   const queryOptions = parseQueryOptions(url);
 
+  if (productId !== null) {
+    return renderProductRoute(data, productId, actor);
+  }
+
   if (spaceId === null) {
-    const lead =
+    let lead =
       data.lead + renderSpaceDirectory(listReadableSpaces(spaces, actor), actor || undefined);
+    // Sample mode surfaces the product directory below the space directory.
+    if (data.showPromotions) lead += productDirectoryView(actor);
     return statusFor(queryOptions, lead, buildThreads(data.accepted));
   }
 

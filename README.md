@@ -8,7 +8,19 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 24 — R2 asset cache adapter.** Ingest, thread building, query
+> **Status: Stage 25 — product read-only route + public asset preview.** A
+> `?product=<id>` route now renders a read-only product page over the fixed
+> sample products: a `ProductDirectory`/lookup helpers (`findProductById`,
+> `listViewableProducts`, `getProductAssets`) feed render helpers
+> (`renderProductDirectory`/`renderProductPage`/`renderAssetPreviewList`/
+> `renderProductNotFound`/`renderProductAccessDenied`). `canViewProduct` gates the
+> page (unknown → not found, denied → access denied), and the asset preview list
+> shows `AssetMetadata` for **public/unlisted assets only** — `private`/`paid`
+> assets are filtered out, no asset bytes are embedded, and there is **no signed
+> URL, download, payment, or DRM**. The default board surfaces the product
+> directory (sample mode). Below is the earlier base.
+>
+> Ingest, thread building, query
 > policy, an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache`
 > boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr `SignatureVerifier`
 > (@noble), a community/channel/group policy model, a NIP-07 `EventSigner`
@@ -84,9 +96,17 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   ignored) via `getProductTags`/`eventMatchesProduct`/`classifyEventToProducts`.
   `bridge.ts` builds a draft product from a Stage 9 space (`productFromSpace`) or a
   Nostr event (`productFromEvent`) and decides `canPromoteProductInSpace` (creator
-  who may post in the space). **No money moves and nothing is delivered** — no
-  payment, checkout, download serving, inventory, or real Stripe/crypto/R2/D1;
-  `priceCents` is display-only and there is no DRM. No commerce UI yet.
+  who may post in the space). `directory.ts` adds the read-only directory/lookup
+  layer: a `ProductDirectory` (`InMemoryProductDirectory`) plus pure helpers
+  `findProductById`, `listViewableProducts` (filters by `canViewProduct`),
+  `getProductAssets` (selects a product's assets by `assetIds`), and a
+  `ProductAsset` (an asset id paired with its PREVIEW `AssetMetadata` — no bytes).
+  `sample_products.ts` ships fixed `SAMPLE_PRODUCTS`/`SAMPLE_GRANTS`/
+  `SAMPLE_ASSET_METADATA` (a public guide, a private grant-gated pack, a
+  creator-only draft; each mixes public/unlisted previews with a hidden `paid`
+  original). **No money moves and nothing is delivered** — no payment, checkout,
+  download serving, inventory, or real Stripe/crypto/R2/D1; `priceCents` is
+  display-only and there is no DRM. The Stage 25 UI is read-only PREVIEW only.
 - `src/promotion/*` — pure INTEGRATION BOUNDARY toward the existing Cloudflare ad
   system (edge-rec-middleware / recommendation-rewriter); it is NOT an ad engine.
   `types.ts` defines `PlacementType` (11 slots across thread/space/chat/product/
@@ -126,7 +146,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `renderSpaceLanding`'s `{ promotions }` option). `product.ts` adds read-only
   product views — `renderProductLabel` (kind + title), `renderProductSummary`
   (price/currency/status/visibility/linked spaces, no links or actions), and
-  `renderProductPromotionPlaceholder` (an EMPTY `product_sidebar` slot).
+  `renderProductPromotionPlaceholder` (an EMPTY `product_sidebar` slot). Stage 25
+  adds the directory/page surface: `renderProductDirectory` (lists viewable
+  products, each linking to its `?product=<id>` page), `renderProductPage`
+  (summary + view-decision reason + asset previews + an EMPTY promotion slot),
+  `renderAssetPreviewList` (PUBLIC/UNLISTED asset metadata labels only —
+  kind/visibility/contentType/size/source/checksum/tags; `private`/`paid` are
+  filtered out, with no bytes and no download/link/button), `renderProductNotFound`,
+  and `renderProductAccessDenied`.
   `promotion.ts`'s `renderPromotionPlaceholder` shows a disclosure label and the
   placement's own (escaped) label only. **No placeholder renders an ad candidate,
   destination link, price-to-pay, or download**, and none of these helpers call a
@@ -183,7 +210,12 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   Honors `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=`, plus
   `?timeout=`, `?ttl=` (seconds, capped at 300) and `?cache=0` (bypass). Also
   `?space=<id>` (read-only landing for one space, gated by `canRead`) and
-  `?actor=<pubkey>` (viewer identity; guest when absent). On a readable space,
+  `?actor=<pubkey>` (viewer identity; guest when absent). `?product=<id>` renders
+  a read-only product page over the fixed sample products — summary plus
+  PUBLIC/UNLISTED asset PREVIEW metadata only, gated by `canViewProduct` (unknown
+  → not found, denied → access denied). The default board (sample mode) also
+  surfaces the product directory. No asset bytes, signed URLs, downloads, or
+  payment paths are introduced. On a readable space,
   `?compose=1` adds a **preview-only** compose panel; `?content=<text>` previews
   the unsigned event for the `?actor` candidate. Posting is only ever a disabled
   mock-only preview — never signed, never sent. There is no POST endpoint (a POST
@@ -315,7 +347,12 @@ confidentiality guarantees and is not a security audit of the wider system.
   "payment"` does not mean this layer charged anyone. `priceCents` is display
   metadata; there is no checkout, inventory, R2/D1 storage, or DRM, and
   `canAccessAsset` is NOT content protection. Do not describe products here as
-  "purchased", "protected", or "DRM-secured".
+  "purchased", "protected", or "DRM-secured". The Stage 25 `?product=<id>` route
+  and product render helpers are **read-only PREVIEW only**: the asset preview
+  list shows descriptive `AssetMetadata` (kind/contentType/size/source/checksum/
+  tags) for `public`/`unlisted` assets ONLY — `private`/`paid` assets are filtered
+  out and never labeled. No asset bytes are embedded in the HTML, and there is no
+  download link, signed URL, payment affordance, or real R2/MeshKV byte lookup.
 - **The promotion layer is a request boundary, not an ad system.** It builds and
   normalizes "place a promotion here" requests and hands them to an injected
   `PromotionProvider` — it does not select, rank, auction, or weight ads, run
@@ -515,7 +552,7 @@ D1 space directory caveats (do not over-promise on these):
 21. Runtime integration layer (`createRuntime` selection/DI seam) ✓
 22. Asset cache boundary (public media only; R2/HTTP/local/MeshKV-swappable) ✓
 23. MeshKV adapter boundary (public previews/thumbnails/segments only; mock client) ✓
-24. R2 AssetCache adapter (origin storage for public media; no signed URLs/DRM) ✓ ← you are here
-25. Product read-only directory/page route + public asset preview
-26. Chat read-only UI labels
+24. R2 AssetCache adapter (origin storage for public media; no signed URLs/DRM) ✓
+25. Product read-only directory/page route + public asset preview ✓ ← you are here
+26. Asset cache composed fallback chain (R2 → MeshKV → in-memory)
 27. Vault / encrypted identity layer (AEAD, external signer)
