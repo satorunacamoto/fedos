@@ -1,0 +1,48 @@
+/**
+ * nostr-window — public surface (Stage 1).
+ *
+ * A Reddit-style "window" into Nostr. This barrel re-exports the read-only
+ * ingest building blocks. Threading, UI, replies, communities, content and
+ * ads layer on in later stages behind the same adapter boundaries.
+ */
+
+// Nostr core
+export type { NostrEvent, NostrTag, EventCore } from "./nostr/types.js";
+export {
+  validateEventStructure,
+  isNostrEvent,
+  serializeForId,
+  computeEventId,
+  verifyEventId,
+  type StructureIssue,
+} from "./nostr/event.js";
+export {
+  webCryptoSha256Hex,
+  constantTimeHexEqual,
+  type Sha256Hex,
+} from "./nostr/crypto.js";
+export {
+  InMemoryRelayAdapter,
+  eventMatchesFilter,
+  eventMatchesAnyFilter,
+  type RelayAdapter,
+  type NostrFilter,
+} from "./nostr/relay.js";
+
+// Ingest
+export { ingestRawEvents, dedupeById } from "./ingest/ingest.js";
+export type {
+  IngestedEvent,
+  RejectedEvent,
+  IngestResult,
+  IngestContext,
+} from "./ingest/types.js";
+
+// Thread builder (Stage 2)
+export { buildThreads, getReplyTarget, getRootTarget } from "./thread/thread.js";
+export type {
+  ThreadNode,
+  ThreadBuildResult,
+  ThreadBuildWarning,
+  ThreadWarningKind,
+} from "./thread/types.js";
