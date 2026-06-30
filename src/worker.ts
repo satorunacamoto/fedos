@@ -56,6 +56,10 @@ import {
   renderSpaceLanding,
   renderSpaceNotFound,
 } from "./render/space.js";
+import {
+  buildPublishPrototypeView,
+  renderPublishPrototype,
+} from "./render/publish.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 
 const DEMO_RELAY_URL = "wss://demo.invalid";
@@ -224,7 +228,22 @@ function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): stri
 
   const postDecision = canPost(actor, space);
   const spaceEvents = filterEventsForSpace(data.accepted, space);
-  const lead = data.lead + renderSpaceLanding(space, readDecision, postDecision);
+  let lead = data.lead + renderSpaceLanding(space, readDecision, postDecision);
+
+  // `?compose=1` adds a MOCK-ONLY publish preview panel. It builds an unsigned
+  // event for display but never signs and never sends — there is no publish
+  // endpoint and no POST handling.
+  if (url.searchParams.get("compose") === "1") {
+    const view = buildPublishPrototypeView(
+      {
+        content: url.searchParams.get("content") ?? "",
+        actorPubkey: actor || undefined,
+      },
+      space,
+    );
+    lead += renderPublishPrototype(view);
+  }
+
   return statusFor(queryOptions, lead, buildThreads(spaceEvents));
 }
 

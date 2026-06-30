@@ -291,6 +291,80 @@ describe("worker space directory routes", () => {
   });
 });
 
+describe("worker publish prototype (mock-only)", () => {
+  const OWNER = "a".repeat(64); // owner of the sample spaces (can post anywhere)
+
+  it("1. ?space=general&compose=1 shows the publish prototype panel", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?space=general&compose=1"))
+    ).text();
+    expect(body).toContain('class="publish-prototype"');
+    expect(body).toContain("Compose — preview only");
+  });
+
+  it("2. an allowed actor with content shows the unsigned event preview", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(
+          `http://localhost/?space=general&compose=1&actor=${OWNER}&content=${encodeURIComponent("hello world")}`,
+        ),
+      )
+    ).text();
+    expect(body).toContain("Unsigned event preview");
+    expect(body).toContain("hello world");
+    // No id/sig were produced — this app does not sign.
+    expect(body).toContain("<code>id</code>");
+    expect(body).toContain("<code>sig</code>");
+  });
+
+  it("3. a denied actor shows the denied reason and no preview", async () => {
+    // announce is an admins-only channel; the owner can post but a stranger cannot.
+    const stranger = "c".repeat(64);
+    const body = await (
+      await handleRequest(
+        new Request(
+          `http://localhost/?space=announce&compose=1&actor=${stranger}&content=hi`,
+        ),
+      )
+    ).text();
+    expect(body).toContain("publish-denied");
+    expect(body).not.toContain("Unsigned event preview");
+  });
+
+  it("4. escapes a <script> content value in the preview", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(
+          `http://localhost/?space=general&compose=1&actor=${OWNER}&content=${encodeURIComponent("<script>alert(1)</script>")}`,
+        ),
+      )
+    ).text();
+    expect(body).not.toContain("<script>alert(1)</script>");
+    expect(body).toContain("&lt;script&gt;");
+  });
+
+  it("5. without ?compose the prototype panel is not shown", async () => {
+    const body = await (
+      await handleRequest(new Request(`http://localhost/?space=general&actor=${OWNER}`))
+    ).text();
+    expect(body).not.toContain('class="publish-prototype"');
+  });
+
+  it("6. there is no publish endpoint / no POST behavior", async () => {
+    // A POST is handled exactly like a GET (read-only render); nothing is sent.
+    const res = await handleRequest(
+      new Request(`http://localhost/?space=general&compose=1&actor=${OWNER}&content=hi`, {
+        method: "POST",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    // Still just the preview; the button is disabled and mock-only.
+    expect(body).toContain("mock only");
+    expect(body).toContain("disabled");
+  });
+});
+
 describe("worker cache backend selection", () => {
   class MockKv implements KvLikeNamespace {
     store = new Map<string, string>();

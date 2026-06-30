@@ -8,16 +8,17 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 12 — relay publish boundary (boundary only).** Ingest, thread
+> **Status: Stage 13 — mock-only publish UI prototype.** Ingest, thread
 > building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
-> (`?space=`/`?actor=`), and a `RelayPublisher` write-path boundary. **The
-> publish path is a boundary only** — it is not wired into the UI or Worker,
-> nothing auto-runs a NIP-07 signer, and no publish endpoint exists. Posting in
-> the UI is still a disabled "coming soon" hint. No key generation/storage, no
-> commerce, no ads.
+> (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, and a
+> **preview-only** compose panel (`?compose=1`) that shows whether you may post
+> and previews the *unsigned* event. **Nothing publishes** — the compose panel
+> never signs, never calls a signer, never calls a `RelayPublisher`, and there is
+> no publish endpoint (POST is rendered exactly like GET). The publish button is
+> always disabled/mock-only. No key generation/storage, no commerce, no ads.
 
 ## What is implemented
 
@@ -64,6 +65,13 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   denies if a supplied `actorPubkey` disagrees), and `preparePublishDecision`
   combines the signature gate with the space policy. Returns allowed/denied
   decisions only; the actual send stays in the `RelayPublisher` layer.
+- `src/render/publish.ts` — **mock-only** compose prototype (render layer).
+  `buildPublishPrototypeView` consults `canPost` and `prepareSpacePost` to build
+  an UNSIGNED event for display; `renderPublishPrototype` /
+  `renderUnsignedEventPreview` / `renderPublishDenied` format it (all event text
+  HTML-escaped). It never signs, never calls a signer, never calls a
+  `RelayPublisher`. A missing actor is treated as a denial (you must name a
+  candidate author). The publish button is always disabled and mock-only.
 - `src/cache/*` — `EventCache` boundary + deterministic cache keys + a get-or-
   fetch policy (hit / miss / stale fallback / bypass). Two implementations ship:
   `InMemoryEventCache` (**process-local, lost on every isolate/process restart**)
@@ -74,8 +82,11 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   Honors `?sort=&q=&author=&minReplies=&since=&until=&limit=&offset=`, plus
   `?timeout=`, `?ttl=` (seconds, capped at 300) and `?cache=0` (bypass). Also
   `?space=<id>` (read-only landing for one space, gated by `canRead`) and
-  `?actor=<pubkey>` (viewer identity; guest when absent). Posting is only ever a
-  disabled "coming soon" hint — never executed.
+  `?actor=<pubkey>` (viewer identity; guest when absent). On a readable space,
+  `?compose=1` adds a **preview-only** compose panel; `?content=<text>` previews
+  the unsigned event for the `?actor` candidate. Posting is only ever a disabled
+  mock-only preview — never signed, never sent. There is no POST endpoint (a POST
+  renders exactly like a GET).
 
 ## Security scope (read before trusting anything here)
 
@@ -115,6 +126,11 @@ confidentiality guarantees and is not a security audit of the wider system.
   signer is auto-invoked. `validateBeforePublish` only gates what *would* be
   safe to publish (structure + a real signature check); it does not itself send,
   and a passing decision is not a guarantee the rest of the flow is bug-free.
+- **The compose panel (`?compose=1`) is preview-only.** It builds and displays
+  an UNSIGNED event (no `id`/`sig`) so a user can see what would be signed; it
+  does not sign, does not call a signer, and does not call a `RelayPublisher`.
+  The publish button is disabled. The `MockRelayPublisher` is referenced only in
+  copy/tests and is never invoked from the request path — no network is touched.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -174,7 +190,8 @@ KV caveats (do not over-promise on these):
 9. Community / Channel / Group space model + policy ✓
 10. NIP-07 signer boundary + unsigned-event builders ✓
 11. Space directory / read-only landing pages ✓
-12. Relay publish boundary (no UI) ✓ ← you are here
-13. Creator / digital-content hooks
-14. Ads / promotion hooks
-15. Vault / encrypted identity layer (AEAD, external signer)
+12. Relay publish boundary (no UI) ✓
+13. Mock-only publish UI prototype (preview only) ✓ ← you are here
+14. Creator / digital-content hooks
+15. Ads / promotion hooks
+16. Vault / encrypted identity layer (AEAD, external signer)
