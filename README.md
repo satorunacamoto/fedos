@@ -8,27 +8,27 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 23 — MeshKV asset cache adapter boundary.** Ingest, thread
-> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
-> `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
-> `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
-> `EventSigner` boundary, read-only space directory + landing pages
-> (`?space=`/`?actor=`), a `RelayPublisher` write-path boundary, a
-> **preview-only** compose panel (`?compose=1`), a `MetadataIndex` boundary
-> (in-memory + Cloudflare D1) for search/listing/space navigation, a D1 space
-> directory adapter for Community/Channel/Group definitions, a chat / DM model
-> boundary, a creator commerce model boundary, a promotion integration boundary,
-> an edge-rec promotion adapter, read-only promotion placeholders, a runtime
-> integration layer (`createRuntime`), an asset cache boundary (`AssetCache` for
-> PUBLIC media), and now a **MeshKV asset cache adapter boundary**:
-> `MeshKVAssetCache implements AssetCache` over a `MeshKVClient` (with an
-> in-process `MockMeshKVClient`), which the runtime selects when a mesh client is
-> bound. **Every write is gated by `canCacheAsset`** — only `public`/`unlisted`,
-> non-sensitive media — and bytes/metadata are cloned on the way through.
-> Private/paid content, DMs, secrets, key material, and payment/entitlement data
-> are refused. **No real WebRTC, signaling server, peer discovery, or peer
-> communication is implemented** — this is the boundary + mock only. MeshKV is a
-> public-media cache, NOT access control, payment, entitlement, or DRM.
+> **Status: Stage 24 — R2 asset cache adapter.** Ingest, thread building, query
+> policy, an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache`
+> boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr `SignatureVerifier`
+> (@noble), a community/channel/group policy model, a NIP-07 `EventSigner`
+> boundary, read-only space directory + landing pages (`?space=`/`?actor=`), a
+> `RelayPublisher` write-path boundary, a **preview-only** compose panel
+> (`?compose=1`), a `MetadataIndex` boundary (in-memory + Cloudflare D1), a D1
+> space directory adapter, a chat / DM model boundary, a creator commerce model
+> boundary, a promotion integration boundary, an edge-rec promotion adapter,
+> read-only promotion placeholders, a runtime integration layer (`createRuntime`),
+> an asset cache boundary (`AssetCache` for PUBLIC media), a MeshKV asset cache
+> adapter (peer cache), and now an **R2 asset cache adapter** (origin storage):
+> `R2AssetCache implements AssetCache` over a minimal `R2LikeBucket` (with a
+> `MockR2Bucket`), which the runtime prefers when an R2 bucket is bound (R2 →
+> MeshKV → in-memory). Metadata/`cachedAt`/`expiresAt` round-trip through R2
+> `customMetadata`; content type through `httpMetadata`. **Every write is gated by
+> `canCacheAsset`** — public/unlisted, non-sensitive media only; private/paid,
+> DMs, secrets, key material, and payment/entitlement data are refused. **No
+> signed URLs, download delivery, payment, or DRM** — R2 is origin storage for
+> public previews, not a delivery/entitlement path. `clear()` is a deliberate
+> no-op (no safe bulk wipe), and the adapter does no external `fetch` of its own.
 
 ## What is implemented
 
@@ -217,6 +217,15 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   side-table (the client stores only bytes), and honors expiry on `get`/`has`.
   **No real WebRTC/signaling/peer discovery / network** — boundary + mock only;
   it is a public-media cache, not access control, payment, entitlement, or DRM.
+  `r2_asset_cache.ts` is the origin-storage adapter: `R2AssetCache implements
+  AssetCache` over a minimal `R2LikeBucket`/`R2LikeObject` (and a `MockR2Bucket`).
+  It gates every `put` through `canCacheAsset`, clones bytes and normalizes
+  metadata, and round-trips `cachedAt`/`expiresAt`/the metadata JSON through R2
+  `customMetadata` (content type via `httpMetadata`), restoring them on `get`/`has`
+  and treating malformed metadata as a miss. `clear()` is a deliberate no-op — R2
+  has no safe atomic bulk wipe and the bucket may hold objects this adapter did not
+  write. **No signed URLs, download delivery, payment, or DRM, and no external
+  `fetch`** — origin storage for public previews only.
 - `src/runtime/*` — the runtime integration layer: the single place that picks
   every boundary. `createRuntime(env?, overrides?)` returns an `AppRuntime`
   (`eventCache`, `assetCache`, `spaceDirectory`, `metadataIndex`,
@@ -228,13 +237,13 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT` **plus** an injected `fetch`) —
   and otherwise a test/local-safe in-memory or mock default (`InMemory*`,
   `MockPromotionProvider`/`MockRecommendationProvider`, `MockRelayPublisher`,
-  `NobleSignatureVerifier`). `selectAssetCache` wraps a bound `MESHKV_ASSET_CACHE`
-  mesh client in a `MeshKVAssetCache`, otherwise uses the in-memory cache
-  (`NOSTR_ASSET_R2` is reserved for a future R2 adapter). `overrides` win over
+  `NobleSignatureVerifier`). `selectAssetCache` prefers an `R2AssetCache` when an
+  `NOSTR_ASSET_R2` bucket is bound, else a `MeshKVAssetCache` when
+  `MESHKV_ASSET_CACHE` is bound, else the in-memory cache. `overrides` win over
   `env`. **Constructing a runtime starts no external work**: no socket, no
-  `fetch`, no publish, no signer, no asset/mesh I/O — selecting the EdgeRec or
-  MeshKV adapter only makes it *ready* to call out behind its injected client. The
-  runtime never reaches for a global `fetch`.
+  `fetch`, no publish, no signer, no asset/mesh/R2 I/O — selecting the EdgeRec,
+  MeshKV, or R2 adapter only makes it *ready* to call out behind its injected
+  client. The runtime never reaches for a global `fetch`.
 
 ## Security scope (read before trusting anything here)
 
@@ -360,6 +369,17 @@ confidentiality guarantees and is not a security audit of the wider system.
   client shipped is the in-process `MockMeshKVClient`. MeshKV is a cache for public
   bytes; it is NOT access control, payment, entitlement, or DRM, and no purchased
   original is ever placed on it.
+- **The R2 adapter is origin storage for public media, not a delivery path.**
+  `R2AssetCache` gates every write through `canCacheAsset`, so private/paid
+  content, DMs, secrets, key material, and payment/entitlement data are refused
+  before they reach the bucket. It clones bytes and normalizes metadata, and
+  round-trips cache fields through R2 `customMetadata`/`httpMetadata`. There are
+  **NO signed URLs, NO download/delivery endpoint, NO payment, and NO DRM** — R2
+  holds public previews/thumbnails/segments only, never a purchased original. The
+  adapter does no external `fetch` of its own (all I/O goes through the injected
+  bucket), and `clear()` is a deliberate no-op because R2 has no safe atomic bulk
+  wipe. A stored object is not proof of authorization — this is a cache, not an
+  entitlement oracle.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -494,8 +514,8 @@ D1 space directory caveats (do not over-promise on these):
 20. Read-only promotion placeholders + product render helpers ✓
 21. Runtime integration layer (`createRuntime` selection/DI seam) ✓
 22. Asset cache boundary (public media only; R2/HTTP/local/MeshKV-swappable) ✓
-23. MeshKV adapter boundary (public previews/thumbnails/segments only; mock client) ✓ ← you are here
-24. R2 AssetCache adapter (origin storage for public media)
-25. Product read-only directory/page route
+23. MeshKV adapter boundary (public previews/thumbnails/segments only; mock client) ✓
+24. R2 AssetCache adapter (origin storage for public media; no signed URLs/DRM) ✓ ← you are here
+25. Product read-only directory/page route + public asset preview
 26. Chat read-only UI labels
 27. Vault / encrypted identity layer (AEAD, external signer)

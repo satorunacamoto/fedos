@@ -15,6 +15,7 @@ import {
   MeshKVAssetCache,
   MockMeshKVClient,
 } from "../src/asset/meshkv_asset_cache.js";
+import { MockR2Bucket, R2AssetCache } from "../src/asset/r2_asset_cache.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
 import { InMemorySpaceDirectory } from "../src/community/directory.js";
@@ -161,6 +162,27 @@ describe("createRuntime", () => {
     expect(fetch.calls).toBe(0); // no promotion request issued
     // The mock publisher has published nothing.
     expect((rt.relayPublisher as MockRelayPublisher).published).toEqual([]);
+  });
+
+  it("selects an R2AssetCache when an R2 bucket is bound (and R2 wins over mesh)", () => {
+    const bucket = new MockR2Bucket();
+    const rt = createRuntime({
+      NOSTR_ASSET_R2: bucket,
+      MESHKV_ASSET_CACHE: new MockMeshKVClient(),
+    });
+    expect(rt.assetCache).toBeInstanceOf(R2AssetCache);
+    expect(rt.mode).toBe("cloudflare");
+    // Construction performs no R2 I/O.
+    expect(bucket.calls).toEqual({ get: 0, put: 0, head: 0, delete: 0 });
+  });
+
+  it("an explicit assetCache override wins over an R2 binding", () => {
+    const override = new InMemoryAssetCache();
+    const rt = createRuntime(
+      { NOSTR_ASSET_R2: new MockR2Bucket() },
+      { assetCache: override },
+    );
+    expect(rt.assetCache).toBe(override);
   });
 
   it("selects a MeshKVAssetCache when a mesh client is bound", () => {
