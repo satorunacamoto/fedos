@@ -8,9 +8,10 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 1 — read-only event ingest only.** No signing, no key
-> storage, no UI, no commerce, no ads yet. The Nostr transport is an adapter
-> (`RelayAdapter`); only an in-memory implementation ships today.
+> **Status: Stage 3 — read-only demo render.** Ingest + thread building + a
+> static HTML view served from a fixed in-memory sample. No signing, no key
+> storage, no live relay, no posting, no commerce, no ads. The Nostr transport
+> is an adapter (`RelayAdapter`); only an in-memory implementation ships today.
 
 ## What is implemented
 
@@ -20,6 +21,11 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/nostr/crypto.ts` — default WebCrypto SHA-256 (Workers + Node compatible).
 - `src/nostr/relay.ts` — `RelayAdapter` interface, filter matching, in-memory adapter.
 - `src/ingest/*` — pure validate → dedupe → normalize pipeline.
+- `src/thread/*` — pure NIP-10 thread builder (reply graph → sorted trees).
+- `src/render/*` — pure HTML render layer (every event-derived string is
+  HTML-escaped before output).
+- `src/worker.ts` — minimal Cloudflare Workers entry that renders the fixed
+  sample read-only. **No live relay connection.**
 
 ## Security scope (read before trusting anything here)
 
@@ -46,9 +52,9 @@ npm test            # vitest run
 
 ## Roadmap (stages)
 
-1. **Nostr event ingest** ← you are here
-2. Thread builder (NIP-10 reply graph → tree)
-3. Reddit-style UI
+1. Nostr event ingest ✓
+2. Thread builder (NIP-10 reply graph → tree) ✓
+3. Reddit-style read-only render ✓ ← you are here
 4. Web reply posting (NIP-07 / external signer)
 5. Community / Channel (admin-post) / Group (open)
 6. Creator / digital-content hooks

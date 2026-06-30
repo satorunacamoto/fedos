@@ -46,3 +46,14 @@ export type {
   ThreadBuildWarning,
   ThreadWarningKind,
 } from "./thread/types.js";
+
+// Render layer (Stage 3, read-only demo)
+export {
+  escapeHtml,
+  shortenHex,
+  renderThreadNode,
+  renderThreadList,
+  renderWarnings,
+  renderPage,
+} from "./render/html.js";
+export { handleRequest } from "./worker.js";
