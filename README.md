@@ -8,13 +8,15 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 11 — read-only space directory.** Ingest, thread building,
-> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 12 — relay publish boundary (boundary only).** Ingest, thread
+> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
-> `EventSigner` boundary, and read-only space directory + landing pages
-> (`?space=`/`?actor=`). **Still no publishing** — signing is delegated to an
-> external signer and nothing is sent to a relay. No key generation/storage, no
+> `EventSigner` boundary, read-only space directory + landing pages
+> (`?space=`/`?actor=`), and a `RelayPublisher` write-path boundary. **The
+> publish path is a boundary only** — it is not wired into the UI or Worker,
+> nothing auto-runs a NIP-07 signer, and no publish endpoint exists. Posting in
+> the UI is still a disabled "coming soon" hint. No key generation/storage, no
 > commerce, no ads.
 
 ## What is implemented
@@ -47,6 +49,21 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 - `src/nostr/ws_relay.ts` — read-only WebSocket relay adapter (REQ → collect →
   EOSE/timeout → CLOSE) with an injectable `WebSocketFactory`. Read-only: it
   never publishes events.
+- `src/nostr/publish.ts` — relay **write-path** boundary, kept separate from the
+  read-only adapter above. `RelayPublisher` sends `["EVENT", signedEvent]` and
+  awaits the NIP-20 `["OK", id, accepted, message]`; `parseOkMessage` is a pure,
+  total parser (malformed/unknown → `null`). `WebSocketRelayPublisher` is a
+  distinct class (its own injected `WebSocketFactory`) with timeout, socket
+  cleanup, and relay-error tolerance (errors resolve `accepted:false`, never
+  throw). `MockRelayPublisher` records events and returns a configured verdict
+  with no network. `validateBeforePublish` gates a publish on `isSignedEventLike`
+  **plus** a real `SignatureVerifier.verify`. **Nothing here is auto-wired** —
+  it is a boundary to compose and test, not an executed action.
+- `src/sign/publish_flow.ts` — pure glue to the Stage 9 space policy:
+  `canPublishToSpace` runs `canPost` for the **signed event's own** pubkey (and
+  denies if a supplied `actorPubkey` disagrees), and `preparePublishDecision`
+  combines the signature gate with the space policy. Returns allowed/denied
+  decisions only; the actual send stays in the `RelayPublisher` layer.
 - `src/cache/*` — `EventCache` boundary + deterministic cache keys + a get-or-
   fetch policy (hit / miss / stale fallback / bypass). Two implementations ship:
   `InMemoryEventCache` (**process-local, lost on every isolate/process restart**)
@@ -89,9 +106,15 @@ confidentiality guarantees and is not a security audit of the wider system.
   pubkeys it already trusts). Treat it as a model, not an access-control system.
 - No private keys are handled, generated, or stored. The signer boundary
   delegates to an external NIP-07 provider; the unsigned-event builders never
-  sign, and nothing here publishes to a relay. Signed events returned by a
-  provider are structurally validated and checked against the signer's pubkey,
-  but this app does not run a signer automatically.
+  sign. Signed events returned by a provider are structurally validated and
+  checked against the signer's pubkey, but this app does not run a signer
+  automatically.
+- **Publishing is a boundary, not a wired action.** `RelayPublisher` /
+  `WebSocketRelayPublisher` can send a signed event to a relay, but nothing in
+  the UI or Worker calls them, there is no publish endpoint, and no NIP-07
+  signer is auto-invoked. `validateBeforePublish` only gates what *would* be
+  safe to publish (structure + a real signature check); it does not itself send,
+  and a passing decision is not a guarantee the rest of the flow is bug-free.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -150,8 +173,8 @@ KV caveats (do not over-promise on these):
 8. Real Schnorr signature verification ✓
 9. Community / Channel / Group space model + policy ✓
 10. NIP-07 signer boundary + unsigned-event builders ✓
-11. Space directory / read-only landing pages ✓ ← you are here
-12. Relay publish boundary (no UI)
+11. Space directory / read-only landing pages ✓
+12. Relay publish boundary (no UI) ✓ ← you are here
 13. Creator / digital-content hooks
 14. Ads / promotion hooks
 15. Vault / encrypted identity layer (AEAD, external signer)
