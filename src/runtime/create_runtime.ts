@@ -15,6 +15,7 @@
  */
 
 import { InMemoryAssetCache } from "../asset/memory_asset_cache.js";
+import { MeshKVAssetCache } from "../asset/meshkv_asset_cache.js";
 import type { AssetCache } from "../asset/types.js";
 import { InMemoryEventCache } from "../cache/event_cache.js";
 import { KvEventCache } from "../cache/kv_event_cache.js";
@@ -76,11 +77,16 @@ export function selectMetadataIndex(env?: RuntimeEnv): MetadataIndex {
 }
 
 /**
- * The public asset cache. Always the in-memory cache in Stage 22 — an R2 / HTTP /
- * MeshKV adapter slots in here later (e.g. keyed off `NOSTR_ASSET_R2`). It only
- * ever holds public/unlisted media; the policy guardrail keeps private/paid out.
+ * The public asset cache. A `MeshKVAssetCache` over a bound mesh client when
+ * `MESHKV_ASSET_CACHE` is present, otherwise the shared in-memory cache. Either
+ * way it only holds public/unlisted media — the policy guardrail keeps
+ * private/paid/sensitive bytes out. Selecting the mesh adapter opens no peer
+ * connection and performs no I/O.
  */
-export function selectAssetCache(_env?: RuntimeEnv): AssetCache {
+export function selectAssetCache(env?: RuntimeEnv): AssetCache {
+  if (env?.MESHKV_ASSET_CACHE) {
+    return new MeshKVAssetCache({ client: env.MESHKV_ASSET_CACHE });
+  }
   return defaultAssetCache;
 }
 
@@ -137,7 +143,8 @@ function resolveMode(env?: RuntimeEnv): RuntimeMode {
     env.NOSTR_SPACE_DB ||
     env.NOSTR_INDEX ||
     env.PROMOTION_ENDPOINT ||
-    env.RECOMMENDATION_ENDPOINT
+    env.RECOMMENDATION_ENDPOINT ||
+    env.MESHKV_ASSET_CACHE
   ) {
     return "cloudflare";
   }

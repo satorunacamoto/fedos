@@ -8,8 +8,8 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 21 — runtime integration layer.** Ingest, thread building,
-> query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
+> **Status: Stage 23 — MeshKV asset cache adapter boundary.** Ingest, thread
+> building, query policy, an HTML view, a NIP-01 read-only WebSocket adapter, an
 > `EventCache` boundary (in-memory + Cloudflare KV), a real BIP-340 Schnorr
 > `SignatureVerifier` (@noble), a community/channel/group policy model, a NIP-07
 > `EventSigner` boundary, read-only space directory + landing pages
@@ -19,14 +19,16 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > directory adapter for Community/Channel/Group definitions, a chat / DM model
 > boundary, a creator commerce model boundary, a promotion integration boundary,
 > an edge-rec promotion adapter, read-only promotion placeholders, a runtime
-> integration layer (`createRuntime`), and now an **asset cache boundary**: an
-> `AssetCache` interface for PUBLIC media (previews, thumbnails, images, audio,
-> video segments) with an in-memory implementation and a pure policy that only
-> ever allows `public`/`unlisted`, non-sensitive assets. **Private/paid content,
-> DMs, secrets, key material, and payment/entitlement data are rejected** — the
-> in-memory cache enforces the policy on `put`. The runtime now selects an
-> `assetCache` (always in-memory in this stage). MeshKV and an R2 adapter are NOT
-> implemented yet; this `AssetCache` interface is the seam they will plug into.
+> integration layer (`createRuntime`), an asset cache boundary (`AssetCache` for
+> PUBLIC media), and now a **MeshKV asset cache adapter boundary**:
+> `MeshKVAssetCache implements AssetCache` over a `MeshKVClient` (with an
+> in-process `MockMeshKVClient`), which the runtime selects when a mesh client is
+> bound. **Every write is gated by `canCacheAsset`** — only `public`/`unlisted`,
+> non-sensitive media — and bytes/metadata are cloned on the way through.
+> Private/paid content, DMs, secrets, key material, and payment/entitlement data
+> are refused. **No real WebRTC, signaling server, peer discovery, or peer
+> communication is implemented** — this is the boundary + mock only. MeshKV is a
+> public-media cache, NOT access control, payment, entitlement, or DRM.
 
 ## What is implemented
 
@@ -207,6 +209,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   paid, and sensitive assets are refused. It only holds public media; **no
   purchased originals, DMs, secrets, keys, or payment/entitlement bytes**, and it
   fetches/serves nothing. R2/HTTP/MeshKV adapters slot in behind `AssetCache`.
+  `meshkv_asset_cache.ts` is the first such adapter: `MeshKVAssetCache implements
+  AssetCache` over a `MeshKVClient` (`get`/`put`/`has`/`delete`/optional `clear`),
+  with an in-process `MockMeshKVClient` (no peers). It gates every `put` through
+  `canCacheAsset`, clones bytes (`ArrayBuffer.slice`) and normalizes metadata
+  before handing them to the client, keeps metadata + expiry in a local
+  side-table (the client stores only bytes), and honors expiry on `get`/`has`.
+  **No real WebRTC/signaling/peer discovery / network** — boundary + mock only;
+  it is a public-media cache, not access control, payment, entitlement, or DRM.
 - `src/runtime/*` — the runtime integration layer: the single place that picks
   every boundary. `createRuntime(env?, overrides?)` returns an `AppRuntime`
   (`eventCache`, `assetCache`, `spaceDirectory`, `metadataIndex`,
@@ -218,13 +228,13 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT` **plus** an injected `fetch`) —
   and otherwise a test/local-safe in-memory or mock default (`InMemory*`,
   `MockPromotionProvider`/`MockRecommendationProvider`, `MockRelayPublisher`,
-  `NobleSignatureVerifier`). `selectAssetCache` is always the in-memory cache in
-  this stage (`NOSTR_ASSET_R2` is reserved for a future R2 adapter). `overrides`
-  win over `env`. **Constructing a runtime starts no external work**: no socket,
-  no `fetch`, no publish, no signer, no asset I/O — selecting the EdgeRec adapter
-  only makes it *ready* to call out behind its injected client. The runtime never
-  reaches for a global `fetch`. MeshKV is NOT implemented here; the `AssetCache`
-  interface is the seam it will plug into.
+  `NobleSignatureVerifier`). `selectAssetCache` wraps a bound `MESHKV_ASSET_CACHE`
+  mesh client in a `MeshKVAssetCache`, otherwise uses the in-memory cache
+  (`NOSTR_ASSET_R2` is reserved for a future R2 adapter). `overrides` win over
+  `env`. **Constructing a runtime starts no external work**: no socket, no
+  `fetch`, no publish, no signer, no asset/mesh I/O — selecting the EdgeRec or
+  MeshKV adapter only makes it *ready* to call out behind its injected client. The
+  runtime never reaches for a global `fetch`.
 
 ## Security scope (read before trusting anything here)
 
@@ -340,7 +350,16 @@ confidentiality guarantees and is not a security audit of the wider system.
   and payment/entitlement data are refused, never stored. It is a cache for
   previews/thumbnails/segments, NOT a delivery path: it fetches nothing, serves
   nothing, and never holds a purchased original. The in-memory cache is
-  non-persistent; MeshKV/R2 adapters are not implemented yet.
+  non-persistent.
+- **The MeshKV adapter is a boundary + mock, not a mesh.** `MeshKVAssetCache`
+  gates every write through `canCacheAsset`, so only public/unlisted, non-sensitive
+  media can be written — private/paid content, DMs, secrets, key material, and
+  payment/entitlement data are refused before they reach the client. It clones
+  bytes/metadata so nothing live is shared. There is **NO real WebRTC, signaling
+  server, peer discovery, or peer/network communication** in this stage — the only
+  client shipped is the in-process `MockMeshKVClient`. MeshKV is a cache for public
+  bytes; it is NOT access control, payment, entitlement, or DRM, and no purchased
+  original is ever placed on it.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -474,8 +493,9 @@ D1 space directory caveats (do not over-promise on these):
 19. edge-rec-middleware adapter (inject-only transport to the existing ad system) ✓
 20. Read-only promotion placeholders + product render helpers ✓
 21. Runtime integration layer (`createRuntime` selection/DI seam) ✓
-22. Asset cache boundary (public media only; R2/HTTP/local/MeshKV-swappable) ✓ ← you are here
-23. MeshKV adapter boundary (public previews/thumbnails/segments only)
-24. Product read-only directory/page route
-25. Chat read-only UI labels
-26. Vault / encrypted identity layer (AEAD, external signer)
+22. Asset cache boundary (public media only; R2/HTTP/local/MeshKV-swappable) ✓
+23. MeshKV adapter boundary (public previews/thumbnails/segments only; mock client) ✓ ← you are here
+24. R2 AssetCache adapter (origin storage for public media)
+25. Product read-only directory/page route
+26. Chat read-only UI labels
+27. Vault / encrypted identity layer (AEAD, external signer)

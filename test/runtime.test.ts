@@ -11,6 +11,10 @@ import {
 } from "../src/runtime/create_runtime.js";
 import type { RuntimeEnv } from "../src/runtime/types.js";
 import { InMemoryAssetCache } from "../src/asset/memory_asset_cache.js";
+import {
+  MeshKVAssetCache,
+  MockMeshKVClient,
+} from "../src/asset/meshkv_asset_cache.js";
 import { InMemoryEventCache } from "../src/cache/event_cache.js";
 import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
 import { InMemorySpaceDirectory } from "../src/community/directory.js";
@@ -157,6 +161,20 @@ describe("createRuntime", () => {
     expect(fetch.calls).toBe(0); // no promotion request issued
     // The mock publisher has published nothing.
     expect((rt.relayPublisher as MockRelayPublisher).published).toEqual([]);
+  });
+
+  it("selects a MeshKVAssetCache when a mesh client is bound", () => {
+    const client = new MockMeshKVClient();
+    const rt = createRuntime({ MESHKV_ASSET_CACHE: client });
+    expect(rt.assetCache).toBeInstanceOf(MeshKVAssetCache);
+    expect(rt.mode).toBe("cloudflare");
+    // Building the runtime opens no mesh connection / runs no mesh op.
+    expect(client.calls).toEqual({ get: 0, put: 0, has: 0, delete: 0, clear: 0 });
+  });
+
+  it("falls back to the in-memory asset cache without a mesh binding", () => {
+    expect(createRuntime().assetCache).toBeInstanceOf(InMemoryAssetCache);
+    expect(createRuntime({}).assetCache).toBeInstanceOf(InMemoryAssetCache);
   });
 
   it("createRuntime performs no asset-cache operations", async () => {

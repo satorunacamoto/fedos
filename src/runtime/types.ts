@@ -13,6 +13,7 @@
  * publish, no signer. MeshKV and asset caching are NOT implemented here.
  */
 
+import type { MeshKVClient } from "../asset/meshkv_asset_cache.js";
 import type { AssetCache } from "../asset/types.js";
 import type { EventCache } from "../cache/types.js";
 import type { KvLikeNamespace } from "../cache/kv_event_cache.js";
@@ -40,11 +41,16 @@ export interface RuntimeEnv {
   /** D1 database backing the discovery metadata index. */
   readonly NOSTR_INDEX?: D1LikeDatabase;
   /**
-   * Reserved for a future R2 bucket backing the public asset cache. Not used in
-   * Stage 22 (the asset cache is always in-memory); kept here so the binding has
-   * a stable name when the R2 adapter lands.
+   * Reserved for a future R2 bucket backing the public asset cache. Not used yet
+   * (no R2 adapter); kept here so the binding has a stable name when it lands.
    */
   readonly NOSTR_ASSET_R2?: unknown;
+  /**
+   * A MeshKV client for browser-to-browser caching of PUBLIC media. When present
+   * the runtime wraps it in a `MeshKVAssetCache`. It only ever carries
+   * public/unlisted bytes — never private/paid/secret/DM/payment data.
+   */
+  readonly MESHKV_ASSET_CACHE?: MeshKVClient;
   /** edge-rec-middleware endpoint for promotions (selection only; no auto-serve). */
   readonly PROMOTION_ENDPOINT?: string;
   /** Optional bearer token for the promotion endpoint. */
