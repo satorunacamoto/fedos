@@ -8,7 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 56 — product purchase/grant preview polish.**
+> **Status: Stage 57 — provider preview docs hardening (docs only, no code).**
+> A new [`docs/provider_preview_safety.md`](docs/provider_preview_safety.md)
+> fixes, in writing, the safety contract that Stage 49's
+> `invokePromotionProviderPreview`, Stage 52's dual-flag Worker wiring, and
+> Stage 53's diagnostics layer already implement — **no `src/` change, no
+> Worker/Runtime/Promotion behavior change** in this stage. It documents: (1)
+> the preview's purpose (a provider-integration check — explicitly NOT ad
+> serving, NOT ranking, NOT billing, NOT tracking); (2) the exact dual-flag
+> invocation condition (`ENABLE_PROMOTION_PROVIDER_PREVIEW` env AND
+> `?edgeRecPreview=1`/`?providerPromotionPreview=1` query, BOTH required —
+> query-only and env-only each call the provider zero times, disabled by
+> default); (3) how it differs from the Stage 41 mock preview
+> (`?promotionPreview=1` drives ONLY `MockPromotionProvider`; the two paths
+> never share a flag or a provider); (4) exactly what MAY be shown (sanitized
+> title/description/sponsor, bounded metadata — 10 entries/200 chars, the
+> `provider_preview`/`provider_error`/`disabled` state, and a fixed diagnostic
+> sentence); (5) exactly what MUST NEVER be shown (destination/image/tracking
+> URLs, click/impression IDs, auction/ranking scores, billing info, API keys,
+> endpoint URLs, stack traces, raw provider error bodies, viewer/actor
+> pubkeys); (6) exactly what MUST NEVER be called (click/impression tracking,
+> billing/Stripe, Telegram, `HTMLRewriter`, any automatic `fetch` outside the
+> one gated `getPromotions` call, recommendation rewriting, default
+> viewer-pubkey sending); (7) error handling (a provider throw becomes a
+> FIXED `provider_error` sentence — the raw reason is dropped entirely, never
+> carried into the diagnostic view); (8) privacy (viewer pubkey non-send by
+> default, `?actor=` never threaded into the provider's placement request,
+> bounded metadata, candidate URLs never surfaced); (9) the test policy this
+> area must keep satisfying (dual-flag combinations, no link/image/tracking
+> markup, error sanitization including a poisoned-error-message check, mock
+> path unaffected); and (10) rules for any future real-serving work (its own
+> Stage, its own disabled-by-default gate per concern, never a silent
+> promotion of "preview" into production). Every rule in the document matches
+> code that already exists and is already tested — this stage adds no new
+> test either, since there is no new behavior to cover. Stage 58 candidate:
+> **Runtime external health check boundary, disabled by default** (an
+> opt-in liveness probe seam for a real provider endpoint — still no
+> automatic calls, mirroring how Stage 49/52 gated real provider invocation).
+> Prior status:
+>
+> **Stage 56 — product purchase/grant preview polish.**
 > `src/render/payment.ts` and `src/render/grant_preview.ts` get clearer,
 > harder-to-misread copy — WITHOUT changing when either preview shows or what
 > data it is built from. The purchase panel now shows an explicit **"Preview
@@ -50,10 +89,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > disabled-button presence, unavailable-panel fallback, no-mutation, board/
 > space/chat non-interference) continue to pass unmodified — this stage
 > changed wording/attributes only, never the public API or the gating logic.
-> Stage 57 candidate: **Provider preview docs hardening** (write up, the way
-> Stage 55 did for Runtime diagnostics, exactly what the Stage 49/52/53
-> promotion provider preview may and may not ever show — no new code). Prior
-> status:
+> Prior status:
 >
 > **Stage 55 — Runtime diagnostics docs hardening (docs only, no code).**
 > A new [`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md) fixes, in
@@ -1863,7 +1899,8 @@ D1 space directory caveats (do not over-promise on these):
 53. Provider preview diagnostics hardening (`disabled`/`provider_error`/`provider_preview` states; sanitized reasons) ✓
 54. Runtime status JSON export, disabled by default (`?runtimeStatus=1&format=json`; strict allowlist) ✓
 55. Runtime diagnostics docs hardening ([`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md); docs only, no code) ✓
-56. Product purchase/grant preview polish (explicit "Preview only." notices, split grant-preview sentences, widened forbidden-word list; wording/attributes only, no gating change) ✓ ← you are here
+56. Product purchase/grant preview polish (explicit "Preview only." notices, split grant-preview sentences, widened forbidden-word list; wording/attributes only, no gating change) ✓
+57. Provider preview docs hardening ([`docs/provider_preview_safety.md`](docs/provider_preview_safety.md); docs only, no code) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
