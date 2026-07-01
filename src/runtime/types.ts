@@ -14,6 +14,7 @@
  */
 
 import type { MeshKVClient } from "../asset/meshkv_asset_cache.js";
+import type { MeshKVApi } from "../../packages/meshkv/src/index.js";
 import type { R2LikeBucket } from "../asset/r2_asset_cache.js";
 import type { AssetCache } from "../asset/types.js";
 import type { EventCache } from "../cache/types.js";
@@ -50,9 +51,25 @@ export interface RuntimeEnv {
   /**
    * A MeshKV client for browser-to-browser caching of PUBLIC media. When present
    * the runtime wraps it in a `MeshKVAssetCache`. It only ever carries
-   * public/unlisted bytes — never private/paid/secret/DM/payment data.
+   * public/unlisted bytes — never private/paid/secret/DM/payment data. This is
+   * the legacy, already-constructed client binding and is used as-is (no opt-in
+   * flag required).
    */
   readonly MESHKV_ASSET_CACHE?: MeshKVClient;
+  /**
+   * EXPLICIT opt-in for building a `MeshKVBrowserClient` from `MESHKV_API` (or an
+   * injected `overrides.meshKVApi`). Truthy = `true` or a truthy string
+   * ("1"/"true"/"yes"/"on"). WITHOUT this flag the runtime never constructs the
+   * browser client. Opting in only SELECTS the adapter — it starts no MeshKV
+   * network: no `init`, `connect`, `startSignaling`, WebRTC, or peer discovery.
+   */
+  readonly ENABLE_MESHKV_ASSET_CACHE?: string | boolean;
+  /**
+   * A MeshKV node / `MeshKVApi` to build a `MeshKVBrowserClient` from, used ONLY
+   * when `ENABLE_MESHKV_ASSET_CACHE` is truthy. Providing it does not bring the
+   * node online; the runtime never calls its lifecycle methods.
+   */
+  readonly MESHKV_API?: MeshKVApi;
   /** edge-rec-middleware endpoint for promotions (selection only; no auto-serve). */
   readonly PROMOTION_ENDPOINT?: string;
   /** Optional bearer token for the promotion endpoint. */
@@ -75,6 +92,17 @@ export interface RuntimeOverrides {
   readonly mode?: RuntimeMode;
   readonly eventCache?: EventCache;
   readonly assetCache?: AssetCache;
+  /**
+   * A pre-built MeshKV client. Wins over `env.MESHKV_ASSET_CACHE` and the opt-in
+   * browser-client path when selecting the asset cache. Ignored if `assetCache`
+   * is supplied.
+   */
+  readonly meshKVClient?: MeshKVClient;
+  /**
+   * A MeshKV node / `MeshKVApi` to build a `MeshKVBrowserClient` from, used ONLY
+   * under the `ENABLE_MESHKV_ASSET_CACHE` opt-in. Wins over `env.MESHKV_API`.
+   */
+  readonly meshKVApi?: MeshKVApi;
   readonly spaceDirectory?: SpaceDirectory | AsyncSpaceDirectory;
   readonly metadataIndex?: MetadataIndex;
   readonly signatureVerifier?: SignatureVerifier;

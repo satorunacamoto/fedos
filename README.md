@@ -8,7 +8,26 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 30 — Product / Chat / Space unified directory page.** The
+> **Status: Stage 31 — MeshKV runtime opt-in wiring.** `createRuntime` can now
+> build a `MeshKVBrowserClient` (over the `packages/meshkv` boundary) and slot it
+> into the asset cache, but **only behind an explicit opt-in**:
+> `ENABLE_MESHKV_ASSET_CACHE` must be truthy AND a `MeshKVApi` supplied (via
+> `MESHKV_API` or `overrides.meshKVApi`). `selectMeshKVClient(env, overrides?)`
+> resolves the client — `overrides.meshKVClient` > the legacy
+> `MESHKV_ASSET_CACHE` binding > the opt-in browser client — and
+> `selectAssetCache` composes it (R2 + MeshKV → `CompositeAssetCache`; MeshKV only
+> → `MeshKVAssetCache`; neither → in-memory). **Opting in only SELECTS the
+> adapter — it starts NO MeshKV network**: constructing the client calls no
+> `init`/`connect`/`startSignaling`, so no signaling socket, WebRTC link, or peer
+> discovery begins; `createRuntime` runs no asset op and issues no `fetch`, and
+> `env` is never mutated. The **Worker does not auto-wire it** (no
+> `ENABLE_MESHKV_ASSET_CACHE` handling), so default behavior is unchanged. MeshKV
+> still carries PUBLIC/unlisted bytes only — private/paid/secret/DM/payment/
+> entitlement data is refused by `canCacheAsset` before it can reach the mesh, and
+> there are no signed URLs, downloads, or payment. Real WebRTC/signaling will be a
+> separate explicit lifecycle boundary in a later stage. Prior status:
+>
+> **Stage 30 — Product / Chat / Space unified directory page.** The
 > default (no-param) board now arranges the read-only Space, Product, and Chat
 > directories into ONE section via `src/render/directory.ts`'s
 > `renderUnifiedDirectory` (reusing the existing per-type helpers and their
@@ -339,15 +358,24 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT` **plus** an injected `fetch`) —
   and otherwise a test/local-safe in-memory or mock default (`InMemory*`,
   `MockPromotionProvider`/`MockRecommendationProvider`, `MockRelayPublisher`,
-  `NobleSignatureVerifier`). `selectAssetCache` composes a `CompositeAssetCache`
-  (R2 origin → MeshKV peer → in-memory fallback) when **both** an `NOSTR_ASSET_R2`
-  bucket and a `MESHKV_ASSET_CACHE` client are bound, else a plain `R2AssetCache`
-  (R2 only), else a `MeshKVAssetCache` (mesh only), else the shared in-memory
-  cache. `overrides` win over `env`. **Constructing a runtime starts no external
-  work**: no socket, no `fetch`, no publish, no signer, no asset/mesh/R2 I/O —
-  selecting the EdgeRec, MeshKV, or R2 adapter (or composing the chain) only makes
-  it *ready* to call out behind its injected client. The runtime never reaches for
-  a global `fetch`.
+  `NobleSignatureVerifier`). `selectMeshKVClient(env, overrides?)` resolves the
+  MeshKV client the asset cache writes through — `overrides.meshKVClient` first,
+  then the legacy already-built `MESHKV_ASSET_CACHE` binding, then (Stage 31) an
+  **explicit opt-in** `MeshKVBrowserClient`: built ONLY when
+  `ENABLE_MESHKV_ASSET_CACHE` is truthy (`true`/`"1"`/`"true"`/`"yes"`/`"on"`) AND
+  a `MeshKVApi` is supplied (`MESHKV_API` or `overrides.meshKVApi`); without the
+  flag the browser client is never constructed. `selectAssetCache(env, overrides?)`
+  then composes a `CompositeAssetCache` (R2 origin → MeshKV peer → in-memory
+  fallback) when **both** an `NOSTR_ASSET_R2` bucket and a MeshKV client are
+  present, else a plain `R2AssetCache` (R2 only), else a `MeshKVAssetCache` (mesh
+  only), else the shared in-memory cache. `overrides` win over `env`.
+  **Constructing a runtime starts no external work**: no socket, no `fetch`, no
+  publish, no signer, no asset/mesh/R2 I/O, and **no MeshKV lifecycle** — building
+  the opt-in `MeshKVBrowserClient` calls no `init`/`connect`/`startSignaling`, so
+  no signaling/WebRTC/peer discovery begins; selecting the EdgeRec, MeshKV, or R2
+  adapter (or composing the chain) only makes it *ready* to call out behind its
+  injected client. The runtime never reaches for a global `fetch`, and the Worker
+  does not auto-wire the MeshKV opt-in.
 - `packages/meshkv/*` — MeshKV as a **standalone external package**
   (`@nostr-window/meshkv`), the typed boundary for the imported browser runtime so
   the host depends only on its contract. `index.ts` is the stable entry point
@@ -487,6 +515,18 @@ confidentiality guarantees and is not a security audit of the wider system.
   Worker uses the runtime's event cache but does not auto-wire the publisher,
   providers, or async directory — there is still no real publish, no NIP-07
   auto-run, and no auto-served ads. The default relay publisher is the mock.
+- **The MeshKV runtime opt-in wires an adapter, not a network.** `createRuntime`
+  builds a `MeshKVBrowserClient` ONLY when `ENABLE_MESHKV_ASSET_CACHE` is truthy
+  AND a `MeshKVApi` is supplied (`MESHKV_API`/`overrides.meshKVApi`); the legacy
+  `MESHKV_ASSET_CACHE` binding and `overrides.meshKVClient` still work as before.
+  Opting in only SELECTS the asset-cache layer — it starts **no** MeshKV network:
+  no `init`, `connect`, `startSignaling`, WebRTC, or peer discovery is called from
+  the runtime, and `createRuntime` performs no asset `get`/`put`/`has`. Bringing a
+  node online stays an explicit caller step for a future lifecycle stage. The
+  Worker does **not** auto-wire this opt-in, so its default behavior is unchanged,
+  and MeshKV still holds public/unlisted bytes only (private/paid/secret/DM/
+  payment/entitlement data is refused by `canCacheAsset`; no signed URLs,
+  downloads, or payment).
 - **The asset cache holds PUBLIC media only.** `canCacheAsset` allows only
   `public`/`unlisted` assets with no sensitive tag, and `InMemoryAssetCache`
   enforces that on `put` — `private`/`paid` assets, DMs, secrets, key material,
@@ -682,5 +722,7 @@ D1 space directory caveats (do not over-promise on these):
 27. Chat read-only UI labels ✓
 28. MeshKV external package boundary (`packages/meshkv` + browser-client adapter) ✓
 29. MeshKV boundary wired to the imported implementation (real `MeshKVApi`) ✓
-30. Product / Chat / Space unified directory page ✓ ← you are here
-31. Vault / encrypted identity layer (AEAD, external signer)
+30. Product / Chat / Space unified directory page ✓
+31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓ ← you are here
+32. MeshKV browser lifecycle boundary (explicit connect/startSignaling)
+33. Vault / encrypted identity layer (AEAD, external signer)

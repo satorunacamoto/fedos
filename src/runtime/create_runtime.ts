@@ -16,7 +16,8 @@
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
 import { InMemoryAssetCache } from "../asset/memory_asset_cache.js";
-import { MeshKVAssetCache } from "../asset/meshkv_asset_cache.js";
+import { MeshKVAssetCache, type MeshKVClient } from "../asset/meshkv_asset_cache.js";
+import { MeshKVBrowserClient } from "../asset/meshkv_browser_client.js";
 import { R2AssetCache } from "../asset/r2_asset_cache.js";
 import type { AssetCache } from "../asset/types.js";
 import { InMemoryEventCache } from "../cache/event_cache.js";
@@ -78,20 +79,65 @@ export function selectMetadataIndex(env?: RuntimeEnv): MetadataIndex {
   return defaultMetadataIndex;
 }
 
+/** Truthy test for the `ENABLE_MESHKV_ASSET_CACHE` opt-in flag. */
+function isMeshKVOptIn(env?: RuntimeEnv): boolean {
+  const flag = env?.ENABLE_MESHKV_ASSET_CACHE;
+  if (flag === true) return true;
+  if (typeof flag === "string") {
+    const v = flag.trim().toLowerCase();
+    return v === "1" || v === "true" || v === "yes" || v === "on";
+  }
+  return false;
+}
+
+/**
+ * Resolves the MeshKV client the asset cache should write through, or
+ * `undefined` when MeshKV is not wired. Priority:
+ *   1. `overrides.meshKVClient` — an explicit, pre-built client.
+ *   2. `env.MESHKV_ASSET_CACHE` — the legacy already-constructed binding.
+ *   3. OPT-IN ONLY: `ENABLE_MESHKV_ASSET_CACHE` truthy AND a `MeshKVApi`
+ *      (`overrides.meshKVApi` or `env.MESHKV_API`) present → a
+ *      `MeshKVBrowserClient` over that node.
+ *
+ * WITHOUT the opt-in flag (cases 1/2 aside) the `MeshKVBrowserClient` is never
+ * constructed. Constructing it here starts NO network: no `init`, `connect`,
+ * `startSignaling`, WebRTC, or peer discovery — it only makes the adapter ready.
+ */
+export function selectMeshKVClient(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): MeshKVClient | undefined {
+  if (overrides.meshKVClient) return overrides.meshKVClient;
+  if (env?.MESHKV_ASSET_CACHE) return env.MESHKV_ASSET_CACHE;
+  if (isMeshKVOptIn(env)) {
+    const mesh = overrides.meshKVApi ?? env?.MESHKV_API;
+    if (mesh) {
+      // No lifecycle call — constructing the adapter opens no MeshKV connection.
+      return new MeshKVBrowserClient({ mesh });
+    }
+  }
+  return undefined;
+}
+
 /**
  * The public asset cache. Priority:
- *   1. both R2 and MeshKV bound → a `CompositeAssetCache` chaining
+ *   1. both R2 and a MeshKV client → a `CompositeAssetCache` chaining
  *      R2 (origin) → MeshKV (peer cache) → in-memory (local fallback),
  *   2. R2 only   → an `R2AssetCache` (origin storage),
  *   3. MeshKV only → a `MeshKVAssetCache` (peer cache),
  *   4. neither   → the shared in-memory cache.
- * Every choice holds public/unlisted media only — the policy guardrail keeps
- * private/paid/sensitive bytes out. Selecting/composing performs no I/O: it
- * opens no connection and reads/writes no asset.
+ * The MeshKV client is resolved via `selectMeshKVClient` (legacy binding or the
+ * explicit opt-in browser client). Every choice holds public/unlisted media
+ * only — the policy guardrail keeps private/paid/sensitive bytes out.
+ * Selecting/composing performs no I/O: it opens no connection and reads/writes
+ * no asset, and starts no MeshKV network.
  */
-export function selectAssetCache(env?: RuntimeEnv): AssetCache {
+export function selectAssetCache(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): AssetCache {
   const r2 = env?.NOSTR_ASSET_R2;
-  const mesh = env?.MESHKV_ASSET_CACHE;
+  const mesh = selectMeshKVClient(env, overrides);
   if (r2 && mesh) {
     return new CompositeAssetCache({
       layers: [
@@ -175,6 +221,7 @@ function resolveMode(env?: RuntimeEnv): RuntimeMode {
     env.PROMOTION_ENDPOINT ||
     env.RECOMMENDATION_ENDPOINT ||
     env.MESHKV_ASSET_CACHE ||
+    (isMeshKVOptIn(env) && env.MESHKV_API) ||
     env.NOSTR_ASSET_R2
   ) {
     return "cloudflare";
@@ -195,7 +242,7 @@ export function createRuntime(
   return {
     mode: overrides.mode ?? resolveMode(env),
     eventCache: overrides.eventCache ?? selectEventCache(env),
-    assetCache: overrides.assetCache ?? selectAssetCache(env),
+    assetCache: overrides.assetCache ?? selectAssetCache(env, overrides),
     spaceDirectory: overrides.spaceDirectory ?? selectSpaceDirectory(env),
     metadataIndex: overrides.metadataIndex ?? selectMetadataIndex(env),
     signatureVerifier: overrides.signatureVerifier ?? selectSignatureVerifier(env),

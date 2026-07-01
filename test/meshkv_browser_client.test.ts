@@ -138,14 +138,21 @@ describe("MeshKVBrowserClient", () => {
     expect((client as MeshKVClient).clear).toBeUndefined();
   });
 
-  it("9. the adapter is not auto-wired into the runtime or worker", () => {
+  it("9. the runtime references the adapter only for the opt-in, and starts no lifecycle", () => {
     const runtime: string = runtimeSource;
     const worker: string = workerSource;
-    expect(runtime).not.toContain("MeshKVBrowserClient");
-    expect(runtime).not.toContain("meshkv_browser_client");
-    expect(runtime).not.toContain("packages/meshkv");
+    // Stage 31: the runtime MAY construct a MeshKVBrowserClient, but ONLY behind
+    // the explicit opt-in flag — never bringing the node online.
+    expect(runtime).toContain("MeshKVBrowserClient");
+    expect(runtime).toContain("ENABLE_MESHKV_ASSET_CACHE");
+    // No lifecycle call is made from the runtime (no init/connect/startSignaling).
+    expect(runtime).not.toContain(".startSignaling(");
+    expect(runtime).not.toContain(".connect(");
+    expect(runtime).not.toContain("mesh.init(");
+    // The Worker still does not auto-wire the adapter at all.
     expect(worker).not.toContain("MeshKVBrowserClient");
     expect(worker).not.toContain("meshkv_browser_client");
+    expect(worker).not.toContain("ENABLE_MESHKV_ASSET_CACHE");
   });
 
   it("10. the MeshKV node only goes online via an explicit startSignaling()", async () => {
