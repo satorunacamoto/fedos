@@ -8,7 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 42 — Notification provider env selection boundary.**
+> **Status: Stage 43 — IPFS asset adapter boundary skeleton.**
+> A new `src/asset/ipfs_asset_cache.ts` treats IPFS as a candidate FUTURE
+> backend for the public `AssetCache` boundary (alongside R2 and MeshKV) —
+> types and safe defaults ONLY. `IpfsClient` (`get(cid)`, `put(bytes,
+> metadata)`, optional `pin(cid)`/`unpin(cid)`) is the shape a real client
+> would implement; `NoopIpfsClient` is the permanently-unavailable default —
+> `get` always resolves `null`, and `put`/`pin`/`unpin` always reject rather
+> than fabricate a CID. `IpfsAssetCache implements AssetCache` runs the same
+> `canCacheAsset` policy as R2/MeshKV on `put` (private/paid/`dm`/`secret`/
+> `key`/`payment`/`entitlement` are rejected) and then **stops** — it NEVER
+> calls the injected client's `get`/`put`/`pin`/`unpin`; `get`/`has` always
+> report a miss/false and `delete`/`clear` are safe no-ops. A "cacheable"
+> result means only "this asset passed the public-asset policy," never that
+> anything was sent to, stored on, or pinned by IPFS. `PlaceholderIpfsAssetCache`
+> is the concrete always-safe default (an `IpfsAssetCache` wired to
+> `NoopIpfsClient` with no way to swap clients). Two pure helpers round out the
+> boundary: `isIpfsCidLike(value)` is a plausibility check for CIDv0/CIDv1
+> shapes that never contacts a node/gateway and never resolves/dereferences
+> anything, and `assetKeyToIpfsRef(key)` maps an opaque `AssetKey` to a CID
+> only if the key string is already CID-shaped — it never fabricates or
+> resolves one (today it always returns `null`, since `createAssetKey` never
+> produces a CID). **A CID is public, non-secret metadata — but it is NOT an
+> authorization token**: whoever has a CID can fetch that content from any
+> node/gateway that pins it, a CID also leaks size/availability/pinning
+> information, and unpinning is not a deletion guarantee (other nodes may keep
+> serving it indefinitely). This stage implements **no IPFS node, no gateway
+> `fetch`, no pinning service, and no upload/download** — the adapter issues
+> no network I/O of any kind. It is **not wired into the runtime or the
+> Worker** (unlike Stage 42's notification env selection, there are no new env
+> fields at all — `create_runtime.ts` and `worker.ts` have zero IPFS
+> references). 15 new tests in `test/ipfs_asset_cache.test.ts` cover:
+> `NoopIpfsClient.get` always null, `put`/`pin`/`unpin` always reject as
+> unavailable, cache `get` always a miss (even after `put`), `put` on a public
+> asset never touches the injected client (a spy client proves zero calls),
+> private/paid/sensitive-tag rejection, `has` always false, `delete`/`clear`
+> safe no-ops that never touch the client, the CID plausibility helper accepts
+> only CID-shaped strings, a CID-shaped value grants no access (not an
+> authorization token), no input mutation, and Runtime/Worker source contain no
+> `ipfs` reference at all and no fetch/http/real-IPFS-client import. Stage 44
+> candidate: **Payment/Lightning Boundary skeleton** (a `PaymentProvider`
+> interface ahead of `PurchaseGrant` issuance — no Lightning/Stripe
+> implementation). Prior status:
+>
+> **Stage 42 — Notification provider env selection boundary.**
 > `createRuntime(env)` can now SELECT a `NotificationBridge` from three new
 > `RuntimeEnv` fields — and NOTHING more. **`NOTIFICATION_PROVIDER`** (`"noop"` or
 > `"placeholder"`), **`ENABLE_NOTIFICATION_PLACEHOLDER`** (truthy string/boolean opt-in),
@@ -40,9 +83,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > The Stage 39 `notification_boundary.test.ts` tests 12/13 are updated: they now
 > confirm that `notify()` is not auto-called and no real transport is imported
 > (rather than checking the runtime is entirely notification-free, which is no
-> longer the case). Stage 43 candidate: **IPFS Asset Adapter Boundary skeleton**
-> (AssetCache/R2/MeshKV/Composite complete; IPFS as a future public-asset backend
-> boundary, not a real node). Prior status:
+> longer the case). Prior status:
 >
 > **Stage 41 — Mock promotion preview mode.** The promotion boundary can
 > now render actual candidate cards in the UI — but ONLY from the in-memory
