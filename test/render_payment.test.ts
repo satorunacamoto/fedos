@@ -89,7 +89,23 @@ describe("renderPurchasePreview", () => {
     expect(lower).not.toContain("card number");
     expect(lower).not.toContain("wallet secret");
     expect(lower).not.toMatch(/\bgrant issued\b/);
-    expect(lower).not.toMatch(/\bpaid\b|\bsettled\b|\bpurchased\b/);
+    expect(lower).not.toMatch(/\bpaid\b|\bsettled\b|\bpurchased\b|\bbought\b|\bowned\b|\bunlocked\b/);
+  });
+
+  it("9. shows a clear Preview only notice (Stage 56)", async () => {
+    const html = await previewFor(product());
+    expect(html).toContain("Preview only.");
+  });
+
+  it("10. never claims paid/settled/purchased/bought/owned/unlocked/granted", async () => {
+    const html = await previewFor(product(), BUYER);
+    const lower = html.toLowerCase();
+    for (const forbidden of ["paid", "settled", "purchased", "bought", "owned", "unlocked"]) {
+      expect(lower).not.toMatch(new RegExp(`\\b${forbidden}\\b`));
+    }
+    // "granted" must never appear at all on the purchase panel (it has no
+    // grant-related fields to negate, unlike the grant preview panel).
+    expect(lower).not.toContain("granted");
   });
 
   it("5. a draft product renders an unavailable preview", async () => {

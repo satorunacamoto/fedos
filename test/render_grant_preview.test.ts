@@ -7,6 +7,8 @@ import {
 import type { GrantPreviewView } from "../src/render/grant_preview.js";
 import type { PaymentDecision } from "../src/payment/types.js";
 import type { Product } from "../src/commerce/types.js";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import grantPreviewSource from "../src/render/grant_preview.ts?raw";
 
 const BUYER = "b".repeat(64);
 
@@ -108,11 +110,13 @@ describe("renderGrantPreview", () => {
     expect(html).toContain("&lt;i&gt;reason&lt;/i&gt;");
   });
 
-  it("7. never claims paid/settled/purchased/granted (only the negated preview wording)", () => {
+  it("7. never claims paid/settled/purchased/bought/owned/unlocked/granted (only negated preview wording)", () => {
     const view = buildGrantPreview(product(), decision(), BUYER)!;
     const html = renderGrantPreview(view);
     const lower = html.toLowerCase();
-    expect(lower).not.toMatch(/\bpaid\b|\bsettled\b|\bpurchased\b/);
+    expect(lower).not.toMatch(
+      /\bpaid\b|\bsettled\b|\bpurchased\b|\bbought\b|\bowned\b|\bunlocked\b/,
+    );
     expect(lower).not.toContain("grant issued");
     expect(lower).not.toContain("access granted");
     expect(lower).not.toContain("download unlocked");
@@ -121,10 +125,40 @@ describe("renderGrantPreview", () => {
     expect(lower).toContain("not_granted");
   });
 
+  it("5. says no PurchaseGrant has been issued (Stage 56, exact sentence)", () => {
+    const view = buildGrantPreview(product(), decision(), BUYER)!;
+    const html = renderGrantPreview(view);
+    expect(html).toContain("No PurchaseGrant has been issued.");
+  });
+
+  it("6. says no access has been granted (Stage 56, exact sentence)", () => {
+    const view = buildGrantPreview(product(), decision(), BUYER)!;
+    const html = renderGrantPreview(view);
+    expect(html).toContain("No access has been granted.");
+  });
+
+  it("does not affirmatively claim access/entitlement was granted anywhere", () => {
+    const view = buildGrantPreview(product(), decision(), BUYER)!;
+    const html = renderGrantPreview(view);
+    // Every occurrence of "granted" must be part of the negated sentence.
+    const granted = html.match(/[^.]*\bgranted\b[^.]*\./gi) ?? [];
+    expect(granted.length).toBeGreaterThan(0);
+    for (const sentence of granted) {
+      expect(sentence.toLowerCase()).toMatch(/\bno\b.*\bgranted\b/);
+    }
+  });
+
   it("renders with no actor line when actorPubkey is absent", () => {
     const view = buildGrantPreview(product(), decision())!;
     const html = renderGrantPreview(view);
     expect(html).not.toContain("grant-preview-actor");
+  });
+
+  it("10. never imports or calls paymentDecisionToGrant", () => {
+    // Doc comments legitimately mention the function name to explain what is
+    // NOT done here; the invariant is that it is never imported or invoked.
+    expect(grantPreviewSource).not.toMatch(/paymentDecisionToGrant\s*\(/);
+    expect(grantPreviewSource).not.toMatch(/import\s*\{[^}]*paymentDecisionToGrant/);
   });
 
   it("8. does not mutate the view", () => {

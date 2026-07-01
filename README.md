@@ -8,7 +8,54 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 55 — Runtime diagnostics docs hardening (docs only, no code).**
+> **Status: Stage 56 — product purchase/grant preview polish.**
+> `src/render/payment.ts` and `src/render/grant_preview.ts` get clearer,
+> harder-to-misread copy — WITHOUT changing when either preview shows or what
+> data it is built from. The purchase panel now shows an explicit **"Preview
+> only."** notice (previously only "No payment is processed." disclosed
+> this), right after the "Purchase preview" heading and before the price/rail
+> table; the buyer line is reworded from "buyer candidate:" to "buyer preview
+> reference:" to make its non-binding, display-only nature explicit (the
+> `purchase-buyer-candidate` CSS class is UNCHANGED for backward
+> compatibility). The disabled checkout button gains `aria-disabled="true"`
+> alongside its native `disabled` attribute; the purchase/grant
+> preview/unavailable sections all gain `data-testid`/`aria-label` attributes
+> — safe, inert additions with no behavioral effect. The grant panel's fixed
+> `PREVIEW_REASON` is split from one run-on sentence ("Preview only — no
+> PurchaseGrant has been issued and no access has been granted.") into two
+> explicit, independently-matchable sentences: **"No PurchaseGrant has been
+> issued."** and **"No access has been granted."** — the standalone "Preview
+> only." note above it already covers that phrase, so it isn't repeated in
+> the reason text. The grant panel's buyer line is reworded the same way
+> ("buyer preview reference:"), and the forbidden-word list is widened from
+> paid/settled/purchased to also cover **bought/owned/unlocked** — a
+> negated/negative-context use of "granted" (`not_granted`, "No access has
+> been granted.") remains the only permitted appearance of that word; nothing
+> here ever affirms "access granted", "grant issued", "download unlocked", or
+> similar. **The gating logic is completely unchanged**: the grant preview
+> still shows ONLY for an `accepted_placeholder` decision (`pending`/
+> `rejected`/`unavailable`/`error` still show nothing), `paymentDecisionToGrant`
+> is still never imported or called, no `PurchaseGrant` is ever constructed,
+> and no invoice/checkout URL/QR/card form/signed URL/download ever appears.
+> 6 new tests across `test/render_payment.test.ts` and `test/
+> render_grant_preview.test.ts` cover: the purchase panel's explicit "Preview
+> only." notice, the widened forbidden-word check (paid/settled/purchased/
+> bought/owned/unlocked, plus a bare "granted" ban on the purchase panel,
+> which has no grant fields to negate), the grant panel's two exact sentences
+> ("No PurchaseGrant has been issued."/"No access has been granted."), a
+> structural check that every occurrence of "granted" on the grant panel sits
+> inside a negated sentence, and a source-level check that
+> `src/render/grant_preview.ts` never imports or calls
+> `paymentDecisionToGrant`. All pre-existing Stage 45/48 tests (escaping,
+> disabled-button presence, unavailable-panel fallback, no-mutation, board/
+> space/chat non-interference) continue to pass unmodified — this stage
+> changed wording/attributes only, never the public API or the gating logic.
+> Stage 57 candidate: **Provider preview docs hardening** (write up, the way
+> Stage 55 did for Runtime diagnostics, exactly what the Stage 49/52/53
+> promotion provider preview may and may not ever show — no new code). Prior
+> status:
+>
+> **Stage 55 — Runtime diagnostics docs hardening (docs only, no code).**
 > A new [`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md) fixes, in
 > writing, the safety contract that `src/render/runtime_status.ts` and the
 > `?runtimeStatus=1`/`&format=json` Worker route (Stages 50–54) already
@@ -38,9 +85,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > the way Stage 49/52 gated real provider invocation; diagnostics is not an
 > audit log). Every rule in the document matches code that already exists and
 > is already tested — this stage adds no new test either, since there is no
-> new behavior to cover. Stage 56 candidate: **Product purchase/grant preview
-> polish** (tighten the Stage 45/48 copy and layout now that the payment/
-> promotion diagnostics side is fully documented). Prior status:
+> new behavior to cover. Prior status:
 >
 > **Stage 54 — Runtime status JSON export, disabled by default.**
 > `src/render/runtime_status.ts` gains an opt-in JSON export of the SAME
@@ -1817,7 +1862,8 @@ D1 space directory caveats (do not over-promise on these):
 52. Promotion provider preview behind a dual flag (env + query, both required; product/space routes only) ✓
 53. Provider preview diagnostics hardening (`disabled`/`provider_error`/`provider_preview` states; sanitized reasons) ✓
 54. Runtime status JSON export, disabled by default (`?runtimeStatus=1&format=json`; strict allowlist) ✓
-55. Runtime diagnostics docs hardening ([`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md); docs only, no code) ✓ ← you are here
+55. Runtime diagnostics docs hardening ([`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md); docs only, no code) ✓
+56. Product purchase/grant preview polish (explicit "Preview only." notices, split grant-preview sentences, widened forbidden-word list; wording/attributes only, no gating change) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 

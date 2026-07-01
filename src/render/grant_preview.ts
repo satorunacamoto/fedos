@@ -9,18 +9,25 @@
  * is always `"preview_only"` and `.access` is always `"not_granted"`.
  *
  * This file NEVER claims a payment was made, settled, or that a purchase
- * completed, and it NEVER claims access/entitlement/download was granted or
- * unlocked. Copy is deliberately "Preview only" / "No access has been
- * granted." Every product/decision/actor-derived string is HTML-escaped.
+ * completed, bought, or was owned, and it NEVER claims access/entitlement/
+ * download was granted or unlocked. Copy is deliberately "Preview only." /
+ * "No PurchaseGrant has been issued." / "No access has been granted." — each
+ * as its own explicit sentence (Stage 56 polish; previously combined into one
+ * run-on sentence). Every product/decision/actor-derived string is
+ * HTML-escaped.
  */
 
 import type { Product } from "../commerce/types.js";
 import type { PaymentDecision } from "../payment/types.js";
 import { escapeHtml, shortenHex } from "./html.js";
 
-/** Fixed, honest explanation of what this preview is (and is not). */
-const PREVIEW_REASON =
-  "Preview only — no PurchaseGrant has been issued and no access has been granted.";
+/**
+ * Fixed, honest explanation of what this preview is (and is not) — two
+ * explicit, separately-matchable sentences. The standalone "Preview only."
+ * notice is rendered separately in `renderGrantPreview`, so it is not
+ * repeated here.
+ */
+const PREVIEW_REASON = "No PurchaseGrant has been issued. No access has been granted.";
 
 /**
  * A DISPLAY-ONLY view of what a grant record might look like. `source` is
@@ -68,17 +75,18 @@ export function buildGrantPreview(
 
 /**
  * Renders the grant preview panel. Shows the product, the fixed
- * `preview_only`/`not_granted` fields, and an escaped actor candidate (when
- * present) — never a `PurchaseGrant`, never an entitlement, never a download/
- * signed-URL affordance. Every string is HTML-escaped.
+ * `preview_only`/`not_granted` fields, and an escaped buyer preview reference
+ * (when present) — never a `PurchaseGrant`, never an entitlement, never a
+ * download/signed-URL affordance. Every string is HTML-escaped.
  */
 export function renderGrantPreview(view: GrantPreviewView): string {
   const actor = view.actorPubkey
-    ? `<p class="grant-preview-actor">buyer candidate: ` +
+    ? `<p class="grant-preview-actor">buyer preview reference: ` +
       `<code>${escapeHtml(shortenHex(view.actorPubkey))}</code></p>`
     : "";
   return (
-    `<section class="grant-preview" data-product="${escapeHtml(view.productId)}">` +
+    `<section class="grant-preview" data-product="${escapeHtml(view.productId)}" ` +
+    `data-testid="grant-preview" aria-label="Grant preview, preview only">` +
     `<h3>Grant preview</h3>` +
     `<p class="grant-preview-note">Preview only.</p>` +
     `<dl class="grant-preview-meta">` +
@@ -98,7 +106,8 @@ export function renderGrantPreview(view: GrantPreviewView): string {
  */
 export function renderGrantPreviewUnavailable(reason: string): string {
   return (
-    `<section class="grant-preview grant-preview-unavailable">` +
+    `<section class="grant-preview grant-preview-unavailable" ` +
+    `data-testid="grant-preview-unavailable" aria-label="Grant preview unavailable">` +
     `<h3>Grant preview unavailable</h3>` +
     `<p class="grant-preview-unavailable-reason">${escapeHtml(reason)}</p>` +
     `</section>`
