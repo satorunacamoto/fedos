@@ -8,7 +8,27 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 39 — Notification Bridge boundary skeleton.** A MINIMAL,
+> **Status: Stage 40 — Deniable Storage research boundary (docs only).** A new
+> research note, [`docs/deniable_storage_research.md`](docs/deniable_storage_research.md),
+> writes up the Shadow Vault / Deniable Storage / Hidden Volume threat model and its
+> hard prohibitions **without adding any code** — no crypto, no vault, no hidden
+> volume, no storage adapter, no IPFS. It fixes, in writing: this is a research
+> boundary not a spec; the `finger_id = 5`-style branch-selected shadow vault is a
+> **forbidden anti-pattern**; TrueCrypt/VeraCrypt are *reference only*; the hidden-
+> volume leak vectors (fixed-size container, padding, metadata, timestamp, access
+> pattern, backup, cloud sync, mobile-OS lifecycle); that AEAD/KDF/zeroize/memory-
+> lock belong to the future Rust Crypto Core; IPFS dangers (CID size/tree leak,
+> pinning/deletion impossibility, gateway traffic analysis, encrypted-payload
+> metadata leak); the Nostr relationship (events are public metadata, a deletion
+> request is not a deletion guarantee, relay IP-logging risk); **forbidden UI
+> wording** ("completely hidden", "zero-trace", "absolutely safe", "legally safe");
+> the preconditions for any future work (Rust core, audited primitives, fixed-size
+> container, nonce discipline, no direct Apple ID seed derivation, local-only
+> unlock, no cloud backup by default); and the conclusion — **no implementation, no
+> production guarantee, docs only, future separate package only.** No `src/` code, no
+> runtime/Worker wiring, and no Stage 1–39 boundary is touched. Prior status:
+>
+> **Stage 39 — Notification Bridge boundary skeleton.** A MINIMAL,
 > future-facing seam for signalling "something happened" to an external channel
 > (Telegram / LINE / APNs / FCM / Email) now lives in `src/notification/`, kept
 > entirely OUT of the current Nostr/Cloudflare core, the chat layer, and the
@@ -1148,7 +1168,8 @@ D1 space directory caveats (do not over-promise on these):
 36. Passkey Unlock boundary skeleton (WebAuthn/Passkey/Face ID as *unlock trigger*, not a key source) ✓
 37. Identity Provider boundary skeleton (Apple/Google/External as opaque auth references, not key sources) ✓
 38. EdgeRec Worker env selection boundary (select the promotion provider from Worker env) ✓
-39. Notification Bridge boundary skeleton (external notify seam; no secret/DM/payment content, no sending) ✓ ← you are here
+39. Notification Bridge boundary skeleton (external notify seam; no secret/DM/payment content, no sending) ✓
+40. Deniable Storage Research Boundary docs (threat model + prohibitions; docs only, no code) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
@@ -1172,6 +1193,11 @@ guardrails.
 - **Deniable Storage Research Boundary** — threat-model study of hidden/shadow
   vaults (TrueCrypt/VeraCrypt as *reference*), with leak vectors (size/padding/
   metadata/timestamp/access-pattern) named and **no production safety claim**.
+  *(Stage 40 writes this up as docs only in
+  [`docs/deniable_storage_research.md`](docs/deniable_storage_research.md) — the
+  forbidden `finger_id`-style branch anti-pattern, IPFS/Nostr leak risks,
+  forbidden UI wording, and the preconditions for any future work. No code, no
+  crypto, no storage; future separate package only.)*
 - **IPFS Asset Adapter** — a future public-media adapter behind the existing
   `AssetCache` boundary (gateway/pinning, not an embedded node); non-deletability,
   liveness, and traffic-analysis risks documented. Public/unlisted bytes only.
