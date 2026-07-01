@@ -8,7 +8,52 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 50 — Runtime provider health/status page (read-only).**
+> **Status: Stage 51 — Runtime status page categorization (still read-only).**
+> `src/render/runtime_status.ts` groups the Stage 50 status page's ten
+> components into five FIXED display categories:
+> **cache** (`eventCache`, `assetCache`), **storage** (`spaceDirectory`,
+> `metadataIndex`), **provider** (`promotionProvider`, `recommendationProvider`,
+> `paymentProvider`), **bridge** (`relayPublisher`, `notificationBridge`), and
+> **security** (`signatureVerifier`). A new `RuntimeComponentCategory` type
+> names these five, and `RuntimeComponentStatus` gains a `category` field
+> alongside its existing `name`/`label`. `RuntimeStatusView` gains `.sections:
+> readonly RuntimeComponentSection[]` — the same components grouped by
+> category, in the fixed cache→storage→provider→bridge→security order — while
+> its original **`.components` flat list is UNCHANGED**, kept for backward
+> compatibility. `buildRuntimeStatusView(runtime)` still only reads
+> `runtime.mode` and each component's `constructor.name`; it calls NO
+> provider/cache/bridge method. A new `renderRuntimeStatusSection(section)`
+> renders one category's heading (`"Cache"`, `"Storage"`, `"Provider"`,
+> `"Bridge"`, `"Security"`) plus its component rows via the EXISTING
+> `renderRuntimeComponentStatus` (now also rendering an escaped
+> `data-category` attribute); `renderRuntimeStatusPage(view)` now renders
+> `view.sections` instead of the flat list. **This stage changes NOTHING about
+> what is read or called** — still zero `getPromotions`/`getRecommendations`/
+> `requestPayment`/`notify`/`publish`/`assetCache.get,put,has,delete,clear`/
+> event-cache/directory/index calls, still no `fetch`, and still no endpoint
+> URL, API key, env value, secret, or viewer/actor pubkey ever rendered (none
+> of that is read from `RuntimeEnv` — only the constructed `AppRuntime`'s
+> component shapes). **The Worker route is UNCHANGED** — `?runtimeStatus=1`/
+> `=true` behaves exactly as Stage 50 left it; only the rendered HTML gained
+> category groupings. 11 tests in `test/render_runtime_status.test.ts` were
+> rewritten/extended (21 total, up from 10) to cover: sections in the fixed
+> category order, each category contains exactly its assigned components,
+> every component carries the right category, section/page headings render
+> for all five categories, category/name/label are all HTML-escaped
+> (including a malicious category value), no endpoint/API-key/secret ever
+> renders, and — using explicit method-counting spies on `assetCache` and
+> `paymentProvider` (not a `Proxy`, which would have falsely flagged the
+> harmless `constructor` property read as a "call") — building AND rendering
+> the view never invokes a single provider/cache method. `test/
+> worker_runtime_status.test.ts` gained a test confirming the rendered page
+> shows all five category headings; its other 10 tests (unwired methods,
+> unchanged board route, no secrets) continue to pass unmodified. Stage 52
+> candidate: **Promotion preview invocation UI behind dual flag** (connect
+> Stage 49's `invokePromotionProviderPreview` to a UI gated on both an env
+> flag and a query flag — still no real ad serving, tracking, or billing).
+> Prior status:
+>
+> **Stage 50 — Runtime provider health/status page (read-only).**
 > A new `src/render/runtime_status.ts` lets `?runtimeStatus=1` (or `=true`)
 > show WHICH implementation `createRuntime(env)` selected for each of the ten
 > `AppRuntime` boundaries (`eventCache`, `assetCache`, `spaceDirectory`,
@@ -47,10 +92,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `getPromotions`/`getRecommendations`/`requestPayment`/`notify`/`publish`/
 > `assetCache.get`), no `fetch(` to an external host, the existing default
 > board route is unaffected, the flag alone (no runtime) falls through
-> safely, and the default Worker export serves the page end-to-end. Stage 51
-> candidate: **Runtime status page polish / component categorization** (group
-> the ten components by concern — cache/directory/index vs. provider/bridge —
-> still read-only, still no method calls). Prior status:
+> safely, and the default Worker export serves the page end-to-end. Prior status:
 >
 > **Stage 49 — EdgeRec real provider invocation boundary, disabled by
 > default.**

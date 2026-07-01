@@ -3,12 +3,15 @@ import {
   buildRuntimeStatusView,
   renderRuntimeComponentStatus,
   renderRuntimeStatusPage,
+  renderRuntimeStatusSection,
 } from "../src/render/runtime_status.js";
 import type { RuntimeStatusView } from "../src/render/runtime_status.js";
 import { createRuntime } from "../src/runtime/create_runtime.js";
+import type { AssetCache, AssetKey, CachedAsset } from "../src/asset/types.js";
+import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/payment/types.js";
 
 describe("buildRuntimeStatusView", () => {
-  it("1. builds a view from a real runtime", () => {
+  it("builds a view from a real runtime (flat components, backward compatible)", () => {
     const runtime = createRuntime();
     const view = buildRuntimeStatusView(runtime);
     expect(view.mode).toBe("test");
@@ -22,10 +25,71 @@ describe("buildRuntimeStatusView", () => {
       "signatureVerifier",
       "promotionProvider",
       "recommendationProvider",
+      "paymentProvider",
       "relayPublisher",
       "notificationBridge",
+    ]);
+  });
+
+  it("1. builds categorized sections in a fixed order", () => {
+    const runtime = createRuntime();
+    const view = buildRuntimeStatusView(runtime);
+    expect(view.sections.map((s) => s.category)).toEqual([
+      "cache",
+      "storage",
+      "provider",
+      "bridge",
+      "security",
+    ]);
+  });
+
+  it("2. the cache section contains eventCache/assetCache", () => {
+    const view = buildRuntimeStatusView(createRuntime());
+    const cache = view.sections.find((s) => s.category === "cache")!;
+    expect(cache.components.map((c) => c.name)).toEqual(["eventCache", "assetCache"]);
+  });
+
+  it("3. the storage section contains spaceDirectory/metadataIndex", () => {
+    const view = buildRuntimeStatusView(createRuntime());
+    const storage = view.sections.find((s) => s.category === "storage")!;
+    expect(storage.components.map((c) => c.name)).toEqual(["spaceDirectory", "metadataIndex"]);
+  });
+
+  it("4. the provider section contains promotion/recommendation/payment providers", () => {
+    const view = buildRuntimeStatusView(createRuntime());
+    const provider = view.sections.find((s) => s.category === "provider")!;
+    expect(provider.components.map((c) => c.name)).toEqual([
+      "promotionProvider",
+      "recommendationProvider",
       "paymentProvider",
     ]);
+  });
+
+  it("5. the bridge section contains relayPublisher/notificationBridge", () => {
+    const view = buildRuntimeStatusView(createRuntime());
+    const bridge = view.sections.find((s) => s.category === "bridge")!;
+    expect(bridge.components.map((c) => c.name)).toEqual(["relayPublisher", "notificationBridge"]);
+  });
+
+  it("6. the security section contains signatureVerifier", () => {
+    const view = buildRuntimeStatusView(createRuntime());
+    const security = view.sections.find((s) => s.category === "security")!;
+    expect(security.components.map((c) => c.name)).toEqual(["signatureVerifier"]);
+  });
+
+  it("every component carries its category", () => {
+    const view = buildRuntimeStatusView(createRuntime());
+    const byName = Object.fromEntries(view.components.map((c) => [c.name, c.category]));
+    expect(byName.eventCache).toBe("cache");
+    expect(byName.assetCache).toBe("cache");
+    expect(byName.spaceDirectory).toBe("storage");
+    expect(byName.metadataIndex).toBe("storage");
+    expect(byName.signatureVerifier).toBe("security");
+    expect(byName.promotionProvider).toBe("provider");
+    expect(byName.recommendationProvider).toBe("provider");
+    expect(byName.paymentProvider).toBe("provider");
+    expect(byName.relayPublisher).toBe("bridge");
+    expect(byName.notificationBridge).toBe("bridge");
   });
 
   it("labels each component with a coarse type (constructor name or safe fallback)", () => {
@@ -47,23 +111,48 @@ describe("buildRuntimeStatusView", () => {
     expect(payment?.label).toBe("PlaceholderPaymentProvider");
   });
 
-  it("does not mutate the runtime", () => {
+  it("11. does not mutate the runtime and never calls a component method", () => {
+    const calls: string[] = [];
     const runtime = createRuntime();
+    const spiedAssetCache: AssetCache = {
+      async get(key: AssetKey, now: number): Promise<CachedAsset | undefined> {
+        calls.push("get");
+        return runtime.assetCache.get(key, now);
+      },
+      async put(asset) {
+        calls.push("put");
+        return runtime.assetCache.put(asset);
+      },
+      async has(key, now) {
+        calls.push("has");
+        return runtime.assetCache.has(key, now);
+      },
+      async delete(key) {
+        calls.push("delete");
+        return runtime.assetCache.delete(key);
+      },
+      async clear() {
+        calls.push("clear");
+        return runtime.assetCache.clear();
+      },
+    };
     const snap = JSON.stringify(Object.keys(runtime));
-    buildRuntimeStatusView(runtime);
+    buildRuntimeStatusView({ ...runtime, assetCache: spiedAssetCache });
     expect(JSON.stringify(Object.keys(runtime))).toBe(snap);
+    // Only a property READ (constructor.name), never a method CALL.
+    expect(calls).toEqual([]);
   });
 });
 
-describe("renderRuntimeComponentStatus / renderRuntimeStatusPage", () => {
-  it("2. the page renders the runtime mode", () => {
+describe("renderRuntimeComponentStatus / renderRuntimeStatusSection / renderRuntimeStatusPage", () => {
+  it("the page renders the runtime mode", () => {
     const runtime = createRuntime();
     const html = renderRuntimeStatusPage(buildRuntimeStatusView(runtime));
     expect(html).toContain("Runtime status");
     expect(html).toContain("mode: <code>test</code>");
   });
 
-  it("3. the page lists every provider/cache label", () => {
+  it("the page lists every provider/cache label", () => {
     const runtime = createRuntime();
     const html = renderRuntimeStatusPage(buildRuntimeStatusView(runtime));
     expect(html).toContain("InMemoryEventCache");
@@ -73,10 +162,52 @@ describe("renderRuntimeComponentStatus / renderRuntimeStatusPage", () => {
     expect(html).toContain("MockPromotionProvider");
   });
 
-  it("4. escapes a malicious component label", () => {
+  it("7. renders a heading for every section/category", () => {
+    const html = renderRuntimeStatusPage(buildRuntimeStatusView(createRuntime()));
+    for (const heading of ["Cache", "Storage", "Provider", "Bridge", "Security"]) {
+      expect(html).toContain(`>${heading}<`);
+    }
+  });
+
+  it("8. escapes category, name, and label", () => {
+    const html = renderRuntimeStatusSection({
+      category: "cache",
+      components: [
+        {
+          name: '"><script>name</script>',
+          label: "<b>label</b>",
+          category: "cache",
+        },
+      ],
+    });
+    expect(html).not.toContain("<script>name</script>");
+    expect(html).toContain("&lt;script&gt;name&lt;/script&gt;");
+    expect(html).not.toContain("<b>label</b>");
+    expect(html).toContain("&lt;b&gt;label&lt;/b&gt;");
+  });
+
+  it("escapes a malicious category on the section itself", () => {
+    const html = renderRuntimeStatusSection({
+      // @ts-expect-error deliberately testing an unexpected/malicious category value
+      category: '"><script>cat</script>',
+      components: [],
+    });
+    expect(html).not.toContain("<script>cat</script>");
+    expect(html).toContain("&lt;script&gt;cat&lt;/script&gt;");
+  });
+
+  it("escapes a malicious component label on the page", () => {
     const view: RuntimeStatusView = {
       mode: "test",
-      components: [{ name: '"><script>evil</script>', label: "<b>Fake</b>" }],
+      components: [{ name: '"><script>evil</script>', label: "<b>Fake</b>", category: "cache" }],
+      sections: [
+        {
+          category: "cache",
+          components: [
+            { name: '"><script>evil</script>', label: "<b>Fake</b>", category: "cache" },
+          ],
+        },
+      ],
     };
     const html = renderRuntimeStatusPage(view);
     expect(html).not.toContain("<script>evil</script>");
@@ -85,7 +216,7 @@ describe("renderRuntimeComponentStatus / renderRuntimeStatusPage", () => {
     expect(html).toContain("&lt;b&gt;Fake&lt;/b&gt;");
   });
 
-  it("5. never exposes an endpoint URL, API key, or env secret", () => {
+  it("9. never exposes an endpoint URL, API key, or env secret", () => {
     const runtime = createRuntime({
       PROMOTION_ENDPOINT: "https://secret-endpoint.example/api",
       PROMOTION_API_KEY: "sk_live_should_never_appear",
@@ -98,12 +229,35 @@ describe("renderRuntimeComponentStatus / renderRuntimeStatusPage", () => {
     expect(html).not.toContain("http://");
   });
 
-  it("6. does not mutate the view", () => {
+  it("10. does not call any component method while rendering", () => {
+    const calls: string[] = [];
+    const runtime = createRuntime();
+    const spiedPayment: PaymentProvider = {
+      getStatus() {
+        calls.push("getStatus");
+        return runtime.paymentProvider.getStatus();
+      },
+      getCapabilities() {
+        calls.push("getCapabilities");
+        return runtime.paymentProvider.getCapabilities();
+      },
+      async requestPayment(request: PaymentRequest): Promise<PaymentDecision> {
+        calls.push("requestPayment");
+        return runtime.paymentProvider.requestPayment(request);
+      },
+    };
+    const view = buildRuntimeStatusView({ ...runtime, paymentProvider: spiedPayment });
+    renderRuntimeStatusPage(view);
+    expect(calls).toEqual([]);
+  });
+
+  it("does not mutate the view", () => {
     const runtime = createRuntime();
     const view = buildRuntimeStatusView(runtime);
     const snap = JSON.stringify(view);
     renderRuntimeStatusPage(view);
     renderRuntimeComponentStatus(view.components[0]!);
+    renderRuntimeStatusSection(view.sections[0]!);
     expect(JSON.stringify(view)).toBe(snap);
   });
 

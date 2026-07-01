@@ -97,8 +97,8 @@ function spyRuntime(): { runtime: AppRuntime; calls: SpyCallCounts } {
   return { runtime, calls };
 }
 
-describe("Stage 50 — Runtime provider status page", () => {
-  it("1. ?runtimeStatus=1 renders a status page", async () => {
+describe("Stage 50/51 — Runtime provider status page (categorized)", () => {
+  it("1. ?runtimeStatus=1 still renders a status page", async () => {
     const { runtime } = spyRuntime();
     const res = await handleRequest(
       new Request("http://localhost/?runtimeStatus=1"),
@@ -112,6 +112,25 @@ describe("Stage 50 — Runtime provider status page", () => {
     );
     const body = await res.text();
     expect(body).toContain("Runtime status");
+  });
+
+  it("the status page has category section headings", async () => {
+    const { runtime } = spyRuntime();
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?runtimeStatus=1"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runtime,
+      )
+    ).text();
+    for (const heading of ["Cache", "Storage", "Provider", "Bridge", "Security"]) {
+      expect(body).toContain(`>${heading}<`);
+    }
   });
 
   it("2. the status page includes the runtime mode", async () => {
