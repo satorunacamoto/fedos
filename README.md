@@ -8,7 +8,55 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 48 — product grant preview boundary.**
+> **Status: Stage 49 — EdgeRec real provider invocation boundary, disabled by
+> default.**
+> A new `src/promotion/invocation.ts` adds the missing middle step between
+> Stage 38's env SELECTION of an `EdgeRecPromotionProvider` and Stage 41's
+> mock-only preview renderer: a single narrow seam,
+> `invokePromotionProviderPreview(provider, request, options)`, through which
+> an already-selected `PromotionProvider` (real EdgeRec or otherwise) may
+> ACTUALLY be invoked for a preview. `options` requires an explicit
+> `allowRealProvider: boolean` (no default enables it — omitting it behaves as
+> `false`) and a `mode: PromotionInvocationMode` (`"disabled"` |
+> `"mock_preview"` | `"provider_preview"`), plus optional `now?`/`onError?`.
+> `provider.getPromotions(request)` is called ONLY when `allowRealProvider ===
+> true` AND `mode === "provider_preview"` — every other combination
+> (`allowRealProvider: false`, or `mode: "disabled"`, or `mode:
+> "mock_preview"`) returns a `PromotionInvocationDecision` with `state:
+> "disabled"`/`"mock_preview"` and the provider is never touched. A thrown/
+> rejected provider call is caught and reported as `state: "provider_error"`
+> (never re-thrown); `onError`, if supplied, gets a diagnostic message. A
+> successful call returns `state: "provider_preview"` plus the provider's raw
+> `PromotionDecision` under `.decision` — a rendering INPUT only, to be shown
+> through the EXISTING Stage 41 `renderPromotionDecisionPreview` (which never
+> renders a `destination` link or an image). **This stage implements no ad
+> serving, ranking, auction, CTR/A-B testing, click tracking, impression
+> tracking, or billing, and calls no Stripe/Telegram/HTMLRewriter.** The module
+> issues no `fetch` of its own — any network I/O happens only inside whatever
+> `provider` the caller injects, and only when this function decides to call
+> it. **The Stage 41 mock preview path (`renderMockPromotionPreview` driving
+> `MockPromotionProvider` directly) is completely unchanged** — `mode:
+> "mock_preview"` is a label only in this new function; it does not invoke the
+> provider itself. **Deliberately NOT wired into the runtime or the Worker in
+> this stage** — per the safety-first plan, Stage 49 ships the boundary and
+> its tests only, so there is no `?edgeRecPreview=1` query flag and no
+> `ENABLE_EDGE_REC_PROVIDER_PREVIEW` env field yet; wiring is left for a future
+> stage once the boundary has proven itself in isolation. 14 new tests in
+> `test/promotion_invocation.test.ts` cover: `allowRealProvider=false` and
+> `mode="disabled"`/`"mock_preview"` never call the provider,
+> `provider_preview`+`allowRealProvider=true` calls it exactly once, a thrown
+> provider yields `provider_error` (never throws), selected candidates pass
+> through on success, the existing preview renderer surfaces no destination/
+> image for an EdgeRec-shaped candidate, no input mutation, no click/
+> impression/billing/auction/rank field on the result, a fake "network"
+> provider is invoked only under the explicit allow+mode combination and never
+> otherwise, the Stage 41 mock path is unaffected, and both the Worker and
+> Runtime sources contain zero reference to `invokePromotionProviderPreview`
+> (proving the non-wiring). Stage 50 candidate: **Runtime provider health/
+> status page** (a read-only page showing which providers `createRuntime`
+> selected — no invocation, no real request). Prior status:
+>
+> **Stage 48 — product grant preview boundary.**
 > A new `src/render/grant_preview.ts` shows what a `PurchaseGrant`
 > (`src/commerce/types.ts`) WOULD look like if one were ever issued from an
 > `accepted_placeholder` `PaymentDecision` — WITHOUT ever calling
@@ -51,11 +99,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > draft product shows none, `NoopPaymentProvider` under `?paymentPreview=1`
 > shows none, `PlaceholderPaymentProvider` under the flag shows one, no
 > `paymentDecisionToGrant` call, no grant-issuance wording, and board/space/
-> chat routes never show one. Stage 49 candidate: **EdgeRec real provider
-> invocation boundary behind a disabled flag** (Stage 38's `EdgeRecPromotionProvider`
-> selection exists; a future stage could let it actually be invoked behind an
-> always-off flag — still no real ad serving, click tracking, or billing).
-> Prior status:
+> chat routes never show one. Prior status:
 >
 > **Stage 47 — product purchase preview uses the runtime payment
 > provider in preview-only mode.**
