@@ -597,6 +597,77 @@ describe("worker chat route (read-only)", () => {
   });
 });
 
+describe("worker unified directory (Stage 30)", () => {
+  it("1. the default board shows the unified directory", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('class="unified-directory"');
+    // The three reused sections are all present in sample mode.
+    expect(body).toContain('class="space-directory"');
+    expect(body).toContain('class="product-directory"');
+    expect(body).toContain('class="chat-directory"');
+  });
+
+  it("2. the directory contains ?space= links", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('href="?space=general"');
+  });
+
+  it("3. the directory contains ?product= links", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('href="?product=guide-pdf"');
+  });
+
+  it("4. the directory contains ?chat= links", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).toContain('href="?chat=lounge-chat"');
+  });
+
+  it("5. escapes a malicious ?actor value on the unified directory", async () => {
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?actor=" + encodeURIComponent("<script>")),
+      )
+    ).text();
+    expect(body).not.toContain("viewing as <code><script>");
+    expect(body).toContain("&lt;script&gt;");
+  });
+
+  it("6. the existing ?space route still works", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?space=general"))
+    ).text();
+    expect(body).toContain('class="space-landing"');
+    expect(body).toContain("General community thread.");
+    // The unified directory only appears on the no-param board.
+    expect(body).not.toContain('class="unified-directory"');
+  });
+
+  it("7. the existing ?product route still works", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    expect(body).toContain('class="product-page"');
+    expect(body).toContain("Field Guide (PDF)");
+  });
+
+  it("8. the existing ?chat route still works", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?chat=lounge-chat"))
+    ).text();
+    expect(body).toContain('class="chat-room"');
+    expect(body).toContain("Welcome to the lounge chat");
+  });
+
+  it("9. introduces no MeshKV / EdgeRec / publisher / NIP-07 auto-wire", () => {
+    const src: string = workerSource;
+    expect(src).not.toContain("MeshKVBrowserClient");
+    expect(src).not.toContain("EdgeRecProvider");
+    expect(src).not.toContain("EdgeRecPromotionProvider");
+    expect(src).not.toContain("WebSocketRelayPublisher");
+    expect(src).not.toContain("Nip07EventSigner");
+  });
+});
+
 describe("worker promotion placeholders (read-only)", () => {
   it("1. ?space=general shows empty header/footer promotion placeholders", async () => {
     const body = await (

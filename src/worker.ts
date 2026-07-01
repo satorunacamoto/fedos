@@ -100,6 +100,7 @@ import {
 } from "./chat/directory.js";
 import { canPostChat, canReadChat } from "./chat/policy.js";
 import { SAMPLE_CHATS, SAMPLE_CHAT_MESSAGES } from "./chat/sample_chats.js";
+import { renderUnifiedDirectory } from "./render/directory.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -356,10 +357,20 @@ function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): stri
   }
 
   if (spaceId === null) {
-    let lead =
-      data.lead + renderSpaceDirectory(listReadableSpaces(spaces, actor), actor || undefined);
-    // Sample mode surfaces the product and chat directories below the spaces.
-    if (data.showPromotions) lead += productDirectoryView(actor) + chatDirectoryView(actor);
+    // Stage 30: the Space / Product / Chat directories are arranged into one
+    // unified section. Spaces are always shown; the product and chat sections
+    // are sample-mode only (the live read-only path adds no new data lookup).
+    const directoryHtml = renderUnifiedDirectory({
+      spaces: listReadableSpaces(spaces, actor),
+      products: data.showPromotions
+        ? listViewableProducts(SAMPLE_PRODUCTS, actor, SAMPLE_GRANTS)
+        : [],
+      chats: data.showPromotions ? listReadableChats(SAMPLE_CHATS, actor) : [],
+      actorPubkey: actor || undefined,
+      showProducts: data.showPromotions,
+      showChats: data.showPromotions,
+    });
+    const lead = data.lead + directoryHtml;
     return statusFor(queryOptions, lead, buildThreads(data.accepted));
   }
 

@@ -260,6 +260,13 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px
 .chat-msg-meta{font-size:.75rem;color:#888;display:flex;gap:6px;align-items:center}
 .chat-author{font-family:monospace}
 .chat-msg-content{white-space:pre-wrap;word-break:break-word;margin-top:2px}
+.unified-directory{border:1px solid rgba(127,127,127,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px}
+.unified-directory>h2{margin:0 0 4px}
+.directory-intro{font-size:.85rem;color:#666;margin:0 0 8px}
+.directory-section{margin-top:8px}
+.directory-section-title{font-size:.9rem;color:#555;margin:8px 0 2px}
+.directory-step{display:inline-block;min-width:1.2em;text-align:center;font-size:.7rem;color:#fff;background:rgba(127,127,127,.6);border-radius:50%;padding:0 4px}
+.directory-empty{color:#888;font-style:italic;padding:16px 0;text-align:center}
 `.trim();
 
 /**

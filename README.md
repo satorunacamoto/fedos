@@ -8,7 +8,16 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 29 — MeshKV boundary wired to the imported implementation.** The
+> **Status: Stage 30 — Product / Chat / Space unified directory page.** The
+> default (no-param) board now arranges the read-only Space, Product, and Chat
+> directories into ONE section via `src/render/directory.ts`'s
+> `renderUnifiedDirectory` (reusing the existing per-type helpers and their
+> `?space=`/`?product=`/`?chat=` routes; product/chat sections are sample-mode
+> only). It is pure presentation: **no new data lookup, no network, no new route,
+> and no change to the Product/Chat/Space types** — the Stage 29 MeshKV boundary,
+> the runtime, and every other boundary are untouched. Prior status:
+>
+> **Stage 29 — MeshKV boundary wired to the imported implementation.** The
 > real MeshKV browser project has been imported (an external, git-ignored checkout
 > whose runtime is a namespace module exporting `init`/`get`/`put`/`load`/`remove`,
 > backed by IndexedDB + WebRTC). `packages/meshkv` is now the typed boundary for
@@ -177,6 +186,16 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   placement's own (escaped) label only. **No placeholder renders an ad candidate,
   destination link, price-to-pay, or download**, and none of these helpers call a
   promotion provider or the network.
+  `directory.ts` (Stage 30) arranges those Space/Product/Chat directories into one
+  read-only section: `renderUnifiedDirectory(view)` renders a Spaces + Products +
+  Chats block (each section toggleable via `showSpaces`/`showProducts`/`showChats`,
+  all default true; an empty state when none are shown), reusing
+  `renderSpaceDirectory`/`renderProductDirectory`/`renderChatDirectory` and linking
+  only to the existing `?space=`/`?product=`/`?chat=` routes. `renderDirectorySection`
+  wraps a helper's (pre-escaped) body under an escaped title, and
+  `renderDirectoryEmptyState` is the "nothing to browse" notice. It adds **no new
+  data lookup, no network, no new route** — it only orders already-built fragments,
+  escaping the titles/actor text it introduces and trusting the helpers' escaping.
 - `src/nostr/messages.ts` — pure NIP-01 relay-message parser (EVENT/EOSE/NOTICE).
 - `src/nostr/signature.ts` — `SignatureVerifier` interface + `Noop`/`RejectAll`
   implementations.
@@ -235,8 +254,11 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   → not found, denied → access denied). `?chat=<id>` renders a read-only chat room
   over the fixed sample chats, gated by `canReadChat` (unknown → not found, denied
   → access denied, allowed → room + plaintext messages + a `canPostChat` hint).
-  The default board (sample mode) surfaces the product and readable-chat
-  directories. Chat messages are plaintext labels only — **nothing is sent,
+  The default (no-param) board surfaces a **unified directory** (`renderUnifiedDirectory`)
+  that combines the readable-space, viewable-product, and readable-chat listings into
+  one section; the product and chat sections are sample-mode only (the live read-only
+  path shows just the spaces and adds no new data lookup). Chat messages are plaintext
+  labels only — **nothing is sent,
   nothing is encrypted, and there is no send form/button or message delivery**. No
   asset bytes, signed URLs, downloads, or payment paths are introduced. On a
   readable space,
@@ -659,6 +681,6 @@ D1 space directory caveats (do not over-promise on these):
 26. Asset cache composed fallback chain (R2 → MeshKV → in-memory) ✓
 27. Chat read-only UI labels ✓
 28. MeshKV external package boundary (`packages/meshkv` + browser-client adapter) ✓
-29. MeshKV boundary wired to the imported implementation (real `MeshKVApi`) ✓ ← you are here
-30. Product / Chat / Space unified directory page
+29. MeshKV boundary wired to the imported implementation (real `MeshKVApi`) ✓
+30. Product / Chat / Space unified directory page ✓ ← you are here
 31. Vault / encrypted identity layer (AEAD, external signer)
