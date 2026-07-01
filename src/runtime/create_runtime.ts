@@ -358,6 +358,15 @@ export function selectPaymentProvider(
   return new NoopPaymentProvider();
 }
 
+/**
+ * Whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy — HALF of the Stage 52
+ * dual-flag gate for invoking a real `promotionProvider` for a preview. Pure;
+ * never mutates `env`.
+ */
+export function isPromotionProviderPreviewAllowed(env?: RuntimeEnv): boolean {
+  return isEnvFlagTruthy(env?.ENABLE_PROMOTION_PROVIDER_PREVIEW);
+}
+
 /** Cloudflare when any binding/endpoint is present, local with a bare env, else test. */
 function resolveMode(env?: RuntimeEnv): RuntimeMode {
   if (!env) return "test";
@@ -399,5 +408,6 @@ export function createRuntime(
     relayPublisher: overrides.relayPublisher ?? selectRelayPublisher(env),
     notificationBridge: selectNotificationBridge(env, overrides),
     paymentProvider: selectPaymentProvider(env, overrides),
+    promotionProviderPreviewAllowed: isPromotionProviderPreviewAllowed(env),
   };
 }

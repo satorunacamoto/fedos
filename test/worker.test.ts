@@ -556,7 +556,9 @@ describe("worker product route (read-only)", () => {
     expect(src).not.toContain("InMemoryAssetCache");
     expect(src).not.toContain("arrayBuffer");
     expect(src).not.toContain("createSignedUrl");
-    expect(src).not.toContain("EdgeRecPromotionProvider");
+    // Stage 52 legitimately mentions `EdgeRecPromotionProvider` in a doc
+    // comment; the invariant is that the Worker never constructs one.
+    expect(src).not.toMatch(/new\s+EdgeRecPromotionProvider/);
   });
 });
 
@@ -886,7 +888,9 @@ describe("worker unified directory (Stage 30)", () => {
     const src: string = workerSource;
     expect(src).not.toContain("MeshKVBrowserClient");
     expect(src).not.toContain("EdgeRecProvider");
-    expect(src).not.toContain("EdgeRecPromotionProvider");
+    // Stage 52 legitimately mentions `EdgeRecPromotionProvider` in a doc
+    // comment; the invariant is that the Worker never constructs one itself.
+    expect(src).not.toMatch(/new\s+EdgeRecPromotionProvider/);
     expect(src).not.toContain("WebSocketRelayPublisher");
     expect(src).not.toContain("Nip07EventSigner");
   });
@@ -912,10 +916,13 @@ describe("worker promotion placeholders (read-only)", () => {
 
   it("3. introduces no provider call or new fetch wiring in the Worker", () => {
     const src: string = workerSource;
-    // The placeholders are rendered purely; no promotion provider is constructed.
-    expect(src).not.toContain("EdgeRecPromotionProvider");
+    // The empty placeholders are rendered purely; no provider is constructed
+    // directly here. Stage 52 legitimately mentions `EdgeRecPromotionProvider`
+    // in a doc comment and calls the gated `invokePromotionProviderPreview`
+    // seam (see promotion_provider_preview_ui.test.ts) — the invariant is
+    // that the Worker never constructs a provider itself.
+    expect(src).not.toMatch(/new\s+EdgeRecPromotionProvider/);
     expect(src).not.toContain("MockPromotionProvider");
-    expect(src).not.toContain("getPromotions");
     expect(src).not.toContain("getRecommendations");
     expect(src).not.toContain("edge_rec_adapter");
   });

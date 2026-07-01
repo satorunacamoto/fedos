@@ -185,11 +185,15 @@ describe("worker mock promotion preview mode", () => {
     expect(body).toContain("promotion-placeholder");
   });
 
-  it("4. the Worker wires no EdgeRec / real provider for the preview", () => {
+  it("4. the mock preview flag path constructs no EdgeRec / real provider", () => {
     const src: string = workerSource;
-    expect(src).not.toContain("EdgeRecPromotionProvider");
+    // Stage 52 legitimately adds a SEPARATE, dual-flag-gated real-provider
+    // preview path (see promotion_provider_preview_ui.test.ts) — but the
+    // Worker never imports the edge-rec adapter module or constructs
+    // `EdgeRecPromotionProvider` directly, and `?promotionPreview=1` alone
+    // still drives ONLY the mock provider (see test 1/2 above).
     expect(src).not.toContain("edge_rec_adapter");
-    expect(src).not.toContain("getPromotions");
+    expect(src).not.toMatch(/new\s+EdgeRecPromotionProvider/);
     expect(src).not.toContain("getRecommendations");
   });
 

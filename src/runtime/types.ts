@@ -157,6 +157,16 @@ export interface RuntimeEnv {
    * "manual_placeholder" | "external_placeholder".
    */
   readonly PAYMENT_DEFAULT_RAIL?: string;
+  /**
+   * EXPLICIT opt-in half of the Stage 52 dual-flag gate for invoking a REAL
+   * `promotionProvider` (e.g. `EdgeRecPromotionProvider`) for a preview.
+   * Truthy = `true` or a truthy string ("1"/"true"/"yes"/"on"). This alone
+   * does NOT invoke anything — the Worker also requires an explicit per-request
+   * query flag (`?edgeRecPreview=1` / `?providerPromotionPreview=1`) before it
+   * ever calls `invokePromotionProviderPreview`. Reflected into
+   * `AppRuntime.promotionProviderPreviewAllowed`; selection/flag only.
+   */
+  readonly ENABLE_PROMOTION_PROVIDER_PREVIEW?: string | boolean;
 }
 
 /**
@@ -217,4 +227,13 @@ export interface AppRuntime {
    * Lightning/Stripe/Apple Pay/Google Pay rail is contacted.
    */
   readonly paymentProvider: PaymentProvider;
+  /**
+   * Stage 52: whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy in env —
+   * HALF of the dual-flag gate for invoking a REAL `promotionProvider` for a
+   * preview. This flag alone never invokes anything; the Worker also requires
+   * an explicit per-request query flag before calling
+   * `invokePromotionProviderPreview`. Constructing a runtime with this `true`
+   * calls no provider method and issues no `fetch`.
+   */
+  readonly promotionProviderPreviewAllowed: boolean;
 }

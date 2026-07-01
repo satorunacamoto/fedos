@@ -215,9 +215,15 @@ describe("invokePromotionProviderPreview", () => {
   });
 });
 
-describe("EdgeRec invocation boundary stays unwired", () => {
-  it("Worker source does not import or call invokePromotionProviderPreview", () => {
-    expect(workerSource).not.toMatch(/invokePromotionProviderPreview/);
+describe("EdgeRec invocation boundary", () => {
+  it("Worker source invokes invokePromotionProviderPreview only from the dual-flag-gated helper (Stage 52)", () => {
+    // Stage 52: the Worker legitimately imports/calls this now, but ONLY from
+    // renderProviderPromotionPreview, and ONLY behind the env+query dual flag.
+    // The invariant is that it is never called unconditionally/directly.
+    const calls = workerSource.match(/invokePromotionProviderPreview\s*\(/g) ?? [];
+    expect(calls.length).toBe(1);
+    expect(workerSource).toMatch(/allowRealProvider:\s*true/);
+    expect(workerSource).toMatch(/mode:\s*["']provider_preview["']/);
   });
 
   it("Runtime source does not import or call invokePromotionProviderPreview", () => {

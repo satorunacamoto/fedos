@@ -8,7 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 51 — Runtime status page categorization (still read-only).**
+> **Status: Stage 52 — promotion provider preview behind a dual flag.**
+> Stage 49's `invokePromotionProviderPreview` is now connected to the Worker's
+> product/space routes, but ONLY behind TWO independent flags that must BOTH
+> be true: an env flag (`ENABLE_PROMOTION_PROVIDER_PREVIEW`, reflected into
+> the new `AppRuntime.promotionProviderPreviewAllowed`) AND a per-request query
+> flag (`?edgeRecPreview=1`/`=true` or `?providerPromotionPreview=1`/`=true`,
+> via the new `isProviderPromotionPreviewEnabled(url)`). Either flag alone
+> calls the provider ZERO times. The new `renderProviderPromotionPreview`
+> helper in `worker.ts` is the ONLY call site for
+> `invokePromotionProviderPreview`: without the env flag it renders a
+> `disabled` explanation (no candidates, no provider contact); with both flags
+> it calls `invokePromotionProviderPreview(runtime.promotionProvider, request,
+> { allowRealProvider: true, mode: "provider_preview" })` and renders the
+> result via two NEW renderers in `src/render/promotion.ts` —
+> `renderProviderPromotionCandidatePreview`/`renderProviderPromotionDecisionPreview`
+> (worded "Provider preview only" / "Not a served advertisement" rather than
+> "mock", since the underlying provider may be a real `EdgeRecPromotionProvider`)
+> and `renderPromotionInvocationPreview` (dispatches on the invocation's
+> `state`, so a `provider_error` renders a small escaped status note — never
+> throws, never fakes a decision). **The pre-existing `?promotionPreview=1`
+> mock-only path (Stage 41) is completely UNCHANGED** — it still only ever
+> constructs `MockPromotionProvider` and is entirely independent of the new
+> dual-flag path; both can coexist on the same page. `buildProductPlacement`/
+> `buildSpacePlacement` are called with NO `viewerPubkey` option for the
+> provider-preview request, exactly as the mock path already did — the actor
+> is NEVER placed on the request. **Applies to the product/space routes
+> ONLY** — the board (no `?space`) and chat routes never call the provider
+> regardless of either flag. **This stage implements no real ad serving, no
+> ranking/auction/CTR, no click/impression tracking, and no billing/Stripe/
+> Telegram/HTMLRewriter** — the new renderers never emit a `destination` link
+> or an image, and candidate title/description/sponsor/metadata are all
+> HTML-escaped. 16 new tests in `test/promotion_provider_preview_ui.test.ts`
+> cover: query-flag-only and env-flag-only both call the provider zero times,
+> both flags together call it exactly once on the product route and exactly
+> once on the space route, the board and chat routes never call it regardless
+> of flags, `?promotionPreview=1` still drives the mock path only, a thrown
+> provider renders `provider_error` (never throws out), no destination/image/
+> click-tracking markup renders, candidate fields are escaped, the actor/
+> viewer pubkey is never sent to the provider, the disabled explanation is
+> escaped-safe, a fake "network" provider is invoked only under the explicit
+> dual-flag combination, and no request mutation. Five pre-existing tests
+> (across `test/worker.test.ts`, `test/render_promotion_preview.test.ts`,
+> and `test/promotion_invocation.test.ts`) that asserted zero
+> `EdgeRecPromotionProvider` mention anywhere in the Worker source are updated
+> to check for no *construction* (`new EdgeRecPromotionProvider(`) instead —
+> the class name now legitimately appears in a doc comment, and
+> `invokePromotionProviderPreview(` is confirmed to appear from exactly one
+> (gated) call site. Stage 53 candidate: **Provider preview diagnostics
+> hardening** (clearer `disabled`/`provider_error` states and reasons on the
+> rendered preview — still no serving/tracking/billing). Prior status:
+>
+> **Stage 51 — Runtime status page categorization (still read-only).**
 > `src/render/runtime_status.ts` groups the Stage 50 status page's ten
 > components into five FIXED display categories:
 > **cache** (`eventCache`, `assetCache`), **storage** (`spaceDirectory`,
@@ -47,11 +98,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > the view never invokes a single provider/cache method. `test/
 > worker_runtime_status.test.ts` gained a test confirming the rendered page
 > shows all five category headings; its other 10 tests (unwired methods,
-> unchanged board route, no secrets) continue to pass unmodified. Stage 52
-> candidate: **Promotion preview invocation UI behind dual flag** (connect
-> Stage 49's `invokePromotionProviderPreview` to a UI gated on both an env
-> flag and a query flag — still no real ad serving, tracking, or billing).
-> Prior status:
+> unchanged board route, no secrets) continue to pass unmodified. Prior status:
 >
 > **Stage 50 — Runtime provider health/status page (read-only).**
 > A new `src/render/runtime_status.ts` lets `?runtimeStatus=1` (or `=true`)

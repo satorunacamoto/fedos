@@ -114,7 +114,10 @@ import { canPostChat, canReadChat } from "./chat/policy.js";
 import { SAMPLE_CHATS, SAMPLE_CHAT_MESSAGES } from "./chat/sample_chats.js";
 import { renderUnifiedDirectory } from "./render/directory.js";
 import { buildProductPlacement, buildSpacePlacement } from "./promotion/bridge.js";
-import { renderMockPromotionPreview } from "./render/promotion.js";
+import { renderMockPromotionPreview, renderPromotionInvocationPreview } from "./render/promotion.js";
+import { invokePromotionProviderPreview } from "./promotion/invocation.js";
+import type { PromotionProvider } from "./promotion/adapter.js";
+import type { PromotionRequest } from "./promotion/types.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -197,6 +200,25 @@ function htmlResponse(html: string, status = 200): Response {
 export function isPromotionPreviewEnabled(url: URL): boolean {
   const value = url.searchParams.get("promotionPreview");
   return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into REAL provider preview mode
+ * via `?edgeRecPreview=1`/`=true` or `?providerPromotionPreview=1`/`=true`.
+ * This is HALF of the Stage 52 dual-flag gate: `runtime.promotionProvider` is
+ * invoked via `invokePromotionProviderPreview` ONLY when this query flag is
+ * ALSO paired with a truthy `ENABLE_PROMOTION_PROVIDER_PREVIEW` env flag
+ * (`runtime.promotionProviderPreviewAllowed`). Applies to the product/space
+ * routes only — the query flag alone, with no env flag, still calls no
+ * provider (a disabled explanation may render instead — see
+ * `renderProviderPromotionPreview`).
+ */
+export function isProviderPromotionPreviewEnabled(url: URL): boolean {
+  const isTruthy = (value: string | null): boolean => value === "1" || value === "true";
+  return (
+    isTruthy(url.searchParams.get("edgeRecPreview")) ||
+    isTruthy(url.searchParams.get("providerPromotionPreview"))
+  );
 }
 
 /**
@@ -336,6 +358,42 @@ async function resolveProductPaymentDecision(
 }
 
 /**
+ * Stage 52: the DUAL-FLAG-gated real provider preview. Calls
+ * `invokePromotionProviderPreview` (Stage 49) with `allowRealProvider: true`
+ * and `mode: "provider_preview"` ONLY when `envAllowed` (from
+ * `runtime.promotionProviderPreviewAllowed`, i.e.
+ * `ENABLE_PROMOTION_PROVIDER_PREVIEW`) is true AND a `provider` is supplied —
+ * the caller (`renderProductRoute`/`renderBoard`'s space branch) only invokes
+ * this function at all once the QUERY flag
+ * (`?edgeRecPreview=1`/`?providerPromotionPreview=1`) is present, so both
+ * halves of the gate are required end to end. Without the env flag, this
+ * renders a `disabled` explanation instead of calling anything. `request`
+ * comes from `buildProductPlacement`/`buildSpacePlacement` called with NO
+ * `viewerPubkey` option — the actor/viewer pubkey is never placed on the
+ * request. A provider error is caught inside `invokePromotionProviderPreview`
+ * and rendered as `provider_error`, never thrown.
+ */
+async function renderProviderPromotionPreview(
+  request: PromotionRequest,
+  provider: PromotionProvider | undefined,
+  envAllowed: boolean,
+): Promise<string> {
+  if (!envAllowed || !provider) {
+    return renderPromotionInvocationPreview({
+      state: "disabled",
+      reason:
+        "provider preview requires ENABLE_PROMOTION_PROVIDER_PREVIEW (env) in addition to the query flag",
+      invokedAt: Date.now(),
+    });
+  }
+  const result = await invokePromotionProviderPreview(provider, request, {
+    allowRealProvider: true,
+    mode: "provider_preview",
+  });
+  return renderPromotionInvocationPreview(result);
+}
+
+/**
  * Routes `?product=<id>` against the fixed sample products (read-only):
  * - unknown id       -> not-found page (+ the viewable directory).
  * - view denied      -> access-denied page.
@@ -365,6 +423,9 @@ async function renderProductRoute(
   promotionPreview = false,
   paymentPreview = false,
   paymentProvider?: PaymentProvider,
+  providerPromotionPreview = false,
+  promotionProvider?: PromotionProvider,
+  providerPreviewAllowed = false,
 ): Promise<string> {
   const product = findProductById(SAMPLE_PRODUCTS, productId);
   if (!product) {
@@ -391,6 +452,17 @@ async function renderProductRoute(
   const preview = promotionPreview
     ? await renderMockPromotionPreview(buildProductPlacement(product))
     : "";
+  // Stage 52: ONLY under the explicit query flag, and gated a second time
+  // inside `renderProviderPromotionPreview` on the env flag — see that
+  // function's doc comment. `buildProductPlacement(product)` is called with
+  // NO `viewerPubkey` option, so the actor is never placed on the request.
+  const providerPreview = providerPromotionPreview
+    ? await renderProviderPromotionPreview(
+        buildProductPlacement(product),
+        promotionProvider,
+        providerPreviewAllowed,
+      )
+    : "";
   // Stage 45/47/48: always appended on this route (view already allowed
   // above). The runtime provider is passed ONLY when `paymentPreview` is
   // explicitly set; otherwise the decision falls back to a local
@@ -415,6 +487,7 @@ async function renderProductRoute(
         actorPubkey: actor || undefined,
       }) +
       preview +
+      providerPreview +
       purchasePreview +
       grantPreview,
   });
@@ -475,7 +548,13 @@ function renderChatRoute(data: BoardData, chatId: string, actor: string): string
  * board/directory path never touches it. `paymentProvider` (the runtime's
  * Stage 46 env-selected `PaymentProvider`), when supplied, is likewise used
  * ONLY by the product route's purchase preview, and only under `?paymentPreview=1`
- * (Stage 47) — board/space/chat never call it.
+ * (Stage 47) — board/space/chat never call it. `promotionProvider` (the
+ * runtime's `PromotionProvider`) and `providerPreviewAllowed` (Stage 52's
+ * `runtime.promotionProviderPreviewAllowed`, i.e. the
+ * `ENABLE_PROMOTION_PROVIDER_PREVIEW` env flag) are likewise used ONLY by the
+ * product/space routes, and only under `?edgeRecPreview=1`/
+ * `?providerPromotionPreview=1` — the board (no `?space`) and chat routes
+ * never call the provider regardless of these flags.
  */
 async function renderBoard(
   url: URL,
@@ -483,6 +562,8 @@ async function renderBoard(
   directory: SpaceDirectory,
   assetCache?: AssetCache,
   paymentProvider?: PaymentProvider,
+  promotionProvider?: PromotionProvider,
+  providerPreviewAllowed = false,
 ): Promise<string> {
   const productId = url.searchParams.get("product");
   const chatId = url.searchParams.get("chat");
@@ -495,6 +576,9 @@ async function renderBoard(
   const promotionPreview = data.showPromotions && isPromotionPreviewEnabled(url);
   // Stage 47: opt-in only, product route only — see `renderProductRoute`.
   const paymentPreview = isPaymentPreviewEnabled(url);
+  // Stage 52: opt-in only, product/space routes only — see
+  // `renderProviderPromotionPreview`. Never true on the board/chat routes.
+  const providerPromotionPreview = isProviderPromotionPreviewEnabled(url);
 
   if (productId !== null) {
     return renderProductRoute(
@@ -505,6 +589,9 @@ async function renderBoard(
       promotionPreview,
       paymentPreview,
       paymentProvider,
+      providerPromotionPreview,
+      promotionProvider,
+      providerPreviewAllowed,
     );
   }
 
@@ -557,6 +644,18 @@ async function renderBoard(
   // mock-provider-driven preview block for the space header slot.
   if (promotionPreview) {
     lead += await renderMockPromotionPreview(buildSpacePlacement(space));
+  }
+
+  // Stage 52: ONLY under the explicit query flag, and gated a second time on
+  // the env flag inside `renderProviderPromotionPreview`. `buildSpacePlacement
+  // (space)` is called with NO `viewerPubkey` option — the actor is never
+  // placed on the request.
+  if (providerPromotionPreview) {
+    lead += await renderProviderPromotionPreview(
+      buildSpacePlacement(space),
+      promotionProvider,
+      providerPreviewAllowed,
+    );
   }
 
   // `?compose=1` adds a MOCK-ONLY publish preview panel. It builds an unsigned
@@ -659,6 +758,12 @@ export async function handleRequest(
     );
   }
 
+  // Stage 52: derived once from `runtime` (when supplied) and threaded into
+  // `renderBoard` — used ONLY by the product/space routes, and only when the
+  // per-request query flag is ALSO present (see `renderProviderPromotionPreview`).
+  const promotionProvider = runtime?.promotionProvider;
+  const providerPreviewAllowed = runtime?.promotionProviderPreviewAllowed ?? false;
+
   const relayParam = url.searchParams.get("relay");
 
   if (relayParam !== null) {
@@ -677,7 +782,17 @@ export async function handleRequest(
         cache,
         verifier,
       );
-      return htmlResponse(await renderBoard(url, data, directory, assetCache, paymentProvider));
+      return htmlResponse(
+        await renderBoard(
+          url,
+          data,
+          directory,
+          assetCache,
+          paymentProvider,
+          promotionProvider,
+          providerPreviewAllowed,
+        ),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const page = renderPage(buildThreads([]), {
@@ -688,7 +803,17 @@ export async function handleRequest(
   }
 
   const data = await buildSampleBoard(Date.now());
-  return htmlResponse(await renderBoard(url, data, directory, assetCache, paymentProvider));
+  return htmlResponse(
+    await renderBoard(
+      url,
+      data,
+      directory,
+      assetCache,
+      paymentProvider,
+      promotionProvider,
+      providerPreviewAllowed,
+    ),
+  );
 }
 
 /** Worker bindings. The KV namespace is optional; without it we fall back. */
@@ -730,6 +855,15 @@ export interface Env {
   PAYMENT_PROVIDER?: string;
   ENABLE_PAYMENT_PLACEHOLDER?: string;
   PAYMENT_DEFAULT_RAIL?: string;
+  /**
+   * HALF of the Stage 52 dual-flag gate for invoking a REAL `promotionProvider`
+   * (e.g. `EdgeRecPromotionProvider`) for a preview. Even when truthy, the
+   * Worker still requires the per-request query flag
+   * (`?edgeRecPreview=1`/`?providerPromotionPreview=1`) before it calls
+   * `invokePromotionProviderPreview` — and even then, only on the product/space
+   * routes. No ad is ever auto-served; this is selection/gating only.
+   */
+  ENABLE_PROMOTION_PROVIDER_PREVIEW?: string;
 }
 
 /**
@@ -763,10 +897,14 @@ export default {
     // route's purchase preview, and ONLY under the explicit `?paymentPreview=1`
     // flag; otherwise the preview keeps using its own local
     // `PlaceholderPaymentProvider` exactly as Stage 45 left it. (Stage 50) the
-    // whole runtime is passed through too, but ONLY so `?runtimeStatus=1` can
-    // render a read-only type-label page — no provider/cache/bridge method is
-    // ever called from it. No real publish, no NIP-07, no auto-served ads, no
-    // asset bytes/downloads, and no automatic
+    // whole runtime is passed through too, so `?runtimeStatus=1` can render a
+    // read-only type-label page (Stage 50) — no provider/cache/bridge method
+    // is called from that path. (Stage 52) `handleRequest` also derives
+    // `runtime.promotionProvider`/`.promotionProviderPreviewAllowed` from it,
+    // but the provider is invoked ONLY on the product/space routes and ONLY
+    // when the per-request query flag (`?edgeRecPreview=1`/
+    // `?providerPromotionPreview=1`) is ALSO present. No real publish, no
+    // NIP-07, no auto-served ads, no asset bytes/downloads, and no automatic
     // `requestPayment()`/`paymentDecisionToGrant` call from this selection.
     const runtime = createRuntime(env);
     return handleRequest(
