@@ -8,7 +8,32 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 32 — MeshKV browser lifecycle boundary.** Bringing a MeshKV
+> **Status: Stage 33 — Vault boundary skeleton.** A MINIMAL, future-facing seam
+> for the FedOS Vault / Crypto / Identity layer now lives in `src/vault/`, kept
+> entirely OUT of the current Nostr/Cloudflare core. `VaultBoundary`
+> (`getState`/`getCapabilities`/`unlock`/`lock`/`isUnlocked`) plus the
+> `VaultState` (`locked`/`unlocked`/`unavailable`/`error`), `VaultStatus`,
+> `VaultDecision`, `VaultCapability` (all `*_placeholder`), and `VaultUnlockRequest`
+> types define shapes ONLY. **This is a boundary, not crypto.** It performs **no
+> cryptography, no key generation, no key derivation, and no seed storage** — no
+> AEAD/XOR, no BIP39/BIP32, no NIP-44. `NoopVaultBoundary` is the safe default:
+> permanently `unavailable`, it never unlocks and advertises nothing.
+> `InMemoryVaultBoundary` (dev/test) models a `locked ↔ (placeholder) unlocked`
+> lifecycle by holding ONLY a coarse status — no secret/key/seed/token field
+> exists. **Apple ID / Passkey are `unlock` factors ONLY, never a key-derivation
+> source**: `unlock` reads only the request `kind` (a fixed enum), derives nothing
+> from the opaque, non-secret `reference`, and never turns a JWT / Apple `sub` /
+> user id / Passkey credential into key material; a successful `unlock` is a
+> "placeholder unlocked" state change and nothing more. `unlock`/`lock` never
+> throw — a malformed request lands in `error` (state + `decision.reason`) instead
+> — and neither mutates its input. Deniable/shadow storage stays RESEARCH only (a
+> placeholder capability name, no shipped feature and no safety claim). **Nothing
+> is auto-wired**: `createRuntime` and the Worker never construct or reference a
+> vault (tests assert both sources are vault-free), so the whole Stage 1–32 core
+> is untouched. See [`docs/vault_crypto_identity.md`](docs/vault_crypto_identity.md)
+> for the design notes this seam is drawn from. Prior status:
+>
+> **Stage 32 — MeshKV browser lifecycle boundary.** Bringing a MeshKV
 > node online is now an explicit, separate step in `src/asset/meshkv_lifecycle.ts`,
 > kept OUT of `createRuntime` and the Worker. `MeshKVLifecycle`
 > (`MeshKVBrowserLifecycle` / `createMeshKVLifecycle(node, initOptions?)`) drives a
@@ -403,6 +428,29 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   adapter (or composing the chain) only makes it *ready* to call out behind its
   injected client. The runtime never reaches for a global `fetch`, and the Worker
   does not auto-wire the MeshKV opt-in.
+- `src/vault/*` — the **Vault boundary skeleton** (Stage 33): a future-facing seam
+  for the FedOS Vault / Crypto / Identity layer sketched in
+  `docs/vault_crypto_identity.md`, kept OUT of the current core. `types.ts` defines
+  shapes ONLY — `VaultState` (`locked`/`unlocked`/`unavailable`/`error`),
+  `VaultStatus`, `VaultDecision`, `VaultCapability` (four `*_placeholder` labels:
+  `identity_unlock`/`deniable_storage`/`aead_crypto`/`external_signer`),
+  `VaultUnlockRequest` (a `kind` enum + an OPAQUE, non-secret `reference`), and the
+  `VaultBoundary` interface (`getState`/`getCapabilities`/`unlock`/`lock`/
+  `isUnlocked`). `noop_vault.ts`'s `NoopVaultBoundary` is the safe default:
+  permanently `unavailable`, it never unlocks, advertises no capabilities, and its
+  every method is total. `memory_vault.ts`'s `InMemoryVaultBoundary` (dev/test)
+  models a `locked ↔ (placeholder) unlocked` lifecycle holding ONLY a coarse
+  `VaultStatus` — **there is no secret/key/seed/token/passphrase field**. **This is
+  boundary only — no crypto, no key generation, no key derivation, no seed
+  storage** (no AEAD/XOR/BIP39/BIP32/NIP-44 anywhere). `unlock` reads only the
+  request `kind`, derives nothing from the `reference`, and never turns an Apple ID
+  JWT / `sub` / user id / Passkey credential into key material — **Apple ID /
+  Passkey are unlock factors ONLY, never a key source** — so a successful unlock is
+  a "placeholder unlocked" state change and nothing more; `lock` returns to
+  `locked`. Neither throws (a malformed request → `error` state + `decision.reason`)
+  and neither mutates its input. Deniable/shadow storage is a placeholder capability
+  name = RESEARCH only, with **no security, privacy, or hidden-storage claim**. It
+  is NOT wired into `createRuntime` or the Worker.
 - `packages/meshkv/*` — MeshKV as a **standalone external package**
   (`@nostr-window/meshkv`), the typed boundary for the imported browser runtime so
   the host depends only on its contract. `index.ts` is the stable entry point
@@ -618,6 +666,19 @@ confidentiality guarantees and is not a security audit of the wider system.
   origin (the opt-in `"volatile"` strategy clears local/peer layers only, never
   R2). There are still **no signed URLs, downloads, delivery, or payment**, and the
   composite opens no connection and issues no `fetch` of its own.
+- **The vault boundary is a seam, not a vault.** `src/vault/*` defines an
+  interface and no-op/in-memory placeholders — it holds **no key, no seed, no
+  passphrase, no token, and no secret bytes**, and it performs **no cryptography,
+  key generation, or key derivation** (no AEAD/XOR/BIP39/BIP32/NIP-44). A
+  "placeholder unlocked" state exposes no key and grants no crypto.
+  `NoopVaultBoundary` never leaves `unavailable`. **Apple ID / Passkey are `unlock`
+  factors ONLY** — a JWT, Apple `sub`/user id, or Passkey credential is never used
+  as, or fed to derive, a key or seed; `unlock` reads only the request `kind` and
+  derives nothing from the opaque `reference`. Operations never throw (a bad
+  request becomes an `error` state + non-sensitive `reason`) and never mutate their
+  input. "Deniable"/shadow storage is a placeholder name for RESEARCH only — do NOT
+  describe this boundary as "safe", "secure", "zero-trace", or able to "hide"
+  anything. It is not wired into the runtime or Worker.
 - No application-level encryption is provided; when added it will use a vetted
   AEAD library, never hand-rolled XOR.
 
@@ -761,8 +822,9 @@ D1 space directory caveats (do not over-promise on these):
 29. MeshKV boundary wired to the imported implementation (real `MeshKVApi`) ✓
 30. Product / Chat / Space unified directory page ✓
 31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓
-32. MeshKV browser lifecycle boundary (explicit connect/startSignaling) ✓ ← you are here
-33. Vault / encrypted identity layer (AEAD, external signer)
+32. MeshKV browser lifecycle boundary (explicit connect/startSignaling) ✓
+33. Vault boundary skeleton (interface + no-op/in-memory; no crypto, no keys) ✓ ← you are here
+34. Crypto Core Boundary skeleton (`CryptoProvider` interface + `NoopCryptoProvider`)
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
@@ -775,10 +837,13 @@ guardrails.
 
 - **Vault Boundary** — local encrypted master-seed storage unlocked by an auth
   factor (Apple ID/Passkey as *unlock only*, never a key-derivation source). No
-  key custody in the app.
+  key custody in the app. *(Stage 33 lands the interface + no-op/in-memory
+  skeleton in `src/vault/` — shapes only, still no crypto/keys/seed.)*
 - **Crypto Core Boundary** — a separate Rust crate (`packages/fedos-core-rust`,
   provisional) for AEAD + KDF + secret zeroing; managed-runtime memory-zeroing
-  limits are documented, not hand-waved. AEAD mandatory, XOR forbidden.
+  limits are documented, not hand-waved. AEAD mandatory, XOR forbidden. *(Stage 34
+  is expected to land the `CryptoProvider` interface + a `NoopCryptoProvider` first
+  — a TypeScript seam that fixes the future Rust-core swap point, no real crypto.)*
 - **Deniable Storage Research Boundary** — threat-model study of hidden/shadow
   vaults (TrueCrypt/VeraCrypt as *reference*), with leak vectors (size/padding/
   metadata/timestamp/access-pattern) named and **no production safety claim**.
