@@ -8,7 +8,43 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 38 — EdgeRec Worker env selection boundary.** `createRuntime`
+> **Status: Stage 39 — Notification Bridge boundary skeleton.** A MINIMAL,
+> future-facing seam for signalling "something happened" to an external channel
+> (Telegram / LINE / APNs / FCM / Email) now lives in `src/notification/`, kept
+> entirely OUT of the current Nostr/Cloudflare core, the chat layer, and the
+> commerce layer. It fixes the shape of a notification as COARSE, non-sensitive
+> metadata so a real transport can drop in later — WITHOUT ever carrying a secret.
+> The `NotificationBridge` interface (`getStatus`/`getCapabilities`/`notify`) plus
+> the `NotificationChannel` / `NotificationCapability` (six `*_placeholder` labels:
+> `telegram`/`line`/`apns`/`fcm`/`email`/`local`), `NotificationKind`
+> (`chat_activity`/`space_activity`/`product_update`/`moderation_notice`/
+> `payment_status_placeholder`/`system_notice`), `NotificationPayload`, and
+> `NotificationDecision` types define shapes ONLY. **This is a boundary, not a
+> notifier.** It **sends nothing, calls no Telegram/LINE Bot API, no APNs, no FCM,
+> and no email service, and issues no `fetch`**. A `NotificationPayload` carries only
+> `kind`, `channel`, a generic `title`, an optional GENERIC `bodyPreview` (e.g. "New
+> chat activity"), opaque `targetRef`/`actorRef`, a `createdAt`, and non-secret
+> `metadata` — **never DM/message content, a secret, key, seed, token, payment
+> secret, entitlement, or credential**. `policy.ts` enforces this: `canSendNotification`
+> DENIES a payload whose fields or metadata look sensitive, `sanitizeNotificationPayload`
+> returns a cleaned copy (sensitive title → generic, sensitive preview/refs dropped,
+> sensitive metadata filtered), and `isSensitiveNotificationField` flags secret
+> markers (it deliberately does NOT flag a plain hex pubkey). `NoopNotificationBridge`
+> is the safe default: permanently `unavailable`, it denies every attempt.
+> `PlaceholderNotificationBridge` (dev/test) evaluates the policy and returns the
+> decision (`accepted`/`rejected`) but still **delivers nothing** — `accepted` is a
+> placeholder queue label. `bridge.ts`'s pure `chatEventToNotification` /
+> `spaceEventToNotification` / `productEventToNotification` build payloads from
+> domain objects that OMIT the message body, the event content, and any
+> payment/download detail (type-only domain imports). **APNs/FCM `metadata` can leak
+> to third parties** — the policy keeps it non-sensitive. **Nothing is auto-wired**:
+> `createRuntime` and the Worker never reference the notification layer (tests assert
+> both sources are notification-free, that the sources import no
+> Telegram/LINE/APNs/FCM/Email transport, and that they issue no `fetch`/send call),
+> so the whole Stage 1–38 core is untouched. Telegram/LINE/APNs/FCM/Email remain
+> FUTURE bridges, not implemented. Prior status:
+>
+> **Stage 38 — EdgeRec Worker env selection boundary.** `createRuntime`
 > can now SELECT the `PromotionProvider` / `RecommendationProvider` from EdgeRec
 > config on the `RuntimeEnv` / Worker `Env` — and NOTHING more. New env fields
 > (`RECOMMENDATION_API_KEY`, `PROMOTION_SEND_VIEWER_PUBKEY`,
@@ -594,6 +630,30 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   adapter (or composing the chain) only makes it *ready* to call out behind its
   injected client. The runtime never reaches for a global `fetch`, and the Worker
   does not auto-wire the MeshKV opt-in.
+- `src/notification/*` — the **Notification Bridge boundary skeleton** (Stage 39):
+  a future-facing seam for signalling "something happened" to an external channel
+  (Telegram / LINE / APNs / FCM / Email), kept OUT of the current core, the chat
+  layer, and the commerce layer. `types.ts` defines shapes ONLY — the
+  `NotificationChannel` / `NotificationCapability` (six `*_placeholder` labels),
+  `NotificationKind` (`chat_activity`/`space_activity`/`product_update`/
+  `moderation_notice`/`payment_status_placeholder`/`system_notice`),
+  `NotificationPayload` (kind + channel + generic title + optional generic
+  `bodyPreview` + opaque `targetRef`/`actorRef` + `createdAt` + non-secret
+  `metadata`), `NotificationDecision`, and the `NotificationBridge` interface
+  (`getStatus`/`getCapabilities`/`notify`). `policy.ts`'s pure `canSendNotification`
+  DENIES a sensitive payload, `sanitizeNotificationPayload` returns a cleaned copy,
+  and `isSensitiveNotificationField` flags secret markers (never a plain hex
+  pubkey). `noop_notification.ts`'s `NoopNotificationBridge` is the permanently
+  `unavailable` default that denies every attempt; `PlaceholderNotificationBridge`
+  (dev/test) returns the policy decision but **delivers nothing**. `bridge.ts`'s pure
+  `chatEventToNotification` / `spaceEventToNotification` / `productEventToNotification`
+  build payloads that OMIT the message body, event content, and payment/download
+  detail (type-only domain imports). **This is boundary only — it sends nothing,
+  calls no Bot API/APNs/FCM/LINE/Email service, and issues no `fetch`**; a payload
+  **never carries DM/message content, a secret, key, seed, token, payment secret,
+  entitlement, or credential** (APNs/FCM `metadata` leakage is kept out by the
+  policy). It is NOT wired into `createRuntime` or the Worker, and the external
+  bridges are not implemented.
 - `src/identity/*` — the **Passkey Unlock boundary skeleton** (Stage 36): a
   future-facing seam that fixes WebAuthn / Passkey / Face ID / Touch ID as the
   AUTHENTICATION boundary that UNLOCKS the Vault — **not** a key source — drawn from
@@ -1087,7 +1147,8 @@ D1 space directory caveats (do not over-promise on these):
 35. Product/Asset preview metadata from runtime (`runtime.assetCache`-backed previews) ✓
 36. Passkey Unlock boundary skeleton (WebAuthn/Passkey/Face ID as *unlock trigger*, not a key source) ✓
 37. Identity Provider boundary skeleton (Apple/Google/External as opaque auth references, not key sources) ✓
-38. EdgeRec Worker env selection boundary (select the promotion provider from Worker env) ✓ ← you are here
+38. EdgeRec Worker env selection boundary (select the promotion provider from Worker env) ✓
+39. Notification Bridge boundary skeleton (external notify seam; no secret/DM/payment content, no sending) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
