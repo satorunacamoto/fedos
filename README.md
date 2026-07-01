@@ -8,7 +8,43 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 35 — Product asset preview metadata from runtime.** The
+> **Status: Stage 36 — Passkey Unlock boundary skeleton.** A MINIMAL,
+> future-facing seam that fixes WebAuthn / Passkey / Face ID / Touch ID as an
+> AUTHENTICATION boundary that UNLOCKS the Vault — **not** a key source — now lives
+> in `src/identity/`, kept entirely OUT of the current Nostr/Cloudflare core, the
+> Vault seam, and the crypto core. It encodes the intended UX seam (Face ID →
+> Passkey → Vault unlock → identity available) WITHOUT building any of it. The
+> `PasskeyBoundary` interface
+> (`getStatus`/`getCapabilities`/`beginAuthentication`/`cancelAuthentication`) plus
+> the `PasskeyStatus` (`idle`/`waiting`/`authenticated`/`cancelled`/`unavailable`/
+> `error`), `PasskeyReport`, `PasskeyCapability` (four `*_placeholder` labels:
+> `faceid`/`touchid`/`passkey`/`external_webauthn`), and the
+> `PasskeyAuthenticationRequest` (a `kind` of `apple_passkey`/`android_passkey`/
+> `webauthn`/`external` + an OPAQUE, non-secret `reference`) types define shapes
+> ONLY. **This is a boundary, not authentication.** It **starts no authentication,
+> calls no WebAuthn/Passkey/Apple/Google API, launches no Face ID or Touch ID,
+> touches no Secure Enclave/Android Keystore, and generates or derives no key** —
+> Passkey / Apple ID / Google are **unlock triggers ONLY, never a key source**, and
+> nothing turns a credential/JWT/challenge/token/seed into key material. The request
+> carries an **OPAQUE, non-secret `reference` only** — never a credential, JWT,
+> secret, token, challenge response, private/public key, seed, passphrase, or bytes.
+> `NoopPasskeyBoundary` is the safe default: permanently `unavailable`, it
+> advertises nothing and every attempt is denied. `PlaceholderPasskeyBoundary`
+> (dev/test) models an `idle → (placeholder) authenticated ↔ cancelled` lifecycle
+> holding ONLY a coarse `PasskeyReport` — its `authenticated` state is a LABEL that
+> **does NOT unlock the Vault**. `vault_bridge.ts`'s pure
+> `passkeyAuthenticationToVaultRequest` maps the authenticator `kind` to a
+> `VaultUnlockKind` and passes the opaque `reference` through unchanged (type-only
+> Vault dependency; it derives no key and wires nothing). **Nothing is auto-wired**:
+> `createRuntime` and the Worker never reference the identity layer (tests assert
+> both sources are identity-free, that `src/identity` imports no crypto/WebAuthn/
+> auth library, and that its Vault import is type-only), so the whole Stage 1–35
+> core is untouched. A future real unlock flow — connected to the planned Rust core
+> — is not implemented. See
+> [`docs/vault_crypto_identity.md`](docs/vault_crypto_identity.md) for the design
+> notes this seam is drawn from. Prior status:
+>
+> **Stage 35 — Product asset preview metadata from runtime.** The
 > `?product=<id>` route can now source its PUBLIC/UNLISTED asset PREVIEW metadata
 > from the runtime's `AssetCache`, not just the fixed sample list.
 > `src/commerce/asset_preview.ts`'s `resolveProductAssetPreviews(product,
@@ -489,6 +525,33 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   adapter (or composing the chain) only makes it *ready* to call out behind its
   injected client. The runtime never reaches for a global `fetch`, and the Worker
   does not auto-wire the MeshKV opt-in.
+- `src/identity/*` — the **Passkey Unlock boundary skeleton** (Stage 36): a
+  future-facing seam that fixes WebAuthn / Passkey / Face ID / Touch ID as the
+  AUTHENTICATION boundary that UNLOCKS the Vault — **not** a key source — drawn from
+  `docs/vault_crypto_identity.md` and kept OUT of the current core, the Vault seam,
+  and the crypto core. `types.ts` defines shapes ONLY — `PasskeyStatus`
+  (`idle`/`waiting`/`authenticated`/`cancelled`/`unavailable`/`error`),
+  `PasskeyReport`, `PasskeyCapability` (four `*_placeholder` labels:
+  `faceid`/`touchid`/`passkey`/`external_webauthn`), `PasskeyAuthenticationRequest`
+  (a `kind` of `apple_passkey`/`android_passkey`/`webauthn`/`external` + an OPAQUE,
+  non-secret `reference`), and the `PasskeyBoundary` interface
+  (`getStatus`/`getCapabilities`/`beginAuthentication`/`cancelAuthentication`).
+  `passkey_boundary.ts`'s `NoopPasskeyBoundary` is the safe default: permanently
+  `unavailable`, it advertises nothing and every attempt is denied;
+  `PlaceholderPasskeyBoundary` (dev/test) models an `idle → (placeholder)
+  authenticated ↔ cancelled` lifecycle holding ONLY a coarse `PasskeyReport` — its
+  `authenticated` state is a LABEL that **does NOT unlock the Vault**.
+  `vault_bridge.ts`'s pure `passkeyAuthenticationToVaultRequest` maps the
+  authenticator `kind` to a `VaultUnlockKind` (apple/android/webauthn passkeys →
+  `passkey`; external → `external_signer`) and passes the opaque `reference` through
+  unchanged — a **type-only** Vault dependency that derives no key and wires
+  nothing. **This is boundary only — no authentication, no key generation, no key
+  derivation**: it starts no auth, calls no WebAuthn/Passkey/Apple/Google API,
+  launches no Face ID/Touch ID, touches no Secure Enclave/Android Keystore, holds no
+  credential/JWT/token/seed, and mutates no request. Passkey / Apple ID / Google are
+  **unlock triggers ONLY, never a key source**. It is NOT wired into `createRuntime`
+  or the Worker, and a future real unlock flow (the planned Rust core) is not
+  implemented.
 - `src/crypto/*` — the **Crypto Core boundary skeleton** (Stage 34): a
   future-facing seam that fixes the swap point for a real crypto core (the
   provisional `packages/fedos-core-rust` / a RustCrypto-backed WASM/FFI module),
