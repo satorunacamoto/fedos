@@ -726,3 +726,30 @@ D1 space directory caveats (do not over-promise on these):
 31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓ ← you are here
 32. MeshKV browser lifecycle boundary (explicit connect/startSignaling)
 33. Vault / encrypted identity layer (AEAD, external signer)
+
+### Future candidate boundaries (design notes only — not scheduled)
+
+These are **exploratory** layers sketched in
+[`docs/vault_crypto_identity.md`](docs/vault_crypto_identity.md). Each is a
+future, opt-in boundary kept OUT of the current core; nothing here is
+implemented, and none carries a security guarantee. When picked up, each lands as
+an interface + mock/no-op first, with its own review, respecting all existing
+guardrails.
+
+- **Vault Boundary** — local encrypted master-seed storage unlocked by an auth
+  factor (Apple ID/Passkey as *unlock only*, never a key-derivation source). No
+  key custody in the app.
+- **Crypto Core Boundary** — a separate Rust crate (`packages/fedos-core-rust`,
+  provisional) for AEAD + KDF + secret zeroing; managed-runtime memory-zeroing
+  limits are documented, not hand-waved. AEAD mandatory, XOR forbidden.
+- **Deniable Storage Research Boundary** — threat-model study of hidden/shadow
+  vaults (TrueCrypt/VeraCrypt as *reference*), with leak vectors (size/padding/
+  metadata/timestamp/access-pattern) named and **no production safety claim**.
+- **IPFS Asset Adapter** — a future public-media adapter behind the existing
+  `AssetCache` boundary (gateway/pinning, not an embedded node); non-deletability,
+  liveness, and traffic-analysis risks documented. Public/unlisted bytes only.
+- **Notification Bridge** — APNs/FCM/Telegram/LINE as contentless, opt-in
+  notification pointers (no secrets in payloads; provider metadata leakage noted).
+- **Payment / Lightning Boundary** — a future external, non-custodial payment
+  seam (Breez SDK / Greenlight as investigation candidates); liquidity is the
+  hard problem. No payment implemented or scheduled.
