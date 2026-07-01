@@ -8,7 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 47 — product purchase preview uses the runtime payment
+> **Status: Stage 48 — product grant preview boundary.**
+> A new `src/render/grant_preview.ts` shows what a `PurchaseGrant`
+> (`src/commerce/types.ts`) WOULD look like if one were ever issued from an
+> `accepted_placeholder` `PaymentDecision` — WITHOUT ever calling
+> `paymentDecisionToGrant` and WITHOUT issuing a real `PurchaseGrant`.
+> `buildGrantPreview(product, decision, actorPubkey?, now?)` returns a
+> `GrantPreviewView | null`: `null` for every non-`accepted_placeholder` status
+> (`pending`/`rejected`/`unavailable`/`error`); otherwise a view whose
+> `source` is ALWAYS the literal `"preview_only"` and whose `access` is ALWAYS
+> the literal `"not_granted"` — values a real `PurchaseGrantSource` never
+> takes, so the view can never be confused with an actual grant at the type
+> level. `renderGrantPreview(view)` renders the product, the fixed
+> `preview_only`/`not_granted` fields, an escaped buyer-candidate line when an
+> actor is present, and a fixed reason: **"Preview only — no PurchaseGrant has
+> been issued and no access has been granted."** `renderGrantPreviewUnavailable
+> (reason)` is a small escaped-reason panel for standalone/future use (the
+> Worker does not currently call it — see below). The Worker's product route
+> now shares ONE `PaymentDecision` between the purchase preview AND the grant
+> preview (`resolveProductPaymentDecision`, replacing the old
+> `renderProductPurchasePreview` helper) and appends the grant preview right
+> after the purchase preview: it shows **regardless of `?paymentPreview=1`** —
+> purely gated on the shared decision being `accepted_placeholder` — because a
+> `NoopPaymentProvider` selected via Stage 46 env config yields `unavailable`
+> either way, while the default local `PlaceholderPaymentProvider` (or an
+> explicitly-selected `PlaceholderPaymentProvider`) yields `accepted_placeholder`
+> and shows one. A non-eligible product (draft/archived/invalid price) never
+> reaches `accepted_placeholder`, so it never shows a grant preview at all —
+> board/space/chat routes don't call the payment boundary either, so they show
+> none. **This stage issues no `PurchaseGrant`, calls no
+> `paymentDecisionToGrant`, and claims no payment/settlement/purchase/grant
+> outcome** — every product/decision/actor-derived string stays HTML-escaped,
+> and the only "granted" wording anywhere is the explicitly negated
+> `not_granted` field value and the "no access has been granted" disclaimer.
+> 12 new tests in `test/render_grant_preview.test.ts` cover: a view is built
+> only for `accepted_placeholder`, `null` for pending/rejected/unavailable/
+> error, `source`/`access` are always the fixed literals, HTML escaping of
+> title/reason/actor, no paid/settled/purchased/"grant issued"/"access
+> granted"/"download unlocked" wording (only the negated preview phrasing), and
+> no input mutation. 7 new tests in `test/payment_preview_runtime.test.ts`
+> cover: an active product shows the grant preview (flag not required), a
+> draft product shows none, `NoopPaymentProvider` under `?paymentPreview=1`
+> shows none, `PlaceholderPaymentProvider` under the flag shows one, no
+> `paymentDecisionToGrant` call, no grant-issuance wording, and board/space/
+> chat routes never show one. Stage 49 candidate: **EdgeRec real provider
+> invocation boundary behind a disabled flag** (Stage 38's `EdgeRecPromotionProvider`
+> selection exists; a future stage could let it actually be invoked behind an
+> always-off flag — still no real ad serving, click tracking, or billing).
+> Prior status:
+>
+> **Stage 47 — product purchase preview uses the runtime payment
 > provider in preview-only mode.**
 > The Stage 45 `?product=<id>` purchase preview can now be connected to
 > Stage 46's env-selected `runtime.paymentProvider` — but ONLY under an
@@ -42,11 +91,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > renders the unavailable panel and a `PlaceholderPaymentProvider` renders the
 > accepted-placeholder panel under the flag, no `paymentDecisionToGrant` call,
 > no invoice/checkout-URL/QR/card/paid/settled/purchased/grant-issued text, a
-> a malicious `?actor` is escaped, no `fetch(` to an external host and no
+> malicious `?actor` is escaped, no `fetch(` to an external host and no
 > Stripe/Lightning/Breez/Greenlight/LNURL reference, and no request mutation.
-> Stage 48 candidate: **Product grant preview boundary** (show what a
-> `PurchaseGrant` WOULD look like from an `accepted_placeholder` decision,
-> still without ever calling `paymentDecisionToGrant` for real or issuing one).
 > Prior status:
 >
 > **Stage 46 — payment provider runtime env selection boundary.**

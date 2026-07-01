@@ -196,3 +196,91 @@ describe("Stage 47 — product purchase preview uses runtime provider in preview
     expect(JSON.stringify(spy.calls[0])).toBe(requestSnap);
   });
 });
+
+describe("Stage 48 — product grant preview boundary", () => {
+  it("1. an active product shows a grant preview (accepted_placeholder, flag not required)", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    expect(body).toContain('class="grant-preview"');
+    expect(body).toContain("Grant preview");
+    expect(body).toContain("preview_only");
+    expect(body).toContain("not_granted");
+  });
+
+  it("2. a draft product does not show a grant preview", async () => {
+    const SAMPLE_PRODUCT_CREATOR = "f".repeat(64);
+    const body = await (
+      await handleRequest(
+        new Request(`http://localhost/?product=draft-kit&actor=${SAMPLE_PRODUCT_CREATOR}`),
+      )
+    ).text();
+    expect(body).not.toContain('class="grant-preview"');
+    expect(body).not.toContain("Grant preview");
+  });
+
+  it("3. NoopPaymentProvider in paymentPreview mode does not show a grant preview", async () => {
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?product=guide-pdf&paymentPreview=1"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        new NoopPaymentProvider(),
+      )
+    ).text();
+    expect(body).not.toContain('class="grant-preview"');
+    expect(body).not.toContain("Grant preview");
+  });
+
+  it("4. PlaceholderPaymentProvider in paymentPreview mode shows a grant preview", async () => {
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?product=guide-pdf&paymentPreview=1"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        new PlaceholderPaymentProvider(),
+      )
+    ).text();
+    expect(body).toContain('class="grant-preview"');
+    expect(body).toContain("preview_only");
+    expect(body).toContain("not_granted");
+  });
+
+  it("5. paymentDecisionToGrant is never called from the Worker", () => {
+    expect(workerSource).not.toMatch(/paymentDecisionToGrant\s*\(/);
+  });
+
+  it("6. no PurchaseGrant issuance wording anywhere on the grant preview", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    const lower = body.toLowerCase();
+    expect(lower).not.toMatch(/\bpaid\b|\bsettled\b|\bpurchased\b/);
+    expect(lower).not.toContain("grant issued");
+    expect(lower).not.toContain("access granted");
+    expect(lower).not.toContain("download unlocked");
+    expect(lower).not.toContain("entitlement granted");
+    // The permitted, explicitly-negated phrasing must be present instead:
+    expect(lower).toContain("preview only");
+  });
+
+  it("7. board/space/chat routes never show a grant preview", async () => {
+    const boardBody = await (await handleRequest(new Request("http://localhost/"))).text();
+    const spaceBody = await (
+      await handleRequest(new Request("http://localhost/?space=general&paymentPreview=1"))
+    ).text();
+    const chatBody = await (
+      await handleRequest(new Request("http://localhost/?chat=lounge-chat&paymentPreview=1"))
+    ).text();
+    for (const body of [boardBody, spaceBody, chatBody]) {
+      expect(body).not.toContain('class="grant-preview"');
+      expect(body).not.toContain("Grant preview");
+    }
+  });
+});

@@ -94,8 +94,9 @@ import {
 import type { AssetCache } from "./asset/types.js";
 import { canRequestPaymentForProduct, productToPaymentRequest } from "./payment/commerce_bridge.js";
 import { PlaceholderPaymentProvider } from "./payment/noop_payment.js";
-import type { PaymentProvider } from "./payment/types.js";
-import { renderPurchasePreview, renderPurchaseUnavailable } from "./render/payment.js";
+import type { PaymentDecision, PaymentProvider } from "./payment/types.js";
+import { renderPurchasePreview } from "./render/payment.js";
+import { buildGrantPreview, renderGrantPreview } from "./render/grant_preview.js";
 import {
   renderChatDirectory,
   renderChatRoom,
@@ -288,39 +289,36 @@ function productDirectoryView(actor: string): string {
 }
 
 /**
- * Stage 45/47: a "Purchase preview" panel for the product route ONLY. Uses the
- * Stage 44 payment boundary purely for a DISPLAY decision —
- * `canRequestPaymentForProduct`/`productToPaymentRequest` gate eligibility
- * (draft/archived/invalid price -> unavailable) and a provider evaluates the
- * request. `actor` is used only as a display "buyer candidate" — never to
- * process payment or issue a grant. `paymentDecisionToGrant` is never called,
- * so no `PurchaseGrant` is ever issued from this preview.
+ * Stage 45/47/48: resolves the payment decision for a product's purchase AND
+ * grant preview (product route only), so both previews share exactly one
+ * decision. `canRequestPaymentForProduct`/`productToPaymentRequest` gate
+ * eligibility (draft/archived/invalid price -> that check's own `rejected`/
+ * `pending` decision is returned as-is); otherwise a provider evaluates the
+ * built request. `actor` is used only as a display "buyer candidate" — never
+ * to process payment or issue a grant. `paymentDecisionToGrant` is never
+ * called here, so no `PurchaseGrant` is ever issued from this preview.
  *
  * Stage 47: `runtimeProvider` is used ONLY when the caller passes one (i.e.
  * ONLY under the explicit `?paymentPreview=1` flag, wired by
  * `renderProductRoute` below) — that is Stage 46's env-selected
- * `runtime.paymentProvider`, which may be `NoopPaymentProvider` (unavailable
- * preview) or `PlaceholderPaymentProvider` (accepted-placeholder preview)
- * depending on env config. WITHOUT the flag, a freshly-constructed
- * `PlaceholderPaymentProvider` is used, exactly as Stage 45 left it — the
- * runtime provider is never contacted implicitly.
+ * `runtime.paymentProvider`, which may be `NoopPaymentProvider` (yields an
+ * `unavailable` decision) or `PlaceholderPaymentProvider` (yields
+ * `accepted_placeholder` for a valid request) depending on env config.
+ * WITHOUT the flag, a freshly-constructed `PlaceholderPaymentProvider` is
+ * used, exactly as Stage 45 left it — the runtime provider is never
+ * contacted implicitly.
  */
-async function renderProductPurchasePreview(
+async function resolveProductPaymentDecision(
   product: Product,
   actor: string,
   runtimeProvider?: PaymentProvider,
-): Promise<string> {
+): Promise<PaymentDecision> {
   const eligibility = canRequestPaymentForProduct(product);
-  if (!eligibility.allowed) {
-    return renderPurchaseUnavailable(eligibility.reason);
-  }
+  if (!eligibility.allowed) return eligibility;
   const request = productToPaymentRequest(product, actor || undefined);
-  if (!request) {
-    return renderPurchaseUnavailable(eligibility.reason);
-  }
+  if (!request) return eligibility;
   const provider = runtimeProvider ?? new PlaceholderPaymentProvider();
-  const decision = await provider.requestPayment(request);
-  return renderPurchasePreview(product, decision, { buyerPubkey: actor || undefined });
+  return provider.requestPayment(request);
 }
 
 /**
@@ -328,17 +326,22 @@ async function renderProductPurchasePreview(
  * - unknown id       -> not-found page (+ the viewable directory).
  * - view denied      -> access-denied page.
  * - view allowed     -> product summary + public/unlisted asset previews + an
- *                       EMPTY promotion placeholder + a purchase preview panel.
+ *                       EMPTY promotion placeholder + a purchase preview panel
+ *                       + (Stage 48) a grant preview panel.
  *
  * Asset previews are PUBLIC/UNLISTED metadata only — no bytes, no download, no
  * signed URL, no payment. `private`/`paid` assets are never shown. When an
  * `assetCache` is supplied (the runtime's), preview METADATA may come from the
  * cache; a miss/error falls back to the fixed sample metadata. The cache is
  * consulted ONLY on this product route — never on the board/directory path.
- * The purchase preview (Stage 45) is likewise product-route only. Stage 47:
- * `paymentPreview` (from `?paymentPreview=1`) gates whether that preview uses
- * `paymentProvider` (the runtime's Stage 46 env-selected provider) instead of
- * its own local `PlaceholderPaymentProvider` — see `renderProductPurchasePreview`.
+ * The purchase preview (Stage 45) and grant preview (Stage 48) are likewise
+ * product-route only. Stage 47: `paymentPreview` (from `?paymentPreview=1`)
+ * gates whether the shared payment decision uses `paymentProvider` (the
+ * runtime's Stage 46 env-selected provider) instead of a local
+ * `PlaceholderPaymentProvider` — see `resolveProductPaymentDecision`. The
+ * grant preview (Stage 48) shows ONLY for an `accepted_placeholder` decision
+ * (any other status renders no grant preview at all); it NEVER calls
+ * `paymentDecisionToGrant` and NEVER issues a `PurchaseGrant`.
  */
 async function renderProductRoute(
   data: BoardData,
@@ -356,10 +359,10 @@ async function renderProductRoute(
     });
   }
 
-  const decision = canViewProduct(actor, product, SAMPLE_GRANTS);
-  if (!decision.allowed) {
+  const viewDecision = canViewProduct(actor, product, SAMPLE_GRANTS);
+  if (!viewDecision.allowed) {
     return renderPage(buildThreads([]), {
-      status: data.lead + renderProductAccessDenied(product, decision),
+      status: data.lead + renderProductAccessDenied(product, viewDecision),
     });
   }
 
@@ -374,24 +377,32 @@ async function renderProductRoute(
   const preview = promotionPreview
     ? await renderMockPromotionPreview(buildProductPlacement(product))
     : "";
-  // Stage 45/47: always appended on this route (view already allowed above).
-  // The runtime provider is passed ONLY when `paymentPreview` is explicitly
-  // set; otherwise `renderProductPurchasePreview` falls back to its own local
+  // Stage 45/47/48: always appended on this route (view already allowed
+  // above). The runtime provider is passed ONLY when `paymentPreview` is
+  // explicitly set; otherwise the decision falls back to a local
   // `PlaceholderPaymentProvider`, exactly as Stage 45 left it.
-  const purchasePreview = await renderProductPurchasePreview(
+  const paymentDecision = await resolveProductPaymentDecision(
     product,
     actor,
     paymentPreview ? paymentProvider : undefined,
   );
+  const purchasePreview = renderPurchasePreview(product, paymentDecision, {
+    buyerPubkey: actor || undefined,
+  });
+  // Stage 48: a grant PREVIEW only — shown ONLY for `accepted_placeholder`,
+  // never issues a PurchaseGrant, never calls `paymentDecisionToGrant`.
+  const grantPreviewView = buildGrantPreview(product, paymentDecision, actor || undefined);
+  const grantPreview = grantPreviewView ? renderGrantPreview(grantPreviewView) : "";
   return renderPage(buildThreads([]), {
     status:
       data.lead +
-      renderProductPage(product, decision, assets, {
+      renderProductPage(product, viewDecision, assets, {
         promotions: data.showPromotions,
         actorPubkey: actor || undefined,
       }) +
       preview +
-      purchasePreview,
+      purchasePreview +
+      grantPreview,
   });
 }
 
