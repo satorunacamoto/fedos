@@ -8,7 +8,62 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 44 — Payment / Lightning boundary skeleton.**
+> **Status: Stage 45 — product purchase preview UI, placeholder only.**
+> A new `src/render/payment.ts` renders a "Purchase preview" panel on the
+> `?product=<id>` route using the Stage 44 payment boundary — display only,
+> nothing is charged. `renderPurchasePreview(product, decision, options?)` is
+> the main entry: given a `PaymentDecision`, an `accepted_placeholder`
+> (`allowed`) result renders a heading, the display price/currency, the
+> placeholder rail name, a `renderPaymentDecision(decision)` status line, a
+> **"No payment is processed."** note, and a **DISABLED** `<button disabled>
+> Checkout disabled</button>` — never an enabled one. Any other decision
+> (`pending`/`rejected`/`unavailable`/`error`, or a draft/archived product, or
+> an invalid price) falls back to `renderPurchaseUnavailable(reason)`, a small
+> panel with just an escaped reason and no button at all.
+> `renderPaymentDecision(decision)` is the standalone escaped status/rail/
+> reason readout, reusable on its own. The Worker wires this into
+> `renderProductRoute` ONLY: a new `renderProductPurchasePreview(product,
+> actor)` helper calls `canRequestPaymentForProduct` (draft/archived/invalid
+> price → straight to `renderPurchaseUnavailable`), then
+> `productToPaymentRequest(product, actor || undefined)` (the `?actor=` value
+> is used ONLY as a display "buyer candidate" — never for payment or grant
+> issuance), then constructs a **fresh** `PlaceholderPaymentProvider` (never
+> added to `createRuntime`/`Env` — the runtime stays exactly as unwired for
+> payment as Stage 44 left it) and calls `requestPayment` for a decision to
+> render. **`paymentDecisionToGrant` is never called from the Worker — no
+> `PurchaseGrant` is ever issued by this preview.** The panel is appended ONLY
+> on the product route, right after the existing product page and promotion
+> placeholder; the board/space/chat routes and the default directory render
+> nothing new. **This stage implements no Lightning, no Stripe, no Apple
+> Pay/Google Pay, no invoice, no checkout URL/session, no QR code, no card
+> form, and no settlement confirmation** — every product/decision-derived
+> string (id, title, currency, rail, reason, and the buyer-candidate pubkey)
+> is HTML-escaped, and the copy never claims "paid", "settled", "purchased",
+> or "grant issued". Two pre-existing Stage 25/35 Worker tests
+> (`test/worker.test.ts`, product-route tests #7 and asset-cache test #5) are
+> updated: they used to assert NO `<button>`/`"checkout"` text at all, and now
+> assert the button is present but **disabled**, with no invoice/signed-URL/
+> Stripe/Lightning text — the earlier "no buy affordance at all" invariant is
+> superseded by "a checkout affordance exists but is inert." The Stage 44
+> `test/payment_boundary.test.ts` Worker-source test #14 is likewise updated:
+> it no longer asserts the Worker has zero payment import (it legitimately
+> constructs `PlaceholderPaymentProvider` now) but still asserts
+> `paymentDecisionToGrant(` is never called and `NoopPaymentProvider` is never
+> referenced. 10 new tests in `test/render_payment.test.ts` and 7 new tests in
+> `test/worker.test.ts` cover: an active product renders the preview,
+> price/currency/id/reason escaping, the disabled button markup, no invoice/
+> checkout-URL/QR/card-form/grant-issued/paid-settled-purchased text anywhere,
+> draft/archived products render the unavailable panel with no button, no
+> input mutation, `?product=<draft>` (viewed as its creator) shows no enabled
+> checkout, a malicious `?actor` is escaped, no `fetch(` to an external host
+> and no Stripe/Lightning/Breez/Greenlight/LNURL reference in the Worker
+> source, and the default board page renders no purchase preview at all.
+> Stage 46 candidate: **Payment provider env selection boundary** (let
+> `createRuntime(env)` SELECT between `NoopPaymentProvider`/
+> `PlaceholderPaymentProvider` the way Stage 42 did for notifications — still
+> no real rail, no auto-charge). Prior status:
+>
+> **Stage 44 — Payment / Lightning boundary skeleton.**
 > A new `src/payment/` treats a future payment step as the front door BEFORE a
 > `PurchaseGrant` (`src/commerce/types.ts`) is ever issued — types and safe
 > defaults ONLY. `src/payment/types.ts` defines `PaymentRail`
@@ -56,10 +111,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > sources. Note on liquidity/custody: this stage takes NO position on how a
 > future real rail would hold or move funds (custodial vs. non-custodial
 > Lightning, chargeback exposure, KYC/AML) — that remains future research, not
-> settled by this skeleton. Stage 45 candidate: **Product purchase preview UI,
-> placeholder only** (a Product-page purchase-intent preview driven by
-> `PlaceholderPaymentProvider`/`canRequestPaymentForProduct` — no checkout, no
-> invoice, no real grant). Prior status:
+> settled by this skeleton. Prior status:
 >
 > **Stage 43 — IPFS asset adapter boundary skeleton.**
 > A new `src/asset/ipfs_asset_cache.ts` treats IPFS as a candidate FUTURE

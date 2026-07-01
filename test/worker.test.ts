@@ -13,7 +13,7 @@ import type {
 } from "../src/indexer/d1_index.js";
 import { NoopSignatureVerifier } from "../src/nostr/signature.js";
 import { SAMPLE_VAULT_MEMBER } from "../src/community/sample_spaces.js";
-import { SAMPLE_PRODUCT_BUYER } from "../src/commerce/sample_products.js";
+import { SAMPLE_PRODUCT_BUYER, SAMPLE_PRODUCT_CREATOR } from "../src/commerce/sample_products.js";
 import { SAMPLE_DM_PARTICIPANT } from "../src/chat/sample_chats.js";
 import type {
   RelaySocketEvent,
@@ -530,18 +530,23 @@ describe("worker product route (read-only)", () => {
     expect(body).toContain('href="?product=guide-pdf"');
   });
 
-  it("7. renders no signed URL / download / payment affordance on a product page", async () => {
+  it("7. renders no signed URL / download / real payment affordance on a product page", async () => {
     const body = await (
       await handleRequest(new Request("http://localhost/?product=guide-pdf"))
     ).text();
     const lower = body.toLowerCase();
     expect(lower).not.toContain("download");
     expect(lower).not.toContain("signed url");
-    expect(lower).not.toContain("checkout");
     expect(lower).not.toContain("stripe");
+    expect(lower).not.toContain("invoice");
+    expect(lower).not.toContain("lnbc"); // no Lightning invoice string
     expect(lower).not.toContain("data:application"); // no inline asset bytes
     expect(body).not.toContain("base64");
-    expect(body).not.toContain("<button"); // no buy/checkout action
+    // Stage 45: a purchase preview panel with a DISABLED checkout button is
+    // expected here — but it must stay disabled and process nothing.
+    expect(body).toContain('class="purchase-checkout-disabled"');
+    expect(body).toMatch(/<button[^>]*\bdisabled\b[^>]*>Checkout disabled<\/button>/);
+    expect(lower).not.toMatch(/\bpaid\b|\bsettled\b|\bpurchased\b/);
   });
 
   it("8. introduces no asset-byte/delivery wiring in the Worker", () => {
@@ -641,7 +646,7 @@ describe("worker product asset preview from runtime (Stage 35)", () => {
     expect(body).toContain('data-asset="asset-guide-preview"');
   });
 
-  it("5. introduces no download / signed URL / payment on the runtime-sourced page", async () => {
+  it("5. introduces no download / signed URL / real payment on the runtime-sourced page", async () => {
     const spy = new SpyAssetCache({
       "asset-guide-preview": cachedWith({
         kind: "preview",
@@ -664,9 +669,76 @@ describe("worker product asset preview from runtime (Stage 35)", () => {
     const lower = body.toLowerCase();
     expect(lower).not.toContain("download");
     expect(lower).not.toContain("signed url");
-    expect(lower).not.toContain("checkout");
     expect(lower).not.toContain("stripe");
+    expect(lower).not.toContain("invoice");
+    // Stage 45: the purchase preview's DISABLED checkout button is expected.
+    expect(body).toMatch(/<button[^>]*\bdisabled\b[^>]*>Checkout disabled<\/button>/);
+  });
+});
+
+describe("worker purchase preview (Stage 45, product route only, placeholder only)", () => {
+  it("1. ?product=<active> renders a purchase preview", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    expect(body).toContain('class="purchase-preview"');
+    expect(body).toContain("Purchase preview");
+    expect(body).toContain("USD 5.00");
+  });
+
+  it("2. ?product=<draft> renders no enabled checkout (unavailable preview)", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(
+          `http://localhost/?product=draft-kit&actor=${SAMPLE_PRODUCT_CREATOR}`,
+        ),
+      )
+    ).text();
+    expect(body).toContain("purchase-preview-unavailable");
+    expect(body).not.toContain("Checkout disabled");
     expect(body).not.toContain("<button");
+  });
+
+  it("3. no invoice / checkout URL / payment / settled text anywhere on the page", async () => {
+    const body = await (
+      await handleRequest(new Request("http://localhost/?product=guide-pdf"))
+    ).text();
+    const lower = body.toLowerCase();
+    expect(lower).not.toContain("invoice");
+    expect(lower).not.toContain("checkout url");
+    expect(lower).not.toMatch(/\bsettled\b|\bpaid\b|\bpurchased\b/);
+  });
+
+  it("4. no grant-issued text anywhere on the page", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(`http://localhost/?product=guide-pdf&actor=${SAMPLE_PRODUCT_BUYER}`),
+      )
+    ).text();
+    expect(body.toLowerCase()).not.toMatch(/\bgrant issued\b|\bgrant granted\b/);
+  });
+
+  it("5. escapes a malicious ?actor used as the buyer candidate", async () => {
+    const body = await (
+      await handleRequest(
+        new Request(
+          "http://localhost/?product=guide-pdf&actor=" + encodeURIComponent("<script>"),
+        ),
+      )
+    ).text();
+    expect(body).not.toContain("<script>");
+  });
+
+  it("6. issues no fetch and constructs no external payment provider", () => {
+    expect(workerSource).not.toMatch(/\bfetch\s*\(\s*['"`]https?:/);
+    expect(workerSource).not.toMatch(/Stripe|Lightning|Breez|Greenlight|LNURL/i);
+  });
+
+  it("7. the default board page does not render a purchase preview", async () => {
+    const body = await (await handleRequest(new Request("http://localhost/"))).text();
+    expect(body).not.toContain('class="purchase-preview"');
+    expect(body).not.toContain("Purchase preview");
+    expect(body).not.toContain("Checkout disabled");
   });
 });
 

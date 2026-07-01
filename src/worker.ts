@@ -85,12 +85,16 @@ import {
 } from "./commerce/directory.js";
 import { resolveProductAssetPreviews } from "./commerce/asset_preview.js";
 import { canViewProduct } from "./commerce/policy.js";
+import type { Product } from "./commerce/types.js";
 import {
   SAMPLE_PRODUCTS,
   SAMPLE_GRANTS,
   SAMPLE_ASSET_METADATA,
 } from "./commerce/sample_products.js";
 import type { AssetCache } from "./asset/types.js";
+import { canRequestPaymentForProduct, productToPaymentRequest } from "./payment/commerce_bridge.js";
+import { PlaceholderPaymentProvider } from "./payment/noop_payment.js";
+import { renderPurchasePreview, renderPurchaseUnavailable } from "./render/payment.js";
 import {
   renderChatDirectory,
   renderChatRoom,
@@ -270,17 +274,42 @@ function productDirectoryView(actor: string): string {
 }
 
 /**
+ * Stage 45: a "Purchase preview" panel for the product route ONLY. Uses the
+ * Stage 44 payment boundary purely for a DISPLAY decision —
+ * `canRequestPaymentForProduct`/`productToPaymentRequest` gate eligibility
+ * (draft/archived/invalid price -> unavailable) and a freshly-constructed
+ * `PlaceholderPaymentProvider` (never wired into the runtime, never contacted
+ * over the network) evaluates the request. `actor` is used only as a display
+ * "buyer candidate" — never to process payment or issue a grant.
+ * `paymentDecisionToGrant` is never called, so no `PurchaseGrant` is ever
+ * issued from this preview.
+ */
+async function renderProductPurchasePreview(product: Product, actor: string): Promise<string> {
+  const eligibility = canRequestPaymentForProduct(product);
+  if (!eligibility.allowed) {
+    return renderPurchaseUnavailable(eligibility.reason);
+  }
+  const request = productToPaymentRequest(product, actor || undefined);
+  if (!request) {
+    return renderPurchaseUnavailable(eligibility.reason);
+  }
+  const decision = await new PlaceholderPaymentProvider().requestPayment(request);
+  return renderPurchasePreview(product, decision, { buyerPubkey: actor || undefined });
+}
+
+/**
  * Routes `?product=<id>` against the fixed sample products (read-only):
  * - unknown id       -> not-found page (+ the viewable directory).
  * - view denied      -> access-denied page.
  * - view allowed     -> product summary + public/unlisted asset previews + an
- *                       EMPTY promotion placeholder.
+ *                       EMPTY promotion placeholder + a purchase preview panel.
  *
  * Asset previews are PUBLIC/UNLISTED metadata only — no bytes, no download, no
  * signed URL, no payment. `private`/`paid` assets are never shown. When an
  * `assetCache` is supplied (the runtime's), preview METADATA may come from the
  * cache; a miss/error falls back to the fixed sample metadata. The cache is
  * consulted ONLY on this product route — never on the board/directory path.
+ * The purchase preview (Stage 45) is likewise product-route only.
  */
 async function renderProductRoute(
   data: BoardData,
@@ -314,6 +343,9 @@ async function renderProductRoute(
   const preview = promotionPreview
     ? await renderMockPromotionPreview(buildProductPlacement(product))
     : "";
+  // Stage 45: always appended on this route (view already allowed above) —
+  // placeholder only, see `renderProductPurchasePreview`.
+  const purchasePreview = await renderProductPurchasePreview(product, actor);
   return renderPage(buildThreads([]), {
     status:
       data.lead +
@@ -321,7 +353,8 @@ async function renderProductRoute(
         promotions: data.showPromotions,
         actorPubkey: actor || undefined,
       }) +
-      preview,
+      preview +
+      purchasePreview,
   });
 }
 

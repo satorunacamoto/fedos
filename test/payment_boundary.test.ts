@@ -231,10 +231,12 @@ describe("payment boundary stays unwired and free of real transports", () => {
     expect(runtimeSource).not.toMatch(/requestPayment|productToPaymentRequest|paymentDecisionToGrant/);
   });
 
-  it("14. Worker source does not import or wire the payment boundary", () => {
-    expect(workerSource).not.toMatch(/from\s+['"].*\/payment\//);
-    expect(workerSource).not.toMatch(/PaymentProvider|NoopPaymentProvider|PlaceholderPaymentProvider/);
-    expect(workerSource).not.toMatch(/requestPayment|productToPaymentRequest|paymentDecisionToGrant/);
+  it("14. Worker source never calls paymentDecisionToGrant (no grant issuance)", () => {
+    // Stage 45: the Worker's product route now drives PlaceholderPaymentProvider
+    // directly for a DISPLAY-only purchase preview (see render/payment.ts). The
+    // invariant is that no PurchaseGrant is ever issued from it.
+    expect(workerSource).not.toMatch(/paymentDecisionToGrant\s*\(/);
+    expect(workerSource).not.toMatch(/NoopPaymentProvider\b/);
   });
 
   it("15. imports no Lightning/Stripe/Apple Pay/Google Pay/Breez/Greenlight library", () => {
