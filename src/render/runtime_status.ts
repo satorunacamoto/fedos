@@ -19,6 +19,16 @@
  * real-connection phase. `RuntimeStatusView.components` (the flat Stage 50
  * list) is UNCHANGED for backward compatibility; `.sections` is new and
  * derives from the same components, grouped and in a fixed category order.
+ *
+ * Stage 54 adds an opt-in JSON export of the SAME view
+ * (`serializeRuntimeStatusView` / `renderRuntimeStatusJson`), disabled by
+ * default and gated behind an explicit `?format=json` query param in the
+ * Worker (see `worker.ts`'s `isRuntimeStatusJsonRequested`). The serializer
+ * NEVER `JSON.stringify`s the raw view or `AppRuntime` — it reconstructs a
+ * plain object field-by-field from an explicit allowlist (`mode`, `name`,
+ * `label`, `category`), so the JSON can never carry more than the HTML page
+ * already shows: no endpoint, API key, env value, secret, viewer/actor
+ * pubkey, method, or function ever appears in it.
  */
 
 import type { AppRuntime, RuntimeMode } from "../runtime/types.js";
@@ -159,4 +169,73 @@ export function renderRuntimeStatusPage(view: RuntimeStatusView): string {
     `was called to build this page, and no endpoint, key, secret, or pubkey is shown.</p>` +
     `</section>`
   );
+}
+
+/** One component's plain-data shape in the JSON export — the same three safe fields as the HTML row. */
+export interface RuntimeStatusJsonComponent {
+  readonly name: string;
+  readonly label: string;
+  readonly category: RuntimeComponentCategory;
+}
+
+/** One category's components, in the JSON export. */
+export interface RuntimeStatusJsonSection {
+  readonly category: RuntimeComponentCategory;
+  readonly components: readonly RuntimeStatusJsonComponent[];
+}
+
+/**
+ * The JSON-safe shape of a `RuntimeStatusView`. Structurally identical to the
+ * view (mode/components/sections), reconstructed field-by-field from an
+ * explicit allowlist rather than reusing the view object directly — so it can
+ * never accidentally carry more than `mode`, `name`, `label`, and `category`.
+ * `generatedAt` is OMITTED by default; a caller may inject a fixed Unix-ms
+ * value via `serializeRuntimeStatusView`'s second argument for reproducible
+ * output, but nothing here ever calls `Date.now()` itself.
+ */
+export interface RuntimeStatusJson {
+  readonly mode: RuntimeMode;
+  readonly components: readonly RuntimeStatusJsonComponent[];
+  readonly sections: readonly RuntimeStatusJsonSection[];
+  readonly generatedAt?: number;
+}
+
+/**
+ * Builds the JSON-safe export from an already-built `RuntimeStatusView`. Pure
+ * and read-only: reads only `mode`/`name`/`label`/`category` off the view —
+ * never the raw `AppRuntime`, never a method, never an endpoint/API
+ * key/env value/secret/viewer-or-actor pubkey (none of those are present on
+ * `RuntimeStatusView` in the first place). `generatedAt` is included ONLY
+ * when the caller explicitly passes one; this function never reads the clock
+ * itself. Never mutates `view`.
+ */
+export function serializeRuntimeStatusView(
+  view: RuntimeStatusView,
+  generatedAt?: number,
+): RuntimeStatusJson {
+  const toJsonComponent = (component: RuntimeComponentStatus): RuntimeStatusJsonComponent => ({
+    name: component.name,
+    label: component.label,
+    category: component.category,
+  });
+  return {
+    mode: view.mode,
+    components: view.components.map(toJsonComponent),
+    sections: view.sections.map((section) => ({
+      category: section.category,
+      components: section.components.map(toJsonComponent),
+    })),
+    ...(generatedAt !== undefined ? { generatedAt } : {}),
+  };
+}
+
+/**
+ * Renders a `RuntimeStatusView` as a JSON string (via `serializeRuntimeStatusView`,
+ * with `generatedAt` omitted). Same safety guarantees as `renderRuntimeStatusPage`:
+ * no provider/cache/bridge method is called, no endpoint/API key/env value/
+ * secret/viewer-or-actor pubkey ever appears, and the raw `AppRuntime`/`RuntimeEnv`
+ * is never serialized directly.
+ */
+export function renderRuntimeStatusJson(view: RuntimeStatusView): string {
+  return JSON.stringify(serializeRuntimeStatusView(view));
 }

@@ -97,7 +97,11 @@ import { PlaceholderPaymentProvider } from "./payment/noop_payment.js";
 import type { PaymentDecision, PaymentProvider } from "./payment/types.js";
 import { renderPurchasePreview } from "./render/payment.js";
 import { buildGrantPreview, renderGrantPreview } from "./render/grant_preview.js";
-import { buildRuntimeStatusView, renderRuntimeStatusPage } from "./render/runtime_status.js";
+import {
+  buildRuntimeStatusView,
+  renderRuntimeStatusPage,
+  renderRuntimeStatusJson,
+} from "./render/runtime_status.js";
 import type { AppRuntime } from "./runtime/types.js";
 import {
   renderChatDirectory,
@@ -195,6 +199,14 @@ function htmlResponse(html: string, status = 200): Response {
   });
 }
 
+/** Stage 54: wraps an already-serialized, safe JSON string. Issues no I/O itself. */
+function jsonResponse(json: string, status = 200): Response {
+  return new Response(json, {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
 /**
  * True ONLY when the caller explicitly opts into mock promotion preview mode via
  * `?promotionPreview=1` or `?promotionPreview=true`. This flag gates a
@@ -248,6 +260,18 @@ export function isPaymentPreviewEnabled(url: URL): boolean {
 export function isRuntimeStatusEnabled(url: URL): boolean {
   const value = url.searchParams.get("runtimeStatus");
   return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when `?runtimeStatus=1`'s page is explicitly asked to render as
+ * JSON via `&format=json`. Any other `format` value (or its absence) falls
+ * back to the HTML page — this is a strict allowlist, not a denylist, so a
+ * typo or unexpected value never accidentally serves JSON. Disabled by
+ * default: `?runtimeStatus=1` alone still renders HTML, exactly as Stage 50
+ * left it.
+ */
+export function isRuntimeStatusJsonRequested(url: URL): boolean {
+  return url.searchParams.get("format") === "json";
 }
 
 /** Builds the query-status HTML for a result page. */
@@ -752,9 +776,14 @@ export async function handleRequest(
   // is entirely read-only — no board is built, no relay/live path runs, and
   // no provider/cache/bridge method is called. Requires a full `AppRuntime`
   // (only the Worker's default `fetch` handler supplies one); without it this
-  // falls through to normal routing.
+  // falls through to normal routing. Stage 54: `&format=json` (disabled by
+  // default — any other/absent value still renders HTML) serves the SAME
+  // view as safe, allowlisted JSON instead of the HTML page.
   if (runtime !== undefined && isRuntimeStatusEnabled(url)) {
     const view = buildRuntimeStatusView(runtime);
+    if (isRuntimeStatusJsonRequested(url)) {
+      return jsonResponse(renderRuntimeStatusJson(view));
+    }
     return htmlResponse(
       renderPage(buildThreads([]), { status: renderRuntimeStatusPage(view) }),
     );

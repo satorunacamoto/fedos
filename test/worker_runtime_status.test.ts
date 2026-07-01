@@ -250,3 +250,188 @@ describe("Stage 50/51 — Runtime provider status page (categorized)", () => {
     expect(body).toContain("mode: <code>local</code>");
   });
 });
+
+describe("Stage 54 — Runtime status JSON export (disabled by default)", () => {
+  it("1. ?runtimeStatus=1&format=json returns application/json", async () => {
+    const { runtime } = spyRuntime();
+    const res = await handleRequest(
+      new Request("http://localhost/?runtimeStatus=1&format=json"),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      runtime,
+    );
+    expect(res.headers.get("content-type")).toContain("application/json");
+  });
+
+  it("2. the response body parses as JSON", async () => {
+    const { runtime } = spyRuntime();
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?runtimeStatus=1&format=json"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runtime,
+      )
+    ).text();
+    expect(() => JSON.parse(body)).not.toThrow();
+  });
+
+  it("3. the JSON has sections", async () => {
+    const { runtime } = spyRuntime();
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?runtimeStatus=1&format=json"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runtime,
+      )
+    ).text();
+    const parsed = JSON.parse(body);
+    expect(parsed.mode).toBe(runtime.mode);
+    expect(parsed.sections.map((s: { category: string }) => s.category)).toEqual([
+      "cache",
+      "storage",
+      "provider",
+      "bridge",
+      "security",
+    ]);
+  });
+
+  it("4. ?runtimeStatus=1 without format=json still returns the HTML page", async () => {
+    const { runtime } = spyRuntime();
+    const res = await handleRequest(
+      new Request("http://localhost/?runtimeStatus=1"),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      runtime,
+    );
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("Runtime status");
+  });
+
+  it("5. an invalid format value falls back to HTML", async () => {
+    const { runtime } = spyRuntime();
+    for (const format of ["xml", "yaml", "JSON", "1", ""]) {
+      const res = await handleRequest(
+        new Request(`http://localhost/?runtimeStatus=1&format=${format}`),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runtime,
+      );
+      expect(res.headers.get("content-type")).toContain("text/html");
+    }
+  });
+
+  it("6. getPromotions/getRecommendations/requestPayment/notify/publish/assetCache.get are never called", async () => {
+    const { runtime, calls } = spyRuntime();
+    await handleRequest(
+      new Request("http://localhost/?runtimeStatus=1&format=json"),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      runtime,
+    );
+    expect(calls.getPromotions).toBe(0);
+    expect(calls.getRecommendations).toBe(0);
+    expect(calls.requestPayment).toBe(0);
+    expect(calls.notify).toBe(0);
+    expect(calls.publish).toBe(0);
+    expect(calls.assetCacheGet).toBe(0);
+  });
+
+  it("7. issues no fetch (source-level check)", () => {
+    expect(workerSource).not.toMatch(/\bfetch\s*\(\s*['"`]https?:/);
+  });
+
+  it("8. no endpoint URL or API key is rendered in the JSON", async () => {
+    const runtime = createRuntime({
+      PROMOTION_ENDPOINT: "https://secret-endpoint.example/api",
+      PROMOTION_API_KEY: "sk_live_should_never_appear",
+    });
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?runtimeStatus=1&format=json"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runtime,
+      )
+    ).text();
+    expect(body).not.toContain("secret-endpoint.example");
+    expect(body).not.toContain("sk_live_should_never_appear");
+    expect(body).not.toContain("https://");
+  });
+
+  it("no viewer/actor pubkey appears in the JSON", async () => {
+    const { runtime } = spyRuntime();
+    const body = await (
+      await handleRequest(
+        new Request(
+          `http://localhost/?runtimeStatus=1&format=json&actor=${"a".repeat(64)}`,
+        ),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runtime,
+      )
+    ).text();
+    expect(body).not.toMatch(/[0-9a-f]{64}/i);
+  });
+
+  it("the flag alone (no runtime supplied) with format=json falls through to normal routing", async () => {
+    const res = await handleRequest(
+      new Request("http://localhost/?runtimeStatus=1&format=json"),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+  });
+
+  it("the default Worker export serves the JSON end-to-end", async () => {
+    const res = await worker.fetch(
+      new Request("http://localhost/?runtimeStatus=1&format=json"),
+      {},
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const parsed = JSON.parse(await res.text());
+    expect(parsed.mode).toBe("local");
+  });
+
+  it("does not mutate the request", async () => {
+    const url = "http://localhost/?runtimeStatus=1&format=json";
+    const req = new Request(url);
+    const { runtime } = spyRuntime();
+    await handleRequest(req, undefined, undefined, undefined, undefined, undefined, undefined, runtime);
+    expect(req.url).toBe(url);
+  });
+});

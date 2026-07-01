@@ -8,7 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 53 — provider preview diagnostics hardening.**
+> **Status: Stage 54 — Runtime status JSON export, disabled by default.**
+> `src/render/runtime_status.ts` gains an opt-in JSON export of the SAME
+> Stage 50/51 `RuntimeStatusView` shown by `?runtimeStatus=1`.
+> `serializeRuntimeStatusView(view, generatedAt?)` builds a `RuntimeStatusJson`
+> (`{ mode, components, sections, generatedAt? }`) by reconstructing each
+> component/section field-by-field from an explicit allowlist
+> (`name`/`label`/`category`) — it NEVER `JSON.stringify`s the view or the raw
+> `AppRuntime` directly, so the JSON can never accidentally carry more than
+> the three safe fields the HTML page already shows. `generatedAt` is OMITTED
+> unless a caller explicitly passes one (this function never reads the clock
+> itself). `renderRuntimeStatusJson(view)` wraps that in `JSON.stringify`. In
+> the Worker, a new `isRuntimeStatusJsonRequested(url)` checks for an EXACT
+> `&format=json` (a strict allowlist — any other value, or its absence, falls
+> back to HTML; there is no denylist to bypass). `?runtimeStatus=1` alone
+> still renders HTML exactly as Stage 50 left it; `?runtimeStatus=1&format=json`
+> returns the same view as `application/json` via a new `jsonResponse` helper.
+> **Same safety guarantees as the HTML page, unchanged**: building/serializing
+> the JSON calls NO provider/cache/bridge method (`getPromotions`,
+> `getRecommendations`, `requestPayment`, `notify`, `publish`,
+> `assetCache.get/put/has/delete/clear`), issues NO `fetch`, and the JSON
+> never contains an endpoint URL, API key, env value, secret, or viewer/actor
+> pubkey — none of that is read from `RuntimeEnv` by this module in the first
+> place, only the ten components' coarse type labels. 10 new tests in
+> `test/runtime_status_json.test.ts` and 12 new tests in `test/
+> worker_runtime_status.test.ts` cover: the serialized JSON carries the
+> mode/sections/categories/labels correctly, no endpoint/API-key/secret/pubkey
+> ever appears, no function/method survives serialization (and the JSON
+> round-trips cleanly), no input mutation, `renderRuntimeStatusJson` returns
+> parseable JSON, `?format=json` returns `application/json` with the expected
+> shape, `?runtimeStatus=1` without (or with an invalid) `format` still
+> returns HTML (tested against `xml`/`yaml`/`JSON`/`1`/empty-string — an
+> allowlist, not a denylist), zero provider/cache/bridge calls happen for the
+> JSON path either, no `fetch`, and the default Worker export serves the JSON
+> end-to-end. Stage 55 candidate: **Runtime diagnostics docs hardening**
+> (write up, in one place, exactly what the HTML/JSON status views may and
+> may not ever show — no new code). Prior status:
+>
+> **Stage 53 — provider preview diagnostics hardening.**
 > `src/render/promotion.ts` gets a clearer, more explicit diagnostic layer for
 > Stage 52's provider preview, WITHOUT touching when it is invoked — the dual
 > flag (`ENABLE_PROMOTION_PROVIDER_PREVIEW` env + `?edgeRecPreview=1`/
@@ -58,10 +95,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > fields are escaped and metadata is bounded (both entry count and per-value
 > length), the mock preview path is untouched by any of this, the dual flag
 > is still required in all three combinations (query-only/env-only/both), the
-> viewer/actor pubkey never renders, and no input mutation. Stage 54
-> candidate: **Runtime status export JSON, disabled by default** (a
-> `?runtimeStatus=1&format=json`-style opt-in JSON dump of the Stage 50/51
-> status view — still read-only, still no secrets/endpoints). Prior status:
+> viewer/actor pubkey never renders, and no input mutation. Prior status:
 >
 > **Stage 52 — promotion provider preview behind a dual flag.**
 > Stage 49's `invokePromotionProviderPreview` is now connected to the Worker's
