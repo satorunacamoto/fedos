@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "description": "MeshKV — browser-to-browser public asset KV store (external package boundary).",
-  "main": "src/meshkv.ts",
+  "main": "src/index.ts",
   "exports": {
-    ".": "./src/meshkv.ts"
+    ".": "./src/index.ts"
   }
 }

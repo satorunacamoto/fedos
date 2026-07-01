@@ -1,27 +1,27 @@
 /**
- * MeshKV — a browser-to-browser public KV store (external package entry point).
+ * MeshKV — browser-free REFERENCE node (mirrors the imported browser API).
  *
- * A MeshKV node is local-first: every read/write hits the in-process `LocalCache`
- * immediately, and the `PeerCache` mesh tier is consulted ONLY after the node is
- * explicitly brought online. Constructing a node opens NO connection: no
- * signaling socket, no WebRTC, no peer discovery, no network of any kind. The
- * node goes online exclusively through `connect()` (aliases: `init()`/`start()`).
+ * The production runtime is the vendored browser MeshKV (`cash/src/index.js`), a
+ * namespace module exporting `init`/`get`/`put`/`load`/`remove` backed by
+ * IndexedDB + WebRTC. This class exposes the SAME public surface (`MeshKVApi`)
+ * and the SAME "no network until explicitly online" guarantee, but is backed by
+ * an in-process map so the host can typecheck and test against the contract
+ * without a browser. Both satisfy `MeshKVApi`, so either is a drop-in.
  *
- * This package is consumed by the host app behind an adapter
- * (`MeshKVBrowserClient implements MeshKVClient`); it has no knowledge of the
- * host's asset/cache/policy types, and the host has no knowledge of this file's
- * internals beyond the `MeshKVApi` contract.
+ * Constructing a node opens NO connection: no store I/O, no signaling socket, no
+ * WebRTC, no peer discovery. `init()` (optionally wiring the mesh handlers when a
+ * `signal` is supplied) still opens nothing; going online is the separate,
+ * explicit `startSignaling()` step — mirroring the real module, where the host
+ * calls `signal.connect()` itself. `get`/`put`/`remove` are local-tier only and
+ * never touch the network.
  */
 
 import { LocalCache } from "./local_cache.js";
 import { PeerCache } from "./peer_cache.js";
 import { SignalingChannel } from "./signaling.js";
-import type { MeshKVApi, MeshKVMeta, MeshKVRecord } from "./types.js";
+import type { MeshKVApi, MeshKVData, MeshKVInitOptions } from "./types.js";
 
-export type { MeshKVApi, MeshKVMeta, MeshKVRecord } from "./types.js";
-export { LocalCache } from "./local_cache.js";
-export { PeerCache } from "./peer_cache.js";
-export { SignalingChannel } from "./signaling.js";
+const DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
 export interface MeshKVOptions {
   readonly localCache?: LocalCache;
@@ -33,79 +33,65 @@ export class MeshKV implements MeshKVApi {
   readonly #local: LocalCache;
   readonly #peers: PeerCache;
   readonly #signaling: SignalingChannel;
-  #connected = false;
+  #meshWired = false;
 
   constructor(options: MeshKVOptions = {}) {
     this.#local = options.localCache ?? new LocalCache();
     this.#peers = options.peerCache ?? new PeerCache();
     this.#signaling = options.signaling ?? new SignalingChannel();
-    // No connection is established here. Reads/writes work locally offline; the
-    // mesh tier is dormant until connect()/init()/start() is called explicitly.
+    // Establishes nothing: no store open, no signaling, no WebRTC/peer discovery.
   }
 
-  get connected(): boolean {
-    return this.#connected;
+  /** True only after signaling was explicitly opened and peers joined. */
+  get online(): boolean {
+    return this.#signaling.isOpen && this.#peers.connected;
+  }
+
+  /** True once `init({ signal })` wired the mesh handlers (still offline). */
+  get meshWired(): boolean {
+    return this.#meshWired;
   }
 
   get signaling(): SignalingChannel {
     return this.#signaling;
   }
 
-  /** Explicitly goes online: opens signaling, then joins the peer mesh. */
-  async connect(): Promise<void> {
-    if (this.#connected) return;
+  /**
+   * Prepares the node. Opens the (in-memory) store and, when a `signal` is
+   * supplied, WIRES the mesh handlers — but opens NO socket and starts NO
+   * WebRTC/peer discovery. Going online is the separate `startSignaling()` call.
+   */
+  async init(options: MeshKVInitOptions = {}): Promise<void> {
+    if (options.signal !== undefined) this.#meshWired = true;
+    // No signaling.open(), no peers.connect(): the node stays fully offline.
+  }
+
+  /** Explicit online step: opens signaling, then joins the peer mesh. */
+  async startSignaling(): Promise<void> {
     await this.#signaling.open();
     await this.#peers.connect(this.#signaling);
-    this.#connected = true;
-  }
-
-  /** Alias for `connect()` — an explicit lifecycle entry point. */
-  async init(): Promise<void> {
-    await this.connect();
-  }
-
-  /** Alias for `connect()` — an explicit lifecycle entry point. */
-  async start(): Promise<void> {
-    await this.connect();
   }
 
   /** Leaves the mesh and closes signaling. Local data is retained. */
-  async close(): Promise<void> {
+  async stop(): Promise<void> {
     await this.#peers.disconnect();
     await this.#signaling.close();
-    this.#connected = false;
   }
 
-  async get(key: string): Promise<MeshKVRecord | null> {
-    const local = this.#local.get(key);
-    if (local) return local;
-    if (this.#connected) {
-      const remote = await this.#peers.fetch(key);
-      if (remote) {
-        this.#local.set(key, remote);
-        return remote;
-      }
-    }
-    return null;
+  async get(key: string): Promise<MeshKVData | null> {
+    const record = this.#local.get(key);
+    return record ? record.data : null;
   }
 
-  async set(key: string, value: ArrayBuffer, meta: MeshKVMeta = {}): Promise<void> {
-    const record: MeshKVRecord = { value, meta };
-    this.#local.set(key, record);
-    if (this.#connected) await this.#peers.announce(key, record);
-  }
-
-  async has(key: string): Promise<boolean> {
-    if (this.#local.has(key)) return true;
-    if (this.#connected) return (await this.#peers.fetch(key)) !== null;
-    return false;
+  async put(
+    key: string,
+    data: MeshKVData,
+    contentType: string = DEFAULT_CONTENT_TYPE,
+  ): Promise<void> {
+    this.#local.set(key, { data, contentType });
   }
 
   async remove(key: string): Promise<void> {
     this.#local.delete(key);
-  }
-
-  async clearAll(): Promise<void> {
-    this.#local.clear();
   }
 }

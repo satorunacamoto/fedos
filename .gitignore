@@ -3,3 +3,8 @@ dist/
 .wrangler/
 *.log
 .DS_Store
+
+# Imported external MeshKV browser project (real runtime for @nostr-window/meshkv).
+# Kept external per the package boundary: the host builds against packages/meshkv
+# (typed MeshKVApi) + the MeshKVBrowserClient adapter, not this browser source.
+/cash/

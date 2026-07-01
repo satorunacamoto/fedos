@@ -8,21 +8,23 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 28 — MeshKV package boundary.** MeshKV now lives as a standalone
-> package (`packages/meshkv`) rather than mixed into the host. A new adapter,
-> `MeshKVBrowserClient implements MeshKVClient` (`src/asset/meshkv_browser_client.ts`),
-> is the ONLY file in `src/` that imports `packages/meshkv`; it translates the
-> host's `MeshKVClient` calls into the package's `MeshKVApi` and clones bytes/
-> metadata across the boundary. **Constructing the adapter or a MeshKV node starts
-> no network** — no signaling socket, no WebRTC, no peer discovery; a node goes
-> online only via an explicit `connect()`/`init()`/`start()`, which the adapter
-> never calls. The host depends on the `MeshKVApi`/`MeshKVClient` contracts only,
-> never on the package internals. **The runtime, `selectAssetCache`, the
-> `AssetCache` interface, `MeshKVAssetCache`, the Worker, promotion, and the
-> product/chat routes are all unchanged** — this stage only makes MeshKV
-> *droppable in*. MeshKV holds PUBLIC bytes only; private/paid/secret content is
-> refused by `canCacheAsset` long before it reaches the package. The earlier chat
-> UI (Stage 27) and base below are unchanged.
+> **Status: Stage 29 — MeshKV boundary wired to the imported implementation.** The
+> real MeshKV browser project has been imported (an external, git-ignored checkout
+> whose runtime is a namespace module exporting `init`/`get`/`put`/`load`/`remove`,
+> backed by IndexedDB + WebRTC). `packages/meshkv` is now the typed boundary for
+> that runtime: `MeshKVApi` mirrors the real exports, an `index.ts` entry point is
+> the stable import surface, and a browser-free reference node (`MeshKV` /
+> `createMeshKV`) lets the host typecheck/test against the contract without a
+> browser. The `MeshKVBrowserClient` adapter was retargeted to the **real** API —
+> `put(key, bytes, contentType)`, `remove` for delete, `has` derived from `get`,
+> and no bulk `clear` (the real MeshKV exposes none) — and still clones bytes
+> across the boundary. **Constructing the adapter or a node starts no network** —
+> no signaling socket, no WebRTC, no peer discovery; going online is an explicit
+> step (`startSignaling()` here / `signal.connect()` in the browser runtime) the
+> adapter never calls. **The runtime, `selectAssetCache`, the `AssetCache`
+> interface, `MeshKVAssetCache`, the Worker, promotion, and the product/chat routes
+> are all unchanged.** MeshKV carries PUBLIC bytes only; private/paid/secret content
+> is refused by `canCacheAsset` before it reaches the package. Base below unchanged.
 >
 > Ingest, thread building, query
 > policy, an HTML view, a NIP-01 read-only WebSocket adapter, an `EventCache`
@@ -271,13 +273,15 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   side-table (the client stores only bytes), and honors expiry on `get`/`has`.
   **No real WebRTC/signaling/peer discovery / network** — boundary + mock only;
   it is a public-media cache, not access control, payment, entitlement, or DRM.
-  `meshkv_browser_client.ts` (Stage 28) is the adapter that plugs the standalone
+  `meshkv_browser_client.ts` is the adapter that plugs the standalone
   `packages/meshkv` package into `MeshKVClient`: `MeshKVBrowserClient implements
-  MeshKVClient` forwards each call to the package's `MeshKVApi` (`get`/`set`/`has`/
-  `remove`/`clearAll`), cloning bytes and metadata across the boundary. It is the
-  ONLY file in `src/` that imports `packages/meshkv`, adds no caching/policy/
-  transport, and **starts no network** — constructing it calls no
-  `connect()`/`init()`/`start()`, so no signaling/WebRTC/peer discovery begins.
+  MeshKVClient` forwards each call to the package's `MeshKVApi` — `get→get`,
+  `put→put(key, bytes, metadata.contentType)`, `has→get≠null`, `delete→remove` —
+  cloning bytes across the boundary. It omits the optional `clear` because the real
+  MeshKV exposes no bulk clear. It is the ONLY file in `src/` that imports
+  `packages/meshkv`, adds no caching/policy/transport, and **starts no network** —
+  constructing it calls no `init()`/`startSignaling()`, so no signaling/WebRTC/peer
+  discovery begins.
   `r2_asset_cache.ts` is the origin-storage adapter: `R2AssetCache implements
   AssetCache` over a minimal `R2LikeBucket`/`R2LikeObject` (and a `MockR2Bucket`).
   It gates every `put` through `canCacheAsset`, clones bytes and normalizes
@@ -323,17 +327,21 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   it *ready* to call out behind its injected client. The runtime never reaches for
   a global `fetch`.
 - `packages/meshkv/*` — MeshKV as a **standalone external package**
-  (`@nostr-window/meshkv`), kept out of `src/` so the real upstream project can be
-  dropped in without the host depending on its internals. `meshkv.ts` is the entry
-  point: a local-first `MeshKV` node (`implements MeshKVApi`) composing
-  `local_cache.ts` (in-process tier), `peer_cache.ts` (mesh tier boundary — no
-  real WebRTC/peer I/O yet), and `signaling.ts` (signaling boundary — no real
-  socket yet). `types.ts` defines `MeshKVApi`/`MeshKVRecord`/`MeshKVMeta`.
-  Constructing a node opens **no connection**; it goes online only via the
-  explicit `connect()` (aliases `init()`/`start()`) and leaves via `close()`. The
-  package knows nothing of the host's asset/policy types; the host reaches it
-  solely through the `src/asset/meshkv_browser_client.ts` adapter. It is a cache
-  for PUBLIC bytes — not access control, payment, entitlement, or DRM.
+  (`@nostr-window/meshkv`), the typed boundary for the imported browser runtime so
+  the host depends only on its contract. `index.ts` is the stable entry point
+  (exports `MeshKVApi` plus `MeshKV`/`createMeshKV`); `types.ts` defines
+  `MeshKVApi` (`init`/`get`/`put`/`remove`, optional `load`) — mirroring the real
+  module's exports — plus `MeshKVData`/`MeshKVInitOptions`/`MeshKVRecord`.
+  `meshkv.ts` is a **browser-free reference node** with that same surface (backed
+  by `local_cache.ts`; `peer_cache.ts`/`signaling.ts` are mesh/signaling
+  boundaries with no real WebRTC or socket) so the host can typecheck/test without
+  a browser; the production runtime is the imported browser MeshKV (git-ignored
+  external checkout), and both satisfy `MeshKVApi`. Constructing a node opens **no
+  connection**; `init()` only wires handlers, and going online is the explicit
+  `startSignaling()` (browser: `signal.connect()`). The package imports only its
+  own `./` siblings — it knows nothing of the host's asset/policy types; the host
+  reaches it solely through the `src/asset/meshkv_browser_client.ts` adapter. It
+  is a cache for PUBLIC bytes — not access control, payment, entitlement, or DRM.
 
 ## Security scope (read before trusting anything here)
 
@@ -475,15 +483,20 @@ confidentiality guarantees and is not a security audit of the wider system.
   original is ever placed on it.
 - **MeshKV is a browser package that starts nothing on its own.** `packages/meshkv`
   is an external, standalone package reached solely through the
-  `MeshKVBrowserClient` adapter (`implements MeshKVClient`). Constructing the
-  adapter or a MeshKV node performs **no network**: no signaling server connection,
-  no WebRTC, and no peer discovery are started — a node goes online only through an
-  explicit `connect()`/`init()`/`start()` that the adapter never calls, and it is
-  not auto-wired into the runtime or Worker. The adapter clones bytes/metadata
-  across the boundary so no live reference is shared. MeshKV carries PUBLIC assets
-  only; private/paid/secret/DM/payment content is refused by `canCacheAsset` (in
-  `MeshKVAssetCache`) before it could ever reach the package. There are still no
-  signed URLs, downloads, or real asset delivery here.
+  `MeshKVBrowserClient` adapter (`implements MeshKVClient`). The real runtime is an
+  imported browser project (IndexedDB + WebRTC), kept as a git-ignored external
+  checkout; the host builds against the typed `MeshKVApi` and a browser-free
+  reference node. Constructing the adapter or a node performs **no network**: no
+  signaling connection, no WebRTC, and no peer discovery are started — going online
+  is an explicit step (`startSignaling()` / `signal.connect()`) the adapter never
+  calls, and it is not auto-wired into the runtime or Worker. Note the real MeshKV
+  `load()` performs an ORIGIN FETCH; the adapter deliberately never uses it (only
+  the local-tier `get`/`put`/`remove`). The adapter clones bytes across the
+  boundary so no live buffer is shared, and the package imports only its own
+  siblings (a test asserts it never reaches into the host's `src/`). MeshKV carries
+  PUBLIC assets only; private/paid/secret/DM/payment content is refused by
+  `canCacheAsset` (in `MeshKVAssetCache`) before it could ever reach the package.
+  There are still no signed URLs, downloads, or real asset delivery here.
 - **The R2 adapter is origin storage for public media, not a delivery path.**
   `R2AssetCache` gates every write through `canCacheAsset`, so private/paid
   content, DMs, secrets, key material, and payment/entitlement data are refused
@@ -645,6 +658,7 @@ D1 space directory caveats (do not over-promise on these):
 25. Product read-only directory/page route + public asset preview ✓
 26. Asset cache composed fallback chain (R2 → MeshKV → in-memory) ✓
 27. Chat read-only UI labels ✓
-28. MeshKV external package boundary (`packages/meshkv` + browser-client adapter) ✓ ← you are here
-29. Product / Chat / Space unified directory page
-30. Vault / encrypted identity layer (AEAD, external signer)
+28. MeshKV external package boundary (`packages/meshkv` + browser-client adapter) ✓
+29. MeshKV boundary wired to the imported implementation (real `MeshKVApi`) ✓ ← you are here
+30. Product / Chat / Space unified directory page
+31. Vault / encrypted identity layer (AEAD, external signer)
