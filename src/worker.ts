@@ -586,6 +586,15 @@ export interface Env {
   PROMOTION_SEND_VIEWER_PUBKEY?: string;
   PROMOTION_HASH_VIEWER_PUBKEY?: string;
   EDGE_REC_TIMEOUT_MS?: string;
+  /**
+   * Notification bridge selection config (Stage 42). These only let
+   * `createRuntime` SELECT a `NotificationBridge`; the Worker NEVER calls
+   * `notify()`, contacts no Telegram/LINE/APNs/FCM/Email API, and issues no
+   * `fetch`. Selection only — no notification is sent from the Worker.
+   */
+  NOTIFICATION_PROVIDER?: string;
+  ENABLE_NOTIFICATION_PLACEHOLDER?: string;
+  NOTIFICATION_DEFAULT_CHANNEL?: string;
 }
 
 /**

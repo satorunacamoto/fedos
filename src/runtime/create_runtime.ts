@@ -44,6 +44,15 @@ import {
 } from "../promotion/adapter.js";
 import { EdgeRecPromotionProvider } from "../promotion/edge_rec_adapter.js";
 import type { EdgeRecViewerOptions } from "../promotion/edge_rec_adapter.js";
+import {
+  NoopNotificationBridge,
+  PlaceholderNotificationBridge,
+} from "../notification/noop_notification.js";
+import {
+  NOTIFICATION_CHANNELS,
+  type NotificationBridge,
+  type NotificationChannel,
+} from "../notification/types.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -261,6 +270,49 @@ export function selectRelayPublisher(_env?: RuntimeEnv): RelayPublisher {
   return new MockRelayPublisher();
 }
 
+/**
+ * Validate and return a `NotificationChannel` from the env's
+ * `NOTIFICATION_DEFAULT_CHANNEL`. An absent or unrecognized value is silently
+ * ignored (returns `undefined`). Pure — never mutates env.
+ */
+export function resolveNotificationDefaultChannel(
+  env?: RuntimeEnv,
+): NotificationChannel | undefined {
+  const raw = env?.NOTIFICATION_DEFAULT_CHANNEL;
+  if (!raw) return undefined;
+  return (NOTIFICATION_CHANNELS as readonly string[]).includes(raw)
+    ? (raw as NotificationChannel)
+    : undefined;
+}
+
+/**
+ * Select the `NotificationBridge` from env / overrides. Priority:
+ *   1. `overrides.notificationBridge` — wins unconditionally.
+ *   2. `NOTIFICATION_PROVIDER=noop` → `NoopNotificationBridge`.
+ *   3. `NOTIFICATION_PROVIDER=placeholder` OR `ENABLE_NOTIFICATION_PLACEHOLDER`
+ *      truthy → `PlaceholderNotificationBridge`.
+ *   4. Otherwise → `NoopNotificationBridge` (safe default, sends nothing).
+ *
+ * Selection only: constructing the bridge contacts no API and calls no `notify`.
+ * No Telegram/LINE/APNs/FCM/Email transport is imported or invoked. `env` is
+ * never mutated.
+ */
+export function selectNotificationBridge(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): NotificationBridge {
+  if (overrides.notificationBridge) return overrides.notificationBridge;
+  const provider = env?.NOTIFICATION_PROVIDER;
+  if (provider === "noop") return new NoopNotificationBridge();
+  if (
+    provider === "placeholder" ||
+    isEnvFlagTruthy(env?.ENABLE_NOTIFICATION_PLACEHOLDER)
+  ) {
+    return new PlaceholderNotificationBridge();
+  }
+  return new NoopNotificationBridge();
+}
+
 /** Cloudflare when any binding/endpoint is present, local with a bare env, else test. */
 function resolveMode(env?: RuntimeEnv): RuntimeMode {
   if (!env) return "test";
@@ -300,5 +352,6 @@ export function createRuntime(
     recommendationProvider:
       overrides.recommendationProvider ?? selectRecommendationProvider(env),
     relayPublisher: overrides.relayPublisher ?? selectRelayPublisher(env),
+    notificationBridge: selectNotificationBridge(env, overrides),
   };
 }

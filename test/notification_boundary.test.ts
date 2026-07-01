@@ -223,12 +223,30 @@ describe("notification boundary is pure and total", () => {
 });
 
 describe("notification layer stays a boundary and is not auto-wired", () => {
-  it("12. Runtime source does not reference notifications", () => {
-    expect(runtimeSource).not.toMatch(/notification/i);
+  it("12. Runtime source wires notification bridge selection but never auto-calls notify()", () => {
+    // Stage 42: createRuntime now selects a NotificationBridge from env, so the
+    // runtime source IS allowed to reference notification imports/selection helpers.
+    // The invariant is that notify() is NEVER called automatically.
+    expect(runtimeSource).not.toMatch(/\.notify\s*\(/);
+    // No Telegram/LINE/APNs/FCM/Email transport imported in the runtime.
+    expect(runtimeSource).not.toMatch(/from\s+['"].*telegraf/i);
+    expect(runtimeSource).not.toMatch(/from\s+['"].*line[-_]bot/i);
+    expect(runtimeSource).not.toMatch(/from\s+['"].*apns/i);
+    expect(runtimeSource).not.toMatch(/from\s+['"].*firebase/i);
+    expect(runtimeSource).not.toMatch(/from\s+['"].*nodemailer/i);
   });
 
-  it("13. Worker source does not reference notifications", () => {
-    expect(workerSource).not.toMatch(/notification/i);
+  it("13. Worker source exposes notification env fields but never auto-calls notify()", () => {
+    // Stage 42: the Worker Env interface now includes NOTIFICATION_* fields, so
+    // the worker source IS allowed to reference notification-related strings.
+    // The invariant is that notify() is NEVER called automatically.
+    expect(workerSource).not.toMatch(/\.notify\s*\(/);
+    // No Telegram/LINE/APNs/FCM/Email transport imported in the worker.
+    expect(workerSource).not.toMatch(/from\s+['"].*telegraf/i);
+    expect(workerSource).not.toMatch(/from\s+['"].*line[-_]bot/i);
+    expect(workerSource).not.toMatch(/from\s+['"].*apns/i);
+    expect(workerSource).not.toMatch(/from\s+['"].*firebase/i);
+    expect(workerSource).not.toMatch(/from\s+['"].*nodemailer/i);
   });
 
   it("14. imports no Telegram / LINE / APNs / FCM / Email transport", () => {

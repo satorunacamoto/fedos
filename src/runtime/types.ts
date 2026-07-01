@@ -22,6 +22,7 @@ import type { KvLikeNamespace } from "../cache/kv_event_cache.js";
 import type { AsyncSpaceDirectory, SpaceDirectory } from "../community/directory.js";
 import type { D1LikeDatabase } from "../indexer/d1_index.js";
 import type { MetadataIndex } from "../indexer/types.js";
+import type { NotificationBridge } from "../notification/types.js";
 import type { SignatureVerifier } from "../nostr/signature.js";
 import type { RelayPublisher } from "../nostr/publish.js";
 import type { PromotionProvider, RecommendationProvider } from "../promotion/adapter.js";
@@ -106,6 +107,29 @@ export interface RuntimeEnv {
    * and the safe mock provider is used instead.
    */
   readonly fetch?: EdgeRecFetchLike;
+  /**
+   * Which notification bridge to build.
+   *   - "noop"        → `NoopNotificationBridge` (safe default — nothing sent).
+   *   - "placeholder" → `PlaceholderNotificationBridge` (dev/test — still nothing sent).
+   *   - absent/other  → `NoopNotificationBridge`.
+   * Selection only. `notify()` is never auto-called.
+   */
+  readonly NOTIFICATION_PROVIDER?: string;
+  /**
+   * Explicit opt-in to use the placeholder bridge. Truthy = `true` or a truthy
+   * string ("1"/"true"/"yes"/"on"). Takes effect when `NOTIFICATION_PROVIDER` is
+   * not "noop" or "placeholder" but this flag is truthy — same result as
+   * `NOTIFICATION_PROVIDER=placeholder`. Selection only; sends nothing.
+   */
+  readonly ENABLE_NOTIFICATION_PLACEHOLDER?: string | boolean;
+  /**
+   * Preferred default `NotificationChannel` when building notification payloads.
+   * Must be one of the six placeholder channel names; any other value is silently
+   * ignored (the bridge constructor receives no channel argument in this stage).
+   * Valid values: "telegram_placeholder" | "line_placeholder" | "apns_placeholder"
+   * | "fcm_placeholder" | "email_placeholder" | "local_placeholder".
+   */
+  readonly NOTIFICATION_DEFAULT_CHANNEL?: string;
 }
 
 /**
@@ -116,6 +140,8 @@ export interface RuntimeOverrides {
   readonly mode?: RuntimeMode;
   readonly eventCache?: EventCache;
   readonly assetCache?: AssetCache;
+  /** Pre-built notification bridge. Wins over any `env` notification fields. */
+  readonly notificationBridge?: NotificationBridge;
   /**
    * A pre-built MeshKV client. Wins over `env.MESHKV_ASSET_CACHE` and the opt-in
    * browser-client path when selecting the asset cache. Ignored if `assetCache`
@@ -148,4 +174,10 @@ export interface AppRuntime {
   readonly promotionProvider: PromotionProvider;
   readonly recommendationProvider: RecommendationProvider;
   readonly relayPublisher: RelayPublisher;
+  /**
+   * The selected notification bridge. Selected from env; `notify()` is NEVER
+   * called automatically. Sending nothing is the default (`NoopNotificationBridge`).
+   * No Telegram/LINE/APNs/FCM/Email API is contacted.
+   */
+  readonly notificationBridge: NotificationBridge;
 }

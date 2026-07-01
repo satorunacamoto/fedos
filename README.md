@@ -8,7 +8,43 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 41 — Mock promotion preview mode.** The promotion boundary can
+> **Status: Stage 42 — Notification provider env selection boundary.**
+> `createRuntime(env)` can now SELECT a `NotificationBridge` from three new
+> `RuntimeEnv` fields — and NOTHING more. **`NOTIFICATION_PROVIDER`** (`"noop"` or
+> `"placeholder"`), **`ENABLE_NOTIFICATION_PLACEHOLDER`** (truthy string/boolean opt-in),
+> and **`NOTIFICATION_DEFAULT_CHANNEL`** (one of the six `*_placeholder` channel
+> names; any other value is silently ignored) let `selectNotificationBridge(env?,
+> overrides?)` choose between `NoopNotificationBridge` (the safe default — every
+> `notify()` returns `unavailable`) and `PlaceholderNotificationBridge` (dev/test —
+> evaluates `canSendNotification` but **delivers nothing**). Priority: (1)
+> `overrides.notificationBridge` wins unconditionally; (2) `NOTIFICATION_PROVIDER=noop`
+> → `NoopNotificationBridge`; (3) `NOTIFICATION_PROVIDER=placeholder` OR
+> `ENABLE_NOTIFICATION_PLACEHOLDER` truthy → `PlaceholderNotificationBridge`; (4)
+> absent / unrecognized → `NoopNotificationBridge`. `resolveNotificationDefaultChannel`
+> validates the channel name against `NOTIFICATION_CHANNELS` and returns `undefined`
+> for any unrecognized value — invalid channels are ignored without error.
+> `AppRuntime` gains a `notificationBridge` field; `RuntimeOverrides` gains
+> `notificationBridge?`. The Worker `Env` interface is extended with the three
+> notification fields so wrangler.toml can supply them — but the Worker **never
+> calls `notify()`** and routes no notification. **This is bridge SELECTION only.**
+> Constructing the runtime issues **no `fetch`**, calls **no Telegram/LINE Bot API,
+> no APNs, no FCM, no email service**, and **never auto-calls `notify()`** —
+> `notificationBridge` is merely placed in the runtime, ready for a future caller
+> to use it explicitly. The Stage 39 `sanitizeNotificationPayload` /
+> `canSendNotification` guardrails remain in force: no secret / DM body / key /
+> seed / payment / entitlement / credential in any notification payload. 12 new
+> tests in `test/runtime_notification_env.test.ts` cover: no-env → Noop, each
+> provider value, each truthy/falsy flag variant, invalid channel ignored,
+> override wins, no `notify()` auto-call, no `fetch` issued, Worker source has no
+> `.notify(` call, no Telegram/LINE/APNs/FCM/Email import, and env not mutated.
+> The Stage 39 `notification_boundary.test.ts` tests 12/13 are updated: they now
+> confirm that `notify()` is not auto-called and no real transport is imported
+> (rather than checking the runtime is entirely notification-free, which is no
+> longer the case). Stage 43 candidate: **IPFS Asset Adapter Boundary skeleton**
+> (AssetCache/R2/MeshKV/Composite complete; IPFS as a future public-asset backend
+> boundary, not a real node). Prior status:
+>
+> **Stage 41 — Mock promotion preview mode.** The promotion boundary can
 > now render actual candidate cards in the UI — but ONLY from the in-memory
 > `MockPromotionProvider`, and ONLY under an explicit opt-in flag. Three pure
 > renderers land in `src/render/promotion.ts`: `renderPromotionCandidatePreview`
