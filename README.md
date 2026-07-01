@@ -8,7 +8,60 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 43 — IPFS asset adapter boundary skeleton.**
+> **Status: Stage 44 — Payment / Lightning boundary skeleton.**
+> A new `src/payment/` treats a future payment step as the front door BEFORE a
+> `PurchaseGrant` (`src/commerce/types.ts`) is ever issued — types and safe
+> defaults ONLY. `src/payment/types.ts` defines `PaymentRail`
+> (`lightning_placeholder`/`stripe_placeholder`/`apple_pay_placeholder`/
+> `google_pay_placeholder`/`manual_placeholder`/`external_placeholder`),
+> `PaymentStatus` (`unavailable`/`pending`/`accepted_placeholder`/`rejected`/
+> `error`), `PaymentCapability`, `PaymentRequest` (productId, optional
+> buyerPubkey, amountCents/currency display metadata, rail, optional
+> metadata/createdAt), `PaymentDecision`, and the `PaymentProvider` seam
+> (`getStatus`/`getCapabilities`/`requestPayment`). `src/payment/noop_payment.ts`
+> ships `NoopPaymentProvider` (permanently `unavailable`/`rejected` — every
+> `requestPayment` call is refused) and `PlaceholderPaymentProvider` (rejects a
+> negative amount or metadata that looks like a card/wallet/secret, otherwise
+> resolves `accepted_placeholder` — a policy-clean placeholder, NEVER a paid
+> confirmation) plus the pure `sanitizePaymentMetadata` helper. `src/payment/
+> commerce_bridge.ts` adds three pure functions: `canRequestPaymentForProduct
+> (product)` (an `active` product with a non-negative price is `pending`-
+> eligible; a draft/archived product or a negative price is `rejected`),
+> `productToPaymentRequest(product, buyerPubkey?, options?)` (returns `null`
+> when the eligibility check fails; otherwise a `PaymentRequest` built from the
+> product's display price/currency/id with any card/wallet/secret-looking
+> metadata entry stripped), and `paymentDecisionToGrant(decision, options?)`
+> (`PurchaseGrant | null` — returns a grant ONLY for an `accepted_placeholder`
+> decision with a known `buyerPubkey`; every other status is `null`). A grant
+> built here is always `source: "manual"` or `"promo"` — **never** `"payment"`,
+> because this boundary never verifies that money moved. **This stage
+> implements no Lightning (BOLT11/LNURL, Breez SDK, Greenlight), no Stripe, no
+> Apple Pay, no Google Pay, no wallet, no invoice, no checkout session, and no
+> settlement/webhook confirmation** — nothing here charges a card, opens a
+> channel, mints an invoice, builds a checkout URL, or issues a `fetch`.
+> `PaymentDecision` carries no invoice/checkout URL field at all, by design.
+> It is **not wired into the runtime or the Worker** — `create_runtime.ts` and
+> `worker.ts` import nothing from `src/payment/` and reference no
+> `PaymentProvider`/`requestPayment`/`productToPaymentRequest`/
+> `paymentDecisionToGrant`. 18 new tests in `test/payment_boundary.test.ts`
+> cover: Noop always unavailable/rejected, Placeholder never produces an
+> invoice or checkout URL, an active product is allowed while draft/archived/
+> negative-price products are rejected, `paymentDecisionToGrant` returns `null`
+> for `pending`/`rejected`/`unavailable`/`error` and a grant only for
+> `accepted_placeholder`, the grant's source is never `"payment"`, sensitive
+> metadata (card number, wallet secret) is stripped by the bridge and denied by
+> the provider, no input mutation, Runtime/Worker source have zero payment
+> import/wiring, no Lightning/Stripe/Apple Pay/Google Pay/Breez/Greenlight
+> import, and no `fetch`/invoice/checkout builder anywhere in the payment
+> sources. Note on liquidity/custody: this stage takes NO position on how a
+> future real rail would hold or move funds (custodial vs. non-custodial
+> Lightning, chargeback exposure, KYC/AML) — that remains future research, not
+> settled by this skeleton. Stage 45 candidate: **Product purchase preview UI,
+> placeholder only** (a Product-page purchase-intent preview driven by
+> `PlaceholderPaymentProvider`/`canRequestPaymentForProduct` — no checkout, no
+> invoice, no real grant). Prior status:
+>
+> **Stage 43 — IPFS asset adapter boundary skeleton.**
 > A new `src/asset/ipfs_asset_cache.ts` treats IPFS as a candidate FUTURE
 > backend for the public `AssetCache` boundary (alongside R2 and MeshKV) —
 > types and safe defaults ONLY. `IpfsClient` (`get(cid)`, `put(bytes,
@@ -46,10 +99,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > safe no-ops that never touch the client, the CID plausibility helper accepts
 > only CID-shaped strings, a CID-shaped value grants no access (not an
 > authorization token), no input mutation, and Runtime/Worker source contain no
-> `ipfs` reference at all and no fetch/http/real-IPFS-client import. Stage 44
-> candidate: **Payment/Lightning Boundary skeleton** (a `PaymentProvider`
-> interface ahead of `PurchaseGrant` issuance — no Lightning/Stripe
-> implementation). Prior status:
+> `ipfs` reference at all and no fetch/http/real-IPFS-client import. Prior status:
 >
 > **Stage 42 — Notification provider env selection boundary.**
 > `createRuntime(env)` can now SELECT a `NotificationBridge` from three new
