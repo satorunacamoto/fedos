@@ -8,7 +8,28 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 34 — Crypto Core boundary skeleton.** A MINIMAL, future-facing
+> **Status: Stage 35 — Product asset preview metadata from runtime.** The
+> `?product=<id>` route can now source its PUBLIC/UNLISTED asset PREVIEW metadata
+> from the runtime's `AssetCache`, not just the fixed sample list.
+> `src/commerce/asset_preview.ts`'s `resolveProductAssetPreviews(product,
+> assetMetadataList, assetCache?, now?)` walks `product.assetIds` in order,
+> starting from the sample metadata and — only when an `assetCache` is supplied —
+> trying `assetCache.get(id, now)`; a hit contributes **`cached.metadata` ONLY**
+> (the bytes are discarded and never reach a `ProductAsset` or the HTML), while a
+> cache **miss or thrown error is swallowed** and the sample metadata stands.
+> `isPreviewAssetVisible`/`filterPreviewAssetMetadata` reuse the Stage 22
+> `canCacheAsset` policy so `private`/`paid` assets and anything tagged sensitive
+> (dm/secret/key/payment/entitlement) are excluded — from cache hits as well as
+> samples. The Worker passes `runtime.assetCache` into `handleRequest` and threads
+> it to the product route **only**: `renderProductRoute` awaits the resolver, and
+> the board/directory path never touches the cache (a test asserts the no-param
+> board issues zero `assetCache.get` calls). This is **read-only metadata, not
+> delivery**: still **no asset bytes in the HTML, no signed URL, no download, no
+> payment**, and no real R2/MeshKV file fetch — the helper reads only the injected
+> cache's already-resolved metadata and mutates neither the product, the sample
+> list, nor a cached asset. Prior status:
+>
+> **Stage 34 — Crypto Core boundary skeleton.** A MINIMAL, future-facing
 > seam for the FedOS crypto core now lives in `src/crypto/`, kept entirely OUT of
 > the current Nostr/Cloudflare core, the Vault seam, and the asset layer. It fixes
 > the swap point for a future real crypto core (the provisional
@@ -215,6 +236,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   original). **No money moves and nothing is delivered** — no payment, checkout,
   download serving, inventory, or real Stripe/crypto/R2/D1; `priceCents` is
   display-only and there is no DRM. The Stage 25 UI is read-only PREVIEW only.
+  `asset_preview.ts` (Stage 35) lets the product route resolve preview metadata
+  from the runtime's `AssetCache`: `resolveProductAssetPreviews(product,
+  assetMetadataList, assetCache?, now?)` walks `product.assetIds`, uses the sample
+  metadata as a baseline, and — only when a cache is supplied — overrides an entry
+  with `cached.metadata` on a hit (**bytes discarded**), swallowing a miss/error
+  back to the sample. `isPreviewAssetVisible`/`filterPreviewAssetMetadata` reuse
+  `canCacheAsset`, so `private`/`paid`/sensitive-tagged assets are excluded from
+  cache hits and samples alike; it mutates no input and carries no bytes.
 - `src/promotion/*` — pure INTEGRATION BOUNDARY toward the existing Cloudflare ad
   system (edge-rec-middleware / recommendation-rewriter); it is NOT an ad engine.
   `types.ts` defines `PlacementType` (11 slots across thread/space/chat/product/
@@ -338,7 +367,11 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `?actor=<pubkey>` (viewer identity; guest when absent). `?product=<id>` renders
   a read-only product page over the fixed sample products — summary plus
   PUBLIC/UNLISTED asset PREVIEW metadata only, gated by `canViewProduct` (unknown
-  → not found, denied → access denied). `?chat=<id>` renders a read-only chat room
+  → not found, denied → access denied). The product route sources that preview
+  metadata via `resolveProductAssetPreviews` from the runtime's `AssetCache`
+  (Stage 35), falling back to the sample metadata on a miss/error — METADATA ONLY,
+  bytes discarded — and the `AssetCache` is consulted ONLY here, never on the
+  board/directory path. `?chat=<id>` renders a read-only chat room
   over the fixed sample chats, gated by `canReadChat` (unknown → not found, denied
   → access denied, allowed → room + plaintext messages + a `canPostChat` hint).
   The default (no-param) board surfaces a **unified directory** (`renderUnifiedDirectory`)
@@ -606,6 +639,14 @@ confidentiality guarantees and is not a security audit of the wider system.
   tags) for `public`/`unlisted` assets ONLY — `private`/`paid` assets are filtered
   out and never labeled. No asset bytes are embedded in the HTML, and there is no
   download link, signed URL, payment affordance, or real R2/MeshKV byte lookup.
+  Stage 35 lets that preview metadata come from the runtime's `AssetCache`
+  (`resolveProductAssetPreviews`) instead of only the sample list, but it stays
+  **metadata-only**: a cache hit contributes `cached.metadata` and the bytes are
+  discarded (never rendered), a miss/error falls back to the sample metadata, and
+  `private`/`paid`/sensitive-tagged assets are still excluded (the filter reuses
+  `canCacheAsset`). The cache is read on the `?product=` route ONLY — the board
+  and directories issue no `assetCache.get` — and this adds no download, signed
+  URL, delivery, or payment path.
 - **The promotion layer is a request boundary, not an ad system.** It builds and
   normalizes "place a promotion here" requests and hands them to an injected
   `PromotionProvider` — it does not select, rank, auction, or weight ads, run
@@ -889,8 +930,9 @@ D1 space directory caveats (do not over-promise on these):
 31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓
 32. MeshKV browser lifecycle boundary (explicit connect/startSignaling) ✓
 33. Vault boundary skeleton (interface + no-op/in-memory; no crypto, no keys) ✓
-34. Crypto Core Boundary skeleton (`CryptoProvider` interface + `NoopCryptoProvider`) ✓ ← you are here
-35. Product/Asset preview metadata from runtime (`runtime.assetCache`-backed previews)
+34. Crypto Core Boundary skeleton (`CryptoProvider` interface + `NoopCryptoProvider`) ✓
+35. Product/Asset preview metadata from runtime (`runtime.assetCache`-backed previews) ✓ ← you are here
+36. EdgeRec Worker env selection boundary (select the promotion provider from Worker env)
 
 ### Future candidate boundaries (design notes only — not scheduled)
 

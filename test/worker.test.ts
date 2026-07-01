@@ -22,8 +22,45 @@ import type {
   WebSocketFactory,
 } from "../src/nostr/ws_relay.js";
 import type { NostrEvent } from "../src/nostr/types.js";
+import type {
+  AssetCache,
+  AssetKey,
+  AssetMetadata,
+  CachedAsset,
+} from "../src/asset/types.js";
 
 const DAMUS = "wss://relay.damus.io";
+
+/** An AssetCache that records every `get` key and returns scripted hits. */
+class SpyAssetCache implements AssetCache {
+  readonly getKeys: string[] = [];
+  #hits: Map<string, CachedAsset>;
+
+  constructor(hits: Record<string, CachedAsset> = {}) {
+    this.#hits = new Map(Object.entries(hits));
+  }
+
+  async get(key: AssetKey, _now: number): Promise<CachedAsset | undefined> {
+    this.getKeys.push(key);
+    return this.#hits.get(key);
+  }
+  async put(): Promise<void> {}
+  async has(): Promise<boolean> {
+    return false;
+  }
+  async delete(): Promise<void> {}
+  async clear(): Promise<void> {}
+}
+
+/** A cached asset with the given metadata and a recognizable byte marker. */
+function cachedWith(metadata: AssetMetadata, marker = "UNUSED_BYTES"): CachedAsset {
+  return {
+    key: "k",
+    bytes: new TextEncoder().encode(marker).buffer,
+    metadata,
+    cachedAt: 0,
+  };
+}
 
 function sampleEvent(): NostrEvent {
   return {
@@ -515,6 +552,121 @@ describe("worker product route (read-only)", () => {
     expect(src).not.toContain("arrayBuffer");
     expect(src).not.toContain("createSignedUrl");
     expect(src).not.toContain("EdgeRecPromotionProvider");
+  });
+});
+
+describe("worker product asset preview from runtime (Stage 35)", () => {
+  it("1. ?product=<id> consults the runtime assetCache", async () => {
+    const spy = new SpyAssetCache();
+    await handleRequest(
+      new Request("http://localhost/?product=guide-pdf"),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      spy,
+    );
+    // guide-pdf references three asset ids; each is looked up by id.
+    expect(spy.getKeys).toContain("asset-guide-thumb");
+    expect(spy.getKeys).toContain("asset-guide-preview");
+    expect(spy.getKeys).toContain("asset-guide-full");
+  });
+
+  it("2. the no-param board never touches the assetCache", async () => {
+    const spy = new SpyAssetCache();
+    await handleRequest(
+      new Request("http://localhost/"),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      spy,
+    );
+    expect(spy.getKeys).toEqual([]);
+  });
+
+  it("3. private/paid metadata (from cache OR sample) is not displayed", async () => {
+    // A cache hit turns the normally-public thumb into a paid asset.
+    const spy = new SpyAssetCache({
+      "asset-guide-thumb": cachedWith({
+        kind: "thumbnail",
+        visibility: "paid",
+        contentType: "image/png",
+        sizeBytes: 1,
+        tags: [],
+      }),
+    });
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?product=guide-pdf"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        spy,
+      )
+    ).text();
+    expect(body).not.toContain('data-asset="asset-guide-thumb"'); // now paid -> hidden
+    expect(body).not.toContain('data-asset="asset-guide-full"'); // sample paid -> hidden
+    expect(body).toContain('data-asset="asset-guide-preview"'); // unlisted -> shown
+  });
+
+  it("4. cached asset bytes never reach the HTML", async () => {
+    const spy = new SpyAssetCache({
+      "asset-guide-preview": cachedWith(
+        {
+          kind: "preview",
+          visibility: "unlisted",
+          contentType: "application/pdf",
+          sizeBytes: 10,
+          tags: [],
+        },
+        "BYTES_SHOULD_NOT_APPEAR",
+      ),
+    });
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?product=guide-pdf"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        spy,
+      )
+    ).text();
+    expect(body).not.toContain("BYTES_SHOULD_NOT_APPEAR");
+    expect(body).not.toContain("base64");
+    expect(body).not.toContain("data:application");
+    // Metadata itself is still rendered.
+    expect(body).toContain('data-asset="asset-guide-preview"');
+  });
+
+  it("5. introduces no download / signed URL / payment on the runtime-sourced page", async () => {
+    const spy = new SpyAssetCache({
+      "asset-guide-preview": cachedWith({
+        kind: "preview",
+        visibility: "unlisted",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        tags: [],
+      }),
+    });
+    const body = await (
+      await handleRequest(
+        new Request("http://localhost/?product=guide-pdf"),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        spy,
+      )
+    ).text();
+    const lower = body.toLowerCase();
+    expect(lower).not.toContain("download");
+    expect(lower).not.toContain("signed url");
+    expect(lower).not.toContain("checkout");
+    expect(lower).not.toContain("stripe");
+    expect(body).not.toContain("<button");
   });
 });
 

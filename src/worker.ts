@@ -13,8 +13,11 @@
  * ?limit ?offset. Live mode also reads ?relay and ?timeout (capped).
  *
  * `?product=<id>` renders a read-only product page over the fixed sample
- * products: a summary plus PUBLIC/UNLISTED asset PREVIEW metadata only. There is
- * NO body delivery, signed URL, download, or payment — `private`/`paid` assets
+ * products: a summary plus PUBLIC/UNLISTED asset PREVIEW metadata only. The
+ * preview metadata may be sourced from the runtime's `AssetCache` (Stage 35),
+ * falling back to the fixed sample metadata on a miss/error — METADATA ONLY. The
+ * asset cache is consulted ONLY on this product route, never on the board. There
+ * is NO body delivery, signed URL, download, or payment — `private`/`paid` assets
  * are never shown and no asset bytes are embedded.
  *
  * `?chat=<id>` renders a read-only chat room over the fixed sample chats, gated
@@ -78,15 +81,16 @@ import {
 } from "./render/product.js";
 import {
   findProductById,
-  getProductAssets,
   listViewableProducts,
 } from "./commerce/directory.js";
+import { resolveProductAssetPreviews } from "./commerce/asset_preview.js";
 import { canViewProduct } from "./commerce/policy.js";
 import {
   SAMPLE_PRODUCTS,
   SAMPLE_GRANTS,
   SAMPLE_ASSET_METADATA,
 } from "./commerce/sample_products.js";
+import type { AssetCache } from "./asset/types.js";
 import {
   renderChatDirectory,
   renderChatRoom,
@@ -260,9 +264,17 @@ function productDirectoryView(actor: string): string {
  *                       EMPTY promotion placeholder.
  *
  * Asset previews are PUBLIC/UNLISTED metadata only — no bytes, no download, no
- * signed URL, no payment. `private`/`paid` assets are never shown.
+ * signed URL, no payment. `private`/`paid` assets are never shown. When an
+ * `assetCache` is supplied (the runtime's), preview METADATA may come from the
+ * cache; a miss/error falls back to the fixed sample metadata. The cache is
+ * consulted ONLY on this product route — never on the board/directory path.
  */
-function renderProductRoute(data: BoardData, productId: string, actor: string): string {
+async function renderProductRoute(
+  data: BoardData,
+  productId: string,
+  actor: string,
+  assetCache?: AssetCache,
+): Promise<string> {
   const product = findProductById(SAMPLE_PRODUCTS, productId);
   if (!product) {
     return renderPage(buildThreads([]), {
@@ -277,7 +289,12 @@ function renderProductRoute(data: BoardData, productId: string, actor: string): 
     });
   }
 
-  const assets = getProductAssets(product, SAMPLE_ASSET_METADATA);
+  const assets = await resolveProductAssetPreviews(
+    product,
+    SAMPLE_ASSET_METADATA,
+    assetCache,
+    Date.now(),
+  );
   return renderPage(buildThreads([]), {
     status:
       data.lead +
@@ -338,9 +355,16 @@ function renderChatRoute(data: BoardData, chatId: string, actor: string): string
  * - read allowed       -> only that space's threads + a landing header.
  *
  * `?product=<id>` and `?chat=<id>` take precedence and render their read-only
- * pages. `?actor=<pubkey>` selects the viewer (guest when absent).
+ * pages. `?actor=<pubkey>` selects the viewer (guest when absent). `assetCache`,
+ * when supplied, is used ONLY by the product route (for preview metadata); the
+ * board/directory path never touches it.
  */
-function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): string {
+async function renderBoard(
+  url: URL,
+  data: BoardData,
+  directory: SpaceDirectory,
+  assetCache?: AssetCache,
+): Promise<string> {
   const productId = url.searchParams.get("product");
   const chatId = url.searchParams.get("chat");
   const spaceId = url.searchParams.get("space");
@@ -349,7 +373,7 @@ function renderBoard(url: URL, data: BoardData, directory: SpaceDirectory): stri
   const queryOptions = parseQueryOptions(url);
 
   if (productId !== null) {
-    return renderProductRoute(data, productId, actor);
+    return renderProductRoute(data, productId, actor, assetCache);
   }
 
   if (chatId !== null) {
@@ -479,6 +503,7 @@ export async function handleRequest(
   cache: EventCache = liveCache,
   verifier: SignatureVerifier = selectVerifier(),
   directory: SpaceDirectory = spaceDirectory,
+  assetCache?: AssetCache,
 ): Promise<Response> {
   const url = new URL(request.url);
   const relayParam = url.searchParams.get("relay");
@@ -499,7 +524,7 @@ export async function handleRequest(
         cache,
         verifier,
       );
-      return htmlResponse(renderBoard(url, data, directory));
+      return htmlResponse(await renderBoard(url, data, directory, assetCache));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const page = renderPage(buildThreads([]), {
@@ -510,7 +535,7 @@ export async function handleRequest(
   }
 
   const data = await buildSampleBoard(Date.now());
-  return htmlResponse(renderBoard(url, data, directory));
+  return htmlResponse(await renderBoard(url, data, directory, assetCache));
 }
 
 /** Worker bindings. The KV namespace is optional; without it we fall back. */
@@ -546,9 +571,18 @@ export function selectDirectory(env?: Env): SpaceDirectory | D1SpaceDirectory {
 export default {
   fetch(request: Request, env?: Env): Promise<Response> {
     // Stage 21: the runtime is the single selection point. We use its event
-    // cache here; the directory/index/providers/publisher are selected too but
-    // not auto-wired (no real publish, no NIP-07, no auto-served ads).
+    // cache here, and (Stage 35) its asset cache is passed for the product route
+    // to source PREVIEW metadata only — the directory/index/providers/publisher
+    // are selected too but not auto-wired (no real publish, no NIP-07, no
+    // auto-served ads, no asset bytes/downloads/payment).
     const runtime = createRuntime(env);
-    return handleRequest(request, createWorkersWebSocket, runtime.eventCache);
+    return handleRequest(
+      request,
+      createWorkersWebSocket,
+      runtime.eventCache,
+      undefined,
+      undefined,
+      runtime.assetCache,
+    );
   },
 };
