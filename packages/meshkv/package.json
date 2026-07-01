@@ -1,0 +1,11 @@
+{
+  "name": "@nostr-window/meshkv",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MeshKV — browser-to-browser public asset KV store (external package boundary).",
+  "main": "src/meshkv.ts",
+  "exports": {
+    ".": "./src/meshkv.ts"
+  }
+}
