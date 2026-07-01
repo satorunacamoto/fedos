@@ -8,7 +8,22 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 31 — MeshKV runtime opt-in wiring.** `createRuntime` can now
+> **Status: Stage 32 — MeshKV browser lifecycle boundary.** Bringing a MeshKV
+> node online is now an explicit, separate step in `src/asset/meshkv_lifecycle.ts`,
+> kept OUT of `createRuntime` and the Worker. `MeshKVLifecycle`
+> (`MeshKVBrowserLifecycle` / `createMeshKVLifecycle(node, initOptions?)`) drives a
+> node through `idle → prepared → online → offline` (or `error`): the
+> **constructor does nothing**, `prepare()` only wires the node (`init`, no
+> socket), `goOnline()` is the FIRST call that may open signaling / join the WebRTC
+> peer mesh (`startSignaling`), and `goOffline()` tears it down (`stop`). Every
+> step is idempotent (double-calls are safe) and a failed step lands in `error`
+> with the cause recorded (`getLastError`) instead of throwing. **Nothing is
+> auto-wired**: `createRuntime` and the Worker never call the lifecycle, so
+> WebRTC / signaling / peer discovery begin only when a caller explicitly invokes
+> `goOnline()`. This adds no cache, policy, or data path and no guarantees; MeshKV
+> still carries PUBLIC/unlisted bytes only. Prior status:
+>
+> **Stage 31 — MeshKV runtime opt-in wiring.** `createRuntime` can now
 > build a `MeshKVBrowserClient` (over the `packages/meshkv` boundary) and slot it
 > into the asset cache, but **only behind an explicit opt-in**:
 > `ENABLE_MESHKV_ASSET_CACHE` must be truthy AND a `MeshKVApi` supplied (via
@@ -319,10 +334,22 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   MeshKVClient` forwards each call to the package's `MeshKVApi` — `get→get`,
   `put→put(key, bytes, metadata.contentType)`, `has→get≠null`, `delete→remove` —
   cloning bytes across the boundary. It omits the optional `clear` because the real
-  MeshKV exposes no bulk clear. It is the ONLY file in `src/` that imports
-  `packages/meshkv`, adds no caching/policy/transport, and **starts no network** —
-  constructing it calls no `init()`/`startSignaling()`, so no signaling/WebRTC/peer
-  discovery begins.
+  MeshKV exposes no bulk clear. It is the only file in `src/` that reaches the
+  package at RUNTIME (forwards `MeshKVClient` calls); a few others take type-only
+  imports (`runtime/types.ts`, `meshkv_lifecycle.ts`). It adds no caching/policy/
+  transport, and **starts no network** — constructing it calls no `init()`/
+  `startSignaling()`, so no signaling/WebRTC/peer discovery begins.
+  `meshkv_lifecycle.ts` (Stage 32) is the explicit ONLINE/OFFLINE boundary,
+  separate from selection: `MeshKVLifecycle` (`MeshKVBrowserLifecycle` /
+  `createMeshKVLifecycle(node, initOptions?)`) drives a lifecycle-capable node
+  (`init` + `startSignaling` + `stop`, satisfied by the reference `MeshKV`) through
+  `idle → prepared → online → offline` (or `error`). The **constructor does
+  nothing**; `prepare()` wires only (`init`); `goOnline()` is the first call that
+  may open signaling / join the peer mesh (`startSignaling`); `goOffline()` calls
+  `stop`. Steps are idempotent and failures set `error` (cause via `getLastError`)
+  rather than throwing. It is **not wired into the runtime or Worker** — WebRTC /
+  signaling / peer discovery begin only through an explicit `goOnline()`. It adds
+  no cache, policy, or data path, and makes no security guarantee.
   `r2_asset_cache.ts` is the origin-storage adapter: `R2AssetCache implements
   AssetCache` over a minimal `R2LikeBucket`/`R2LikeObject` (and a `MockR2Bucket`).
   It gates every `put` through `canCacheAsset`, clones bytes and normalizes
@@ -527,6 +554,16 @@ confidentiality guarantees and is not a security audit of the wider system.
   and MeshKV still holds public/unlisted bytes only (private/paid/secret/DM/
   payment/entitlement data is refused by `canCacheAsset`; no signed URLs,
   downloads, or payment).
+- **Going online is an explicit lifecycle step, never automatic.**
+  `MeshKVLifecycle` (`src/asset/meshkv_lifecycle.ts`) is the only place a MeshKV
+  node is brought online. Constructing it does nothing; `prepare()` wires the node
+  (`init`) without opening a socket; `goOnline()` is the FIRST call that may open
+  signaling or join the WebRTC peer mesh (`startSignaling`); `goOffline()` calls
+  `stop`. It is **not** wired into `createRuntime` or the Worker, so no signaling,
+  WebRTC, or peer discovery begins unless a caller explicitly calls `goOnline()`.
+  Steps are idempotent and failures set an `error` state rather than throwing. The
+  boundary adds no cache, policy, delivery, or data path and makes **no** security
+  or anonymity guarantee — it only sequences a node's online/offline transitions.
 - **The asset cache holds PUBLIC media only.** `canCacheAsset` allows only
   `public`/`unlisted` assets with no sensitive tag, and `InMemoryAssetCache`
   enforces that on `put` — `private`/`paid` assets, DMs, secrets, key material,
@@ -723,8 +760,8 @@ D1 space directory caveats (do not over-promise on these):
 28. MeshKV external package boundary (`packages/meshkv` + browser-client adapter) ✓
 29. MeshKV boundary wired to the imported implementation (real `MeshKVApi`) ✓
 30. Product / Chat / Space unified directory page ✓
-31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓ ← you are here
-32. MeshKV browser lifecycle boundary (explicit connect/startSignaling)
+31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓
+32. MeshKV browser lifecycle boundary (explicit connect/startSignaling) ✓ ← you are here
 33. Vault / encrypted identity layer (AEAD, external signer)
 
 ### Future candidate boundaries (design notes only — not scheduled)

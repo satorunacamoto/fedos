@@ -2,10 +2,11 @@
  * Stage 28/29 — `MeshKVBrowserClient`: the adapter that plugs the external MeshKV
  * package into the host's `MeshKVClient` boundary.
  *
- * This is the ONLY file in `src/` that imports `packages/meshkv`. Its sole job is
- * to translate the host's `MeshKVClient` calls into the MeshKV package's
- * `MeshKVApi` (`init`/`get`/`put`/`remove`) — it adds no caching, no policy, and
- * no transport. The asset policy gate stays in `MeshKVAssetCache` (which wraps a
+ * This is the only file in `src/` that reaches `packages/meshkv` at RUNTIME (a
+ * few others take type-only imports: `runtime/types.ts`, `meshkv_lifecycle.ts`).
+ * Its sole job is to translate the host's `MeshKVClient` calls into the MeshKV
+ * package's `MeshKVApi` (`init`/`get`/`put`/`remove`) — it adds no caching, no
+ * policy, and no transport. The asset policy gate stays in `MeshKVAssetCache` (which wraps a
  * `MeshKVClient`); this adapter never sees a private/paid/secret asset because
  * that cache refuses it before calling `put`.
  *
