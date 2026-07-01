@@ -114,7 +114,11 @@ import { canPostChat, canReadChat } from "./chat/policy.js";
 import { SAMPLE_CHATS, SAMPLE_CHAT_MESSAGES } from "./chat/sample_chats.js";
 import { renderUnifiedDirectory } from "./render/directory.js";
 import { buildProductPlacement, buildSpacePlacement } from "./promotion/bridge.js";
-import { renderMockPromotionPreview, renderPromotionInvocationPreview } from "./render/promotion.js";
+import {
+  renderMockPromotionPreview,
+  buildPromotionPreviewDiagnostic,
+  renderPromotionPreviewDiagnostic,
+} from "./render/promotion.js";
 import { invokePromotionProviderPreview } from "./promotion/invocation.js";
 import type { PromotionProvider } from "./promotion/adapter.js";
 import type { PromotionRequest } from "./promotion/types.js";
@@ -358,20 +362,23 @@ async function resolveProductPaymentDecision(
 }
 
 /**
- * Stage 52: the DUAL-FLAG-gated real provider preview. Calls
- * `invokePromotionProviderPreview` (Stage 49) with `allowRealProvider: true`
- * and `mode: "provider_preview"` ONLY when `envAllowed` (from
- * `runtime.promotionProviderPreviewAllowed`, i.e.
+ * Stage 52: the DUAL-FLAG-gated real provider preview (Stage 53: hardened
+ * diagnostics). Calls `invokePromotionProviderPreview` (Stage 49) with
+ * `allowRealProvider: true` and `mode: "provider_preview"` ONLY when
+ * `envAllowed` (from `runtime.promotionProviderPreviewAllowed`, i.e.
  * `ENABLE_PROMOTION_PROVIDER_PREVIEW`) is true AND a `provider` is supplied —
  * the caller (`renderProductRoute`/`renderBoard`'s space branch) only invokes
  * this function at all once the QUERY flag
  * (`?edgeRecPreview=1`/`?providerPromotionPreview=1`) is present, so both
- * halves of the gate are required end to end. Without the env flag, this
- * renders a `disabled` explanation instead of calling anything. `request`
- * comes from `buildProductPlacement`/`buildSpacePlacement` called with NO
- * `viewerPubkey` option — the actor/viewer pubkey is never placed on the
- * request. A provider error is caught inside `invokePromotionProviderPreview`
- * and rendered as `provider_error`, never thrown.
+ * halves of the gate are required end to end (UNCHANGED from Stage 52).
+ * Without the env flag, this renders a categorized `"env_flag_disabled"`
+ * diagnostic (fixed, safe copy — never an echoed reason/env value) instead of
+ * calling anything. `request` comes from `buildProductPlacement`/
+ * `buildSpacePlacement` called with NO `viewerPubkey` option — the
+ * actor/viewer pubkey is never placed on the request. A provider error is
+ * caught inside `invokePromotionProviderPreview` and rendered as a fixed,
+ * sanitized "Provider preview unavailable" note, never thrown and never
+ * echoing the provider's own error text.
  */
 async function renderProviderPromotionPreview(
   request: PromotionRequest,
@@ -379,18 +386,13 @@ async function renderProviderPromotionPreview(
   envAllowed: boolean,
 ): Promise<string> {
   if (!envAllowed || !provider) {
-    return renderPromotionInvocationPreview({
-      state: "disabled",
-      reason:
-        "provider preview requires ENABLE_PROMOTION_PROVIDER_PREVIEW (env) in addition to the query flag",
-      invokedAt: Date.now(),
-    });
+    return renderPromotionPreviewDiagnostic({ kind: "disabled", disabledReason: "env_flag_disabled" });
   }
   const result = await invokePromotionProviderPreview(provider, request, {
     allowRealProvider: true,
     mode: "provider_preview",
   });
-  return renderPromotionInvocationPreview(result);
+  return renderPromotionPreviewDiagnostic(buildPromotionPreviewDiagnostic(result));
 }
 
 /**

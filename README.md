@@ -8,7 +8,62 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 52 — promotion provider preview behind a dual flag.**
+> **Status: Stage 53 — provider preview diagnostics hardening.**
+> `src/render/promotion.ts` gets a clearer, more explicit diagnostic layer for
+> Stage 52's provider preview, WITHOUT touching when it is invoked — the dual
+> flag (`ENABLE_PROMOTION_PROVIDER_PREVIEW` env + `?edgeRecPreview=1`/
+> `?providerPromotionPreview=1` query, both required) is byte-for-byte
+> unchanged. A new `PromotionPreviewDisabledReason` type
+> (`"env_flag_disabled"` | `"query_flag_missing"` | `"preview_mode_not_requested"`)
+> and `PromotionPreviewDiagnosticView` (`{ kind: "disabled" | "provider_preview"
+> | "provider_error", disabledReason?, decision? }`) replace the old
+> `renderPromotionInvocationPreview`. `buildPromotionPreviewDiagnostic(result,
+> disabledReason?)` maps a Stage 49 `PromotionInvocationDecision` into this
+> view — a successful `"provider_preview"` (with a decision) maps straight
+> through; `"provider_error"` maps to `{ kind: "provider_error" }` (the raw
+> reason is DROPPED, not carried forward); everything else maps to `{ kind:
+> "disabled", disabledReason }`, defaulting to `"preview_mode_not_requested"`
+> when the caller doesn't specify one — the Worker (which structurally knows
+> the query flag was already checked before this function is ever reached)
+> always passes `"env_flag_disabled"` explicitly. `renderPromotionPreviewDiagnostic
+> (view)` renders three distinct panels: **disabled** → heading "Provider
+> preview disabled" plus ONE OF THREE fixed, safe sentences keyed by
+> `disabledReason` (never an echoed flag/env value); **provider_error** →
+> heading "Provider preview unavailable" plus a SINGLE FIXED sentence ("the
+> provider could not be reached or returned an error.") that NEVER echoes the
+> provider's own error text, an endpoint, an API key, or a stack trace —
+> `buildPromotionPreviewDiagnostic` drops `result.reason` entirely for this
+> case, so there is nothing left to leak even if a future provider adapter
+> starts stuffing richer detail into that field; **provider_preview** →
+> unchanged `renderProviderPromotionDecisionPreview`, now headed "Provider
+> preview" (dropped "only") with the disclaimer split into "Not a served
+> advertisement." and "No click/impression tracking, ranking, auction, or
+> billing occurs here." (both phrases required verbatim). Candidate rendering
+> (`renderProviderPromotionCandidatePreview`) gains a metadata BOUND: at most
+> 10 metadata entries, each value truncated to 200 chars — a real/injected
+> provider is an external boundary and could otherwise return unbounded data;
+> title/description/sponsor/metadata stay escaped and `destination`/`image`
+> stay unrendered, unchanged from Stage 52. **The Stage 52 dual-flag gate,
+> the Worker's routing (product/space only, never board/chat), and the
+> pre-existing `?promotionPreview=1` mock-only path are all UNCHANGED** — this
+> stage only changes what gets DISPLAYED for the disabled/error states, never
+> when the real provider is called. 20 new tests in `test/
+> promotion_provider_preview_diagnostics.test.ts` cover: each of the three
+> disabled reasons renders its own fixed copy plus a `data-disabled-reason`
+> attribute, the provider-invoked and provider_error labels render correctly,
+> a provider_error never leaks a stack trace/endpoint/API key (tested both at
+> the pure-render level with a poisoned `reason` string AND end-to-end through
+> the Worker with a provider that throws a message containing a fake secret
+> endpoint/key), candidate destination/image stay unrendered, candidate
+> fields are escaped and metadata is bounded (both entry count and per-value
+> length), the mock preview path is untouched by any of this, the dual flag
+> is still required in all three combinations (query-only/env-only/both), the
+> viewer/actor pubkey never renders, and no input mutation. Stage 54
+> candidate: **Runtime status export JSON, disabled by default** (a
+> `?runtimeStatus=1&format=json`-style opt-in JSON dump of the Stage 50/51
+> status view — still read-only, still no secrets/endpoints). Prior status:
+>
+> **Stage 52 — promotion provider preview behind a dual flag.**
 > Stage 49's `invokePromotionProviderPreview` is now connected to the Worker's
 > product/space routes, but ONLY behind TWO independent flags that must BOTH
 > be true: an env flag (`ENABLE_PROMOTION_PROVIDER_PREVIEW`, reflected into
@@ -55,9 +110,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > to check for no *construction* (`new EdgeRecPromotionProvider(`) instead —
 > the class name now legitimately appears in a doc comment, and
 > `invokePromotionProviderPreview(` is confirmed to appear from exactly one
-> (gated) call site. Stage 53 candidate: **Provider preview diagnostics
-> hardening** (clearer `disabled`/`provider_error` states and reasons on the
-> rendered preview — still no serving/tracking/billing). Prior status:
+> (gated) call site. Prior status:
 >
 > **Stage 51 — Runtime status page categorization (still read-only).**
 > `src/render/runtime_status.ts` groups the Stage 50 status page's ten
