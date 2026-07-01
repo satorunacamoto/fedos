@@ -97,6 +97,8 @@ import { PlaceholderPaymentProvider } from "./payment/noop_payment.js";
 import type { PaymentDecision, PaymentProvider } from "./payment/types.js";
 import { renderPurchasePreview } from "./render/payment.js";
 import { buildGrantPreview, renderGrantPreview } from "./render/grant_preview.js";
+import { buildRuntimeStatusView, renderRuntimeStatusPage } from "./render/runtime_status.js";
+import type { AppRuntime } from "./runtime/types.js";
 import {
   renderChatDirectory,
   renderChatRoom,
@@ -207,6 +209,18 @@ export function isPromotionPreviewEnabled(url: URL): boolean {
  */
 export function isPaymentPreviewEnabled(url: URL): boolean {
   const value = url.searchParams.get("paymentPreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Runtime status
+ * page via `?runtimeStatus=1` or `?runtimeStatus=true`. This flag takes
+ * precedence over every other route (board/product/space/chat). The page it
+ * gates (`renderRuntimeStatusPage`) calls no provider/cache/bridge method and
+ * issues no `fetch` — see `src/render/runtime_status.ts`.
+ */
+export function isRuntimeStatusEnabled(url: URL): boolean {
+  const value = url.searchParams.get("runtimeStatus");
   return value === "1" || value === "true";
 }
 
@@ -629,8 +643,22 @@ export async function handleRequest(
   directory: SpaceDirectory = spaceDirectory,
   assetCache?: AssetCache,
   paymentProvider?: PaymentProvider,
+  runtime?: AppRuntime,
 ): Promise<Response> {
   const url = new URL(request.url);
+
+  // Stage 50: `?runtimeStatus=1` takes precedence over every other route. It
+  // is entirely read-only — no board is built, no relay/live path runs, and
+  // no provider/cache/bridge method is called. Requires a full `AppRuntime`
+  // (only the Worker's default `fetch` handler supplies one); without it this
+  // falls through to normal routing.
+  if (runtime !== undefined && isRuntimeStatusEnabled(url)) {
+    const view = buildRuntimeStatusView(runtime);
+    return htmlResponse(
+      renderPage(buildThreads([]), { status: renderRuntimeStatusPage(view) }),
+    );
+  }
+
   const relayParam = url.searchParams.get("relay");
 
   if (relayParam !== null) {
@@ -734,8 +762,11 @@ export default {
     // is passed through too — but (Stage 47) it is used ONLY by the product
     // route's purchase preview, and ONLY under the explicit `?paymentPreview=1`
     // flag; otherwise the preview keeps using its own local
-    // `PlaceholderPaymentProvider` exactly as Stage 45 left it. No real publish,
-    // no NIP-07, no auto-served ads, no asset bytes/downloads, and no automatic
+    // `PlaceholderPaymentProvider` exactly as Stage 45 left it. (Stage 50) the
+    // whole runtime is passed through too, but ONLY so `?runtimeStatus=1` can
+    // render a read-only type-label page — no provider/cache/bridge method is
+    // ever called from it. No real publish, no NIP-07, no auto-served ads, no
+    // asset bytes/downloads, and no automatic
     // `requestPayment()`/`paymentDecisionToGrant` call from this selection.
     const runtime = createRuntime(env);
     return handleRequest(
@@ -746,6 +777,7 @@ export default {
       undefined,
       runtime.assetCache,
       runtime.paymentProvider,
+      runtime,
     );
   },
 };

@@ -8,7 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 49 — EdgeRec real provider invocation boundary, disabled by
+> **Status: Stage 50 — Runtime provider health/status page (read-only).**
+> A new `src/render/runtime_status.ts` lets `?runtimeStatus=1` (or `=true`)
+> show WHICH implementation `createRuntime(env)` selected for each of the ten
+> `AppRuntime` boundaries (`eventCache`, `assetCache`, `spaceDirectory`,
+> `metadataIndex`, `signatureVerifier`, `promotionProvider`,
+> `recommendationProvider`, `relayPublisher`, `notificationBridge`,
+> `paymentProvider`) — a COARSE TYPE LABEL only (e.g. `"InMemoryEventCache"`,
+> `"EdgeRecPromotionProvider"`, `"PlaceholderPaymentProvider"`).
+> `buildRuntimeStatusView(runtime)` reads only `runtime.mode` and each
+> component's `constructor.name` (a property read, never a method call); a
+> plain-object implementation that isn't a class instance (today, only
+> `signatureVerifier` — `NobleSignatureVerifier` is an object literal) reports
+> the safe fallback `"(unnamed implementation)"` rather than the meaningless
+> `"Object"`. `renderRuntimeComponentStatus(component)` renders one escaped
+> name/label row; `renderRuntimeStatusPage(view)` renders the whole page.
+> **This is read-only in the strictest sense**: it calls NO provider/cache/
+> bridge method at all — no `getPromotions`, `getRecommendations`,
+> `requestPayment`, `notify`, `publish`, `assetCache.get/put/has/delete/clear`,
+> or `eventCache`/directory/index lookup — and issues no `fetch`. It also
+> never reads or renders an endpoint URL, API key, env value, secret, or
+> viewer/actor pubkey (`buildRuntimeStatusView` never touches `RuntimeEnv` —
+> only the already-constructed `AppRuntime`'s component shapes). The new
+> `isRuntimeStatusEnabled(url)` flag takes precedence over every other route
+> (board/product/space/chat) in `handleRequest`, which gained an optional
+> `runtime?: AppRuntime` parameter (appended last, so existing positional call
+> sites are unaffected) — the page renders ONLY when both the flag AND a full
+> `runtime` are present; the flag alone (no runtime, as in most existing test
+> call sites) falls through to normal routing unchanged. The Worker's default
+> `fetch` now passes its constructed `runtime` through as that last argument.
+> 10 new tests in `test/render_runtime_status.test.ts` and 10 new tests in
+> `test/worker_runtime_status.test.ts` cover: the view lists all ten
+> components in a fixed order, each label is a real `constructor.name` (or the
+> safe fallback), env-selected providers are reflected (e.g.
+> `PlaceholderPaymentProvider`), HTML-escaping of a malicious label, no
+> endpoint/API-key/secret/URL ever renders, no input mutation, the status page
+> route calls zero provider/cache/bridge methods (verified with spies on
+> `getPromotions`/`getRecommendations`/`requestPayment`/`notify`/`publish`/
+> `assetCache.get`), no `fetch(` to an external host, the existing default
+> board route is unaffected, the flag alone (no runtime) falls through
+> safely, and the default Worker export serves the page end-to-end. Stage 51
+> candidate: **Runtime status page polish / component categorization** (group
+> the ten components by concern — cache/directory/index vs. provider/bridge —
+> still read-only, still no method calls). Prior status:
+>
+> **Stage 49 — EdgeRec real provider invocation boundary, disabled by
 > default.**
 > A new `src/promotion/invocation.ts` adds the missing middle step between
 > Stage 38's env SELECTION of an `EdgeRecPromotionProvider` and Stage 41's
@@ -52,9 +96,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > provider is invoked only under the explicit allow+mode combination and never
 > otherwise, the Stage 41 mock path is unaffected, and both the Worker and
 > Runtime sources contain zero reference to `invokePromotionProviderPreview`
-> (proving the non-wiring). Stage 50 candidate: **Runtime provider health/
-> status page** (a read-only page showing which providers `createRuntime`
-> selected — no invocation, no real request). Prior status:
+> (proving the non-wiring). Prior status:
 >
 > **Stage 48 — product grant preview boundary.**
 > A new `src/render/grant_preview.ts` shows what a `PurchaseGrant`
