@@ -8,7 +8,42 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 36 — Passkey Unlock boundary skeleton.** A MINIMAL,
+> **Status: Stage 37 — Identity Provider boundary skeleton.** A MINIMAL,
+> future-facing seam that fixes Apple / Google / External identity providers as
+> OPAQUE AUTHENTICATION-REFERENCE providers — **not** key sources — now lives in
+> `src/identity/`, kept entirely OUT of the current Nostr/Cloudflare core, the
+> Passkey seam, the Vault seam, and the crypto core. Apple / Google / External feed
+> the Passkey unlock boundary (Stage 36) and, through it, the Vault (Stage 33); they
+> generate no key. The `IdentityProviderBoundary` interface
+> (`getStatus`/`getCapabilities`/`begin`/`cancel`) plus the `IdentityProviderKind`
+> (`apple`/`google`/`external`/`passkey`), `IdentityProviderStatus`
+> (`idle`/`waiting`/`authenticated`/`cancelled`/`unavailable`/`error`),
+> `IdentityProviderCapability` (four `*_placeholder` labels:
+> `apple`/`google`/`external`/`passkey_bridge`), `IdentityProviderRequest` (a `kind`
+> + an OPAQUE, non-secret `reference`), and `IdentityProviderReport` (status +
+> echoed kind + the same opaque reference + reason) types define shapes ONLY.
+> **This is a boundary, not authentication.** It **starts no sign-in, runs no OAuth,
+> parses/stores no JWT, calls no WebAuthn/Apple/Google API, launches no Face ID or
+> Touch ID, touches no Secure Enclave/Android Keystore, and generates or derives no
+> key** — Apple / Google are **authentication references, never a key source**, and
+> nothing turns a token/JWT/credential/email/profile/seed into key material. Request
+> and report carry an **OPAQUE, non-secret `reference` only**. `NoopIdentityProvider`
+> is the safe default: permanently `unavailable`, it advertises nothing and every
+> attempt is denied. `PlaceholderIdentityProvider` (dev/test) models an
+> `idle → (placeholder) authenticated ↔ cancelled` lifecycle holding ONLY a coarse
+> `IdentityProviderReport` — its `authenticated` state is a LABEL that **unlocks
+> nothing**. `provider_bridge.ts`'s pure `identityProviderToPasskeyRequest` and
+> `identityProviderToVaultRequest` map the provider `kind` to a
+> `PasskeyAuthenticationKind` / `VaultUnlockKind` and pass the opaque `reference`
+> through unchanged (type-only Passkey + Vault dependencies; they derive no key,
+> unlock nothing, and wire nothing). **Nothing is auto-wired**: `createRuntime` and
+> the Worker never reference the provider layer (tests assert both sources are
+> provider-free, that the sources import no OAuth/JWT/WebAuthn/crypto library, and
+> that the Vault/Passkey imports are type-only), so the whole Stage 1–36 core is
+> untouched. See [`docs/vault_crypto_identity.md`](docs/vault_crypto_identity.md) for
+> the design notes this seam is drawn from. Prior status:
+>
+> **Stage 36 — Passkey Unlock boundary skeleton.** A MINIMAL,
 > future-facing seam that fixes WebAuthn / Passkey / Face ID / Touch ID as an
 > AUTHENTICATION boundary that UNLOCKS the Vault — **not** a key source — now lives
 > in `src/identity/`, kept entirely OUT of the current Nostr/Cloudflare core, the
@@ -551,7 +586,28 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   credential/JWT/token/seed, and mutates no request. Passkey / Apple ID / Google are
   **unlock triggers ONLY, never a key source**. It is NOT wired into `createRuntime`
   or the Worker, and a future real unlock flow (the planned Rust core) is not
-  implemented.
+  implemented. **Stage 37** adds the **Identity Provider boundary skeleton** in the
+  same directory: `provider_types.ts` defines shapes ONLY — `IdentityProviderKind`
+  (`apple`/`google`/`external`/`passkey`), `IdentityProviderStatus`
+  (`idle`/`waiting`/`authenticated`/`cancelled`/`unavailable`/`error`),
+  `IdentityProviderCapability` (four `*_placeholder` labels:
+  `apple`/`google`/`external`/`passkey_bridge`), `IdentityProviderRequest` (a `kind`
+  + OPAQUE, non-secret `reference`), `IdentityProviderReport` (status + echoed kind +
+  the same opaque reference + reason), and the `IdentityProviderBoundary` interface
+  (`getStatus`/`getCapabilities`/`begin`/`cancel`). `provider_boundary.ts`'s
+  `NoopIdentityProvider` is the permanently `unavailable` default that advertises
+  nothing and denies every attempt; `PlaceholderIdentityProvider` (dev/test) models
+  an `idle → (placeholder) authenticated ↔ cancelled` lifecycle whose
+  `authenticated` state **unlocks nothing**. `provider_bridge.ts`'s pure
+  `identityProviderToPasskeyRequest` / `identityProviderToVaultRequest` map the
+  provider `kind` to a `PasskeyAuthenticationKind` / `VaultUnlockKind`
+  (apple → `apple_passkey`/`apple_id`; google → `android_passkey`/`passkey`;
+  external → `external`/`external_signer`; passkey → `webauthn`/`passkey`) and pass
+  the opaque `reference` through unchanged — **type-only** Passkey + Vault
+  dependencies that derive no key and wire nothing. **Apple / Google / External are
+  authentication references, NEVER a key source**: it runs no OAuth, parses/stores no
+  JWT, calls no WebAuthn/Apple/Google API, holds no token/credential/email/profile,
+  and unlocks nothing. It is NOT wired into `createRuntime` or the Worker.
 - `src/crypto/*` — the **Crypto Core boundary skeleton** (Stage 34): a
   future-facing seam that fixes the swap point for a real crypto core (the
   provisional `packages/fedos-core-rust` / a RustCrypto-backed WASM/FFI module),
