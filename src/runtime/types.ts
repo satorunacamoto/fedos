@@ -23,6 +23,7 @@ import type { AsyncSpaceDirectory, SpaceDirectory } from "../community/directory
 import type { D1LikeDatabase } from "../indexer/d1_index.js";
 import type { MetadataIndex } from "../indexer/types.js";
 import type { NotificationBridge } from "../notification/types.js";
+import type { PaymentProvider } from "../payment/types.js";
 import type { SignatureVerifier } from "../nostr/signature.js";
 import type { RelayPublisher } from "../nostr/publish.js";
 import type { PromotionProvider, RecommendationProvider } from "../promotion/adapter.js";
@@ -130,6 +131,32 @@ export interface RuntimeEnv {
    * | "fcm_placeholder" | "email_placeholder" | "local_placeholder".
    */
   readonly NOTIFICATION_DEFAULT_CHANNEL?: string;
+  /**
+   * Which payment provider to build (Stage 44's `PaymentProvider` seam).
+   *   - "noop"        → `NoopPaymentProvider` (safe default — always `unavailable`/rejected).
+   *   - "placeholder" → `PlaceholderPaymentProvider` (dev/test — still charges nothing).
+   *   - absent/other  → `NoopPaymentProvider`.
+   * Selection only. `requestPayment()` is never auto-called, and
+   * `paymentDecisionToGrant` is never called from the runtime — no
+   * `PurchaseGrant` is ever issued by constructing a runtime.
+   */
+  readonly PAYMENT_PROVIDER?: string;
+  /**
+   * Explicit opt-in to use the placeholder provider. Truthy = `true` or a
+   * truthy string ("1"/"true"/"yes"/"on"). Takes effect when `PAYMENT_PROVIDER`
+   * is not "noop" or "placeholder" but this flag is truthy — same result as
+   * `PAYMENT_PROVIDER=placeholder`. Selection only; charges nothing.
+   */
+  readonly ENABLE_PAYMENT_PLACEHOLDER?: string | boolean;
+  /**
+   * Preferred default `PaymentRail` for building payment requests. Must be one
+   * of the six placeholder rail names; any other value is silently ignored (no
+   * provider constructor takes it in this stage — see
+   * `resolvePaymentDefaultRail`). Valid values: "lightning_placeholder" |
+   * "stripe_placeholder" | "apple_pay_placeholder" | "google_pay_placeholder" |
+   * "manual_placeholder" | "external_placeholder".
+   */
+  readonly PAYMENT_DEFAULT_RAIL?: string;
 }
 
 /**
@@ -159,6 +186,8 @@ export interface RuntimeOverrides {
   readonly promotionProvider?: PromotionProvider;
   readonly recommendationProvider?: RecommendationProvider;
   readonly relayPublisher?: RelayPublisher;
+  /** Pre-built payment provider. Wins over any `env` payment fields. */
+  readonly paymentProvider?: PaymentProvider;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -180,4 +209,12 @@ export interface AppRuntime {
    * No Telegram/LINE/APNs/FCM/Email API is contacted.
    */
   readonly notificationBridge: NotificationBridge;
+  /**
+   * The selected payment provider. Selected from env; `requestPayment()` is
+   * NEVER called automatically and `paymentDecisionToGrant` is never called
+   * from the runtime — no `PurchaseGrant` is ever issued by constructing a
+   * runtime. Charging nothing is the default (`NoopPaymentProvider`). No
+   * Lightning/Stripe/Apple Pay/Google Pay rail is contacted.
+   */
+  readonly paymentProvider: PaymentProvider;
 }

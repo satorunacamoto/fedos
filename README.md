@@ -8,7 +8,57 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 45 — product purchase preview UI, placeholder only.**
+> **Status: Stage 46 — payment provider runtime env selection boundary.**
+> `createRuntime(env)` can now SELECT a `PaymentProvider` from three new
+> `RuntimeEnv` fields — and NOTHING more, mirroring Stage 42's notification env
+> selection exactly. **`PAYMENT_PROVIDER`** (`"noop"` or `"placeholder"`),
+> **`ENABLE_PAYMENT_PLACEHOLDER`** (truthy string/boolean opt-in), and
+> **`PAYMENT_DEFAULT_RAIL`** (one of the six `*_placeholder` rail names; any
+> other value is silently ignored) let `selectPaymentProvider(env?, overrides?)`
+> choose between `NoopPaymentProvider` (the safe default — every
+> `requestPayment()` resolves `unavailable`/rejected) and
+> `PlaceholderPaymentProvider` (dev/test — evaluates the request policy but
+> **charges nothing**). Priority: (1) `overrides.paymentProvider` wins
+> unconditionally; (2) `PAYMENT_PROVIDER=noop` → `NoopPaymentProvider`; (3)
+> `PAYMENT_PROVIDER=placeholder` OR `ENABLE_PAYMENT_PLACEHOLDER` truthy →
+> `PlaceholderPaymentProvider`; (4) absent/unrecognized →
+> `NoopPaymentProvider`. `resolvePaymentDefaultRail` validates the rail name
+> against `PAYMENT_RAILS` and returns `undefined` for any unrecognized value —
+> no provider constructor takes it in this stage, so an invalid rail is simply
+> ignored. `AppRuntime` gains a `paymentProvider` field; `RuntimeOverrides`
+> gains `paymentProvider?`. The Worker `Env` interface is extended with the
+> three payment fields so wrangler.toml can supply them — but the Worker
+> **never calls `runtime.paymentProvider.requestPayment()`** and issues no
+> payment request from this selection. **This is provider SELECTION only.**
+> Constructing the runtime issues **no `fetch`**, calls **no
+> Lightning/Stripe/Apple Pay/Google Pay rail**, and **never auto-calls
+> `requestPayment()`** — `paymentProvider` is merely placed in the runtime,
+> ready for a future caller to use it explicitly. `paymentDecisionToGrant` is
+> never called from the runtime or the Worker, so **no `PurchaseGrant` is ever
+> issued** by this stage. The Stage 45 product purchase preview is UNCHANGED:
+> the Worker's `renderProductPurchasePreview` still constructs its own
+> **fresh** `PlaceholderPaymentProvider` directly (not `runtime.paymentProvider`)
+> for the `?product=<id>` display-only preview — the two paths are
+> intentionally independent so the preview's behavior does not shift with env
+> config. The Stage 44 `canRequestPaymentForProduct`/`productToPaymentRequest`
+> guardrails remain in force: no secret/card/wallet/token in any payment
+> request, no invoice, no checkout URL, no settlement. 14 new tests in
+> `test/runtime_payment_env.test.ts` cover: no-env → Noop, each provider value,
+> each truthy/falsy flag variant, invalid provider ignored, invalid/valid
+> default rail, override wins, no `requestPayment()` auto-call, no `fetch`
+> issued, Worker source has at most the one legitimate (Stage 45 preview)
+> `.requestPayment(` call and never calls it via `runtime.paymentProvider`, no
+> `paymentDecisionToGrant` call, no Lightning/Stripe/Breez/Greenlight import in
+> the runtime sources, and env not mutated. The Stage 44
+> `payment_boundary.test.ts` test #13 is updated: it now confirms
+> `requestPayment()`/`paymentDecisionToGrant`/`productToPaymentRequest` are
+> never auto-called from the runtime source (rather than asserting the runtime
+> is entirely payment-free, which is no longer the case). Stage 47 candidate:
+> **Payment purchase preview uses the runtime provider in an explicit
+> preview-only mode** (thread `runtime.paymentProvider` into the Stage 45
+> preview behind an opt-in, still no real rail/checkout/grant). Prior status:
+>
+> **Stage 45 — product purchase preview UI, placeholder only.**
 > A new `src/render/payment.ts` renders a "Purchase preview" panel on the
 > `?product=<id>` route using the Stage 44 payment boundary — display only,
 > nothing is charged. `renderPurchasePreview(product, decision, options?)` is
@@ -57,11 +107,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > input mutation, `?product=<draft>` (viewed as its creator) shows no enabled
 > checkout, a malicious `?actor` is escaped, no `fetch(` to an external host
 > and no Stripe/Lightning/Breez/Greenlight/LNURL reference in the Worker
-> source, and the default board page renders no purchase preview at all.
-> Stage 46 candidate: **Payment provider env selection boundary** (let
-> `createRuntime(env)` SELECT between `NoopPaymentProvider`/
-> `PlaceholderPaymentProvider` the way Stage 42 did for notifications — still
-> no real rail, no auto-charge). Prior status:
+> source, and the default board page renders no purchase preview at all. Prior status:
 >
 > **Stage 44 — Payment / Lightning boundary skeleton.**
 > A new `src/payment/` treats a future payment step as the front door BEFORE a

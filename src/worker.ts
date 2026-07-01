@@ -628,6 +628,17 @@ export interface Env {
   NOTIFICATION_PROVIDER?: string;
   ENABLE_NOTIFICATION_PLACEHOLDER?: string;
   NOTIFICATION_DEFAULT_CHANNEL?: string;
+  /**
+   * Payment provider selection config (Stage 46). These only let
+   * `createRuntime` SELECT a `PaymentProvider`; the Worker NEVER calls
+   * `requestPayment()` from this field and never calls
+   * `paymentDecisionToGrant` — no `PurchaseGrant` is issued. Selection only —
+   * the product purchase preview (Stage 45) still builds its own
+   * `PlaceholderPaymentProvider` directly and is unaffected by these fields.
+   */
+  PAYMENT_PROVIDER?: string;
+  ENABLE_PAYMENT_PLACEHOLDER?: string;
+  PAYMENT_DEFAULT_RAIL?: string;
 }
 
 /**
@@ -656,9 +667,10 @@ export default {
   fetch(request: Request, env?: Env): Promise<Response> {
     // Stage 21: the runtime is the single selection point. We use its event
     // cache here, and (Stage 35) its asset cache is passed for the product route
-    // to source PREVIEW metadata only — the directory/index/providers/publisher
-    // are selected too but not auto-wired (no real publish, no NIP-07, no
-    // auto-served ads, no asset bytes/downloads/payment).
+    // to source PREVIEW metadata only — the directory/index/providers/publisher/
+    // paymentProvider (Stage 46) are selected too but not auto-wired (no real
+    // publish, no NIP-07, no auto-served ads, no asset bytes/downloads, and no
+    // `requestPayment()`/`paymentDecisionToGrant` call from this selection).
     const runtime = createRuntime(env);
     return handleRequest(
       request,

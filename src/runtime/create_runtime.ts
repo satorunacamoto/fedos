@@ -53,6 +53,15 @@ import {
   type NotificationBridge,
   type NotificationChannel,
 } from "../notification/types.js";
+import {
+  NoopPaymentProvider,
+  PlaceholderPaymentProvider,
+} from "../payment/noop_payment.js";
+import {
+  PAYMENT_RAILS,
+  type PaymentProvider,
+  type PaymentRail,
+} from "../payment/types.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -313,6 +322,42 @@ export function selectNotificationBridge(
   return new NoopNotificationBridge();
 }
 
+/**
+ * Validate and return a `PaymentRail` from the env's `PAYMENT_DEFAULT_RAIL`. An
+ * absent or unrecognized value is silently ignored (returns `undefined`) — no
+ * provider constructor in this stage takes it. Pure — never mutates env.
+ */
+export function resolvePaymentDefaultRail(env?: RuntimeEnv): PaymentRail | undefined {
+  const raw = env?.PAYMENT_DEFAULT_RAIL;
+  if (!raw) return undefined;
+  return (PAYMENT_RAILS as readonly string[]).includes(raw) ? (raw as PaymentRail) : undefined;
+}
+
+/**
+ * Select the `PaymentProvider` from env / overrides. Priority:
+ *   1. `overrides.paymentProvider` — wins unconditionally.
+ *   2. `PAYMENT_PROVIDER=noop` → `NoopPaymentProvider`.
+ *   3. `PAYMENT_PROVIDER=placeholder` OR `ENABLE_PAYMENT_PLACEHOLDER` truthy →
+ *      `PlaceholderPaymentProvider`.
+ *   4. Otherwise → `NoopPaymentProvider` (safe default, charges nothing).
+ *
+ * Selection only: constructing the provider contacts no rail and calls no
+ * `requestPayment`. No Lightning/Stripe/Apple Pay/Google Pay transport is
+ * imported or invoked. `env` is never mutated.
+ */
+export function selectPaymentProvider(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): PaymentProvider {
+  if (overrides.paymentProvider) return overrides.paymentProvider;
+  const provider = env?.PAYMENT_PROVIDER;
+  if (provider === "noop") return new NoopPaymentProvider();
+  if (provider === "placeholder" || isEnvFlagTruthy(env?.ENABLE_PAYMENT_PLACEHOLDER)) {
+    return new PlaceholderPaymentProvider();
+  }
+  return new NoopPaymentProvider();
+}
+
 /** Cloudflare when any binding/endpoint is present, local with a bare env, else test. */
 function resolveMode(env?: RuntimeEnv): RuntimeMode {
   if (!env) return "test";
@@ -353,5 +398,6 @@ export function createRuntime(
       overrides.recommendationProvider ?? selectRecommendationProvider(env),
     relayPublisher: overrides.relayPublisher ?? selectRelayPublisher(env),
     notificationBridge: selectNotificationBridge(env, overrides),
+    paymentProvider: selectPaymentProvider(env, overrides),
   };
 }

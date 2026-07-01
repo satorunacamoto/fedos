@@ -225,10 +225,14 @@ describe("commerce bridge", () => {
 });
 
 describe("payment boundary stays unwired and free of real transports", () => {
-  it("13. Runtime source does not import or wire the payment boundary", () => {
-    expect(runtimeSource).not.toMatch(/from\s+['"].*\/payment\//);
-    expect(runtimeSource).not.toMatch(/PaymentProvider|NoopPaymentProvider|PlaceholderPaymentProvider/);
-    expect(runtimeSource).not.toMatch(/requestPayment|productToPaymentRequest|paymentDecisionToGrant/);
+  it("13. Runtime source selects a PaymentProvider (Stage 46) but never calls it", () => {
+    // Stage 46: createRuntime now SELECTS a PaymentProvider from env, so the
+    // runtime source IS allowed to reference payment imports/selection helpers.
+    // The invariant is that requestPayment()/paymentDecisionToGrant are NEVER
+    // called automatically by constructing a runtime.
+    expect(runtimeSource).not.toMatch(/requestPayment\s*\(/);
+    expect(runtimeSource).not.toMatch(/paymentDecisionToGrant\s*\(/);
+    expect(runtimeSource).not.toMatch(/productToPaymentRequest\s*\(/);
   });
 
   it("14. Worker source never calls paymentDecisionToGrant (no grant issuance)", () => {
