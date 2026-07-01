@@ -544,6 +544,19 @@ export interface Env {
   NOSTR_EVENT_CACHE?: KvLikeNamespace;
   /** Optional D1 database holding persisted space definitions + members. */
   NOSTR_SPACE_DB?: D1LikeDatabase;
+  /**
+   * EdgeRec selection config (Stage 38). These only let `createRuntime` SELECT a
+   * provider; the Worker injects NO `fetch`, so without one the safe mock provider
+   * is used and no ad is ever served or fetched. No promotion request is issued
+   * from the Worker at all. Viewer pubkey is NOT sent by default.
+   */
+  PROMOTION_ENDPOINT?: string;
+  RECOMMENDATION_ENDPOINT?: string;
+  PROMOTION_API_KEY?: string;
+  RECOMMENDATION_API_KEY?: string;
+  PROMOTION_SEND_VIEWER_PUBKEY?: string;
+  PROMOTION_HASH_VIEWER_PUBKEY?: string;
+  EDGE_REC_TIMEOUT_MS?: string;
 }
 
 /**

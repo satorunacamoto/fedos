@@ -43,6 +43,7 @@ import {
   type RecommendationProvider,
 } from "../promotion/adapter.js";
 import { EdgeRecPromotionProvider } from "../promotion/edge_rec_adapter.js";
+import type { EdgeRecViewerOptions } from "../promotion/edge_rec_adapter.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -79,15 +80,19 @@ export function selectMetadataIndex(env?: RuntimeEnv): MetadataIndex {
   return defaultMetadataIndex;
 }
 
-/** Truthy test for the `ENABLE_MESHKV_ASSET_CACHE` opt-in flag. */
-function isMeshKVOptIn(env?: RuntimeEnv): boolean {
-  const flag = env?.ENABLE_MESHKV_ASSET_CACHE;
+/** Truthy test for a string|boolean env flag ("1"/"true"/"yes"/"on" or `true`). */
+function isEnvFlagTruthy(flag: string | boolean | undefined): boolean {
   if (flag === true) return true;
   if (typeof flag === "string") {
     const v = flag.trim().toLowerCase();
     return v === "1" || v === "true" || v === "yes" || v === "on";
   }
   return false;
+}
+
+/** Truthy test for the `ENABLE_MESHKV_ASSET_CACHE` opt-in flag. */
+function isMeshKVOptIn(env?: RuntimeEnv): boolean {
+  return isEnvFlagTruthy(env?.ENABLE_MESHKV_ASSET_CACHE);
 }
 
 /**
@@ -171,10 +176,48 @@ export function selectSignatureVerifier(_env?: RuntimeEnv): SignatureVerifier {
   return NobleSignatureVerifier;
 }
 
+/** Safe timeout bounds for the edge-rec transport (ms). */
+const EDGE_REC_MIN_TIMEOUT_MS = 100;
+const EDGE_REC_MAX_TIMEOUT_MS = 30_000;
+
+/**
+ * Parse `EDGE_REC_TIMEOUT_MS` into a clamped millisecond value, or `undefined`
+ * when it is absent/unparseable/non-positive (the adapter's own default applies).
+ * Pure — reads only the passed value.
+ */
+export function parseEdgeRecTimeoutMs(value?: string | number): number | undefined {
+  if (value === undefined) return undefined;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.min(Math.max(Math.floor(n), EDGE_REC_MIN_TIMEOUT_MS), EDGE_REC_MAX_TIMEOUT_MS);
+}
+
+/** `{ timeoutMs }` only when the env supplies a usable value, else `{}`. */
+function edgeRecTimeoutOption(env?: RuntimeEnv): { timeoutMs?: number } {
+  const timeoutMs = parseEdgeRecTimeoutMs(env?.EDGE_REC_TIMEOUT_MS);
+  return timeoutMs !== undefined ? { timeoutMs } : {};
+}
+
+/**
+ * Resolve the viewer-privacy options for the edge-rec adapter from env.
+ *
+ * PRIVACY DEFAULT: the viewer pubkey is NEVER sent. Only an explicit truthy
+ * `PROMOTION_SEND_VIEWER_PUBKEY` opts in to sending the RAW pubkey.
+ * `PROMOTION_HASH_VIEWER_PUBKEY` is recognized as intent, but NO hash function is
+ * wired here, so no `hashViewerPubkey` is set and nothing is sent for it — the raw
+ * pubkey is never leaked as a fallback.
+ */
+export function resolveEdgeRecViewerOptions(env?: RuntimeEnv): EdgeRecViewerOptions {
+  return isEnvFlagTruthy(env?.PROMOTION_SEND_VIEWER_PUBKEY)
+    ? { sendViewerPubkey: true }
+    : {};
+}
+
 /**
  * EdgeRec adapter when an endpoint AND an injected fetch are present, else the
  * inert mock. Selecting the EdgeRec adapter does NOT call out — it is merely
- * ready to, behind an injected client.
+ * ready to, behind an injected client. API key, a clamped timeout, and the
+ * (default-off) viewer options are threaded from env into the adapter.
  */
 export function selectPromotionProvider(env?: RuntimeEnv): PromotionProvider {
   if (env?.PROMOTION_ENDPOINT && env.fetch) {
@@ -182,6 +225,8 @@ export function selectPromotionProvider(env?: RuntimeEnv): PromotionProvider {
       fetch: env.fetch,
       endpoint: env.PROMOTION_ENDPOINT,
       ...(env.PROMOTION_API_KEY !== undefined ? { apiKey: env.PROMOTION_API_KEY } : {}),
+      ...edgeRecTimeoutOption(env),
+      ...resolveEdgeRecViewerOptions(env),
     });
   }
   return new MockPromotionProvider();
@@ -189,15 +234,20 @@ export function selectPromotionProvider(env?: RuntimeEnv): PromotionProvider {
 
 /**
  * EdgeRec adapter (shares the promotion transport) when a recommendation or
- * promotion endpoint AND an injected fetch are present, else the inert mock.
+ * promotion endpoint AND an injected fetch are present, else the inert mock. The
+ * recommendation API key falls back to the promotion key; timeout and viewer
+ * options are shared with the promotion path.
  */
 export function selectRecommendationProvider(env?: RuntimeEnv): RecommendationProvider {
   const endpoint = env?.RECOMMENDATION_ENDPOINT ?? env?.PROMOTION_ENDPOINT;
   if (endpoint && env?.fetch) {
+    const apiKey = env.RECOMMENDATION_API_KEY ?? env.PROMOTION_API_KEY;
     return new EdgeRecPromotionProvider({
       fetch: env.fetch,
       endpoint,
-      ...(env.PROMOTION_API_KEY !== undefined ? { apiKey: env.PROMOTION_API_KEY } : {}),
+      ...(apiKey !== undefined ? { apiKey } : {}),
+      ...edgeRecTimeoutOption(env),
+      ...resolveEdgeRecViewerOptions(env),
     });
   }
   return new MockRecommendationProvider();

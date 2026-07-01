@@ -77,6 +77,30 @@ export interface RuntimeEnv {
   /** recommendation-rewriter endpoint (falls back to the promotion endpoint). */
   readonly RECOMMENDATION_ENDPOINT?: string;
   /**
+   * Optional bearer token for the recommendation endpoint. Falls back to
+   * `PROMOTION_API_KEY` when absent (the two often share the edge-rec transport).
+   */
+  readonly RECOMMENDATION_API_KEY?: string;
+  /**
+   * EXPLICIT opt-in to send the RAW viewer pubkey to edge-rec. Truthy = `true` or a
+   * truthy string ("1"/"true"/"yes"/"on"). DEFAULT (absent/falsy): the viewer
+   * pubkey is NEVER sent. Selection only reflects this into the adapter options; it
+   * sends nothing here.
+   */
+  readonly PROMOTION_SEND_VIEWER_PUBKEY?: string | boolean;
+  /**
+   * Intent to send a HASHED viewer id instead of the raw pubkey. Recognized as a
+   * future opt-in, but NO hash function is wired in the runtime yet, so setting it
+   * sends NOTHING (the raw pubkey is never leaked as a fallback). See the README.
+   */
+  readonly PROMOTION_HASH_VIEWER_PUBKEY?: string | boolean;
+  /**
+   * edge-rec request timeout in milliseconds. Parsed and clamped to a safe range by
+   * `parseEdgeRecTimeoutMs`; unparseable/non-positive values are ignored (the
+   * adapter's own default applies).
+   */
+  readonly EDGE_REC_TIMEOUT_MS?: string | number;
+  /**
    * Injected HTTP client for the promotion/recommendation adapters. The runtime
    * never reaches for a global `fetch`; without this an endpoint cannot be wired
    * and the safe mock provider is used instead.

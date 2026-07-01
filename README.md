@@ -8,7 +8,32 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 37 — Identity Provider boundary skeleton.** A MINIMAL,
+> **Status: Stage 38 — EdgeRec Worker env selection boundary.** `createRuntime`
+> can now SELECT the `PromotionProvider` / `RecommendationProvider` from EdgeRec
+> config on the `RuntimeEnv` / Worker `Env` — and NOTHING more. New env fields
+> (`RECOMMENDATION_API_KEY`, `PROMOTION_SEND_VIEWER_PUBKEY`,
+> `PROMOTION_HASH_VIEWER_PUBKEY`, `EDGE_REC_TIMEOUT_MS`, alongside the existing
+> `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT`/`PROMOTION_API_KEY`/`fetch`) let
+> `selectPromotionProvider` / `selectRecommendationProvider` wire an
+> `EdgeRecPromotionProvider` **only when an endpoint AND an injected `fetch` are
+> both present**; an endpoint with no `fetch` (the Worker's default — it injects
+> none) falls back to the inert `MockPromotionProvider` / `MockRecommendationProvider`.
+> The recommendation path falls back to `PROMOTION_ENDPOINT`/`PROMOTION_API_KEY`
+> when its own are absent; `EDGE_REC_TIMEOUT_MS` is parsed and **clamped**
+> (`parseEdgeRecTimeoutMs`, 100–30000 ms; unparseable/non-positive ignored). **Privacy
+> default: the viewer pubkey is NEVER sent** — only an explicit truthy
+> `PROMOTION_SEND_VIEWER_PUBKEY` opts in to the RAW pubkey, and
+> `PROMOTION_HASH_VIEWER_PUBKEY` is recognized as intent but **no hash function is
+> wired**, so it sends nothing and the raw pubkey is never leaked as a fallback.
+> **This is provider SELECTION only.** Constructing the runtime issues **no
+> `fetch`**, calls **no `getPromotions`/`getRecommendations`**, and there is still
+> **no real ad serving, no ranking/auction/CTR, no click tracking, no billing, no
+> Stripe/Telegram, no HTMLRewriter, and no external fetch** — the EdgeRec provider is
+> merely constructed READY to call out behind an injected client. The Worker still
+> shows only empty promotion placeholders and issues no promotion request. `env` is
+> never mutated. Prior status:
+>
+> **Stage 37 — Identity Provider boundary skeleton.** A MINIMAL,
 > future-facing seam that fixes Apple / Google / External identity providers as
 > OPAQUE AUTHENTICATION-REFERENCE providers — **not** key sources — now lives in
 > `src/identity/`, kept entirely OUT of the current Nostr/Cloudflare core, the
@@ -542,7 +567,16 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `PROMOTION_ENDPOINT`/`RECOMMENDATION_ENDPOINT` **plus** an injected `fetch`) —
   and otherwise a test/local-safe in-memory or mock default (`InMemory*`,
   `MockPromotionProvider`/`MockRecommendationProvider`, `MockRelayPublisher`,
-  `NobleSignatureVerifier`). `selectMeshKVClient(env, overrides?)` resolves the
+  `NobleSignatureVerifier`). **Stage 38** threads the rest of the EdgeRec config
+  through `select{Promotion,Recommendation}Provider`: `RECOMMENDATION_API_KEY` (falls
+  back to `PROMOTION_API_KEY`), a `parseEdgeRecTimeoutMs`-clamped `EDGE_REC_TIMEOUT_MS`
+  (100–30000 ms; unparseable/non-positive ignored), and the **default-off** viewer
+  privacy flags — `PROMOTION_SEND_VIEWER_PUBKEY` opts in to the RAW pubkey while
+  `PROMOTION_HASH_VIEWER_PUBKEY` is recognized but **unwired** (no hash function, so
+  nothing is sent and the raw pubkey is never leaked). The same fields exist on the
+  Worker `Env`, but the Worker injects **no `fetch`**, so it always resolves to the
+  inert mock and issues no promotion request. Selecting a provider is DI only — no
+  `getPromotions`/`getRecommendations` and no `fetch` runs. `selectMeshKVClient(env, overrides?)` resolves the
   MeshKV client the asset cache writes through — `overrides.meshKVClient` first,
   then the legacy already-built `MESHKV_ASSET_CACHE` binding, then (Stage 31) an
   **explicit opt-in** `MeshKVBrowserClient`: built ONLY when
@@ -1050,8 +1084,10 @@ D1 space directory caveats (do not over-promise on these):
 32. MeshKV browser lifecycle boundary (explicit connect/startSignaling) ✓
 33. Vault boundary skeleton (interface + no-op/in-memory; no crypto, no keys) ✓
 34. Crypto Core Boundary skeleton (`CryptoProvider` interface + `NoopCryptoProvider`) ✓
-35. Product/Asset preview metadata from runtime (`runtime.assetCache`-backed previews) ✓ ← you are here
-36. EdgeRec Worker env selection boundary (select the promotion provider from Worker env)
+35. Product/Asset preview metadata from runtime (`runtime.assetCache`-backed previews) ✓
+36. Passkey Unlock boundary skeleton (WebAuthn/Passkey/Face ID as *unlock trigger*, not a key source) ✓
+37. Identity Provider boundary skeleton (Apple/Google/External as opaque auth references, not key sources) ✓
+38. EdgeRec Worker env selection boundary (select the promotion provider from Worker env) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
