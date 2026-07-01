@@ -8,7 +8,30 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 40 — Deniable Storage research boundary (docs only).** A new
+> **Status: Stage 41 — Mock promotion preview mode.** The promotion boundary can
+> now render actual candidate cards in the UI — but ONLY from the in-memory
+> `MockPromotionProvider`, and ONLY under an explicit opt-in flag. Three pure
+> renderers land in `src/render/promotion.ts`: `renderPromotionCandidatePreview`
+> (one candidate card — escaped title/sponsor/description/metadata and a shortened
+> id, with **NO `destination` link and NO image**), `renderPromotionDecisionPreview`
+> (a whole `PromotionDecision`, with a safe empty state), and
+> `renderMockPromotionPreview(request, provider = new MockPromotionProvider())`,
+> which drives the **mock provider only** and never constructs or calls the real /
+> EdgeRec provider. The Worker gates this behind `isPromotionPreviewEnabled(url)`
+> (`?promotionPreview=1` or `=true`) **and** sample mode (`data.showPromotions`), so
+> `?space=<id>&promotionPreview=1` and `?product=<id>&promotionPreview=1` append a
+> mock preview block while the no-param board, the flag-less pages, and the live
+> relay path render none. The Worker itself constructs no provider and contains no
+> `getPromotions` / `EdgeRecPromotionProvider` / `edge_rec_adapter` reference — the
+> mock invocation lives in the render helper. **This is a UI ↔ boundary connection
+> check, not ad serving.** It issues **no `fetch`**, calls **no real/EdgeRec
+> provider**, and does **no click tracking, no impression tracking, no ranking, no
+> auction, no CTR, no billing, no destination link, and no image** — every candidate
+> is disclosed as a mock preview and all candidate-derived text is HTML-escaped. The
+> Stage 38 EdgeRec env selection still stands but is deliberately unused here. Prior
+> status:
+>
+> **Stage 40 — Deniable Storage research boundary (docs only).** A new
 > research note, [`docs/deniable_storage_research.md`](docs/deniable_storage_research.md),
 > writes up the Shadow Vault / Deniable Storage / Hidden Volume threat model and its
 > hard prohibitions **without adding any code** — no crypto, no vault, no hidden
@@ -453,7 +476,14 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   `promotion.ts`'s `renderPromotionPlaceholder` shows a disclosure label and the
   placement's own (escaped) label only. **No placeholder renders an ad candidate,
   destination link, price-to-pay, or download**, and none of these helpers call a
-  promotion provider or the network.
+  promotion provider or the network. Stage 41 adds preview-only renderers to the
+  same file — `renderPromotionCandidatePreview` / `renderPromotionDecisionPreview`
+  (escaped candidate cards with **no destination link, no image**, and a safe empty
+  state) and `renderMockPromotionPreview`, which drives the **in-memory
+  `MockPromotionProvider` only** (never the real/EdgeRec provider, no `fetch`). The
+  Worker renders these solely under `?promotionPreview=1|true` in sample mode
+  (`isPromotionPreviewEnabled`); it does **no click/impression tracking, ranking,
+  auction, or billing**, and the Worker constructs no provider itself.
   `directory.ts` (Stage 30) arranges those Space/Product/Chat directories into one
   read-only section: `renderUnifiedDirectory(view)` renders a Spaces + Products +
   Chats block (each section toggleable via `showSpaces`/`showProducts`/`showChats`,
@@ -1169,7 +1199,8 @@ D1 space directory caveats (do not over-promise on these):
 37. Identity Provider boundary skeleton (Apple/Google/External as opaque auth references, not key sources) ✓
 38. EdgeRec Worker env selection boundary (select the promotion provider from Worker env) ✓
 39. Notification Bridge boundary skeleton (external notify seam; no secret/DM/payment content, no sending) ✓
-40. Deniable Storage Research Boundary docs (threat model + prohibitions; docs only, no code) ✓ ← you are here
+40. Deniable Storage Research Boundary docs (threat model + prohibitions; docs only, no code) ✓
+41. Mock promotion preview mode (MockPromotionProvider-only, opt-in flag; no real ads/fetch/tracking) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 

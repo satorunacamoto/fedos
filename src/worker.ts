@@ -105,6 +105,8 @@ import {
 import { canPostChat, canReadChat } from "./chat/policy.js";
 import { SAMPLE_CHATS, SAMPLE_CHAT_MESSAGES } from "./chat/sample_chats.js";
 import { renderUnifiedDirectory } from "./render/directory.js";
+import { buildProductPlacement, buildSpacePlacement } from "./promotion/bridge.js";
+import { renderMockPromotionPreview } from "./render/promotion.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -176,6 +178,17 @@ function htmlResponse(html: string, status = 200): Response {
     status,
     headers: { "content-type": "text/html; charset=utf-8" },
   });
+}
+
+/**
+ * True ONLY when the caller explicitly opts into mock promotion preview mode via
+ * `?promotionPreview=1` or `?promotionPreview=true`. This flag gates a
+ * mock-provider-only preview (see `renderMockPromotionPreview`); it never enables
+ * the real/EdgeRec provider and issues no `fetch`.
+ */
+export function isPromotionPreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("promotionPreview");
+  return value === "1" || value === "true";
 }
 
 /** Builds the query-status HTML for a result page. */
@@ -274,6 +287,7 @@ async function renderProductRoute(
   productId: string,
   actor: string,
   assetCache?: AssetCache,
+  promotionPreview = false,
 ): Promise<string> {
   const product = findProductById(SAMPLE_PRODUCTS, productId);
   if (!product) {
@@ -295,13 +309,19 @@ async function renderProductRoute(
     assetCache,
     Date.now(),
   );
+  // Stage 41: ONLY under an explicit preview flag (sample mode), append a
+  // mock-provider-driven preview block. No real/EdgeRec provider, no fetch.
+  const preview = promotionPreview
+    ? await renderMockPromotionPreview(buildProductPlacement(product))
+    : "";
   return renderPage(buildThreads([]), {
     status:
       data.lead +
       renderProductPage(product, decision, assets, {
         promotions: data.showPromotions,
         actorPubkey: actor || undefined,
-      }),
+      }) +
+      preview,
   });
 }
 
@@ -371,9 +391,12 @@ async function renderBoard(
   const actor = url.searchParams.get("actor") ?? "";
   const spaces = directory.list();
   const queryOptions = parseQueryOptions(url);
+  // Preview is sample-mode only (`data.showPromotions`) AND opt-in via the flag,
+  // so the live read-only relay path never invokes the preview provider.
+  const promotionPreview = data.showPromotions && isPromotionPreviewEnabled(url);
 
   if (productId !== null) {
-    return renderProductRoute(data, productId, actor, assetCache);
+    return renderProductRoute(data, productId, actor, assetCache, promotionPreview);
   }
 
   if (chatId !== null) {
@@ -420,6 +443,12 @@ async function renderBoard(
     renderSpaceLanding(space, readDecision, postDecision, {
       promotions: data.showPromotions,
     });
+
+  // Stage 41: ONLY under an explicit preview flag (sample mode), append a
+  // mock-provider-driven preview block for the space header slot.
+  if (promotionPreview) {
+    lead += await renderMockPromotionPreview(buildSpacePlacement(space));
+  }
 
   // `?compose=1` adds a MOCK-ONLY publish preview panel. It builds an unsigned
   // event for display but never signs and never sends — there is no publish
