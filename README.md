@@ -8,7 +8,41 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 54 — Runtime status JSON export, disabled by default.**
+> **Status: Stage 55 — Runtime diagnostics docs hardening (docs only, no code).**
+> A new [`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md) fixes, in
+> writing, the safety contract that `src/render/runtime_status.ts` and the
+> `?runtimeStatus=1`/`&format=json` Worker route (Stages 50–54) already
+> implement — **no `src/` change, no Runtime/Worker/provider/cache behavior
+> change** in this stage. It documents: (1) the diagnostics layer's purpose
+> (read-only inspection of which implementation `createRuntime` selected —
+> coarse type labels only, no health probing, no external calls); (2) exactly
+> what MAY be shown (runtime mode, component name/category, constructor label
+> or the `"(unnamed implementation)"` fallback, the five fixed categories);
+> (3) exactly what MUST NEVER be shown (API keys, endpoint URLs, tokens,
+> secrets, raw env values, actor/viewer pubkeys, payment metadata,
+> notification payloads, asset bytes, provider response bodies, stack traces);
+> (4) exactly what MUST NEVER be called (`getPromotions`/`getRecommendations`/
+> `requestPayment`/`notify`/`publish`/`assetCache.get,put,has,delete,clear`/
+> event-cache or directory/index lookups/external `fetch`) — the only
+> permitted read is `.constructor.name`, a property read, never an
+> invocation; (5) HTML-specific rules (mandatory `escapeHtml`, no endpoint
+> links, no raw object dumps, no stack traces); (6) JSON-specific rules
+> (allowlist fields only, never `JSON.stringify` the raw runtime, no
+> functions/methods, `generatedAt` opt-in only, `format=json` as a strict
+> allowlist rather than a denylist); (7) the test policy this area must keep
+> satisfying (method-call spies at zero, secret/endpoint-shaped values proven
+> absent, invalid-`format` fallback, no raw-runtime-stringify); and (8) rules
+> for future extensions (new components need a category + safe label;
+> calling a `getStatus()`-style method requires a documented inertness proof;
+> external health checks must ship as their own disabled-by-default boundary,
+> the way Stage 49/52 gated real provider invocation; diagnostics is not an
+> audit log). Every rule in the document matches code that already exists and
+> is already tested — this stage adds no new test either, since there is no
+> new behavior to cover. Stage 56 candidate: **Product purchase/grant preview
+> polish** (tighten the Stage 45/48 copy and layout now that the payment/
+> promotion diagnostics side is fully documented). Prior status:
+>
+> **Stage 54 — Runtime status JSON export, disabled by default.**
 > `src/render/runtime_status.ts` gains an opt-in JSON export of the SAME
 > Stage 50/51 `RuntimeStatusView` shown by `?runtimeStatus=1`.
 > `serializeRuntimeStatusView(view, generatedAt?)` builds a `RuntimeStatusJson`
@@ -41,9 +75,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > returns HTML (tested against `xml`/`yaml`/`JSON`/`1`/empty-string — an
 > allowlist, not a denylist), zero provider/cache/bridge calls happen for the
 > JSON path either, no `fetch`, and the default Worker export serves the JSON
-> end-to-end. Stage 55 candidate: **Runtime diagnostics docs hardening**
-> (write up, in one place, exactly what the HTML/JSON status views may and
-> may not ever show — no new code). Prior status:
+> end-to-end. Prior status:
 >
 > **Stage 53 — provider preview diagnostics hardening.**
 > `src/render/promotion.ts` gets a clearer, more explicit diagnostic layer for
@@ -1771,7 +1803,21 @@ D1 space directory caveats (do not over-promise on these):
 38. EdgeRec Worker env selection boundary (select the promotion provider from Worker env) ✓
 39. Notification Bridge boundary skeleton (external notify seam; no secret/DM/payment content, no sending) ✓
 40. Deniable Storage Research Boundary docs (threat model + prohibitions; docs only, no code) ✓
-41. Mock promotion preview mode (MockPromotionProvider-only, opt-in flag; no real ads/fetch/tracking) ✓ ← you are here
+41. Mock promotion preview mode (MockPromotionProvider-only, opt-in flag; no real ads/fetch/tracking) ✓
+42. Notification provider env selection boundary (`createRuntime` selects a `NotificationBridge` from env; no auto-`notify()`) ✓
+43. IPFS Asset Adapter Boundary skeleton (`IpfsClient`/`NoopIpfsClient`/`IpfsAssetCache`; no real IPFS node/gateway) ✓
+44. Payment / Lightning Boundary skeleton (`PaymentProvider`/`NoopPaymentProvider`/`PlaceholderPaymentProvider`; no real payment) ✓
+45. Product purchase preview UI (placeholder-only purchase panel, disabled checkout button; no real payment) ✓
+46. Payment provider runtime env selection boundary (`createRuntime` selects a `PaymentProvider` from env; no auto-charge) ✓
+47. Product purchase preview uses the runtime payment provider in preview-only mode (`?paymentPreview=1`) ✓
+48. Product grant preview boundary (`source: "preview_only"`/`access: "not_granted"`; no real `PurchaseGrant`) ✓
+49. EdgeRec real provider invocation boundary, disabled by default (`invokePromotionProviderPreview`; no auto-invoke) ✓
+50. Runtime provider health/status page, read-only (`?runtimeStatus=1`; no provider/cache method calls) ✓
+51. Runtime status page categorization (cache/storage/provider/bridge/security sections; still read-only) ✓
+52. Promotion provider preview behind a dual flag (env + query, both required; product/space routes only) ✓
+53. Provider preview diagnostics hardening (`disabled`/`provider_error`/`provider_preview` states; sanitized reasons) ✓
+54. Runtime status JSON export, disabled by default (`?runtimeStatus=1&format=json`; strict allowlist) ✓
+55. Runtime diagnostics docs hardening ([`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md); docs only, no code) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
