@@ -8,7 +8,48 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 46 — payment provider runtime env selection boundary.**
+> **Status: Stage 47 — product purchase preview uses the runtime payment
+> provider in preview-only mode.**
+> The Stage 45 `?product=<id>` purchase preview can now be connected to
+> Stage 46's env-selected `runtime.paymentProvider` — but ONLY under an
+> explicit opt-in flag, and ONLY on the product route. A new
+> `isPaymentPreviewEnabled(url)` recognizes `?paymentPreview=1` or
+> `?paymentPreview=true`. `renderBoard` computes this flag and threads it (plus
+> the `paymentProvider` passed down from `handleRequest`/the Worker's default
+> `fetch`) into `renderProductRoute`, which passes them to
+> `renderProductPurchasePreview(product, actor, runtimeProvider?)`: WITHOUT the
+> flag, `runtimeProvider` is `undefined` and the function falls back to its own
+> freshly-constructed `PlaceholderPaymentProvider`, EXACTLY as Stage 45 left
+> it; WITH the flag, it calls `runtime.paymentProvider.requestPayment(request)`
+> instead — which may be `NoopPaymentProvider` (renders the `unavailable`
+> panel) or `PlaceholderPaymentProvider` (renders the `accepted_placeholder`
+> panel) depending on `PAYMENT_PROVIDER`/`ENABLE_PAYMENT_PLACEHOLDER` env
+> config. `handleRequest` and `renderBoard` both gained a `paymentProvider?`
+> parameter (appended at the end, so existing positional call sites are
+> unaffected); `export default { fetch }` now passes `runtime.paymentProvider`
+> through. **`?paymentPreview=1` has NO effect on the board/space/chat
+> routes** — those never call `paymentProvider` at all, flag or not. As
+> before, `?actor=` is used only as a display "buyer candidate", never for
+> payment or grant issuance, and `paymentDecisionToGrant` is still never called
+> from the Worker — no `PurchaseGrant` is issued by this stage. **This stage
+> implements no real payment, no invoice, no checkout URL, no settlement, and
+> no grant issuance** — every rendered string stays HTML-escaped and the copy
+> never claims "paid"/"settled"/"purchased"/"grant issued". 12 new tests in
+> `test/payment_preview_runtime.test.ts` cover: the flag calls
+> `runtime.paymentProvider.requestPayment` exactly once on the product route,
+> no flag means zero calls (preview still renders via the local fallback), the
+> flag has no effect on the board/space/chat routes, a `NoopPaymentProvider`
+> renders the unavailable panel and a `PlaceholderPaymentProvider` renders the
+> accepted-placeholder panel under the flag, no `paymentDecisionToGrant` call,
+> no invoice/checkout-URL/QR/card/paid/settled/purchased/grant-issued text, a
+> a malicious `?actor` is escaped, no `fetch(` to an external host and no
+> Stripe/Lightning/Breez/Greenlight/LNURL reference, and no request mutation.
+> Stage 48 candidate: **Product grant preview boundary** (show what a
+> `PurchaseGrant` WOULD look like from an `accepted_placeholder` decision,
+> still without ever calling `paymentDecisionToGrant` for real or issuing one).
+> Prior status:
+>
+> **Stage 46 — payment provider runtime env selection boundary.**
 > `createRuntime(env)` can now SELECT a `PaymentProvider` from three new
 > `RuntimeEnv` fields — and NOTHING more, mirroring Stage 42's notification env
 > selection exactly. **`PAYMENT_PROVIDER`** (`"noop"` or `"placeholder"`),
@@ -53,10 +94,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `payment_boundary.test.ts` test #13 is updated: it now confirms
 > `requestPayment()`/`paymentDecisionToGrant`/`productToPaymentRequest` are
 > never auto-called from the runtime source (rather than asserting the runtime
-> is entirely payment-free, which is no longer the case). Stage 47 candidate:
-> **Payment purchase preview uses the runtime provider in an explicit
-> preview-only mode** (thread `runtime.paymentProvider` into the Stage 45
-> preview behind an opt-in, still no real rail/checkout/grant). Prior status:
+> is entirely payment-free, which is no longer the case). Prior status:
 >
 > **Stage 45 — product purchase preview UI, placeholder only.**
 > A new `src/render/payment.ts` renders a "Purchase preview" panel on the

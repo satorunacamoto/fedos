@@ -94,6 +94,7 @@ import {
 import type { AssetCache } from "./asset/types.js";
 import { canRequestPaymentForProduct, productToPaymentRequest } from "./payment/commerce_bridge.js";
 import { PlaceholderPaymentProvider } from "./payment/noop_payment.js";
+import type { PaymentProvider } from "./payment/types.js";
 import { renderPurchasePreview, renderPurchaseUnavailable } from "./render/payment.js";
 import {
   renderChatDirectory,
@@ -195,6 +196,19 @@ export function isPromotionPreviewEnabled(url: URL): boolean {
   return value === "1" || value === "true";
 }
 
+/**
+ * True ONLY when the caller explicitly opts into payment-provider preview mode
+ * via `?paymentPreview=1` or `?paymentPreview=true`. This flag gates whether
+ * the product purchase preview (Stage 45) calls `runtime.paymentProvider`
+ * (Stage 46's env-selected provider) instead of its own locally-constructed
+ * `PlaceholderPaymentProvider`. It never enables a real payment rail, never
+ * calls `paymentDecisionToGrant`, and applies to the product route only.
+ */
+export function isPaymentPreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("paymentPreview");
+  return value === "1" || value === "true";
+}
+
 /** Builds the query-status HTML for a result page. */
 function statusFor(options: ThreadQueryOptions, lead: string, result: ReturnType<typeof buildThreads>): string {
   const query = queryThreads(result, options);
@@ -274,17 +288,28 @@ function productDirectoryView(actor: string): string {
 }
 
 /**
- * Stage 45: a "Purchase preview" panel for the product route ONLY. Uses the
+ * Stage 45/47: a "Purchase preview" panel for the product route ONLY. Uses the
  * Stage 44 payment boundary purely for a DISPLAY decision —
  * `canRequestPaymentForProduct`/`productToPaymentRequest` gate eligibility
- * (draft/archived/invalid price -> unavailable) and a freshly-constructed
- * `PlaceholderPaymentProvider` (never wired into the runtime, never contacted
- * over the network) evaluates the request. `actor` is used only as a display
- * "buyer candidate" — never to process payment or issue a grant.
- * `paymentDecisionToGrant` is never called, so no `PurchaseGrant` is ever
- * issued from this preview.
+ * (draft/archived/invalid price -> unavailable) and a provider evaluates the
+ * request. `actor` is used only as a display "buyer candidate" — never to
+ * process payment or issue a grant. `paymentDecisionToGrant` is never called,
+ * so no `PurchaseGrant` is ever issued from this preview.
+ *
+ * Stage 47: `runtimeProvider` is used ONLY when the caller passes one (i.e.
+ * ONLY under the explicit `?paymentPreview=1` flag, wired by
+ * `renderProductRoute` below) — that is Stage 46's env-selected
+ * `runtime.paymentProvider`, which may be `NoopPaymentProvider` (unavailable
+ * preview) or `PlaceholderPaymentProvider` (accepted-placeholder preview)
+ * depending on env config. WITHOUT the flag, a freshly-constructed
+ * `PlaceholderPaymentProvider` is used, exactly as Stage 45 left it — the
+ * runtime provider is never contacted implicitly.
  */
-async function renderProductPurchasePreview(product: Product, actor: string): Promise<string> {
+async function renderProductPurchasePreview(
+  product: Product,
+  actor: string,
+  runtimeProvider?: PaymentProvider,
+): Promise<string> {
   const eligibility = canRequestPaymentForProduct(product);
   if (!eligibility.allowed) {
     return renderPurchaseUnavailable(eligibility.reason);
@@ -293,7 +318,8 @@ async function renderProductPurchasePreview(product: Product, actor: string): Pr
   if (!request) {
     return renderPurchaseUnavailable(eligibility.reason);
   }
-  const decision = await new PlaceholderPaymentProvider().requestPayment(request);
+  const provider = runtimeProvider ?? new PlaceholderPaymentProvider();
+  const decision = await provider.requestPayment(request);
   return renderPurchasePreview(product, decision, { buyerPubkey: actor || undefined });
 }
 
@@ -309,7 +335,10 @@ async function renderProductPurchasePreview(product: Product, actor: string): Pr
  * `assetCache` is supplied (the runtime's), preview METADATA may come from the
  * cache; a miss/error falls back to the fixed sample metadata. The cache is
  * consulted ONLY on this product route — never on the board/directory path.
- * The purchase preview (Stage 45) is likewise product-route only.
+ * The purchase preview (Stage 45) is likewise product-route only. Stage 47:
+ * `paymentPreview` (from `?paymentPreview=1`) gates whether that preview uses
+ * `paymentProvider` (the runtime's Stage 46 env-selected provider) instead of
+ * its own local `PlaceholderPaymentProvider` — see `renderProductPurchasePreview`.
  */
 async function renderProductRoute(
   data: BoardData,
@@ -317,6 +346,8 @@ async function renderProductRoute(
   actor: string,
   assetCache?: AssetCache,
   promotionPreview = false,
+  paymentPreview = false,
+  paymentProvider?: PaymentProvider,
 ): Promise<string> {
   const product = findProductById(SAMPLE_PRODUCTS, productId);
   if (!product) {
@@ -343,9 +374,15 @@ async function renderProductRoute(
   const preview = promotionPreview
     ? await renderMockPromotionPreview(buildProductPlacement(product))
     : "";
-  // Stage 45: always appended on this route (view already allowed above) —
-  // placeholder only, see `renderProductPurchasePreview`.
-  const purchasePreview = await renderProductPurchasePreview(product, actor);
+  // Stage 45/47: always appended on this route (view already allowed above).
+  // The runtime provider is passed ONLY when `paymentPreview` is explicitly
+  // set; otherwise `renderProductPurchasePreview` falls back to its own local
+  // `PlaceholderPaymentProvider`, exactly as Stage 45 left it.
+  const purchasePreview = await renderProductPurchasePreview(
+    product,
+    actor,
+    paymentPreview ? paymentProvider : undefined,
+  );
   return renderPage(buildThreads([]), {
     status:
       data.lead +
@@ -410,13 +447,17 @@ function renderChatRoute(data: BoardData, chatId: string, actor: string): string
  * `?product=<id>` and `?chat=<id>` take precedence and render their read-only
  * pages. `?actor=<pubkey>` selects the viewer (guest when absent). `assetCache`,
  * when supplied, is used ONLY by the product route (for preview metadata); the
- * board/directory path never touches it.
+ * board/directory path never touches it. `paymentProvider` (the runtime's
+ * Stage 46 env-selected `PaymentProvider`), when supplied, is likewise used
+ * ONLY by the product route's purchase preview, and only under `?paymentPreview=1`
+ * (Stage 47) — board/space/chat never call it.
  */
 async function renderBoard(
   url: URL,
   data: BoardData,
   directory: SpaceDirectory,
   assetCache?: AssetCache,
+  paymentProvider?: PaymentProvider,
 ): Promise<string> {
   const productId = url.searchParams.get("product");
   const chatId = url.searchParams.get("chat");
@@ -427,9 +468,19 @@ async function renderBoard(
   // Preview is sample-mode only (`data.showPromotions`) AND opt-in via the flag,
   // so the live read-only relay path never invokes the preview provider.
   const promotionPreview = data.showPromotions && isPromotionPreviewEnabled(url);
+  // Stage 47: opt-in only, product route only — see `renderProductRoute`.
+  const paymentPreview = isPaymentPreviewEnabled(url);
 
   if (productId !== null) {
-    return renderProductRoute(data, productId, actor, assetCache, promotionPreview);
+    return renderProductRoute(
+      data,
+      productId,
+      actor,
+      assetCache,
+      promotionPreview,
+      paymentPreview,
+      paymentProvider,
+    );
   }
 
   if (chatId !== null) {
@@ -566,6 +617,7 @@ export async function handleRequest(
   verifier: SignatureVerifier = selectVerifier(),
   directory: SpaceDirectory = spaceDirectory,
   assetCache?: AssetCache,
+  paymentProvider?: PaymentProvider,
 ): Promise<Response> {
   const url = new URL(request.url);
   const relayParam = url.searchParams.get("relay");
@@ -586,7 +638,7 @@ export async function handleRequest(
         cache,
         verifier,
       );
-      return htmlResponse(await renderBoard(url, data, directory, assetCache));
+      return htmlResponse(await renderBoard(url, data, directory, assetCache, paymentProvider));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const page = renderPage(buildThreads([]), {
@@ -597,7 +649,7 @@ export async function handleRequest(
   }
 
   const data = await buildSampleBoard(Date.now());
-  return htmlResponse(await renderBoard(url, data, directory, assetCache));
+  return htmlResponse(await renderBoard(url, data, directory, assetCache, paymentProvider));
 }
 
 /** Worker bindings. The KV namespace is optional; without it we fall back. */
@@ -667,10 +719,13 @@ export default {
   fetch(request: Request, env?: Env): Promise<Response> {
     // Stage 21: the runtime is the single selection point. We use its event
     // cache here, and (Stage 35) its asset cache is passed for the product route
-    // to source PREVIEW metadata only — the directory/index/providers/publisher/
-    // paymentProvider (Stage 46) are selected too but not auto-wired (no real
-    // publish, no NIP-07, no auto-served ads, no asset bytes/downloads, and no
-    // `requestPayment()`/`paymentDecisionToGrant` call from this selection).
+    // to source PREVIEW metadata only. (Stage 46) the runtime's paymentProvider
+    // is passed through too — but (Stage 47) it is used ONLY by the product
+    // route's purchase preview, and ONLY under the explicit `?paymentPreview=1`
+    // flag; otherwise the preview keeps using its own local
+    // `PlaceholderPaymentProvider` exactly as Stage 45 left it. No real publish,
+    // no NIP-07, no auto-served ads, no asset bytes/downloads, and no automatic
+    // `requestPayment()`/`paymentDecisionToGrant` call from this selection.
     const runtime = createRuntime(env);
     return handleRequest(
       request,
@@ -679,6 +734,7 @@ export default {
       undefined,
       undefined,
       runtime.assetCache,
+      runtime.paymentProvider,
     );
   },
 };
