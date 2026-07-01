@@ -8,7 +8,47 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 57 — provider preview docs hardening (docs only, no code).**
+> **Status: Stage 58 — Runtime external health check boundary, disabled by
+> default.**
+> A new `src/runtime/health_check.ts` ships ONLY the boundary shape for a
+> future "is this selected provider/endpoint actually reachable?" seam — as
+> opposed to Stage 50/51's `runtime_status.ts`, which only reports WHICH
+> implementation was selected, never whether it works. `HealthCheckTarget`
+> (`kind`/`label`/optional `endpointRef`) describes what would be checked —
+> `endpointRef` is an OPAQUE display label only, never a real URL to
+> dereference, and there is deliberately no field for an API key or token
+> anywhere in this file. `HealthCheckProvider` (`getStatus()`/`check(target,
+> options?)`) is the seam; `NoopHealthCheckProvider` and
+> `DisabledHealthCheckProvider` are both safe, permanently-inert defaults —
+> `check()` NEVER issues a `fetch`, pings anything, or calls a provider/cache/
+> bridge method, and always resolves `status: "disabled"` without touching
+> the network. The pure `canRunHealthCheck(target, options?)` policy helper
+> models the opt-in gate itself: without `{ enabled: true }` it resolves
+> `"disabled"`; even WITH that opt-in, it resolves `"skipped"` rather than
+> fabricate a health result, because no real check implementation exists yet.
+> `HealthCheckDecision.checkedAt` is populated ONLY from a caller-supplied
+> `options.now` — this module never calls `Date.now()` itself, so omitting
+> `now` means no `checkedAt` at all (never a silently guessed timestamp), and
+> `targetLabel` echoes ONLY `target.label`, never `target.endpointRef` — even
+> a caller-supplied endpointRef that looks like a real secret/URL never
+> appears anywhere in the returned decision. **This stage implements no real
+> probe, ping, or `fetch` of any kind, and is NOT wired into the runtime or
+> the Worker** — `createRuntime`/`worker.ts` construct nothing from this file
+> and call nothing in it; `src/runtime/health_check.ts` itself has zero
+> imports. 15 new tests in `test/runtime_health_check.test.ts` cover: both
+> Noop/Disabled providers are always `"disabled"`, `check()` issues no
+> `fetch` (verified with a `globalThis.fetch` spy) and calls no provider
+> method, `endpointRef` stays opaque and is never echoed in the decision (even
+> a fake-secret-shaped value), no API-key/token-shaped field exists on the
+> target or the decision, `checkedAt` reflects an injected `now` and is
+> absent (not defaulted) without one, no input mutation, and both the Runtime
+> and Worker sources have zero reference to this module. Stage 59 candidate:
+> **Provider preview test matrix docs** (a table of the Stage 52 dual-flag ×
+> Stage 53 diagnostic-state combinations and their expected rendered output,
+> to guard against regression as that area accumulates more tests). Prior
+> status:
+>
+> **Stage 57 — provider preview docs hardening (docs only, no code).**
 > A new [`docs/provider_preview_safety.md`](docs/provider_preview_safety.md)
 > fixes, in writing, the safety contract that Stage 49's
 > `invokePromotionProviderPreview`, Stage 52's dual-flag Worker wiring, and
@@ -41,11 +81,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Stage, its own disabled-by-default gate per concern, never a silent
 > promotion of "preview" into production). Every rule in the document matches
 > code that already exists and is already tested — this stage adds no new
-> test either, since there is no new behavior to cover. Stage 58 candidate:
-> **Runtime external health check boundary, disabled by default** (an
-> opt-in liveness probe seam for a real provider endpoint — still no
-> automatic calls, mirroring how Stage 49/52 gated real provider invocation).
-> Prior status:
+> test either, since there is no new behavior to cover. Prior status:
 >
 > **Stage 56 — product purchase/grant preview polish.**
 > `src/render/payment.ts` and `src/render/grant_preview.ts` get clearer,
@@ -1900,7 +1936,8 @@ D1 space directory caveats (do not over-promise on these):
 54. Runtime status JSON export, disabled by default (`?runtimeStatus=1&format=json`; strict allowlist) ✓
 55. Runtime diagnostics docs hardening ([`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md); docs only, no code) ✓
 56. Product purchase/grant preview polish (explicit "Preview only." notices, split grant-preview sentences, widened forbidden-word list; wording/attributes only, no gating change) ✓
-57. Provider preview docs hardening ([`docs/provider_preview_safety.md`](docs/provider_preview_safety.md); docs only, no code) ✓ ← you are here
+57. Provider preview docs hardening ([`docs/provider_preview_safety.md`](docs/provider_preview_safety.md); docs only, no code) ✓
+58. Runtime external health check boundary, disabled by default (`HealthCheckProvider`/`NoopHealthCheckProvider`/`DisabledHealthCheckProvider`; no real probe, not wired) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
