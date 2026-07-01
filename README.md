@@ -8,7 +8,35 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 33 — Vault boundary skeleton.** A MINIMAL, future-facing seam
+> **Status: Stage 34 — Crypto Core boundary skeleton.** A MINIMAL, future-facing
+> seam for the FedOS crypto core now lives in `src/crypto/`, kept entirely OUT of
+> the current Nostr/Cloudflare core, the Vault seam, and the asset layer. It fixes
+> the swap point for a future real crypto core (the provisional
+> `packages/fedos-core-rust` / a RustCrypto-backed WASM/FFI module) WITHOUT
+> committing to any implementation. `CryptoProvider`
+> (`getStatus`/`getCapabilities`/`randomBytes`/`deriveKey`/`encrypt`/`decrypt`)
+> plus the `CryptoState` (`available`/`unavailable`/`error`), `CryptoStatus`,
+> `CryptoDecision`, `CryptoCapability` (five `*_placeholder` labels), and the
+> `RandomBytesRequest`/`DeriveKeyRequest`/`EncryptRequest`/`DecryptRequest` types
+> define shapes ONLY. **This is a boundary, not crypto.** It performs **no
+> encryption, no key derivation, and no random generation** — no AEAD/XOR, no
+> HKDF/Argon2, no BIP39/BIP32, no NIP-44, no zeroize, no key generation. Requests
+> carry **OPAQUE, non-secret handles and labels only** — never raw key material,
+> seeds, passphrases, or plaintext — and a `CryptoDecision` carries **no output
+> bytes** (nothing runs, so nothing is produced). `NoopCryptoProvider` is the safe
+> default: permanently `unavailable`, it advertises nothing and every operation
+> resolves to a denied/unavailable decision, never throwing and never mutating its
+> input. `vault_bridge.ts`'s pure `cryptoCapabilitiesToVaultCapabilities` maps the
+> crypto placeholders to the Vault placeholders they would back (type-only Vault
+> dependency; it wires nothing). **Nothing is auto-wired**: `createRuntime` and the
+> Worker never construct or reference a crypto core (tests assert both sources are
+> crypto-free, that `src/crypto` contains no XOR, and that it imports no AEAD/crypto
+> library), so the whole Stage 1–33 core is untouched. See
+> [`docs/vault_crypto_identity.md`](docs/vault_crypto_identity.md) for the design
+> notes (AEAD mandatory, XOR forbidden, Rust core as a separate package) this seam
+> is drawn from. Prior status:
+>
+> **Stage 33 — Vault boundary skeleton.** A MINIMAL, future-facing seam
 > for the FedOS Vault / Crypto / Identity layer now lives in `src/vault/`, kept
 > entirely OUT of the current Nostr/Cloudflare core. `VaultBoundary`
 > (`getState`/`getCapabilities`/`unlock`/`lock`/`isUnlocked`) plus the
@@ -428,6 +456,31 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
   adapter (or composing the chain) only makes it *ready* to call out behind its
   injected client. The runtime never reaches for a global `fetch`, and the Worker
   does not auto-wire the MeshKV opt-in.
+- `src/crypto/*` — the **Crypto Core boundary skeleton** (Stage 34): a
+  future-facing seam that fixes the swap point for a real crypto core (the
+  provisional `packages/fedos-core-rust` / a RustCrypto-backed WASM/FFI module),
+  drawn from `docs/vault_crypto_identity.md` and kept OUT of the current core.
+  `types.ts` defines shapes ONLY — `CryptoState` (`available`/`unavailable`/
+  `error`), `CryptoStatus`, `CryptoDecision` (allowed + state + non-sensitive
+  reason, **no output/bytes field**), `CryptoCapability` (five `*_placeholder`
+  labels: `aead`/`kdf`/`random`/`nip44`/`rust_core`), and the request shapes
+  `RandomBytesRequest` (a length only), `DeriveKeyRequest`, `EncryptRequest`, and
+  `DecryptRequest` — the latter three carrying **OPAQUE, non-secret handles and
+  labels only** (`keyRef`/`plaintextRef`/`ciphertextRef`/`aad`/algorithm labels),
+  never raw key/seed/passphrase/plaintext bytes, plus the `CryptoProvider`
+  interface (`getStatus`/`getCapabilities`/`randomBytes`/`deriveKey`/`encrypt`/
+  `decrypt`). `noop_crypto.ts`'s `NoopCryptoProvider` is the safe default:
+  permanently `unavailable`, it advertises no capabilities and every operation
+  resolves to a denied/unavailable `CryptoDecision`; it is total and never throws.
+  `vault_bridge.ts`'s pure `cryptoCapabilitiesToVaultCapabilities` maps the crypto
+  placeholders to the Vault placeholders they would back (aead/nip44/rust_core →
+  `aead_crypto_placeholder`; kdf → `identity_unlock_placeholder`; random → none),
+  deduped and without mutating its input — a **type-only** dependency on the Vault
+  types that wires nothing. **This is boundary only — no encryption, no key
+  derivation, no random generation** (no AEAD/XOR/HKDF/Argon2/BIP39/BIP32/NIP-44/
+  zeroize anywhere); it holds no key, seed, or plaintext, mutates no request, and
+  makes **no security or confidentiality claim**. It is NOT wired into
+  `createRuntime` or the Worker, and a future Rust core is not implemented.
 - `src/vault/*` — the **Vault boundary skeleton** (Stage 33): a future-facing seam
   for the FedOS Vault / Crypto / Identity layer sketched in
   `docs/vault_crypto_identity.md`, kept OUT of the current core. `types.ts` defines
@@ -666,6 +719,18 @@ confidentiality guarantees and is not a security audit of the wider system.
   origin (the opt-in `"volatile"` strategy clears local/peer layers only, never
   R2). There are still **no signed URLs, downloads, delivery, or payment**, and the
   composite opens no connection and issues no `fetch` of its own.
+- **The crypto core boundary is a seam, not crypto.** `src/crypto/*` defines a
+  `CryptoProvider` interface and a no-op provider — it performs **no encryption,
+  no key derivation, and no random generation** (no AEAD/XOR/HKDF/Argon2/BIP39/
+  BIP32/NIP-44/zeroize, no key generation), holds **no key, seed, or plaintext**,
+  and its requests carry OPAQUE, non-secret handles/labels only (never raw
+  key/seed/passphrase/plaintext bytes). A `CryptoDecision` carries no output —
+  nothing is computed. `NoopCryptoProvider` is permanently `unavailable` and denies
+  every operation; nothing throws and no request is mutated. The future Rust core
+  (`packages/fedos-core-rust`, provisional) is **not implemented**. Do NOT describe
+  this boundary as "safe", "complete", "secure", or "zero-trace". It is not wired
+  into the runtime or Worker, and a test asserts `src/crypto` contains no XOR and
+  imports no AEAD/crypto library.
 - **The vault boundary is a seam, not a vault.** `src/vault/*` defines an
   interface and no-op/in-memory placeholders — it holds **no key, no seed, no
   passphrase, no token, and no secret bytes**, and it performs **no cryptography,
@@ -823,8 +888,9 @@ D1 space directory caveats (do not over-promise on these):
 30. Product / Chat / Space unified directory page ✓
 31. Runtime MeshKV explicit opt-in wiring (no auto network) ✓
 32. MeshKV browser lifecycle boundary (explicit connect/startSignaling) ✓
-33. Vault boundary skeleton (interface + no-op/in-memory; no crypto, no keys) ✓ ← you are here
-34. Crypto Core Boundary skeleton (`CryptoProvider` interface + `NoopCryptoProvider`)
+33. Vault boundary skeleton (interface + no-op/in-memory; no crypto, no keys) ✓
+34. Crypto Core Boundary skeleton (`CryptoProvider` interface + `NoopCryptoProvider`) ✓ ← you are here
+35. Product/Asset preview metadata from runtime (`runtime.assetCache`-backed previews)
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
@@ -842,8 +908,9 @@ guardrails.
 - **Crypto Core Boundary** — a separate Rust crate (`packages/fedos-core-rust`,
   provisional) for AEAD + KDF + secret zeroing; managed-runtime memory-zeroing
   limits are documented, not hand-waved. AEAD mandatory, XOR forbidden. *(Stage 34
-  is expected to land the `CryptoProvider` interface + a `NoopCryptoProvider` first
-  — a TypeScript seam that fixes the future Rust-core swap point, no real crypto.)*
+  lands the `CryptoProvider` interface + `NoopCryptoProvider` in `src/crypto/` —
+  a TypeScript seam that fixes the future Rust-core swap point; shapes only, still
+  no real crypto/keys/randomness.)*
 - **Deniable Storage Research Boundary** — threat-model study of hidden/shadow
   vaults (TrueCrypt/VeraCrypt as *reference*), with leak vectors (size/padding/
   metadata/timestamp/access-pattern) named and **no production safety claim**.
