@@ -8,7 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 63 — FedOS Core WASM loader boundary (loader seam only,
+> **Status: Stage 64 — FedOS Core WASM loader safety docs (docs only, no
+> code).**
+> A new [`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md) fixes,
+> in writing, the safety contract that Stage 63's
+> `packages/fedos-core-rust/src/wasm_loader.ts` already implements — **no `src/`
+> change, no `packages/fedos-core-rust/src/` change, no behavior change** in this
+> stage — so that when a real loader is eventually built (actual WASM
+> instantiation) it cannot regress the rules that matter most: **nothing loads
+> automatically, nothing is fetched, and no cryptography runs until an audited
+> core exists behind an explicit, disabled-by-default gate.** It documents:
+> (1) the loader boundary's purpose (WASM loader seam / future Rust crypto core
+> replacement point — explicitly NOT an implementation spec, no runtime loading
+> yet); (2) the absolute rules (no automatic WASM loading, no `fetch` by default,
+> no dynamic import by default, no `WebAssembly.instantiate` by default, no
+> path/URL resolution from env, no secrets in `moduleRef`/`integrityRef`, no
+> crypto operation until an audited core exists); (3) what MAY be handled (opaque
+> `moduleRef`/`integrityRef`, coarse loader state, placeholder capability,
+> `PlaceholderFedosCoreCrypto` only); (4) what MUST NEVER be handled (raw module
+> URL, endpoint URL, filesystem path, API key, seed, key material,
+> plaintext/ciphertext bytes, stack trace, raw loader error); (5) the integrity /
+> provenance policy (`integrityRef` is an opaque label, no real hash verification
+> yet, a real loader needs a pinned digest / signed release / reproducible build /
+> versioned manifest, and never loads real WASM without an integrity check);
+> (6) the Runtime / Worker relationship (no auto-load from `createRuntime` or the
+> Worker, loader selection is a separate stage, actual load is a further stage,
+> status page shows a constructor label only); (7) the CryptoProvider relationship
+> (`FedosCoreCryptoProvider` is the adapter, the bridge only extracts a core from a
+> decision, no real KDF/AEAD/random/zeroize, Noop/Placeholder are not a safety
+> guarantee); (8) error handling (no raw error, no stack trace, no endpoint/path
+> echoed, error state + fixed reason only); (9) the test policy this area must keep
+> satisfying (no `.wasm` committed, no `.rs`/Cargo committed, no
+> fetch/import/`WebAssembly.instantiate`, Runtime/Worker not wired,
+> `moduleRef`/`integrityRef` not resolved, no input mutation); and (10) the future
+> implementation prerequisites (Rust crate separated, audited dependencies,
+> `zeroize`/`secrecy`/`subtle`, AEAD test vectors, KDF test vectors, reproducible
+> build, pinned digest, explicit disabled-by-default runtime gate, no auto
+> network). Every rule matches code that already exists and is already tested in
+> `test/fedos_core_wasm_loader.test.ts` — this stage adds no new test either, since
+> there is no new behavior to cover. Stage 65 candidate: **Runtime crypto provider
+> selection boundary, disabled by default** (let `createRuntime` SELECT a
+> `CryptoProvider` — still with no real WASM load and no real cryptography). Prior
+> status:
+>
+> **Stage 63 — FedOS Core WASM loader boundary (loader seam only,
 > disabled by default, no WASM, no Rust, no cryptography).**
 > A new [`packages/fedos-core-rust/src/wasm_loader.ts`](packages/fedos-core-rust/src/wasm_loader.ts)
 > adds the LOADER SEAM a future stage would use to bring a real RustCrypto-backed
@@ -2147,7 +2190,10 @@ D1 space directory caveats (do not over-promise on these):
 58. Runtime external health check boundary, disabled by default (`HealthCheckProvider`/`NoopHealthCheckProvider`/`DisabledHealthCheckProvider`; no real probe, not wired) ✓
 59. FedOS core crypto package boundary ([`packages/fedos-core-rust`](packages/fedos-core-rust/README.md); `FedosCoreCrypto` seam + `PlaceholderFedosCoreCrypto` + host adapter; no Rust, no WASM, no crypto, not wired) ✓
 60. WebAuthn / Passkey provider adapter skeleton (`src/identity/webauthn_adapter.ts`; `WebAuthnProvider` + Noop/Placeholder + pure Passkey bridge; no `navigator.credentials`, not wired) ✓
-61. WebAuthn / Passkey adapter safety docs ([`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md); docs only, no code) ✓ ← you are here
+61. WebAuthn / Passkey adapter safety docs ([`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md); docs only, no code) ✓
+62. WebAuthn runtime selection boundary, disabled by default (`createRuntime` selects a `WebAuthnProvider` from env; `AppRuntime.webAuthnProvider`; selection only, no `navigator.credentials`, no `begin`/`cancel`) ✓
+63. FedOS core WASM loader boundary, disabled by default (`packages/fedos-core-rust/src/wasm_loader.ts`; `FedosCoreWasmLoader` + Noop/Placeholder + bridge helpers; no WASM/Rust/fetch/instantiate, not wired) ✓
+64. FedOS core WASM loader safety docs ([`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); docs only, no code) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
