@@ -4,11 +4,11 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 82 — Add an internal KDF module skeleton (crate-private
-> only; no public API change, no actual HKDF, no IKM/salt/info/PRK/OKM
-> handling, no Runtime/Worker/CryptoProvider wiring, no WASM change). Public
-> API STILL a placeholder SKELETON. No cryptography reachable from any
-> public function.**
+> **Status: Stage 83 — Extract a test-only HKDF-SHA256 helper (test-only
+> refactor; no public API change, no production deriveKey, no Runtime/
+> Worker/CryptoProvider wiring, no WASM change). Public API STILL a
+> placeholder SKELETON. No cryptography reachable from any public
+> function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -17,36 +17,30 @@ app depends only on its *contract*, never on its internals.
 > `decrypt_placeholder` — is UNCHANGED since Stage 69. Stage 74 added
 > `chacha20poly1305` (RustCrypto AEAD, `default-features = false`, `features =
 > ["alloc"]` — no `getrandom`), wired to the RFC 8439 vectors under
-> `cfg(test)` in Stage 75 (refactored into a test-only helper Stage 81) — see
-> the "RFC 8439 vector wiring" section below. Stage 76 adopted `hkdf`
-> (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256 vectors under
-> `cfg(test)` in Stage 77 — see the "RFC 5869 vector wiring" section below.
-> Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a secret-handling
-> FOUNDATION. Stage 79 added a crate-private `secret_handle` module (an
-> INTERNAL-ONLY `SecretHandle` skeleton). Stage 80 added a second
-> crate-private module, `aead_core` (an INTERNAL-ONLY `AeadPlaceholderRequest`
-> skeleton) — **unchanged this stage, still placeholder-only**. **Stage 82
-> adds a third crate-private module, `kdf_core`**, defining an INTERNAL-ONLY
-> `KdfPlaceholderRequest` skeleton — see the "Internal KDF module skeleton"
-> section below. **Not part of the public API** — every item in `kdf_core` is
-> `pub(crate)` at most (never `pub`), nothing is re-exported, and this
-> crate's public `pub fn` surface is still exactly the same six placeholder
-> functions from Stage 69. **No actual HKDF** — nothing in `kdf_core`
-> extracts or expands a byte, and its production code does not import `hkdf`
-> or `sha2` (both still exercised only by the pre-existing `cfg(test)`-only
-> `rfc5869_vectors` module from Stage 77). **No IKM/salt/info/PRK/OKM** —
-> `KdfPlaceholderRequest` accepts and stores only two labels (an algorithm
-> name and an extract/expand/extract-then-expand intent); there is no
-> borrowed-byte-slice/`Vec<u8>`/`String` field or parameter anywhere in the
-> module. `kdf_core` does not connect to `aead_core` or `secret_handle` —
-> same "when in doubt, leave unconnected" reasoning as Stage 80.
-> `derive_key_placeholder` / `encrypt_placeholder` / `decrypt_placeholder`
-> remain byte-for-byte unchanged. The Rust crate still has no
-> `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**; the
-> runtime/Worker/`CryptoProvider` are **not** wired to any of this. A future
-> stage may extract an internal HKDF helper (behind `cfg(test)` or
-> crate-private, per the Stage 81 ChaCha20-Poly1305 pattern) before any
-> public `deriveKey` is ever considered. A real RustCrypto-backed core is a
+> `cfg(test)` in Stage 75 (refactored into a test-only helper Stage 81). Stage
+> 76 adopted `hkdf` (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256
+> vectors under `cfg(test)` in Stage 77 — see the "RFC 5869 vector wiring"
+> section below. Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a
+> secret-handling FOUNDATION. Stage 79 added a crate-private `secret_handle`
+> module. Stage 80 added a second crate-private module, `aead_core`. Stage 82
+> added a third crate-private module, `kdf_core` (an INTERNAL-ONLY
+> `KdfPlaceholderRequest` skeleton) — see the "Internal KDF module skeleton"
+> section below; **`kdf_core` is UNCHANGED this stage, still
+> placeholder-only**. **Stage 83 is a test-only refactor of the Stage 77
+> module**: the HKDF-SHA256 extract/expand logic that used to be written
+> inline (and duplicated) in `rfc5869_vectors`'s two vector tests is now
+> three small, private, test-only helper functions,
+> `extract_hkdf_sha256_for_test`, `expand_hkdf_sha256_for_test`, and
+> `extract_expand_hkdf_sha256_for_test` — see the "RFC 5869 vector wiring"
+> section below for the details. **Not connected to `kdf_core` or
+> `secret_handle`/`aead_core`** — the helpers exist ONLY inside the
+> `cfg(test)`-only `rfc5869_vectors` module, are never `pub`/`pub(crate)`,
+> and are never re-exported. **No production `deriveKey`** — production code
+> (everything before this file's first `cfg(test)`-gated module) still does
+> not import `hkdf` or `sha2` at all; `derive_key_placeholder` remains
+> byte-for-byte unchanged. The Rust crate still has no `wasm-bindgen`, no
+> `unsafe`, and produces **no `.wasm`**; the runtime/Worker/`CryptoProvider`
+> are **not** wired to any of this. A real RustCrypto-backed core is a
 > future, explicitly-reviewed stage that must pass the full crypto
 > test-vector plan
 > ([`docs/crypto_test_vectors.md`](../../docs/crypto_test_vectors.md)) and ship a
@@ -142,7 +136,7 @@ packages/fedos-core-rust
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only) — none of the three skeletons is part of the public API
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged Stage 83) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only) — none of the three skeletons is part of the public API
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -277,12 +271,12 @@ as a dependency" step only, mirroring Stage 74's `chacha20poly1305` adoption
 (no code imported `hkdf` yet, and no vector was wired). Stage 77 (below)
 completes the "wired" step for this dependency.
 
-## RFC 5869 vector wiring (Stage 77)
+## RFC 5869 vector wiring (Stage 77, refactored Stage 83)
 
-`src/lib.rs`'s bottom-most module, `rfc5869_vectors` (gated `#[cfg(test)]`,
-compiled only for `cargo test`), reads
+`src/lib.rs`'s `rfc5869_vectors` module (gated `#[cfg(test)]`, compiled only
+for `cargo test`), reads
 [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json)
-at compile time via `include_str!` and runs three tests:
+at compile time via `include_str!` and runs five tests:
 
 - `rfc5869_json_parses_and_is_non_empty` — the vector file parses and is
   non-empty.
@@ -290,7 +284,7 @@ at compile time via `include_str!` and runs three tests:
   `shouldPass: true` vector (RFC 5869 Appendix A, Test Cases 1–3, SHA-256),
   `hkdf::Hkdf::<sha2::Sha256>::extract` produces exactly the RFC's expected
   PRK, and `.expand` with that vector's `info` produces exactly the RFC's
-  expected `L`-octet OKM.
+  expected `L`-octet OKM — via the three test-only helpers described below.
 - `rfc5869_negative_vectors_do_not_match_if_present` — for every
   `shouldPass: false` vector (none exist in the current file; RFC 5869
   Appendix A publishes only positive known-answer test cases for HKDF-SHA256,
@@ -300,14 +294,45 @@ at compile time via `include_str!` and runs three tests:
   expected bytes. This loop runs zero iterations today and trivially passes;
   it starts enforcing automatically if a future, explicitly-reviewed
   re-import ever adds an official negative case.
+- `extract_then_expand_round_trip_for_test_helper` (Stage 83) — an
+  extract-then-expand round trip over fixed, non-secret, test-only bytes
+  (not RFC vector data) agrees between the three-helper path and the single
+  combined-helper path.
+- `expand_fails_for_unsupported_length_for_test_helper` (Stage 83) —
+  requesting an OKM length beyond RFC 5869 §2.3's `255 * HashLen` ceiling
+  makes the expand helper return an error.
+
+**Stage 83 refactor.** The two vector tests' extract/expand logic —
+previously written inline (and duplicated between the positive and negative
+test) — is now three small, private, test-only helper functions declared
+earlier in the same module:
+`extract_hkdf_sha256_for_test(ikm_bytes, salt_bytes) -> Vec<u8>` (infallible,
+matching `hkdf`'s own `extract` signature),
+`expand_hkdf_sha256_for_test(prk_bytes, info_bytes, length) ->
+Result<Vec<u8>, InvalidLength>`, and
+`extract_expand_hkdf_sha256_for_test(ikm_bytes, salt_bytes, info_bytes,
+length) -> Result<(Vec<u8>, Vec<u8>), InvalidLength>` (runs both steps in one
+call). All three are private `fn`s — never `pub`/`pub(crate)`, never
+re-exported — that exist ONLY inside this `cfg(test)`-only module, and are
+NOT connected to the crate-private `kdf_core` skeleton (Stage 82) or
+`secret_handle`/`aead_core` in any way. This is a test-only refactor, not a
+new capability — the KDF-side analogue of Stage 81's AEAD-side refactor: the
+two pre-existing vector tests assert exactly what they asserted before Stage
+83, just calling the shared helpers instead of constructing an
+`Hkdf<Sha256>` inline twice.
 
 This is the "wired" step of the vector lifecycle in
 [`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
 §5 for HKDF-SHA256 — it does not, by itself, make any public API real:
 `derive_key_placeholder` is unchanged, there is still **no public `deriveKey`
 implementation**, and the runtime still selects only
-`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. Nothing outside this
-package's own `Cargo.toml`/`Cargo.lock`/`src/lib.rs` changed.
+`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. See
+[`test/fedos_core_rust_hkdf_test_helper.test.ts`](../../test/fedos_core_rust_hkdf_test_helper.test.ts)
+for the dedicated Stage 83 guard tests (helper presence/visibility, no
+production `hkdf`/`sha2` reference, public `pub fn` count still 6, `kdf_core`
+unchanged and still placeholder-only, no production IKM/salt/info/PRK/OKM
+storage field, Runtime/Worker untouched, no committed build artifact).
+Nothing outside this package's own `src/lib.rs` changed.
 
 ## Secret-handling foundation adoption (Stage 78)
 
@@ -596,8 +621,41 @@ unchanged; and nothing is wired into the Runtime, the Worker, or
 `CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
 `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
 
-A future, explicitly-reviewed Stage 83 candidate is an internal HKDF helper
-behind `cfg(test)` or crate-private visibility — the KDF-side analogue of
-Stage 81's ChaCha20-Poly1305 helper extraction, a small,
-RFC-5869-vector-verified extract/expand routine that `kdf_core` could
-eventually call — still no public `deriveKey` implementation.
+Stage 83 (below) is the internal HKDF helper this section anticipated — see
+"RFC 5869 vector wiring" above for its details. It stays `cfg(test)`-only
+and unconnected to `kdf_core`; `kdf_core` itself is untouched by Stage 83.
+
+## Test-only HKDF-SHA256 helper extraction (Stage 83)
+
+`extract_hkdf_sha256_for_test`, `expand_hkdf_sha256_for_test`, and
+`extract_expand_hkdf_sha256_for_test` are now shared by both
+`rfc5869_vectors` tests instead of being written inline (and duplicated) in
+each — see "RFC 5869 vector wiring" above for the full description,
+signatures, and the two new helper-focused unit tests. This section exists
+so the guardrails are stated once, explicitly, in the same place as every
+other stage's summary — the KDF-side mirror of Stage 81's own section:
+
+- **Test-only refactor, not a new capability.** Both pre-existing
+  `rfc5869_vectors` tests assert exactly what they asserted before this
+  stage; only the extract/expand construction moved into shared functions.
+- **No production `hkdf`/`sha2` import.** `src/lib.rs`'s production code
+  (everything before this file's first `cfg(test)`-gated module) still does
+  not import, reference, or call `hkdf` or `sha2` anywhere.
+- **`kdf_core` (Stage 82) is unchanged and still placeholder-only.** The
+  three new helpers are not called from it, not referenced by it, and it
+  gains no new field or method this stage.
+- **No connection to `secret_handle` (Stage 79) or `aead_core` (Stage 80).**
+  The helpers take raw test-vector IKM/salt/info/PRK bytes as plain
+  parameters — never a `SecretHandle` or an `AeadPlaceholderRequest`, never
+  anything sourced from either.
+- **No `Cargo.toml` change.** No new dependency; `hkdf` was already a
+  `[dependencies]` (production) entry since Stage 76, and `sha2` a
+  `[dev-dependencies]` entry since Stage 77.
+- **Public API and Runtime/Worker/`CryptoProvider` wiring are exactly as
+  before** — `derive_key_placeholder` is byte-for-byte unchanged, and the
+  host still selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+A future, explicitly-reviewed Stage 84 candidate is to adopt the `argon2`
+dependency (build-check only, one crate per Stage per
+[`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
+§1) — still no public `deriveKey`/password-hashing implementation.

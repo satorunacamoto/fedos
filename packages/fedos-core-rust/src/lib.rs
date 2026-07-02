@@ -60,6 +60,14 @@
 //! names are kept out of this summary, see the note above). Same rules
 //! apply: not part of the public API, no public function above constructs,
 //! holds, or returns one of its types.
+//!
+//! Stage 83 is a test-only refactor of the Stage 77 module — the KDF-side
+//! analogue of Stage 81's AEAD-side refactor: the extract/expand logic that
+//! used to be written inline in its two vector tests is now three small,
+//! private, test-only helper functions inside that same module (their own
+//! doc comments, next to their declarations, name them). No production code
+//! changed — the six functions above are untouched, and the Stage 82
+//! skeleton is not connected to this refactor.
 
 #![forbid(unsafe_code)]
 
@@ -868,9 +876,23 @@ mod rfc8439_vectors {
 /// vectors, and implements no key-derivation function that any other code —
 /// production or otherwise — can call. `derive_key_placeholder` above is
 /// untouched.
+///
+/// Stage 83 extracts the extract/expand logic that used to be written
+/// inline in the two vector tests below into three small test-only helpers,
+/// [`extract_hkdf_sha256_for_test`], [`expand_hkdf_sha256_for_test`], and
+/// [`extract_expand_hkdf_sha256_for_test`] — private `fn`s that exist ONLY
+/// inside this `cfg(test)`-only module, are not `pub`/`pub(crate)`, are not
+/// re-exported, and are NOT connected to the crate-private `kdf_core`
+/// skeleton (Stage 82) or to `secret_handle`/`aead_core` in any way. This is
+/// a test-only refactor, mirroring Stage 81's `rfc8439_vectors` refactor:
+/// the two vector tests
+/// (`rfc5869_positive_vectors_extract_and_expand_correctly` and
+/// `rfc5869_negative_vectors_do_not_match_if_present`) assert exactly the
+/// same things as before, just calling the shared helpers instead of
+/// constructing an `Hkdf<Sha256>` inline twice.
 #[cfg(test)]
 mod rfc5869_vectors {
-    use hkdf::Hkdf;
+    use hkdf::{Hkdf, InvalidLength};
     use serde::Deserialize;
     use sha2::Sha256;
 
@@ -905,6 +927,48 @@ mod rfc5869_vectors {
         })
     }
 
+    /// Test-only HKDF-SHA256 EXTRACT helper — private `fn`, exists ONLY
+    /// under `cfg(test)`, never `pub`/`pub(crate)`. Takes raw IKM/salt bytes
+    /// (test-vector bytes, never a real secret) and returns the PRK.
+    /// Infallible, matching the `hkdf` crate's own `extract` signature.
+    fn extract_hkdf_sha256_for_test(ikm_bytes: &[u8], salt_bytes: &[u8]) -> Vec<u8> {
+        let (prk, _) = Hkdf::<Sha256>::extract(Some(salt_bytes), ikm_bytes);
+        prk.to_vec()
+    }
+
+    /// Test-only HKDF-SHA256 EXPAND helper — same scope/rules as
+    /// [`extract_hkdf_sha256_for_test`] above. Takes a PRK (raw bytes, e.g.
+    /// from [`extract_hkdf_sha256_for_test`] or a vector's own fixture
+    /// value) + `info` + a desired output length, and returns OKM bytes on
+    /// success, or the underlying `InvalidLength` error if the requested
+    /// length is unsupported (RFC 5869 §2.3's `255 * HashLen` ceiling).
+    fn expand_hkdf_sha256_for_test(
+        prk_bytes: &[u8],
+        info_bytes: &[u8],
+        length: usize,
+    ) -> Result<Vec<u8>, InvalidLength> {
+        let hk = Hkdf::<Sha256>::from_prk(prk_bytes)
+            .expect("test helper: PRK is not the correct length");
+        let mut okm = vec![0u8; length];
+        hk.expand(info_bytes, &mut okm)?;
+        Ok(okm)
+    }
+
+    /// Test-only combined HKDF-SHA256 EXTRACT-THEN-EXPAND helper — same
+    /// scope/rules as [`extract_hkdf_sha256_for_test`] above. Runs extract
+    /// then expand in one call; returns `(prk_bytes, okm_bytes)` on success.
+    fn extract_expand_hkdf_sha256_for_test(
+        ikm_bytes: &[u8],
+        salt_bytes: &[u8],
+        info_bytes: &[u8],
+        length: usize,
+    ) -> Result<(Vec<u8>, Vec<u8>), InvalidLength> {
+        let (prk, hk) = Hkdf::<Sha256>::extract(Some(salt_bytes), ikm_bytes);
+        let mut okm = vec![0u8; length];
+        hk.expand(info_bytes, &mut okm)?;
+        Ok((prk.to_vec(), okm))
+    }
+
     #[test]
     fn rfc5869_json_parses_and_is_non_empty() {
         let file: VectorFile =
@@ -915,10 +979,12 @@ mod rfc5869_vectors {
         );
     }
 
-    /// `shouldPass=true` vectors: `hkdf::Hkdf::<sha2::Sha256>` must both (a)
-    /// extract a PRK from IKM+salt matching the RFC's expected PRK, and (b)
-    /// expand that PRK with `info` to exactly the RFC's expected `L`-octet
-    /// OKM.
+    /// `shouldPass=true` vectors: [`extract_hkdf_sha256_for_test`] must
+    /// extract a PRK from IKM+salt matching the RFC's expected PRK,
+    /// [`expand_hkdf_sha256_for_test`] must expand that PRK with `info` to
+    /// exactly the RFC's expected `L`-octet OKM, and
+    /// [`extract_expand_hkdf_sha256_for_test`] must reproduce both bytes in
+    /// one combined call.
     #[test]
     fn rfc5869_positive_vectors_extract_and_expand_correctly() {
         let file: VectorFile =
@@ -932,20 +998,36 @@ mod rfc5869_vectors {
             let prk_bytes = decode_hex("prk", &vector.id, &vector.prk);
             let okm_bytes = decode_hex("okm", &vector.id, &vector.okm);
 
-            let (prk, hk) = Hkdf::<Sha256>::extract(Some(&salt_bytes), &ikm_bytes);
+            let prk = extract_hkdf_sha256_for_test(&ikm_bytes, &salt_bytes);
             assert_eq!(
-                prk.as_slice(),
-                prk_bytes.as_slice(),
+                prk, prk_bytes,
                 "{}: PRK did not match the RFC 5869 vector",
                 vector.id
             );
 
-            let mut okm = vec![0u8; vector.length];
-            hk.expand(&info_bytes, &mut okm)
+            let okm = expand_hkdf_sha256_for_test(&prk_bytes, &info_bytes, vector.length)
                 .unwrap_or_else(|err| panic!("{}: expand failed: {err}", vector.id));
             assert_eq!(
                 okm, okm_bytes,
                 "{}: OKM did not match the RFC 5869 vector",
+                vector.id
+            );
+
+            let (combined_prk, combined_okm) = extract_expand_hkdf_sha256_for_test(
+                &ikm_bytes,
+                &salt_bytes,
+                &info_bytes,
+                vector.length,
+            )
+            .unwrap_or_else(|err| panic!("{}: extract_expand failed: {err}", vector.id));
+            assert_eq!(
+                combined_prk, prk_bytes,
+                "{}: combined-helper PRK did not match the RFC 5869 vector",
+                vector.id
+            );
+            assert_eq!(
+                combined_okm, okm_bytes,
+                "{}: combined-helper OKM did not match the RFC 5869 vector",
                 vector.id
             );
 
@@ -958,10 +1040,11 @@ mod rfc5869_vectors {
     }
 
     /// `shouldPass=false` vectors, if any exist in the imported file, must
-    /// produce a PRK or OKM that does NOT match whatever (necessarily
-    /// incorrect) expected bytes the fixture carries. The currently imported
-    /// RFC 5869 file has no negative case (RFC 5869 Appendix A publishes only
-    /// positive known-answer test cases for HKDF-SHA256 — see
+    /// produce a PRK or OKM (via [`extract_expand_hkdf_sha256_for_test`])
+    /// that does NOT match whatever (necessarily incorrect) expected bytes
+    /// the fixture carries. The currently imported RFC 5869 file has no
+    /// negative case (RFC 5869 Appendix A publishes only positive
+    /// known-answer test cases for HKDF-SHA256 — see
     /// docs/crypto_vector_sources.md §2's verbatim-only import rule; none is
     /// fabricated here) — so today this loop body runs zero times and the
     /// test trivially passes. It exists so that IF a future,
@@ -980,16 +1063,58 @@ mod rfc5869_vectors {
             let prk_bytes = decode_hex("prk", &vector.id, &vector.prk);
             let okm_bytes = decode_hex("okm", &vector.id, &vector.okm);
 
-            let (prk, hk) = Hkdf::<Sha256>::extract(Some(&salt_bytes), &ikm_bytes);
-            let mut okm = vec![0u8; vector.length];
-            hk.expand(&info_bytes, &mut okm)
-                .unwrap_or_else(|err| panic!("{}: expand failed: {err}", vector.id));
+            let (prk, okm) = extract_expand_hkdf_sha256_for_test(
+                &ikm_bytes,
+                &salt_bytes,
+                &info_bytes,
+                vector.length,
+            )
+            .unwrap_or_else(|err| panic!("{}: expand failed: {err}", vector.id));
 
             assert!(
-                prk.as_slice() != prk_bytes.as_slice() || okm != okm_bytes,
+                prk != prk_bytes || okm != okm_bytes,
                 "{}: expected PRK or OKM mismatch for a shouldPass=false vector",
                 vector.id
             );
         }
+    }
+
+    /// Unit test for the helpers themselves, independent of the vector
+    /// file: an extract-then-expand round trip over fixed, non-secret,
+    /// test-only bytes must agree between the three-helper path and the
+    /// single combined-helper path.
+    #[test]
+    fn extract_then_expand_round_trip_for_test_helper() {
+        let ikm_bytes = [0x11u8; 22];
+        let salt_bytes = [0x22u8; 13];
+        let info_bytes = b"info-for-test";
+        let length = 42;
+
+        let prk = extract_hkdf_sha256_for_test(&ikm_bytes, &salt_bytes);
+        let okm = expand_hkdf_sha256_for_test(&prk, info_bytes, length)
+            .expect("expand should succeed with a well-formed PRK");
+        assert_eq!(okm.len(), length);
+
+        let (combined_prk, combined_okm) =
+            extract_expand_hkdf_sha256_for_test(&ikm_bytes, &salt_bytes, info_bytes, length)
+                .expect("extract_expand should succeed with well-formed input");
+        assert_eq!(combined_prk, prk);
+        assert_eq!(combined_okm, okm);
+    }
+
+    /// Unit test for the EXPAND helper's failure path: RFC 5869 §2.3 caps
+    /// HKDF-SHA256 output at `255 * 32` octets — requesting more must make
+    /// [`expand_hkdf_sha256_for_test`] return an error.
+    #[test]
+    fn expand_fails_for_unsupported_length_for_test_helper() {
+        let ikm_bytes = [0x33u8; 22];
+        let salt_bytes = [0x44u8; 13];
+        let prk = extract_hkdf_sha256_for_test(&ikm_bytes, &salt_bytes);
+
+        let result = expand_hkdf_sha256_for_test(&prk, b"info-for-test", 255 * 32 + 1);
+        assert!(
+            result.is_err(),
+            "expected an error for an out-of-range OKM length"
+        );
     }
 }

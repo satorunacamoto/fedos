@@ -8,7 +8,66 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 82 — Add an internal KDF module skeleton (crate-private
+> **Status: Stage 83 — Extract a test-only HKDF-SHA256 helper (test-only
+> refactor; no public API change, no production deriveKey, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs`'s pre-existing `cfg(test)`-only
+> `rfc5869_vectors` module (Stage 77) is refactored: the HKDF-SHA256
+> extract/expand logic that used to be written inline (and duplicated) in
+> its two vector tests is now three small, private, test-only helper
+> functions, `extract_hkdf_sha256_for_test(ikm_bytes, salt_bytes) ->
+> Vec<u8>` (infallible, matching `hkdf`'s own `extract` signature),
+> `expand_hkdf_sha256_for_test(prk_bytes, info_bytes, length) ->
+> Result<Vec<u8>, InvalidLength>`, and
+> `extract_expand_hkdf_sha256_for_test(ikm_bytes, salt_bytes, info_bytes,
+> length) -> Result<(Vec<u8>, Vec<u8>), InvalidLength>` (runs both steps in
+> one call). All three are private `fn`s — never `pub`/`pub(crate)`, never
+> re-exported — that exist ONLY inside the `cfg(test)`-only `rfc5869_vectors`
+> module, and are NOT connected to the crate-private `kdf_core` skeleton
+> (Stage 82, unchanged this stage — still placeholder-only) or
+> `secret_handle`/`aead_core` in any way. **Test-only refactor, not a new
+> capability**: the two pre-existing vector tests
+> (`rfc5869_positive_vectors_extract_and_expand_correctly` and
+> `rfc5869_negative_vectors_do_not_match_if_present`) assert exactly what
+> they asserted before Stage 83, just calling the shared helpers instead of
+> constructing an `Hkdf<Sha256>` inline twice. Two new unit tests exercise
+> the helpers directly, independent of the vector file:
+> `extract_then_expand_round_trip_for_test_helper` (agrees between the
+> three-helper path and the single combined-helper path over fixed,
+> non-secret, test-only bytes) and
+> `expand_fails_for_unsupported_length_for_test_helper` (an out-of-range
+> OKM length makes expand fail). `cargo test` is GREEN with all 25 tests
+> passing (23 pre-existing + 2 new helper unit tests); `cargo check` and
+> `cargo check --tests` stay GREEN with no warnings. `Cargo.toml` is
+> UNCHANGED this stage — `hkdf`/`sha2` were already `[dependencies]`/
+> `[dev-dependencies]` entries since Stage 76/77. **No production
+> `hkdf`/`sha2` import**: `src/lib.rs`'s production code (everything before
+> this file's first `cfg(test)`-gated module) still does not import,
+> reference, or call `hkdf` or `sha2` anywhere; `derive_key_placeholder`
+> remains byte-for-byte unchanged, and the crate's public `pub fn` surface
+> stays exactly the same six placeholder functions from Stage 69. New
+> [`test/fedos_core_rust_hkdf_test_helper.test.ts`](test/fedos_core_rust_hkdf_test_helper.test.ts)
+> (10 tests) checks: the three helpers exist inside the `cfg(test)`-gated
+> region and are private (never `pub`/`pub(crate)`, never re-exported);
+> production code (before the first `cfg(test)`) has no `hkdf`/`sha2`
+> import/reference and no reference to the new helper names either; the
+> public `pub fn` surface is exactly the six Stage 69 names; `kdf_core`
+> remains unchanged and placeholder-only (no `hkdf`/`sha2` import, no
+> reference to the new helpers, its six methods unchanged) and still holds
+> no production IKM/salt/info/PRK/OKM storage field or
+> `Vec<u8>`/`String`/borrowed-byte-slice field; Runtime/Worker sources
+> mention neither helper name nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; and all three
+> helper call sites use the documented signatures. No existing Rust source
+> guard test needed updating this stage — the refactor stayed entirely
+> inside `rfc5869_vectors`'s existing `cfg(test)`-gated boundary, so
+> `test/fedos_core_rust_hkdf_wiring.test.ts` (which already asserts
+> `hkdf`/`sha2` usage is confined to that module's `cfg(test)`-scoped tail)
+> needed no change. Stage 84 candidate: **adopt the `argon2` dependency**
+> (build-check only, one crate per Stage) — still no public
+> `deriveKey`/password-hashing implementation. Prior status:
+>
+> **Stage 82 — Add an internal KDF module skeleton (crate-private
 > only; no public API change, no actual HKDF, no Runtime/Worker/
 > CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs` gains a third crate-private module,
