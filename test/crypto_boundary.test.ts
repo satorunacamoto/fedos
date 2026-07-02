@@ -160,12 +160,23 @@ describe("src/crypto has no real cryptography", () => {
   });
 });
 
-describe("crypto core is not auto-wired into the core", () => {
-  it("Runtime source has no crypto auto-wire", () => {
-    expect(runtimeSource).not.toMatch(/crypto/i);
+describe("crypto core is SELECTED but never executed by the core", () => {
+  // Stage 65 lets `createRuntime` SELECT a `CryptoProvider` from env — so the
+  // Runtime/Worker sources now legitimately reference crypto. What must stay
+  // absent is any EXECUTION: no `randomBytes`/`deriveKey`/`encrypt`/`decrypt`
+  // call. (See `test/runtime_crypto_env.test.ts` for the full selection-boundary
+  // coverage.)
+  it("Runtime source selects a crypto provider but never runs a crypto op", () => {
+    expect(runtimeSource).not.toMatch(/\.\s*randomBytes\s*\(/);
+    expect(runtimeSource).not.toMatch(/\.\s*deriveKey\s*\(/);
+    expect(runtimeSource).not.toMatch(/\.\s*encrypt\s*\(/);
+    expect(runtimeSource).not.toMatch(/\.\s*decrypt\s*\(/);
   });
 
-  it("Worker source has no crypto auto-wire", () => {
-    expect(workerSource).not.toMatch(/crypto/i);
+  it("Worker source never runs a crypto op", () => {
+    expect(workerSource).not.toMatch(/\.\s*randomBytes\s*\(/);
+    expect(workerSource).not.toMatch(/\.\s*deriveKey\s*\(/);
+    expect(workerSource).not.toMatch(/\.\s*encrypt\s*\(/);
+    expect(workerSource).not.toMatch(/\.\s*decrypt\s*\(/);
   });
 });

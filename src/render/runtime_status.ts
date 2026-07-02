@@ -3,11 +3,12 @@
  *
  * Shows WHICH implementation `createRuntime` selected for each boundary (mode,
  * event cache, asset cache, space directory, metadata index, signature
- * verifier, WebAuthn provider, promotion/recommendation providers, relay
- * publisher, notification bridge, payment provider) — a coarse TYPE LABEL only,
- * e.g. "InMemoryEventCache" or "EdgeRecPromotionProvider". It NEVER calls a
- * provider/cache method (`getPromotions`, `getRecommendations`,
- * `requestPayment`, `notify`, `publish`, WebAuthn `begin`/`cancel`,
+ * verifier, WebAuthn provider, crypto provider, promotion/recommendation
+ * providers, relay publisher, notification bridge, payment provider) — a coarse
+ * TYPE LABEL only, e.g. "InMemoryEventCache" or "EdgeRecPromotionProvider". It
+ * NEVER calls a provider/cache method (`getPromotions`, `getRecommendations`,
+ * `requestPayment`, `notify`, `publish`, WebAuthn `begin`/`cancel`, crypto
+ * `randomBytes`/`deriveKey`/`encrypt`/`decrypt`,
  * `assetCache.get/put/has/delete/clear`, `eventCache.get/put`,
  * directory/index lookups) and issues no `fetch`. It NEVER renders an
  * endpoint URL, API key, env value, secret, or a viewer/actor pubkey — those
@@ -17,9 +18,10 @@
  *
  * Stage 51 groups the components into fixed CATEGORIES (cache, storage,
  * provider, bridge, security) for easier diagnostics ahead of any future
- * real-connection phase. Stage 62 adds `webAuthnProvider` to the `security`
- * category as a coarse constructor label only — the page never calls its
- * `begin`/`cancel` and touches no browser credential API. `RuntimeStatusView.components` (the flat Stage 50
+ * real-connection phase. Stage 62 adds `webAuthnProvider` and Stage 65 adds
+ * `cryptoProvider` to the `security` category as coarse constructor labels only
+ * — the page never calls their methods, loads no WASM, and touches no browser
+ * credential API. `RuntimeStatusView.components` (the flat Stage 50
  * list) is UNCHANGED for backward compatibility; `.sections` is new and
  * derives from the same components, grouped and in a fixed category order.
  *
@@ -72,6 +74,7 @@ const COMPONENT_FIELDS: readonly { name: keyof AppRuntime; category: RuntimeComp
   { name: "metadataIndex", category: "storage" },
   { name: "signatureVerifier", category: "security" },
   { name: "webAuthnProvider", category: "security" },
+  { name: "cryptoProvider", category: "security" },
   { name: "promotionProvider", category: "provider" },
   { name: "recommendationProvider", category: "provider" },
   { name: "paymentProvider", category: "provider" },

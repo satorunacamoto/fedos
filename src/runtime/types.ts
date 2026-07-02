@@ -29,6 +29,7 @@ import type { RelayPublisher } from "../nostr/publish.js";
 import type { PromotionProvider, RecommendationProvider } from "../promotion/adapter.js";
 import type { EdgeRecFetchLike } from "../promotion/edge_rec_adapter.js";
 import type { WebAuthnProvider } from "../identity/webauthn_adapter.js";
+import type { CryptoProvider } from "../crypto/types.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -188,6 +189,26 @@ export interface RuntimeEnv {
    * `WEBAUTHN_PROVIDER=placeholder`. Selection only; starts no WebAuthn request.
    */
   readonly ENABLE_WEBAUTHN_PLACEHOLDER?: string | boolean;
+  /**
+   * Which crypto core provider to build (Stage 34's `CryptoProvider` seam).
+   *   - "noop"  → `NoopCryptoProvider` (safe default — permanently `unavailable`,
+   *               advertises nothing, denies every operation).
+   *   - "fedos" → `FedosCoreCryptoProvider` injected with the permanently-inert
+   *               `PlaceholderFedosCoreCrypto` ONLY (no real Rust/WASM core, no
+   *               WASM loader). Still `unavailable`; runs no cryptography.
+   *   - absent/other → `NoopCryptoProvider`.
+   * Selection only. `randomBytes()`/`deriveKey()`/`encrypt()`/`decrypt()` are
+   * NEVER auto-called; no WASM is loaded, no `fetch`/dynamic import happens, and
+   * no randomness/KDF/AEAD runs.
+   */
+  readonly CRYPTO_PROVIDER?: string;
+  /**
+   * Explicit opt-in to use the FedOS core provider (placeholder core only).
+   * Truthy = `true` or a truthy string ("1"/"true"/"yes"/"on"). Takes effect
+   * when `CRYPTO_PROVIDER` is not "noop" or "fedos" but this flag is truthy —
+   * same result as `CRYPTO_PROVIDER=fedos`. Selection only; runs no cryptography.
+   */
+  readonly ENABLE_CRYPTO_PLACEHOLDER?: string | boolean;
 }
 
 /**
@@ -224,6 +245,11 @@ export interface RuntimeOverrides {
    * Selection only — the runtime never calls its `begin()`/`cancel()`.
    */
   readonly webAuthnProvider?: WebAuthnProvider;
+  /**
+   * Pre-built crypto provider. Wins over any `env` crypto fields. Selection only
+   * — the runtime never calls its `randomBytes`/`deriveKey`/`encrypt`/`decrypt`.
+   */
+  readonly cryptoProvider?: CryptoProvider;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -272,4 +298,14 @@ export interface AppRuntime {
    * never a key source — and no unlock happens by building a runtime.
    */
   readonly webAuthnProvider: WebAuthnProvider;
+  /**
+   * The selected crypto core provider (Stage 65). Selected from env;
+   * `randomBytes()`/`deriveKey()`/`encrypt()`/`decrypt()` are NEVER called
+   * automatically. The safe default (`NoopCryptoProvider`) is permanently
+   * `unavailable`. The FedOS option injects the permanently-inert
+   * `PlaceholderFedosCoreCrypto` ONLY — no real Rust/WASM core, no WASM loader.
+   * Constructing a runtime loads no WASM, issues no `fetch`/dynamic import, runs
+   * no KDF/AEAD, and generates no randomness.
+   */
+  readonly cryptoProvider: CryptoProvider;
 }

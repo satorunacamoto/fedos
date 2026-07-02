@@ -163,15 +163,20 @@ describe("Stage 63 — FedOS Core WASM loader boundary (disabled by default)", (
 });
 
 describe("FedOS Core WASM loader is not auto-wired into the core", () => {
-  it("10. Runtime source has no WASM loader auto-wire", () => {
+  // Stage 65 lets `createRuntime` SELECT a crypto provider (whose FedOS option
+  // wraps only the inert `PlaceholderFedosCoreCrypto`) — so the runtime docstrings
+  // now legitimately mention WASM. What must stay absent is the LOADER itself:
+  // no `FedosCoreWasmLoader`, no `wasm_loader` import, and no `.load(` call.
+  it("10. Runtime source wires no WASM loader (placeholder core only)", () => {
     const src = runtimeSource.toLowerCase();
-    expect(src).not.toContain("wasm");
     expect(src).not.toContain("fedoscorewasmloader");
+    expect(src).not.toContain("wasm_loader");
+    expect(runtimeSource).not.toMatch(/\.\s*load\s*\(/);
   });
 
   it("11. Worker source has no WASM loader auto-wire", () => {
     const src = workerSource.toLowerCase();
-    expect(src).not.toContain("wasm");
+    expect(src).not.toContain("wasm_loader");
     expect(src).not.toContain("fedoscorewasmloader");
   });
 });

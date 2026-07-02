@@ -15,7 +15,7 @@ describe("buildRuntimeStatusView", () => {
     const runtime = createRuntime();
     const view = buildRuntimeStatusView(runtime);
     expect(view.mode).toBe("test");
-    expect(view.components.length).toBe(11);
+    expect(view.components.length).toBe(12);
     const names = view.components.map((c) => c.name);
     expect(names).toEqual([
       "eventCache",
@@ -24,6 +24,7 @@ describe("buildRuntimeStatusView", () => {
       "metadataIndex",
       "signatureVerifier",
       "webAuthnProvider",
+      "cryptoProvider",
       "promotionProvider",
       "recommendationProvider",
       "paymentProvider",
@@ -72,12 +73,13 @@ describe("buildRuntimeStatusView", () => {
     expect(bridge.components.map((c) => c.name)).toEqual(["relayPublisher", "notificationBridge"]);
   });
 
-  it("6. the security section contains signatureVerifier/webAuthnProvider", () => {
+  it("6. the security section contains signatureVerifier/webAuthnProvider/cryptoProvider", () => {
     const view = buildRuntimeStatusView(createRuntime());
     const security = view.sections.find((s) => s.category === "security")!;
     expect(security.components.map((c) => c.name)).toEqual([
       "signatureVerifier",
       "webAuthnProvider",
+      "cryptoProvider",
     ]);
   });
 
@@ -90,6 +92,7 @@ describe("buildRuntimeStatusView", () => {
     expect(byName.metadataIndex).toBe("storage");
     expect(byName.signatureVerifier).toBe("security");
     expect(byName.webAuthnProvider).toBe("security");
+    expect(byName.cryptoProvider).toBe("security");
     expect(byName.promotionProvider).toBe("provider");
     expect(byName.recommendationProvider).toBe("provider");
     expect(byName.paymentProvider).toBe("provider");
@@ -106,6 +109,7 @@ describe("buildRuntimeStatusView", () => {
     expect(byName.notificationBridge).toBe("NoopNotificationBridge");
     expect(byName.paymentProvider).toBe("NoopPaymentProvider");
     expect(byName.webAuthnProvider).toBe("NoopWebAuthnProvider");
+    expect(byName.cryptoProvider).toBe("NoopCryptoProvider");
     // signatureVerifier is a plain object literal (not a class) -> safe fallback.
     expect(byName.signatureVerifier).toBe("(unnamed implementation)");
   });

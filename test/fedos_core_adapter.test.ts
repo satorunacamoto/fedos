@@ -168,13 +168,26 @@ describe("FedosCoreCryptoProvider adapter", () => {
   });
 });
 
-describe("FedOS core is not auto-wired into the core", () => {
-  it("12. Runtime source has no fedos-core auto-wire", () => {
-    expect(runtimeSource.toLowerCase()).not.toContain("fedos");
+describe("FedOS core is SELECTED but never executed by the core", () => {
+  // Stage 65 lets `createRuntime` SELECT a `FedosCoreCryptoProvider` (wrapping
+  // only the inert `PlaceholderFedosCoreCrypto`) — so the Runtime now
+  // legitimately references FedOS. What must stay absent is any crypto EXECUTION
+  // and, crucially, any REAL core / WASM loader wiring.
+  it("12. Runtime source selects a FedOS provider but wires no real core / WASM loader", () => {
+    // Only the placeholder core may be injected — never a real core or the loader.
+    expect(runtimeSource).not.toMatch(/FedosCoreWasmLoader/);
+    expect(runtimeSource).not.toMatch(/wasm_loader/);
+    // No crypto operation is ever called from the runtime.
+    expect(runtimeSource).not.toMatch(/\.\s*(randomBytes|deriveKey|encrypt|decrypt)\s*\(/);
   });
 
-  it("13. Worker source has no fedos-core auto-wire", () => {
-    expect(workerSource.toLowerCase()).not.toContain("fedos");
+  it("13. Worker constructs no FedOS core and runs no crypto op", () => {
+    // The Worker `Env` may mention FedOS in a comment, but it constructs nothing:
+    // no core, no adapter, no WASM loader, and no crypto operation call.
+    expect(workerSource).not.toMatch(/new\s+FedosCoreCryptoProvider/);
+    expect(workerSource).not.toMatch(/new\s+PlaceholderFedosCoreCrypto/);
+    expect(workerSource.toLowerCase()).not.toContain("wasm_loader");
+    expect(workerSource).not.toMatch(/\.\s*(randomBytes|deriveKey|encrypt|decrypt)\s*\(/);
   });
 });
 

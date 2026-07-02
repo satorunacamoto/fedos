@@ -8,7 +8,48 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 64 — FedOS Core WASM loader safety docs (docs only, no
+> **Status: Stage 65 — Runtime crypto provider selection boundary (disabled by
+> default, selection only, no WASM, no cryptography).**
+> `createRuntime` can now SELECT a Stage 34 `CryptoProvider` from the environment
+> and exposes it as `AppRuntime.cryptoProvider`. This is a **selection /
+> dependency-injection seam ONLY** — building a runtime constructs the provider
+> and nothing more: it never calls
+> `randomBytes()`/`deriveKey()`/`encrypt()`/`decrypt()`, loads no WASM, issues no
+> `fetch`/dynamic import, performs no WASM instantiation, and runs no
+> KDF/AEAD/random/zeroize. New selection helper
+> `selectCryptoProvider(env, overrides)`: (1) `overrides.cryptoProvider` wins
+> unconditionally; (2) `CRYPTO_PROVIDER="noop"` → `NoopCryptoProvider`;
+> (3) `CRYPTO_PROVIDER="fedos"` OR a truthy `ENABLE_CRYPTO_PLACEHOLDER`
+> (`true`/`"1"`/`"true"`/`"yes"`/`"on"`) → a `FedosCoreCryptoProvider` injected
+> with the permanently-inert **`PlaceholderFedosCoreCrypto` ONLY** (no real
+> Rust/WASM core, no WASM loader — still `unavailable`, runs no cryptography);
+> (4) anything else / invalid / absent → `NoopCryptoProvider` (the safe default —
+> **disabled by default**). New env fields `RuntimeEnv.CRYPTO_PROVIDER?` and
+> `RuntimeEnv.ENABLE_CRYPTO_PLACEHOLDER?` (mirrored on the Worker `Env`) are read
+> but never mutated; the truthy check reuses the existing `isEnvFlagTruthy`
+> helper. A new `RuntimeOverrides.cryptoProvider?` lets tests/callers pin a
+> provider. The read-only Runtime status page adds `cryptoProvider` under the
+> **security** category as a coarse constructor label only — it never calls
+> `randomBytes`/`deriveKey`/`encrypt`/`decrypt` or any provider method. The Worker
+> constructs and runs **nothing**: no crypto op, no WASM loader,
+> and no cryptography. **Not implemented (still requires its own future, explicit
+> stage):** any real WASM load / `WebAssembly.instantiate`, `.wasm` file, `fetch`,
+> dynamic import, HKDF / Argon2 / AEAD, random generation, zeroize, encryption /
+> decryption / key derivation, Vault unlock, and WebAuthn / Passkey. See
+> [`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md) for the safety
+> contract this selection boundary preserves (§6 "loader selection is a separate
+> stage"). 12 tests in `test/runtime_crypto_env.test.ts` cover: override wins,
+> `noop`→Noop, `fedos`→FedOS (placeholder core only), truthy
+> `ENABLE_CRYPTO_PLACEHOLDER`→FedOS (and falsy→Noop), invalid→Noop,
+> disabled-by-default, no crypto-op auto-call, no WASM instantiation / no `fetch`,
+> status-page label-only (no provider method called), Worker runs no crypto op /
+> no WASM loader, no `navigator.credentials` / `WebAssembly` / `fetch` call site in
+> the runtime, and no env mutation. Stage 66 candidate: **Crypto operation
+> test-vector documentation** (fix the KNOWN-ANSWER vectors — AEAD / HKDF /
+> Argon2 / NIP-44 — a future real core must reproduce, so the Rust implementation
+> can be built test-first). Prior status:
+>
+> **Stage 64 — FedOS Core WASM loader safety docs (docs only, no
 > code).**
 > A new [`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md) fixes,
 > in writing, the safety contract that Stage 63's
@@ -2193,7 +2234,8 @@ D1 space directory caveats (do not over-promise on these):
 61. WebAuthn / Passkey adapter safety docs ([`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md); docs only, no code) ✓
 62. WebAuthn runtime selection boundary, disabled by default (`createRuntime` selects a `WebAuthnProvider` from env; `AppRuntime.webAuthnProvider`; selection only, no `navigator.credentials`, no `begin`/`cancel`) ✓
 63. FedOS core WASM loader boundary, disabled by default (`packages/fedos-core-rust/src/wasm_loader.ts`; `FedosCoreWasmLoader` + Noop/Placeholder + bridge helpers; no WASM/Rust/fetch/instantiate, not wired) ✓
-64. FedOS core WASM loader safety docs ([`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); docs only, no code) ✓ ← you are here
+64. FedOS core WASM loader safety docs ([`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); docs only, no code) ✓
+65. Runtime crypto provider selection boundary, disabled by default (`createRuntime` selects a `CryptoProvider` from env; `AppRuntime.cryptoProvider`; FedOS option wraps the inert `PlaceholderFedosCoreCrypto` only; selection only, no WASM load, no cryptography, no crypto-op call) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 

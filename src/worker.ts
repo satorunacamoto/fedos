@@ -905,6 +905,16 @@ export interface Env {
    */
   WEBAUTHN_PROVIDER?: string;
   ENABLE_WEBAUTHN_PLACEHOLDER?: string;
+  /**
+   * Crypto provider selection config (Stage 65). These only let `createRuntime`
+   * SELECT a `CryptoProvider`; the Worker NEVER calls
+   * `randomBytes`/`deriveKey`/`encrypt`/`decrypt`, loads no WASM, issues no
+   * `fetch`/dynamic import, and runs no KDF/AEAD/random. The FedOS option wraps
+   * only the inert `PlaceholderFedosCoreCrypto`. Selection only — no cryptography
+   * happens from the Worker.
+   */
+  CRYPTO_PROVIDER?: string;
+  ENABLE_CRYPTO_PLACEHOLDER?: string;
 }
 
 /**

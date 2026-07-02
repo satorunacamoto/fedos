@@ -67,6 +67,10 @@ import {
   PlaceholderWebAuthnProvider,
   type WebAuthnProvider,
 } from "../identity/webauthn_adapter.js";
+import { NoopCryptoProvider } from "../crypto/noop_crypto.js";
+import { FedosCoreCryptoProvider } from "../crypto/fedos_core_adapter.js";
+import type { CryptoProvider } from "../crypto/types.js";
+import { PlaceholderFedosCoreCrypto } from "../../packages/fedos-core-rust/src/index.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -392,6 +396,38 @@ export function selectWebAuthnProvider(
 }
 
 /**
+ * Select the `CryptoProvider` from env / overrides. Priority:
+ *   1. `overrides.cryptoProvider` — wins unconditionally.
+ *   2. `CRYPTO_PROVIDER=noop` → `NoopCryptoProvider`.
+ *   3. `CRYPTO_PROVIDER=fedos` OR `ENABLE_CRYPTO_PLACEHOLDER` truthy →
+ *      `FedosCoreCryptoProvider` injected with the permanently-inert
+ *      `PlaceholderFedosCoreCrypto` ONLY.
+ *   4. Otherwise → `NoopCryptoProvider` (safe default, permanently `unavailable`).
+ *
+ * DISABLED BY DEFAULT: without an explicit opt-in the runtime uses
+ * `NoopCryptoProvider`. Even the FedOS option is inert — it wraps only the
+ * placeholder core, so it stays `unavailable` and runs no cryptography.
+ *
+ * Selection only: constructing the provider loads NO WASM (no real WASM loader
+ * is used), issues no `fetch`/dynamic import, performs no WASM instantiation,
+ * and runs no KDF/AEAD/random/zeroize. `randomBytes`/`deriveKey`/`encrypt`/
+ * `decrypt` are never auto-called. `env` is never mutated.
+ */
+export function selectCryptoProvider(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): CryptoProvider {
+  if (overrides.cryptoProvider) return overrides.cryptoProvider;
+  const provider = env?.CRYPTO_PROVIDER;
+  if (provider === "noop") return new NoopCryptoProvider();
+  if (provider === "fedos" || isEnvFlagTruthy(env?.ENABLE_CRYPTO_PLACEHOLDER)) {
+    // Inject the inert placeholder core ONLY — no real Rust/WASM core, no loader.
+    return new FedosCoreCryptoProvider(new PlaceholderFedosCoreCrypto());
+  }
+  return new NoopCryptoProvider();
+}
+
+/**
  * Whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy — HALF of the Stage 52
  * dual-flag gate for invoking a real `promotionProvider` for a preview. Pure;
  * never mutates `env`.
@@ -443,5 +479,6 @@ export function createRuntime(
     paymentProvider: selectPaymentProvider(env, overrides),
     promotionProviderPreviewAllowed: isPromotionProviderPreviewAllowed(env),
     webAuthnProvider: selectWebAuthnProvider(env, overrides),
+    cryptoProvider: selectCryptoProvider(env, overrides),
   };
 }
