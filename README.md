@@ -8,7 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 67 — Crypto operation test-vector plan (docs only, no code,
+> **Status: Stage 68 — FedOS Core build manifest plan (docs only, no code, no
+> manifest committed).**
+> A new [`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md)
+> fixes, in writing, the plan for a build **manifest / provenance** contract a
+> FUTURE FedOS Rust/WASM core must ship with — **no `src/` change, no
+> `packages/fedos-core-rust/src/` change, no manifest JSON, no `Cargo.toml` / `.rs`
+> / `.wasm`, no hashing/signing tooling** in this stage — so a build artifact can
+> be tracked, pinned, and (eventually) verified before it is ever loaded. It is a
+> **management plan, not a build spec**. It documents: (1) the purpose (provenance
+> contract for a future core; a manifest skeleton; explicitly not a build spec);
+> (2) why a manifest is needed (WASM module-swap risk, supply-chain risk,
+> dependency drift, reproducibility, runtime loader safety); (3) the manifest
+> skeleton fields (`manifestVersion`, `packageName`, `sourceRevision`,
+> `sourceTreeDigest`, `rustToolchain`, `wasmTarget`, `buildProfile`,
+> `dependencyLockDigest`, `testVectorSet`, `wasmArtifactDigest`, `signatureRef`,
+> `provenanceRef`, `buildTimestampPolicy`, `notes`); (4) forbidden fields (secret,
+> API key, private signing key, raw seed, local path with username, endpoint
+> token, machine-specific absolute path); (5) the digest policy (SHA-256+, state
+> what each digest covers, separate generated files from the source tree, no
+> unverified WASM at runtime); (6) the signature policy (signed release is a
+> future candidate, `signatureRef` is an opaque label, no private key in the
+> manifest, verification unimplemented); (7) the reproducible-build policy
+> (toolchain pinning, lockfile digest, deterministic flags, timestamp handling,
+> environment note, state gaps honestly); (8) test-vector linkage (connects to
+> [`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md) via `testVectorSet`;
+> a Rust core must pass vectors before runtime selection); (9) the runtime-loader
+> relationship (connects to
+> [`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); the loader
+> does not read the manifest yet; a future manifest-validation boundary; no
+> validation ⇒ no load); (10) the future file layout
+> (`packages/fedos-core-rust/manifest.example.json`,
+> `packages/fedos-core-rust/build/`, `test-vectors/` — none added yet); and
+> (11) the current conclusion (docs only, no manifest JSON, no WASM, no Rust, a
+> future explicit stage required). This stage adds no test — there is no new
+> behavior to cover. Stage 69 candidate: **Minimal Rust crate skeleton** (a
+> Cargo project only — no cryptography, no WASM generation). Prior status:
+>
+> **Stage 67 — Crypto operation test-vector plan (docs only, no code,
 > no vectors committed).**
 > A new [`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md) fixes, in
 > writing, the KNOWN-ANSWER test vectors a FUTURE FedOS Rust crypto core must
@@ -2304,7 +2341,8 @@ D1 space directory caveats (do not over-promise on these):
 64. FedOS core WASM loader safety docs ([`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); docs only, no code) ✓
 65. Runtime crypto provider selection boundary, disabled by default (`createRuntime` selects a `CryptoProvider` from env; `AppRuntime.cryptoProvider`; FedOS option wraps the inert `PlaceholderFedosCoreCrypto` only; selection only, no WASM load, no cryptography, no crypto-op call) ✓
 66. Anti-analysis & Shadow Vault risk docs ([`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md); docs only, no code; binding prohibitions — no anti-debug/anti-VM, no self-destruct, no shadow/fake-data generator) ✓
-67. Crypto operation test-vector plan ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md); docs only, no code, no vectors committed; test-first verification plan for a future Rust core — AEAD/HKDF/Argon2id/NIP-44, official vectors only) ✓ ← you are here
+67. Crypto operation test-vector plan ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md); docs only, no code, no vectors committed; test-first verification plan for a future Rust core — AEAD/HKDF/Argon2id/NIP-44, official vectors only) ✓
+68. FedOS Core build manifest plan ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md); docs only, no code, no manifest committed; provenance contract — manifest skeleton, digest/signature/reproducible-build policy, no validation ⇒ no load) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
