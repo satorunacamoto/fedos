@@ -121,6 +121,18 @@
 //! `domain_label`, or `operation_context` today. Same rules apply: not part
 //! of the public API, no public function above constructs, holds, or
 //! returns one of its types.
+//!
+//! Stage 91 adds an eighth crate-private module, `response_descriptor`: an
+//! INTERNAL-ONLY response-descriptor skeleton naming a future AEAD/KDF/
+//! Argon2/NIP-44/Nostr-key-derivation operation RESULT (a label and a
+//! non-sensitive status only — no key, seed, plaintext, ciphertext,
+//! passphrase, tag, or nonce byte, and no `String`/`Vec` field, no result
+//! payload of any kind). It exists as a non-sensitive-metadata type basis
+//! for a future real response, still not connected to `secret_handle`,
+//! `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+//! `operation_context`, or `request_descriptor` today. Same rules apply:
+//! not part of the public API, no public function above constructs, holds,
+//! or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -1450,6 +1462,246 @@ mod request_descriptor {
             assert_eq!(
                 RequestDescriptorState::default(),
                 RequestDescriptorState::Disabled
+            );
+        }
+    }
+}
+
+/// Stage 91 — an INTERNAL-ONLY response-descriptor skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`ResponseDescriptor`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, no result payload of any
+/// kind, and no AEAD/HKDF/Argon2/NIP-44 operation is implemented or called,
+/// and no Nostr key is derived. It takes no user-, environment-, or
+/// config-derived input of any kind —
+/// [`ResponseDescriptor::new_placeholder`] accepts only a
+/// [`ResponseDescriptorKind`] label, and
+/// [`ResponseDescriptor::new_error_placeholder`] accepts nothing at all.
+/// This module does not connect to `secret_handle` (Stage 79), `aead_core`
+/// (Stage 80), `kdf_core` (Stage 82), `key_material` (Stage 87),
+/// `domain_label` (Stage 88), `operation_context` (Stage 89), or
+/// `request_descriptor` (Stage 90): it never constructs any of their types
+/// and never reads a key/secret/label/operation/request byte out of one —
+/// when in doubt about a connection between skeletons, this crate
+/// deliberately leaves them unconnected rather than guess at a future
+/// design (the same reasoning `aead_core`'s own doc comment already
+/// states). It exists as a non-sensitive-metadata type basis a later,
+/// explicitly-reviewed stage can extend to actually describe a real
+/// AEAD/KDF/NIP-44/Nostr-key-derivation operation RESULT, once it also
+/// implements the operation the response would describe.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`/
+/// `request_descriptor` above do. This is expected for a skeleton not yet
+/// wired to any consumer.
+#[allow(dead_code)]
+mod response_descriptor {
+    /// Coarse internal lifecycle state of a [`ResponseDescriptor`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ResponseDescriptorState {
+        /// A placeholder response descriptor is active. Describes no real
+        /// result; runs no cryptography.
+        Placeholder,
+        /// No response descriptor should be treated as active — the
+        /// default, inert state before any [`ResponseDescriptor`] is
+        /// constructed for use.
+        Disabled,
+        /// A placeholder ERROR response descriptor is active — describes
+        /// only that a future real operation would have failed, never a
+        /// real error payload/message/cause byte.
+        ErrorPlaceholder,
+    }
+
+    impl Default for ResponseDescriptorState {
+        fn default() -> Self {
+            ResponseDescriptorState::Disabled
+        }
+    }
+
+    /// Which future cryptographic operation RESULT a [`ResponseDescriptor`]
+    /// names — a label only, intent, not an implementation and not a real
+    /// result payload. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ResponseDescriptorKind {
+        /// Intended future connection point: an AEAD ciphertext result. No
+        /// AEAD ciphertext is described here.
+        AeadCiphertextPlaceholder,
+        /// Intended future connection point: an AEAD plaintext result. No
+        /// AEAD plaintext is described here.
+        AeadPlaintextPlaceholder,
+        /// Intended future connection point: an HKDF PRK result. No HKDF
+        /// PRK is described here.
+        HkdfPrkPlaceholder,
+        /// Intended future connection point: an HKDF OKM result. No HKDF
+        /// OKM is described here.
+        HkdfOkmPlaceholder,
+        /// Intended future connection point: an Argon2id tag result. No
+        /// Argon2id tag is described here.
+        Argon2idTagPlaceholder,
+        /// Intended future connection point: a NIP-44 ciphertext result. No
+        /// NIP-44 ciphertext is described here.
+        Nip44CiphertextPlaceholder,
+        /// Intended future connection point: a NIP-44 plaintext result. No
+        /// NIP-44 plaintext is described here.
+        Nip44PlaintextPlaceholder,
+        /// Intended future connection point: a Nostr secret-key derivation
+        /// result. No Nostr secret key is described here.
+        NostrSecretKeyPlaceholder,
+        /// Intended future connection point: a Nostr public-key derivation
+        /// result. No Nostr public key is described here.
+        NostrPublicKeyPlaceholder,
+        /// A placeholder ERROR result label — pairs with
+        /// [`ResponseDescriptorState::ErrorPlaceholder`]. Never a real error
+        /// payload/message/cause byte.
+        ErrorPlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`ResponseDescriptor`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct ResponseDescriptorStatus {
+        pub(crate) state: ResponseDescriptorState,
+    }
+
+    /// An INTERNAL-ONLY response-descriptor handle skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds only a [`ResponseDescriptorKind`] label and a
+    /// [`ResponseDescriptorState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, and no user-, environment-, or
+    /// config-derived input, and no result payload of any kind. A future,
+    /// explicitly-reviewed stage may extend this skeleton to actually
+    /// describe a real response; until then it accepts and stores none.
+    pub(crate) struct ResponseDescriptor {
+        kind: ResponseDescriptorKind,
+        state: ResponseDescriptorState,
+    }
+
+    impl ResponseDescriptor {
+        /// Construct a placeholder response descriptor of the given
+        /// [`ResponseDescriptorKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind, and no result payload of any
+        /// kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: ResponseDescriptorKind) -> Self {
+            Self {
+                kind,
+                state: ResponseDescriptorState::Placeholder,
+            }
+        }
+
+        /// Construct a placeholder ERROR response descriptor. Takes NO
+        /// input of any kind — never a real error payload/message/cause
+        /// byte. Always pairs [`ResponseDescriptorKind::ErrorPlaceholder`]
+        /// with [`ResponseDescriptorState::ErrorPlaceholder`].
+        pub(crate) fn new_error_placeholder() -> Self {
+            Self {
+                kind: ResponseDescriptorKind::ErrorPlaceholder,
+                state: ResponseDescriptorState::ErrorPlaceholder,
+            }
+        }
+
+        /// The [`ResponseDescriptorKind`] label this descriptor was
+        /// constructed with — intent only.
+        pub(crate) fn kind(&self) -> ResponseDescriptorKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> ResponseDescriptorStatus {
+            ResponseDescriptorStatus { state: self.state }
+        }
+
+        /// Whether this descriptor is in the
+        /// [`ResponseDescriptorState::Placeholder`] state — `true` for any
+        /// handle constructed via
+        /// [`ResponseDescriptor::new_placeholder`], `false` for one
+        /// constructed via [`ResponseDescriptor::new_error_placeholder`].
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == ResponseDescriptorState::Placeholder
+        }
+
+        /// Whether this descriptor is in the
+        /// [`ResponseDescriptorState::ErrorPlaceholder`] state — `true`
+        /// only for a handle constructed via
+        /// [`ResponseDescriptor::new_error_placeholder`].
+        pub(crate) fn is_error_placeholder(&self) -> bool {
+            self.state == ResponseDescriptorState::ErrorPlaceholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let descriptor =
+                ResponseDescriptor::new_placeholder(ResponseDescriptorKind::AeadCiphertextPlaceholder);
+            assert_eq!(descriptor.status().state, ResponseDescriptorState::Placeholder);
+            assert!(descriptor.is_placeholder());
+            assert!(!descriptor.is_error_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                ResponseDescriptorKind::AeadCiphertextPlaceholder,
+                ResponseDescriptorKind::AeadPlaintextPlaceholder,
+                ResponseDescriptorKind::HkdfPrkPlaceholder,
+                ResponseDescriptorKind::HkdfOkmPlaceholder,
+                ResponseDescriptorKind::Argon2idTagPlaceholder,
+                ResponseDescriptorKind::Nip44CiphertextPlaceholder,
+                ResponseDescriptorKind::Nip44PlaintextPlaceholder,
+                ResponseDescriptorKind::NostrSecretKeyPlaceholder,
+                ResponseDescriptorKind::NostrPublicKeyPlaceholder,
+                ResponseDescriptorKind::TestOnlyPlaceholder,
+            ] {
+                let descriptor = ResponseDescriptor::new_placeholder(kind);
+                assert_eq!(descriptor.kind(), kind);
+                assert_eq!(descriptor.status().state, ResponseDescriptorState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let descriptor =
+                ResponseDescriptor::new_placeholder(ResponseDescriptorKind::HkdfPrkPlaceholder);
+            let status = descriptor.status();
+            assert_eq!(status.state, ResponseDescriptorState::Placeholder);
+        }
+
+        #[test]
+        fn new_error_placeholder_pairs_error_kind_with_error_state() {
+            let descriptor = ResponseDescriptor::new_error_placeholder();
+            assert_eq!(descriptor.kind(), ResponseDescriptorKind::ErrorPlaceholder);
+            assert_eq!(
+                descriptor.status().state,
+                ResponseDescriptorState::ErrorPlaceholder
+            );
+            assert!(descriptor.is_error_placeholder());
+            assert!(!descriptor.is_placeholder());
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(
+                ResponseDescriptorState::default(),
+                ResponseDescriptorState::Disabled
             );
         }
     }
