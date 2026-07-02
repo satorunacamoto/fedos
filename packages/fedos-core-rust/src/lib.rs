@@ -110,6 +110,17 @@
 //! `secret_handle`, `aead_core`, `kdf_core`, `key_material`, or
 //! `domain_label` today. Same rules apply: not part of the public API, no
 //! public function above constructs, holds, or returns one of its types.
+//!
+//! Stage 90 adds a seventh crate-private module, `request_descriptor`: an
+//! INTERNAL-ONLY request-descriptor skeleton naming a future AEAD/KDF/
+//! Argon2/NIP-44/Nostr-key-derivation operation REQUEST (a label and a
+//! non-sensitive status only — no key, seed, plaintext, ciphertext,
+//! passphrase, or nonce byte, and no `String`/`Vec` field). It exists as a
+//! non-sensitive-metadata type basis for a future real request, still not
+//! connected to `secret_handle`, `aead_core`, `kdf_core`, `key_material`,
+//! `domain_label`, or `operation_context` today. Same rules apply: not part
+//! of the public API, no public function above constructs, holds, or
+//! returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -1233,6 +1244,213 @@ mod operation_context {
         #[test]
         fn disabled_state_is_the_default_placeholder_only_state() {
             assert_eq!(OperationContextState::default(), OperationContextState::Disabled);
+        }
+    }
+}
+
+/// Stage 90 — an INTERNAL-ONLY request-descriptor skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`RequestDescriptor`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or `String`
+/// field or parameter anywhere below, and no AEAD/HKDF/Argon2/NIP-44
+/// operation is implemented or called, and no Nostr key is derived. It
+/// takes no user-, environment-, or config-derived input of any kind —
+/// [`RequestDescriptor::new_placeholder`] accepts only a
+/// [`RequestDescriptorKind`] label. This module does not connect to
+/// `secret_handle` (Stage 79), `aead_core` (Stage 80), `kdf_core` (Stage
+/// 82), `key_material` (Stage 87), `domain_label` (Stage 88), or
+/// `operation_context` (Stage 89): it never constructs any of their types
+/// and never reads a key/secret/label/operation byte out of one — when in
+/// doubt about a connection between skeletons, this crate deliberately
+/// leaves them unconnected rather than guess at a future design (the same
+/// reasoning `aead_core`'s own doc comment already states). It exists as a
+/// non-sensitive-metadata type basis a later, explicitly-reviewed stage can
+/// extend to actually describe a real AEAD/KDF/NIP-44/Nostr-key-derivation
+/// operation REQUEST, once it also implements the operation the request
+/// would describe.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`
+/// above do. This is expected for a skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod request_descriptor {
+    /// Coarse internal lifecycle state of a [`RequestDescriptor`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum RequestDescriptorState {
+        /// A placeholder request descriptor is active. Describes no real
+        /// request; runs no cryptography.
+        Placeholder,
+        /// No request descriptor should be treated as active — the
+        /// default, inert state before any [`RequestDescriptor`] is
+        /// constructed for use.
+        Disabled,
+    }
+
+    impl Default for RequestDescriptorState {
+        fn default() -> Self {
+            RequestDescriptorState::Disabled
+        }
+    }
+
+    /// Which future cryptographic operation REQUEST a [`RequestDescriptor`]
+    /// names — a label only, intent, not an implementation and not a real
+    /// request payload. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum RequestDescriptorKind {
+        /// Intended future connection point: an AEAD seal/encrypt request.
+        /// No AEAD encryption request is described here.
+        AeadEncryptRequestPlaceholder,
+        /// Intended future connection point: an AEAD open/decrypt request.
+        /// No AEAD decryption request is described here.
+        AeadDecryptRequestPlaceholder,
+        /// Intended future connection point: an HKDF extract request. No
+        /// HKDF extraction request is described here.
+        HkdfExtractRequestPlaceholder,
+        /// Intended future connection point: an HKDF expand request. No
+        /// HKDF expansion request is described here.
+        HkdfExpandRequestPlaceholder,
+        /// Intended future connection point: a combined HKDF
+        /// extract-then-expand request. No HKDF request is described here.
+        HkdfExtractExpandRequestPlaceholder,
+        /// Intended future connection point: an Argon2id hash request. No
+        /// Argon2id hashing request is described here.
+        Argon2idRequestPlaceholder,
+        /// Intended future connection point: a NIP-44 encrypt request. No
+        /// NIP-44 encryption request is described here.
+        Nip44EncryptRequestPlaceholder,
+        /// Intended future connection point: a NIP-44 decrypt request. No
+        /// NIP-44 decryption request is described here.
+        Nip44DecryptRequestPlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key
+        /// derivation request. No Nostr key derivation request is
+        /// described here.
+        NostrKeyDerivationRequestPlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyRequestPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`RequestDescriptor`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/nonce byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct RequestDescriptorStatus {
+        pub(crate) state: RequestDescriptorState,
+    }
+
+    /// An INTERNAL-ONLY request-descriptor handle skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds only a [`RequestDescriptorKind`] label and a
+    /// [`RequestDescriptorState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, or nonce byte, and no user-, environment-, or
+    /// config-derived input. A future, explicitly-reviewed stage may extend
+    /// this skeleton to actually describe a real request; until then it
+    /// accepts and stores none.
+    pub(crate) struct RequestDescriptor {
+        kind: RequestDescriptorKind,
+        state: RequestDescriptorState,
+    }
+
+    impl RequestDescriptor {
+        /// Construct a placeholder request descriptor of the given
+        /// [`RequestDescriptorKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: RequestDescriptorKind) -> Self {
+            Self {
+                kind,
+                state: RequestDescriptorState::Placeholder,
+            }
+        }
+
+        /// The [`RequestDescriptorKind`] label this descriptor was
+        /// constructed with — intent only.
+        pub(crate) fn kind(&self) -> RequestDescriptorKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> RequestDescriptorStatus {
+            RequestDescriptorStatus { state: self.state }
+        }
+
+        /// Whether this descriptor is still in the
+        /// [`RequestDescriptorState::Placeholder`] state — always `true`
+        /// for any handle constructed via
+        /// [`RequestDescriptor::new_placeholder`], since no other
+        /// constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == RequestDescriptorState::Placeholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let descriptor =
+                RequestDescriptor::new_placeholder(RequestDescriptorKind::AeadEncryptRequestPlaceholder);
+            assert_eq!(descriptor.status().state, RequestDescriptorState::Placeholder);
+            assert!(descriptor.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                RequestDescriptorKind::AeadEncryptRequestPlaceholder,
+                RequestDescriptorKind::AeadDecryptRequestPlaceholder,
+                RequestDescriptorKind::HkdfExtractRequestPlaceholder,
+                RequestDescriptorKind::HkdfExpandRequestPlaceholder,
+                RequestDescriptorKind::HkdfExtractExpandRequestPlaceholder,
+                RequestDescriptorKind::Argon2idRequestPlaceholder,
+                RequestDescriptorKind::Nip44EncryptRequestPlaceholder,
+                RequestDescriptorKind::Nip44DecryptRequestPlaceholder,
+                RequestDescriptorKind::NostrKeyDerivationRequestPlaceholder,
+                RequestDescriptorKind::TestOnlyRequestPlaceholder,
+            ] {
+                let descriptor = RequestDescriptor::new_placeholder(kind);
+                assert_eq!(descriptor.kind(), kind);
+                assert_eq!(descriptor.status().state, RequestDescriptorState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let descriptor =
+                RequestDescriptor::new_placeholder(RequestDescriptorKind::HkdfExtractRequestPlaceholder);
+            let status = descriptor.status();
+            assert_eq!(status.state, RequestDescriptorState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_descriptor() {
+            for kind in [
+                RequestDescriptorKind::Argon2idRequestPlaceholder,
+                RequestDescriptorKind::Nip44DecryptRequestPlaceholder,
+                RequestDescriptorKind::TestOnlyRequestPlaceholder,
+            ] {
+                assert!(RequestDescriptor::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(
+                RequestDescriptorState::default(),
+                RequestDescriptorState::Disabled
+            );
         }
     }
 }

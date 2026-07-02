@@ -8,7 +8,77 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 89 — Internal operation context skeleton (internal-only
+> **Status: Stage 90 — Internal request descriptor skeleton (internal-only
+> `request_descriptor` module; non-sensitive request-kind labels only, no
+> real bytes/secrets, no real AEAD/HKDF/Argon2/NIP-44 connection, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a seventh crate-private
+> module, `request_descriptor` (alongside Stage 79's `secret_handle`, Stage
+> 80's `aead_core`, Stage 82's `kdf_core`, Stage 87's `key_material`, Stage
+> 88's `domain_label`, and Stage 89's `operation_context`, placed right
+> after `operation_context`, still ahead of this file's first module gated
+> `cfg(test)`). It defines: `RequestDescriptorState` (`pub(crate) enum`,
+> `Placeholder`/`Disabled` — `Disabled` is the `Default`, same shape as
+> `OperationContextState`); `RequestDescriptorKind` (`pub(crate) enum`,
+> `AeadEncryptRequestPlaceholder`/`AeadDecryptRequestPlaceholder`/
+> `HkdfExtractRequestPlaceholder`/`HkdfExpandRequestPlaceholder`/
+> `HkdfExtractExpandRequestPlaceholder`/`Argon2idRequestPlaceholder`/
+> `Nip44EncryptRequestPlaceholder`/`Nip44DecryptRequestPlaceholder`/
+> `NostrKeyDerivationRequestPlaceholder`/`TestOnlyRequestPlaceholder` — ten
+> label-only unit variants, no associated data); `RequestDescriptorStatus`
+> (`pub(crate) struct`, a non-sensitive status snapshot carrying only the
+> state enum); and `RequestDescriptor` (`pub(crate) struct`, holding
+> `kind`/`state`) with four methods: `new_placeholder(kind:
+> RequestDescriptorKind)` (takes only the label — no user-, environment-,
+> or config-derived input of any kind), `kind()`, `status()`, and
+> `is_placeholder()`. **NOT part of this crate's public API**: every item
+> is `pub(crate)` at most — never `pub` — nothing is re-exported from the
+> crate root, and the crate's public `pub fn` surface is still exactly the
+> same six placeholder functions from Stage 69; none of them constructs,
+> holds, or returns a `RequestDescriptor`. **Non-sensitive metadata only —
+> no dynamic allocation, no secret bytes**: all ten
+> `RequestDescriptorKind` variants are bare unit variants,
+> `RequestDescriptor` stores no `String`/`Vec<u8>`/borrowed-byte-slice field
+> of any kind, and describes no real request payload (no plaintext,
+> ciphertext, key, salt, nonce, or associated-data byte). **Not connected to
+> `secret_handle`, `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+> or `operation_context`** — `request_descriptor` never constructs any of
+> their types and runs no actual AEAD/HKDF/Argon2/NIP-44 operation, derives
+> no Nostr key, same "when a skeleton-to-skeleton connection is ambiguous,
+> leave it unconnected" reasoning Stage 80/82/87/88/89 already established;
+> all six of those modules are UNCHANGED this stage, still
+> placeholder-only. `cargo test` is GREEN with all 51 tests passing (46
+> pre-existing + 5 new `request_descriptor::tests`); `cargo check` and
+> `cargo check --tests` stay GREEN with no warnings. `Cargo.toml` is
+> UNCHANGED this stage — no new dependency needed (`request_descriptor`
+> imports nothing beyond the standard library). New
+> [`test/fedos_core_rust_request_descriptor.test.ts`](test/fedos_core_rust_request_descriptor.test.ts)
+> (17 tests) checks: the module is internal-only and not `pub`;
+> `RequestDescriptor` is `pub(crate)` at most and never re-exported; the
+> public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged; every
+> `RequestDescriptorKind` variant is a label-only unit variant (no
+> tuple/struct data); no `String`/`Vec` field anywhere in the module;
+> `new_placeholder` takes only a `RequestDescriptorKind` (no
+> `&str`/`String` parameter); no `std::env`/`env::`/`var_os`/`std::process`
+> usage; no AEAD/HKDF/Argon2 usage (specific Rust-usage patterns only, not
+> a bare word match, same "no bare `\bnip.?44\b` check" reasoning Stage 89
+> established, since it would also match this stage's own required
+> `Nip44Encrypt`/`Nip44DecryptRequestPlaceholder` variant names — there is
+> no `nip44`-named crate in this repo's dependency tree to import in the
+> first place, so that absence is structural, not text-banned); no
+> connection to `SecretHandle`/`AeadPlaceholderRequest`/
+> `KdfPlaceholderRequest`/`KeyMaterialHandle`/`DomainLabel`/
+> `OperationContext`/`OperationKind` (nor do those six modules reference
+> `RequestDescriptor*`); no `unsafe`; Runtime/Worker sources mention
+> neither `request_descriptor` nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; the state
+> enum has exactly its two variants and the handle exposes exactly its four
+> methods. Stage 91 candidate: **an internal response descriptor skeleton**
+> — non-sensitive metadata only, still no real bytes/secrets held. Prior
+> status:
+>
+> **Stage 89 — Internal operation context skeleton (internal-only
 > `operation_context` module; operation-kind labels only, no real
 > AEAD/HKDF/Argon2/NIP-44 connection, no Runtime/Worker/CryptoProvider
 > wiring, no WASM change).**
