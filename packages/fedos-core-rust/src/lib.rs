@@ -81,6 +81,15 @@
 //! comment, next to its declaration, names it). No production code
 //! changed — the six functions above are untouched, and the Stage 82
 //! skeleton is not connected to this refactor.
+//!
+//! Stage 87 adds a fourth crate-private module, `key_material`, reusing
+//! `secret_handle`'s (Stage 79) exact placeholder-only pattern: an
+//! INTERNAL-ONLY key-material handle skeleton (labels and a non-sensitive
+//! status only — no key, seed, plaintext, ciphertext, passphrase, or nonce
+//! byte). It exists as a future AEAD/KDF connection point, still not
+//! connected to `secret_handle`, `aead_core`, or `kdf_core` today. Same
+//! rules apply: not part of the public API, no public function above
+//! constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -598,6 +607,213 @@ mod kdf_core {
             ] {
                 assert_eq!(request.status().state, FedosCoreState::Placeholder);
             }
+        }
+    }
+}
+
+/// Stage 87 — an INTERNAL-ONLY key-material handle skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`KeyMaterialHandle`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or `String`
+/// field or parameter anywhere below, and no AEAD/HKDF/Argon2/NIP-44
+/// operation is implemented or called. It reuses `secret_handle`'s
+/// (Stage 79) exact placeholder-only pattern — a fixed, non-secret marker
+/// wrapped in `secrecy::SecretBox`, zeroized on `clear()` — rather than
+/// duplicating a second, divergent design; `subtle` (adopted Stage 78) is
+/// intentionally NOT used yet, same reasoning as `secret_handle`. This
+/// module does not connect to `secret_handle`, `aead_core` (Stage 80), or
+/// `kdf_core` (Stage 82): it never constructs any of their types and never
+/// reads a key/secret byte out of one — when in doubt about a connection
+/// between skeletons, this crate deliberately leaves them unconnected
+/// rather than guess at a future design (the same reasoning `aead_core`'s
+/// own doc comment already states). It exists as a future AEAD/KDF
+/// connection point: a place a later, explicitly-reviewed stage can extend
+/// to actually hold key bytes, once it also implements the AEAD/KDF
+/// operation that would consume them.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core` above do. This is expected for a skeleton not yet
+/// wired to any consumer.
+#[allow(dead_code)]
+mod key_material {
+    use secrecy::SecretBox;
+    use zeroize::Zeroize;
+
+    /// Coarse internal lifecycle state of a [`KeyMaterialHandle`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum KeyMaterialState {
+        /// No placeholder marker has been allocated yet.
+        Empty,
+        /// A placeholder marker is allocated. Still holds no real key byte.
+        Placeholder,
+        /// [`KeyMaterialHandle::clear`] was called: the placeholder marker
+        /// was zeroized and this handle must not be treated as holding
+        /// anything.
+        Cleared,
+    }
+
+    impl Default for KeyMaterialState {
+        fn default() -> Self {
+            KeyMaterialState::Empty
+        }
+    }
+
+    /// Which future connection point a [`KeyMaterialHandle`] names — a
+    /// label only, intent, not an implementation. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum KeyMaterialKind {
+        /// Intended future connection point: an AEAD key (e.g. for
+        /// `aead_core`, Stage 80). No AEAD key is held here.
+        AeadKeyPlaceholder,
+        /// Intended future connection point: KDF output (e.g. HKDF's OKM or
+        /// Argon2id's tag, for `kdf_core`, Stage 82). No KDF output is held
+        /// here.
+        KdfOutputPlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key.
+        /// No Nostr key is held here.
+        NostrKeyPlaceholder,
+        /// Any other future connection point not yet named above.
+        UnknownPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`KeyMaterialHandle`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/nonce byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct KeyMaterialStatus {
+        pub(crate) state: KeyMaterialState,
+    }
+
+    /// A fixed, non-secret placeholder value. Exists ONLY so
+    /// [`KeyMaterialHandle`] has a concrete `Zeroize`-able type to wrap in
+    /// `secrecy::SecretBox` — its value is a constant, never derived from
+    /// or holding any real key/seed/plaintext/ciphertext/passphrase/nonce
+    /// byte. Identical in shape to `secret_handle`'s own `PlaceholderMarker`
+    /// (Stage 79) — deliberately not shared across modules, so each
+    /// skeleton stays independently reviewable.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct PlaceholderMarker(u8);
+
+    impl Zeroize for PlaceholderMarker {
+        fn zeroize(&mut self) {
+            self.0 = 0;
+        }
+    }
+
+    /// An INTERNAL-ONLY key-material handle skeleton (crate-private; not
+    /// part of this crate's public API — see the module-level doc comment
+    /// above). Holds NO real key, seed, plaintext, ciphertext, passphrase,
+    /// or nonce byte: `marker` is the fixed, non-secret [`PlaceholderMarker`]
+    /// above, wrapped in `secrecy::SecretBox` purely to exercise the
+    /// secret-handling foundation adopted Stage 78, same as
+    /// `secret_handle`. A future, explicitly-reviewed stage may extend this
+    /// skeleton to hold real key bytes; until then it accepts and stores
+    /// none.
+    pub(crate) struct KeyMaterialHandle {
+        state: KeyMaterialState,
+        kind: KeyMaterialKind,
+        marker: SecretBox<PlaceholderMarker>,
+    }
+
+    impl KeyMaterialHandle {
+        /// Construct a placeholder handle of the given [`KeyMaterialKind`].
+        /// Takes NO key, seed, plaintext, ciphertext, passphrase, or nonce
+        /// input of any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: KeyMaterialKind) -> Self {
+            Self {
+                state: KeyMaterialState::Placeholder,
+                kind,
+                marker: SecretBox::new(Box::new(PlaceholderMarker(0))),
+            }
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> KeyMaterialStatus {
+            KeyMaterialStatus { state: self.state }
+        }
+
+        /// The [`KeyMaterialKind`] label this handle was constructed with —
+        /// intent only.
+        pub(crate) fn kind(&self) -> KeyMaterialKind {
+            self.kind
+        }
+
+        /// Zeroizes the (non-secret) placeholder marker and marks this
+        /// handle `Cleared`. Does not return, expose, or copy the marker.
+        pub(crate) fn clear(&mut self) {
+            self.marker.zeroize();
+            self.state = KeyMaterialState::Cleared;
+        }
+
+        /// Whether [`KeyMaterialHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.state == KeyMaterialState::Cleared
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let handle = KeyMaterialHandle::new_placeholder(KeyMaterialKind::AeadKeyPlaceholder);
+            assert_eq!(handle.status().state, KeyMaterialState::Placeholder);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                KeyMaterialKind::AeadKeyPlaceholder,
+                KeyMaterialKind::KdfOutputPlaceholder,
+                KeyMaterialKind::NostrKeyPlaceholder,
+                KeyMaterialKind::UnknownPlaceholder,
+            ] {
+                let handle = KeyMaterialHandle::new_placeholder(kind);
+                assert_eq!(handle.kind(), kind);
+                assert_eq!(handle.status().state, KeyMaterialState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            // `KeyMaterialStatus` carries only the coarse state enum — no
+            // secret byte, no marker, nothing derived from `marker`.
+            let handle = KeyMaterialHandle::new_placeholder(KeyMaterialKind::KdfOutputPlaceholder);
+            let status = handle.status();
+            assert_eq!(status.state, KeyMaterialState::Placeholder);
+        }
+
+        #[test]
+        fn clear_transitions_state_to_cleared_only() {
+            let mut handle =
+                KeyMaterialHandle::new_placeholder(KeyMaterialKind::NostrKeyPlaceholder);
+            handle.clear();
+            assert_eq!(handle.status().state, KeyMaterialState::Cleared);
+            assert!(handle.is_cleared());
+        }
+
+        #[test]
+        fn is_cleared_is_false_until_clear_is_called() {
+            let handle = KeyMaterialHandle::new_placeholder(KeyMaterialKind::UnknownPlaceholder);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn empty_state_is_the_default_placeholder_only_state() {
+            assert_eq!(KeyMaterialState::default(), KeyMaterialState::Empty);
         }
     }
 }

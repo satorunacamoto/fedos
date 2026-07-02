@@ -8,7 +8,67 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 86 — Extract a test-only Argon2id helper (test-only
+> **Status: Stage 87 — Internal key material handle skeleton
+> (internal-only `key_material` module; no public API change, no real
+> key/seed/plaintext/ciphertext/passphrase/nonce byte, no AEAD/HKDF/Argon2/
+> NIP-44 implementation, no Runtime/Worker/CryptoProvider wiring, no WASM
+> change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a fourth crate-private module,
+> `key_material` (alongside Stage 79's `secret_handle`, Stage 80's
+> `aead_core`, and Stage 82's `kdf_core`, placed right after `kdf_core`,
+> still ahead of this file's first module gated `cfg(test)`). It reuses
+> `secret_handle`'s exact placeholder-only pattern — a fixed, non-secret
+> `PlaceholderMarker` wrapped in `secrecy::SecretBox`, zeroized on
+> `clear()` — rather than a divergent design, and defines:
+> `KeyMaterialState` (`pub(crate) enum`, `Empty`/`Placeholder`/`Cleared`,
+> same three variants as `SecretHandleState`); `KeyMaterialKind`
+> (`pub(crate) enum`, `AeadKeyPlaceholder`/`KdfOutputPlaceholder`/
+> `NostrKeyPlaceholder`/`UnknownPlaceholder` — a label only, naming a future
+> AEAD/KDF/Nostr-identity connection point; no key of any of these kinds is
+> held); `KeyMaterialStatus` (`pub(crate) struct`, a non-sensitive status
+> snapshot carrying only the state enum); and `KeyMaterialHandle`
+> (`pub(crate) struct`, holding `state`, `kind`, and
+> `marker: SecretBox<PlaceholderMarker>`) with five methods:
+> `new_placeholder(kind: KeyMaterialKind)` (takes only the label — no
+> secret input of any kind), `status()`, `kind()`, `clear()` (zeroizes the
+> marker and sets state to `Cleared`), and `is_cleared()`. **NOT part of
+> this crate's public API**: every item is `pub(crate)` at most — never
+> `pub` — nothing is re-exported from the crate root, and the crate's
+> public `pub fn` surface is still exactly the same six placeholder
+> functions from Stage 69; none of them constructs, holds, or returns a
+> `KeyMaterialHandle`. **Not connected to `secret_handle`, `aead_core`, or
+> `kdf_core`** — `key_material` never constructs any of their types and
+> reads no key/secret byte from one, same "when a skeleton-to-skeleton
+> connection is ambiguous, leave it unconnected" reasoning Stage 80/82
+> already established; all three of those modules are UNCHANGED this
+> stage, still placeholder-only. `cargo test` is GREEN with all 36 tests
+> passing (30 pre-existing + 6 new `key_material::tests`); `cargo check`
+> and `cargo check --tests` stay GREEN with no warnings. `Cargo.toml` is
+> UNCHANGED this stage — `zeroize`/`secrecy` were already `[dependencies]`
+> (production) entries since Stage 78; `subtle` remains unused, same
+> reasoning as `secret_handle`. New
+> [`test/fedos_core_rust_key_material.test.ts`](test/fedos_core_rust_key_material.test.ts)
+> (16 tests) checks: the module is internal-only and not `pub`;
+> `KeyMaterialHandle` is `pub(crate)` at most and never re-exported; the
+> public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged; no
+> key/seed/plaintext/ciphertext/passphrase/nonce storage field and no
+> `Vec<u8>`/`String`/borrowed-byte-slice secret field anywhere in the
+> module; no AEAD/HKDF/Argon2/NIP-44 usage (specific Rust-usage patterns
+> only, not a bare word match, to avoid colliding with this module's own
+> doc-comment prose); no random/`getrandom`; no `unsafe`; Runtime/Worker
+> sources mention neither `key_material` nor auto-call a crypto operation;
+> no `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed;
+> `zeroize`/`secrecy` are used only against the placeholder marker and
+> `subtle` stays unused; both enums have exactly their specified variants
+> and the handle exposes exactly its five methods; and `key_material` does
+> not construct or reference `SecretHandle`/`AeadPlaceholderRequest`/
+> `KdfPlaceholderRequest` (nor do those three modules reference
+> `KeyMaterial*`). Stage 88 candidate: **an internal domain separation
+> label skeleton** — important for future HKDF/AEAD connections, still no
+> real HKDF/AEAD implementation. Prior status:
+>
+> **Stage 86 — Extract a test-only Argon2id helper (test-only
 > refactor; no public API change, no production deriveKey/password KDF, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs`'s pre-existing `cfg(test)`-only
