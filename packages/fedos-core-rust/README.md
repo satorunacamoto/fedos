@@ -4,10 +4,11 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 77 — Wire RFC 5869 HKDF-SHA256 vectors to Rust
-> `cargo test` (verification wiring only; no public `deriveKey` API, no
-> Runtime/Worker/CryptoProvider wiring, no WASM change). Public API STILL a
-> placeholder SKELETON. No cryptography reachable from any public function.**
+> **Status: Stage 78 — Adopt `zeroize` / `secrecy` / `subtle` secret-handling
+> foundation dependencies (build check only; no secret types, no
+> zeroization behavior, no constant-time compare, no Runtime/Worker/
+> CryptoProvider wiring, no WASM change). Public API STILL a placeholder
+> SKELETON. No cryptography reachable from any public function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -17,18 +18,25 @@ app depends only on its *contract*, never on its internals.
 > `chacha20poly1305` (RustCrypto AEAD, `default-features = false`, `features =
 > ["alloc"]` — no `getrandom`), wired to the RFC 8439 vectors under
 > `cfg(test)` in Stage 75 — see the "RFC 8439 vector wiring" section below.
-> Stage 76 adopted a SECOND `[dependencies]` (production) entry, **`hkdf`**
-> v0.13.0 (RustCrypto KDF), as a dependency + build-check ADOPTION ONLY.
-> Stage 77 wires that dependency: `src/lib.rs` gains a new bottom-of-file
-> `#[cfg(test)]`-only module, `rfc5869_vectors`, that reads
-> [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json)
-> (imported verbatim Stage 73) via `include_str!` and asserts `hkdf::Hkdf::<sha2::Sha256>`
-> reproduces the RFC's known-answer PRK and OKM bytes for all three official
-> HKDF-SHA256 test cases — see the "RFC 5869 vector wiring" section below.
-> `sha2` v0.11.0 is added this stage, but ONLY under `[dev-dependencies]`
-> (test-only) — never a production dependency; see "Dependencies" below.
-> `derive_key_placeholder` remains byte-for-byte unchanged and there is still
-> **no public `deriveKey` implementation**. The Rust crate still has no
+> Stage 76 adopted `hkdf` (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256
+> vectors under `cfg(test)` in Stage 77 — see the "RFC 5869 vector wiring"
+> section below. **Stage 78 adopts THREE more `[dependencies]` (production)
+> entries together — `zeroize` v1.9.0, `secrecy` v0.10.3, `subtle` v2.6.1** —
+> a secret-handling FOUNDATION, ahead of any real secret type, in
+> preparation for a future internal secret-handle skeleton (Stage 79
+> candidate) and eventual real key/seed/plaintext handling. **Why now:**
+> with both AEAD (RFC 8439) and KDF (RFC 5869) verification wired to
+> `cargo test`, the next natural step before touching any real secret byte
+> is the infrastructure that will hold, protect, and compare it safely —
+> adopting it as its own reviewed Stage keeps that infrastructure itself
+> auditable in isolation, before any secret-handling code exists to lean on
+> it. **No secret type exists yet** — no `Secret`/`SecretBox` wrapper is
+> defined; **no zeroization behavior exists yet** — no type derives
+> `Zeroize` and no `.zeroize()` is called; **no constant-time compare
+> behavior exists yet** — no `ConstantTimeEq`/`.ct_eq()` call exists
+> anywhere. `derive_key_placeholder` / `encrypt_placeholder` /
+> `decrypt_placeholder` remain byte-for-byte unchanged. See the "Secret-
+> handling foundation adoption" section below. The Rust crate still has no
 > `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**; the
 > runtime/Worker/`CryptoProvider` are **not** wired to any of this. A real
 > RustCrypto-backed core is a future, explicitly-reviewed stage that must pass
@@ -83,7 +91,11 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   either)
 - No BIP39 / BIP32
 - No NIP-44
-- No zeroize / secrecy / subtle
+- No secret type — `zeroize` / `secrecy` / `subtle` are `[dependencies]`
+  (production) entries as of Stage 78, but no code anywhere in `src/lib.rs`
+  imports, references, or calls any of the three; no `Secret`/`SecretBox`
+  wrapper is defined; no type derives `Zeroize` or calls `.zeroize()`; no
+  `ConstantTimeEq`/`.ct_eq()` call exists
 - No WebAuthn / passkey, no Secure Enclave, no Apple/Google enclave integration
 - Handles no secret bytes: requests carry OPAQUE, non-secret handles/labels only
 
@@ -106,11 +118,11 @@ this stage.
 
 ```
 packages/fedos-core-rust
-  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77)
+  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78)
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869; zeroize/secrecy/subtle (Stage 78) are not referenced anywhere yet
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -120,29 +132,29 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 `FedosCoreStatus` and runs no cryptography. `#![forbid(unsafe_code)]` bans
 `unsafe`. No WASM target is declared; nothing compiles to `.wasm`.
 
-## Dependencies (Stage 74/76 production + Stage 75/77 dev-dependencies)
+## Dependencies (Stage 74/76/78 production + Stage 75/77 dev-dependencies)
 
 - **`chacha20poly1305` v0.11.0** (RustCrypto, Apache-2.0 OR MIT,
-  `default-features = false`, `features = ["alloc"]`) — one of two entries in
+  `default-features = false`, `features = ["alloc"]`) — one of five entries in
   `[dependencies]` (production). Pulls in, transitively, only other
   RustCrypto/utility crates (`aead`, `chacha20`, `cipher`, `poly1305`,
   `crypto-common`, `inout`, `hybrid-array`, `universal-hash`, `block-buffer`,
   `typenum`, `cfg-if`, `cpufeatures`, `cmov`, `ctutils` — plus itself) — **no
-  `getrandom`, no `rand`/`rand_core`, no `zeroize`, no build script
-  (`build.rs`) in any of them.** Several of the lower-level crates
-  (`chacha20`, `poly1305`, `cipher`, `aead`, `cpufeatures`) use `unsafe`
-  internally for SIMD backends / CPU feature detection — `chacha20poly1305`
-  itself does not; this crate's own `#![forbid(unsafe_code)]` is unaffected
-  (it governs this crate's code, not a dependency's). MSRV for
-  `chacha20poly1305` 0.11.0 is Rust 1.85; this repo's toolchain is newer, so
-  no MSRV bump was needed. As of Stage 75, this dependency is exercised — but
-  only inside `cfg(test)`, by the `rfc8439_vectors` module (see below).
-- **`hkdf` v0.13.0** (RustCrypto, MIT OR Apache-2.0, default features) — the
-  other entry in `[dependencies]` (production), adopted Stage 76. Adds three
-  NEW transitive packages beyond what `chacha20poly1305` already pulls in:
-  `hkdf` itself, `hmac` (its only dependency), and `digest` (`hmac`'s only
-  dependency; `digest` is also shared/reused by `crypto-common` already in
-  the tree from `chacha20poly1305`). No `build.rs` in any of the three; no
+  `getrandom`, no `rand`/`rand_core`, no build script (`build.rs`) in any of
+  them.** Several of the lower-level crates (`chacha20`, `poly1305`,
+  `cipher`, `aead`, `cpufeatures`) use `unsafe` internally for SIMD backends /
+  CPU feature detection — `chacha20poly1305` itself does not; this crate's
+  own `#![forbid(unsafe_code)]` is unaffected (it governs this crate's code,
+  not a dependency's). MSRV for `chacha20poly1305` 0.11.0 is Rust 1.85; this
+  repo's toolchain is newer, so no MSRV bump was needed. As of Stage 75, this
+  dependency is exercised — but only inside `cfg(test)`, by the
+  `rfc8439_vectors` module (see below).
+- **`hkdf` v0.13.0** (RustCrypto, MIT OR Apache-2.0, default features) —
+  another entry in `[dependencies]` (production), adopted Stage 76. Adds
+  three NEW transitive packages beyond what `chacha20poly1305` already pulls
+  in: `hkdf` itself, `hmac` (its only dependency), and `digest` (`hmac`'s
+  only dependency; `digest` is also shared/reused by `crypto-common` already
+  in the tree from `chacha20poly1305`). No `build.rs` in any of the three; no
   `unsafe` in any of the three either — `digest` itself declares
   `#![forbid(unsafe_code)]`. `hkdf`'s only optional feature, `kdf` (an
   unrelated trait-abstraction crate), is NOT enabled — default features are
@@ -150,6 +162,12 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   no toolchain change was needed. As of Stage 77, this dependency is
   exercised — but only inside `cfg(test)`, by the `rfc5869_vectors` module
   (see below); production code still neither imports nor calls it.
+- **`zeroize` v1.9.0 / `secrecy` v0.10.3 / `subtle` v2.6.1** — the remaining
+  three entries in `[dependencies]` (production), adopted together Stage 78
+  as a secret-handling foundation. See "Secret-handling foundation adoption
+  (Stage 78)" below for the full review; none of the three is imported,
+  referenced, or exercised anywhere in `src/lib.rs` — production or
+  `cfg(test)` — yet.
 - **`[dev-dependencies]` (Stage 75/77, test-only, NOT production
   dependencies):** `serde` v1.0.228 (`features = ["derive"]`), `serde_json`
   v1.0.150, `hex` v0.4.3 (Stage 75) — used by the `cfg(test)`-only
@@ -168,10 +186,10 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   from `src/lib.rs`'s public API or from any non-test code path.
 - See
   [`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
-  for the full adoption record and policy (§12 has a dedicated `hkdf` — Stage
-  76 entry). **`Cargo.lock` is intentionally NOT committed** (library crate;
-  reproducibility via a lockfile digest is deferred to the future
-  build-manifest stage,
+  for the full adoption record and policy (§12 has dedicated `hkdf` — Stage
+  76 and `zeroize`/`secrecy`/`subtle` — Stage 78 entries). **`Cargo.lock` is
+  intentionally NOT committed** (library crate; reproducibility via a
+  lockfile digest is deferred to the future build-manifest stage,
   [`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md)).
   It was generated to run `cargo check`/`cargo test` this stage and then
   deleted, as in every prior dependency-adoption stage.
@@ -243,3 +261,54 @@ This is the "wired" step of the vector lifecycle in
 implementation**, and the runtime still selects only
 `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. Nothing outside this
 package's own `Cargo.toml`/`Cargo.lock`/`src/lib.rs` changed.
+
+## Secret-handling foundation adoption (Stage 78)
+
+`zeroize` v1.9.0, `secrecy` v0.10.3, and `subtle` v2.6.1 became
+`[dependencies]` (production) entries in Stage 78 — see "Dependencies" above
+for the per-crate review, and
+[`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
+§12 for the full recorded review (versions, features, transitive
+dependencies, license, MSRV, `unsafe`/build-script presence).
+
+**Why adopted now, together, ahead of a consumer:** with the AEAD (RFC 8439,
+Stage 75) and KDF (RFC 5869, Stage 77) primitives both verified against their
+official vectors under `cargo test`, the next natural step before any real
+secret byte is handled is the infrastructure that will hold, protect, and
+compare it — `zeroize` clears secret buffers on drop, `secrecy` prevents a
+secret value from being accidentally `Debug`/`Display`-printed or copied
+without an explicit `expose_secret()` call, and `subtle` provides
+constant-time equality so a future secret-derived byte comparison (e.g. an
+authentication tag) is never a hand-rolled, timing-variable `==`. Adopting
+this trio as its own reviewed Stage — ahead of, but immediately preceding,
+the internal secret-handle skeleton that will actually use them (Stage 79
+candidate) — keeps the foundation itself auditable in isolation, before any
+code leans on it.
+
+**What this stage does NOT do** (this is a dependency + build-check ADOPTION
+ONLY, exactly like every prior dependency Stage):
+
+- **No secret type.** No `Secret`/`SecretBox` (or any other) wrapper type is
+  defined anywhere in `src/lib.rs`; no code imports or references `secrecy`.
+- **No zeroization behavior.** No type derives `Zeroize`; no `.zeroize()` or
+  `Zeroizing` usage exists anywhere; no code imports or references `zeroize`.
+- **No constant-time compare behavior.** No `ConstantTimeEq`/`Choice`/
+  `.ct_eq()` usage exists anywhere; no code imports or references `subtle`.
+- **No key/seed/plaintext/ciphertext byte is handled, stored, or compared**
+  anywhere in this crate — there is still nothing for these dependencies to
+  protect.
+- **No `#[cfg(test)]` module is added this stage** — unlike Stage 75/77
+  (which each wired an official test-vector file), this trio serves no
+  single AEAD/KDF primitive and has no known-answer vector to verify against
+  under `cargo test`; there is nothing to wire yet.
+- **No Runtime / Worker / `CryptoProvider` wiring.** Nothing outside this
+  package's own `Cargo.toml`/`Cargo.lock` changed; the host still selects
+  only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+- **`derive_key_placeholder` / `encrypt_placeholder` / `decrypt_placeholder`
+  are byte-for-byte unchanged** from Stage 69, and the crate's full public
+  API is otherwise untouched.
+
+A future, explicitly-reviewed Stage 79 candidate is to introduce an internal
+secret-handle skeleton — the first code anywhere in this crate to actually
+import and use `zeroize`/`secrecy`/`subtle` — still without any real key
+derivation or encrypt/decrypt implementation.

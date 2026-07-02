@@ -1,22 +1,28 @@
 # FedOS Core — minimal Rust crate skeleton (Stage 69) + first dependency
 # (Stage 74) + RFC 8439 vectors wired to `cargo test` (Stage 75) + `hkdf`
 # dependency adopted (Stage 76) + RFC 5869 HKDF vectors wired to
-# `cargo test` (Stage 77).
+# `cargo test` (Stage 77) + `zeroize`/`secrecy`/`subtle` secret-handling
+# foundation adopted (Stage 78).
 #
 # Placeholder crate. There is still NO cryptography and NO WASM here — the
 # PUBLIC API in `src/lib.rs` is unchanged (placeholder functions only; see
 # docs/rust_dependency_adoption.md). Stage 74 added `chacha20poly1305`
 # (RustCrypto), wired to the RFC 8439 vectors under `#[cfg(test)]` in
 # Stage 75. Stage 76 adopted a SECOND production dependency, `hkdf`
-# (RustCrypto). Stage 77 wires the RFC 5869 HKDF-SHA256 test vectors already
-# imported at test-vectors/kdf/hkdf-rfc5869.json to a `#[cfg(test)]`-only
-# module, exactly like Stage 75 did for `chacha20poly1305` — this requires a
-# concrete hash algorithm to instantiate `Hkdf::<Sha256>`, so `sha2` is added
-# below, but ONLY under `[dev-dependencies]` (test-only): production code
-# still neither imports nor calls `hkdf`/`sha2`, and `derive_key_placeholder`
-# is unchanged. Every other crypto crate (aes-gcm / argon2), rand /
-# getrandom, zeroize / secrecy / subtle, bip39 / secp256k1 / nostr, and
-# wasm-bindgen remain ABSENT — each lands only in its own future,
+# (RustCrypto), wired to the RFC 5869 HKDF-SHA256 vectors already imported
+# at test-vectors/kdf/hkdf-rfc5869.json to a `#[cfg(test)]`-only module in
+# Stage 77 — this requires a concrete hash algorithm to instantiate
+# `Hkdf::<Sha256>`, so `sha2` is added ONLY under `[dev-dependencies]`
+# (test-only): production code still neither imports nor calls `hkdf`/`sha2`,
+# and `derive_key_placeholder` is unchanged. Stage 78 adopts THREE more
+# production dependencies together — `zeroize`, `secrecy`, `subtle` — a
+# secret-handling FOUNDATION, ahead of any real secret type, in preparation
+# for a future secret-handle skeleton (Stage 79 candidate) and eventual real
+# key/seed/plaintext handling. No code anywhere in `src/lib.rs` imports,
+# references, or calls any of the three — this is a dependency + build-check
+# ADOPTION ONLY, exactly like every prior dependency Stage. Every other
+# crypto crate (aes-gcm / argon2), rand / getrandom, bip39 / secp256k1 /
+# nostr, and wasm-bindgen remain ABSENT — each lands only in its own future,
 # explicitly-reviewed, one-crate-per-stage adoption
 # (docs/rust_dependency_adoption.md §1).
 
@@ -55,6 +61,30 @@ chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["
 # build check only.
 hkdf = "0.13.0"
 
+# `zeroize` (RustCrypto, Apache-2.0 OR MIT) — clears secret buffers on drop.
+# Default features (`alloc`) are used as-is; the `derive` feature (which pulls
+# in the `zeroize_derive` proc-macro crate) is deliberately NOT enabled —
+# no type in this crate derives `Zeroize` yet. NOT imported/used anywhere in
+# src/lib.rs yet — dependency + build check only.
+zeroize = "1.9.0"
+
+# `secrecy` (Apache-2.0 OR MIT) — wraps secret values so they are never
+# accidentally `Debug`/`Display`-printed, logged, or copied without an
+# explicit `expose_secret()` call. Depends only on `zeroize` (already listed
+# above); default features are used as-is (its only optional feature,
+# `serde`, is NOT enabled). NOT imported/used anywhere in src/lib.rs yet —
+# no `Secret`/`SecretBox` type is defined or wrapped — dependency + build
+# check only.
+secrecy = "0.10.3"
+
+# `subtle` (dalek-cryptography, BSD-3-Clause) — constant-time equality and
+# selection, so a future secret-derived byte comparison (e.g. an
+# authentication tag) never uses a hand-rolled, timing-variable `==`.
+# Default features (`std`, `i128`) are used as-is. NOT imported/used
+# anywhere in src/lib.rs yet — no `ConstantTimeEq` call exists — dependency +
+# build check only.
+subtle = "2.6.1"
+
 [dev-dependencies]
 # Test-only plumbing (Stage 75) to read and assert against the RFC 8439
 # vector JSON from `#[cfg(test)]` — none of these three crates is a
@@ -74,6 +104,8 @@ serde_json = "1.0.150"
 sha2 = "0.11.0"
 
 # Still intentionally ABSENT from [dependencies] (production): aes-gcm,
-# argon2, sha2, rand / getrandom, zeroize / secrecy / subtle, bip39 /
-# secp256k1 / nostr, wasm-bindgen. One crate per Stage, each with its own
-# recorded dependency review (docs/rust_dependency_adoption.md §1, §8).
+# argon2, sha2, rand / getrandom, bip39 / secp256k1 / nostr, wasm-bindgen.
+# One crate per Stage (Stage 78's zeroize/secrecy/subtle trio is one
+# reviewed group, not a bulk add — see docs/rust_dependency_adoption.md §12),
+# each with its own recorded dependency review
+# (docs/rust_dependency_adoption.md §1, §8).

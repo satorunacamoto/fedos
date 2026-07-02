@@ -8,7 +8,73 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 77 — Wire RFC 5869 HKDF-SHA256 vectors to Rust
+> **Status: Stage 78 — Adopt `zeroize` / `secrecy` / `subtle` secret-handling
+> foundation dependencies (build check only; no secret types, no
+> zeroization behavior, no constant-time compare, no Runtime/Worker/
+> CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
+> gains THREE new entries together — `zeroize` v1.9.0, `secrecy` v0.10.3,
+> `subtle` v2.6.1 (all RustCrypto/dalek-cryptography, default features) —
+> alongside the unchanged `chacha20poly1305` v0.11.0 (Stage 74) and `hkdf`
+> v0.13.0 (Stage 76). This is a dependency + build-check ADOPTION ONLY,
+> exactly like every prior dependency Stage: `src/lib.rs` is **completely
+> unchanged** (no `#[cfg(test)]` module is added this stage — unlike Stage
+> 75/77, this trio serves no single primitive and has no known-answer vector
+> to wire), no code imports, references, or calls any of the three, no
+> `Secret`/`SecretBox` type is defined, no type derives `Zeroize` or calls
+> `.zeroize()`, and no `ConstantTimeEq`/`.ct_eq()` call exists anywhere.
+> **Why now:** with the AEAD (RFC 8439, Stage 75) and KDF (RFC 5869, Stage
+> 77) primitives both verified against their official vectors, the next
+> natural step before any real secret byte is handled is the infrastructure
+> that will hold, protect, and compare it — adopting it as its own reviewed
+> Stage, immediately ahead of the internal secret-handle skeleton that will
+> use it (Stage 79 candidate), keeps the foundation itself auditable in
+> isolation before any code leans on it. `zeroize` and `subtle` add exactly 3
+> NEW transitive packages beyond the existing 18-package
+> `chacha20poly1305`/`hkdf` tree — `zeroize`, `secrecy` (depends only on
+> `zeroize`), `subtle` (zero dependencies of its own) — for a 21-package
+> combined production dependency graph; **no `getrandom`, no
+> `rand`/`rand_core`, no build script (`build.rs`)** in any of the three.
+> `zeroize` uses `unsafe` internally (volatile writes, load-bearing — this is
+> how it defeats compiler dead-store elimination on stable Rust); `secrecy`
+> declares `#![forbid(unsafe_code)]` (zero `unsafe`); `subtle` has 2 internal
+> `unsafe` call sites (an optimization barrier and a `cmp::Ordering` cast).
+> None of this affects this crate's own `#![forbid(unsafe_code)]`, which
+> governs only this crate's code. Licenses: `zeroize`/`secrecy` are
+> Apache-2.0 OR MIT (same family as `chacha20poly1305`/`hkdf`); `subtle` is
+> BSD-3-Clause (a new, compatible license family for this graph). MSRV: no
+> bump — `zeroize` 1.9.0 states Rust ≥ 1.85 (same floor already established),
+> `secrecy` 0.10.3 states ≥ 1.60 (lower, no-op), `subtle` 2.6.1 states no
+> `rust-version` upstream (only `edition = "2018"`, recorded as a documented
+> gap per §9, not blocking since its floor is already far below the crate's
+> actual toolchain). The full dependency review is recorded in
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md) §12,
+> a new `zeroize`/`secrecy`/`subtle` — Stage 78 entry appended after the
+> `hkdf` — Stage 76 entry (never edited in place); §5's original "adopted
+> together with the first primitive that handles real secret bytes" wording
+> is explicitly addressed there as a reviewed refinement, not a silent
+> violation. `Cargo.lock` was generated to run `cargo check`/`cargo test` and
+> then deleted, not committed, per the same convention as every prior
+> dependency-adoption stage. `argon2` / `aes-gcm` / `rand` / `getrandom` /
+> `wasm-bindgen` remain ABSENT; `crate-type = ["rlib"]` and
+> `#![forbid(unsafe_code)]` stay exactly as before; no `.wasm` is produced.
+> Existing [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> was rewritten (now 20 tests, following this stage's exact numbered
+> checklist) to assert `zeroize`/`secrecy`/`subtle` are present as production
+> dependencies, `sha2` stays dev-only, and lib.rs has no
+> `Secret`/`SecretBox`/`ExposeSecret`, no `Zeroize` derive/`.zeroize()` call,
+> and no `ConstantTimeEq`/`subtle` usage anywhere (the whole file, since
+> Stage 78 adds no new `#[cfg(test)]` module to exclude);
+> [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts)
+> test 3 and [`test/fedos_core_rust_rfc8439_wiring.test.ts`](test/fedos_core_rust_rfc8439_wiring.test.ts) /
+> [`test/fedos_core_rust_hkdf_wiring.test.ts`](test/fedos_core_rust_hkdf_wiring.test.ts)
+> tests 1/3 were updated to expect FIVE production dependency-table entries
+> instead of two. Stage 79 candidate: **introduce an internal secret-handle
+> skeleton** — the first code anywhere in this crate to actually import and
+> use `zeroize`/`secrecy`/`subtle` — still without any real key derivation or
+> encrypt/decrypt implementation. Prior status:
+>
+> **Stage 77 — Wire RFC 5869 HKDF-SHA256 vectors to Rust
 > `cargo test` (verification wiring only; no public `deriveKey` API, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs` gains a second bottom-of-file module,

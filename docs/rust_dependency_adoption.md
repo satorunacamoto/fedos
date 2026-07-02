@@ -18,6 +18,29 @@ implements no cryptography. `chacha20poly1305` v0.11.0 remains exactly as
 adopted Stage 74 (and wired to the RFC 8439 vectors under `cfg(test)` Stage
 75) — Stage 76 adds ONLY `hkdf`, following §1's one-crate-per-Stage rule.
 
+**Update (Stage 78): the third adoption group under this policy is the
+`zeroize` / `secrecy` / `subtle` secret-handling foundation** — see §12's
+`zeroize` / `secrecy` / `subtle` — Stage 78 entry. This is a deliberate,
+explicitly-reviewed REFINEMENT of §5's original wording ("adopted together
+with the first primitive that handles real secret bytes") rather than a
+silent violation of it: Stage 78 adopts the trio as a FOUNDATION ahead of
+the internal secret-handle skeleton that will actually use them (Stage 79
+candidate per this repo's README `Stage 78` status entry) — not "for later
+with nothing ever planned to use them" (§1's speculative-add rule), but
+one Stage ahead of the concrete consumer, with that consumer already named
+as the immediate next Stage. §5's underlying concern — that these crates
+must not sit unused indefinitely while hand-rolled secret handling
+accumulates elsewhere in the meantime — still holds and is restated here:
+no type in `src/lib.rs` holds a key/seed/plaintext/ciphertext byte today,
+`derive_key_placeholder`/`encrypt_placeholder`/`decrypt_placeholder` remain
+placeholders, and this ordering does not license a hand-rolled secret type
+or comparison to appear before Stage 79 lands. `chacha20poly1305` and `hkdf`
+remain exactly as adopted Stage 74/76 (and wired to their respective vector
+files under `cfg(test)` Stage 75/77) — Stage 78 adds ONLY `zeroize` +
+`secrecy` + `subtle`, reviewed and recorded together because they are one
+inseparable secret-handling foundation (per §5's own grouping), not three
+independent primitives.
+
 **Status: this document, as originally written in Stage 72, added no code and
 added no dependency.** It fixes, in
 writing, the PROCESS a future Stage must follow to add any dependency to
@@ -320,5 +343,102 @@ edited in place, by the Stage that adopted the crate.
   [`../test-vectors/kdf/hkdf-rfc5869.json`](../test-vectors/kdf/hkdf-rfc5869.json);
   `derive_key_placeholder` is unchanged; no `sha2` (or any other digest
   crate) added; no random/key generation; `Cargo.lock` was generated to
+  verify the resolved dependency graph (§ above) and then deleted, not
+  committed.
+
+### `zeroize` / `secrecy` / `subtle` — Stage 78
+
+- **Crate + exact versions:** `zeroize` v1.9.0, `secrecy` v0.10.3, `subtle`
+  v2.6.1 (all pinned in `Cargo.toml`; `Cargo.lock` is not committed — same
+  convention as the `chacha20poly1305`/`hkdf` entries above). Reviewed and
+  recorded together, per §5, as one secret-handling foundation rather than
+  three independent adoptions.
+- **Primitive served / vector file:** none — this trio serves no single AEAD
+  or KDF primitive and has no known-answer test vector to pass. `zeroize`
+  clears secret buffers on drop; `secrecy` wraps secret values against
+  accidental `Debug`/`Display`/copy exposure; `subtle` provides
+  constant-time equality/selection for a future secret-derived byte
+  comparison. Adopted as a FOUNDATION ahead of the internal secret-handle
+  skeleton that will use them (Stage 79 candidate) — see the "Update (Stage
+  78)" note above for why this is a reviewed refinement of §5's original
+  "adopted together with the first primitive that handles real secret
+  bytes" wording, not a violation of it.
+- **Why these crates (§2–§3):** `zeroize` and `secrecy` are RustCrypto
+  organization crates (default preference, §3); `subtle` is
+  dalek-cryptography's crate, the de facto standard constant-time-comparison
+  crate in the Rust crypto ecosystem (used transitively by RustCrypto's own
+  `poly1305`/`ctutils` stack already in this crate's dependency graph via
+  `chacha20poly1305`, per §12's `chacha20poly1305` — Stage 74 entry's
+  transitive list) — no equivalent RustCrypto-organization crate exists for
+  constant-time comparison, so §3's "non-RustCrypto crate requires an
+  explicit reason" is satisfied: `subtle` is the established choice with no
+  RustCrypto alternative.
+- **Feature configuration:** all three use DEFAULT features, unmodified.
+  - `zeroize`: default feature is `alloc` only. The optional `derive`
+    feature (which would pull in the `zeroize_derive` proc-macro crate) is
+    deliberately NOT enabled — no type in this crate derives `Zeroize` yet
+    (§10's rule against speculative capability).
+  - `secrecy`: has no default-enabled optional feature; its only optional
+    feature, `serde`, is NOT enabled. `secrecy` unconditionally depends on
+    `zeroize` regardless of feature selection (it is not itself
+    feature-gated).
+  - `subtle`: default features are `std` + `i128`. Neither introduces
+    `unsafe`, a build script, or a further transitive dependency beyond
+    `subtle` itself (verified in the resolved `Cargo.lock` before deleting
+    it).
+- **Transitive dependency count:** exactly 3 NEW packages — `zeroize`,
+  `secrecy`, `subtle` themselves. `secrecy`'s only dependency is `zeroize`
+  (already counted); `subtle` has zero dependencies of its own. None
+  overlaps with the existing `chacha20poly1305`/`hkdf` tree (verified via
+  `cargo tree -e normal`: neither `zeroize` nor `subtle` appears anywhere in
+  that tree before this Stage). Combined production dependency graph as of
+  this Stage: 21 unique packages total (the 18 from the `hkdf` — Stage 76
+  entry above, plus `zeroize`, `secrecy`, `subtle`), per `cargo tree -e
+  normal`'s output at adoption time. **No `getrandom`, no `rand`/`rand_core`**
+  appear in the resolved graph (verified by inspecting the generated
+  `Cargo.lock` before deleting it).
+- **Build-script presence:** none. `zeroize`, `secrecy`, and `subtle` each
+  have no `build.rs` (`subtle`'s upstream `Cargo.toml` explicitly declares
+  `build = false`).
+- **`unsafe` presence:** `secrecy` declares `#![forbid(unsafe_code)]` in its
+  own source (zero `unsafe`). `zeroize` uses `unsafe` internally (~10 call
+  sites, mostly `core::ptr::write_volatile` and a raw-pointer offset helper)
+  — this is intentional and load-bearing: volatile writes are how `zeroize`
+  defeats compiler dead-store elimination to guarantee a zeroing write is
+  not optimized away, which a safe-only implementation cannot achieve on
+  stable Rust. `subtle` uses `unsafe` in 2 call sites (an optimization-barrier
+  read and a `cmp::Ordering` raw-pointer cast used by its constant-time
+  comparison primitives). None of this affects
+  `packages/fedos-core-rust`'s own `#![forbid(unsafe_code)]`, which governs
+  only this crate's code, not a dependency's — consistent with how
+  `chacha20poly1305`'s internal `unsafe` was already acknowledged in its own
+  Stage 74 entry above.
+- **License:** `zeroize` — Apache-2.0 OR MIT; `secrecy` — Apache-2.0 OR MIT
+  (same dual-license family as `chacha20poly1305`/`hkdf`); `subtle` —
+  BSD-3-Clause (a new license family for this crate's dependency graph,
+  checked for compatibility — BSD-3-Clause is a permissive license with no
+  copyleft or additional obligation beyond attribution, compatible with this
+  project's use).
+- **MSRV impact:** `zeroize` 1.9.0 requires Rust ≥ 1.85 (per its published
+  `rust-version`), same floor as `chacha20poly1305`/`hkdf` — no bump.
+  `secrecy` 0.10.3 states `rust-version = "1.60"` (lower than the existing
+  1.85 floor, so it does not raise it). `subtle` 2.6.1 publishes no
+  `rust-version` field upstream (only `edition = "2018"`, which implies Rust
+  ≥ 1.31) — its own MSRV policy is effectively "no fixed floor stated"; this
+  is recorded as a gap per §9's "no dependency adopted whose MSRV
+  requirement is undocumented upstream" rule, but is not blocking here
+  because `subtle`'s `edition = "2018"` floor is already far below this
+  repository's actual toolchain and below every other adopted crate's
+  stated MSRV, so it cannot itself raise the crate's effective floor.
+- **What was NOT done:** no import of `zeroize`, `secrecy`, or `subtle`
+  anywhere in `src/lib.rs` — production or `cfg(test)` (no `#[cfg(test)]`
+  module is added this Stage at all, unlike Stage 75/77, since there is no
+  vector file for a dependency-adoption-only Stage to wire); no `Secret` /
+  `SecretBox` / `ExposeSecret` type or usage; no `#[derive(Zeroize)]` or
+  `.zeroize()` call; no `ConstantTimeEq` / `Choice` / `.ct_eq()` usage; no
+  secret/key/seed/plaintext/ciphertext byte is defined, stored, or handled
+  anywhere; `derive_key_placeholder` / `encrypt_placeholder` /
+  `decrypt_placeholder` are unchanged; no random/key generation; no
+  Runtime/Worker/`CryptoProvider` wiring; `Cargo.lock` was generated to
   verify the resolved dependency graph (§ above) and then deleted, not
   committed.
