@@ -133,6 +133,18 @@
 //! `operation_context`, or `request_descriptor` today. Same rules apply:
 //! not part of the public API, no public function above constructs, holds,
 //! or returns one of its types.
+//!
+//! Stage 92 adds a ninth crate-private module, `crypto_pipeline`: an
+//! INTERNAL-ONLY crypto-pipeline skeleton naming a future AEAD/KDF/Argon2/
+//! NIP-44/Nostr-key-derivation PIPELINE that would eventually bundle the
+//! descriptor/context/label/key-material skeletons above (a label and a
+//! non-sensitive status only — no key, seed, plaintext, ciphertext,
+//! passphrase, tag, or nonce byte, and no `String`/`Vec` field). It exists
+//! as a type basis for a future real pipeline, still not connected to
+//! `secret_handle`, `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+//! `operation_context`, `request_descriptor`, or `response_descriptor`
+//! today. Same rules apply: not part of the public API, no public function
+//! above constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -1703,6 +1715,192 @@ mod response_descriptor {
                 ResponseDescriptorState::default(),
                 ResponseDescriptorState::Disabled
             );
+        }
+    }
+}
+
+/// Stage 92 — an INTERNAL-ONLY crypto-pipeline skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a [`CryptoPipeline`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It takes no user-, environment-, or config-derived input of any kind —
+/// [`CryptoPipeline::new_placeholder`] accepts only a [`CryptoPipelineKind`]
+/// label. This module does not connect to `secret_handle` (Stage 79),
+/// `aead_core` (Stage 80), `kdf_core` (Stage 82), `key_material` (Stage 87),
+/// `domain_label` (Stage 88), `operation_context` (Stage 89),
+/// `request_descriptor` (Stage 90), or `response_descriptor` (Stage 91): it
+/// never constructs any of their types and never reads a key/secret/label/
+/// operation/request/response byte out of one — when in doubt about a
+/// connection between skeletons, this crate deliberately leaves them
+/// unconnected rather than guess at a future design (the same reasoning
+/// `aead_core`'s own doc comment already states). It exists as a type basis
+/// a later, explicitly-reviewed stage can extend to actually bundle the
+/// descriptor/context/label/key-material skeletons above into a real
+/// AEAD/KDF/NIP-44/Nostr-key-derivation pipeline, once it also implements
+/// the operation that pipeline would run.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`/
+/// `request_descriptor`/`response_descriptor` above do. This is expected
+/// for a skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod crypto_pipeline {
+    /// Coarse internal lifecycle state of a [`CryptoPipeline`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum CryptoPipelineState {
+        /// A placeholder pipeline is active. Runs no cryptography and
+        /// bundles no descriptor.
+        Placeholder,
+        /// No pipeline should be treated as active — the default, inert
+        /// state before any [`CryptoPipeline`] is constructed for use.
+        Disabled,
+    }
+
+    impl Default for CryptoPipelineState {
+        fn default() -> Self {
+            CryptoPipelineState::Disabled
+        }
+    }
+
+    /// Which future cryptographic PIPELINE a [`CryptoPipeline`] names — a
+    /// label only, intent, not an implementation and not a real bundling of
+    /// descriptors. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum CryptoPipelineKind {
+        /// Intended future connection point: an AEAD encrypt/decrypt
+        /// pipeline. No AEAD pipeline is bundled here.
+        AeadPipelinePlaceholder,
+        /// Intended future connection point: an HKDF extract/expand
+        /// pipeline. No KDF pipeline is bundled here.
+        KdfPipelinePlaceholder,
+        /// Intended future connection point: an Argon2id hashing pipeline.
+        /// No Argon2id pipeline is bundled here.
+        Argon2idPipelinePlaceholder,
+        /// Intended future connection point: a NIP-44 encrypt/decrypt
+        /// pipeline. No NIP-44 pipeline is bundled here.
+        Nip44PipelinePlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key
+        /// derivation pipeline. No Nostr key pipeline is bundled here.
+        NostrKeyPipelinePlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyPipelinePlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`CryptoPipeline`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct CryptoPipelineStatus {
+        pub(crate) state: CryptoPipelineState,
+    }
+
+    /// An INTERNAL-ONLY crypto-pipeline handle skeleton (crate-private; not
+    /// part of this crate's public API — see the module-level doc comment
+    /// above). Holds only a [`CryptoPipelineKind`] label and a
+    /// [`CryptoPipelineState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, and no user-, environment-, or
+    /// config-derived input, and no bundled descriptor of any kind. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually bundle a real pipeline; until then it accepts and stores
+    /// none.
+    pub(crate) struct CryptoPipeline {
+        kind: CryptoPipelineKind,
+        state: CryptoPipelineState,
+    }
+
+    impl CryptoPipeline {
+        /// Construct a placeholder pipeline of the given
+        /// [`CryptoPipelineKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind, and bundles no descriptor of
+        /// any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: CryptoPipelineKind) -> Self {
+            Self {
+                kind,
+                state: CryptoPipelineState::Placeholder,
+            }
+        }
+
+        /// The [`CryptoPipelineKind`] label this pipeline was constructed
+        /// with — intent only.
+        pub(crate) fn kind(&self) -> CryptoPipelineKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> CryptoPipelineStatus {
+            CryptoPipelineStatus { state: self.state }
+        }
+
+        /// Whether this pipeline is still in the
+        /// [`CryptoPipelineState::Placeholder`] state — always `true` for
+        /// any handle constructed via [`CryptoPipeline::new_placeholder`],
+        /// since no other constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == CryptoPipelineState::Placeholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let pipeline = CryptoPipeline::new_placeholder(CryptoPipelineKind::AeadPipelinePlaceholder);
+            assert_eq!(pipeline.status().state, CryptoPipelineState::Placeholder);
+            assert!(pipeline.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                CryptoPipelineKind::AeadPipelinePlaceholder,
+                CryptoPipelineKind::KdfPipelinePlaceholder,
+                CryptoPipelineKind::Argon2idPipelinePlaceholder,
+                CryptoPipelineKind::Nip44PipelinePlaceholder,
+                CryptoPipelineKind::NostrKeyPipelinePlaceholder,
+                CryptoPipelineKind::TestOnlyPipelinePlaceholder,
+            ] {
+                let pipeline = CryptoPipeline::new_placeholder(kind);
+                assert_eq!(pipeline.kind(), kind);
+                assert_eq!(pipeline.status().state, CryptoPipelineState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let pipeline = CryptoPipeline::new_placeholder(CryptoPipelineKind::KdfPipelinePlaceholder);
+            let status = pipeline.status();
+            assert_eq!(status.state, CryptoPipelineState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_pipeline() {
+            for kind in [
+                CryptoPipelineKind::Argon2idPipelinePlaceholder,
+                CryptoPipelineKind::Nip44PipelinePlaceholder,
+                CryptoPipelineKind::TestOnlyPipelinePlaceholder,
+            ] {
+                assert!(CryptoPipeline::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(CryptoPipelineState::default(), CryptoPipelineState::Disabled);
         }
     }
 }
