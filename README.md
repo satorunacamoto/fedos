@@ -8,7 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 59 — FedOS core crypto package boundary (no Rust, no WASM,
+> **Status: Stage 60 — WebAuthn / Passkey provider adapter skeleton (boundary
+> only, no browser API).**
+> A new [`src/identity/webauthn_adapter.ts`](src/identity/webauthn_adapter.ts)
+> adds the browser-provider ADAPTER seam that a future unlock flow would hand to
+> the Stage 36 `PasskeyBoundary` — but this stage ships the **boundary /
+> placeholder / pure bridge ONLY**. It defines `WebAuthnProvider` (`getStatus`,
+> `getCapabilities`, `begin(request)`, `cancel()`), a `WebAuthnAdapterStatus`
+> (`unavailable`/`idle`/`waiting`/`authenticated_placeholder`/`cancelled`/
+> `error`), placeholder `WebAuthnAdapterCapability` labels (`webauthn_placeholder`,
+> `platform_authenticator_placeholder`, `cross_platform_authenticator_placeholder`,
+> `conditional_ui_placeholder`), and a `WebAuthnAdapterRequest` (`kind: "get" |
+> "create"` plus OPAQUE, non-secret `reference`/`rpIdRef`/`userRef` labels).
+> `NoopWebAuthnProvider` is the permanently-`unavailable` default (advertises
+> nothing, denies every attempt); `PlaceholderWebAuthnProvider` models an
+> `idle → authenticated_placeholder ↔ cancelled` UX holding ONLY a coarse
+> `WebAuthnReport` — its `authenticated_placeholder` is a LABEL (no credential is
+> held and the Vault is NOT unlocked), `cancel()` only changes state, and the
+> report's `reason` never echoes any opaque label. **The WebAuthn adapter is a
+> boundary only: it calls no browser credential API** (`navigator.credentials`
+> appears nowhere), launches no Face ID / Touch ID, contacts no Secure Enclave /
+> Android Keystore, runs no conditional-UI flow, and stores no
+> challenge/credential id/rawId/response/attestation/assertion/token/key.
+> **Apple / Google / WebAuthn are unlock TRIGGERS ONLY, never a key source.** The
+> pure `webauthnReportToPasskeyRequest(request)` bridge maps a WebAuthn
+> `get`/`create` to a Stage 36 `PasskeyAuthenticationRequest` with `kind:
+> "webauthn"` (never `apple_passkey`/`android_passkey`), passing only the opaque
+> `reference` through (`rpIdRef`/`userRef` are NOT forwarded) — it derives no
+> key, holds no credential, does NOT unlock the Vault, and keeps its Passkey-types
+> dependency TYPE-ONLY. It is **NOT wired into the runtime or the Worker** —
+> `create_runtime.ts`/`worker.ts` construct nothing from this file and contain no
+> `webauthn` reference. **A future real browser adapter (actual
+> `navigator.credentials` calls) requires its own separate, explicit stage.** 16
+> tests in `test/webauthn_adapter.test.ts` cover: Noop always unavailable,
+> Placeholder constructor is inert, `begin` calls no browser API (no throw in
+> node + source has no `navigator.credentials`), a `create` request stores no
+> challenge/attestation, a `get` request stores no credential id/assertion,
+> `cancel` changes state only, the bridge is pure and passes only the opaque
+> reference (never a platform passkey kind), no input mutation, no method throws,
+> the Runtime and Worker sources contain no `webauthn` reference, no
+> browser-credential API usage, and no WebAuthn/credential/crypto library import.
+> Stage 61 candidate: **WebAuthn adapter safety docs** (fix, in writing, the
+> "credential is not a key source / Apple·Google are not a seed" rules before any
+> real browser API lands). Prior status:
+>
+> **Stage 59 — FedOS core crypto package boundary (no Rust, no WASM,
 > no cryptography).**
 > A new package [`packages/fedos-core-rust`](packages/fedos-core-rust/README.md)
 > is the INTENDED future home of a RustCrypto-backed WASM/FFI crypto core — but
