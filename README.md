@@ -8,7 +8,45 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 60 — WebAuthn / Passkey provider adapter skeleton (boundary
+> **Status: Stage 61 — WebAuthn / Passkey adapter safety docs (docs only, no
+> code).**
+> A new [`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md)
+> fixes, in writing, the safety contract that Stage 60's
+> `src/identity/webauthn_adapter.ts` already implements — **no `src/` change, no
+> behavior change** in this stage — so that when a real browser adapter is
+> eventually built (actual `navigator.credentials` calls) it cannot regress the
+> rule that matters most: **WebAuthn / Passkey is an unlock TRIGGER, never a key
+> source, never an identity seed.** It documents: (1) the adapter's purpose
+> (unlock-trigger boundary / browser-provider seam — explicitly NOT a key source,
+> NOT an identity seed); (2) the absolute rules (Apple ID / Google Account, a
+> credential id, and an assertion response are NEVER a seed; challenge / `rawId` /
+> `attestation` / `authenticatorData` / `clientDataJSON` / JWT / OAuth tokens are
+> NEVER stored); (3) what MAY be handled (opaque `reference`/`rpIdRef`/`userRef`
+> labels, coarse status, placeholder capability, non-secret reason); (4) what
+> MUST NEVER be handled (credential, rawId, challenge bytes, assertion response,
+> attestation object, authenticator data, private key, seed, token, JWT,
+> profile/email, platform-authenticator secret); (5) the Vault relationship
+> (WebAuthn → `PasskeyAuthenticationRequest` → `VaultUnlockRequest`, all separate
+> boundaries — WebAuthn unlocks a LOCAL vault but never generates its seed, and no
+> real unlock happens yet); (6) the Crypto / FedOS Core relationship (FedOS Core
+> is the future crypto swap point; the adapter never calls a `CryptoProvider` and
+> handles no KDF/AEAD/random); (7) the conditions any future real
+> `navigator.credentials` adapter must satisfy (disabled by default, explicit user
+> action, no automatic prompt, no credential/challenge persistence, sanitized
+> errors, no stack trace, no raw provider response); (8) UI/UX wording ("Unlock
+> with passkey" allowed; "Generate key from Apple ID" / "Face ID creates your
+> Nostr key" / "Apple·Google account is your seed" forbidden); (9) the test policy
+> this area must keep satisfying (no `navigator.credentials` call, no
+> credential/challenge retention, Runtime/Worker not wired, type-only Passkey
+> import, no crypto import); and (10) the current-state conclusion (docs only, no
+> real WebAuthn, no key derivation, a future explicit stage required). Every rule
+> matches code that already exists and is already tested in
+> `test/webauthn_adapter.test.ts` — this stage adds no new test either, since
+> there is no new behavior to cover. Stage 62 candidate: **WebAuthn runtime
+> selection boundary, disabled by default** (let `createRuntime` SELECT a
+> `WebAuthnProvider` — still with no real `navigator.credentials`). Prior status:
+>
+> **Stage 60 — WebAuthn / Passkey provider adapter skeleton (boundary
 > only, no browser API).**
 > A new [`src/identity/webauthn_adapter.ts`](src/identity/webauthn_adapter.ts)
 > adds the browser-provider ADAPTER seam that a future unlock flow would hand to
@@ -2022,7 +2060,10 @@ D1 space directory caveats (do not over-promise on these):
 55. Runtime diagnostics docs hardening ([`docs/runtime_diagnostics.md`](docs/runtime_diagnostics.md); docs only, no code) ✓
 56. Product purchase/grant preview polish (explicit "Preview only." notices, split grant-preview sentences, widened forbidden-word list; wording/attributes only, no gating change) ✓
 57. Provider preview docs hardening ([`docs/provider_preview_safety.md`](docs/provider_preview_safety.md); docs only, no code) ✓
-58. Runtime external health check boundary, disabled by default (`HealthCheckProvider`/`NoopHealthCheckProvider`/`DisabledHealthCheckProvider`; no real probe, not wired) ✓ ← you are here
+58. Runtime external health check boundary, disabled by default (`HealthCheckProvider`/`NoopHealthCheckProvider`/`DisabledHealthCheckProvider`; no real probe, not wired) ✓
+59. FedOS core crypto package boundary ([`packages/fedos-core-rust`](packages/fedos-core-rust/README.md); `FedosCoreCrypto` seam + `PlaceholderFedosCoreCrypto` + host adapter; no Rust, no WASM, no crypto, not wired) ✓
+60. WebAuthn / Passkey provider adapter skeleton (`src/identity/webauthn_adapter.ts`; `WebAuthnProvider` + Noop/Placeholder + pure Passkey bridge; no `navigator.credentials`, not wired) ✓
+61. WebAuthn / Passkey adapter safety docs ([`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md); docs only, no code) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
