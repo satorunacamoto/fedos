@@ -8,7 +8,72 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 71 — Crypto vector source research docs (docs only, no
+> **Status: Stage 72 — Crypto verification infrastructure skeleton (docs +
+> empty `test-vectors/` directories only, no vectors, no crypto, no
+> Rust/WASM change).**
+> Four new docs plus an empty `test-vectors/` tree assemble the
+> end-to-end **verification infrastructure** a future Rust crypto core will
+> run inside — **no `src/` change, no `packages/fedos-core-rust/src/` change,
+> no `Cargo.toml` change, no dependency, no vector JSON, no manifest JSON, no
+> WASM, no Runtime/Worker change** in this stage.
+> [`docs/verification_infrastructure.md`](docs/verification_infrastructure.md)
+> fixes the pipeline: (1) purpose (a single pipeline doc, infrastructure not
+> implementation, a gate registry); (2)–(3) the six-stage flow — source
+> catalog → vector import → Rust implementation → `cargo test` → build
+> manifest → runtime selection — each with an explicit gate condition;
+> (4) the docs dependency graph (`crypto_test_vectors.md` →
+> `crypto_vector_sources.md` → `fedos_core_rust_safety.md` →
+> `rust_dependency_adoption.md` → `fedos_core_build_manifest.md` →
+> `build_manifest_example.md` → this file → `test-vectors/README.md`);
+> (5) vector lifecycle (proposed → imported → wired → passing → referenced →
+> frozen, never edited to "fix" a failing implementation); (6) negative
+> vectors (must assert explicit failure, never merely "didn't crash", never
+> skipped for green CI); (7) regression policy (wired vectors run every
+> `cargo test`; a dependency bump is validated against the full vector set);
+> (8) CI policy as future intent only (no CI config changed in this stage);
+> (9) the runtime gate condition (five conditions — sourced vectors, passing
+> known-answer tests, failing-closed negative tests, a validated build
+> manifest, WASM loader provenance — ALL required before a real provider can
+> be selected; the placeholder stays selected otherwise); and (10) the
+> current conclusion (docs + skeleton only, pipeline named end-to-end but
+> unimplemented). [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md)
+> fixes the crate dependency process: one crate per Stage; audited crates
+> only, no abandoned/single-author novelty crates; RustCrypto preferred by
+> default; libsodium limited to uses with no RustCrypto equivalent (e.g.
+> XChaCha20-Poly1305) with its C-dependency/build-script cost stated
+> explicitly; `zeroize`/`secrecy`/`subtle` adopted together with the first
+> primitive touching real secrets; `rand`/`getrandom` as its own Stage with
+> production/test RNG kept separate; semver bumps validated against the full
+> vector set and treated as a correctness incident if any output changes;
+> a dependency-review record (crate+version, primitive served, why this
+> crate, transitive count, build-script presence, internal `unsafe`, license,
+> MSRV impact) required per Stage; MSRV stated explicitly once any dependency
+> lands; and restated forbids (no home-grown crypto, no XOR, no custom
+> constant-time compare, no `unsafe` added to FedOS's own code).
+> [`docs/build_manifest_example.md`](docs/build_manifest_example.md) shows an
+> ILLUSTRATIVE, non-normative example of the
+> [`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md) §3
+> field set with fabricated placeholder values (all-zero revisions,
+> `EXAMPLE`-prefixed digests, `unset` signature/provenance refs, a
+> self-describing `notes` field) — explicitly **not** the
+> `packages/fedos-core-rust/manifest.example.json` file named as a future
+> candidate elsewhere, and not committed anywhere but inside this markdown
+> file's fenced code block. A new [`test-vectors/`](test-vectors/README.md)
+> directory adds only a `README.md` (directory purpose, "no vectors committed
+> yet", official-vectors-only rule, generated-vectors-forbidden-without-label
+> rule, and the future `aead/`/`kdf`/`nip44/` layout) plus three EMPTY
+> category subdirectories (`aead/`, `kdf/`, `nip44/`, each held in git by a
+> `.gitkeep` placeholder) — no `.json` vector file exists anywhere in the
+> tree. This stage adds no test — there is no new behavior to cover (the
+> existing `fedos_core_rust_skeleton.test.ts` glob guard, scoped to
+> `packages/fedos-core-rust/**`, is unaffected by the new top-level
+> `test-vectors/` directory). Stage 73 candidate: **Official test vectors
+> (verbatim import)** — the first Stage to add real `test-vectors/*.json`
+> files (RFC 8439, RFC 5869, RFC 9106, NIST AES-GCM, upstream NIP-44), with
+> source/license/revision fixed alongside each; Rust implementation still not
+> started. Prior status:
+>
+> **Stage 71 — Crypto vector source research docs (docs only, no
 > vectors, no crypto).**
 > A new [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md) fixes,
 > in writing, the **official/upstream test-vector source catalog** a FUTURE
