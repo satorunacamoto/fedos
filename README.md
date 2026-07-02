@@ -8,7 +8,77 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 79 — Add an internal secret-handle skeleton (crate-private
+> **Status: Stage 80 — Add an internal AEAD module skeleton (crate-private
+> only; no public API change, no actual encryption/decryption, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a second crate-private module,
+> `aead_core`, placed right after Stage 79's `secret_handle`. It defines
+> `AeadAlgorithm` (`pub(crate) enum`: one variant, `ChaCha20Poly1305` — a
+> label only), `AeadOperation` (`pub(crate) enum`: `Encrypt` / `Decrypt` — a
+> label only), `AeadRequestStatus` (`pub(crate) struct`: wraps this crate's
+> existing `FedosCoreState`, not a new parallel enum), and
+> `AeadPlaceholderRequest` (`pub(crate) struct`: `algorithm: AeadAlgorithm` +
+> `operation: AeadOperation` — no other field) with five methods —
+> `new_placeholder_encrypt()` / `new_placeholder_decrypt()` (take NO
+> plaintext/ciphertext/key/nonce/AAD/tag input of any kind), `status()`
+> (always `Placeholder` — this skeleton runs no cryptography), `algorithm()`,
+> `operation()`. **NOT part of the public API**: every item is `pub(crate)`
+> at most — never `pub` — nothing is re-exported, and this crate's public
+> `pub fn` surface stays exactly the same six placeholder functions from
+> Stage 69; none of them constructs, holds, or returns an
+> `AeadPlaceholderRequest`. **No actual encryption/decryption**:
+> `aead_core`'s production code does NOT import `chacha20poly1305` (adopted
+> Stage 74) — that dependency stays exercised ONLY by the pre-existing
+> `cfg(test)`-only `rfc8439_vectors` module (Stage 75), unchanged this stage;
+> `AeadPlaceholderRequest` stores only the two labels above — no
+> borrowed-byte-slice/`Vec<u8>`/`String` field or parameter exists anywhere
+> in the module. **No connection to `secret_handle`**: `aead_core` never
+> constructs a `SecretHandle` and extracts no key/secret byte from one — when
+> a skeleton-to-skeleton connection was ambiguous, this stage deliberately
+> left the two unconnected. `derive_key_placeholder` / `encrypt_placeholder`
+> / `decrypt_placeholder` remain byte-for-byte unchanged. `Cargo.toml` is
+> UNCHANGED this stage (no new dependency — `aead_core` uses only this
+> crate's own `FedosCoreState`, already in scope). `cargo test` is GREEN with
+> all 17 tests passing (14 pre-existing + 3 new `aead_core::tests`, its own
+> nested `#[cfg(test)] mod tests`:
+> `new_placeholder_encrypt_reports_encrypt_operation_only`,
+> `new_placeholder_decrypt_reports_decrypt_operation_only`,
+> `status_is_always_placeholder_only_no_real_cryptography`); `cargo check`
+> and `cargo check --tests` stay GREEN with no warnings —
+> `#[allow(dead_code)]` on the module suppresses the (expected) unused-code
+> warning a plain, non-test build would otherwise emit, exactly as
+> `secret_handle` already does. New
+> [`test/fedos_core_rust_aead_skeleton.test.ts`](test/fedos_core_rust_aead_skeleton.test.ts)
+> (16 tests) checks: `aead_core` is present and not `pub mod`;
+> `AeadAlgorithm`/`AeadOperation`/`AeadRequestStatus`/`AeadPlaceholderRequest`
+> are `pub(crate)`, never `pub`; no public re-export; the public `pub fn`
+> surface is exactly the six Stage 69 names; the six placeholder
+> signatures/bodies are byte-for-byte unchanged; `aead_core`'s own extracted
+> module text (via brace-matching, not the fragile "first `cfg(test)`" slice)
+> has no `chacha20poly1305` import; no key/nonce/plaintext/ciphertext/tag/aad
+> storage field (a colon-typed field declaration, not doc-comment prose) and
+> no `Vec<u8>`/`String`/borrowed-byte-slice field anywhere in the module; no
+> random/`getrandom`; no HKDF mention; no `SecretHandle` mention; no `unsafe`
+> anywhere in `lib.rs`; no `.wasm`/`Cargo.lock`/`target`/`build` artifact
+> committed; and Runtime/Worker sources mention neither
+> `aead_core`/`AeadPlaceholderRequest` nor auto-call a crypto operation (the
+> bare word "aead" is deliberately NOT checked there, since both files
+> already legitimately contain it in pre-existing, unrelated prose describing
+> what `selectCryptoProvider` does NOT do). No existing Rust source guard
+> test needed updating this stage — `aead_core` was placed so its own nested
+> `#[cfg(test)]` lands after `secret_handle`'s (lib.rs's existing first
+> occurrence), leaving every prior file's slicing logic untouched; the one
+> near-miss caught during this stage's own verification was a
+> self-referential doc-comment naming `chacha20poly1305` inside `lib.rs`'s
+> top-of-file summary, ahead of the production-code slice boundary — reworded
+> to avoid the literal crate name, following the same precedent the original
+> Stage 69 doc comment already set for keeping AEAD crate names out of that
+> summary. Stage 81 candidate: **an internal ChaCha20-Poly1305 helper behind
+> `cfg(test)` or crate-private visibility** — a small, RFC-8439-vector-verified
+> seal/open routine `aead_core` could eventually call — still no public
+> `encrypt`/`decrypt` implementation. Prior status:
+>
+> **Stage 79 — Add an internal secret-handle skeleton (crate-private
 > only; no public API change, no real secrets, no AEAD/HKDF/Argon2, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs` gains a crate-private `secret_handle`

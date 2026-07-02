@@ -37,6 +37,14 @@
 //! public API (nothing below is `pub`, nothing is re-exported), holds no
 //! real key/seed/plaintext/ciphertext/passphrase byte, and none of the six
 //! functions above constructs, holds, or returns one.
+//!
+//! Stage 80 adds a second crate-private module, `aead_core`, of the same
+//! shape: an INTERNAL-ONLY AEAD request skeleton (labels and a non-sensitive
+//! status only — no key, nonce, plaintext, ciphertext, or tag byte, and its
+//! production code imports no AEAD cipher crate — same reason that crate
+//! name is kept out of this summary, see the note above). Same rules apply:
+//! not part of the public API, no public function above constructs, holds,
+//! or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -258,6 +266,144 @@ mod secret_handle {
         #[test]
         fn empty_state_is_the_default_placeholder_only_state() {
             assert_eq!(SecretHandleState::default(), SecretHandleState::Empty);
+        }
+    }
+}
+
+/// Stage 80 — an INTERNAL-ONLY AEAD request skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns an
+/// [`AeadPlaceholderRequest`].
+///
+/// This module holds NO key, nonce, plaintext, ciphertext, or tag byte —
+/// there is no borrowed-byte-slice, `Vec<u8>`, or `String` field or
+/// parameter anywhere below, and no real encrypt/decrypt operation is
+/// implemented or called. Production code here does NOT import
+/// `chacha20poly1305` — that dependency is exercised only by the
+/// `cfg(test)`-only `rfc8439_vectors` module above, unchanged since Stage
+/// 75. This module does not connect to `secret_handle` (above): it never
+/// constructs a `SecretHandle` and never reads a key/secret byte out of one
+/// — when in doubt about a connection between the two skeletons, this stage
+/// deliberately leaves them unconnected rather than guess at a future
+/// design. `hkdf` is likewise not referenced here.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle` above
+/// does. This is expected for a skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod aead_core {
+    use crate::FedosCoreState;
+
+    /// A supported AEAD algorithm label — intent only, no implementation.
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AeadAlgorithm {
+        ChaCha20Poly1305,
+    }
+
+    /// Which AEAD operation an [`AeadPlaceholderRequest`] represents —
+    /// a label only, no bytes are sealed or opened. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AeadOperation {
+        Encrypt,
+        Decrypt,
+    }
+
+    /// A non-sensitive status snapshot for an [`AeadPlaceholderRequest`].
+    /// Crate-private only. Never contains a key/nonce/plaintext/ciphertext/
+    /// tag byte — `state` reuses this crate's existing
+    /// [`FedosCoreState`](crate::FedosCoreState) labels (`Unavailable` /
+    /// `Placeholder`) rather than inventing a parallel enum.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct AeadRequestStatus {
+        pub(crate) state: FedosCoreState,
+    }
+
+    /// An INTERNAL-ONLY AEAD placeholder request skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds ONLY the two labels below — no key, nonce,
+    /// plaintext, ciphertext, or tag byte, and no `chacha20poly1305` type.
+    /// A future, explicitly-reviewed stage may extend this skeleton to
+    /// actually seal/open bytes behind `cfg(test)` first; until then it
+    /// accepts and stores none.
+    pub(crate) struct AeadPlaceholderRequest {
+        algorithm: AeadAlgorithm,
+        operation: AeadOperation,
+    }
+
+    impl AeadPlaceholderRequest {
+        /// Construct a placeholder ENCRYPT request. Takes NO plaintext,
+        /// key, nonce, or AAD input of any kind.
+        pub(crate) fn new_placeholder_encrypt() -> Self {
+            Self {
+                algorithm: AeadAlgorithm::ChaCha20Poly1305,
+                operation: AeadOperation::Encrypt,
+            }
+        }
+
+        /// Construct a placeholder DECRYPT request. Takes NO ciphertext,
+        /// tag, key, nonce, or AAD input of any kind.
+        pub(crate) fn new_placeholder_decrypt() -> Self {
+            Self {
+                algorithm: AeadAlgorithm::ChaCha20Poly1305,
+                operation: AeadOperation::Decrypt,
+            }
+        }
+
+        /// A non-sensitive status snapshot. Always `Placeholder` — this
+        /// skeleton runs no cryptography, so there is no other state to
+        /// report.
+        pub(crate) fn status(&self) -> AeadRequestStatus {
+            AeadRequestStatus {
+                state: FedosCoreState::Placeholder,
+            }
+        }
+
+        /// The algorithm label this request names — intent only.
+        pub(crate) fn algorithm(&self) -> AeadAlgorithm {
+            self.algorithm
+        }
+
+        /// The operation label this request names — intent only.
+        pub(crate) fn operation(&self) -> AeadOperation {
+            self.operation
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_encrypt_reports_encrypt_operation_only() {
+            let request = AeadPlaceholderRequest::new_placeholder_encrypt();
+            assert_eq!(request.operation(), AeadOperation::Encrypt);
+            assert_eq!(request.algorithm(), AeadAlgorithm::ChaCha20Poly1305);
+            assert_eq!(request.status().state, FedosCoreState::Placeholder);
+        }
+
+        #[test]
+        fn new_placeholder_decrypt_reports_decrypt_operation_only() {
+            let request = AeadPlaceholderRequest::new_placeholder_decrypt();
+            assert_eq!(request.operation(), AeadOperation::Decrypt);
+            assert_eq!(request.algorithm(), AeadAlgorithm::ChaCha20Poly1305);
+            assert_eq!(request.status().state, FedosCoreState::Placeholder);
+        }
+
+        #[test]
+        fn status_is_always_placeholder_only_no_real_cryptography() {
+            for request in [
+                AeadPlaceholderRequest::new_placeholder_encrypt(),
+                AeadPlaceholderRequest::new_placeholder_decrypt(),
+            ] {
+                assert_eq!(request.status().state, FedosCoreState::Placeholder);
+            }
         }
     }
 }
