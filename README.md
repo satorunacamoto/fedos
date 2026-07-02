@@ -8,7 +8,70 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 87 — Internal key material handle skeleton
+> **Status: Stage 88 — Internal domain separation label skeleton
+> (internal-only `domain_label` module; fixed static labels only, no
+> user/environment/config-derived string, no HKDF/AEAD/NIP-44/Nostr-key
+> connection yet, no Runtime/Worker/CryptoProvider wiring, no WASM
+> change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a fifth crate-private module,
+> `domain_label` (alongside Stage 79's `secret_handle`, Stage 80's
+> `aead_core`, Stage 82's `kdf_core`, and Stage 87's `key_material`, placed
+> right after `key_material`, still ahead of this file's first module gated
+> `cfg(test)`). It defines: `DomainLabelState` (`pub(crate) enum`,
+> `Placeholder`/`Disabled` — `Disabled` is the `Default`);
+> `DomainLabelKind` (`pub(crate) enum`, `FedosMasterPlaceholder`/
+> `AeadKeyPlaceholder`/`KdfOutputPlaceholder`/`NostrKeyPlaceholder`/
+> `Nip44Placeholder`/`TestOnlyPlaceholder` — a label identity only);
+> `DomainLabelStatus` (`pub(crate) struct`, a non-sensitive status snapshot
+> carrying only the state enum); and `DomainLabel` (`pub(crate) struct`,
+> holding `kind`/`state`) with four methods: `new_placeholder(kind:
+> DomainLabelKind)` (takes only the label identity — no user-,
+> environment-, or config-derived input of any kind), `kind()`, `status()`,
+> and `as_static_label()` (returns a fixed `&'static str` per kind via a
+> private `const fn` lookup table — `"fedos:placeholder:master"`,
+> `"fedos:placeholder:aead-key"`, `"fedos:placeholder:kdf-output"`,
+> `"fedos:placeholder:nostr-key"`, `"fedos:placeholder:nip44"`,
+> `"fedos:placeholder:test-only"`). **NOT part of this crate's public API**:
+> every item is `pub(crate)` at most — never `pub` — nothing is re-exported
+> from the crate root, and the crate's public `pub fn` surface is still
+> exactly the same six placeholder functions from Stage 69; none of them
+> constructs, holds, or returns a `DomainLabel`. **Fixed labels only**:
+> every string `as_static_label()` can return is a compile-time `&'static
+> str` literal — never built with `format!`, `String::from`,
+> `.to_string()`, concatenation, or read from the process environment or any
+> runtime configuration; `DomainLabel` stores no `String`/`Vec<u8>` field.
+> **Not connected to `secret_handle`, `aead_core`, `kdf_core`, or
+> `key_material`** — `domain_label` never constructs any of their types and
+> mixes no fixed label into an actual HKDF/AEAD/NIP-44/Nostr-key-derivation
+> operation, same "when a skeleton-to-skeleton connection is ambiguous,
+> leave it unconnected" reasoning Stage 80/82/87 already established; all
+> four of those modules are UNCHANGED this stage, still placeholder-only.
+> `cargo test` is GREEN with all 41 tests passing (36 pre-existing + 5 new
+> `domain_label::tests`); `cargo check` and `cargo check --tests` stay GREEN
+> with no warnings. `Cargo.toml` is UNCHANGED this stage — no new dependency
+> needed (`domain_label` imports nothing beyond the standard library). New
+> [`test/fedos_core_rust_domain_label.test.ts`](test/fedos_core_rust_domain_label.test.ts)
+> (16 tests) checks: the module is internal-only and not `pub`;
+> `DomainLabel` is `pub(crate)` at most and never re-exported; the public
+> `pub fn` surface is exactly the six Stage 69 names; the six placeholder
+> function bodies are byte-for-byte unchanged; every `DomainLabelKind` label
+> is a fixed static string literal matching the documented table inside a
+> `const fn`; no `String`/`Vec` field anywhere in the module;
+> `new_placeholder` takes only a `DomainLabelKind` (no `&str`/`String`
+> parameter); no `std::env`/`env::`/`var_os`/`std::process` usage; no
+> connection to `SecretHandle`/`AeadPlaceholderRequest`/
+> `KdfPlaceholderRequest`/`KeyMaterialHandle` (nor do those four modules
+> reference `DomainLabel*`), and no HKDF/AEAD/Argon2 usage (specific
+> Rust-usage patterns only, not a bare word match, to avoid colliding with
+> this module's own doc-comment prose); no `unsafe`; Runtime/Worker sources
+> mention neither `domain_label` nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; both enums
+> have exactly their specified variants and the handle exposes exactly its
+> four methods. Stage 89 candidate: **an internal operation context
+> skeleton** — a type basis for future AEAD/KDF/NIP-44 operations, still no
+> real cryptography wired in. Prior status:
+>
+> **Stage 87 — Internal key material handle skeleton
 > (internal-only `key_material` module; no public API change, no real
 > key/seed/plaintext/ciphertext/passphrase/nonce byte, no AEAD/HKDF/Argon2/
 > NIP-44 implementation, no Runtime/Worker/CryptoProvider wiring, no WASM

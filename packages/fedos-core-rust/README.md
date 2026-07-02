@@ -4,10 +4,10 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 87 — Internal key material handle skeleton (internal-only
-> `key_material` module; no public API change, no real key/seed/plaintext/
-> ciphertext/passphrase/nonce byte, no AEAD/HKDF/Argon2/NIP-44
-> implementation, no Runtime/Worker/CryptoProvider wiring, no WASM change).
+> **Status: Stage 88 — Internal domain separation label skeleton
+> (internal-only `domain_label` module; fixed static labels only, no
+> user/environment/config-derived string, no HKDF/AEAD/NIP-44/Nostr-key
+> connection yet, no Runtime/Worker/CryptoProvider wiring, no WASM change).
 > Public API STILL a placeholder SKELETON. No cryptography reachable from any
 > public function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
@@ -28,17 +28,24 @@ app depends only on its *contract*, never on its internals.
 > module skeleton" section below. Stage 84 adopted `argon2` v0.5.3
 > (`default-features = false`, no features), wired to the RFC 9106 Argon2id
 > vector under `cfg(test)` in Stage 85 (refactored into a test-only helper
-> Stage 86). **Stage 87 adds a fourth crate-private module, `key_material`**
+> Stage 86). Stage 87 added a fourth crate-private module, `key_material`
 > — an INTERNAL-ONLY key-material handle skeleton reusing `secret_handle`'s
-> (Stage 79) exact placeholder-only pattern (a fixed, non-secret marker
-> wrapped in `secrecy::SecretBox`, zeroized on `clear()`), plus a
-> `KeyMaterialKind` label enum (`AeadKeyPlaceholder` / `KdfOutputPlaceholder`
-> / `NostrKeyPlaceholder` / `UnknownPlaceholder`) naming future AEAD/KDF/
-> Nostr-identity connection points — see the "Internal key material
-> skeleton" section below. **Not connected to `secret_handle`, `aead_core`,
-> or `kdf_core`** — same "when in doubt, leave unconnected" reasoning those
-> modules already state; `secret_handle`/`aead_core`/`kdf_core` are all
-> UNCHANGED this stage, still placeholder-only. **No production
+> (Stage 79) exact placeholder-only pattern, plus a `KeyMaterialKind` label
+> enum naming future AEAD/KDF/Nostr-identity connection points — see the
+> "Internal key material skeleton" section below; `key_material` is
+> UNCHANGED this stage, still placeholder-only. **Stage 88 adds a fifth
+> crate-private module, `domain_label`** — an INTERNAL-ONLY
+> domain-separation-label skeleton holding only a fixed, non-secret
+> `&'static str` label per named future connection point, plus a
+> `DomainLabelKind` label enum (`FedosMasterPlaceholder` /
+> `AeadKeyPlaceholder` / `KdfOutputPlaceholder` / `NostrKeyPlaceholder` /
+> `Nip44Placeholder` / `TestOnlyPlaceholder`) — see the "Internal domain
+> separation label skeleton" section below. **No user-, environment-, or
+> config-derived label** — every label is a compile-time `&'static str`
+> literal, never built/formatted/concatenated at runtime. **Not connected to
+> `secret_handle`, `aead_core`, `kdf_core`, or `key_material`** — same "when
+> in doubt, leave unconnected" reasoning those modules already state; all
+> four are UNCHANGED this stage, still placeholder-only. **No production
 > `deriveKey`/password KDF** — production code (everything before this
 > file's first `cfg(test)`-gated module) still does not import `argon2` at
 > all; `derive_key_placeholder` remains byte-for-byte unchanged. `Cargo.toml`
@@ -127,6 +134,13 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   against a fixed, non-secret marker); it accepts and stores no real
   key/seed/plaintext/ciphertext/passphrase/nonce byte, and is not connected
   to `secret_handle`/`aead_core`/`kdf_core`
+- No dynamic domain separation label — Stage 88 adds an INTERNAL-ONLY
+  `DomainLabel` skeleton (crate-private `domain_label` module, `pub(crate)`
+  at most, never `pub`, never re-exported) whose `as_static_label()` returns
+  only a fixed, compile-time `&'static str` literal per `DomainLabelKind`;
+  it accepts no user-, environment-, or config-derived string, holds no
+  `String`/`Vec<u8>` field, and is not connected to
+  `secret_handle`/`aead_core`/`kdf_core`/`key_material`
 - No WebAuthn / passkey, no Secure Enclave, no Apple/Google enclave integration
 - Handles no secret bytes: requests carry OPAQUE, non-secret handles/labels only
 
@@ -153,7 +167,7 @@ packages/fedos-core-rust
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a third `cfg(test)`-only `rfc9106_vectors` module (Stage 85) verifies argon2 against RFC 9106 Argon2id, refactored Stage 86 to share derivation logic via one test-only helper fn; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `key_material` module (Stage 87) is an INTERNAL-ONLY `KeyMaterialHandle` skeleton reusing `secret_handle`'s zeroize/secrecy placeholder-marker pattern, plus a `KeyMaterialKind` label enum — none of the four skeletons is part of the public API, and none is connected to any other
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a third `cfg(test)`-only `rfc9106_vectors` module (Stage 85) verifies argon2 against RFC 9106 Argon2id, refactored Stage 86 to share derivation logic via one test-only helper fn; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `key_material` module (Stage 87) is an INTERNAL-ONLY `KeyMaterialHandle` skeleton reusing `secret_handle`'s zeroize/secrecy placeholder-marker pattern, plus a `KeyMaterialKind` label enum; a crate-private `domain_label` module (Stage 88) is an INTERNAL-ONLY `DomainLabel` skeleton holding only a fixed `&'static str` label per `DomainLabelKind` — none of the five skeletons is part of the public API, and none is connected to any other
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -833,6 +847,74 @@ unchanged; and nothing is wired into the Runtime, the Worker, or
 `CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
 `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
 
-A future, explicitly-reviewed Stage 88 candidate is an internal domain
-separation label skeleton — important for future HKDF/AEAD connections,
-still no real HKDF/AEAD implementation.
+## Internal domain separation label skeleton (Stage 88)
+
+`src/lib.rs` gains a fifth crate-private module, `domain_label` (alongside
+Stage 79's `secret_handle`, Stage 80's `aead_core`, Stage 82's `kdf_core`,
+and Stage 87's `key_material`, placed right after `key_material`, still
+ahead of this file's first module gated `cfg(test)`). It defines:
+
+- **`DomainLabelState`** (`pub(crate) enum`) — `Placeholder` / `Disabled`.
+  `Disabled` is the `Default` — the inert state before any `DomainLabel` is
+  constructed for use.
+- **`DomainLabelKind`** (`pub(crate) enum`) — `FedosMasterPlaceholder` /
+  `AeadKeyPlaceholder` / `KdfOutputPlaceholder` / `NostrKeyPlaceholder` /
+  `Nip44Placeholder` / `TestOnlyPlaceholder` — a label identity only; no
+  key/derivation of any of these kinds happens here.
+- **`DomainLabelStatus`** (`pub(crate) struct`) — a non-sensitive status
+  snapshot, carrying only the state enum.
+- **`DomainLabel`** (`pub(crate) struct`) — the skeleton itself, holding
+  only `kind: DomainLabelKind` and `state: DomainLabelState`. Four methods:
+  `new_placeholder(kind: DomainLabelKind)` (constructs a handle — takes only
+  the label identity, no user-, environment-, or config-derived input of any
+  kind), `kind()` (returns the label identity), `status()` (returns the
+  non-sensitive snapshot), and `as_static_label()` (returns the fixed
+  `&'static str` for this handle's kind, via a private `const fn` lookup
+  table on `DomainLabelKind` — `"fedos:placeholder:master"`,
+  `"fedos:placeholder:aead-key"`, `"fedos:placeholder:kdf-output"`,
+  `"fedos:placeholder:nostr-key"`, `"fedos:placeholder:nip44"`,
+  `"fedos:placeholder:test-only"`).
+
+**NOT part of this crate's public API.** Every item above is `pub(crate)` at
+most — never `pub` — and nothing is re-exported from the crate root. This
+crate's public `pub fn` surface is still exactly the same six placeholder
+functions from Stage 69 (`fedos_core_status`, `fedos_core_capabilities`,
+`random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+`decrypt_placeholder`); none of them constructs, holds, or returns a
+`DomainLabel`. See
+[`test/fedos_core_rust_domain_label.test.ts`](../../test/fedos_core_rust_domain_label.test.ts)
+for the dedicated guard tests (internal-only visibility, no public export,
+public `pub fn` count still 6, every label is a fixed static string literal
+matching the documented table, no `String`/`Vec` field, `new_placeholder`
+takes only a `DomainLabelKind`, no env/runtime/config-derived label
+construction, no `unsafe`, no committed build artifact, Runtime/Worker
+untouched, no connection to
+`secret_handle`/`aead_core`/`kdf_core`/`key_material`).
+
+**Fixed labels only — no dynamic construction.** Every string
+`as_static_label()` can return is a compile-time `&'static str` literal
+inside a `const fn` — never built with `format!`, `String::from`,
+`.to_string()`, string concatenation, or read from `std::env`/any runtime
+configuration/any user input. `DomainLabel` stores no `String`, no `Vec<u8>`,
+and no borrowed-byte-slice field of any kind — only the two labels
+(`kind`/`state`).
+
+**No connection to `secret_handle`, `aead_core`, `kdf_core`, or
+`key_material`.** `domain_label` never constructs any of their types and
+mixes no fixed label into an actual HKDF/AEAD/NIP-44/Nostr-key-derivation
+operation — same "when a skeleton-to-skeleton connection is ambiguous, leave
+it unconnected rather than guess at a future design" reasoning Stage
+80/82/87 already established.
+
+This is dependency-free SKELETON work only (no new `Cargo.toml` entry this
+stage): no key, seed, plaintext, ciphertext, passphrase, or nonce byte is
+accepted, stored, or handled anywhere in `domain_label`; no HKDF/AEAD/
+NIP-44 operation is implemented or called, and no Nostr key is derived;
+`derive_key_placeholder`/`encrypt_placeholder`/`decrypt_placeholder` are
+unchanged; and nothing is wired into the Runtime, the Worker, or
+`CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
+`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+A future, explicitly-reviewed Stage 89 candidate is an internal operation
+context skeleton — a type basis for future AEAD/KDF/NIP-44 operations,
+still no real cryptography wired in.

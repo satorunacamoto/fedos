@@ -90,6 +90,16 @@
 //! connected to `secret_handle`, `aead_core`, or `kdf_core` today. Same
 //! rules apply: not part of the public API, no public function above
 //! constructs, holds, or returns one of its types.
+//!
+//! Stage 88 adds a fifth crate-private module, `domain_label`: an
+//! INTERNAL-ONLY domain-separation-label skeleton holding only a fixed,
+//! non-secret, `&'static str` label per named future connection point
+//! (never a user-, environment-, or config-derived string, and never a
+//! `String`/`Vec<u8>` field). It exists in preparation for a future HKDF/
+//! AEAD/NIP-44/Nostr-key-derivation connection, still not connected to
+//! `secret_handle`, `aead_core`, `kdf_core`, or `key_material` today. Same
+//! rules apply: not part of the public API, no public function above
+//! constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -814,6 +824,209 @@ mod key_material {
         #[test]
         fn empty_state_is_the_default_placeholder_only_state() {
             assert_eq!(KeyMaterialState::default(), KeyMaterialState::Empty);
+        }
+    }
+}
+
+/// Stage 88 — an INTERNAL-ONLY domain-separation-label skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a [`DomainLabel`].
+///
+/// This module holds NO user-, environment-, or config-derived string — every
+/// label [`DomainLabel::as_static_label`] can return is a fixed `&'static
+/// str` literal, chosen at compile time from a [`DomainLabelKind`], never
+/// built, formatted, concatenated, or read from any input, the process
+/// environment, or runtime configuration. There is no `String` or owned
+/// byte-buffer field
+/// anywhere below — only the fixed `&'static str` table and the two label
+/// enums. No AEAD/HKDF/Argon2/NIP-44 operation is implemented or called, and
+/// no Nostr key is derived. This module does not connect to `secret_handle`
+/// (Stage 79), `aead_core` (Stage 80), `kdf_core` (Stage 82), or
+/// `key_material` (Stage 87): it never constructs any of their types and
+/// never reads a key/secret byte out of one — when in doubt about a
+/// connection between skeletons, this crate deliberately leaves them
+/// unconnected rather than guess at a future design (the same reasoning
+/// `aead_core`'s own doc comment already states). It exists in preparation
+/// for a future HKDF/AEAD/NIP-44/Nostr-key-derivation connection point: a
+/// place a later, explicitly-reviewed stage can extend to actually mix a
+/// fixed label into a real derivation, once it also implements the
+/// HKDF/AEAD/NIP-44 operation that would consume it.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material` above do. This is expected for a
+/// skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod domain_label {
+    /// Coarse internal lifecycle state of a [`DomainLabel`]. Crate-private
+    /// only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum DomainLabelState {
+        /// A fixed placeholder label is active and returnable.
+        Placeholder,
+        /// No fixed label should be treated as active — the default, inert
+        /// state before any [`DomainLabel`] is constructed for use.
+        Disabled,
+    }
+
+    impl Default for DomainLabelState {
+        fn default() -> Self {
+            DomainLabelState::Disabled
+        }
+    }
+
+    /// Which future domain-separation connection point a [`DomainLabel`]
+    /// names — a label identity only, not an implementation. Crate-private
+    /// only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum DomainLabelKind {
+        /// Intended future connection point: a top-level FedOS master
+        /// domain-separation label. No master key is derived here.
+        FedosMasterPlaceholder,
+        /// Intended future connection point: an AEAD key label (e.g. for
+        /// `aead_core`, Stage 80, or `key_material`, Stage 87). No AEAD key
+        /// is derived here.
+        AeadKeyPlaceholder,
+        /// Intended future connection point: a KDF output label (e.g. for
+        /// `kdf_core`, Stage 82). No KDF output is derived here.
+        KdfOutputPlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key
+        /// label. No Nostr key is derived here.
+        NostrKeyPlaceholder,
+        /// Intended future connection point: a NIP-44 encryption label. No
+        /// NIP-44 operation is performed here.
+        Nip44Placeholder,
+        /// Reserved for this module's own tests / future test-only fixtures
+        /// — never used by production code paths.
+        TestOnlyPlaceholder,
+    }
+
+    impl DomainLabelKind {
+        /// The fixed `&'static str` label for this kind. Never built,
+        /// formatted, concatenated, or derived from any input — a plain
+        /// literal chosen at compile time.
+        const fn as_static_label(self) -> &'static str {
+            match self {
+                DomainLabelKind::FedosMasterPlaceholder => "fedos:placeholder:master",
+                DomainLabelKind::AeadKeyPlaceholder => "fedos:placeholder:aead-key",
+                DomainLabelKind::KdfOutputPlaceholder => "fedos:placeholder:kdf-output",
+                DomainLabelKind::NostrKeyPlaceholder => "fedos:placeholder:nostr-key",
+                DomainLabelKind::Nip44Placeholder => "fedos:placeholder:nip44",
+                DomainLabelKind::TestOnlyPlaceholder => "fedos:placeholder:test-only",
+            }
+        }
+    }
+
+    /// A non-sensitive status snapshot for a [`DomainLabel`]. Crate-private
+    /// only. Never contains a key/seed/plaintext/ciphertext/passphrase/nonce
+    /// byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct DomainLabelStatus {
+        pub(crate) state: DomainLabelState,
+    }
+
+    /// An INTERNAL-ONLY domain-separation-label handle skeleton
+    /// (crate-private; not part of this crate's public API — see the
+    /// module-level doc comment above). Holds only a [`DomainLabelKind`]
+    /// label identity and a [`DomainLabelState`] — no key, seed, plaintext,
+    /// ciphertext, passphrase, or nonce byte, and no user-, environment-, or
+    /// config-derived string. A future, explicitly-reviewed stage may extend
+    /// this skeleton to actually mix its fixed label into a real
+    /// derivation; until then it accepts and stores none.
+    pub(crate) struct DomainLabel {
+        kind: DomainLabelKind,
+        state: DomainLabelState,
+    }
+
+    impl DomainLabel {
+        /// Construct a placeholder label handle of the given
+        /// [`DomainLabelKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind — `kind` is a fixed label
+        /// identity only.
+        pub(crate) fn new_placeholder(kind: DomainLabelKind) -> Self {
+            Self {
+                kind,
+                state: DomainLabelState::Placeholder,
+            }
+        }
+
+        /// The [`DomainLabelKind`] this handle was constructed with —
+        /// identity only.
+        pub(crate) fn kind(&self) -> DomainLabelKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> DomainLabelStatus {
+            DomainLabelStatus { state: self.state }
+        }
+
+        /// The fixed `&'static str` label for this handle's
+        /// [`DomainLabelKind`] — never a `String`, never built/formatted/
+        /// concatenated, never derived from user input, the process
+        /// environment, or runtime configuration.
+        pub(crate) fn as_static_label(&self) -> &'static str {
+            self.kind.as_static_label()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let label = DomainLabel::new_placeholder(DomainLabelKind::AeadKeyPlaceholder);
+            assert_eq!(label.status().state, DomainLabelState::Placeholder);
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                DomainLabelKind::FedosMasterPlaceholder,
+                DomainLabelKind::AeadKeyPlaceholder,
+                DomainLabelKind::KdfOutputPlaceholder,
+                DomainLabelKind::NostrKeyPlaceholder,
+                DomainLabelKind::Nip44Placeholder,
+                DomainLabelKind::TestOnlyPlaceholder,
+            ] {
+                let label = DomainLabel::new_placeholder(kind);
+                assert_eq!(label.kind(), kind);
+                assert_eq!(label.status().state, DomainLabelState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn as_static_label_returns_the_documented_fixed_string_per_kind() {
+            let expected = [
+                (DomainLabelKind::FedosMasterPlaceholder, "fedos:placeholder:master"),
+                (DomainLabelKind::AeadKeyPlaceholder, "fedos:placeholder:aead-key"),
+                (DomainLabelKind::KdfOutputPlaceholder, "fedos:placeholder:kdf-output"),
+                (DomainLabelKind::NostrKeyPlaceholder, "fedos:placeholder:nostr-key"),
+                (DomainLabelKind::Nip44Placeholder, "fedos:placeholder:nip44"),
+                (DomainLabelKind::TestOnlyPlaceholder, "fedos:placeholder:test-only"),
+            ];
+            for (kind, expected_label) in expected {
+                let label = DomainLabel::new_placeholder(kind);
+                assert_eq!(label.as_static_label(), expected_label);
+            }
+        }
+
+        #[test]
+        fn as_static_label_is_stable_across_repeated_calls() {
+            let label = DomainLabel::new_placeholder(DomainLabelKind::Nip44Placeholder);
+            assert_eq!(label.as_static_label(), label.as_static_label());
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(DomainLabelState::default(), DomainLabelState::Disabled);
         }
     }
 }
