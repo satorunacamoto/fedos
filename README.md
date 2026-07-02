@@ -8,7 +8,67 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 85 — Wire RFC 9106 Argon2id vectors to Rust
+> **Status: Stage 86 — Extract a test-only Argon2id helper (test-only
+> refactor; no public API change, no production deriveKey/password KDF, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs`'s pre-existing `cfg(test)`-only
+> `rfc9106_vectors` module (Stage 85) is refactored: the Argon2id derivation
+> logic that used to be written as a per-vector helper,
+> `run_argon2id_for_vector(vector: &Vector)`, is now one small, private,
+> test-only helper function taking raw bytes,
+> `derive_argon2id_for_test(password_bytes, salt_bytes, secret_bytes,
+> associated_data_bytes, memory_cost_kib, time_cost, parallelism,
+> output_len) -> argon2::Result<Vec<u8>>` (constructed internally with
+> `Algorithm::Argon2id`, hardcoded `Version::V0x13`, and the given `secret`
+> bytes as the pepper via `Argon2::new_with_secret`) — mirroring the
+> byte-level shape and `_for_test` naming convention Stage 81/83
+> established for `seal_chacha20poly1305_for_test`/
+> `extract_hkdf_sha256_for_test`. It is a private `fn` — never
+> `pub`/`pub(crate)`, never re-exported — that exists ONLY inside the
+> `cfg(test)`-only `rfc9106_vectors` module, and is NOT connected to the
+> crate-private `kdf_core` skeleton (Stage 82, unchanged this stage — still
+> placeholder-only) or `secret_handle`/`aead_core` in any way. **Test-only
+> refactor, not a new capability**: the two pre-existing vector tests
+> (`rfc9106_positive_vectors_hash_correctly` and
+> `rfc9106_negative_vectors_do_not_match_if_present`) assert exactly what
+> they asserted before Stage 86, just calling the shared helper instead of
+> building an `argon2::Argon2` inline per vector. Two new unit tests
+> exercise the helper directly, independent of the vector file:
+> `derive_argon2id_is_deterministic_for_test_helper` (fixed, non-secret,
+> test-only inputs always produce the same output) and
+> `derive_argon2id_fails_for_unsupported_memory_cost_for_test_helper` (a
+> memory cost below Argon2's own minimum makes the helper return an error).
+> `cargo test` is GREEN with all 30 tests passing (28 pre-existing + 2 new
+> helper unit tests); `cargo check` and `cargo check --tests` stay GREEN
+> with no warnings. `Cargo.toml` is UNCHANGED this stage — `argon2` was
+> already a `[dependencies]` (production) entry since Stage 84, with the
+> same `default-features = false`, zero-features configuration. **No
+> production `argon2` import**: `src/lib.rs`'s production code (everything
+> before this file's first `cfg(test)`-gated module) still does not import,
+> reference, or call `argon2` anywhere; `derive_key_placeholder` remains
+> byte-for-byte unchanged, and the crate's public `pub fn` surface stays
+> exactly the same six placeholder functions from Stage 69. New
+> [`test/fedos_core_rust_argon2_test_helper.test.ts`](test/fedos_core_rust_argon2_test_helper.test.ts)
+> (10 tests) checks: the helper exists inside the `cfg(test)`-gated region
+> and is private (never `pub`/`pub(crate)`, never re-exported); production
+> code (before the first `cfg(test)`) has no `Argon2::`/`Argon2<`/`argon2::`
+> usage and no password/salt/secret/associatedData/tag field, and no
+> reference to the new helper name either; the public `pub fn` surface is
+> exactly the six Stage 69 names; `kdf_core` remains unchanged and
+> placeholder-only (no `argon2` import, no reference to the new helper, its
+> six methods unchanged); Runtime/Worker sources mention neither the helper
+> name nor `argon2`/`rfc9106` and do not auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; and the
+> helper call sites use the documented `argon2::Result<Vec<u8>>` signature.
+> [`test/fedos_core_rust_argon2_wiring.test.ts`](test/fedos_core_rust_argon2_wiring.test.ts)
+> test 5 was updated because it named the OLD per-vector helper —
+> `run_argon2id_for_vector` no longer exists after this stage's rename, so
+> that test now checks the new `derive_argon2id_for_test` name is not `pub`
+> instead. Stage 87 candidate: **an internal key material type skeleton** —
+> placeholder-only, holding no real secret bytes yet — in preparation for a
+> future AEAD/KDF connection point. Prior status:
+>
+> **Stage 85 — Wire RFC 9106 Argon2id vectors to Rust
 > `cargo test` (verification wiring only; no public `deriveKey`/password-KDF
 > API, no Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs` gains a third bottom-of-file module,

@@ -4,10 +4,10 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 85 — Wire RFC 9106 Argon2id vectors to Rust
-> `cargo test` (verification wiring only; no public `deriveKey`/password-KDF
-> API, no Runtime/Worker/CryptoProvider wiring, no WASM change). Public API
-> STILL a placeholder SKELETON. No cryptography reachable from any public
+> **Status: Stage 86 — Extract a test-only Argon2id helper (test-only
+> refactor; no public API change, no production deriveKey/password KDF, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change). Public API STILL a
+> placeholder SKELETON. No cryptography reachable from any public
 > function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
@@ -26,22 +26,22 @@ app depends only on its *contract*, never on its internals.
 > added a third crate-private module, `kdf_core` — see the "Internal KDF
 > module skeleton" section below; **`kdf_core` is UNCHANGED this stage, still
 > placeholder-only**. Stage 84 adopted `argon2` v0.5.3 (`default-features =
-> false`, no features). **Stage 85 wires that dependency**: `src/lib.rs`
-> gains a new bottom-of-file `#[cfg(test)]`-only module, `rfc9106_vectors`,
-> that reads
-> [`test-vectors/kdf/argon2id-rfc9106.json`](../../test-vectors/kdf/argon2id-rfc9106.json)
-> (imported verbatim Stage 73) via `include_str!` and asserts `argon2`
-> reproduces RFC 9106 §5.3's known-answer Argon2id tag — see the "RFC 9106
-> vector wiring" section below. `Cargo.toml` is UNCHANGED this stage: the
-> vector's memory buffer is allocated with this crate's own `std::vec` via
-> `Argon2::hash_password_into_with_memory`, so no `alloc`/`password-hash`/
-> `rand` feature was needed on `argon2` after all. `derive_key_placeholder`
-> remains byte-for-byte unchanged and there is still **no public
-> `deriveKey`/password-hashing implementation**. The Rust crate still has no
-> `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**; the
-> runtime/Worker/`CryptoProvider` are **not** wired to any of this. A real
-> RustCrypto-backed core is a future, explicitly-reviewed stage that must pass
-> the full crypto test-vector plan
+> false`, no features), wired to the RFC 9106 Argon2id vector under
+> `cfg(test)` in Stage 85. **Stage 86 is a test-only refactor of the Stage 85
+> module**: the Argon2id derivation logic that used to be written as a
+> per-vector helper is now one small, private, test-only helper function
+> taking raw bytes, `derive_argon2id_for_test` — see the "RFC 9106 vector
+> wiring" section below for the details. **Not connected to `kdf_core` or
+> `secret_handle`/`aead_core`** — the helper exists ONLY inside the
+> `cfg(test)`-only `rfc9106_vectors` module, is never `pub`/`pub(crate)`,
+> and is never re-exported. **No production `deriveKey`/password KDF** —
+> production code (everything before this file's first `cfg(test)`-gated
+> module) still does not import `argon2` at all; `derive_key_placeholder`
+> remains byte-for-byte unchanged. `Cargo.toml` is UNCHANGED this stage. The
+> Rust crate still has no `wasm-bindgen`, no `unsafe`, and produces **no
+> `.wasm`**; the runtime/Worker/`CryptoProvider` are **not** wired to any of
+> this. A real RustCrypto-backed core is a future, explicitly-reviewed stage
+> that must pass the full crypto test-vector plan
 > ([`docs/crypto_test_vectors.md`](../../docs/crypto_test_vectors.md)) and ship a
 > build manifest ([`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md))
 > before it can be selected at runtime. See also
@@ -679,23 +679,22 @@ see "Dependencies" above for the full crate review. That stage was the
 vector was wired). Stage 85 (below) completes the "wired" step for this
 dependency.
 
-## RFC 9106 vector wiring (Stage 85)
+## RFC 9106 vector wiring (Stage 85, refactored Stage 86)
 
-`src/lib.rs`'s bottom-most module, `rfc9106_vectors` (gated `#[cfg(test)]`,
-compiled only for `cargo test`), reads
+`src/lib.rs`'s `rfc9106_vectors` module (gated `#[cfg(test)]`, compiled only
+for `cargo test`), reads
 [`test-vectors/kdf/argon2id-rfc9106.json`](../../test-vectors/kdf/argon2id-rfc9106.json)
-at compile time via `include_str!` and runs three tests:
+at compile time via `include_str!` and runs five tests:
 
 - `rfc9106_json_parses_and_is_non_empty` — the vector file parses and is
   non-empty.
 - `rfc9106_positive_vectors_hash_correctly` — for the `shouldPass: true`
   vector (RFC 9106 §5.3's sole published Argon2id conformance test case:
   m=32 KiB, t=3, p=4, a small, fast-to-verify parameter set — NOT a
-  production parameter recommendation), `argon2::Argon2` (constructed with
-  `Algorithm::Argon2id`, `Version::V0x13`, the vector's `memoryKiB`/
-  `iterations`/`parallelism`/`tagLength`/`associatedData`, and the vector's
-  `secret` as the pepper via `Argon2::new_with_secret`) produces exactly the
-  RFC's expected 32-byte tag from the vector's `password`/`salt`.
+  production parameter recommendation), the test-only helper (below)
+  produces exactly the RFC's expected 32-byte tag from the vector's
+  `password`/`salt`/`secret`/`associatedData`/`memoryKiB`/`iterations`/
+  `parallelism`/`tagLength`.
 - `rfc9106_negative_vectors_do_not_match_if_present` — for every
   `shouldPass: false` vector (none exist in the current file; RFC 9106 §5.3
   publishes only the one positive Argon2id conformance vector — no
@@ -706,17 +705,39 @@ at compile time via `include_str!` and runs three tests:
   expected bytes. This loop runs zero iterations today and trivially passes;
   it starts enforcing automatically if a future, explicitly-reviewed
   re-import ever adds an official negative case.
+- `derive_argon2id_is_deterministic_for_test_helper` (Stage 86) — the same
+  fixed, non-secret, test-only inputs (not RFC vector data) always produce
+  the same 32-byte output.
+- `derive_argon2id_fails_for_unsupported_memory_cost_for_test_helper`
+  (Stage 86) — a memory cost below Argon2's own minimum
+  (`Params::MIN_M_COST`, 8 KiB) makes the helper return an error.
 
-**No `Cargo.toml` change was needed.** The vector's memory buffer (`Block`s)
-is allocated with this crate's own `std::vec` and passed to
-`Argon2::hash_password_into_with_memory` — `argon2`'s optional `alloc`
-feature (which would transitively enable `password-hash` and pull in
+**Stage 86 refactor.** The positive/negative vector tests' Argon2id
+derivation — previously a per-vector helper,
+`run_argon2id_for_vector(vector: &Vector)` — is now one small, private,
+test-only helper function declared earlier in the same module, taking raw
+bytes: `derive_argon2id_for_test(password_bytes, salt_bytes, secret_bytes,
+associated_data_bytes, memory_cost_kib, time_cost, parallelism, output_len)
+-> argon2::Result<Vec<u8>>` (constructed internally with
+`Algorithm::Argon2id`, hardcoded `Version::V0x13`, and the given `secret`
+bytes as the pepper via `Argon2::new_with_secret`). This mirrors the
+byte-level shape and `_for_test` naming convention Stage 81/83 established
+for `seal_chacha20poly1305_for_test`/`extract_hkdf_sha256_for_test`. It is a
+private `fn` — never `pub`/`pub(crate)`, never re-exported — that exists
+ONLY inside this `cfg(test)`-only module, and is NOT connected to the
+crate-private `kdf_core` skeleton (Stage 82) or `secret_handle`/`aead_core`
+in any way. This is a test-only refactor, not a new capability: the two
+pre-existing vector tests assert exactly what they asserted before Stage 86,
+just calling the shared helper instead of building an `argon2::Argon2`
+inline per vector.
+
+**No `Cargo.toml` change was needed** (Stage 85 or Stage 86). The vector's
+memory buffer (`Block`s) is allocated with this crate's own `std::vec` and
+passed to `Argon2::hash_password_into_with_memory` — `argon2`'s optional
+`alloc` feature (which would transitively enable `password-hash` and pull in
 `rand_core`, per the Stage 84 review) is NOT needed for this API surface.
 `argon2` stays adopted exactly as Stage 84 left it:
-`default-features = false`, zero features enabled. Verified empirically (a
-throwaway probe project, deleted before this stage's own commit) that this
-API reproduces the RFC's expected tag byte-for-byte with this exact
-dependency configuration.
+`default-features = false`, zero features enabled.
 
 This is the "wired" step of the vector lifecycle in
 [`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
@@ -725,14 +746,15 @@ This is the "wired" step of the vector lifecycle in
 `deriveKey`/password-hashing implementation**, and the runtime still selects
 only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. See
 [`test/fedos_core_rust_argon2_wiring.test.ts`](../../test/fedos_core_rust_argon2_wiring.test.ts)
-for the dedicated Stage 85 guard tests (module presence/`include_str!` path,
-no production `argon2`/`Argon2` reference, `kdf_core` unchanged and still
+and
+[`test/fedos_core_rust_argon2_test_helper.test.ts`](../../test/fedos_core_rust_argon2_test_helper.test.ts)
+for the dedicated guard tests (module/helper presence and visibility, no
+production `argon2`/`Argon2` reference, `kdf_core` unchanged and still
 placeholder-only, public `pub fn` count still 6, no production password/
 salt/secret/tag storage field, `rand`/`getrandom` still not a direct
 dependency, `password-hash` feature still not enabled, Runtime/Worker
 untouched, no committed build artifact).
 
-A future, explicitly-reviewed Stage 86 candidate is an internal Argon2 test
-helper behind `cfg(test)` — the Argon2id-side analogue of Stage 81/83's
-ChaCha20-Poly1305/HKDF helper extractions — still no public `deriveKey`
-implementation.
+A future, explicitly-reviewed Stage 87 candidate is an internal key material
+type skeleton — placeholder-only, holding no real secret bytes yet — in
+preparation for a future AEAD/KDF connection point.

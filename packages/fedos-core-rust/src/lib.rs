@@ -73,6 +73,14 @@
 //! verifying Stage 84's Argon2id dependency against an official RFC 9106
 //! known-answer vector file. Same rules apply: `cfg(test)` only, no public
 //! API change.
+//!
+//! Stage 86 is a test-only refactor of the Stage 85 module — the
+//! Argon2id-side analogue of Stage 81/83's refactors: the derivation logic
+//! that used to be written as a per-vector helper is now one small,
+//! private, test-only helper function taking raw bytes (its own doc
+//! comment, next to its declaration, names it). No production code
+//! changed — the six functions above are untouched, and the Stage 82
+//! skeleton is not connected to this refactor.
 
 #![forbid(unsafe_code)]
 
@@ -1133,6 +1141,17 @@ mod rfc5869_vectors {
 /// 9106 §5.3 Argon2id test vector, and implements no password-hashing/KDF
 /// function that any other code — production or otherwise — can call.
 /// `derive_key_placeholder` above is untouched.
+///
+/// Stage 86 extracts the Argon2id derivation logic that used to be written
+/// as a per-vector helper into [`derive_argon2id_for_test`] — a private
+/// `fn`, exists ONLY inside this `cfg(test)`-only module, takes raw
+/// password/salt/secret/associatedData bytes plus the cost parameters
+/// (mirroring the byte-level shape of Stage 81/83's
+/// `seal_chacha20poly1305_for_test`/`extract_hkdf_sha256_for_test`), and is
+/// NOT connected to the crate-private `kdf_core` skeleton (Stage 82) or
+/// `secret_handle` (Stage 79) in any way. This is a test-only refactor: the
+/// two vector tests below assert exactly the same things as before, just
+/// calling the shared helper instead of building an `Argon2` inline.
 #[cfg(test)]
 mod rfc9106_vectors {
     use argon2::{Algorithm, Argon2, AssociatedData, Block, ParamsBuilder, Version};
@@ -1178,47 +1197,54 @@ mod rfc9106_vectors {
         })
     }
 
-    /// Runs Argon2id over one vector's fields and returns the computed tag.
-    /// Test-only: not `pub`/`pub(crate)`, exists ONLY inside this
-    /// `cfg(test)`-only module. `memory_blocks` is allocated with this
-    /// crate's own `std::vec` (NOT `argon2`'s optional `alloc` feature,
-    /// which is deliberately not enabled — see the Cargo.toml comment above
-    /// the `argon2` entry), so no additional `argon2` feature is required
-    /// beyond the `default-features = false` configuration already adopted
-    /// Stage 84.
-    fn run_argon2id_for_vector(vector: &Vector) -> Vec<u8> {
-        let password_bytes = decode_hex("password", &vector.id, &vector.password);
-        let salt_bytes = decode_hex("salt", &vector.id, &vector.salt);
-        let secret_bytes = decode_hex("secret", &vector.id, &vector.secret);
-        let ad_bytes = decode_hex("associatedData", &vector.id, &vector.associated_data);
-
-        let version = Version::try_from(vector.version)
-            .unwrap_or_else(|_| panic!("{}: unsupported version {}", vector.id, vector.version));
-
+    /// Test-only Argon2id derivation helper — private `fn`, exists ONLY
+    /// under `cfg(test)`, never `pub`/`pub(crate)`. Takes raw
+    /// password/salt/secret/associatedData bytes (all test-vector bytes,
+    /// never a real passphrase) plus the Argon2id cost parameters, and
+    /// returns the computed tag on success, or the underlying
+    /// `argon2::Error` on failure (e.g. invalid parameters). Hardcodes
+    /// `Version::V0x13` (0x13 = 19) — RFC 9106 §5.3's own test vector, the
+    /// only one this crate imports — rather than taking a version
+    /// parameter; a future re-import with a different version would need
+    /// this updated (each vector's own `version` field is still checked
+    /// against it below, in the tests). `memory_blocks` is allocated with
+    /// this crate's own `std::vec` (NOT `argon2`'s optional `alloc`
+    /// feature, which is deliberately not enabled — see the Cargo.toml
+    /// comment above the `argon2` entry), so no additional `argon2` feature
+    /// is required beyond the `default-features = false` configuration
+    /// already adopted Stage 84.
+    fn derive_argon2id_for_test(
+        password_bytes: &[u8],
+        salt_bytes: &[u8],
+        secret_bytes: &[u8],
+        associated_data_bytes: &[u8],
+        memory_cost_kib: u32,
+        time_cost: u32,
+        parallelism: u32,
+        output_len: usize,
+    ) -> argon2::Result<Vec<u8>> {
         let mut builder = ParamsBuilder::new();
         builder
-            .m_cost(vector.memory_kib)
-            .t_cost(vector.iterations)
-            .p_cost(vector.parallelism)
-            .output_len(vector.tag_length)
-            .data(
-                AssociatedData::new(&ad_bytes)
-                    .unwrap_or_else(|err| panic!("{}: associatedData invalid: {err}", vector.id)),
-            );
-        let params = builder
-            .build()
-            .unwrap_or_else(|err| panic!("{}: invalid params: {err}", vector.id));
+            .m_cost(memory_cost_kib)
+            .t_cost(time_cost)
+            .p_cost(parallelism)
+            .output_len(output_len)
+            .data(AssociatedData::new(associated_data_bytes)?);
+        let params = builder.build()?;
         let block_count = params.block_count();
 
-        let argon2 = Argon2::new_with_secret(&secret_bytes, Algorithm::Argon2id, version, params)
-            .unwrap_or_else(|err| panic!("{}: invalid secret: {err}", vector.id));
+        let argon2 =
+            Argon2::new_with_secret(secret_bytes, Algorithm::Argon2id, Version::V0x13, params)?;
 
         let mut memory_blocks = vec![Block::default(); block_count];
-        let mut tag = vec![0u8; vector.tag_length];
-        argon2
-            .hash_password_into_with_memory(&password_bytes, &salt_bytes, &mut tag, &mut memory_blocks)
-            .unwrap_or_else(|err| panic!("{}: hash failed: {err}", vector.id));
-        tag
+        let mut tag = vec![0u8; output_len];
+        argon2.hash_password_into_with_memory(
+            password_bytes,
+            salt_bytes,
+            &mut tag,
+            &mut memory_blocks,
+        )?;
+        Ok(tag)
     }
 
     #[test]
@@ -1231,7 +1257,7 @@ mod rfc9106_vectors {
         );
     }
 
-    /// `shouldPass=true` vectors: `argon2::Argon2` (Argon2id) must produce
+    /// `shouldPass=true` vectors: [`derive_argon2id_for_test`] must produce
     /// exactly the RFC's expected tag from the vector's
     /// password/salt/secret/associatedData/memoryKiB/iterations/parallelism/
     /// tagLength.
@@ -1242,13 +1268,37 @@ mod rfc9106_vectors {
 
         let mut checked = 0usize;
         for vector in file.vectors.iter().filter(|v| v.should_pass) {
+            assert_eq!(
+                vector.version, 0x13,
+                "{}: derive_argon2id_for_test hardcodes RFC 9106 §5.3's version (0x13); \
+                 update it if a future vector uses a different one",
+                vector.id
+            );
+
+            let password_bytes = decode_hex("password", &vector.id, &vector.password);
+            let salt_bytes = decode_hex("salt", &vector.id, &vector.salt);
+            let secret_bytes = decode_hex("secret", &vector.id, &vector.secret);
+            let ad_bytes = decode_hex("associatedData", &vector.id, &vector.associated_data);
             let expected_tag = decode_hex("tag", &vector.id, &vector.tag);
-            let tag = run_argon2id_for_vector(vector);
+
+            let tag = derive_argon2id_for_test(
+                &password_bytes,
+                &salt_bytes,
+                &secret_bytes,
+                &ad_bytes,
+                vector.memory_kib,
+                vector.iterations,
+                vector.parallelism,
+                vector.tag_length,
+            )
+            .unwrap_or_else(|err| panic!("{}: derive failed: {err}", vector.id));
+
             assert_eq!(
                 tag, expected_tag,
                 "{}: Argon2id tag did not match the RFC 9106 vector",
                 vector.id
             );
+
             checked += 1;
         }
         assert!(
@@ -1273,13 +1323,60 @@ mod rfc9106_vectors {
             serde_json::from_str(RFC9106_JSON).expect("RFC 9106 vector JSON must parse");
 
         for vector in file.vectors.iter().filter(|v| !v.should_pass) {
+            let password_bytes = decode_hex("password", &vector.id, &vector.password);
+            let salt_bytes = decode_hex("salt", &vector.id, &vector.salt);
+            let secret_bytes = decode_hex("secret", &vector.id, &vector.secret);
+            let ad_bytes = decode_hex("associatedData", &vector.id, &vector.associated_data);
             let expected_tag = decode_hex("tag", &vector.id, &vector.tag);
-            let tag = run_argon2id_for_vector(vector);
+
+            let tag = derive_argon2id_for_test(
+                &password_bytes,
+                &salt_bytes,
+                &secret_bytes,
+                &ad_bytes,
+                vector.memory_kib,
+                vector.iterations,
+                vector.parallelism,
+                vector.tag_length,
+            )
+            .unwrap_or_else(|err| panic!("{}: derive failed: {err}", vector.id));
+
             assert_ne!(
                 tag, expected_tag,
                 "{}: expected tag mismatch for a shouldPass=false vector",
                 vector.id
             );
         }
+    }
+
+    /// Unit test for the helper itself, independent of the vector file:
+    /// Argon2id must be deterministic — identical inputs must always
+    /// produce identical output.
+    #[test]
+    fn derive_argon2id_is_deterministic_for_test_helper() {
+        let password = b"password-for-test";
+        let salt = b"salt-for-test-0123456789012345";
+        let secret = b"secret-for-test";
+        let ad = b"ad-for-test";
+
+        let first = derive_argon2id_for_test(password, salt, secret, ad, 32, 3, 4, 32)
+            .expect("derive should succeed with well-formed parameters");
+        let second = derive_argon2id_for_test(password, salt, secret, ad, 32, 3, 4, 32)
+            .expect("derive should succeed with well-formed parameters");
+
+        assert_eq!(first.len(), 32);
+        assert_eq!(first, second, "Argon2id must be deterministic for identical inputs");
+    }
+
+    /// Unit test for the helper's failure path: a memory cost below Argon2's
+    /// own minimum (`Params::MIN_M_COST`, 8 KiB) must make
+    /// [`derive_argon2id_for_test`] return an error.
+    #[test]
+    fn derive_argon2id_fails_for_unsupported_memory_cost_for_test_helper() {
+        let result = derive_argon2id_for_test(b"password-for-test", b"salt-for-test", b"", b"", 1, 3, 4, 32);
+        assert!(
+            result.is_err(),
+            "expected an error for an out-of-range memory cost"
+        );
     }
 }

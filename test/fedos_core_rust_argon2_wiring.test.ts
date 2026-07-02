@@ -39,6 +39,14 @@ import rfc9106Vectors from "../test-vectors/kdf/argon2id-rfc9106.json";
  * --tests` are verified as their own separate commands outside `npm test`,
  * consistent with how this repo has always kept the Rust toolchain check
  * independent of the vitest/TypeScript test run.
+ *
+ * Update (Stage 86): the per-vector helper this file's test 5 named,
+ * `run_argon2id_for_vector`, was renamed and reshaped into
+ * `derive_argon2id_for_test` (a byte-level helper matching the
+ * `_for_test`-suffix convention Stage 81/83 established for the AEAD/HKDF
+ * modules) — test 5 below now checks the new name. See
+ * test/fedos_core_rust_argon2_test_helper.test.ts for the dedicated
+ * Stage 86 checks.
  */
 describe("FedOS Rust crate — RFC 9106 Argon2id vectors wired to cargo test", () => {
   /** Extracts a `mod name { ... }` block via brace matching (robust to
@@ -138,7 +146,12 @@ describe("FedOS Rust crate — RFC 9106 Argon2id vectors wired to cargo test", (
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
     // The #[cfg(test)] module's own test/helper functions are not `pub`.
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+rfc9106/);
-    expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+run_argon2id_for_vector\b/);
+    // Stage 86 extracts the Argon2id derivation logic into
+    // `derive_argon2id_for_test` — see
+    // test/fedos_core_rust_argon2_test_helper.test.ts for its dedicated
+    // checks; this test only asserts it (like every other test-only
+    // function here) is never `pub`.
+    expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+derive_argon2id_for_test\b/);
   });
 
   it("6. derive_key_placeholder is unchanged: still a no-op placeholder, no Argon2 call", () => {
