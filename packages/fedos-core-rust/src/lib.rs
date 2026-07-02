@@ -14,6 +14,16 @@
 //! Mirrors the TypeScript `FedosCoreCrypto` seam
 //! (`packages/fedos-core-rust/src/types.ts`) so a real core can eventually drop
 //! in without the host depending on any concrete implementation.
+//!
+//! Stage 75 adds ONE thing beyond the above: a test-only module (gated
+//! `cfg(test)`, at the bottom of this file) that reads an official RFC 8439
+//! AEAD known-answer vector file and asserts Stage 74's AEAD dependency
+//! reproduces its expected bytes under `cargo test`. That module is
+//! verification plumbing only — it is compiled only for `cargo test`, is not
+//! compiled into the library's public API, and does not change any function
+//! above. (Its own doc comment, just above its declaration, names the
+//! specific dependency and vector file — kept out of this crate-level doc so
+//! this production-facing summary stays free of any AEAD crate name.)
 
 #![forbid(unsafe_code)]
 
@@ -110,6 +120,174 @@ mod tests {
             decrypt_placeholder(),
         ] {
             assert_eq!(status.state, FedosCoreState::Placeholder);
+        }
+    }
+}
+
+/// Stage 75 — RFC 8439 known-answer verification, `#[cfg(test)]` ONLY.
+///
+/// This module is not part of the crate's public API: it is compiled only
+/// under `cargo test`, imports `chacha20poly1305` (adopted as a production
+/// dependency in Stage 74) purely to check that dependency against the
+/// official vectors, and implements no encrypt/decrypt function that any
+/// other code — production or otherwise — can call. The placeholder
+/// functions above (`encrypt_placeholder`, `decrypt_placeholder`, etc.) are
+/// untouched.
+#[cfg(test)]
+mod rfc8439_vectors {
+    use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+    use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
+    use serde::Deserialize;
+
+    /// One vector entry. Only the fields this test needs are named; unknown
+    /// JSON fields (`nonceConstant`, `plaintextUtf8`, `notes`, ...) are
+    /// ignored by serde rather than mirrored here.
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vector {
+        id: String,
+        should_pass: bool,
+        key: String,
+        nonce: String,
+        aad: String,
+        plaintext: String,
+        ciphertext: String,
+        tag: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct VectorFile {
+        vectors: Vec<Vector>,
+    }
+
+    /// The RFC 8439 vector file imported verbatim in Stage 73, read at
+    /// compile time so this test has no filesystem/IO dependency at runtime.
+    const RFC8439_JSON: &str =
+        include_str!("../../../test-vectors/aead/chacha20poly1305-rfc8439.json");
+
+    fn decode_hex(field: &str, id: &str, value: &str) -> Vec<u8> {
+        hex::decode(value).unwrap_or_else(|err| {
+            panic!("{id}: invalid hex in field `{field}`: {err}")
+        })
+    }
+
+    #[test]
+    fn rfc8439_json_parses_and_is_non_empty() {
+        let file: VectorFile =
+            serde_json::from_str(RFC8439_JSON).expect("RFC 8439 vector JSON must parse");
+        assert!(
+            !file.vectors.is_empty(),
+            "expected at least one RFC 8439 vector"
+        );
+    }
+
+    /// `shouldPass=true` vectors: `chacha20poly1305` must both (a) seal
+    /// (encrypt) plaintext+AAD to exactly the RFC's expected
+    /// ciphertext||tag, and (b) open (decrypt) that same ciphertext||tag
+    /// back to exactly the RFC's expected plaintext.
+    #[test]
+    fn rfc8439_positive_vectors_encrypt_and_decrypt_correctly() {
+        let file: VectorFile =
+            serde_json::from_str(RFC8439_JSON).expect("RFC 8439 vector JSON must parse");
+
+        let mut checked = 0usize;
+        for vector in file.vectors.iter().filter(|v| v.should_pass) {
+            let key_bytes = decode_hex("key", &vector.id, &vector.key);
+            let nonce_bytes = decode_hex("nonce", &vector.id, &vector.nonce);
+            let aad_bytes = decode_hex("aad", &vector.id, &vector.aad);
+            let plaintext_bytes = decode_hex("plaintext", &vector.id, &vector.plaintext);
+            let ciphertext_bytes = decode_hex("ciphertext", &vector.id, &vector.ciphertext);
+            let tag_bytes = decode_hex("tag", &vector.id, &vector.tag);
+
+            let key = Key::try_from(key_bytes.as_slice())
+                .unwrap_or_else(|_| panic!("{}: key is not 32 bytes", vector.id));
+            let nonce = Nonce::try_from(nonce_bytes.as_slice())
+                .unwrap_or_else(|_| panic!("{}: nonce is not 12 bytes", vector.id));
+            let cipher = ChaCha20Poly1305::new(&key);
+
+            let mut expected_sealed = ciphertext_bytes.clone();
+            expected_sealed.extend_from_slice(&tag_bytes);
+
+            let sealed = cipher
+                .encrypt(
+                    &nonce,
+                    Payload {
+                        msg: &plaintext_bytes,
+                        aad: &aad_bytes,
+                    },
+                )
+                .unwrap_or_else(|err| panic!("{}: encrypt failed: {err}", vector.id));
+            assert_eq!(
+                sealed, expected_sealed,
+                "{}: ciphertext||tag did not match the RFC 8439 vector",
+                vector.id
+            );
+
+            let opened = cipher
+                .decrypt(
+                    &nonce,
+                    Payload {
+                        msg: expected_sealed.as_slice(),
+                        aad: &aad_bytes,
+                    },
+                )
+                .unwrap_or_else(|err| panic!("{}: decrypt failed: {err}", vector.id));
+            assert_eq!(
+                opened, plaintext_bytes,
+                "{}: decrypted plaintext did not match the RFC 8439 vector",
+                vector.id
+            );
+
+            checked += 1;
+        }
+        assert!(
+            checked > 0,
+            "expected at least one shouldPass=true RFC 8439 vector to be checked"
+        );
+    }
+
+    /// `shouldPass=false` vectors, if any exist in the imported file, must
+    /// fail to decrypt/authenticate. RFC 8439 itself publishes no
+    /// byte-level tamper/negative vector for this construction (per
+    /// docs/crypto_vector_sources.md §2's verbatim-only import rule, none is
+    /// fabricated here — see the file's own `notes` field) — so today this
+    /// loop body runs zero times and the test trivially passes. It exists so
+    /// that IF a future, explicitly-reviewed re-import of this file ever
+    /// adds an official negative case, this test starts enforcing it with no
+    /// further code change required.
+    #[test]
+    fn rfc8439_negative_vectors_fail_to_decrypt_if_present() {
+        let file: VectorFile =
+            serde_json::from_str(RFC8439_JSON).expect("RFC 8439 vector JSON must parse");
+
+        for vector in file.vectors.iter().filter(|v| !v.should_pass) {
+            let key_bytes = decode_hex("key", &vector.id, &vector.key);
+            let nonce_bytes = decode_hex("nonce", &vector.id, &vector.nonce);
+            let aad_bytes = decode_hex("aad", &vector.id, &vector.aad);
+            let ciphertext_bytes = decode_hex("ciphertext", &vector.id, &vector.ciphertext);
+            let tag_bytes = decode_hex("tag", &vector.id, &vector.tag);
+
+            let key = Key::try_from(key_bytes.as_slice())
+                .unwrap_or_else(|_| panic!("{}: key is not 32 bytes", vector.id));
+            let nonce = Nonce::try_from(nonce_bytes.as_slice())
+                .unwrap_or_else(|_| panic!("{}: nonce is not 12 bytes", vector.id));
+            let cipher = ChaCha20Poly1305::new(&key);
+
+            let mut sealed = ciphertext_bytes.clone();
+            sealed.extend_from_slice(&tag_bytes);
+
+            let result = cipher.decrypt(
+                &nonce,
+                Payload {
+                    msg: sealed.as_slice(),
+                    aad: &aad_bytes,
+                },
+            );
+            assert!(
+                result.is_err(),
+                "{}: expected decrypt/authentication failure for a shouldPass=false vector",
+                vector.id
+            );
         }
     }
 }

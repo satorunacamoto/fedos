@@ -18,13 +18,23 @@ import workerSource from "../src/worker.ts?raw";
 /**
  * Stage 69 — minimal FedOS Rust crate skeleton tests.
  * Updated Stage 74: `Cargo.toml` now depends on `chacha20poly1305` (the crate's
- * ONLY dependency; see test/fedos_core_rust_dependency.test.ts for the
- * dedicated Stage 74 checks) — `src/lib.rs` is unchanged.
+ * ONLY *production* dependency; see test/fedos_core_rust_dependency.test.ts for
+ * the dedicated Stage 74 checks) — `src/lib.rs` is unchanged.
+ * Updated Stage 75: `Cargo.toml` also gains a `[dev-dependencies]` table
+ * (`serde`/`serde_json`/`hex`, test-only) and `src/lib.rs` gains a
+ * `#[cfg(test)]`-only module that imports and calls `chacha20poly1305` to
+ * verify it against the RFC 8439 vectors — see
+ * test/fedos_core_rust_rfc8439_wiring.test.ts for the dedicated Stage 75
+ * checks. Tests 3, 6, and 8 below are scoped to PRODUCTION code/dependencies
+ * only (excluding `[dev-dependencies]` and excluding everything from the
+ * first `#[cfg(test)]` onward) so they keep verifying exactly what they always
+ * verified: the crate's public, non-test surface still implements no
+ * cryptography.
  *
  * The crate is still a placeholder skeleton: no wasm-bindgen, no `unsafe`, no
- * cryptography *implementation*, no random, and no compiled/WASM artifact. The
- * TS boundary is unchanged and stays importable; the Runtime/Worker are not
- * wired.
+ * *production* cryptography implementation, no random, and no compiled/WASM
+ * artifact. The TS boundary is unchanged and stays importable; the
+ * Runtime/Worker are not wired.
  */
 describe("FedOS Rust crate skeleton", () => {
   it("1. Cargo.toml exists with the expected package identity", () => {
@@ -59,7 +69,7 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml depends on chacha20poly1305 only — no other crypto dependency", () => {
+  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 only — no other crypto dependency", () => {
     for (const dep of [
       "aes-gcm",
       "aes_gcm",
@@ -77,10 +87,16 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] table has exactly one entry: chacha20poly1305.
+    // The [dependencies] (production) table has exactly one entry:
+    // chacha20poly1305. Stop at the next top-level `[section]` header (Stage
+    // 75 adds `[dev-dependencies]` right after it) so its test-only entries
+    // (serde/serde_json/hex) are not counted here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
-    const depLines = depsSection
+    const nextSectionIdx = depsSection.indexOf("\n[", 1);
+    const productionDepsSection =
+      nextSectionIdx === -1 ? depsSection : depsSection.slice(0, nextSectionIdx);
+    const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
     expect(depLines.length).toBe(1);
@@ -101,9 +117,19 @@ describe("FedOS Rust crate skeleton", () => {
     expect(libRsSource).not.toMatch(/\bunsafe\s+(fn|impl|trait|\{)/);
   });
 
-  it("6. lib.rs imports no crypto crate (no `use`/`extern crate` of a cipher/KDF)", () => {
-    expect(libRsSource).not.toMatch(/\bextern\s+crate\b/);
-    expect(libRsSource).not.toMatch(
+  // Stage 75 adds a #[cfg(test)]-only module that legitimately imports and
+  // calls chacha20poly1305 to verify it against the RFC 8439 vectors (see
+  // test/fedos_core_rust_rfc8439_wiring.test.ts). Tests 6 and 8 below scope
+  // themselves to lib.rs's PRODUCTION code — everything before the first
+  // `#[cfg(test)]` — which must still implement no cryptography at all.
+  const firstCfgTestIdx = libRsSource.indexOf("#[cfg(test)]");
+  const productionLibRs =
+    firstCfgTestIdx === -1 ? libRsSource : libRsSource.slice(0, firstCfgTestIdx);
+
+  it("6. lib.rs's production code imports no crypto crate (no `use`/`extern crate` of a cipher/KDF)", () => {
+    expect(firstCfgTestIdx).toBeGreaterThan(-1);
+    expect(productionLibRs).not.toMatch(/\bextern\s+crate\b/);
+    expect(productionLibRs).not.toMatch(
       /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|argon2|zeroize|secrecy|subtle|bip39|secp256k1|nostr|wasm_bindgen)\b/,
     );
   });
@@ -115,13 +141,14 @@ describe("FedOS Rust crate skeleton", () => {
     expect(libRsSource).not.toMatch(/\bthread_rng\b/);
   });
 
-  it("8. lib.rs has no encryption implementation beyond placeholder names", () => {
+  it("8. lib.rs's production code has no encryption implementation beyond placeholder names", () => {
     // The encrypt/decrypt entry points exist as names...
-    expect(libRsSource).toContain("encrypt_placeholder");
-    expect(libRsSource).toContain("decrypt_placeholder");
-    // ...but no real AEAD/cipher primitive and no hand-rolled XOR cipher.
-    expect(libRsSource).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
-    expect(libRsSource).not.toContain("^=");
+    expect(productionLibRs).toContain("encrypt_placeholder");
+    expect(productionLibRs).toContain("decrypt_placeholder");
+    // ...but no real AEAD/cipher primitive and no hand-rolled XOR cipher,
+    // outside the #[cfg(test)]-only RFC 8439 verification module.
+    expect(productionLibRs).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
+    expect(productionLibRs).not.toContain("^=");
   });
 
   it("9. no .wasm file is committed to the package", () => {

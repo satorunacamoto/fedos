@@ -8,7 +8,70 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 74 — Adopt `chacha20poly1305` dependency (build check
+> **Status: Stage 75 — Wire RFC 8439 ChaCha20-Poly1305 vectors to Rust
+> `cargo test` (verification wiring only; no public encrypt/decrypt API, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a new bottom-of-file module,
+> `rfc8439_vectors`, gated `#[cfg(test)]` (compiled only for `cargo test`).
+> It reads
+> [`test-vectors/aead/chacha20poly1305-rfc8439.json`](test-vectors/aead/chacha20poly1305-rfc8439.json)
+> (imported verbatim Stage 73) at compile time via `include_str!` — no
+> filesystem IO at test runtime — parses it into a `serde`-derived struct, and
+> for every `shouldPass: true` vector asserts the `chacha20poly1305` crate
+> (adopted Stage 74) both seals plaintext+AAD to exactly the RFC's expected
+> ciphertext‖tag AND opens that ciphertext‖tag back to exactly the RFC's
+> expected plaintext; a third test asserts decrypt/authentication failure for
+> any `shouldPass: false` vector (none exist in this file today — RFC 8439
+> publishes no byte-level tamper vector for this construction and none is
+> fabricated, per [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md)
+> §2 — so that test's loop runs zero iterations and trivially passes, ready to
+> start enforcing automatically if a future re-import ever adds one).
+> `cargo test` is GREEN with all 6 tests passing (3 pre-existing placeholder
+> tests + 3 new RFC 8439 tests); `cargo check` stays GREEN. `Cargo.toml` gains
+> a `[dev-dependencies]` table — `serde` v1.0.228 (`features = ["derive"]`),
+> `serde_json` v1.0.150, `hex` v0.4.3 — used ONLY by the new test module to
+> parse the vector JSON and decode its hex fields; none is a production
+> dependency, none is reachable from `src/lib.rs`'s public API, and
+> `[dependencies]` (production) still has exactly one entry,
+> `chacha20poly1305`, unchanged from Stage 74. The crate's PUBLIC API —
+> `fedos_core_status`, `fedos_core_capabilities`, `random_bytes_placeholder`,
+> `derive_key_placeholder`, `encrypt_placeholder`, `decrypt_placeholder` — is
+> **completely unchanged** and still implements no cryptography; there is
+> still **no public encrypt/decrypt implementation**, and nothing outside
+> `#[cfg(test)]` imports or calls `chacha20poly1305`. `crate-type = ["rlib"]`,
+> `#![forbid(unsafe_code)]`, and the absence of `wasm-bindgen` all stay exactly
+> as before; no `.wasm` is produced. The Runtime, the Worker, and
+> `CryptoProvider`/`FedosCoreCryptoProvider` are **not** touched — no random,
+> nonce, or key generation is added anywhere, and nothing wires this crate's
+> dependency into the host. `Cargo.lock` was generated to run `cargo test`
+> and then deleted, not committed, per the same convention as Stage 74. New
+> [`test/fedos_core_rust_rfc8439_wiring.test.ts`](test/fedos_core_rust_rfc8439_wiring.test.ts)
+> (9 tests) checks: `[dependencies]` still has only `chacha20poly1305`;
+> `serde`/`serde_json`/`hex` are dev-dependencies only and excluded from
+> `[dependencies]`; every other named crypto crate and `wasm-bindgen` stay
+> absent; `lib.rs` contains the `rfc8439_vectors` module wired to the exact
+> vector file path via `include_str!` and actually imports/uses
+> `chacha20poly1305` (but only in its `#[cfg(test)]`-scoped tail); the six
+> public placeholder function signatures and bodies are byte-for-byte
+> unchanged; no `pub fn` anywhere in the file is anything other than those six
+> names; no `.wasm`/`Cargo.lock`/`target`/`build`/compiled artifact is
+> committed; and the Runtime/Worker sources neither mention
+> `chacha20poly1305`/`rfc8439` nor auto-call a crypto operation. Two existing
+> test files were updated to keep scanning PRODUCTION code only, since the new
+> `#[cfg(test)]` module legitimately mentions `chacha20poly1305`:
+> [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> test 10, and [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts)
+> tests 3, 6, and 8 (test 3 also now stops its `[dependencies]` line-count at
+> the next `[section]` header so `[dev-dependencies]` entries aren't
+> miscounted as production dependencies) — every one of them now slices
+> `lib.rs`'s source at its first `#[cfg(test)]` attribute and asserts the
+> PRODUCTION prefix, not the whole file, has no AEAD mention. Stage 76
+> candidate: **adopt the `hkdf` dependency** (production dependency + build
+> check only, same one-crate-per-Stage pattern as Stage 74, no vector wiring
+> yet — that follows in a later Stage once `hkdf` itself is adopted). Prior
+> status:
+>
+> **Stage 74 — Adopt `chacha20poly1305` dependency (build check
 > only; no crypto implementation, no vector wiring, no WASM change).**
 > `packages/fedos-core-rust/Cargo.toml` gains its **first dependency**:
 > `chacha20poly1305` v0.11.0 (RustCrypto, `default-features = false`,

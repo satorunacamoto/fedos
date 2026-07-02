@@ -1,16 +1,19 @@
-# FedOS Core — minimal Rust crate skeleton (Stage 69) + first dependency (Stage 74).
+# FedOS Core — minimal Rust crate skeleton (Stage 69) + first dependency
+# (Stage 74) + RFC 8439 vectors wired to `cargo test` (Stage 75).
 #
-# Placeholder crate. There is still NO cryptography and NO WASM here — `src/lib.rs`
-# is unchanged (placeholder functions only; see docs/rust_dependency_adoption.md).
-# Stage 74 adds exactly ONE dependency, `chacha20poly1305` (RustCrypto), so a
-# FUTURE, explicitly-reviewed stage can wire the RFC 8439 vectors
-# (test-vectors/aead/chacha20poly1305-rfc8439.json) to `cargo test` and, later,
-# implement real AEAD behind this crate's placeholder API. That crate is not
-# imported, called, or exercised anywhere in this crate yet. Every other crypto
-# crate (aes-gcm / hkdf / argon2), rand / getrandom, zeroize / secrecy / subtle,
-# bip39 / secp256k1 / nostr, and wasm-bindgen remain ABSENT — each lands only in
-# its own future, explicitly-reviewed, one-crate-per-stage adoption
-# (docs/rust_dependency_adoption.md §1).
+# Placeholder crate. There is still NO cryptography and NO WASM here — the
+# PUBLIC API in `src/lib.rs` is unchanged (placeholder functions only; see
+# docs/rust_dependency_adoption.md). Stage 74 added exactly ONE production
+# dependency, `chacha20poly1305` (RustCrypto). Stage 75 wires the RFC 8439
+# vectors (test-vectors/aead/chacha20poly1305-rfc8439.json) to a `#[cfg(test)]`
+# module in `src/lib.rs` that reads the vector file and asserts
+# `chacha20poly1305` reproduces the official known answers — this is
+# verification plumbing only; there is still no public encrypt/decrypt API and
+# nothing outside `#[cfg(test)]` imports or calls the crate. Every other
+# crypto crate (aes-gcm / hkdf / argon2), rand / getrandom, zeroize / secrecy /
+# subtle, bip39 / secp256k1 / nostr, and wasm-bindgen remain ABSENT — each
+# lands only in its own future, explicitly-reviewed, one-crate-per-stage
+# adoption (docs/rust_dependency_adoption.md §1).
 
 [package]
 name = "fedos-core-rust"
@@ -34,7 +37,17 @@ crate-type = ["rlib"]
 # NOT imported/used anywhere in src/lib.rs yet — dependency + build check only.
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
 
-# Still intentionally ABSENT: aes-gcm, hkdf, argon2, rand / getrandom, zeroize /
-# secrecy / subtle, bip39 / secp256k1 / nostr, wasm-bindgen. One crate per
-# Stage, each with its own recorded dependency review
-# (docs/rust_dependency_adoption.md §1, §8).
+[dev-dependencies]
+# Test-only plumbing (Stage 75) to read and assert against the RFC 8439
+# vector JSON from `#[cfg(test)]` — none of these three crates is a
+# production dependency and none is reachable from the crate's public API.
+# `serde`/`serde_json` parse test-vectors/aead/chacha20poly1305-rfc8439.json
+# into a Rust struct; `hex` decodes its hex-string fields into bytes.
+hex = "0.4.3"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+
+# Still intentionally ABSENT from [dependencies] (production): aes-gcm, hkdf,
+# argon2, rand / getrandom, zeroize / secrecy / subtle, bip39 / secp256k1 /
+# nostr, wasm-bindgen. One crate per Stage, each with its own recorded
+# dependency review (docs/rust_dependency_adoption.md §1, §8).

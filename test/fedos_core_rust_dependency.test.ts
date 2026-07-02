@@ -23,6 +23,14 @@ import workerSource from "../src/worker.ts?raw";
  * `cargo check` (green as of this stage) is verified as its own separate
  * command outside `npm test`, consistent with how this repo has always kept
  * the Rust toolchain check independent of the vitest/TypeScript test run.
+ *
+ * Update (Stage 75): test 10 below is scoped to lib.rs's PRODUCTION code
+ * (everything before the first `#[cfg(test)]`) rather than the whole file,
+ * because Stage 75 adds a `#[cfg(test)]`-only module that legitimately
+ * imports and calls `chacha20poly1305` to verify it against the RFC 8439
+ * vectors — see test/fedos_core_rust_rfc8439_wiring.test.ts for that
+ * stage's own dedicated tests. Every other test in this file is unchanged
+ * and still describes Stage 74's dependency-adoption-only state.
  */
 describe("FedOS Rust crate — chacha20poly1305 dependency adoption", () => {
   // TOML comments legitimately NAME both the adopted and the still-forbidden
@@ -82,18 +90,26 @@ describe("FedOS Rust crate — chacha20poly1305 dependency adoption", () => {
     expect(libRsSource).not.toMatch(/\bunsafe\s+(fn|impl|trait|\{)/);
   });
 
-  it("10. lib.rs does not implement encrypt/decrypt (placeholder names only, no chacha20poly1305 usage)", () => {
-    // The dependency was added to Cargo.toml only — lib.rs is unchanged and
-    // must not import, reference, or call into it (or any other AEAD).
-    expect(libRsSource).not.toMatch(/\buse\s+chacha20poly1305\b/);
-    expect(libRsSource).not.toMatch(/\bchacha20poly1305::/);
-    expect(libRsSource).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
-    expect(libRsSource).not.toContain("^=");
-    // The placeholder entry points still exist and still do nothing real.
-    expect(libRsSource).toContain("fn encrypt_placeholder(");
-    expect(libRsSource).toContain("fn decrypt_placeholder(");
-    expect(libRsSource).toContain("fn random_bytes_placeholder(");
-    expect(libRsSource).toContain("fn derive_key_placeholder(");
+  it("10. lib.rs's production code does not implement encrypt/decrypt (placeholder names only, no chacha20poly1305 usage outside #[cfg(test)])", () => {
+    // Stage 75 wires the RFC 8439 vectors to a #[cfg(test)]-only module
+    // (see test/fedos_core_rust_rfc8439_wiring.test.ts), which DOES import
+    // and call chacha20poly1305 — but only inside #[cfg(test)]. The
+    // PRODUCTION code (everything before the first #[cfg(test)]) must still
+    // neither import, reference, nor call into chacha20poly1305 (or any
+    // other AEAD), exactly as Stage 74 left it.
+    const firstCfgTest = libRsSource.indexOf("#[cfg(test)]");
+    expect(firstCfgTest).toBeGreaterThan(-1);
+    const productionCode = libRsSource.slice(0, firstCfgTest);
+    expect(productionCode).not.toMatch(/\buse\s+chacha20poly1305\b/);
+    expect(productionCode).not.toMatch(/\bchacha20poly1305::/);
+    expect(productionCode).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
+    expect(productionCode).not.toContain("^=");
+    // The placeholder entry points still exist (in production code) and
+    // still do nothing real.
+    expect(productionCode).toContain("fn encrypt_placeholder(");
+    expect(productionCode).toContain("fn decrypt_placeholder(");
+    expect(productionCode).toContain("fn random_bytes_placeholder(");
+    expect(productionCode).toContain("fn derive_key_placeholder(");
   });
 
   it("11. no .wasm file is committed to the package", () => {
