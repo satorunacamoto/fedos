@@ -8,7 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 70 — FedOS Core Rust crate safety docs (docs only, no code).**
+> **Status: Stage 71 — Crypto vector source research docs (docs only, no
+> vectors, no crypto).**
+> A new [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md) fixes,
+> in writing, the **official/upstream test-vector source catalog** a FUTURE
+> FedOS Rust crypto core will draw known-answer vectors from — **no vector
+> bytes copied, no `src/` change, no `packages/fedos-core-rust/src/` change, no
+> dependency, no crypto, no WASM** in this stage. It is a **source-selection
+> catalog**, concretizing the general rules already fixed in
+> [`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md) §3–§7. It
+> documents, per primitive: (1) purpose (source catalog before implementation;
+> not a vector file, not an implementation spec); (2) adoption principles
+> (official RFC/standard/upstream sources preferred; every vector needs
+> source + section + revision + license note; generated/custom vectors stay
+> out of scope; no implementation behavior specified); (3) ChaCha20-Poly1305
+> (primary source RFC 8439 §2.8.2 + Appendix A.5; key/nonce/plaintext/AAD/
+> ciphertext/tag; tag/ciphertext/AAD tamper cases; no nonce reuse);
+> (4) XChaCha20-Poly1305 (candidate sources: draft-irtf-cfrg-xchacha,
+> libsodium vectors, RustCrypto vectors only if traceable to an official
+> source; weaker provenance than an RFC, revision must be recorded
+> explicitly); (5) AES-256-GCM (candidate sources: NIST SP 800-38D, NIST CAVP
+> GCM KATs, Wycheproof negative tests as optional future supplement;
+> distinguishes 96-bit IV standard case from non-standard IV cases);
+> (6) HKDF-SHA256 (primary source RFC 5869 SHA-256 cases; IKM/salt/info/L/PRK/
+> OKM; domain-separation labels mandatory; Apple/Google/WebAuthn credential is
+> never IKM/seed); (7) Argon2id (primary source RFC 9106; password
+> label/salt/m/t/p/output/expected; mobile vs. desktop profile is a separate
+> future decision; password never used directly as an AEAD key); (8) NIP-44
+> (primary source upstream `nostr-protocol/nips` NIP-44 v2 vectors;
+> conversation key/nonce/payload/ciphertext/decrypt-failure cases; NIP-44 is
+> separate from the generic AEAD layer, no local variant); (9) cross-cutting
+> negative/tamper vectors (tag/AAD/nonce/ciphertext tamper, malformed/
+> truncated payload, wrong domain-separation label, KDF wrong info/salt must
+> not collide); (10) the future `test-vectors/` file layout (six named files,
+> none added); (11) a future JSON schema proposal (`algorithm` /`source`/
+> `sourceRevision`/`licenseNote`/`cases[]`/`expected`/`shouldPass`/`notes` —
+> proposal only, not committed); (12) Rust implementation linkage (connects to
+> [`docs/fedos_core_rust_safety.md`](docs/fedos_core_rust_safety.md) and
+> [`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md); a
+> future implementation must pass these vectors before runtime provider
+> selection is real; the runtime provider stays the inert placeholder); and
+> (13) the current conclusion (docs only, no vectors, no crypto, no
+> dependencies). This stage adds no test — there is no new behavior to cover.
+> Stage 72 candidate: **Test-vector JSON schema docs and empty
+> `test-vectors/` directory skeleton** (fix the schema and directory shape
+> before any real vector bytes land). Prior status:
+>
+> **Stage 70 — FedOS Core Rust crate safety docs (docs only, no code).**
 > A new [`docs/fedos_core_rust_safety.md`](docs/fedos_core_rust_safety.md) fixes,
 > in writing, the guardrails around the Stage 69 minimal Rust crate skeleton —
 > **no Rust/`Cargo.toml` change, no dependency, no crypto, no `zeroize`/`rand`, no
