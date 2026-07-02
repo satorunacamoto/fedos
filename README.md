@@ -8,7 +8,39 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 65 — Runtime crypto provider selection boundary (disabled by
+> **Status: Stage 66 — Anti-analysis & Shadow Vault risk docs (docs only, no
+> code).**
+> A new [`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md)
+> fixes, in writing, a set of **hard prohibitions** — **no `src/` change, no
+> behavior change** in this stage — so that nobody, now or in a future stage, adds
+> anti-debugging, anti-VM detection, self-destruct, or fake "shadow data"
+> generation. It documents: (1) anti-debug / anti-VM detection is NOT implemented
+> (no `sys.gettrace`/`ptrace`/`debugger;` traps, no VM/emulator artifact scan, no
+> "am I being analyzed?" fingerprinting); (2) self-destruct / forced exit /
+> process kill is NOT implemented (no `os._exit`, no crash-on-detection, no
+> heuristic-driven wipe trigger); (3) VM detection has high false positives and
+> breaks legitimate users, developers/CI, and auditors; (4) debugger detection
+> reads as evasion and is security theater; (5) the safe alternatives it DOES
+> consider instead (app lock on background, explicit user lock, session timeout,
+> a best-effort memory-wipe *request* boundary, crash-safe state clearing, no
+> secret in logs) — reacting to the user/OS lifecycle, never to a "watched?"
+> guess; (6) shadow data generator is NOT implemented; (7) branch-selected shadow
+> vaults (e.g. `finger_id == 5`) are a clear anti-pattern; (8) fake activity
+> generation carries large legal / UX / safety risk; (9) deniable storage stays a
+> Stage 40 research boundary; (10) the prerequisites IF a legitimate hardened
+> container were ever pursued (audited Rust core, fixed-size container, AEAD,
+> padding, metadata-leak analysis, no hardcoded branch, no generated fake claims);
+> (11) forbidden wording ("完全に隠せる" / "捜査に耐える" / "痕跡ゼロ" /
+> "絶対バレない" and variants); and (12) the current conclusion (docs only, no
+> anti-analysis, no shadow generator, prohibitions binding). It complements
+> [`docs/deniable_storage_research.md`](docs/deniable_storage_research.md)
+> (Stage 40) and [`docs/vault_crypto_identity.md`](docs/vault_crypto_identity.md).
+> This stage adds no test — there is no new behavior to cover. Stage 67 candidate:
+> **Crypto operation test-vector documentation** (fix the KNOWN-ANSWER vectors —
+> AEAD / HKDF / Argon2 / NIP-44 — a future real core must reproduce). Prior
+> status:
+>
+> **Stage 65 — Runtime crypto provider selection boundary (disabled by
 > default, selection only, no WASM, no cryptography).**
 > `createRuntime` can now SELECT a Stage 34 `CryptoProvider` from the environment
 > and exposes it as `AppRuntime.cryptoProvider`. This is a **selection /
@@ -2235,7 +2267,8 @@ D1 space directory caveats (do not over-promise on these):
 62. WebAuthn runtime selection boundary, disabled by default (`createRuntime` selects a `WebAuthnProvider` from env; `AppRuntime.webAuthnProvider`; selection only, no `navigator.credentials`, no `begin`/`cancel`) ✓
 63. FedOS core WASM loader boundary, disabled by default (`packages/fedos-core-rust/src/wasm_loader.ts`; `FedosCoreWasmLoader` + Noop/Placeholder + bridge helpers; no WASM/Rust/fetch/instantiate, not wired) ✓
 64. FedOS core WASM loader safety docs ([`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); docs only, no code) ✓
-65. Runtime crypto provider selection boundary, disabled by default (`createRuntime` selects a `CryptoProvider` from env; `AppRuntime.cryptoProvider`; FedOS option wraps the inert `PlaceholderFedosCoreCrypto` only; selection only, no WASM load, no cryptography, no crypto-op call) ✓ ← you are here
+65. Runtime crypto provider selection boundary, disabled by default (`createRuntime` selects a `CryptoProvider` from env; `AppRuntime.cryptoProvider`; FedOS option wraps the inert `PlaceholderFedosCoreCrypto` only; selection only, no WASM load, no cryptography, no crypto-op call) ✓
+66. Anti-analysis & Shadow Vault risk docs ([`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md); docs only, no code; binding prohibitions — no anti-debug/anti-VM, no self-destruct, no shadow/fake-data generator) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
