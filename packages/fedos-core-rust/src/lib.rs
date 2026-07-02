@@ -68,6 +68,11 @@
 //! doc comments, next to their declarations, name them). No production code
 //! changed — the six functions above are untouched, and the Stage 82
 //! skeleton is not connected to this refactor.
+//!
+//! Stage 85 adds a third test-only module of the same shape as Stage 75/77,
+//! verifying Stage 84's Argon2id dependency against an official RFC 9106
+//! known-answer vector file. Same rules apply: `cfg(test)` only, no public
+//! API change.
 
 #![forbid(unsafe_code)]
 
@@ -1116,5 +1121,165 @@ mod rfc5869_vectors {
             result.is_err(),
             "expected an error for an out-of-range OKM length"
         );
+    }
+}
+
+/// Stage 85 — RFC 9106 Argon2id known-answer verification, `#[cfg(test)]`
+/// ONLY.
+///
+/// This module is not part of the crate's public API: it is compiled only
+/// under `cargo test`, imports `argon2` (adopted as a production dependency
+/// in Stage 84) purely to check that dependency against the official RFC
+/// 9106 §5.3 Argon2id test vector, and implements no password-hashing/KDF
+/// function that any other code — production or otherwise — can call.
+/// `derive_key_placeholder` above is untouched.
+#[cfg(test)]
+mod rfc9106_vectors {
+    use argon2::{Algorithm, Argon2, AssociatedData, Block, ParamsBuilder, Version};
+    use serde::Deserialize;
+
+    /// One vector entry. Only the fields this test needs are named; unknown
+    /// JSON fields (`type`, `description`, `preHashingDigestH0`, `notes`,
+    /// ...) are ignored by serde rather than mirrored here — `tag` (the
+    /// final digest) is the only field RFC 9106 §5.3 publishes as a
+    /// complete, independently-verifiable known-answer value (see the
+    /// imported vector file's own `notes` field).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vector {
+        id: String,
+        should_pass: bool,
+        version: u32,
+        #[serde(rename = "memoryKiB")]
+        memory_kib: u32,
+        iterations: u32,
+        parallelism: u32,
+        tag_length: usize,
+        password: String,
+        salt: String,
+        secret: String,
+        associated_data: String,
+        tag: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct VectorFile {
+        vectors: Vec<Vector>,
+    }
+
+    /// The RFC 9106 vector file imported verbatim in Stage 73, read at
+    /// compile time so this test has no filesystem/IO dependency at runtime.
+    const RFC9106_JSON: &str =
+        include_str!("../../../test-vectors/kdf/argon2id-rfc9106.json");
+
+    fn decode_hex(field: &str, id: &str, value: &str) -> Vec<u8> {
+        hex::decode(value).unwrap_or_else(|err| {
+            panic!("{id}: invalid hex in field `{field}`: {err}")
+        })
+    }
+
+    /// Runs Argon2id over one vector's fields and returns the computed tag.
+    /// Test-only: not `pub`/`pub(crate)`, exists ONLY inside this
+    /// `cfg(test)`-only module. `memory_blocks` is allocated with this
+    /// crate's own `std::vec` (NOT `argon2`'s optional `alloc` feature,
+    /// which is deliberately not enabled — see the Cargo.toml comment above
+    /// the `argon2` entry), so no additional `argon2` feature is required
+    /// beyond the `default-features = false` configuration already adopted
+    /// Stage 84.
+    fn run_argon2id_for_vector(vector: &Vector) -> Vec<u8> {
+        let password_bytes = decode_hex("password", &vector.id, &vector.password);
+        let salt_bytes = decode_hex("salt", &vector.id, &vector.salt);
+        let secret_bytes = decode_hex("secret", &vector.id, &vector.secret);
+        let ad_bytes = decode_hex("associatedData", &vector.id, &vector.associated_data);
+
+        let version = Version::try_from(vector.version)
+            .unwrap_or_else(|_| panic!("{}: unsupported version {}", vector.id, vector.version));
+
+        let mut builder = ParamsBuilder::new();
+        builder
+            .m_cost(vector.memory_kib)
+            .t_cost(vector.iterations)
+            .p_cost(vector.parallelism)
+            .output_len(vector.tag_length)
+            .data(
+                AssociatedData::new(&ad_bytes)
+                    .unwrap_or_else(|err| panic!("{}: associatedData invalid: {err}", vector.id)),
+            );
+        let params = builder
+            .build()
+            .unwrap_or_else(|err| panic!("{}: invalid params: {err}", vector.id));
+        let block_count = params.block_count();
+
+        let argon2 = Argon2::new_with_secret(&secret_bytes, Algorithm::Argon2id, version, params)
+            .unwrap_or_else(|err| panic!("{}: invalid secret: {err}", vector.id));
+
+        let mut memory_blocks = vec![Block::default(); block_count];
+        let mut tag = vec![0u8; vector.tag_length];
+        argon2
+            .hash_password_into_with_memory(&password_bytes, &salt_bytes, &mut tag, &mut memory_blocks)
+            .unwrap_or_else(|err| panic!("{}: hash failed: {err}", vector.id));
+        tag
+    }
+
+    #[test]
+    fn rfc9106_json_parses_and_is_non_empty() {
+        let file: VectorFile =
+            serde_json::from_str(RFC9106_JSON).expect("RFC 9106 vector JSON must parse");
+        assert!(
+            !file.vectors.is_empty(),
+            "expected at least one RFC 9106 vector"
+        );
+    }
+
+    /// `shouldPass=true` vectors: `argon2::Argon2` (Argon2id) must produce
+    /// exactly the RFC's expected tag from the vector's
+    /// password/salt/secret/associatedData/memoryKiB/iterations/parallelism/
+    /// tagLength.
+    #[test]
+    fn rfc9106_positive_vectors_hash_correctly() {
+        let file: VectorFile =
+            serde_json::from_str(RFC9106_JSON).expect("RFC 9106 vector JSON must parse");
+
+        let mut checked = 0usize;
+        for vector in file.vectors.iter().filter(|v| v.should_pass) {
+            let expected_tag = decode_hex("tag", &vector.id, &vector.tag);
+            let tag = run_argon2id_for_vector(vector);
+            assert_eq!(
+                tag, expected_tag,
+                "{}: Argon2id tag did not match the RFC 9106 vector",
+                vector.id
+            );
+            checked += 1;
+        }
+        assert!(
+            checked > 0,
+            "expected at least one shouldPass=true RFC 9106 vector to be checked"
+        );
+    }
+
+    /// `shouldPass=false` vectors, if any exist in the imported file, must
+    /// produce a tag that does NOT match whatever (necessarily incorrect)
+    /// expected bytes the fixture carries. RFC 9106 §5.3 publishes only the
+    /// single positive Argon2id conformance vector — no byte-level
+    /// tamper/negative vector — and none is fabricated here (per
+    /// docs/crypto_vector_sources.md §2's verbatim-only import rule) — so
+    /// today this loop body runs zero times and the test trivially passes.
+    /// It exists so that IF a future, explicitly-reviewed re-import of this
+    /// file ever adds an official negative case, this test starts enforcing
+    /// it with no further code change required.
+    #[test]
+    fn rfc9106_negative_vectors_do_not_match_if_present() {
+        let file: VectorFile =
+            serde_json::from_str(RFC9106_JSON).expect("RFC 9106 vector JSON must parse");
+
+        for vector in file.vectors.iter().filter(|v| !v.should_pass) {
+            let expected_tag = decode_hex("tag", &vector.id, &vector.tag);
+            let tag = run_argon2id_for_vector(vector);
+            assert_ne!(
+                tag, expected_tag,
+                "{}: expected tag mismatch for a shouldPass=false vector",
+                vector.id
+            );
+        }
     }
 }
