@@ -1,0 +1,8 @@
+# Rust build artifacts — never committed (Stage 69 ships the crate SKELETON only:
+# no compiled output, no lockfile, no WASM). A real build/lockfile/manifest lands
+# only in a future, explicitly-reviewed stage.
+/target/
+/build/
+Cargo.lock
+*.wasm
+*.rlib

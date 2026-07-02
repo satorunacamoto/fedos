@@ -193,16 +193,22 @@ describe("FedOS Core WASM loader ships no WASM/Rust and no cryptography", () => 
     }
   });
 
-  it("13. no .rs / Cargo files are committed to the package", () => {
+  it("13. a Rust crate skeleton is allowed, but no compiled/lock/build artifacts", () => {
+    // Stage 69 adds a minimal Rust crate skeleton (Cargo.toml + src/lib.rs). What
+    // must stay absent is any COMPILED output: no `.wasm`, no `.rlib`/`.so`/
+    // `.dll`/`.dylib`/`.node`/`.a`/`.o`, no committed `Cargo.lock`, and no
+    // `target/`/`build/` artifacts.
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../packages/fedos-core-rust/**/*");
     const paths = Object.keys(files);
-    const forbidden = /\.(rs|rlib)$/i;
-    const forbiddenName = /\/(Cargo\.toml|Cargo\.lock)$/i;
+    const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
+    const forbiddenName = /\/Cargo\.lock$/i;
+    const forbiddenDir = /\/(target|build)\//i;
     for (const path of paths) {
-      expect(forbidden.test(path), `unexpected Rust file: ${path}`).toBe(false);
-      expect(forbiddenName.test(path), `unexpected Cargo file: ${path}`).toBe(false);
+      expect(forbidden.test(path), `unexpected compiled artifact: ${path}`).toBe(false);
+      expect(forbiddenName.test(path), `unexpected Cargo.lock: ${path}`).toBe(false);
+      expect(forbiddenDir.test(path), `unexpected build dir artifact: ${path}`).toBe(false);
     }
   });
 

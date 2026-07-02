@@ -219,9 +219,10 @@ describe("FedOS core package has no real cryptography", () => {
     expect(pkgTypesSource).not.toMatch(/^\s*import\b/m);
   });
 
-  it("15. no WASM / Rust binary is committed to the package", () => {
+  it("15. no compiled WASM / Rust binary is committed to the package", () => {
     // Enumerate every committed file in the package via Vite's glob (no import,
-    // keys only) — no node:fs types needed. Assert none is a WASM/Rust artifact.
+    // keys only) — no node:fs types needed. Stage 69 allows a Rust crate SKELETON
+    // (Cargo.toml + src/lib.rs); what must stay absent is any COMPILED artifact.
     const files = (
       import.meta as unknown as {
         glob: (pattern: string) => Record<string, unknown>;
@@ -230,13 +231,13 @@ describe("FedOS core package has no real cryptography", () => {
     const paths = Object.keys(files);
     // Sanity: the glob actually found the package's committed files.
     expect(paths.some((p) => p.endsWith("/src/index.ts"))).toBe(true);
-    const forbidden = /\.(wasm|rs|rlib|so|dll|dylib|node|a|o)$/i;
-    const forbiddenName = /\/(Cargo\.toml|Cargo\.lock)$/i;
+    const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
+    const forbiddenName = /\/Cargo\.lock$/i;
+    const forbiddenDir = /\/(target|build)\//i;
     for (const path of paths) {
-      expect(forbidden.test(path), `unexpected binary: ${path}`).toBe(false);
-      expect(forbiddenName.test(path), `unexpected Rust file: ${path}`).toBe(
-        false,
-      );
+      expect(forbidden.test(path), `unexpected compiled binary: ${path}`).toBe(false);
+      expect(forbiddenName.test(path), `unexpected Cargo.lock: ${path}`).toBe(false);
+      expect(forbiddenDir.test(path), `unexpected build dir artifact: ${path}`).toBe(false);
     }
   });
 });

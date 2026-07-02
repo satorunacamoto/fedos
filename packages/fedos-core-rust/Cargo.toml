@@ -1,0 +1,24 @@
+# FedOS Core — minimal Rust crate skeleton (Stage 69).
+#
+# Placeholder crate ONLY. There is NO cryptography, NO WASM, and NO dependencies
+# here. A real RustCrypto-backed core is a future, explicitly-reviewed stage; it
+# must FIRST pass the crypto test vectors (docs/crypto_test_vectors.md) and ship
+# with a build manifest (docs/fedos_core_build_manifest.md) before it can be
+# selected at runtime.
+
+[package]
+name = "fedos-core-rust"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+# `rlib` only for now. NO `cdylib`/WASM target is declared until a future,
+# explicitly-reviewed stage adds a real (audited) core and a build manifest.
+crate-type = ["rlib"]
+
+[dependencies]
+# Intentionally EMPTY. No crypto crates (chacha20poly1305 / aes-gcm / hkdf /
+# argon2), no rand / getrandom, no zeroize / secrecy / subtle, no bip39 /
+# secp256k1 / nostr, and no wasm-bindgen. These land ONLY in a future audited
+# stage, never grown silently into this skeleton.

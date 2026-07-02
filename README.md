@@ -8,7 +8,42 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 68 — FedOS Core build manifest plan (docs only, no code, no
+> **Status: Stage 69 — Minimal FedOS Rust crate skeleton (Cargo project only, no
+> cryptography, no WASM).**
+> [`packages/fedos-core-rust`](packages/fedos-core-rust/README.md) gains a
+> **minimal Rust crate skeleton** — a `Cargo.toml` (name `fedos-core-rust`,
+> version `0.0.0`, edition 2021, `crate-type = ["rlib"]`, **no dependencies**) and
+> a `src/lib.rs` with **placeholder functions only**. `lib.rs` defines
+> `FedosCoreState` (`Unavailable`/`Placeholder`), `FedosCoreStatus`
+> (`state` + `&'static str reason`), `fedos_core_status()`,
+> `fedos_core_capabilities()`, and `random_bytes_placeholder()` /
+> `derive_key_placeholder()` / `encrypt_placeholder()` / `decrypt_placeholder()` —
+> each returns an `Unavailable`/`Placeholder` status and runs **no cryptography**.
+> The crate has **no crypto crates** (no chacha20poly1305/aes-gcm/hkdf/argon2), no
+> `rand`/`getrandom`, no `zeroize`/`secrecy`/`subtle`, no `bip39`/`secp256k1`, no
+> `wasm-bindgen`, and `#![forbid(unsafe_code)]` bans `unsafe`. **No `.wasm`, no
+> `cdylib`/WASM target, no build script, no `Cargo.lock`/`target/`** (a package
+> `.gitignore` excludes build artifacts). The TS boundary
+> (`FedosCoreCrypto` seam + inert `PlaceholderFedosCoreCrypto`) is unchanged and
+> still passes typecheck, and the Rust crate is **not wired into the Runtime or
+> Worker**. `cargo check` builds the dependency-free crate cleanly (optional; not
+> required by CI). **Not implemented (still a future, explicitly-reviewed stage):**
+> AEAD / HKDF / Argon2 / NIP-44 / BIP39 / BIP32, random generation, `zeroize`, key
+> derivation, encryption/decryption, WASM generation, and any dependency — a real
+> AEAD implementation must FIRST pass the crypto test vectors
+> ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md)) and ship a build
+> manifest ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md)).
+> 13 tests in `test/fedos_core_rust_skeleton.test.ts` cover: Cargo.toml identity,
+> lib.rs placeholder API, no crypto deps, no wasm-bindgen/cdylib, no `unsafe`, no
+> crypto imports, no random/getrandom, no encryption beyond placeholder names, no
+> `.wasm` committed, no `build/`/`target/` committed, README states skeleton-only,
+> the TS boundary still loads inertly, and Runtime/Worker have no Rust/WASM
+> auto-wire; the Stage 59/63 "no .rs/Cargo" guards were updated to "skeleton
+> allowed, no compiled/WASM artifact". Stage 70 candidate: **Rust crate safety
+> docs** (fix the dependency-addition / `unsafe` / `zeroize` / crypto-crate
+> adoption rules before any real primitive lands). Prior status:
+>
+> **Stage 68 — FedOS Core build manifest plan (docs only, no code, no
 > manifest committed).**
 > A new [`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md)
 > fixes, in writing, the plan for a build **manifest / provenance** contract a
@@ -2342,7 +2377,8 @@ D1 space directory caveats (do not over-promise on these):
 65. Runtime crypto provider selection boundary, disabled by default (`createRuntime` selects a `CryptoProvider` from env; `AppRuntime.cryptoProvider`; FedOS option wraps the inert `PlaceholderFedosCoreCrypto` only; selection only, no WASM load, no cryptography, no crypto-op call) ✓
 66. Anti-analysis & Shadow Vault risk docs ([`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md); docs only, no code; binding prohibitions — no anti-debug/anti-VM, no self-destruct, no shadow/fake-data generator) ✓
 67. Crypto operation test-vector plan ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md); docs only, no code, no vectors committed; test-first verification plan for a future Rust core — AEAD/HKDF/Argon2id/NIP-44, official vectors only) ✓
-68. FedOS Core build manifest plan ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md); docs only, no code, no manifest committed; provenance contract — manifest skeleton, digest/signature/reproducible-build policy, no validation ⇒ no load) ✓ ← you are here
+68. FedOS Core build manifest plan ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md); docs only, no code, no manifest committed; provenance contract — manifest skeleton, digest/signature/reproducible-build policy, no validation ⇒ no load) ✓
+69. Minimal FedOS Rust crate skeleton ([`packages/fedos-core-rust`](packages/fedos-core-rust/README.md); `Cargo.toml` + `src/lib.rs` placeholder API; no dependencies, no crypto, no `unsafe`, no WASM/cdylib, no build artifacts; TS boundary unchanged, not wired) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
