@@ -44,6 +44,29 @@ export type {
 export { FEDOS_CORE_CAPABILITIES } from "./types.js";
 
 /**
+ * Stage 63 — the FedOS Core WASM loader boundary (loader SEAM only, disabled by
+ * default). Re-exported on the package's stable import surface. It loads no real
+ * WASM: no `fetch`, no dynamic `import()`, no `WebAssembly.instantiate`, no path
+ * resolution, and no cryptography. Any `core` a loader returns is only the inert
+ * `PlaceholderFedosCoreCrypto`. It is NOT wired into the runtime or the Worker.
+ */
+export {
+  FEDOS_CORE_WASM_LOADER_CAPABILITIES,
+  NoopFedosCoreWasmLoader,
+  PlaceholderFedosCoreWasmLoader,
+  fedosCoreWasmDecisionToCore,
+  loadFedosCoreWasm,
+} from "./wasm_loader.js";
+export type {
+  FedosCoreWasmLoader,
+  FedosCoreWasmLoaderCapability,
+  FedosCoreWasmLoaderState,
+  FedosCoreWasmLoaderStatus,
+  FedosCoreWasmLoadDecision,
+  FedosCoreWasmLoadRequest,
+} from "./wasm_loader.js";
+
+/**
  * The placeholder FedOS core: permanently `unavailable`. It advertises the
  * placeholder capabilities as labels of FUTURE intent, but every operation is
  * denied — nothing runs, nothing is generated, nothing is stored. This is the

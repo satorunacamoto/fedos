@@ -8,7 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 62 — WebAuthn runtime selection boundary (disabled by
+> **Status: Stage 63 — FedOS Core WASM loader boundary (loader seam only,
+> disabled by default, no WASM, no Rust, no cryptography).**
+> A new [`packages/fedos-core-rust/src/wasm_loader.ts`](packages/fedos-core-rust/src/wasm_loader.ts)
+> adds the LOADER SEAM a future stage would use to bring a real RustCrypto-backed
+> WASM module online behind the Stage 59 `FedosCoreCrypto` seam — but this stage
+> ships the **boundary / placeholder / pure bridge ONLY**, and **loads nothing**.
+> It defines `FedosCoreWasmLoader` (`getStatus`, `getCapabilities`,
+> `load(request)`, `unload()`), a `FedosCoreWasmLoaderState`
+> (`disabled`/`unloaded`/`loaded_placeholder`/`unavailable`/`error`), placeholder
+> `FedosCoreWasmLoaderCapability` labels (`wasm_loader_placeholder`,
+> `instantiate_placeholder`, `integrity_check_placeholder`,
+> `rust_core_placeholder`), a `FedosCoreWasmLoadRequest` (OPAQUE, non-secret
+> `moduleRef`/`integrityRef` labels plus a coarse `source: "disabled" |
+> "placeholder"`), and a `FedosCoreWasmLoadDecision` (`allowed`/`state`/`reason`
+> plus an optional `core`). `NoopFedosCoreWasmLoader` is the **disabled-by-default**
+> default (advertises nothing, denies every load); `PlaceholderFedosCoreWasmLoader`
+> models an `unloaded → loaded_placeholder → unloaded` state machine — and even a
+> `loaded_placeholder` hands back ONLY the permanently-inert
+> `PlaceholderFedosCoreCrypto` (itself `unavailable`), never a real core; `unload()`
+> only changes state. Two pure helpers: `fedosCoreWasmDecisionToCore(decision)`
+> pulls the core a decision produced (or `undefined`), and
+> `loadFedosCoreWasm(loader, request)` wraps any loader's `load` so a throw/reject
+> becomes a non-sensitive `error` decision instead of propagating. **The loader is
+> a boundary only: it issues no `fetch`, performs no dynamic module import, calls
+> no WASM `instantiate`/`compile` engine API, resolves no module path/URL, and
+> runs no cryptography** (no HKDF/Argon2/KDF, no AEAD, no CSPRNG/random, no
+> zeroize, no key generation/derivation). `moduleRef`/`integrityRef` are opaque
+> labels — never resolved, fetched, or echoed. It is **NOT wired into the runtime
+> or the Worker** (`create_runtime.ts`/`worker.ts` contain no `wasm`/`fedos`
+> reference). **No `.wasm` file, no `.rs`/`Cargo.toml`, and no Rust/crypto/WASM
+> library** are added. **A future real loader (actual WASM instantiation) requires
+> its own separate, explicit stage.** 15 tests in
+> `test/fedos_core_wasm_loader.test.ts` cover: Noop always disabled, Placeholder
+> constructor inert (starts `unloaded`), `load` issues no `fetch`, `load` calls no
+> WASM `instantiate`/`compile`, `load` returns the inert placeholder core only,
+> `moduleRef`/`integrityRef` never resolved or echoed, `unload` changes state
+> only, loader errors caught by `loadFedosCoreWasm` (never thrown/leaked), no
+> input mutation, Runtime/Worker have no WASM-loader auto-wire, no `.wasm`
+> committed, no `.rs`/Cargo committed, no crypto/WASM import, and no dynamic
+> import. Stage 64 candidate: **FedOS Core WASM safety docs** (fix, in writing,
+> what a real loader MAY and MUST NEVER do before any real WASM lands). Prior
+> status:
+>
+> **Stage 62 — WebAuthn runtime selection boundary (disabled by
 > default, selection only, no browser API).**
 > `createRuntime` can now SELECT a Stage 60 `WebAuthnProvider` from the
 > environment and exposes it as `AppRuntime.webAuthnProvider`. This is a
