@@ -193,12 +193,18 @@ describe("src/identity has no key source and stays a boundary", () => {
   });
 });
 
-describe("identity layer is not auto-wired into the core", () => {
-  it("Runtime source does not reference identity", () => {
-    expect(runtimeSource).not.toMatch(/identity|passkey/i);
+describe("passkey unlock boundary is not auto-executed by the core", () => {
+  // Stage 62 lets `createRuntime` SELECT a `WebAuthnProvider`, which lives under
+  // `src/identity/`, so an `identity/` import path and a "Passkey" mention in a
+  // comment are now expected. What must stay absent is the Stage 36
+  // `PasskeyBoundary` itself and any unlock EXECUTION (`authenticate(`).
+  it("Runtime source does not wire or execute the PasskeyBoundary", () => {
+    expect(runtimeSource).not.toMatch(/passkey_boundary|PasskeyBoundary/);
+    expect(runtimeSource).not.toMatch(/\.\s*authenticate\s*\(/);
   });
 
-  it("Worker source does not reference identity", () => {
-    expect(workerSource).not.toMatch(/identity|passkey/i);
+  it("Worker source does not wire or execute the PasskeyBoundary", () => {
+    expect(workerSource).not.toMatch(/passkey_boundary|PasskeyBoundary/);
+    expect(workerSource).not.toMatch(/\.\s*authenticate\s*\(/);
   });
 });

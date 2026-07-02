@@ -28,6 +28,7 @@ import type { SignatureVerifier } from "../nostr/signature.js";
 import type { RelayPublisher } from "../nostr/publish.js";
 import type { PromotionProvider, RecommendationProvider } from "../promotion/adapter.js";
 import type { EdgeRecFetchLike } from "../promotion/edge_rec_adapter.js";
+import type { WebAuthnProvider } from "../identity/webauthn_adapter.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -167,6 +168,26 @@ export interface RuntimeEnv {
    * `AppRuntime.promotionProviderPreviewAllowed`; selection/flag only.
    */
   readonly ENABLE_PROMOTION_PROVIDER_PREVIEW?: string | boolean;
+  /**
+   * Which WebAuthn / Passkey browser provider to build (Stage 60's
+   * `WebAuthnProvider` seam).
+   *   - "noop"        → `NoopWebAuthnProvider` (safe default — permanently
+   *                     `unavailable`, advertises nothing, denies every attempt).
+   *   - "placeholder" → `PlaceholderWebAuthnProvider` (dev/test — models the UX
+   *                     states but still calls no browser API and unlocks nothing).
+   *   - absent/other  → `NoopWebAuthnProvider`.
+   * Selection only. `begin()`/`cancel()` are NEVER auto-called, no
+   * browser credential API is touched, no Face ID / Touch ID is launched,
+   * and no credential/challenge is stored.
+   */
+  readonly WEBAUTHN_PROVIDER?: string;
+  /**
+   * Explicit opt-in to use the placeholder provider. Truthy = `true` or a truthy
+   * string ("1"/"true"/"yes"/"on"). Takes effect when `WEBAUTHN_PROVIDER` is not
+   * "noop" or "placeholder" but this flag is truthy — same result as
+   * `WEBAUTHN_PROVIDER=placeholder`. Selection only; starts no WebAuthn request.
+   */
+  readonly ENABLE_WEBAUTHN_PLACEHOLDER?: string | boolean;
 }
 
 /**
@@ -198,6 +219,11 @@ export interface RuntimeOverrides {
   readonly relayPublisher?: RelayPublisher;
   /** Pre-built payment provider. Wins over any `env` payment fields. */
   readonly paymentProvider?: PaymentProvider;
+  /**
+   * Pre-built WebAuthn provider. Wins over any `env` WebAuthn fields.
+   * Selection only — the runtime never calls its `begin()`/`cancel()`.
+   */
+  readonly webAuthnProvider?: WebAuthnProvider;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -236,4 +262,14 @@ export interface AppRuntime {
    * calls no provider method and issues no `fetch`.
    */
   readonly promotionProviderPreviewAllowed: boolean;
+  /**
+   * The selected WebAuthn / Passkey browser provider (Stage 62). Selected from
+   * env; `begin()`/`cancel()` are NEVER called automatically. The safe default
+   * (`NoopWebAuthnProvider`) is permanently `unavailable`. Constructing a
+   * runtime touches no browser credential API, launches no Face ID /
+   * Touch ID, contacts no Secure Enclave / Android Keystore, and stores no
+   * credential/challenge. WebAuthn / Passkey remains an unlock TRIGGER only,
+   * never a key source — and no unlock happens by building a runtime.
+   */
+  readonly webAuthnProvider: WebAuthnProvider;
 }

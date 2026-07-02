@@ -237,11 +237,14 @@ describe("src/identity provider has no key source and stays a boundary", () => {
 });
 
 describe("identity provider layer is not auto-wired into the core", () => {
+  // Stage 62 selects a `WebAuthnProvider` from `src/identity/`, so an
+  // `identity/` import path is expected now. The Stage 34 IdentityProvider /
+  // `provider_boundary` must still never be wired into the Runtime or Worker.
   it("Runtime source does not reference an identity provider", () => {
-    expect(runtimeSource).not.toMatch(/identity|provider_boundary|IdentityProvider/i);
+    expect(runtimeSource).not.toMatch(/provider_boundary|IdentityProvider/);
   });
 
   it("Worker source does not reference an identity provider", () => {
-    expect(workerSource).not.toMatch(/identity|provider_boundary|IdentityProvider/i);
+    expect(workerSource).not.toMatch(/provider_boundary|IdentityProvider/);
   });
 });

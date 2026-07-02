@@ -62,6 +62,11 @@ import {
   type PaymentProvider,
   type PaymentRail,
 } from "../payment/types.js";
+import {
+  NoopWebAuthnProvider,
+  PlaceholderWebAuthnProvider,
+  type WebAuthnProvider,
+} from "../identity/webauthn_adapter.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -359,6 +364,34 @@ export function selectPaymentProvider(
 }
 
 /**
+ * Select the `WebAuthnProvider` from env / overrides. Priority:
+ *   1. `overrides.webAuthnProvider` — wins unconditionally.
+ *   2. `WEBAUTHN_PROVIDER=noop` → `NoopWebAuthnProvider`.
+ *   3. `WEBAUTHN_PROVIDER=placeholder` OR `ENABLE_WEBAUTHN_PLACEHOLDER` truthy →
+ *      `PlaceholderWebAuthnProvider`.
+ *   4. Otherwise → `NoopWebAuthnProvider` (safe default, permanently
+ *      `unavailable`).
+ *
+ * Selection only: constructing the provider touches no browser credential
+ * API, launches no Face ID / Touch ID, contacts no Secure Enclave / Android
+ * Keystore, and calls no `begin`/`cancel`. WebAuthn / Passkey stays an unlock
+ * TRIGGER only, never a key source. No credential/challenge is stored. `env` is
+ * never mutated.
+ */
+export function selectWebAuthnProvider(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): WebAuthnProvider {
+  if (overrides.webAuthnProvider) return overrides.webAuthnProvider;
+  const provider = env?.WEBAUTHN_PROVIDER;
+  if (provider === "noop") return new NoopWebAuthnProvider();
+  if (provider === "placeholder" || isEnvFlagTruthy(env?.ENABLE_WEBAUTHN_PLACEHOLDER)) {
+    return new PlaceholderWebAuthnProvider();
+  }
+  return new NoopWebAuthnProvider();
+}
+
+/**
  * Whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy — HALF of the Stage 52
  * dual-flag gate for invoking a real `promotionProvider` for a preview. Pure;
  * never mutates `env`.
@@ -409,5 +442,6 @@ export function createRuntime(
     notificationBridge: selectNotificationBridge(env, overrides),
     paymentProvider: selectPaymentProvider(env, overrides),
     promotionProviderPreviewAllowed: isPromotionProviderPreviewAllowed(env),
+    webAuthnProvider: selectWebAuthnProvider(env, overrides),
   };
 }

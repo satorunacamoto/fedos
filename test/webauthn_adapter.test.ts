@@ -228,12 +228,24 @@ describe("WebAuthn adapter stays a boundary (no key source, no API)", () => {
   });
 });
 
-describe("WebAuthn adapter is not auto-wired into the core", () => {
-  it("10. Runtime source has no WebAuthn auto-wire", () => {
-    expect(runtimeSource.toLowerCase()).not.toContain("webauthn");
+describe("WebAuthn adapter is SELECTED but never executed by the core", () => {
+  // Stage 62 lets `createRuntime` SELECT a `WebAuthnProvider` from env — so the
+  // Runtime/Worker sources now legitimately reference WebAuthn. What must stay
+  // absent is any EXECUTION: no `begin`/`cancel` auto-call and no browser
+  // credential API. (See `test/runtime_webauthn_env.test.ts` for the full
+  // selection-boundary coverage.)
+  it("10. Runtime source selects a WebAuthn provider but never begins/cancels one", () => {
+    expect(runtimeSource).not.toMatch(/\.\s*begin\s*\(/);
+    expect(runtimeSource).not.toMatch(/webAuthnProvider\s*\.\s*cancel\s*\(/);
+    expect(runtimeSource).not.toContain("navigator.credentials");
+    expect(runtimeSource).not.toMatch(/navigator\s*\.\s*credentials/);
   });
 
-  it("11. Worker source has no WebAuthn auto-wire", () => {
-    expect(workerSource.toLowerCase()).not.toContain("webauthn");
+  it("11. Worker source never begins/cancels a WebAuthn provider or calls a browser credential API", () => {
+    expect(workerSource).not.toMatch(/webAuthnProvider\s*\.\s*begin\s*\(/);
+    expect(workerSource).not.toMatch(/webAuthnProvider\s*\.\s*cancel\s*\(/);
+    expect(workerSource).not.toMatch(/new\s+PlaceholderWebAuthnProvider/);
+    expect(workerSource).not.toContain("navigator.credentials");
+    expect(workerSource).not.toMatch(/navigator\s*\.\s*credentials/);
   });
 });

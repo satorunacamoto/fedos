@@ -8,7 +8,48 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 61 — WebAuthn / Passkey adapter safety docs (docs only, no
+> **Status: Stage 62 — WebAuthn runtime selection boundary (disabled by
+> default, selection only, no browser API).**
+> `createRuntime` can now SELECT a Stage 60 `WebAuthnProvider` from the
+> environment and exposes it as `AppRuntime.webAuthnProvider`. This is a
+> **selection / dependency-injection seam ONLY** — building a runtime constructs
+> the provider and nothing more: it never calls `begin()`/`cancel()`, touches no
+> browser credential API, launches no Face ID / Touch ID, contacts no Secure
+> Enclave / Android Keystore, and stores no credential/challenge. **WebAuthn /
+> Passkey stays an unlock TRIGGER only, never a key source — and no unlock ever
+> happens by constructing a runtime.** New selection helper
+> `selectWebAuthnProvider(env, overrides)`: (1) `overrides.webAuthnProvider`
+> wins unconditionally; (2) `WEBAUTHN_PROVIDER="noop"` → `NoopWebAuthnProvider`;
+> (3) `WEBAUTHN_PROVIDER="placeholder"` OR a truthy `ENABLE_WEBAUTHN_PLACEHOLDER`
+> (`true`/`"1"`/`"true"`/`"yes"`/`"on"`) → `PlaceholderWebAuthnProvider`;
+> (4) anything else / invalid / absent → `NoopWebAuthnProvider` (the safe,
+> permanently-`unavailable` default — **disabled by default**). New env fields
+> `RuntimeEnv.WEBAUTHN_PROVIDER?` and `RuntimeEnv.ENABLE_WEBAUTHN_PLACEHOLDER?`
+> (mirrored on the Worker `Env`) are read but never mutated; the truthy check
+> reuses the existing `isEnvFlagTruthy` helper. A new `RuntimeOverrides.
+> webAuthnProvider?` lets tests/callers pin a provider. The read-only Runtime
+> status page adds `webAuthnProvider` under the **security** category as a coarse
+> constructor label only — it never calls `begin`/`cancel` or any provider
+> method. The Worker constructs and begins **nothing**: no
+> `new PlaceholderWebAuthnProvider`, no `begin()`/`cancel()`, no
+> `navigator.credentials`. **Not implemented (still requires its own future,
+> explicit stage):** any real `navigator.credentials.create/get` call, Face ID /
+> Touch ID / platform-authenticator launch, Secure Enclave / Android Keystore
+> access, conditional-UI / autofill, credential / challenge / response /
+> attestation / assertion storage, JWT / OAuth, key generation / derivation, and
+> Vault unlock. See [`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md)
+> for the safety contract this selection boundary preserves. 13 tests in
+> `test/runtime_webauthn_env.test.ts` cover: default→Noop, `noop`→Noop,
+> `placeholder`→Placeholder, truthy `ENABLE_WEBAUTHN_PLACEHOLDER`→Placeholder
+> (and falsy→Noop), invalid→Noop, override wins, no `begin()` auto-call, no
+> `cancel()` auto-call, no `navigator.credentials` in the runtime sources (and no
+> throw when building), no Worker `begin`/`navigator.credentials`, status-page
+> label-only (no provider method called), and no env mutation. Stage 63
+> candidate: **FedOS Core WASM loading boundary, disabled by default** (cut the
+> next swap point — the FedOS Core WASM loader seam — so the Identity → WebAuthn
+> → Vault → Crypto Core substitution path becomes visible). Prior status:
+>
+> **Stage 61 — WebAuthn / Passkey adapter safety docs (docs only, no
 > code).**
 > A new [`docs/webauthn_passkey_safety.md`](docs/webauthn_passkey_safety.md)
 > fixes, in writing, the safety contract that Stage 60's

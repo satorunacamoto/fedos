@@ -895,6 +895,16 @@ export interface Env {
    * routes. No ad is ever auto-served; this is selection/gating only.
    */
   ENABLE_PROMOTION_PROVIDER_PREVIEW?: string;
+  /**
+   * WebAuthn / Passkey provider selection config (Stage 62). These only let
+   * `createRuntime` SELECT a `WebAuthnProvider`; the Worker NEVER calls
+   * `begin()`/`cancel()`, touches no browser credential API, launches no
+   * Face ID / Touch ID, contacts no Secure Enclave / Android Keystore, and
+   * stores no credential/challenge. Selection only — WebAuthn stays an unlock
+   * TRIGGER, never a key source, and no unlock happens from the Worker.
+   */
+  WEBAUTHN_PROVIDER?: string;
+  ENABLE_WEBAUTHN_PLACEHOLDER?: string;
 }
 
 /**
