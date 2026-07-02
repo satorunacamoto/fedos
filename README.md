@@ -8,7 +8,63 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 80 — Add an internal AEAD module skeleton (crate-private
+> **Status: Stage 81 — Extract a test-only ChaCha20-Poly1305 helper
+> (test-only refactor; no public API change, no production encrypt/decrypt,
+> no Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs`'s pre-existing `cfg(test)`-only
+> `rfc8439_vectors` module (Stage 75) is refactored: the ChaCha20-Poly1305
+> seal/open logic that used to be written inline (and duplicated) in its two
+> vector tests is now two small, private, test-only helper functions,
+> `seal_chacha20poly1305_for_test(key_bytes, nonce_bytes, plaintext_bytes,
+> aad_bytes) -> Result<Vec<u8>, AeadError>` and
+> `open_chacha20poly1305_for_test(key_bytes, nonce_bytes, sealed_bytes,
+> aad_bytes) -> Result<Vec<u8>, AeadError>` (`sealed_bytes` is
+> `ciphertext‖tag`). Both are private `fn`s — never `pub`/`pub(crate)`, never
+> re-exported — that exist ONLY inside the `cfg(test)`-only `rfc8439_vectors`
+> module, and are NOT connected to the crate-private `aead_core` skeleton
+> (Stage 80, unchanged this stage — still placeholder-only) or
+> `secret_handle` (Stage 79) in any way. **Test-only refactor, not a new
+> capability**: the two pre-existing vector tests
+> (`rfc8439_positive_vectors_encrypt_and_decrypt_correctly` and
+> `rfc8439_negative_vectors_fail_to_decrypt_if_present`) assert exactly what
+> they asserted before Stage 81, just calling the shared helper instead of
+> constructing a `Key`/`Nonce`/`ChaCha20Poly1305` inline twice. Two new unit
+> tests exercise the helpers directly, independent of the vector file:
+> `seal_then_open_round_trip_for_test_helper` (round-trips fixed, non-secret,
+> test-only bytes) and `open_fails_for_tampered_sealed_bytes_for_test_helper`
+> (tampering with the tag makes open fail). `cargo test` is GREEN with all 19
+> tests passing (17 pre-existing + 2 new helper unit tests); `cargo check`
+> and `cargo check --tests` stay GREEN with no warnings. `Cargo.toml` is
+> UNCHANGED this stage — `chacha20poly1305` was already a `[dependencies]`
+> (production) entry since Stage 74. **No production `chacha20poly1305`
+> import**: `src/lib.rs`'s production code (everything before this file's
+> first `cfg(test)`-gated module) still does not import, reference, or call
+> `chacha20poly1305` anywhere; `encrypt_placeholder`/`decrypt_placeholder`
+> remain byte-for-byte unchanged, and the crate's public `pub fn` surface
+> stays exactly the same six placeholder functions from Stage 69. New
+> [`test/fedos_core_rust_aead_test_helper.test.ts`](test/fedos_core_rust_aead_test_helper.test.ts)
+> (9 tests) checks: the two helpers exist inside the `cfg(test)`-gated
+> region and are private (never `pub`/`pub(crate)`, never re-exported);
+> production code (before the first `cfg(test)`) has no `chacha20poly1305`
+> import/reference and no reference to the new helper names either; the
+> public `pub fn` surface is exactly the six Stage 69 names; `aead_core`
+> remains unchanged and placeholder-only (no `chacha20poly1305` import, no
+> reference to the new helpers, its five methods unchanged) and still holds
+> no production key/nonce/plaintext/ciphertext/tag/aad storage field or
+> `Vec<u8>`/`String`/borrowed-byte-slice field; Runtime/Worker sources
+> mention neither helper name nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; and both
+> helper call sites use the documented `Result<Vec<u8>, AeadError>`
+> signature. No existing Rust source guard test needed updating this stage —
+> the refactor stayed entirely inside `rfc8439_vectors`'s existing
+> `cfg(test)`-gated boundary, so `test/fedos_core_rust_rfc8439_wiring.test.ts`
+> (which already asserts `chacha20poly1305` usage is confined to that
+> module's `cfg(test)`-scoped tail) needed no change. Stage 82 candidate:
+> **an internal KDF module skeleton** (the `secret_handle`/`aead_core`-
+> analogue for HKDF) — still no public `deriveKey` implementation. Prior
+> status:
+>
+> **Stage 80 — Add an internal AEAD module skeleton (crate-private
 > only; no public API change, no actual encryption/decryption, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs` gains a second crate-private module,

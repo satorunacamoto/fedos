@@ -45,6 +45,13 @@
 //! name is kept out of this summary, see the note above). Same rules apply:
 //! not part of the public API, no public function above constructs, holds,
 //! or returns one of its types.
+//!
+//! Stage 81 is a test-only refactor of the Stage 75 module: the seal/open
+//! logic that used to be written inline in its two vector tests is now two
+//! small, private, test-only helper functions inside that same module
+//! (their own doc comments, next to their declarations, name them). No
+//! production code changed — the six functions above are untouched, and the
+//! Stage 80 skeleton is not connected to this refactor.
 
 #![forbid(unsafe_code)]
 
@@ -446,9 +453,21 @@ mod tests {
 /// other code — production or otherwise — can call. The placeholder
 /// functions above (`encrypt_placeholder`, `decrypt_placeholder`, etc.) are
 /// untouched.
+///
+/// Stage 81 extracts the seal/open logic that used to be written inline in
+/// the two vector tests below into two small test-only helpers,
+/// [`seal_chacha20poly1305_for_test`] and [`open_chacha20poly1305_for_test`]
+/// — private `fn`s that exist ONLY inside this `cfg(test)`-only module, are
+/// not `pub`/`pub(crate)`, are not re-exported, and are NOT connected to the
+/// crate-private `aead_core` skeleton (Stage 80) or to `secret_handle`
+/// (Stage 79) in any way. This is a test-only refactor: the two vector tests
+/// (`rfc8439_positive_vectors_encrypt_and_decrypt_correctly` and
+/// `rfc8439_negative_vectors_fail_to_decrypt_if_present`) assert exactly the
+/// same things as before, just calling the shared helper instead of
+/// constructing a `Key`/`Nonce`/`ChaCha20Poly1305` inline twice.
 #[cfg(test)]
 mod rfc8439_vectors {
-    use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+    use chacha20poly1305::aead::{Aead, Error as AeadError, KeyInit, Payload};
     use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
     use serde::Deserialize;
 
@@ -484,6 +503,52 @@ mod rfc8439_vectors {
         })
     }
 
+    /// Test-only ChaCha20-Poly1305 SEAL (encrypt-then-tag) helper — private
+    /// `fn`, exists ONLY under `cfg(test)`, never `pub`/`pub(crate)`. Takes
+    /// raw key/nonce/plaintext/AAD bytes (all test-vector bytes, never a
+    /// real secret) and returns `ciphertext‖tag` on success, or the
+    /// underlying AEAD error on failure (e.g. a malformed key/nonce length).
+    fn seal_chacha20poly1305_for_test(
+        key_bytes: &[u8],
+        nonce_bytes: &[u8],
+        plaintext_bytes: &[u8],
+        aad_bytes: &[u8],
+    ) -> Result<Vec<u8>, AeadError> {
+        let key = Key::try_from(key_bytes).expect("test helper: key is not 32 bytes");
+        let nonce = Nonce::try_from(nonce_bytes).expect("test helper: nonce is not 12 bytes");
+        let cipher = ChaCha20Poly1305::new(&key);
+        cipher.encrypt(
+            &nonce,
+            Payload {
+                msg: plaintext_bytes,
+                aad: aad_bytes,
+            },
+        )
+    }
+
+    /// Test-only ChaCha20-Poly1305 OPEN (verify-then-decrypt) helper — same
+    /// scope/rules as [`seal_chacha20poly1305_for_test`] above.
+    /// `sealed_bytes` is `ciphertext‖tag`; returns the plaintext on success,
+    /// or an error if authentication fails (e.g. for a tampered/negative
+    /// vector).
+    fn open_chacha20poly1305_for_test(
+        key_bytes: &[u8],
+        nonce_bytes: &[u8],
+        sealed_bytes: &[u8],
+        aad_bytes: &[u8],
+    ) -> Result<Vec<u8>, AeadError> {
+        let key = Key::try_from(key_bytes).expect("test helper: key is not 32 bytes");
+        let nonce = Nonce::try_from(nonce_bytes).expect("test helper: nonce is not 12 bytes");
+        let cipher = ChaCha20Poly1305::new(&key);
+        cipher.decrypt(
+            &nonce,
+            Payload {
+                msg: sealed_bytes,
+                aad: aad_bytes,
+            },
+        )
+    }
+
     #[test]
     fn rfc8439_json_parses_and_is_non_empty() {
         let file: VectorFile =
@@ -494,10 +559,10 @@ mod rfc8439_vectors {
         );
     }
 
-    /// `shouldPass=true` vectors: `chacha20poly1305` must both (a) seal
-    /// (encrypt) plaintext+AAD to exactly the RFC's expected
-    /// ciphertext||tag, and (b) open (decrypt) that same ciphertext||tag
-    /// back to exactly the RFC's expected plaintext.
+    /// `shouldPass=true` vectors: [`seal_chacha20poly1305_for_test`] must
+    /// seal plaintext+AAD to exactly the RFC's expected ciphertext||tag, and
+    /// [`open_chacha20poly1305_for_test`] must open that same
+    /// ciphertext||tag back to exactly the RFC's expected plaintext.
     #[test]
     fn rfc8439_positive_vectors_encrypt_and_decrypt_correctly() {
         let file: VectorFile =
@@ -512,39 +577,29 @@ mod rfc8439_vectors {
             let ciphertext_bytes = decode_hex("ciphertext", &vector.id, &vector.ciphertext);
             let tag_bytes = decode_hex("tag", &vector.id, &vector.tag);
 
-            let key = Key::try_from(key_bytes.as_slice())
-                .unwrap_or_else(|_| panic!("{}: key is not 32 bytes", vector.id));
-            let nonce = Nonce::try_from(nonce_bytes.as_slice())
-                .unwrap_or_else(|_| panic!("{}: nonce is not 12 bytes", vector.id));
-            let cipher = ChaCha20Poly1305::new(&key);
-
             let mut expected_sealed = ciphertext_bytes.clone();
             expected_sealed.extend_from_slice(&tag_bytes);
 
-            let sealed = cipher
-                .encrypt(
-                    &nonce,
-                    Payload {
-                        msg: &plaintext_bytes,
-                        aad: &aad_bytes,
-                    },
-                )
-                .unwrap_or_else(|err| panic!("{}: encrypt failed: {err}", vector.id));
+            let sealed = seal_chacha20poly1305_for_test(
+                &key_bytes,
+                &nonce_bytes,
+                &plaintext_bytes,
+                &aad_bytes,
+            )
+            .unwrap_or_else(|err| panic!("{}: encrypt failed: {err}", vector.id));
             assert_eq!(
                 sealed, expected_sealed,
                 "{}: ciphertext||tag did not match the RFC 8439 vector",
                 vector.id
             );
 
-            let opened = cipher
-                .decrypt(
-                    &nonce,
-                    Payload {
-                        msg: expected_sealed.as_slice(),
-                        aad: &aad_bytes,
-                    },
-                )
-                .unwrap_or_else(|err| panic!("{}: decrypt failed: {err}", vector.id));
+            let opened = open_chacha20poly1305_for_test(
+                &key_bytes,
+                &nonce_bytes,
+                &expected_sealed,
+                &aad_bytes,
+            )
+            .unwrap_or_else(|err| panic!("{}: decrypt failed: {err}", vector.id));
             assert_eq!(
                 opened, plaintext_bytes,
                 "{}: decrypted plaintext did not match the RFC 8439 vector",
@@ -560,14 +615,15 @@ mod rfc8439_vectors {
     }
 
     /// `shouldPass=false` vectors, if any exist in the imported file, must
-    /// fail to decrypt/authenticate. RFC 8439 itself publishes no
-    /// byte-level tamper/negative vector for this construction (per
-    /// docs/crypto_vector_sources.md §2's verbatim-only import rule, none is
-    /// fabricated here — see the file's own `notes` field) — so today this
-    /// loop body runs zero times and the test trivially passes. It exists so
-    /// that IF a future, explicitly-reviewed re-import of this file ever
-    /// adds an official negative case, this test starts enforcing it with no
-    /// further code change required.
+    /// fail to decrypt/authenticate via [`open_chacha20poly1305_for_test`].
+    /// RFC 8439 itself publishes no byte-level tamper/negative vector for
+    /// this construction (per docs/crypto_vector_sources.md §2's
+    /// verbatim-only import rule, none is fabricated here — see the file's
+    /// own `notes` field) — so today this loop body runs zero times and the
+    /// test trivially passes. It exists so that IF a future,
+    /// explicitly-reviewed re-import of this file ever adds an official
+    /// negative case, this test starts enforcing it with no further code
+    /// change required.
     #[test]
     fn rfc8439_negative_vectors_fail_to_decrypt_if_present() {
         let file: VectorFile =
@@ -580,28 +636,59 @@ mod rfc8439_vectors {
             let ciphertext_bytes = decode_hex("ciphertext", &vector.id, &vector.ciphertext);
             let tag_bytes = decode_hex("tag", &vector.id, &vector.tag);
 
-            let key = Key::try_from(key_bytes.as_slice())
-                .unwrap_or_else(|_| panic!("{}: key is not 32 bytes", vector.id));
-            let nonce = Nonce::try_from(nonce_bytes.as_slice())
-                .unwrap_or_else(|_| panic!("{}: nonce is not 12 bytes", vector.id));
-            let cipher = ChaCha20Poly1305::new(&key);
-
             let mut sealed = ciphertext_bytes.clone();
             sealed.extend_from_slice(&tag_bytes);
 
-            let result = cipher.decrypt(
-                &nonce,
-                Payload {
-                    msg: sealed.as_slice(),
-                    aad: &aad_bytes,
-                },
-            );
+            let result =
+                open_chacha20poly1305_for_test(&key_bytes, &nonce_bytes, &sealed, &aad_bytes);
             assert!(
                 result.is_err(),
                 "{}: expected decrypt/authentication failure for a shouldPass=false vector",
                 vector.id
             );
         }
+    }
+
+    /// Unit test for the helpers themselves, independent of the vector
+    /// file: a seal-then-open round trip over fixed, non-secret,
+    /// test-only bytes must return the original plaintext.
+    #[test]
+    fn seal_then_open_round_trip_for_test_helper() {
+        let key_bytes = [0x11u8; 32];
+        let nonce_bytes = [0x22u8; 12];
+        let aad_bytes = b"aad-for-test";
+        let plaintext_bytes = b"plaintext-for-test";
+
+        let sealed =
+            seal_chacha20poly1305_for_test(&key_bytes, &nonce_bytes, plaintext_bytes, aad_bytes)
+                .expect("seal should succeed with a well-formed key/nonce");
+        let opened =
+            open_chacha20poly1305_for_test(&key_bytes, &nonce_bytes, &sealed, aad_bytes)
+                .expect("open should succeed against its own sealed output");
+        assert_eq!(opened, plaintext_bytes);
+    }
+
+    /// Unit test for the OPEN helper's failure path: tampering with the
+    /// sealed bytes (the authentication tag, here) must make
+    /// [`open_chacha20poly1305_for_test`] return an error.
+    #[test]
+    fn open_fails_for_tampered_sealed_bytes_for_test_helper() {
+        let key_bytes = [0x33u8; 32];
+        let nonce_bytes = [0x44u8; 12];
+        let aad_bytes = b"aad-for-test";
+        let plaintext_bytes = b"plaintext-for-test";
+
+        let mut sealed =
+            seal_chacha20poly1305_for_test(&key_bytes, &nonce_bytes, plaintext_bytes, aad_bytes)
+                .expect("seal should succeed with a well-formed key/nonce");
+        let last = sealed.len() - 1;
+        sealed[last] ^= 0xff;
+
+        let result = open_chacha20poly1305_for_test(&key_bytes, &nonce_bytes, &sealed, aad_bytes);
+        assert!(
+            result.is_err(),
+            "expected authentication failure for tampered sealed bytes"
+        );
     }
 }
 

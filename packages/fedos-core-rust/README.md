@@ -4,11 +4,11 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 80 — Add an internal AEAD module skeleton (crate-private
-> only; no public API change, no actual encryption/decryption, no key/
-> nonce/plaintext/ciphertext/tag handling, no Runtime/Worker/CryptoProvider
-> wiring, no WASM change). Public API STILL a placeholder SKELETON. No
-> cryptography reachable from any public function.**
+> **Status: Stage 81 — Extract a test-only ChaCha20-Poly1305 helper
+> (test-only refactor; no public API change, no production encrypt/decrypt,
+> no Runtime/Worker/CryptoProvider wiring, no WASM change). Public API STILL
+> a placeholder SKELETON. No cryptography reachable from any public
+> function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -19,36 +19,28 @@ app depends only on its *contract*, never on its internals.
 > ["alloc"]` — no `getrandom`), wired to the RFC 8439 vectors under
 > `cfg(test)` in Stage 75 — see the "RFC 8439 vector wiring" section below.
 > Stage 76 adopted `hkdf` (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256
-> vectors under `cfg(test)` in Stage 77 — see the "RFC 5869 vector wiring"
-> section below. Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a
-> secret-handling FOUNDATION. Stage 79 added a crate-private `secret_handle`
-> module (an INTERNAL-ONLY `SecretHandle` skeleton) — see the "Internal
-> secret-handle skeleton" section below. **Stage 80 adds a second
-> crate-private module, `aead_core`**, defining an INTERNAL-ONLY
-> `AeadPlaceholderRequest` skeleton — see the "Internal AEAD module skeleton"
-> section below. **Not part of the public API** — every item in `aead_core`
-> is `pub(crate)` at most (never `pub`), nothing is re-exported, and this
-> crate's public `pub fn` surface is still exactly the same six placeholder
-> functions from Stage 69. **No actual encryption/decryption** — nothing in
-> `aead_core` seals or opens a byte, and its production code does not import
-> `chacha20poly1305` (adopted Stage 74, still exercised only by the
-> pre-existing `cfg(test)`-only `rfc8439_vectors` module from Stage 75).
-> **No key/nonce/plaintext/ciphertext/tag** — `AeadPlaceholderRequest`
-> accepts and stores only two labels (an algorithm name and an
-> encrypt-or-decrypt intent); there is no borrowed-byte-slice/`Vec<u8>`/
-> `String` field or parameter anywhere in the module. `aead_core` does not
-> connect to Stage 79's `secret_handle` — it never constructs a
-> `SecretHandle` and extracts no key/secret byte from one; when in doubt
-> about a connection between skeletons, this stage deliberately leaves them
-> unconnected. `derive_key_placeholder` / `encrypt_placeholder` /
-> `decrypt_placeholder` remain byte-for-byte unchanged. The Rust crate still
-> has no `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**; the
-> runtime/Worker/`CryptoProvider` are **not** wired to any of this. A future
-> stage may implement an internal ChaCha20-Poly1305 helper (behind
-> `cfg(test)` or crate-private, per the "RFC 8439 vector wiring" pattern)
-> before any public `encrypt`/`decrypt` is ever considered. A real
-> RustCrypto-backed core is a future, explicitly-reviewed stage that must pass
-> the full crypto test-vector plan
+> vectors under `cfg(test)` in Stage 77. Stage 78 adopted `zeroize` /
+> `secrecy` / `subtle` as a secret-handling FOUNDATION. Stage 79 added a
+> crate-private `secret_handle` module (an INTERNAL-ONLY `SecretHandle`
+> skeleton). Stage 80 added a second crate-private module, `aead_core`,
+> defining an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton — see the
+> "Internal AEAD module skeleton" section below; **`aead_core` is UNCHANGED
+> this stage, still placeholder-only**. **Stage 81 is a test-only refactor of
+> the Stage 75 module**: the ChaCha20-Poly1305 seal/open logic that used to
+> be written inline (and duplicated) in `rfc8439_vectors`'s two vector tests
+> is now two small, private, test-only helper functions,
+> `seal_chacha20poly1305_for_test` and `open_chacha20poly1305_for_test` — see
+> the "RFC 8439 vector wiring" section below for the details. **Not
+> connected to `aead_core` or `secret_handle`** — the helpers exist ONLY
+> inside the `cfg(test)`-only `rfc8439_vectors` module, are never
+> `pub`/`pub(crate)`, and are never re-exported. **No production
+> encrypt/decrypt** — production code (everything before this file's first
+> `cfg(test)`-gated module) still does not import `chacha20poly1305` at all;
+> `encrypt_placeholder`/`decrypt_placeholder` remain byte-for-byte unchanged.
+> The Rust crate still has no `wasm-bindgen`, no `unsafe`, and produces **no
+> `.wasm`**; the runtime/Worker/`CryptoProvider` are **not** wired to any of
+> this. A real RustCrypto-backed core is a future, explicitly-reviewed stage
+> that must pass the full crypto test-vector plan
 > ([`docs/crypto_test_vectors.md`](../../docs/crypto_test_vectors.md)) and ship a
 > build manifest ([`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md))
 > before it can be selected at runtime. See also
@@ -137,7 +129,7 @@ packages/fedos-core-rust
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only) — neither is part of the public API
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged Stage 81) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only) — neither is part of the public API
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -209,12 +201,12 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   It was generated to run `cargo check`/`cargo test` this stage and then
   deleted, as in every prior dependency-adoption stage.
 
-## RFC 8439 vector wiring (Stage 75)
+## RFC 8439 vector wiring (Stage 75, refactored Stage 81)
 
-`src/lib.rs`'s bottom-most module, `rfc8439_vectors` (gated `#[cfg(test)]`,
-compiled only for `cargo test`), reads
+`src/lib.rs`'s `rfc8439_vectors` module (gated `#[cfg(test)]`, compiled only
+for `cargo test`), reads
 [`test-vectors/aead/chacha20poly1305-rfc8439.json`](../../test-vectors/aead/chacha20poly1305-rfc8439.json)
-at compile time via `include_str!` and runs three tests:
+at compile time via `include_str!` and runs five tests:
 
 - `rfc8439_json_parses_and_is_non_empty` — the vector file parses and is
   non-empty.
@@ -230,12 +222,39 @@ at compile time via `include_str!` and runs three tests:
   §2), decryption/authentication must fail. This loop runs zero iterations
   today and trivially passes; it starts enforcing automatically if a future,
   explicitly-reviewed re-import ever adds an official negative case.
+- `seal_then_open_round_trip_for_test_helper` (Stage 81) — a seal-then-open
+  round trip over fixed, non-secret, test-only bytes (not RFC vector data)
+  returns the original plaintext.
+- `open_fails_for_tampered_sealed_bytes_for_test_helper` (Stage 81) —
+  tampering with the sealed bytes (the tag) makes the open helper return an
+  error.
+
+**Stage 81 refactor.** The two vector tests' seal/open logic — previously
+written inline (and duplicated between the positive and negative test) — is
+now two small, private, test-only helper functions declared earlier in the
+same module: `seal_chacha20poly1305_for_test(key_bytes, nonce_bytes,
+plaintext_bytes, aad_bytes) -> Result<Vec<u8>, AeadError>` and
+`open_chacha20poly1305_for_test(key_bytes, nonce_bytes, sealed_bytes,
+aad_bytes) -> Result<Vec<u8>, AeadError>` (`sealed_bytes` is
+`ciphertext‖tag`). Both are private `fn`s — never `pub`/`pub(crate)`, never
+re-exported — that exist ONLY inside this `cfg(test)`-only module, and are
+NOT connected to the crate-private `aead_core` skeleton (Stage 80) or
+`secret_handle` (Stage 79) in any way. This is a test-only refactor, not a
+new capability: the two pre-existing vector tests assert exactly what they
+asserted before Stage 81, just calling the shared helper instead of
+constructing a `Key`/`Nonce`/`ChaCha20Poly1305` inline twice.
 
 This is the "wired" step of the vector lifecycle in
 [`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
 §5 for ChaCha20-Poly1305 — it does not, by itself, make any public API real:
 `encrypt_placeholder`/`decrypt_placeholder` are unchanged, and the runtime
-still selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+still selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. See
+[`test/fedos_core_rust_aead_test_helper.test.ts`](../../test/fedos_core_rust_aead_test_helper.test.ts)
+for the dedicated Stage 81 guard tests (helper presence/visibility, no
+production `chacha20poly1305` reference, public `pub fn` count still 6,
+`aead_core` unchanged and still placeholder-only, no production key/nonce/
+plaintext/ciphertext/tag storage field, Runtime/Worker untouched, no
+committed build artifact).
 
 ## `hkdf` dependency adoption (Stage 76)
 
@@ -463,7 +482,38 @@ unchanged; and nothing is wired into the Runtime, the Worker, or
 `CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
 `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
 
-A future, explicitly-reviewed Stage 81 candidate is an internal
-ChaCha20-Poly1305 helper behind `cfg(test)` or crate-private visibility — a
-small, RFC-8439-vector-verified seal/open routine that `aead_core` could
-eventually call — still no public `encrypt`/`decrypt` implementation.
+Stage 81 (below) is the ChaCha20-Poly1305 helper this section anticipated —
+see "RFC 8439 vector wiring" above for its details. It stays `cfg(test)`-only
+and unconnected to `aead_core`; `aead_core` itself is untouched by Stage 81.
+
+## Test-only ChaCha20-Poly1305 helper extraction (Stage 81)
+
+`seal_chacha20poly1305_for_test` and `open_chacha20poly1305_for_test` are
+now shared by both `rfc8439_vectors` tests instead of being written inline
+(and duplicated) in each — see "RFC 8439 vector wiring" above for the full
+description, signatures, and the two new helper-focused unit tests. This
+section exists so the guardrails are stated once, explicitly, in the same
+place as every other stage's summary:
+
+- **Test-only refactor, not a new capability.** Both pre-existing
+  `rfc8439_vectors` tests assert exactly what they asserted before this
+  stage; only the seal/open construction moved into a shared function.
+- **No production `chacha20poly1305` import.** `src/lib.rs`'s production
+  code (everything before this file's first `cfg(test)`-gated module) still
+  does not import, reference, or call `chacha20poly1305` anywhere.
+- **`aead_core` (Stage 80) is unchanged and still placeholder-only.** The
+  two new helpers are not called from it, not referenced by it, and it gains
+  no new field or method this stage.
+- **No connection to `secret_handle` (Stage 79).** The helpers take raw
+  test-vector key/nonce bytes as plain parameters — never a `SecretHandle`,
+  never anything sourced from one.
+- **No `Cargo.toml` change.** No new dependency; `chacha20poly1305` was
+  already a `[dependencies]` (production) entry since Stage 74.
+- **Public API and Runtime/Worker/`CryptoProvider` wiring are exactly as
+  before** — `encrypt_placeholder`/`decrypt_placeholder` are byte-for-byte
+  unchanged, and the host still selects only
+  `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+A future, explicitly-reviewed Stage 82 candidate is an internal KDF module
+skeleton (the `secret_handle`/`aead_core`-analogue for HKDF) — still no
+public `deriveKey` implementation.
