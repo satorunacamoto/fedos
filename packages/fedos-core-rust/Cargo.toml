@@ -1,19 +1,25 @@
 # FedOS Core — minimal Rust crate skeleton (Stage 69) + first dependency
-# (Stage 74) + RFC 8439 vectors wired to `cargo test` (Stage 75).
+# (Stage 74) + RFC 8439 vectors wired to `cargo test` (Stage 75) + `hkdf`
+# dependency adopted (Stage 76).
 #
 # Placeholder crate. There is still NO cryptography and NO WASM here — the
 # PUBLIC API in `src/lib.rs` is unchanged (placeholder functions only; see
-# docs/rust_dependency_adoption.md). Stage 74 added exactly ONE production
-# dependency, `chacha20poly1305` (RustCrypto). Stage 75 wires the RFC 8439
-# vectors (test-vectors/aead/chacha20poly1305-rfc8439.json) to a `#[cfg(test)]`
-# module in `src/lib.rs` that reads the vector file and asserts
-# `chacha20poly1305` reproduces the official known answers — this is
-# verification plumbing only; there is still no public encrypt/decrypt API and
-# nothing outside `#[cfg(test)]` imports or calls the crate. Every other
-# crypto crate (aes-gcm / hkdf / argon2), rand / getrandom, zeroize / secrecy /
-# subtle, bip39 / secp256k1 / nostr, and wasm-bindgen remain ABSENT — each
-# lands only in its own future, explicitly-reviewed, one-crate-per-stage
-# adoption (docs/rust_dependency_adoption.md §1).
+# docs/rust_dependency_adoption.md). Stage 74 added `chacha20poly1305`
+# (RustCrypto), wired to the RFC 8439 vectors under `#[cfg(test)]` in
+# Stage 75. Stage 76 adds a SECOND production dependency, `hkdf` (RustCrypto)
+# — a dependency + build-check ADOPTION ONLY, exactly like Stage 74: nothing
+# imports, calls, or exercises `hkdf` anywhere in this crate yet, no HKDF
+# vector is wired, and `derive_key_placeholder` is unchanged. `sha2` is
+# deliberately NOT added this stage — `hkdf` is generic over its digest
+# algorithm (it depends only on `hmac`, which is generic over `digest`), so it
+# builds and `cargo check`s standalone with no concrete hash crate; `sha2`
+# will be added only in the future stage that actually instantiates
+# `Hkdf::<Sha256>` to wire the RFC 5869 HKDF-SHA256 vectors already imported
+# at test-vectors/kdf/hkdf-rfc5869.json (Stage 73). Every other crypto crate
+# (aes-gcm / argon2), rand / getrandom, zeroize / secrecy / subtle, bip39 /
+# secp256k1 / nostr, and wasm-bindgen remain ABSENT — each lands only in its
+# own future, explicitly-reviewed, one-crate-per-stage adoption
+# (docs/rust_dependency_adoption.md §1).
 
 [package]
 name = "fedos-core-rust"
@@ -37,6 +43,18 @@ crate-type = ["rlib"]
 # NOT imported/used anywhere in src/lib.rs yet — dependency + build check only.
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
 
+# `hkdf` (RustCrypto, MIT OR Apache-2.0) — the extract-and-expand KDF this
+# crate will eventually implement against the RFC 5869 HKDF-SHA256 test
+# vectors already imported at test-vectors/kdf/hkdf-rfc5869.json. Default
+# features are fine as-is: `hkdf`'s only optional feature is `kdf` (an
+# unrelated trait-abstraction crate), which is NOT enabled here and pulls in
+# no `rand`/`getrandom`/`zeroize`. `hkdf` depends only on `hmac` (which
+# depends only on `digest`) — no concrete hash algorithm crate (`sha2`) is
+# required to build or `cargo check` this dependency; see the crate-level
+# comment above for why `sha2` is deferred to a future stage.
+# NOT imported/used anywhere in src/lib.rs yet — dependency + build check only.
+hkdf = "0.13.0"
+
 [dev-dependencies]
 # Test-only plumbing (Stage 75) to read and assert against the RFC 8439
 # vector JSON from `#[cfg(test)]` — none of these three crates is a
@@ -47,7 +65,7 @@ hex = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 
-# Still intentionally ABSENT from [dependencies] (production): aes-gcm, hkdf,
-# argon2, rand / getrandom, zeroize / secrecy / subtle, bip39 / secp256k1 /
-# nostr, wasm-bindgen. One crate per Stage, each with its own recorded
-# dependency review (docs/rust_dependency_adoption.md §1, §8).
+# Still intentionally ABSENT from [dependencies] (production): aes-gcm,
+# argon2, sha2, rand / getrandom, zeroize / secrecy / subtle, bip39 /
+# secp256k1 / nostr, wasm-bindgen. One crate per Stage, each with its own
+# recorded dependency review (docs/rust_dependency_adoption.md §1, §8).

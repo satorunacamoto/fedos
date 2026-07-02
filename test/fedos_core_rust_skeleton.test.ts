@@ -17,17 +17,23 @@ import workerSource from "../src/worker.ts?raw";
 
 /**
  * Stage 69 — minimal FedOS Rust crate skeleton tests.
- * Updated Stage 74: `Cargo.toml` now depends on `chacha20poly1305` (the crate's
- * ONLY *production* dependency; see test/fedos_core_rust_dependency.test.ts for
+ * Updated Stage 74: `Cargo.toml` now depends on `chacha20poly1305` (a
+ * *production* dependency; see test/fedos_core_rust_dependency.test.ts for
  * the dedicated Stage 74 checks) — `src/lib.rs` is unchanged.
  * Updated Stage 75: `Cargo.toml` also gains a `[dev-dependencies]` table
  * (`serde`/`serde_json`/`hex`, test-only) and `src/lib.rs` gains a
  * `#[cfg(test)]`-only module that imports and calls `chacha20poly1305` to
  * verify it against the RFC 8439 vectors — see
  * test/fedos_core_rust_rfc8439_wiring.test.ts for the dedicated Stage 75
- * checks. Tests 3, 6, and 8 below are scoped to PRODUCTION code/dependencies
- * only (excluding `[dev-dependencies]` and excluding everything from the
- * first `#[cfg(test)]` onward) so they keep verifying exactly what they always
+ * checks.
+ * Updated Stage 76: `Cargo.toml`'s `[dependencies]` (production) table gains
+ * a SECOND entry, `hkdf` (see test/fedos_core_rust_dependency.test.ts for the
+ * dedicated Stage 76 checks, including why `sha2` is deliberately NOT added)
+ * — `src/lib.rs` remains unchanged; nothing imports or calls `hkdf` anywhere,
+ * production or test.
+ * Tests 3, 6, and 8 below are scoped to PRODUCTION code/dependencies only
+ * (excluding `[dev-dependencies]` and excluding everything from the first
+ * `#[cfg(test)]` onward) so they keep verifying exactly what they always
  * verified: the crate's public, non-test surface still implements no
  * cryptography.
  *
@@ -69,12 +75,12 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 only — no other crypto dependency", () => {
+  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf only — no other crypto dependency", () => {
     for (const dep of [
       "aes-gcm",
       "aes_gcm",
-      "hkdf",
       "argon2",
+      "sha2",
       "getrandom",
       "rand_core",
       "zeroize",
@@ -87,10 +93,11 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] (production) table has exactly one entry:
-    // chacha20poly1305. Stop at the next top-level `[section]` header (Stage
-    // 75 adds `[dev-dependencies]` right after it) so its test-only entries
-    // (serde/serde_json/hex) are not counted here.
+    // The [dependencies] (production) table has exactly two entries:
+    // chacha20poly1305 (Stage 74) and hkdf (Stage 76). Stop at the next
+    // top-level `[section]` header (Stage 75 adds `[dev-dependencies]` right
+    // after it) so its test-only entries (serde/serde_json/hex) are not
+    // counted here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -99,8 +106,9 @@ describe("FedOS Rust crate skeleton", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(1);
-    expect(depLines[0]).toContain("chacha20poly1305");
+    expect(depLines.length).toBe(2);
+    expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
   });
 
   it("4. Cargo.toml has no wasm-bindgen / cdylib / WASM target", () => {

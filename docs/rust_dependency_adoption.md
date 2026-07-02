@@ -8,6 +8,16 @@ presence, internal `unsafe`, license, MSRV impact). `Cargo.toml`'s
 implements no cryptography. The rest of this document (§1–§11) is the
 ORIGINAL Stage 72 process document and is otherwise unchanged.
 
+**Update (Stage 76): the second dependency adopted under this policy is
+`hkdf`** — see §12's `hkdf` — Stage 76 entry, appended after the
+`chacha20poly1305` — Stage 74 entry (entries are appended, never edited in
+place, per this section's own rule). `hkdf` serves the HKDF-SHA256 primitive
+(RFC 5869 vectors imported Stage 73 at
+test-vectors/kdf/hkdf-rfc5869.json); `src/lib.rs` is unchanged and still
+implements no cryptography. `chacha20poly1305` v0.11.0 remains exactly as
+adopted Stage 74 (and wired to the RFC 8439 vectors under `cfg(test)` Stage
+75) — Stage 76 adds ONLY `hkdf`, following §1's one-crate-per-Stage rule.
+
 **Status: this document, as originally written in Stage 72, added no code and
 added no dependency.** It fixes, in
 writing, the PROCESS a future Stage must follow to add any dependency to
@@ -247,3 +257,68 @@ edited in place, by the Stage that adopted the crate.
   `src/lib.rs`; no encrypt/decrypt implementation; no vector-loading code; no
   random/nonce/key generation; `Cargo.lock` was generated to verify the
   resolved dependency graph (§ above) and then deleted, not committed.
+
+### `hkdf` — Stage 76
+
+- **Crate + exact version:** `hkdf` v0.13.0 (pinned in `Cargo.toml`;
+  `Cargo.lock` is not committed — same convention as the `chacha20poly1305`
+  entry above).
+- **Primitive served / vector file:** HKDF-SHA256 (extract-and-expand KDF);
+  must eventually pass
+  [`../test-vectors/kdf/hkdf-rfc5869.json`](../test-vectors/kdf/hkdf-rfc5869.json)
+  (imported Stage 73) before any real implementation is wired. This Stage
+  does not wire that file — see "What was NOT done" below.
+- **Why this crate (§2–§3):** RustCrypto (default preference, §3); no
+  libsodium binding needed since RustCrypto has a maintained, audited-family
+  HKDF implementation (§4 does not apply here). `hkdf` is the RustCrypto
+  KDFs-organization crate for HKDF specifically (as opposed to a
+  hand-rolled HMAC-based construction), consistent with §10's "no home-grown
+  cryptography" restated rule.
+- **Feature configuration:** default features (no `default-features = false`
+  override needed, unlike `chacha20poly1305`). `hkdf`'s only optional
+  feature, `kdf` (an unrelated trait-abstraction crate from the `kdf` crate,
+  not a hash algorithm), is NOT enabled — it is not selected by default and
+  this Stage does not opt into it.
+- **`sha2` explicitly NOT added this Stage.** `hkdf` is generic over its
+  digest algorithm (its own dependency is only `hmac`, itself generic over
+  `digest`'s traits) — no concrete hash algorithm crate is required to add
+  `hkdf` to `Cargo.toml` or to pass `cargo check`. `sha2` (RustCrypto's
+  SHA-256 implementation) is deferred to the future Stage that actually
+  instantiates `Hkdf::<Sha256>` to wire the RFC 5869 vectors (Stage 77
+  candidate, per this repo's README `Stage 76` status entry) — adding it now,
+  unused, would violate §1's "no crate with no immediate primitive use is
+  added speculatively" rule.
+- **Transitive dependency count:** 3 NEW packages beyond what
+  `chacha20poly1305` already pulls in — `hkdf` itself, `hmac` (its only
+  dependency), and `digest` (`hmac`'s only dependency; already shared in the
+  resolved graph via `crypto-common`'s use of `digest`-adjacent traits from
+  the `chacha20poly1305` tree). Combined production dependency graph as of
+  this Stage: 18 unique packages total (`aead`, `block-buffer`, `cfg-if`,
+  `chacha20`, `chacha20poly1305`, `cipher`, `cmov`, `cpufeatures`,
+  `crypto-common`, `ctutils`, `digest`, `hkdf`, `hmac`, `hybrid-array`,
+  `inout`, `poly1305`, `typenum`, `universal-hash`), per `cargo tree -e
+  normal`'s output at adoption time. **No `getrandom`, no `rand`/`rand_core`,
+  no `zeroize`** appear in the resolved graph (verified by inspecting the
+  generated `Cargo.lock` before deleting it).
+- **Build-script presence:** none. `hkdf`, `hmac`, and `digest` each have no
+  `build.rs`.
+- **`unsafe` presence:** none of `hkdf`, `hmac`, or `digest` uses `unsafe` —
+  `digest` itself declares `#![forbid(unsafe_code)]` in its own source. This
+  is a cleaner result than `chacha20poly1305`'s transitive tree (which has
+  internal `unsafe` in a few lower-level crates for SIMD/CPU-feature code);
+  recorded here for completeness, not because any change was needed.
+- **License:** MIT OR Apache-2.0 (`hkdf`, `hmac`, `digest` all use the same
+  dual license — same license family as `chacha20poly1305`'s "Apache-2.0 OR
+  MIT", just listed in the opposite order upstream).
+- **MSRV impact:** `hkdf` 0.13.0 requires Rust ≥ 1.85 (per its published
+  `rust-version`), same as `chacha20poly1305` 0.11.0 — no MSRV bump beyond
+  what Stage 74 already established. This repository's toolchain at adoption
+  time is newer, so no toolchain change was needed.
+- **What was NOT done:** no import of `hkdf` anywhere in `src/lib.rs`
+  (production or `cfg(test)`); no HKDF `extract`/`expand` implementation; no
+  vector-loading code for
+  [`../test-vectors/kdf/hkdf-rfc5869.json`](../test-vectors/kdf/hkdf-rfc5869.json);
+  `derive_key_placeholder` is unchanged; no `sha2` (or any other digest
+  crate) added; no random/key generation; `Cargo.lock` was generated to
+  verify the resolved dependency graph (§ above) and then deleted, not
+  committed.

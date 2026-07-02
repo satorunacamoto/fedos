@@ -27,6 +27,12 @@ import rfc8439Vectors from "../test-vectors/aead/chacha20poly1305-rfc8439.json";
  * their own separate commands outside `npm test`, consistent with how this
  * repo has always kept the Rust toolchain check independent of the
  * vitest/TypeScript test run.
+ *
+ * Update (Stage 76): tests 1 and 3 below now expect `chacha20poly1305` AND
+ * `hkdf` as the [dependencies] (production) table's two entries — Stage 76
+ * adopts `hkdf` (see test/fedos_core_rust_dependency.test.ts for its
+ * dedicated checks) but does not wire any HKDF vector, so it does not affect
+ * anything else this file asserts about the RFC 8439 wiring.
  */
 describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
   // TOML comments legitimately NAME both allowed and still-forbidden crates;
@@ -37,7 +43,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     .join("\n")
     .toLowerCase();
 
-  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 as its only entry", () => {
+  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 (plus hkdf, Stage 76)", () => {
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -46,8 +52,9 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(1);
-    expect(depLines[0]).toContain("chacha20poly1305");
+    expect(depLines.length).toBe(2);
+    expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
   });
 
   it("2. serde / serde_json / hex are dev-dependencies only — not production dependencies", () => {
@@ -70,8 +77,8 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     for (const dep of [
       "aes-gcm",
       "aes_gcm",
-      "hkdf",
       "argon2",
+      "sha2",
       "getrandom",
       "rand_core",
       "zeroize",

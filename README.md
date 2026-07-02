@@ -8,7 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 75 — Wire RFC 8439 ChaCha20-Poly1305 vectors to Rust
+> **Status: Stage 76 — Adopt `hkdf` dependency (build check only; no HKDF
+> implementation, no vector wiring, no `deriveKey` implementation, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
+> gains a SECOND entry, `hkdf` v0.13.0 (RustCrypto, default features — its
+> only optional feature, `kdf`, is NOT enabled), alongside the unchanged
+> `chacha20poly1305` v0.11.0 from Stage 74. This is a dependency + build-check
+> ADOPTION ONLY, exactly like Stage 74: nothing in `src/lib.rs` — production
+> or `cfg(test)` — imports, calls, or exercises `hkdf`; no RFC 5869
+> HKDF-SHA256 vector (imported Stage 73 at
+> [`test-vectors/kdf/hkdf-rfc5869.json`](test-vectors/kdf/hkdf-rfc5869.json))
+> is loaded or wired; `derive_key_placeholder` is byte-for-byte unchanged from
+> Stage 69. **`sha2` is deliberately NOT added** — `hkdf` depends only on
+> `hmac` (itself generic over `digest`'s traits), so no concrete hash
+> algorithm crate is required to build or `cargo check` this dependency;
+> `sha2` is deferred to the future stage that actually instantiates
+> `Hkdf::<Sha256>` to wire the vectors. `hkdf` adds exactly 3 NEW transitive
+> packages beyond `chacha20poly1305`'s existing tree — `hkdf`, `hmac`,
+> `digest` — for an 18-package combined production dependency graph; none of
+> the three has a `build.rs`, and none uses `unsafe` (`digest` itself declares
+> `#![forbid(unsafe_code)]`). MSRV stays 1.85 (same as `chacha20poly1305`,
+> already satisfied by this repo's toolchain). The full dependency review is
+> recorded in
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md) §12,
+> a new `hkdf` — Stage 76 entry appended after the existing
+> `chacha20poly1305` — Stage 74 entry (never edited in place). `Cargo.lock`
+> was generated to run `cargo check`/`cargo test` and then deleted, not
+> committed, per the same convention as every prior dependency-adoption
+> stage. `argon2` / `aes-gcm` / `rand` / `getrandom` / `zeroize` / `secrecy` /
+> `subtle` / `wasm-bindgen` remain ABSENT; `crate-type = ["rlib"]` and
+> `#![forbid(unsafe_code)]` stay exactly as before; no `.wasm` is produced.
+> Existing [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> was updated (now 15 tests) to assert `hkdf` is present, `sha2` is absent
+> (with the documented reason), and lib.rs's production code has no
+> `hkdf`/`Hkdf` mention outside `#[cfg(test)]` (there is no such `cfg(test)`
+> module yet either); [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts)
+> test 3 and [`test/fedos_core_rust_rfc8439_wiring.test.ts`](test/fedos_core_rust_rfc8439_wiring.test.ts)
+> tests 1/3 were updated to expect TWO production dependency-table entries
+> (`chacha20poly1305` + `hkdf`) instead of one. Stage 77 candidate: **wire the
+> RFC 5869 HKDF-SHA256 vectors to `cargo test`**, following the exact pattern
+> Stage 75 used for RFC 8439 — a new `cfg(test)`-only module reading
+> [`test-vectors/kdf/hkdf-rfc5869.json`](test-vectors/kdf/hkdf-rfc5869.json)
+> via `include_str!`, adding `sha2` to instantiate `Hkdf::<Sha256>`, and
+> asserting the known-answer OKM bytes — still no public `deriveKey`
+> implementation. Prior status:
+>
+> **Stage 75 — Wire RFC 8439 ChaCha20-Poly1305 vectors to Rust
 > `cargo test` (verification wiring only; no public encrypt/decrypt API, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs` gains a new bottom-of-file module,
