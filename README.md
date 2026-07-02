@@ -8,7 +8,77 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 81 — Extract a test-only ChaCha20-Poly1305 helper
+> **Status: Stage 82 — Add an internal KDF module skeleton (crate-private
+> only; no public API change, no actual HKDF, no Runtime/Worker/
+> CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a third crate-private module,
+> `kdf_core`, placed right after Stage 80's `aead_core`. It defines
+> `KdfAlgorithm` (`pub(crate) enum`: one variant, `HkdfSha256` — a label
+> only), `KdfOperation` (`pub(crate) enum`: `Extract` / `Expand` /
+> `ExtractExpand` — a label only), `KdfRequestStatus` (`pub(crate) struct`:
+> wraps this crate's existing `FedosCoreState`, not a new parallel enum), and
+> `KdfPlaceholderRequest` (`pub(crate) struct`: `algorithm: KdfAlgorithm` +
+> `operation: KdfOperation` — no other field) with six methods —
+> `new_placeholder_extract()` / `new_placeholder_expand()` /
+> `new_placeholder_extract_expand()` (take NO IKM/salt/info/PRK/OKM/length
+> input of any kind), `status()` (always `Placeholder` — this skeleton runs
+> no cryptography), `algorithm()`, `operation()`. **NOT part of the public
+> API**: every item is `pub(crate)` at most — never `pub` — nothing is
+> re-exported, and this crate's public `pub fn` surface stays exactly the
+> same six placeholder functions from Stage 69; none of them constructs,
+> holds, or returns a `KdfPlaceholderRequest`. **No actual HKDF**:
+> `kdf_core`'s production code does NOT import `hkdf` (adopted Stage 76) or
+> `sha2` (dev-dependency since Stage 77) — both stay exercised ONLY by the
+> pre-existing `cfg(test)`-only `rfc5869_vectors` module (Stage 77),
+> unchanged this stage; `KdfPlaceholderRequest` stores only the two labels
+> above — no borrowed-byte-slice/`Vec<u8>`/`String` field or parameter
+> exists anywhere in the module. **No connection to `aead_core` (Stage 80)
+> or `secret_handle` (Stage 79)**: `kdf_core` never constructs an
+> `AeadPlaceholderRequest` or a `SecretHandle`, and extracts no key/secret
+> byte from either — same "when in doubt, leave unconnected" reasoning Stage
+> 80 already established; `aead_core` itself is untouched by this stage.
+> `derive_key_placeholder` / `encrypt_placeholder` / `decrypt_placeholder`
+> remain byte-for-byte unchanged. `Cargo.toml` is UNCHANGED this stage (no
+> new dependency — `kdf_core` uses only this crate's own `FedosCoreState`,
+> already in scope). `cargo test` is GREEN with all 23 tests passing (19
+> pre-existing + 4 new `kdf_core::tests`, its own nested `#[cfg(test)] mod
+> tests`: `new_placeholder_extract_reports_extract_operation_only`,
+> `new_placeholder_expand_reports_expand_operation_only`,
+> `new_placeholder_extract_expand_reports_extract_expand_operation_only`,
+> `status_is_always_placeholder_only_no_real_cryptography`); `cargo check`
+> and `cargo check --tests` stay GREEN with no warnings —
+> `#[allow(dead_code)]` on the module suppresses the (expected) unused-code
+> warning a plain, non-test build would otherwise emit, exactly as
+> `secret_handle`/`aead_core` already do. New
+> [`test/fedos_core_rust_kdf_skeleton.test.ts`](test/fedos_core_rust_kdf_skeleton.test.ts)
+> (17 tests) checks: `kdf_core` is present and not `pub mod`;
+> `KdfAlgorithm`/`KdfOperation`/`KdfRequestStatus`/`KdfPlaceholderRequest`
+> are `pub(crate)`, never `pub`; no public re-export; the public `pub fn`
+> surface is exactly the six Stage 69 names; the six placeholder
+> signatures/bodies are byte-for-byte unchanged; `kdf_core`'s own extracted
+> module text (via brace-matching) has no `hkdf`/`sha2` import; no
+> IKM/salt/info/PRK/OKM/secret storage field (a colon-typed field
+> declaration, not doc-comment prose) and no
+> `Vec<u8>`/`String`/borrowed-byte-slice field anywhere in the module; no
+> random/`getrandom`; no `AeadPlaceholderRequest`/`chacha20poly1305`
+> mention; no `SecretHandle` mention; no `unsafe` anywhere in `lib.rs`; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact committed; and Runtime/
+> Worker sources mention neither `kdf_core`/`KdfPlaceholderRequest` nor
+> auto-call a crypto operation (the bare word "kdf" is deliberately NOT
+> checked there, since both files already legitimately contain it in
+> pre-existing, unrelated prose describing what `selectCryptoProvider` does
+> NOT do). No existing Rust source guard test needed updating this stage —
+> `kdf_core` was placed so its own nested `#[cfg(test)]` lands after
+> `secret_handle`'s (lib.rs's existing first occurrence) and `aead_core`'s,
+> leaving every prior file's slicing logic untouched, and the crate-level
+> top-of-file doc comment update named no KDF/digest crate directly
+> (following the same precedent Stage 80 set for AEAD crate names), avoiding
+> the self-referential doc-comment trap two prior stages hit. Stage 83
+> candidate: **an internal HKDF helper behind `cfg(test)` or crate-private
+> visibility** — the KDF-side analogue of Stage 81's ChaCha20-Poly1305 helper
+> extraction — still no public `deriveKey` implementation. Prior status:
+>
+> **Stage 81 — Extract a test-only ChaCha20-Poly1305 helper
 > (test-only refactor; no public API change, no production encrypt/decrypt,
 > no Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs`'s pre-existing `cfg(test)`-only

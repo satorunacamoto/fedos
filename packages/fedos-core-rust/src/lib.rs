@@ -52,6 +52,14 @@
 //! (their own doc comments, next to their declarations, name them). No
 //! production code changed — the six functions above are untouched, and the
 //! Stage 80 skeleton is not connected to this refactor.
+//!
+//! Stage 82 adds a third crate-private module, `kdf_core`, of the same
+//! shape as `aead_core`: an INTERNAL-ONLY KDF request skeleton (labels and a
+//! non-sensitive status only — no IKM, salt, info, PRK, or OKM byte, and its
+//! production code imports no KDF/digest crate — same reason those crate
+//! names are kept out of this summary, see the note above). Same rules
+//! apply: not part of the public API, no public function above constructs,
+//! holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -408,6 +416,164 @@ mod aead_core {
             for request in [
                 AeadPlaceholderRequest::new_placeholder_encrypt(),
                 AeadPlaceholderRequest::new_placeholder_decrypt(),
+            ] {
+                assert_eq!(request.status().state, FedosCoreState::Placeholder);
+            }
+        }
+    }
+}
+
+/// Stage 82 — an INTERNAL-ONLY KDF request skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`KdfPlaceholderRequest`].
+///
+/// This module holds NO IKM, salt, info, PRK, OKM, or other secret byte —
+/// there is no borrowed-byte-slice, `Vec<u8>`, or `String` field or
+/// parameter anywhere below, and no real extract/expand operation is
+/// implemented or called. Production code here does NOT import `hkdf` or
+/// `sha2` — those dependencies are exercised only by the `cfg(test)`-only
+/// `rfc5869_vectors` module above, unchanged since Stage 77/81. This module
+/// does not connect to `aead_core` (above) or `secret_handle` (further
+/// above): it never constructs an `AeadPlaceholderRequest` or a
+/// `SecretHandle`, and never reads a key/secret byte out of either — when in
+/// doubt about a connection between skeletons, this crate deliberately
+/// leaves them unconnected rather than guess at a future design.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle` and
+/// `aead_core` above do. This is expected for a skeleton not yet wired to
+/// any consumer.
+#[allow(dead_code)]
+mod kdf_core {
+    use crate::FedosCoreState;
+
+    /// A supported KDF algorithm label — intent only, no implementation.
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum KdfAlgorithm {
+        HkdfSha256,
+    }
+
+    /// Which KDF operation a [`KdfPlaceholderRequest`] represents — a label
+    /// only, no bytes are extracted or expanded. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum KdfOperation {
+        Extract,
+        Expand,
+        ExtractExpand,
+    }
+
+    /// A non-sensitive status snapshot for a [`KdfPlaceholderRequest`].
+    /// Crate-private only. Never contains an IKM/salt/info/PRK/OKM byte —
+    /// `state` reuses this crate's existing
+    /// [`FedosCoreState`](crate::FedosCoreState) labels (`Unavailable` /
+    /// `Placeholder`) rather than inventing a parallel enum.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct KdfRequestStatus {
+        pub(crate) state: FedosCoreState,
+    }
+
+    /// An INTERNAL-ONLY KDF placeholder request skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds ONLY the two labels below — no IKM, salt,
+    /// info, PRK, OKM, or other secret byte, and no `hkdf`/`sha2` type. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually extract/expand bytes behind `cfg(test)` first; until then it
+    /// accepts and stores none.
+    pub(crate) struct KdfPlaceholderRequest {
+        algorithm: KdfAlgorithm,
+        operation: KdfOperation,
+    }
+
+    impl KdfPlaceholderRequest {
+        /// Construct a placeholder EXTRACT request. Takes NO IKM or salt
+        /// input of any kind.
+        pub(crate) fn new_placeholder_extract() -> Self {
+            Self {
+                algorithm: KdfAlgorithm::HkdfSha256,
+                operation: KdfOperation::Extract,
+            }
+        }
+
+        /// Construct a placeholder EXPAND request. Takes NO PRK or info
+        /// input of any kind.
+        pub(crate) fn new_placeholder_expand() -> Self {
+            Self {
+                algorithm: KdfAlgorithm::HkdfSha256,
+                operation: KdfOperation::Expand,
+            }
+        }
+
+        /// Construct a placeholder combined EXTRACT-THEN-EXPAND request.
+        /// Takes NO IKM, salt, info, or length input of any kind.
+        pub(crate) fn new_placeholder_extract_expand() -> Self {
+            Self {
+                algorithm: KdfAlgorithm::HkdfSha256,
+                operation: KdfOperation::ExtractExpand,
+            }
+        }
+
+        /// A non-sensitive status snapshot. Always `Placeholder` — this
+        /// skeleton runs no cryptography, so there is no other state to
+        /// report.
+        pub(crate) fn status(&self) -> KdfRequestStatus {
+            KdfRequestStatus {
+                state: FedosCoreState::Placeholder,
+            }
+        }
+
+        /// The algorithm label this request names — intent only.
+        pub(crate) fn algorithm(&self) -> KdfAlgorithm {
+            self.algorithm
+        }
+
+        /// The operation label this request names — intent only.
+        pub(crate) fn operation(&self) -> KdfOperation {
+            self.operation
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_extract_reports_extract_operation_only() {
+            let request = KdfPlaceholderRequest::new_placeholder_extract();
+            assert_eq!(request.operation(), KdfOperation::Extract);
+            assert_eq!(request.algorithm(), KdfAlgorithm::HkdfSha256);
+            assert_eq!(request.status().state, FedosCoreState::Placeholder);
+        }
+
+        #[test]
+        fn new_placeholder_expand_reports_expand_operation_only() {
+            let request = KdfPlaceholderRequest::new_placeholder_expand();
+            assert_eq!(request.operation(), KdfOperation::Expand);
+            assert_eq!(request.algorithm(), KdfAlgorithm::HkdfSha256);
+            assert_eq!(request.status().state, FedosCoreState::Placeholder);
+        }
+
+        #[test]
+        fn new_placeholder_extract_expand_reports_extract_expand_operation_only() {
+            let request = KdfPlaceholderRequest::new_placeholder_extract_expand();
+            assert_eq!(request.operation(), KdfOperation::ExtractExpand);
+            assert_eq!(request.algorithm(), KdfAlgorithm::HkdfSha256);
+            assert_eq!(request.status().state, FedosCoreState::Placeholder);
+        }
+
+        #[test]
+        fn status_is_always_placeholder_only_no_real_cryptography() {
+            for request in [
+                KdfPlaceholderRequest::new_placeholder_extract(),
+                KdfPlaceholderRequest::new_placeholder_expand(),
+                KdfPlaceholderRequest::new_placeholder_extract_expand(),
             ] {
                 assert_eq!(request.status().state, FedosCoreState::Placeholder);
             }
