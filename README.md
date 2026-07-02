@@ -8,7 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 69 — Minimal FedOS Rust crate skeleton (Cargo project only, no
+> **Status: Stage 70 — FedOS Core Rust crate safety docs (docs only, no code).**
+> A new [`docs/fedos_core_rust_safety.md`](docs/fedos_core_rust_safety.md) fixes,
+> in writing, the guardrails around the Stage 69 minimal Rust crate skeleton —
+> **no Rust/`Cargo.toml` change, no dependency, no crypto, no `zeroize`/`rand`, no
+> WASM** in this stage — for adding dependencies, `unsafe`, crypto crates,
+> randomness, and WASM before any real primitive lands. It documents: (1) the
+> purpose (Rust crate safety contract; future crypto guardrails; not a crypto
+> implementation spec); (2) the current crate state (Cargo.toml + lib.rs, no
+> deps, `rlib` only, no cdylib/WASM, no crypto, `#![forbid(unsafe_code)]`);
+> (3) the `unsafe` policy (keep it forbidden; adding it needs its own
+> Stage + docs + review; no casual `unsafe` at FFI/WASM boundaries); (4) the
+> dependency policy (adding deps is a separate Stage, audited crates only, crypto
+> deps bind to the test-vector plan, `dependencyLockDigest`/manifest updated,
+> supply-chain risk explicit); (5) the crypto-crate adoption policy
+> (chacha20poly1305 / aes-gcm / hkdf / argon2 / zeroize / secrecy / subtle are
+> candidates, adopt per feature per Stage, vectors mandatory, no custom XOR, no
+> hand-rolled constant-time compare); (6) memory-safety / secret handling
+> (`zeroize`/`secrecy` deferred until real secrets, arrive together with them, no
+> secret in logs, panic/core-dump risk is future work); (7) the randomness policy
+> (no `rand`/`getrandom` yet, CSPRNG is a separate Stage, separate test RNG from
+> production RNG, no nonce reuse); (8) the WASM policy (no `wasm-bindgen`, no
+> `cdylib`, no `.wasm`, follow the loader safety rules, runtime loading is a
+> separate Stage); (9) the build-artifact policy (`target/`, `Cargo.lock`,
+> `.wasm`, `.rlib`/`.so`/`.dll`/`.dylib`/`.a`/`.o`, `build/` never committed —
+> enforced by `.gitignore` + test guards); (10) the test policy (`cargo check` /
+> `cargo test` / `npm test` guards, official vectors at adoption, no unlabeled
+> generated vectors); (11) the future implementation order (test-vector docs →
+> build manifest docs → dependency adoption → AEAD → KDF → WASM target → runtime
+> loading); and (12) the current conclusion (docs only, no Rust change, no deps,
+> no crypto, no WASM). It complements
+> [`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md),
+> [`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md), and
+> [`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md). This stage
+> adds no test — there is no new behavior to cover. Stage 71 candidate: **AEAD
+> vector source research docs** (survey which official AEAD known-answer vectors
+> to adopt first). Prior status:
+>
+> **Stage 69 — Minimal FedOS Rust crate skeleton (Cargo project only, no
 > cryptography, no WASM).**
 > [`packages/fedos-core-rust`](packages/fedos-core-rust/README.md) gains a
 > **minimal Rust crate skeleton** — a `Cargo.toml` (name `fedos-core-rust`,
@@ -2378,7 +2415,8 @@ D1 space directory caveats (do not over-promise on these):
 66. Anti-analysis & Shadow Vault risk docs ([`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md); docs only, no code; binding prohibitions — no anti-debug/anti-VM, no self-destruct, no shadow/fake-data generator) ✓
 67. Crypto operation test-vector plan ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md); docs only, no code, no vectors committed; test-first verification plan for a future Rust core — AEAD/HKDF/Argon2id/NIP-44, official vectors only) ✓
 68. FedOS Core build manifest plan ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md); docs only, no code, no manifest committed; provenance contract — manifest skeleton, digest/signature/reproducible-build policy, no validation ⇒ no load) ✓
-69. Minimal FedOS Rust crate skeleton ([`packages/fedos-core-rust`](packages/fedos-core-rust/README.md); `Cargo.toml` + `src/lib.rs` placeholder API; no dependencies, no crypto, no `unsafe`, no WASM/cdylib, no build artifacts; TS boundary unchanged, not wired) ✓ ← you are here
+69. Minimal FedOS Rust crate skeleton ([`packages/fedos-core-rust`](packages/fedos-core-rust/README.md); `Cargo.toml` + `src/lib.rs` placeholder API; no dependencies, no crypto, no `unsafe`, no WASM/cdylib, no build artifacts; TS boundary unchanged, not wired) ✓
+70. FedOS Core Rust crate safety docs ([`docs/fedos_core_rust_safety.md`](docs/fedos_core_rust_safety.md); docs only, no code; guardrails for unsafe / dependencies / crypto-crate adoption / secrets / randomness / WASM / build artifacts) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
