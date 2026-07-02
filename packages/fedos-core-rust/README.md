@@ -4,11 +4,11 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 83 — Extract a test-only HKDF-SHA256 helper (test-only
-> refactor; no public API change, no production deriveKey, no Runtime/
-> Worker/CryptoProvider wiring, no WASM change). Public API STILL a
-> placeholder SKELETON. No cryptography reachable from any public
-> function.**
+> **Status: Stage 84 — Adopt `argon2` dependency (build check only; no
+> Argon2id implementation, no RFC 9106 vector wiring, no `deriveKey`
+> implementation, no Runtime/Worker/CryptoProvider wiring, no WASM change).
+> Public API STILL a placeholder SKELETON. No cryptography reachable from
+> any public function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -19,30 +19,27 @@ app depends only on its *contract*, never on its internals.
 > ["alloc"]` — no `getrandom`), wired to the RFC 8439 vectors under
 > `cfg(test)` in Stage 75 (refactored into a test-only helper Stage 81). Stage
 > 76 adopted `hkdf` (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256
-> vectors under `cfg(test)` in Stage 77 — see the "RFC 5869 vector wiring"
-> section below. Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a
+> vectors under `cfg(test)` in Stage 77 (refactored into a test-only helper
+> Stage 83). Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a
 > secret-handling FOUNDATION. Stage 79 added a crate-private `secret_handle`
 > module. Stage 80 added a second crate-private module, `aead_core`. Stage 82
-> added a third crate-private module, `kdf_core` (an INTERNAL-ONLY
-> `KdfPlaceholderRequest` skeleton) — see the "Internal KDF module skeleton"
-> section below; **`kdf_core` is UNCHANGED this stage, still
-> placeholder-only**. **Stage 83 is a test-only refactor of the Stage 77
-> module**: the HKDF-SHA256 extract/expand logic that used to be written
-> inline (and duplicated) in `rfc5869_vectors`'s two vector tests is now
-> three small, private, test-only helper functions,
-> `extract_hkdf_sha256_for_test`, `expand_hkdf_sha256_for_test`, and
-> `extract_expand_hkdf_sha256_for_test` — see the "RFC 5869 vector wiring"
-> section below for the details. **Not connected to `kdf_core` or
-> `secret_handle`/`aead_core`** — the helpers exist ONLY inside the
-> `cfg(test)`-only `rfc5869_vectors` module, are never `pub`/`pub(crate)`,
-> and are never re-exported. **No production `deriveKey`** — production code
-> (everything before this file's first `cfg(test)`-gated module) still does
-> not import `hkdf` or `sha2` at all; `derive_key_placeholder` remains
-> byte-for-byte unchanged. The Rust crate still has no `wasm-bindgen`, no
-> `unsafe`, and produces **no `.wasm`**; the runtime/Worker/`CryptoProvider`
-> are **not** wired to any of this. A real RustCrypto-backed core is a
-> future, explicitly-reviewed stage that must pass the full crypto
-> test-vector plan
+> added a third crate-private module, `kdf_core` — see the "Internal KDF
+> module skeleton" section below; **`kdf_core` is UNCHANGED this stage, still
+> placeholder-only**. **Stage 84 adds a SIXTH `[dependencies]` (production)
+> entry, `argon2` v0.5.3** (RustCrypto, `default-features = false`, NO
+> features enabled — explicitly excludes the crate's default `rand`/
+> `password-hash` feature set, which would otherwise pull in `rand_core`) —
+> a dependency + build-check ADOPTION ONLY, exactly like every prior
+> dependency Stage: nothing imports, calls, or exercises `argon2` anywhere
+> in this crate yet (production or `cfg(test)`), no RFC 9106 Argon2id vector
+> (imported Stage 73 at
+> [`test-vectors/kdf/argon2id-rfc9106.json`](../../test-vectors/kdf/argon2id-rfc9106.json))
+> is loaded or wired, and `derive_key_placeholder` is byte-for-byte
+> unchanged. See the "`argon2` dependency adoption" section below. The Rust
+> crate still has no `wasm-bindgen`, no `unsafe`, and produces **no
+> `.wasm`**; the runtime/Worker/`CryptoProvider` are **not** wired to any of
+> this. A real RustCrypto-backed core is a future, explicitly-reviewed stage
+> that must pass the full crypto test-vector plan
 > ([`docs/crypto_test_vectors.md`](../../docs/crypto_test_vectors.md)) and ship a
 > build manifest ([`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md))
 > before it can be selected at runtime. See also
@@ -87,7 +84,10 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   algorithm label and an extract/expand/extract-then-expand intent label —
   no IKM, salt, info, PRK, or OKM byte, and its production code does not
   import `hkdf` or `sha2` either
-- No Argon2 / any other KDF
+- No Argon2id / password-hashing implementation — `argon2` (adopted
+  Stage 84, `default-features = false`, no features enabled) is NOT
+  imported, called, or exercised anywhere in `src/lib.rs` yet (production or
+  `cfg(test)`); no RFC 9106 Argon2id vector is loaded or wired
 - No PUBLIC AEAD implementation — `chacha20poly1305` is exercised ONLY inside
   the `cfg(test)`-only `rfc8439_vectors` module added Stage 75, to check the
   dependency against the RFC 8439 vectors; no production code path imports,
@@ -101,7 +101,8 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   either
 - No CSPRNG / random generation (chacha20poly1305's default `getrandom`
   feature is explicitly disabled; `hkdf` pulls in no `rand`/`getrandom`
-  either)
+  either; `argon2`'s default `rand` feature is explicitly disabled too, so
+  it pulls in no `rand_core` either)
 - No BIP39 / BIP32
 - No NIP-44
 - No PUBLIC secret type — Stage 79 adds an INTERNAL-ONLY `SecretHandle`
@@ -132,11 +133,11 @@ this stage.
 
 ```
 packages/fedos-core-rust
-  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78) — UNCHANGED since Stage 78
+  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78) + argon2 dependency (Stage 84)
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged Stage 83) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only) — none of the three skeletons is part of the public API
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 (and UNCHANGED this stage — Stage 84 is dependency-adoption only) — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only) — none of the three skeletons is part of the public API; `argon2` (Stage 84) is not referenced anywhere yet
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -146,10 +147,10 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 `FedosCoreStatus` and runs no cryptography. `#![forbid(unsafe_code)]` bans
 `unsafe`. No WASM target is declared; nothing compiles to `.wasm`.
 
-## Dependencies (Stage 74/76/78 production + Stage 75/77 dev-dependencies)
+## Dependencies (Stage 74/76/78/84 production + Stage 75/77 dev-dependencies)
 
 - **`chacha20poly1305` v0.11.0** (RustCrypto, Apache-2.0 OR MIT,
-  `default-features = false`, `features = ["alloc"]`) — one of five entries in
+  `default-features = false`, `features = ["alloc"]`) — one of six entries in
   `[dependencies]` (production). Pulls in, transitively, only other
   RustCrypto/utility crates (`aead`, `chacha20`, `cipher`, `poly1305`,
   `crypto-common`, `inout`, `hybrid-array`, `universal-hash`, `block-buffer`,
@@ -176,12 +177,18 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   no toolchain change was needed. As of Stage 77, this dependency is
   exercised — but only inside `cfg(test)`, by the `rfc5869_vectors` module
   (see below); production code still neither imports nor calls it.
-- **`zeroize` v1.9.0 / `secrecy` v0.10.3 / `subtle` v2.6.1** — the remaining
-  three entries in `[dependencies]` (production), adopted together Stage 78
+- **`zeroize` v1.9.0 / `secrecy` v0.10.3 / `subtle` v2.6.1** — three more
+  entries in `[dependencies]` (production), adopted together Stage 78
   as a secret-handling foundation. See "Secret-handling foundation adoption
   (Stage 78)" below for the full review; none of the three is imported,
   referenced, or exercised anywhere in `src/lib.rs` — production or
   `cfg(test)` — yet.
+- **`argon2` v0.5.3** (RustCrypto, MIT OR Apache-2.0, `default-features =
+  false`, NO `features` enabled) — the sixth and newest entry in
+  `[dependencies]` (production), adopted Stage 84. See "`argon2` dependency
+  adoption (Stage 84)" below for the full review; NOT imported/used
+  anywhere in `src/lib.rs` yet — production or `cfg(test)` — dependency +
+  build check only.
 - **`[dev-dependencies]` (Stage 75/77, test-only, NOT production
   dependencies):** `serde` v1.0.228 (`features = ["derive"]`), `serde_json`
   v1.0.150, `hex` v0.4.3 (Stage 75) — used by the `cfg(test)`-only
@@ -201,9 +208,10 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 - See
   [`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
   for the full adoption record and policy (§12 has dedicated `hkdf` — Stage
-  76 and `zeroize`/`secrecy`/`subtle` — Stage 78 entries). **`Cargo.lock` is
-  intentionally NOT committed** (library crate; reproducibility via a
-  lockfile digest is deferred to the future build-manifest stage,
+  76, `zeroize`/`secrecy`/`subtle` — Stage 78, and `argon2` — Stage 84
+  entries). **`Cargo.lock` is intentionally NOT committed** (library crate;
+  reproducibility via a lockfile digest is deferred to the future
+  build-manifest stage,
   [`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md)).
   It was generated to run `cargo check`/`cargo test` this stage and then
   deleted, as in every prior dependency-adoption stage.
@@ -655,7 +663,43 @@ other stage's summary — the KDF-side mirror of Stage 81's own section:
   before** — `derive_key_placeholder` is byte-for-byte unchanged, and the
   host still selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
 
-A future, explicitly-reviewed Stage 84 candidate is to adopt the `argon2`
-dependency (build-check only, one crate per Stage per
-[`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
-§1) — still no public `deriveKey`/password-hashing implementation.
+Stage 84 (below) is the `argon2` dependency adoption this section
+anticipated — see "`argon2` dependency adoption" below for its details.
+
+## `argon2` dependency adoption (Stage 84)
+
+`argon2` v0.5.3 is now a `[dependencies]` (production) entry — see
+"Dependencies" above for the full crate review. This stage is the "imported
+as a dependency" step only, mirroring Stage 74/76's `chacha20poly1305`/`hkdf`
+adoption:
+
+- **No Argon2id implementation.** No code anywhere in `src/lib.rs` —
+  production or `cfg(test)` — imports `argon2`, references `argon2::`, or
+  names `Argon2`.
+- **No vector wiring.**
+  [`test-vectors/kdf/argon2id-rfc9106.json`](../../test-vectors/kdf/argon2id-rfc9106.json)
+  (imported verbatim Stage 73, RFC 9106 §5.3's Argon2id known-answer test
+  case) is not read by any Rust code yet; this dependency stays at
+  vector-lifecycle step 2 ("imported"), not step 3 ("wired") in
+  [`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
+  §5.
+- **No `deriveKey` implementation.** `derive_key_placeholder` is
+  byte-for-byte unchanged from Stage 69: it still calls `placeholder_status()`
+  and does no real key derivation.
+- **`default-features = false`, no `rand`/`password-hash`.** Unlike
+  `hkdf`'s "default features are fine as-is" Stage 76 adoption, `argon2`'s
+  own defaults (`alloc`, `password-hash`, `rand`) would pull in
+  `password-hash`'s optional `rand_core` dependency — explicitly excluded
+  here, matching `chacha20poly1305`'s Stage 74 `default-features = false`
+  treatment of its default `getrandom` feature. Verified: neither
+  `rand_core` nor `password-hash` appears anywhere in the resolved
+  dependency graph with this configuration.
+- **No Runtime / Worker / `CryptoProvider` wiring.** Nothing outside this
+  package's own `Cargo.toml`/`Cargo.lock` changed; the host still selects
+  only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+A future, explicitly-reviewed Stage 85 candidate is to wire the RFC 9106
+Argon2id vectors to `cargo test`, following the exact same pattern Stage 75
+used for RFC 8439 and Stage 77 used for RFC 5869: a new `cfg(test)`-only
+module that reads the vector file via `include_str!` and asserts the
+known-answer tag bytes — still no public `deriveKey` implementation.

@@ -2,7 +2,7 @@
 # (Stage 74) + RFC 8439 vectors wired to `cargo test` (Stage 75) + `hkdf`
 # dependency adopted (Stage 76) + RFC 5869 HKDF vectors wired to
 # `cargo test` (Stage 77) + `zeroize`/`secrecy`/`subtle` secret-handling
-# foundation adopted (Stage 78).
+# foundation adopted (Stage 78) + `argon2` dependency adopted (Stage 84).
 #
 # Placeholder crate. There is still NO cryptography and NO WASM here — the
 # PUBLIC API in `src/lib.rs` is unchanged (placeholder functions only; see
@@ -14,16 +14,19 @@
 # Stage 77 — this requires a concrete hash algorithm to instantiate
 # `Hkdf::<Sha256>`, so `sha2` is added ONLY under `[dev-dependencies]`
 # (test-only): production code still neither imports nor calls `hkdf`/`sha2`,
-# and `derive_key_placeholder` is unchanged. Stage 78 adopts THREE more
+# and `derive_key_placeholder` is unchanged. Stage 78 adopted THREE more
 # production dependencies together — `zeroize`, `secrecy`, `subtle` — a
 # secret-handling FOUNDATION, ahead of any real secret type, in preparation
-# for a future secret-handle skeleton (Stage 79 candidate) and eventual real
-# key/seed/plaintext handling. No code anywhere in `src/lib.rs` imports,
-# references, or calls any of the three — this is a dependency + build-check
-# ADOPTION ONLY, exactly like every prior dependency Stage. Every other
-# crypto crate (aes-gcm / argon2), rand / getrandom, bip39 / secp256k1 /
-# nostr, and wasm-bindgen remain ABSENT — each lands only in its own future,
-# explicitly-reviewed, one-crate-per-stage adoption
+# for the secret-handle skeleton (Stage 79) and eventual real
+# key/seed/plaintext handling. Stage 84 adopts a FIFTH production
+# dependency, `argon2` (RustCrypto), preparing for the RFC 9106 Argon2id
+# test vectors already imported at test-vectors/kdf/argon2id-rfc9106.json —
+# a dependency + build-check ADOPTION ONLY, exactly like every prior
+# dependency Stage: no code anywhere in `src/lib.rs` imports, references, or
+# calls `argon2`, no vector is wired, and `derive_key_placeholder` is
+# unchanged. Every other crypto crate (aes-gcm), rand / getrandom, bip39 /
+# secp256k1 / nostr, and wasm-bindgen remain ABSENT — each lands only in its
+# own future, explicitly-reviewed, one-crate-per-stage adoption
 # (docs/rust_dependency_adoption.md §1).
 
 [package]
@@ -85,6 +88,20 @@ secrecy = "0.10.3"
 # build check only.
 subtle = "2.6.1"
 
+# `argon2` (RustCrypto, MIT OR Apache-2.0) — the password-hashing/KDF this
+# crate will eventually implement against the RFC 9106 Argon2id test vector
+# already imported at test-vectors/kdf/argon2id-rfc9106.json.
+# `default-features = false` (no `features` enabled) explicitly excludes the
+# crate's default `rand` feature (which pulls in `password-hash`'s optional
+# `rand_core` dependency for salt-string generation convenience) and its
+# default `alloc`/`password-hash` features (the `PasswordHasher`/PHC-string
+# API surface) — none of that is needed to instantiate the low-level
+# `Argon2` hasher directly against fixed vector bytes, and no random-number
+# source is adopted in this stage (docs/fedos_core_rust_safety.md §7,
+# docs/rust_dependency_adoption.md §6). NOT imported/used anywhere in
+# src/lib.rs yet — dependency + build check only.
+argon2 = { version = "0.5.3", default-features = false }
+
 [dev-dependencies]
 # Test-only plumbing (Stage 75) to read and assert against the RFC 8439
 # vector JSON from `#[cfg(test)]` — none of these three crates is a
@@ -104,8 +121,8 @@ serde_json = "1.0.150"
 sha2 = "0.11.0"
 
 # Still intentionally ABSENT from [dependencies] (production): aes-gcm,
-# argon2, sha2, rand / getrandom, bip39 / secp256k1 / nostr, wasm-bindgen.
-# One crate per Stage (Stage 78's zeroize/secrecy/subtle trio is one
-# reviewed group, not a bulk add — see docs/rust_dependency_adoption.md §12),
-# each with its own recorded dependency review
+# sha2, rand / getrandom, bip39 / secp256k1 / nostr, wasm-bindgen. One crate
+# per Stage (Stage 78's zeroize/secrecy/subtle trio is one reviewed group,
+# not a bulk add — see docs/rust_dependency_adoption.md §12), each with its
+# own recorded dependency review
 # (docs/rust_dependency_adoption.md §1, §8).

@@ -54,6 +54,11 @@ import workerSource from "../src/worker.ts?raw";
  * so `firstCfgTestIdx` below shifts earlier accordingly (harmlessly — see
  * test 6's own comment). See test/fedos_core_rust_secret_handle.test.ts for
  * the dedicated Stage 79 checks.
+ * Updated Stage 84: `Cargo.toml`'s `[dependencies]` (production) table gains
+ * a SIXTH entry, `argon2` (see test/fedos_core_rust_dependency.test.ts for
+ * the dedicated Stage 84 checks) — `src/lib.rs` remains unchanged; nothing
+ * imports or calls `argon2` anywhere, production or test. Test 3 below now
+ * expects SIX production dependency-table entries.
  * Tests 3, 6, and 8 below are scoped to PRODUCTION code/dependencies only
  * (excluding `[dev-dependencies]` and excluding everything from the first
  * `#[cfg(test)]` onward) so they keep verifying exactly what they always
@@ -99,11 +104,10 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle only — no other crypto dependency", () => {
+  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 only — no other crypto dependency", () => {
     for (const dep of [
       "aes-gcm",
       "aes_gcm",
-      "argon2",
       // sha2 is NOT in this list: since Stage 77 it is a legitimate
       // [dev-dependencies] entry (used only by the #[cfg(test)]-only
       // rfc5869_vectors module) — its absence from PRODUCTION dependencies
@@ -112,7 +116,9 @@ describe("FedOS Rust crate skeleton", () => {
       // Stage 78 they are legitimate PRODUCTION dependencies (a
       // secret-handling foundation adopted ahead of any real secret type) —
       // see test/fedos_core_rust_dependency.test.ts tests 3–5 for their
-      // dedicated presence checks.
+      // dedicated presence checks. argon2 is likewise NOT in this list:
+      // since Stage 84 it is a legitimate PRODUCTION dependency — see
+      // test/fedos_core_rust_dependency.test.ts test 6.
       "getrandom",
       "rand_core",
       "bip39",
@@ -122,11 +128,12 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] (production) table has exactly five entries:
-    // chacha20poly1305 (Stage 74), hkdf (Stage 76), and zeroize/secrecy/subtle
-    // (Stage 78). Stop at the next top-level `[section]` header (Stage 75
-    // adds `[dev-dependencies]` right after it) so its test-only entries
-    // (serde/serde_json/hex/sha2) are not counted here.
+    // The [dependencies] (production) table has exactly six entries:
+    // chacha20poly1305 (Stage 74), hkdf (Stage 76), zeroize/secrecy/subtle
+    // (Stage 78), and argon2 (Stage 84). Stop at the next top-level
+    // `[section]` header (Stage 75 adds `[dev-dependencies]` right after it)
+    // so its test-only entries (serde/serde_json/hex/sha2) are not counted
+    // here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -135,12 +142,13 @@ describe("FedOS Rust crate skeleton", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(5);
+    expect(depLines.length).toBe(6);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*secrecy\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*subtle\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(false);
   });
 

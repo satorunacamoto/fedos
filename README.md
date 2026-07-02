@@ -8,7 +8,77 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 83 — Extract a test-only HKDF-SHA256 helper (test-only
+> **Status: Stage 84 — Adopt `argon2` dependency (build check only; no
+> Argon2id implementation, no RFC 9106 vector wiring, no `deriveKey`
+> implementation, no Runtime/Worker/CryptoProvider wiring, no WASM
+> change).**
+> `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
+> gains a SIXTH entry, `argon2` v0.5.3 (RustCrypto, `default-features =
+> false`, NO features enabled — its default `alloc`/`password-hash`/`rand`
+> feature set is explicitly excluded), alongside the unchanged
+> `chacha20poly1305` v0.11.0 (Stage 74), `hkdf` v0.13.0 (Stage 76), and
+> `zeroize`/`secrecy`/`subtle` (Stage 78). This is a dependency + build-check
+> ADOPTION ONLY, exactly like every prior dependency Stage: nothing in
+> `src/lib.rs` — production or `cfg(test)` — imports, calls, or exercises
+> `argon2`; no RFC 9106 Argon2id vector (imported Stage 73 at
+> [`test-vectors/kdf/argon2id-rfc9106.json`](test-vectors/kdf/argon2id-rfc9106.json))
+> is loaded or wired; `derive_key_placeholder` is byte-for-byte unchanged from
+> Stage 69. **`default-features = false` with NO features enabled** — unlike
+> `hkdf`'s "default features are fine as-is" Stage 76 adoption, `argon2`'s
+> own defaults (`alloc`, `password-hash`, `rand`) would pull in
+> `password-hash`'s optional `rand_core` dependency for salt-generation
+> convenience; excluding them mirrors `chacha20poly1305`'s Stage 74
+> `default-features = false` treatment of its default `getrandom` feature —
+> verified empirically that neither `rand_core` nor `password-hash` appears
+> anywhere in the resolved dependency graph with this configuration. `argon2`
+> adds exactly 8 NEW transitive packages beyond the existing 21-package
+> `chacha20poly1305`/`hkdf`/`zeroize`/`secrecy`/`subtle` tree — `argon2`
+> itself, `base64ct`, `blake2`, and a SECOND, older generation of
+> `digest`/`block-buffer`/`crypto-common`/`generic-array`/`cpufeatures`
+> (Argon2's `blake2` dependency pulls `digest` v0.10.7, distinct from the
+> `digest` v0.11.3 already in the tree via `hkdf`; both generations coexist,
+> which Cargo permits) — for a 29-package combined production dependency
+> graph; `subtle` v2.6.1 and `typenum` v1.20.1 are REUSED at their existing
+> pinned versions. `argon2` itself uses `unsafe` in 2 call sites (an AVX2
+> SIMD backend, the same pattern already acknowledged for
+> `chacha20poly1305`'s transitive tree); `blake2`/`base64ct` also use
+> `unsafe` internally. None of this affects this crate's own
+> `#![forbid(unsafe_code)]`, which governs only this crate's code. The full
+> dependency review is recorded in
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md) §12,
+> a new `argon2` — Stage 84 entry appended after the existing
+> `zeroize`/`secrecy`/`subtle` — Stage 78 entry (never edited in place).
+> `Cargo.lock` was generated to run `cargo check`/`cargo test` and then
+> deleted, not committed, per the same convention as every prior
+> dependency-adoption stage. `aes-gcm` / `rand` / `getrandom` /
+> `wasm-bindgen` remain ABSENT; `crate-type = ["rlib"]` and
+> `#![forbid(unsafe_code)]` stay exactly as before; no `.wasm` is produced.
+> Existing [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> was updated (now 21 tests) to assert `argon2` is present (test 6), lib.rs's
+> production code has no `Argon2::`/`Argon2<`/`argon2::` usage outside
+> `#[cfg(test)]` (test 12, folded into test 16), and `rand`/`getrandom`
+> remain strictly absent (test 9 — `argon2`'s feature configuration avoids
+> `rand_core` entirely, so this stays the strict "does not contain" wording
+> rather than a relaxed "unless argon2 pulls it in").
+> [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts)
+> test 3 and
+> [`test/fedos_core_rust_rfc8439_wiring.test.ts`](test/fedos_core_rust_rfc8439_wiring.test.ts)/[`test/fedos_core_rust_hkdf_wiring.test.ts`](test/fedos_core_rust_hkdf_wiring.test.ts)
+> tests 1/3 were updated to expect SIX production dependency-table entries
+> instead of five. A self-referential doc-comment trap was caught and fixed
+> during this stage's own verification: a bare, case-matched `\bArgon2\b`
+> regex collided with PRE-EXISTING prose in `src/lib.rs` (Stage 69's
+> crate-level summary and Stage 79's `secret_handle` doc both already say
+> "Argon2" in plain English describing what the crate does NOT do) — the
+> new tests instead check specific Rust usage patterns (`Argon2::`,
+> `Argon2<`, `Argon2::new(`) that would not appear in that prose. Stage 85
+> candidate: **wire the RFC 9106 Argon2id vectors to `cargo test`**,
+> following the exact pattern Stage 75/77 used for RFC 8439/RFC 5869 — a new
+> `cfg(test)`-only module reading
+> [`test-vectors/kdf/argon2id-rfc9106.json`](test-vectors/kdf/argon2id-rfc9106.json)
+> via `include_str!` and asserting the known-answer tag bytes — still no
+> public `deriveKey` implementation. Prior status:
+>
+> **Stage 83 — Extract a test-only HKDF-SHA256 helper (test-only
 > refactor; no public API change, no production deriveKey, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
 > `packages/fedos-core-rust/src/lib.rs`'s pre-existing `cfg(test)`-only

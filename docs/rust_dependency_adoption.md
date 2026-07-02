@@ -41,6 +41,22 @@ files under `cfg(test)` Stage 75/77) — Stage 78 adds ONLY `zeroize` +
 inseparable secret-handling foundation (per §5's own grouping), not three
 independent primitives.
 
+**Update (Stage 84): the fourth dependency adopted under this policy is
+`argon2`** — see §12's `argon2` — Stage 84 entry, appended after the
+`zeroize`/`secrecy`/`subtle` — Stage 78 entry. `argon2` serves the Argon2id
+password-hashing/KDF primitive (RFC 9106 vectors imported Stage 73 at
+test-vectors/kdf/argon2id-rfc9106.json); `src/lib.rs` is unchanged and still
+implements no cryptography. `chacha20poly1305` / `hkdf` /
+`zeroize`/`secrecy`/`subtle` remain exactly as adopted Stage 74/76/78 — Stage
+84 adds ONLY `argon2`, following §1's one-crate-per-Stage rule. Unlike
+`chacha20poly1305`/`hkdf`, `argon2` is adopted with `default-features =
+false` and NO features enabled at all — its default feature set (`alloc`,
+`password-hash`, `rand`) would otherwise pull in `password-hash`'s optional
+`rand_core` dependency (§6 reserves CSPRNG adoption for its own,
+separate, explicitly-reviewed Stage); the bare hasher this crate will
+eventually wire against the RFC 9106 vectors needs none of that convenience
+API surface.
+
 **Status: this document, as originally written in Stage 72, added no code and
 added no dependency.** It fixes, in
 writing, the PROCESS a future Stage must follow to add any dependency to
@@ -440,5 +456,84 @@ edited in place, by the Stage that adopted the crate.
   anywhere; `derive_key_placeholder` / `encrypt_placeholder` /
   `decrypt_placeholder` are unchanged; no random/key generation; no
   Runtime/Worker/`CryptoProvider` wiring; `Cargo.lock` was generated to
+  verify the resolved dependency graph (§ above) and then deleted, not
+  committed.
+
+### `argon2` — Stage 84
+
+- **Crate + exact version:** `argon2` v0.5.3 (pinned in `Cargo.toml`;
+  `Cargo.lock` is not committed — same convention as every prior entry
+  above).
+- **Primitive served / vector file:** Argon2id password-hashing/KDF; must
+  eventually pass
+  [`../test-vectors/kdf/argon2id-rfc9106.json`](../test-vectors/kdf/argon2id-rfc9106.json)
+  (imported Stage 73, RFC 9106 §5.3's Argon2id known-answer test case) before
+  any real implementation is wired. This Stage does not wire that file — see
+  "What was NOT done" below.
+- **Why this crate (§2–§3):** RustCrypto (default preference, §3); no
+  libsodium binding needed since RustCrypto has a maintained, audited-family
+  Argon2 implementation (§4 does not apply here) — the same crate family
+  already used for `chacha20poly1305`/`hkdf`.
+- **Feature configuration:** `default-features = false`, NO `features`
+  enabled. `argon2`'s own default features are `alloc`, `password-hash`, and
+  `rand` — the `rand` feature specifically enables `password-hash`'s
+  optional `rand_core` dependency (for `SaltString::generate`-style
+  convenience). None of that convenience API (PHC-string encoding, salt
+  generation) is needed to instantiate the low-level `Argon2` hasher
+  directly against fixed vector bytes, and §6 reserves CSPRNG adoption for
+  its own, separate, explicitly-reviewed Stage — so this Stage explicitly
+  opts OUT of `argon2`'s defaults, mirroring Stage 74's
+  `default-features = false` treatment of `chacha20poly1305`'s default
+  `getrandom` feature. Verified empirically: with this configuration,
+  neither `rand_core` nor `password-hash` appears anywhere in the resolved
+  dependency graph.
+- **Transitive dependency count:** 8 NEW packages beyond the existing
+  21-package `chacha20poly1305`/`hkdf`/`zeroize`/`secrecy`/`subtle` tree —
+  `argon2` itself, `base64ct`, `blake2`, and a SECOND, older generation of
+  `digest`/`block-buffer`/`crypto-common`/`generic-array`/`cpufeatures`
+  (Argon2's own `blake2` dependency pulls `digest` v0.10.7, distinct from
+  the `digest` v0.11.3 already in the tree via `hkdf`/`hmac` — both
+  generations coexist in the resolved graph, which Cargo permits; this is a
+  binary-size/compile-time note, not a build failure). `subtle` v2.6.1 and
+  `typenum` v1.20.1 are REUSED at their existing pinned versions (no
+  duplicate). Combined production dependency graph as of this Stage:
+  29 unique (name, version) packages total, per `cargo tree -e normal`'s
+  output at adoption time. **No `getrandom`, no `rand`/`rand_core`, no
+  `password-hash`** appear in the resolved graph (verified by inspecting
+  the generated `Cargo.lock` before deleting it) — a direct consequence of
+  the feature configuration above, not merely an absence of a default
+  choice elsewhere.
+- **Build-script presence:** none for `argon2`, `base64ct`, or `blake2`
+  themselves. Two ALREADY-established transitive crates in the wider tree
+  (`generic-array`, `libc`, both already present via the
+  `chacha20poly1305`/`cpufeatures` tree since Stage 74) have their own
+  `build.rs` — unchanged by this Stage, not newly introduced by `argon2`.
+- **`unsafe` presence:** `argon2` itself uses `unsafe` in 2 call sites (an
+  AVX2 SIMD backend for its compression function — the same
+  SIMD-acceleration pattern already acknowledged for `chacha20poly1305`'s
+  transitive tree in its own Stage 74 entry above). `blake2` and `base64ct`
+  also use `unsafe` internally (their own SIMD/const-time-encoding
+  internals). None of this affects `packages/fedos-core-rust`'s own
+  `#![forbid(unsafe_code)]`, which governs only this crate's code.
+- **License:** MIT OR Apache-2.0 (`argon2`, `blake2`); Apache-2.0 OR MIT
+  (`base64ct`) — same dual-license family as every other adopted crate so
+  far.
+- **MSRV impact:** `argon2` 0.5.3 requires Rust ≥ 1.65 (per its published
+  `rust-version`) — lower than the existing 1.85 floor established by
+  `chacha20poly1305`/`hkdf`/`zeroize`, so no bump. `base64ct` 1.8.3 states
+  ≥ 1.85 (matches the existing floor exactly, no-op). `blake2` publishes no
+  `rust-version` upstream — recorded as a documented gap per §9, not
+  blocking since its transitive presence via `digest`/`crypto-common` (both
+  themselves stating no fixed floor either) does not raise the crate's
+  effective MSRV above what `chacha20poly1305`/`hkdf`/`zeroize` already
+  require.
+- **What was NOT done:** no import of `argon2` anywhere in `src/lib.rs` —
+  production or `cfg(test)` (no `#[cfg(test)]` module is added this Stage,
+  same as Stage 78, since wiring the RFC 9106 vector is deferred to a future
+  Stage); no Argon2id hashing/verification implementation; no vector-loading
+  code for
+  [`../test-vectors/kdf/argon2id-rfc9106.json`](../test-vectors/kdf/argon2id-rfc9106.json);
+  `derive_key_placeholder` is unchanged; no random/password/key generation;
+  no Runtime/Worker/`CryptoProvider` wiring; `Cargo.lock` was generated to
   verify the resolved dependency graph (§ above) and then deleted, not
   committed.

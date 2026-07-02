@@ -43,6 +43,12 @@ import rfc5869Vectors from "../test-vectors/kdf/hkdf-rfc5869.json";
  * test/fedos_core_rust_dependency.test.ts for its dedicated checks) but
  * wires no code and does not affect anything else this file asserts about
  * the RFC 5869 wiring.
+ *
+ * Update (Stage 84): tests 1 and 3 below now expect `argon2` as a SIXTH
+ * production dependency-table entry — Stage 84 adopts it as a dependency +
+ * build-check ONLY (see test/fedos_core_rust_dependency.test.ts for its
+ * dedicated checks) but wires no code and does not affect anything else this
+ * file asserts about the RFC 5869 wiring.
  */
 describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () => {
   // TOML comments legitimately NAME both allowed and still-forbidden crates;
@@ -53,7 +59,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     .join("\n")
     .toLowerCase();
 
-  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 + hkdf (plus zeroize/secrecy/subtle, Stage 78)", () => {
+  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 + hkdf (plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84)", () => {
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -62,12 +68,13 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(5);
+    expect(depLines.length).toBe(6);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*secrecy\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*subtle\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
   });
 
   it("2. serde / serde_json / hex / sha2 are dev-dependencies only — not production dependencies", () => {
@@ -90,10 +97,12 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     for (const dep of [
       "aes-gcm",
       "aes_gcm",
-      "argon2",
       // zeroize / secrecy / subtle are NOT in this list: since Stage 78
       // they are legitimate PRODUCTION dependencies (a secret-handling
       // foundation) — see test/fedos_core_rust_dependency.test.ts tests 3–5.
+      // argon2 is likewise NOT in this list: since Stage 84 it is a
+      // legitimate PRODUCTION dependency — see
+      // test/fedos_core_rust_dependency.test.ts test 6.
       "getrandom",
       "rand_core",
       "wasm-bindgen",
