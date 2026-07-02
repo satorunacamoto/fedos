@@ -24,6 +24,10 @@
 //! above. (Its own doc comment, just above its declaration, names the
 //! specific dependency and vector file — kept out of this crate-level doc so
 //! this production-facing summary stays free of any AEAD crate name.)
+//!
+//! Stage 77 adds a second test-only module of the same shape, verifying
+//! Stage 76's KDF dependency against an official RFC 5869 HKDF known-answer
+//! vector file. Same rules apply: `cfg(test)` only, no public API change.
 
 #![forbid(unsafe_code)]
 
@@ -286,6 +290,142 @@ mod rfc8439_vectors {
             assert!(
                 result.is_err(),
                 "{}: expected decrypt/authentication failure for a shouldPass=false vector",
+                vector.id
+            );
+        }
+    }
+}
+
+/// Stage 77 — RFC 5869 HKDF-SHA256 known-answer verification, `#[cfg(test)]`
+/// ONLY.
+///
+/// This module is not part of the crate's public API: it is compiled only
+/// under `cargo test`, imports `hkdf` (adopted as a production dependency in
+/// Stage 76) and `sha2` (a `[dev-dependencies]`-only crate added this stage)
+/// purely to check the `hkdf` dependency against the official RFC 5869
+/// vectors, and implements no key-derivation function that any other code —
+/// production or otherwise — can call. `derive_key_placeholder` above is
+/// untouched.
+#[cfg(test)]
+mod rfc5869_vectors {
+    use hkdf::Hkdf;
+    use serde::Deserialize;
+    use sha2::Sha256;
+
+    /// One vector entry. Only the fields this test needs are named; unknown
+    /// JSON fields (`description`, `notes`, ...) are ignored by serde rather
+    /// than mirrored here.
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vector {
+        id: String,
+        should_pass: bool,
+        ikm: String,
+        salt: String,
+        info: String,
+        length: usize,
+        prk: String,
+        okm: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct VectorFile {
+        vectors: Vec<Vector>,
+    }
+
+    /// The RFC 5869 vector file imported verbatim in Stage 73, read at
+    /// compile time so this test has no filesystem/IO dependency at runtime.
+    const RFC5869_JSON: &str = include_str!("../../../test-vectors/kdf/hkdf-rfc5869.json");
+
+    fn decode_hex(field: &str, id: &str, value: &str) -> Vec<u8> {
+        hex::decode(value).unwrap_or_else(|err| {
+            panic!("{id}: invalid hex in field `{field}`: {err}")
+        })
+    }
+
+    #[test]
+    fn rfc5869_json_parses_and_is_non_empty() {
+        let file: VectorFile =
+            serde_json::from_str(RFC5869_JSON).expect("RFC 5869 vector JSON must parse");
+        assert!(
+            !file.vectors.is_empty(),
+            "expected at least one RFC 5869 vector"
+        );
+    }
+
+    /// `shouldPass=true` vectors: `hkdf::Hkdf::<sha2::Sha256>` must both (a)
+    /// extract a PRK from IKM+salt matching the RFC's expected PRK, and (b)
+    /// expand that PRK with `info` to exactly the RFC's expected `L`-octet
+    /// OKM.
+    #[test]
+    fn rfc5869_positive_vectors_extract_and_expand_correctly() {
+        let file: VectorFile =
+            serde_json::from_str(RFC5869_JSON).expect("RFC 5869 vector JSON must parse");
+
+        let mut checked = 0usize;
+        for vector in file.vectors.iter().filter(|v| v.should_pass) {
+            let ikm_bytes = decode_hex("ikm", &vector.id, &vector.ikm);
+            let salt_bytes = decode_hex("salt", &vector.id, &vector.salt);
+            let info_bytes = decode_hex("info", &vector.id, &vector.info);
+            let prk_bytes = decode_hex("prk", &vector.id, &vector.prk);
+            let okm_bytes = decode_hex("okm", &vector.id, &vector.okm);
+
+            let (prk, hk) = Hkdf::<Sha256>::extract(Some(&salt_bytes), &ikm_bytes);
+            assert_eq!(
+                prk.as_slice(),
+                prk_bytes.as_slice(),
+                "{}: PRK did not match the RFC 5869 vector",
+                vector.id
+            );
+
+            let mut okm = vec![0u8; vector.length];
+            hk.expand(&info_bytes, &mut okm)
+                .unwrap_or_else(|err| panic!("{}: expand failed: {err}", vector.id));
+            assert_eq!(
+                okm, okm_bytes,
+                "{}: OKM did not match the RFC 5869 vector",
+                vector.id
+            );
+
+            checked += 1;
+        }
+        assert!(
+            checked > 0,
+            "expected at least one shouldPass=true RFC 5869 vector to be checked"
+        );
+    }
+
+    /// `shouldPass=false` vectors, if any exist in the imported file, must
+    /// produce a PRK or OKM that does NOT match whatever (necessarily
+    /// incorrect) expected bytes the fixture carries. The currently imported
+    /// RFC 5869 file has no negative case (RFC 5869 Appendix A publishes only
+    /// positive known-answer test cases for HKDF-SHA256 — see
+    /// docs/crypto_vector_sources.md §2's verbatim-only import rule; none is
+    /// fabricated here) — so today this loop body runs zero times and the
+    /// test trivially passes. It exists so that IF a future,
+    /// explicitly-reviewed re-import of this file ever adds an official
+    /// negative case, this test starts enforcing it with no further code
+    /// change required.
+    #[test]
+    fn rfc5869_negative_vectors_do_not_match_if_present() {
+        let file: VectorFile =
+            serde_json::from_str(RFC5869_JSON).expect("RFC 5869 vector JSON must parse");
+
+        for vector in file.vectors.iter().filter(|v| !v.should_pass) {
+            let ikm_bytes = decode_hex("ikm", &vector.id, &vector.ikm);
+            let salt_bytes = decode_hex("salt", &vector.id, &vector.salt);
+            let info_bytes = decode_hex("info", &vector.id, &vector.info);
+            let prk_bytes = decode_hex("prk", &vector.id, &vector.prk);
+            let okm_bytes = decode_hex("okm", &vector.id, &vector.okm);
+
+            let (prk, hk) = Hkdf::<Sha256>::extract(Some(&salt_bytes), &ikm_bytes);
+            let mut okm = vec![0u8; vector.length];
+            hk.expand(&info_bytes, &mut okm)
+                .unwrap_or_else(|err| panic!("{}: expand failed: {err}", vector.id));
+
+            assert!(
+                prk.as_slice() != prk_bytes.as_slice() || okm != okm_bytes,
+                "{}: expected PRK or OKM mismatch for a shouldPass=false vector",
                 vector.id
             );
         }

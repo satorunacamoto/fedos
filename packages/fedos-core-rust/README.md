@@ -4,10 +4,10 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 76 — Adopt `hkdf` dependency (build check only; no HKDF
-> implementation, no vector wiring, no `deriveKey` implementation, no WASM
-> change). Public API STILL a placeholder SKELETON. No cryptography reachable
-> from any public function.**
+> **Status: Stage 77 — Wire RFC 5869 HKDF-SHA256 vectors to Rust
+> `cargo test` (verification wiring only; no public `deriveKey` API, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change). Public API STILL a
+> placeholder SKELETON. No cryptography reachable from any public function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -17,18 +17,22 @@ app depends only on its *contract*, never on its internals.
 > `chacha20poly1305` (RustCrypto AEAD, `default-features = false`, `features =
 > ["alloc"]` — no `getrandom`), wired to the RFC 8439 vectors under
 > `cfg(test)` in Stage 75 — see the "RFC 8439 vector wiring" section below.
-> Stage 76 adds a SECOND `[dependencies]` (production) entry, **`hkdf`**
-> v0.13.0 (RustCrypto KDF) — a dependency + build-check ADOPTION ONLY,
-> exactly like Stage 74: nothing imports, calls, or exercises `hkdf`
-> anywhere in this crate yet (production or `cfg(test)`), `derive_key_placeholder`
-> is byte-for-byte unchanged, and no RFC 5869 HKDF-SHA256 vector (imported
-> Stage 73 at
-> [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json))
-> is loaded or wired yet. `sha2` is deliberately NOT added this stage — see
-> "Dependencies" below for why. The Rust crate still has no `wasm-bindgen`, no
-> `unsafe`, and produces **no `.wasm`**; the runtime/Worker/`CryptoProvider`
-> are **not** wired to any of this. A real RustCrypto-backed core is a future,
-> explicitly-reviewed stage that must pass the full crypto test-vector plan
+> Stage 76 adopted a SECOND `[dependencies]` (production) entry, **`hkdf`**
+> v0.13.0 (RustCrypto KDF), as a dependency + build-check ADOPTION ONLY.
+> Stage 77 wires that dependency: `src/lib.rs` gains a new bottom-of-file
+> `#[cfg(test)]`-only module, `rfc5869_vectors`, that reads
+> [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json)
+> (imported verbatim Stage 73) via `include_str!` and asserts `hkdf::Hkdf::<sha2::Sha256>`
+> reproduces the RFC's known-answer PRK and OKM bytes for all three official
+> HKDF-SHA256 test cases — see the "RFC 5869 vector wiring" section below.
+> `sha2` v0.11.0 is added this stage, but ONLY under `[dev-dependencies]`
+> (test-only) — never a production dependency; see "Dependencies" below.
+> `derive_key_placeholder` remains byte-for-byte unchanged and there is still
+> **no public `deriveKey` implementation**. The Rust crate still has no
+> `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**; the
+> runtime/Worker/`CryptoProvider` are **not** wired to any of this. A real
+> RustCrypto-backed core is a future, explicitly-reviewed stage that must pass
+> the full crypto test-vector plan
 > ([`docs/crypto_test_vectors.md`](../../docs/crypto_test_vectors.md)) and ship a
 > build manifest ([`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md))
 > before it can be selected at runtime. See also
@@ -63,10 +67,11 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
 
 ## Hard guardrails (this stage implements NONE of these)
 
-- No HKDF implementation and no key derivation — `hkdf` is a Cargo
-  dependency as of Stage 76, but is not imported, called, or exercised by
-  any code in this crate (production or `cfg(test)`); `derive_key_placeholder`
-  is unchanged and still does no real work
+- No PUBLIC HKDF / key derivation implementation — `hkdf` is exercised ONLY
+  inside the `cfg(test)`-only `rfc5869_vectors` module added Stage 77, to
+  check the dependency against the RFC 5869 vectors; no production code path
+  imports, calls, or exercises it, and `derive_key_placeholder` is unchanged
+  and still does no real work
 - No Argon2 / any other KDF
 - No PUBLIC AEAD implementation — `chacha20poly1305` is exercised ONLY inside
   the `cfg(test)`-only `rfc8439_vectors` module added Stage 75, to check the
@@ -101,11 +106,11 @@ this stage.
 
 ```
 packages/fedos-core-rust
-  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76)
+  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77)
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; hkdf is not referenced anywhere yet
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -115,7 +120,7 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 `FedosCoreStatus` and runs no cryptography. `#![forbid(unsafe_code)]` bans
 `unsafe`. No WASM target is declared; nothing compiles to `.wasm`.
 
-## Dependencies (Stage 74/76 production + Stage 75 dev-dependencies)
+## Dependencies (Stage 74/76 production + Stage 75/77 dev-dependencies)
 
 - **`chacha20poly1305` v0.11.0** (RustCrypto, Apache-2.0 OR MIT,
   `default-features = false`, `features = ["alloc"]`) — one of two entries in
@@ -142,24 +147,25 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   `#![forbid(unsafe_code)]`. `hkdf`'s only optional feature, `kdf` (an
   unrelated trait-abstraction crate), is NOT enabled — default features are
   used as-is. MSRV for `hkdf` 0.13.0 is Rust 1.85, same as `chacha20poly1305`;
-  no toolchain change was needed. **NOT imported or used anywhere in
-  `src/lib.rs` yet** — production or `cfg(test)` — `cargo check`/`cargo test`
-  resolve and build the dependency graph, nothing more.
-  **`sha2` was deliberately NOT added this stage.** `hkdf` is generic over its
-  digest algorithm: it depends only on `hmac`, which is itself generic over
-  `digest`'s traits. Neither `hkdf` nor `hmac` requires a concrete hash
-  algorithm crate to compile — `sha2` (the RustCrypto SHA-256 implementation)
-  is only needed once code actually instantiates `Hkdf::<Sha256>`, which is
-  Stage 77 candidate work (wiring
-  [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json),
-  imported Stage 73) — not this stage.
-- **`[dev-dependencies]` (Stage 75, test-only, NOT production dependencies):**
-  `serde` v1.0.228 (`features = ["derive"]`), `serde_json` v1.0.150, `hex`
-  v0.4.3. Used exclusively by the `cfg(test)`-only `rfc8439_vectors` module in
-  `src/lib.rs` to parse
+  no toolchain change was needed. As of Stage 77, this dependency is
+  exercised — but only inside `cfg(test)`, by the `rfc5869_vectors` module
+  (see below); production code still neither imports nor calls it.
+- **`[dev-dependencies]` (Stage 75/77, test-only, NOT production
+  dependencies):** `serde` v1.0.228 (`features = ["derive"]`), `serde_json`
+  v1.0.150, `hex` v0.4.3 (Stage 75) — used by the `cfg(test)`-only
+  `rfc8439_vectors` module to parse
   [`test-vectors/aead/chacha20poly1305-rfc8439.json`](../../test-vectors/aead/chacha20poly1305-rfc8439.json)
-  and decode its hex fields; none is reachable from `src/lib.rs`'s public API
-  or from any non-test code path.
+  and decode its hex fields — plus **`sha2` v0.11.0** (Stage 77), used
+  exclusively by the `cfg(test)`-only `rfc5869_vectors` module to instantiate
+  `hkdf::Hkdf::<sha2::Sha256>` and verify it against
+  [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json).
+  `sha2` v0.11.0 was chosen (not the older v0.10.x) because it depends on the
+  same `digest` v0.11 generation as `hkdf` v0.13.0's `hmac` dependency — an
+  older `sha2` v0.10.x pulls in `digest` v0.10, which does not satisfy the
+  trait bounds `Hkdf<D>` requires (`cargo check --tests` fails to compile
+  with a `CoreProxy`/`Sized` trait-bound mismatch if the two `digest`
+  generations disagree). None of these four dev-dependencies is reachable
+  from `src/lib.rs`'s public API or from any non-test code path.
 - See
   [`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
   for the full adoption record and policy (§12 has a dedicated `hkdf` — Stage
@@ -200,28 +206,40 @@ still selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
 
 ## `hkdf` dependency adoption (Stage 76)
 
-`hkdf` v0.13.0 is now a `[dependencies]` (production) entry — see
-"Dependencies" above for the full crate review. This stage is the "imported
-as a dependency" step only, mirroring Stage 74's `chacha20poly1305` adoption:
+`hkdf` v0.13.0 became a `[dependencies]` (production) entry in Stage 76 — see
+"Dependencies" above for the full crate review. That stage was the "imported
+as a dependency" step only, mirroring Stage 74's `chacha20poly1305` adoption
+(no code imported `hkdf` yet, and no vector was wired). Stage 77 (below)
+completes the "wired" step for this dependency.
 
-- **No HKDF implementation.** No code anywhere in `src/lib.rs` — production
-  or `cfg(test)` — imports `hkdf`, references `hkdf::`, or names `Hkdf`.
-- **No vector wiring.** [`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json)
-  (imported verbatim Stage 73) is not read by any Rust code yet; this
-  dependency stays at vector-lifecycle step 2 ("imported"), not step 3
-  ("wired") in [`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
-  §5.
-- **No `deriveKey` implementation.** `derive_key_placeholder` is
-  byte-for-byte unchanged from Stage 69: it still calls `placeholder_status()`
-  and does no real key derivation.
-- **No Runtime / Worker / `CryptoProvider` wiring.** Nothing outside this
-  package's own `Cargo.toml`/`Cargo.lock` changed; the host still selects
-  only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+## RFC 5869 vector wiring (Stage 77)
 
-A future, explicitly-reviewed Stage 77 candidate is to wire the RFC 5869
-HKDF-SHA256 vectors to `cargo test`, following the exact same pattern Stage
-75 used for RFC 8439: a new `cfg(test)`-only module that reads the vector
-file via `include_str!`, adds `sha2` as a dev-dependency (or a production
-dependency, decided in that stage) to instantiate `Hkdf::<Sha256>`, and
-asserts the known-answer `OKM` (output keying material) bytes — still no
-public `deriveKey` implementation.
+`src/lib.rs`'s bottom-most module, `rfc5869_vectors` (gated `#[cfg(test)]`,
+compiled only for `cargo test`), reads
+[`test-vectors/kdf/hkdf-rfc5869.json`](../../test-vectors/kdf/hkdf-rfc5869.json)
+at compile time via `include_str!` and runs three tests:
+
+- `rfc5869_json_parses_and_is_non_empty` — the vector file parses and is
+  non-empty.
+- `rfc5869_positive_vectors_extract_and_expand_correctly` — for every
+  `shouldPass: true` vector (RFC 5869 Appendix A, Test Cases 1–3, SHA-256),
+  `hkdf::Hkdf::<sha2::Sha256>::extract` produces exactly the RFC's expected
+  PRK, and `.expand` with that vector's `info` produces exactly the RFC's
+  expected `L`-octet OKM.
+- `rfc5869_negative_vectors_do_not_match_if_present` — for every
+  `shouldPass: false` vector (none exist in the current file; RFC 5869
+  Appendix A publishes only positive known-answer test cases for HKDF-SHA256,
+  and none is fabricated per
+  [`docs/crypto_vector_sources.md`](../../docs/crypto_vector_sources.md) §2),
+  the derived PRK or OKM must NOT match the fixture's (necessarily incorrect)
+  expected bytes. This loop runs zero iterations today and trivially passes;
+  it starts enforcing automatically if a future, explicitly-reviewed
+  re-import ever adds an official negative case.
+
+This is the "wired" step of the vector lifecycle in
+[`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
+§5 for HKDF-SHA256 — it does not, by itself, make any public API real:
+`derive_key_placeholder` is unchanged, there is still **no public `deriveKey`
+implementation**, and the runtime still selects only
+`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. Nothing outside this
+package's own `Cargo.toml`/`Cargo.lock`/`src/lib.rs` changed.

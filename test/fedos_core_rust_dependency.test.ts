@@ -12,16 +12,16 @@ import workerSource from "../src/worker.ts?raw";
 /**
  * Stage 74 — `chacha20poly1305` dependency adoption tests.
  * Updated Stage 76 — `hkdf` dependency adoption tests.
+ * Updated Stage 77 — `sha2` becomes a dev-dependency (test 3 below); RFC 5869
+ * HKDF vector wiring itself has its own dedicated test file, see
+ * test/fedos_core_rust_hkdf_wiring.test.ts.
  *
  * `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
- * now has exactly TWO entries: `chacha20poly1305` (Stage 74, RustCrypto AEAD,
+ * has exactly TWO entries: `chacha20poly1305` (Stage 74, RustCrypto AEAD,
  * wired to the RFC 8439 vectors under `#[cfg(test)]` in Stage 75) and `hkdf`
- * (Stage 76, RustCrypto KDF, so a future stage can wire the RFC 5869
- * HKDF-SHA256 vectors at test-vectors/kdf/hkdf-rfc5869.json to `cargo test`).
- * Stage 76 is dependency-adoption + build-check ONLY, exactly like Stage 74:
- * `src/lib.rs`'s production code is unchanged, no HKDF is implemented, no
- * vector is loaded, `derive_key_placeholder` is untouched, no random/key is
- * generated, `sha2` is deliberately NOT added (see test 3 below), and no
+ * (Stage 76, RustCrypto KDF, wired to the RFC 5869 HKDF-SHA256 vectors at
+ * test-vectors/kdf/hkdf-rfc5869.json under `#[cfg(test)]` in Stage 77).
+ * `derive_key_placeholder` is untouched, no random/key is generated, and no
  * other crypto crate (argon2 / aes-gcm / rand / getrandom / zeroize / secrecy
  * / subtle) or wasm-bindgen is added.
  *
@@ -35,8 +35,11 @@ import workerSource from "../src/worker.ts?raw";
  * imports and calls `chacha20poly1305` to verify it against the RFC 8439
  * vectors — see test/fedos_core_rust_rfc8439_wiring.test.ts for that stage's
  * own dedicated tests. Stage 76 extends the same production-code check to
- * also forbid any `hkdf` usage outside `#[cfg(test)]` (there is no
- * `#[cfg(test)]` module using `hkdf` yet — that is Stage 77 candidate work).
+ * also forbid any `hkdf` usage outside `#[cfg(test)]`. Stage 77 adds a SECOND
+ * `#[cfg(test)]`-only module, `rfc5869_vectors`, that legitimately imports and
+ * calls `hkdf` — it lands after lib.rs's FIRST `#[cfg(test)]` marker (the
+ * pre-existing placeholder tests module), so test 11's slice cutoff still
+ * excludes it and the production-code assertion is unaffected.
  */
 describe("FedOS Rust crate — chacha20poly1305 + hkdf dependency adoption", () => {
   // TOML comments legitimately NAME both the adopted and the still-forbidden
@@ -67,14 +70,21 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf dependency adoption", () 
     expect(productionDepsSection).toMatch(/\bhkdf\s*=/);
   });
 
-  it("3. Cargo.toml does not contain sha2 — hkdf builds standalone without a concrete digest crate", () => {
-    // hkdf depends only on hmac (generic over `digest`), so no concrete hash
-    // algorithm crate is required to add hkdf or run `cargo check`. sha2 is
-    // deferred to the future stage that actually instantiates
-    // `Hkdf::<Sha256>` to wire the RFC 5869 HKDF-SHA256 vectors — see the
-    // Cargo.toml comment above the hkdf entry and docs/rust_dependency_adoption.md.
-    expect(cargoCode).not.toMatch(/\bsha2\b/);
+  it("3. Cargo.toml's production [dependencies] table does not contain sha2 — sha2 is a dev-dependency only (Stage 77)", () => {
+    // Stage 77 wires the RFC 5869 HKDF-SHA256 vectors to `cargo test`, which
+    // requires a concrete hash algorithm crate to instantiate
+    // `Hkdf::<Sha256>`. `sha2` is added, but ONLY under [dev-dependencies] —
+    // it is used exclusively by the #[cfg(test)]-only `rfc5869_vectors`
+    // module and must never become a production dependency of this crate.
     expect(cargoCode).not.toContain("sha-2");
+    const depsIdx = cargoCode.indexOf("[dependencies]");
+    const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
+    const productionDepsSection =
+      devDepsIdx === -1 ? cargoCode.slice(depsIdx) : cargoCode.slice(depsIdx, devDepsIdx);
+    expect(productionDepsSection).not.toMatch(/\bsha2\b/);
+    expect(cargoCode).toContain("[dev-dependencies]");
+    const devDepsSection = cargoCode.slice(devDepsIdx);
+    expect(devDepsSection).toMatch(/\bsha2\s*=/);
   });
 
   it("4. Cargo.toml does not contain argon2", () => {

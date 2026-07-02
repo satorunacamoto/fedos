@@ -28,9 +28,15 @@ import workerSource from "../src/worker.ts?raw";
  * checks.
  * Updated Stage 76: `Cargo.toml`'s `[dependencies]` (production) table gains
  * a SECOND entry, `hkdf` (see test/fedos_core_rust_dependency.test.ts for the
- * dedicated Stage 76 checks, including why `sha2` is deliberately NOT added)
- * — `src/lib.rs` remains unchanged; nothing imports or calls `hkdf` anywhere,
- * production or test.
+ * dedicated Stage 76 checks) — `src/lib.rs` remains unchanged; nothing
+ * imports or calls `hkdf` anywhere, production or test.
+ * Updated Stage 77: `Cargo.toml` gains a `sha2` `[dev-dependencies]` entry
+ * (test-only) and `src/lib.rs` gains a second `#[cfg(test)]`-only module,
+ * `rfc5869_vectors`, that imports and calls `hkdf` + `sha2` to verify the
+ * `hkdf` dependency against the RFC 5869 HKDF-SHA256 vectors — see
+ * test/fedos_core_rust_hkdf_wiring.test.ts for the dedicated Stage 77 checks.
+ * Test 3 below now also asserts `sha2` is absent from the PRODUCTION
+ * `[dependencies]` table (it stays a dev-dependency only).
  * Tests 3, 6, and 8 below are scoped to PRODUCTION code/dependencies only
  * (excluding `[dev-dependencies]` and excluding everything from the first
  * `#[cfg(test)]` onward) so they keep verifying exactly what they always
@@ -80,7 +86,10 @@ describe("FedOS Rust crate skeleton", () => {
       "aes-gcm",
       "aes_gcm",
       "argon2",
-      "sha2",
+      // sha2 is NOT in this list: since Stage 77 it is a legitimate
+      // [dev-dependencies] entry (used only by the #[cfg(test)]-only
+      // rfc5869_vectors module) — its absence from PRODUCTION dependencies
+      // is asserted separately below instead of via this whole-file scan.
       "getrandom",
       "rand_core",
       "zeroize",
@@ -96,7 +105,7 @@ describe("FedOS Rust crate skeleton", () => {
     // The [dependencies] (production) table has exactly two entries:
     // chacha20poly1305 (Stage 74) and hkdf (Stage 76). Stop at the next
     // top-level `[section]` header (Stage 75 adds `[dev-dependencies]` right
-    // after it) so its test-only entries (serde/serde_json/hex) are not
+    // after it) so its test-only entries (serde/serde_json/hex/sha2) are not
     // counted here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
@@ -109,6 +118,7 @@ describe("FedOS Rust crate skeleton", () => {
     expect(depLines.length).toBe(2);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(false);
   });
 
   it("4. Cargo.toml has no wasm-bindgen / cdylib / WASM target", () => {

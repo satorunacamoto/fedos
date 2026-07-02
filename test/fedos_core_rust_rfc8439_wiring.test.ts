@@ -33,6 +33,12 @@ import rfc8439Vectors from "../test-vectors/aead/chacha20poly1305-rfc8439.json";
  * adopts `hkdf` (see test/fedos_core_rust_dependency.test.ts for its
  * dedicated checks) but does not wire any HKDF vector, so it does not affect
  * anything else this file asserts about the RFC 8439 wiring.
+ *
+ * Update (Stage 77): test 3 below no longer forbids `sha2` — it becomes a
+ * legitimate `[dev-dependencies]`-only entry (see
+ * test/fedos_core_rust_hkdf_wiring.test.ts for the dedicated Stage 77 checks,
+ * which wire the RFC 5869 HKDF vectors and assert `sha2` never reaches
+ * `[dependencies]` production).
  */
 describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
   // TOML comments legitimately NAME both allowed and still-forbidden crates;
@@ -78,7 +84,10 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       "aes-gcm",
       "aes_gcm",
       "argon2",
-      "sha2",
+      // sha2 is NOT in this list: since Stage 77 it is a legitimate
+      // [dev-dependencies] entry (used only by the #[cfg(test)]-only
+      // rfc5869_vectors module) — see test/fedos_core_rust_hkdf_wiring.test.ts
+      // for its dedicated dev-dependency-only checks.
       "getrandom",
       "rand_core",
       "zeroize",

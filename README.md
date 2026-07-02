@@ -8,51 +8,71 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 76 — Adopt `hkdf` dependency (build check only; no HKDF
-> implementation, no vector wiring, no `deriveKey` implementation, no
+> **Status: Stage 77 — Wire RFC 5869 HKDF-SHA256 vectors to Rust
+> `cargo test` (verification wiring only; no public `deriveKey` API, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
-> `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
-> gains a SECOND entry, `hkdf` v0.13.0 (RustCrypto, default features — its
-> only optional feature, `kdf`, is NOT enabled), alongside the unchanged
-> `chacha20poly1305` v0.11.0 from Stage 74. This is a dependency + build-check
-> ADOPTION ONLY, exactly like Stage 74: nothing in `src/lib.rs` — production
-> or `cfg(test)` — imports, calls, or exercises `hkdf`; no RFC 5869
-> HKDF-SHA256 vector (imported Stage 73 at
-> [`test-vectors/kdf/hkdf-rfc5869.json`](test-vectors/kdf/hkdf-rfc5869.json))
-> is loaded or wired; `derive_key_placeholder` is byte-for-byte unchanged from
-> Stage 69. **`sha2` is deliberately NOT added** — `hkdf` depends only on
-> `hmac` (itself generic over `digest`'s traits), so no concrete hash
-> algorithm crate is required to build or `cargo check` this dependency;
-> `sha2` is deferred to the future stage that actually instantiates
-> `Hkdf::<Sha256>` to wire the vectors. `hkdf` adds exactly 3 NEW transitive
-> packages beyond `chacha20poly1305`'s existing tree — `hkdf`, `hmac`,
-> `digest` — for an 18-package combined production dependency graph; none of
-> the three has a `build.rs`, and none uses `unsafe` (`digest` itself declares
-> `#![forbid(unsafe_code)]`). MSRV stays 1.85 (same as `chacha20poly1305`,
-> already satisfied by this repo's toolchain). The full dependency review is
-> recorded in
-> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md) §12,
-> a new `hkdf` — Stage 76 entry appended after the existing
-> `chacha20poly1305` — Stage 74 entry (never edited in place). `Cargo.lock`
-> was generated to run `cargo check`/`cargo test` and then deleted, not
-> committed, per the same convention as every prior dependency-adoption
-> stage. `argon2` / `aes-gcm` / `rand` / `getrandom` / `zeroize` / `secrecy` /
-> `subtle` / `wasm-bindgen` remain ABSENT; `crate-type = ["rlib"]` and
-> `#![forbid(unsafe_code)]` stay exactly as before; no `.wasm` is produced.
-> Existing [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
-> was updated (now 15 tests) to assert `hkdf` is present, `sha2` is absent
-> (with the documented reason), and lib.rs's production code has no
-> `hkdf`/`Hkdf` mention outside `#[cfg(test)]` (there is no such `cfg(test)`
-> module yet either); [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts)
-> test 3 and [`test/fedos_core_rust_rfc8439_wiring.test.ts`](test/fedos_core_rust_rfc8439_wiring.test.ts)
-> tests 1/3 were updated to expect TWO production dependency-table entries
-> (`chacha20poly1305` + `hkdf`) instead of one. Stage 77 candidate: **wire the
-> RFC 5869 HKDF-SHA256 vectors to `cargo test`**, following the exact pattern
-> Stage 75 used for RFC 8439 — a new `cfg(test)`-only module reading
+> `packages/fedos-core-rust/src/lib.rs` gains a second bottom-of-file module,
+> `rfc5869_vectors`, gated `#[cfg(test)]` (compiled only for `cargo test`),
+> mirroring Stage 75's `rfc8439_vectors` module. It reads
 > [`test-vectors/kdf/hkdf-rfc5869.json`](test-vectors/kdf/hkdf-rfc5869.json)
-> via `include_str!`, adding `sha2` to instantiate `Hkdf::<Sha256>`, and
-> asserting the known-answer OKM bytes — still no public `deriveKey`
-> implementation. Prior status:
+> (imported verbatim Stage 73) at compile time via `include_str!` — no
+> filesystem IO at test runtime — parses it into a `serde`-derived struct, and
+> for every `shouldPass: true` vector (RFC 5869 Appendix A, Test Cases 1–3,
+> HKDF-SHA256) asserts `hkdf::Hkdf::<sha2::Sha256>::extract` (adopted as a
+> production dependency Stage 76) produces exactly the RFC's expected PRK, and
+> `.expand` with that vector's `info` produces exactly the RFC's expected
+> `L`-octet OKM; a third test asserts the derived PRK/OKM does NOT match the
+> fixture for any `shouldPass: false` vector (none exist in this file today —
+> RFC 5869 Appendix A publishes only positive known-answer cases and none is
+> fabricated, per [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md)
+> §2 — so that test's loop runs zero iterations and trivially passes, ready to
+> start enforcing automatically if a future re-import ever adds one).
+> `cargo test` is GREEN with all 9 tests passing (3 pre-existing placeholder
+> tests + 3 RFC 8439 tests from Stage 75 + 3 new RFC 5869 tests); `cargo
+> check` and `cargo check --tests` stay GREEN. `Cargo.toml` gains ONE new
+> `[dev-dependencies]` entry, `sha2` v0.11.0 (RustCrypto, MIT OR Apache-2.0) —
+> chosen over the older v0.10.x line because it depends on the same `digest`
+> v0.11 generation as `hkdf` v0.13.0's `hmac` dependency (an older `sha2`
+> pulls in `digest` v0.10, which fails `Hkdf<D>`'s trait bounds at `cargo
+> check --tests` time — this mismatch was caught and fixed during this
+> stage's own verification, before commit). `sha2` is used ONLY by the new
+> test module to instantiate `Hkdf::<Sha256>`; it is NOT a production
+> dependency, and `[dependencies]` (production) still has exactly two
+> entries, `chacha20poly1305` and `hkdf`, unchanged from Stage 76. The
+> crate's PUBLIC API — `fedos_core_status`, `fedos_core_capabilities`,
+> `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+> `decrypt_placeholder` — is **completely unchanged** and still implements no
+> cryptography; there is still **no public `deriveKey` implementation**, and
+> nothing outside `#[cfg(test)]` imports or calls `hkdf`/`sha2`.
+> `crate-type = ["rlib"]`, `#![forbid(unsafe_code)]`, and the absence of
+> `wasm-bindgen` all stay exactly as before; no `.wasm` is produced. The
+> Runtime, the Worker, and `CryptoProvider`/`FedosCoreCryptoProvider` are
+> **not** touched — no random, nonce, or key generation is added anywhere,
+> and nothing wires this crate's dependency into the host. `Cargo.lock` was
+> generated to run `cargo test`/`cargo check --tests` and then deleted, not
+> committed, per the same convention as every prior dependency-adoption
+> stage. New
+> [`test/fedos_core_rust_hkdf_wiring.test.ts`](test/fedos_core_rust_hkdf_wiring.test.ts)
+> (9 tests) checks: `[dependencies]` still has only `chacha20poly1305` +
+> `hkdf`; `serde`/`serde_json`/`hex`/`sha2` are dev-dependencies only and
+> excluded from `[dependencies]`; every other named crypto crate and
+> `wasm-bindgen` stay absent; `lib.rs` contains the `rfc5869_vectors` module
+> wired to the exact vector file path via `include_str!` and actually
+> imports/uses `hkdf`/`sha2` (but only in its `#[cfg(test)]`-scoped tail); the
+> six public placeholder function signatures and bodies are byte-for-byte
+> unchanged; no `pub fn` anywhere in the file is anything other than those six
+> names; no `.wasm`/`Cargo.lock`/`target`/`build`/compiled artifact is
+> committed; and the Runtime/Worker sources neither mention
+> `hkdf`/`rfc5869`/`sha2` nor auto-call a crypto operation. Three existing
+> test files were updated because `sha2` newly and legitimately appears in
+> `Cargo.toml` (as a dev-dependency): test 3 in both
+> [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> and [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts),
+> and test 3 in
+> [`test/fedos_core_rust_rfc8439_wiring.test.ts`](test/fedos_core_rust_rfc8439_wiring.test.ts),
+> now assert `sha2` is absent from PRODUCTION `[dependencies]` specifically
+> (rather than absent from the whole manifest) and present under
+> `[dev-dependencies]`. Prior status:
 >
 > **Stage 75 — Wire RFC 8439 ChaCha20-Poly1305 vectors to Rust
 > `cargo test` (verification wiring only; no public encrypt/decrypt API, no

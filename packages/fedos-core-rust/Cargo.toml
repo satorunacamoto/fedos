@@ -1,24 +1,23 @@
 # FedOS Core — minimal Rust crate skeleton (Stage 69) + first dependency
 # (Stage 74) + RFC 8439 vectors wired to `cargo test` (Stage 75) + `hkdf`
-# dependency adopted (Stage 76).
+# dependency adopted (Stage 76) + RFC 5869 HKDF vectors wired to
+# `cargo test` (Stage 77).
 #
 # Placeholder crate. There is still NO cryptography and NO WASM here — the
 # PUBLIC API in `src/lib.rs` is unchanged (placeholder functions only; see
 # docs/rust_dependency_adoption.md). Stage 74 added `chacha20poly1305`
 # (RustCrypto), wired to the RFC 8439 vectors under `#[cfg(test)]` in
-# Stage 75. Stage 76 adds a SECOND production dependency, `hkdf` (RustCrypto)
-# — a dependency + build-check ADOPTION ONLY, exactly like Stage 74: nothing
-# imports, calls, or exercises `hkdf` anywhere in this crate yet, no HKDF
-# vector is wired, and `derive_key_placeholder` is unchanged. `sha2` is
-# deliberately NOT added this stage — `hkdf` is generic over its digest
-# algorithm (it depends only on `hmac`, which is generic over `digest`), so it
-# builds and `cargo check`s standalone with no concrete hash crate; `sha2`
-# will be added only in the future stage that actually instantiates
-# `Hkdf::<Sha256>` to wire the RFC 5869 HKDF-SHA256 vectors already imported
-# at test-vectors/kdf/hkdf-rfc5869.json (Stage 73). Every other crypto crate
-# (aes-gcm / argon2), rand / getrandom, zeroize / secrecy / subtle, bip39 /
-# secp256k1 / nostr, and wasm-bindgen remain ABSENT — each lands only in its
-# own future, explicitly-reviewed, one-crate-per-stage adoption
+# Stage 75. Stage 76 adopted a SECOND production dependency, `hkdf`
+# (RustCrypto). Stage 77 wires the RFC 5869 HKDF-SHA256 test vectors already
+# imported at test-vectors/kdf/hkdf-rfc5869.json to a `#[cfg(test)]`-only
+# module, exactly like Stage 75 did for `chacha20poly1305` — this requires a
+# concrete hash algorithm to instantiate `Hkdf::<Sha256>`, so `sha2` is added
+# below, but ONLY under `[dev-dependencies]` (test-only): production code
+# still neither imports nor calls `hkdf`/`sha2`, and `derive_key_placeholder`
+# is unchanged. Every other crypto crate (aes-gcm / argon2), rand /
+# getrandom, zeroize / secrecy / subtle, bip39 / secp256k1 / nostr, and
+# wasm-bindgen remain ABSENT — each lands only in its own future,
+# explicitly-reviewed, one-crate-per-stage adoption
 # (docs/rust_dependency_adoption.md §1).
 
 [package]
@@ -48,11 +47,12 @@ chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["
 # vectors already imported at test-vectors/kdf/hkdf-rfc5869.json. Default
 # features are fine as-is: `hkdf`'s only optional feature is `kdf` (an
 # unrelated trait-abstraction crate), which is NOT enabled here and pulls in
-# no `rand`/`getrandom`/`zeroize`. `hkdf` depends only on `hmac` (which
-# depends only on `digest`) — no concrete hash algorithm crate (`sha2`) is
-# required to build or `cargo check` this dependency; see the crate-level
-# comment above for why `sha2` is deferred to a future stage.
-# NOT imported/used anywhere in src/lib.rs yet — dependency + build check only.
+# no `rand`/`getrandom`/`zeroize`. Production code still does not import or
+# call `hkdf` anywhere — it is exercised ONLY inside the `#[cfg(test)]`-only
+# `rfc5869_vectors` module added Stage 77 (see src/lib.rs), instantiated
+# there with `sha2::Sha256` (a dev-dependency, below — never production).
+# NOT imported/used anywhere in src/lib.rs's PRODUCTION code — dependency +
+# build check only.
 hkdf = "0.13.0"
 
 [dev-dependencies]
@@ -64,6 +64,14 @@ hkdf = "0.13.0"
 hex = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
+
+# `sha2` (RustCrypto, MIT OR Apache-2.0) — Stage 77, test-only. The concrete
+# hash algorithm needed to instantiate `Hkdf::<Sha256>` and verify the `hkdf`
+# dependency (adopted Stage 76) against the RFC 5869 HKDF-SHA256 vectors
+# already imported at test-vectors/kdf/hkdf-rfc5869.json. Used ONLY by the
+# `#[cfg(test)]`-only `rfc5869_vectors` module in src/lib.rs — never a
+# production dependency, never reachable from the crate's public API.
+sha2 = "0.11.0"
 
 # Still intentionally ABSENT from [dependencies] (production): aes-gcm,
 # argon2, sha2, rand / getrandom, zeroize / secrecy / subtle, bip39 /
