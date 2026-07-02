@@ -1,0 +1,28 @@
+{
+  "algorithm": "Argon2id (password-hashing / KDF, version 0x13 = 19)",
+  "source": "RFC 9106 — Argon2 Memory-Hard Function for Password Hashing and Proof-of-Work Applications (Biryukov, Dinu, Khovratovich, Josefsson, IETF, September 2021)",
+  "section": "§5.3 \"Argon2id Test Vectors\"",
+  "revision": "RFC 9106 (September 2021). Fetched verbatim from https://www.rfc-editor.org/rfc/rfc9106.txt on 2026-07-02.",
+  "license": "Copyright (c) 2021 IETF Trust and the persons identified as the document authors. All rights reserved. Subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (https://trustee.ietf.org/license-info) in effect on the publication date. Code Components extracted from this document (including these test-vector octet values) are licensed under the Simplified BSD License.",
+  "notes": "Verbatim import (Stage 73). The RFC prints password/salt/secret/associatedData/preHashingDigest/tag as space-separated hex byte rows; this file concatenates each field into one lowercase hex string, byte-length-checked against the RFC's own stated field sizes ([32]/[16]/[8]/[12] octets, 64-octet pre-hashing digest, 32-byte tag). The RFC's intermediate 'After pass 0/1/2' block dumps are themselves abbreviated in the source with '...' (only the first 4 and last 4 64-bit words of specific blocks are printed) — they are NOT full internal-state vectors and are reproduced here only as free-text 'notes', not as a byte field, since the RFC itself does not give their complete bytes. This is the ONLY test vector RFC 9106 §5.3 publishes for Argon2id (m=32 KiB, t=3, p=4 is a small, fast-to-verify parameter set chosen by the RFC's authors for conformance testing — it is NOT a production parameter recommendation; see docs/crypto_vector_sources.md §7 on the separate future mobile/desktop production-parameter decision). RFC 9106 does not publish a byte-level tamper/negative Argon2id vector; per the verbatim-only rule, none is fabricated here. No Rust code reads this file yet.",
+  "vectors": [
+    {
+      "id": "rfc9106-5.3-argon2id",
+      "description": "RFC 9106 §5.3 sole published Argon2id conformance test vector.",
+      "shouldPass": true,
+      "type": "Argon2id",
+      "version": 19,
+      "memoryKiB": 32,
+      "iterations": 3,
+      "parallelism": 4,
+      "tagLength": 32,
+      "password": "0101010101010101010101010101010101010101010101010101010101010101",
+      "salt": "02020202020202020202020202020202",
+      "secret": "0303030303030303",
+      "associatedData": "040404040404040404040404",
+      "preHashingDigestH0": "2889de487eb42ae500c0007ed9252f1069eadec40d5765b485de6dc2437a67b8546a2f0acc1a0882db8fcf74714b472e94df421a5da1112ffa11434370a1e997",
+      "tag": "0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659",
+      "notes": "password/salt/secret/associatedData are the RFC's fixed, non-secret conformance-test byte patterns (repeated 0x01/0x02/0x03/0x04 respectively) — never real passphrase material, per docs/crypto_test_vectors.md §6. preHashingDigestH0 is Argon2's internal BLAKE2b-512 pre-hash (64 bytes), included because the RFC prints it explicitly as an intermediate checkpoint. The RFC's 'After pass 0/1/2' internal block dumps are abbreviated (first/last 4 words of specific blocks only, separated by '...') and are not reproduced as data here — only 'tag' (the final 32-byte output) is a complete, verifiable known-answer value."
+    }
+  ]
+}

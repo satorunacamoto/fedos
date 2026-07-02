@@ -1,0 +1,75 @@
+{
+  "algorithm": "AES-256-GCM (Galois/Counter Mode, 256-bit key)",
+  "source": "NIST Cryptographic Algorithm Validation Program (CAVP) GCM Known Answer Test vectors, under the SP 800-38D GCM specification",
+  "section": "gcmtestvectors.zip files gcmEncryptExtIV256.rsp and gcmDecrypt256.rsp, '[Keylen = 256]' sections",
+  "revision": "CAVS 14.0, generated 2012-08-31 (gcmEncryptExtIV256.rsp: 'Generated on Fri Aug 31 11:26:26 2012'; gcmDecrypt256.rsp: 'Generated on Fri Aug 31 11:31:25 2012'). Fetched verbatim from https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/mac/gcmtestvectors.zip on 2026-07-02.",
+  "license": "NIST publication; work of the U.S. federal government, not subject to domestic copyright under 17 U.S.C. §105. Treated as public-domain test data; no separate LICENSE file accompanies the CAVP vector archive.",
+  "notes": "Verbatim import (Stage 73) of a small, named subset of the much larger official .rsp Known Answer Test files (each file contains many hundreds of cases across all Keylen/IVlen/PTlen/AADlen/Taglen combinations) — only the specific '[Keylen = 256] [IVlen = 96] ... [Taglen = 128]' cases below were selected and copied byte-for-byte, each recorded with its exact source file + 1-indexed 'Count' value for traceability back to the full .rsp file. No value was altered; 'Key =' / 'IV =' / etc. field-name prefixes and NIST's line format were stripped as minimal, non-value formatting. This selection distinguishes the standard 96-bit-IV case (all vectors below use IVlen=96) from non-standard IV lengths, which exist in the source files (e.g. IVlen=8, IVlen=1024) but are NOT imported in this stage. gcmDecrypt256.rsp's 'FAIL' marker (in place of a 'PT =' line) is NIST's own official negative/tamper case — an authentication-tag mismatch that MUST cause decryption to fail closed — and is imported verbatim as such, not generated locally. No Rust code reads this file yet.",
+  "vectors": [
+    {
+      "id": "nist-cavp-gcmEncryptExtIV256-count0-empty",
+      "sourceFile": "gcmEncryptExtIV256.rsp",
+      "sourceCount": 0,
+      "description": "Encrypt direction, [Keylen=256] [IVlen=96] [PTlen=0] [AADlen=0] [Taglen=128] — empty plaintext, empty AAD.",
+      "shouldPass": true,
+      "key": "b52c505a37d78eda5dd34f20c22540ea1b58963cf8e5bf8ffa85f9f2492505b4",
+      "iv": "516c33929df5a3284ff463d7",
+      "plaintext": "",
+      "aad": "",
+      "ciphertext": "",
+      "tag": "bdc1ac884d332457a1d2664f168c76f0"
+    },
+    {
+      "id": "nist-cavp-gcmEncryptExtIV256-count0-full",
+      "sourceFile": "gcmEncryptExtIV256.rsp",
+      "sourceCount": 0,
+      "description": "Encrypt direction, [Keylen=256] [IVlen=96] [PTlen=128] [AADlen=128] [Taglen=128] — 16-byte plaintext, 16-byte AAD (the standard 96-bit-IV case).",
+      "shouldPass": true,
+      "key": "92e11dcdaa866f5ce790fd24501f92509aacf4cb8b1339d50c9c1240935dd08b",
+      "iv": "ac93a1a6145299bde902f21a",
+      "plaintext": "2d71bcfa914e4ac045b2aa60955fad24",
+      "aad": "1e0889016f67601c8ebea4943bc23ad6",
+      "ciphertext": "8995ae2e6df3dbf96fac7b7137bae67f",
+      "tag": "eca5aa77d51d4a0a14d9c51e1da474ab"
+    },
+    {
+      "id": "nist-cavp-gcmDecrypt256-count0-empty",
+      "sourceFile": "gcmDecrypt256.rsp",
+      "sourceCount": 0,
+      "description": "Decrypt direction, [Keylen=256] [IVlen=96] [PTlen=0] [AADlen=0] [Taglen=128] — empty ciphertext/AAD, valid tag, decryption succeeds.",
+      "shouldPass": true,
+      "key": "f5a2b27c74355872eb3ef6c5feafaa740e6ae990d9d48c3bd9bb8235e589f010",
+      "iv": "58d2240f580a31c1d24948e9",
+      "ciphertext": "",
+      "aad": "",
+      "tag": "15e051a5e4a5f5da6cea92e2ebee5bac",
+      "plaintext": ""
+    },
+    {
+      "id": "nist-cavp-gcmDecrypt256-count0-full",
+      "sourceFile": "gcmDecrypt256.rsp",
+      "sourceCount": 0,
+      "description": "Decrypt direction, [Keylen=256] [IVlen=96] [PTlen=128] [AADlen=128] [Taglen=128] — valid tag, decryption succeeds (the standard 96-bit-IV case).",
+      "shouldPass": true,
+      "key": "54e352ea1d84bfe64a1011096111fbe7668ad2203d902a01458c3bbd85bfce14",
+      "iv": "df7c3bca00396d0c018495d9",
+      "ciphertext": "426e0efc693b7be1f3018db7ddbb7e4d",
+      "aad": "7e968d71b50c1f11fd001f3fef49d045",
+      "tag": "ee8257795be6a1164d7e1d2d6cac77a7",
+      "plaintext": "85fc3dfad9b5a8d3258e4fc44571bd3b"
+    },
+    {
+      "id": "nist-cavp-gcmDecrypt256-count2-fail",
+      "sourceFile": "gcmDecrypt256.rsp",
+      "sourceCount": 2,
+      "description": "Decrypt direction, [Keylen=256] [IVlen=96] [PTlen=128] [AADlen=128] [Taglen=128] — NIST's own official negative case: the tag does not authenticate this (key, IV, AAD, ciphertext); the source .rsp file records 'FAIL' in place of a 'PT =' line, i.e. no plaintext is defined and decryption MUST be rejected.",
+      "shouldPass": false,
+      "key": "9a0343f850a6427120f764789ffec6d237447b898fbf51d2182f065d3861497d",
+      "iv": "3deef6f453dd70d92143adcd",
+      "ciphertext": "e93165935ac18e3a2845d15fe31a9286",
+      "aad": "dbb8226a624520863db6897017b2a4f8",
+      "tag": "f5fc50d18766bc3d9e16dd136d45816b",
+      "expectedResult": "FAIL"
+    }
+  ]
+}

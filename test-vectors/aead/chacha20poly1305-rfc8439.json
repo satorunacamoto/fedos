@@ -1,0 +1,40 @@
+{
+  "algorithm": "ChaCha20-Poly1305 AEAD (AEAD_CHACHA20_POLY1305)",
+  "source": "RFC 8439 — ChaCha20 and Poly1305 for IETF Protocols (Nir & Langley, IETF, June 2018; obsoletes RFC 7539)",
+  "section": "§2.8.2 \"Example and Test Vector for AEAD_CHACHA20_POLY1305\" and Appendix A.5 \"ChaCha20-Poly1305 AEAD Decryption\"",
+  "revision": "RFC 8439 (June 2018). Fetched verbatim from https://www.rfc-editor.org/rfc/rfc8439.txt on 2026-07-02.",
+  "license": "Copyright (c) 2018 IETF Trust and the persons identified as the document authors. All rights reserved. Subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (https://trustee.ietf.org/license-info) in effect on the publication date. Code Components extracted from this document (including these test-vector octet values) are licensed under the Simplified BSD License.",
+  "notes": "Verbatim import (Stage 73). Each RFC hex-dump field (byte-offset column + space-separated hex bytes + ASCII-annotation column, or colon-separated tag bytes) has been concatenated into a single lowercase hex string per field — this is a minimal, non-value-altering formatting change (offsets/ASCII annotations/colons/'0x' prefixes are formatting, not vector data). No byte value was added, removed, or reordered; the plaintext fields were cross-checked by decoding the extracted hex as UTF-8/ASCII and comparing byte-for-byte against the RFC's own printed plaintext text. RFC 8439 does not itself publish byte-level tamper/negative vectors (bit-flipped tag/ciphertext/AAD) for this construction — per the verbatim-only, no-independent-generation rule (docs/crypto_test_vectors.md §3, docs/crypto_vector_sources.md §2), no such negative vector is fabricated here. Negative/tamper cases for this primitive remain a future, explicitly-labeled 'generated' Stage, not part of this import. No Rust code reads this file yet.",
+  "vectors": [
+    {
+      "id": "rfc8439-sec2.8.2",
+      "description": "RFC 8439 §2.8.2 worked AEAD_CHACHA20_POLY1305 example (the 'sunscreen' plaintext).",
+      "shouldPass": true,
+      "key": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "nonceConstant": "07000000",
+      "nonceIv": "4041424344454647",
+      "nonce": "070000004041424344454647",
+      "aad": "50515253c0c1c2c3c4c5c6c7",
+      "plaintext": "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e",
+      "plaintextUtf8": "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.",
+      "ciphertext": "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116",
+      "tag": "1ae10b594f09e26a7e902ecbd0600691",
+      "notes": "nonce = nonceConstant (32-bit fixed-common part, sender id=7) || nonceIv (64-bit IV), per RFC 8439 §2.8.2's own construction of the 96-bit AEAD nonce. The RFC's 'AEAD Construction for Poly1305' buffer (AAD || padding || ciphertext || padding || lengths) is used internally to compute the tag; it is not itself an output field and is not duplicated here."
+    },
+    {
+      "id": "rfc8439-appendixA.5",
+      "description": "RFC 8439 Appendix A.5 full ChaCha20-Poly1305 AEAD decryption worked example (the 'Internet-Drafts' plaintext); the RFC computes the tag and confirms it equals the received tag before decrypting.",
+      "shouldPass": true,
+      "key": "1c9240a5eb55d38af333888604f6b5f0473917c1402b80099dca5cbc207075c0",
+      "nonce": "000000000102030405060708",
+      "aad": "f33388860000000000004e91",
+      "ciphertext": "64a0861575861af460f062c79be643bd5e805cfd345cf389f108670ac76c8cb24c6cfc18755d43eea09ee94e382d26b0bdb7b73c321b0100d4f03b7f355894cf332f830e710b97ce98c8a84abd0b948114ad176e008d33bd60f982b1ff37c8559797a06ef4f0ef61c186324e2b3506383606907b6a7c02b0f9f6157b53c867e4b9166c767b804d46a59b5216cde7a4e99040c5a40433225ee282a1b0a06c523eaf4534d7f83fa1155b0047718cbc546a0d072b04b3564eea1b422273f548271a0bb2316053fa76991955ebd63159434ecebb4e466dae5a1073a6727627097a1049e617d91d361094fa68f0ff77987130305beaba2eda04df997b714d6c6f2c29a6ad5cb4022b02709b",
+      "receivedTag": "eead9d67890cbb22392336fea1851f38",
+      "calculatedTag": "eead9d67890cbb22392336fea1851f38",
+      "tag": "eead9d67890cbb22392336fea1851f38",
+      "plaintext": "496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d6f6e74687320616e64206d617920626520757064617465642c207265706c616365642c206f72206f62736f6c65746564206279206f7468657220646f63756d656e747320617420616e792074696d652e20497420697320696e617070726f70726961746520746f2075736520496e7465726e65742d447261667473206173207265666572656e6365206d6174657269616c206f7220746f2063697465207468656d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67726573732e2fe2809d",
+      "plaintextUtf8": "Internet-Drafts are draft documents valid for a maximum of six months and may be updated, replaced, or obsoleted by other documents at any time. It is inappropriate to use Internet-Drafts as reference material or to cite them other than as /“work in progress./”",
+      "notes": "The RFC's 'Received Tag' and independently 'Calculated Tag' are identical in the source text (the worked example demonstrates a matching tag before decrypting); both are recorded as receivedTag/calculatedTag for traceability, and 'tag' duplicates the same value as the field a test harness would compare against."
+    }
+  ]
+}

@@ -1,6 +1,18 @@
 # Crypto Verification Infrastructure (binding)
 
-**Status: this document adds no code and commits no vectors.** It fixes, in
+**Update (Stage 73): §5's "imported" step has since happened for five of the
+six primitives in scope.** [`test-vectors/`](../test-vectors/README.md) now
+holds verbatim official vectors for ChaCha20-Poly1305, AES-256-GCM,
+HKDF-SHA256, Argon2id, and NIP-44 v2 (XChaCha20-Poly1305 remains unimported,
+source undecided). This moves those primitives from lifecycle step 1
+("proposed") to step 2 ("imported") in §5 below — **no primitive has reached
+step 3 ("wired")**; no Rust code exists to consume these files, and every
+runtime-gate condition in §9 remains unmet for all primitives. The rest of
+this document describes the pipeline as originally fixed in Stage 72 and is
+otherwise unchanged.
+
+**Status: this document adds no code and, as originally written, committed no
+vectors.** It fixes, in
 writing, the **verification infrastructure** that ties together the plans
 already fixed in [`crypto_test_vectors.md`](crypto_test_vectors.md),
 [`crypto_vector_sources.md`](crypto_vector_sources.md),

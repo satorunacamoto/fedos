@@ -8,7 +8,60 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 72 — Crypto verification infrastructure skeleton (docs +
+> **Status: Stage 73 — Official crypto test vectors, verbatim import (no
+> Rust, no crypto implementation, no dependency, no WASM change).**
+> [`test-vectors/`](test-vectors/README.md) gains **five committed,
+> verbatim-imported vector files** — the first real vector bytes in the
+> repository — covering ChaCha20-Poly1305, AES-256-GCM, HKDF-SHA256,
+> Argon2id, and NIP-44 v2, per the source catalog fixed in
+> [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md):
+> [`test-vectors/aead/chacha20poly1305-rfc8439.json`](test-vectors/aead/chacha20poly1305-rfc8439.json)
+> (RFC 8439 §2.8.2 + Appendix A.5, 2 cases, fetched and scripted-extracted
+> from `rfc-editor.org`, plaintext cross-checked by UTF-8 decode);
+> [`test-vectors/aead/aes256gcm-nist.json`](test-vectors/aead/aes256gcm-nist.json)
+> (NIST CAVP GCM Known-Answer Tests under SP 800-38D, from the official
+> `gcmtestvectors.zip`'s `gcmEncryptExtIV256.rsp`/`gcmDecrypt256.rsp`, 5
+> cases incl. one official `FAIL`/negative case, each recording its source
+> file + `Count` index);
+> [`test-vectors/kdf/hkdf-rfc5869.json`](test-vectors/kdf/hkdf-rfc5869.json)
+> (RFC 5869 Appendix A.1–A.3, all 3 SHA-256 cases, including the zero-length
+> salt/info case and the same-IKM/different-info domain-separation pair);
+> [`test-vectors/kdf/argon2id-rfc9106.json`](test-vectors/kdf/argon2id-rfc9106.json)
+> (RFC 9106 §5.3, the RFC's sole published Argon2id KAT); and
+> [`test-vectors/nip44/nip44-v2.json`](test-vectors/nip44/nip44-v2.json) (the
+> ENTIRE upstream `nip44.vectors.json` `v2` object from `paulmillr/nip44`,
+> SHA-256-verified against the checksum published inline in
+> `nostr-protocol/nips`' `44.md`, restructured — not value-altered — into 8
+> named categories incl. 3 official `invalid.*` negative categories; a
+> scripted deep-equality check confirmed every imported leaf value is
+> byte-identical to upstream). Every file records its own `source` /
+> `section` / `revision` / `license` fields; **no vector value was
+> independently generated** — every negative/tamper case present (AES-256-GCM's
+> `FAIL` case, all of NIP-44's `invalid.*` categories) is itself an official
+> vector copied from source, since RFC 8439/RFC 5869/RFC 9106 do not publish
+> byte-level tamper vectors and none is fabricated for those three files.
+> **`XChaCha20-Poly1305` remains unimported** (source undecided,
+> [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md) §4).
+> [`test-vectors/README.md`](test-vectors/README.md),
+> [`docs/crypto_vector_sources.md`](docs/crypto_vector_sources.md) §10/§13, and
+> [`docs/verification_infrastructure.md`](docs/verification_infrastructure.md)
+> were updated in place (with an explicit "Update (Stage 73)" note preserving
+> the original Stage 71/72 text) to record that these five primitives moved
+> from lifecycle step 1 ("proposed") to step 2 ("imported") — **no primitive
+> has reached step 3 ("wired")**; `packages/fedos-core-rust` is completely
+> untouched (no `Cargo.toml`/`.rs` change, no dependency, no `unsafe`, no
+> WASM), no crypto runs anywhere, and every runtime-gate condition in
+> [`docs/verification_infrastructure.md`](docs/verification_infrastructure.md)
+> §9 remains unmet for all primitives — the runtime still selects only the
+> inert `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. This stage adds no
+> test — there is no new behavior to cover (the vectors are inert JSON data
+> read by no code). Stage 74 candidate: **minimal RustCrypto dependency
+> adoption** (`chacha20poly1305` / `hkdf` / `zeroize` / `subtle` / `secrecy` /
+> `rand_core`) — dependency + build-plumbing only, per
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md), with
+> no crypto API implementation and no Runtime wiring. Prior status:
+>
+> **Stage 72 — Crypto verification infrastructure skeleton (docs +
 > empty `test-vectors/` directories only, no vectors, no crypto, no
 > Rust/WASM change).**
 > Four new docs plus an empty `test-vectors/` tree assemble the

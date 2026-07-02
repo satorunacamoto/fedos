@@ -1,6 +1,16 @@
 # Crypto Test-Vector Source Catalog (binding)
 
-**Status: this document adds no code and commits no vectors.** It fixes, in
+**Update (Stage 73): the vectors this catalog names for ChaCha20-Poly1305,
+AES-256-GCM, HKDF-SHA256, Argon2id, and NIP-44 v2 have since been imported
+verbatim into [`test-vectors/`](../test-vectors/README.md) — see that
+directory's README for the committed file list, and §10/§13 below for the
+updated file layout. `XChaCha20-Poly1305` (§4) is still NOT imported; its
+source remains undecided. No Rust code reads any imported vector yet; the
+rest of this document (§1–§9, §11–§12) describes the ORIGINAL Stage 71
+source-selection research and is otherwise unchanged.**
+
+**Status: this document adds no code and, as originally written in Stage 71,
+committed no vectors.** It fixes, in
 writing, the **official/upstream source catalog** a FUTURE FedOS Rust crypto
 core will draw its known-answer test vectors from — for each candidate
 primitive named in [`crypto_test_vectors.md`](crypto_test_vectors.md), it
@@ -215,20 +225,29 @@ checklist so no primitive's catalog entry silently skips them:
   inputs do NOT collide with a correct output, not merely that "correct"
   inputs work.
 
-## 10. Future file layout (NOT created in this stage)
+## 10. File layout (updated — Stage 73 committed five of six files)
 
-When official vectors are eventually copied, they would live at:
+Originally (Stage 71) this section named a future layout with none of these
+files created. As of Stage 73, the following are COMMITTED, verbatim-imported
+files under [`test-vectors/`](../test-vectors/README.md):
 
-- `test-vectors/aead/chacha20poly1305-rfc8439.json`
-- `test-vectors/aead/xchacha20poly1305-source-tbd.json` (filename reflects
-  that §4's source is not yet chosen)
-- `test-vectors/aead/aes256gcm-nist-cavp.json`
-- `test-vectors/kdf/hkdf-sha256-rfc5869.json`
-- `test-vectors/kdf/argon2id-rfc9106.json`
-- `test-vectors/nip44/nip44-v2-upstream.json`
+- `test-vectors/aead/chacha20poly1305-rfc8439.json` — **committed**.
+- `test-vectors/aead/xchacha20poly1305-*.json` — **still NOT committed**;
+  §4's source (draft-irtf-cfrg-xchacha vs. libsodium vs. a traceable
+  RustCrypto vector) remains undecided.
+- `test-vectors/aead/aes256gcm-nist.json` — **committed** (named
+  `aes256gcm-nist.json`, not the originally sketched
+  `aes256gcm-nist-cavp.json` — a naming detail only).
+- `test-vectors/kdf/hkdf-rfc5869.json` — **committed** (named `hkdf-rfc5869.json`,
+  not the originally sketched `hkdf-sha256-rfc5869.json`).
+- `test-vectors/kdf/argon2id-rfc9106.json` — **committed**.
+- `test-vectors/nip44/nip44-v2.json` — **committed** (named `nip44-v2.json`,
+  not the originally sketched `nip44-v2-upstream.json`).
 
-None of these files, or the `test-vectors/` directory itself, is added in
-this stage.
+Each committed file carries its own `source` / `section` / `revision` /
+`license` fields inline (per the §11 schema, as adopted); see
+[`test-vectors/README.md`](../test-vectors/README.md) §3 for how verbatim
+fidelity (no rewritten values) was verified for each source type.
 
 ## 11. Future JSON schema proposal (NOT implemented in this stage)
 
@@ -277,14 +296,17 @@ nothing here commits a future Stage to this exact shape.
   not change that gate; it only prepares the sources the future gate will be
   checked against.
 
-## 13. Current conclusion
+## 13. Current conclusion (updated — Stage 73)
 
-- **Docs only.** This stage adds no code and changes nothing under `src/` or
+- **Docs + committed vector data.** Stage 71 (this document) added no code.
+  Stage 73 added the five verbatim vector files named in §10 under
+  `test-vectors/`, still without touching `src/` or
   `packages/fedos-core-rust/src/`.
-- **No vectors committed.** No byte, hex string, or vector JSON from any
-  source named above is copied into this repository.
+- **Vectors committed for five of six named primitives.** ChaCha20-Poly1305,
+  AES-256-GCM, HKDF-SHA256, Argon2id, and NIP-44 v2 each have a committed,
+  source-cited vector file; XChaCha20-Poly1305 does not.
 - **No crypto implementation.** No AEAD/KDF/Argon2/NIP-44 runs anywhere in
-  this repository as a result of this stage.
+  this repository — the vectors are inert JSON data, read by no code.
 - **No dependencies.** `packages/fedos-core-rust/Cargo.toml` is untouched;
   `[dependencies]` stays empty.
 - **Next stage may add an empty `test-vectors/` directory/schema docs or a
