@@ -1,6 +1,15 @@
 # Rust Dependency Adoption Policy (binding)
 
-**Status: this document adds no code and adds no dependency.** It fixes, in
+**Update (Stage 74): the first dependency adopted under this policy is
+`chacha20poly1305`** — see §12 "Adoption log" for its recorded review (crate +
+version, primitive served, why this crate, transitive count, build-script
+presence, internal `unsafe`, license, MSRV impact). `Cargo.toml`'s
+`[dependencies]` table is no longer empty; `src/lib.rs` is unchanged and still
+implements no cryptography. The rest of this document (§1–§11) is the
+ORIGINAL Stage 72 process document and is otherwise unchanged.
+
+**Status: this document, as originally written in Stage 72, added no code and
+added no dependency.** It fixes, in
 writing, the PROCESS a future Stage must follow to add any dependency to
 `packages/fedos-core-rust/Cargo.toml` — one crate at a time, audited, with a
 recorded review. This concretizes the dependency policy already stated in
@@ -177,13 +186,64 @@ redundant:
   requires; a dependency may use `unsafe` internally (recorded per §8), but
   the FedOS crate's own code never does.
 
-## 11. Current conclusion
+## 11. Current conclusion (as originally written, Stage 72 — see §12 for what changed in Stage 74)
 
-- **Docs only.** This stage adds no code and changes nothing under `src/` or
-  `packages/fedos-core-rust/src/`.
-- **No dependency added.** `Cargo.toml`'s `[dependencies]` table stays
-  empty; MSRV is unchanged.
-- **No crypto, no `unsafe`, no randomness.** Nothing here executes; it is a
-  process document for a future Stage to follow.
+- **Docs only (Stage 72).** That stage added no code and changed nothing under
+  `src/` or `packages/fedos-core-rust/src/`.
+- **No dependency added (Stage 72).** `Cargo.toml`'s `[dependencies]` table
+  stayed empty; MSRV was unchanged.
+- **No crypto, no `unsafe`, no randomness (Stage 72).** Nothing executed; it
+  was a process document for a future Stage to follow.
 - **A future explicit stage is required** for every crate this document
-  discusses — one crate, one Stage, one recorded review (§8), every time.
+  discusses — one crate, one Stage, one recorded review (§8), every time. §12
+  records the first such Stage.
+
+## 12. Adoption log
+
+Each entry follows the §8 review checklist. Entries are appended, never
+edited in place, by the Stage that adopted the crate.
+
+### `chacha20poly1305` — Stage 74
+
+- **Crate + exact version:** `chacha20poly1305` v0.11.0 (pinned in
+  `Cargo.toml`; `Cargo.lock` is not committed — see §7 "pinned, not
+  floating" for the distinction between a pinned `Cargo.toml` version
+  requirement and a committed lockfile).
+- **Primitive served / vector file:** ChaCha20-Poly1305 AEAD; must eventually
+  pass [`../test-vectors/aead/chacha20poly1305-rfc8439.json`](../test-vectors/aead/chacha20poly1305-rfc8439.json)
+  (imported Stage 73) before any real implementation is wired.
+- **Why this crate (§2–§3):** RustCrypto (default preference, §3); no
+  libsodium binding needed since RustCrypto has a maintained, audited-family
+  ChaCha20-Poly1305 implementation (§4 does not apply here).
+- **Feature configuration:** `default-features = false`, `features =
+  ["alloc"]` — explicitly excludes the crate's default `getrandom` feature
+  (no CSPRNG dependency is adopted in this Stage, per §6).
+- **Transitive dependency count:** 16 packages total per `cargo check`'s
+  dependency-resolution output (`aead`, `block-buffer`, `cfg-if`, `chacha20`,
+  `cipher`, `cmov`, `cpufeatures`, `crypto-common`, `ctutils`, `hybrid-array`,
+  `inout`, `libc`, `poly1305`, `typenum`, `universal-hash`, plus
+  `chacha20poly1305` itself) — all RustCrypto or small RustCrypto-adjacent
+  utility crates; **no `getrandom`, no `rand`/`rand_core`, no `zeroize`**
+  appear in the resolved graph with this feature configuration (verified by
+  inspecting the generated `Cargo.lock` before deleting it, per the §7/Stage
+  73 "Cargo.lock not committed" convention).
+- **Build-script presence:** none. `chacha20poly1305` and its checked direct
+  dependencies (`aead`, `chacha20`, `cipher`, `poly1305`, `cpufeatures`) each
+  have no `build.rs`.
+- **`unsafe` presence:** `chacha20poly1305` itself uses no `unsafe`. Several
+  lower-level dependencies (`chacha20`, `poly1305`, `cipher`, `aead`,
+  `cpufeatures`) use `unsafe` internally (SIMD backend selection / CPU
+  feature detection) — acknowledged here, not assumed absent. This does not
+  affect `packages/fedos-core-rust`'s own `#![forbid(unsafe_code)]`, which
+  governs only this crate's code.
+- **License:** Apache-2.0 OR MIT (chacha20poly1305, and the RustCrypto
+  dependencies checked above use the same dual license).
+- **MSRV impact:** `chacha20poly1305` 0.11.0 requires Rust ≥ 1.85 (per its
+  published `rust_version`). This repository's toolchain at adoption time is
+  newer, so no toolchain change was needed. No project-wide MSRV floor is
+  formally pinned elsewhere yet — recorded as a gap, not silently assumed
+  resolved.
+- **What was NOT done:** no import of `chacha20poly1305` anywhere in
+  `src/lib.rs`; no encrypt/decrypt implementation; no vector-loading code; no
+  random/nonce/key generation; `Cargo.lock` was generated to verify the
+  resolved dependency graph (§ above) and then deleted, not committed.

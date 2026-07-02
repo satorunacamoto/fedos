@@ -8,7 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 73 — Official crypto test vectors, verbatim import (no
+> **Status: Stage 74 — Adopt `chacha20poly1305` dependency (build check
+> only; no crypto implementation, no vector wiring, no WASM change).**
+> `packages/fedos-core-rust/Cargo.toml` gains its **first dependency**:
+> `chacha20poly1305` v0.11.0 (RustCrypto, `default-features = false`,
+> `features = ["alloc"]` — explicitly excludes the crate's default
+> `getrandom` feature). `src/lib.rs` is **completely unchanged** — no import,
+> no call, no encrypt/decrypt implementation, no test-vector loading, no
+> random/nonce/key generation; `#![forbid(unsafe_code)]` and `crate-type =
+> ["rlib"]` stay exactly as before. `cargo check` resolves and builds a
+> 16-package dependency graph (`aead`, `chacha20`, `cipher`, `poly1305`,
+> `crypto-common`, `inout`, `hybrid-array`, `universal-hash`, `block-buffer`,
+> `typenum`, `cfg-if`, `cpufeatures`, `libc`, `cmov`, `ctutils`, plus
+> `chacha20poly1305` itself) with **no `getrandom`, no `rand`/`rand_core`, no
+> `zeroize`, no build script** anywhere in it (verified by inspecting the
+> generated `Cargo.lock` before deleting it — **`Cargo.lock` is intentionally
+> NOT committed** this stage, per the recommendation in
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md) §12:
+> a library crate can defer lockfile reproducibility to the future
+> build-manifest stage's `dependencyLockDigest`
+> ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md))).
+> `hkdf` / `argon2` / `aes-gcm` / `rand` / `getrandom` / `zeroize` / `secrecy`
+> / `subtle` / `wasm-bindgen` remain ABSENT. The full dependency review (crate
+> + version, why this crate, transitive count, build-script presence,
+> internal `unsafe` in `chacha20`/`poly1305`/`cipher`/`aead`/`cpufeatures`,
+> license, MSRV 1.85) is recorded in
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md) §12
+> "Adoption log", the first entry under the Stage 72 one-crate-per-Stage
+> process. New [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> (13 tests) checks: Cargo.toml contains `chacha20poly1305` and excludes every
+> other named crypto crate; `crate-type` stays `rlib` only (no `cdylib`, no
+> `wasm32`); `lib.rs` keeps `#![forbid(unsafe_code)]`, has no `unsafe` usage,
+> and neither imports nor mentions `chacha20poly1305`/AEAD names, and its
+> placeholder functions are untouched; no `.wasm`/compiled/`target`/`build`
+> artifact and no `Cargo.lock` is committed; and the Runtime/Worker sources
+> neither mention `chacha20poly1305` nor auto-call a crypto operation. The
+> existing `test/fedos_core_rust_skeleton.test.ts` test 3 (previously "no
+> crypto dependencies", asserting an empty `[dependencies]` table) was updated
+> to assert `chacha20poly1305` is the table's ONLY entry, with every other
+> crypto crate still forbidden. Stage 75 candidate: **wire the RFC 8439
+> ChaCha20-Poly1305 vectors to `cargo test`** (read
+> [`test-vectors/aead/chacha20poly1305-rfc8439.json`](test-vectors/aead/chacha20poly1305-rfc8439.json)
+> from a Rust test and assert the crate's dependency reproduces the known
+> answers — still no public encrypt/decrypt API). Prior status:
+>
+> **Stage 73 — Official crypto test vectors, verbatim import (no
 > Rust, no crypto implementation, no dependency, no WASM change).**
 > [`test-vectors/`](test-vectors/README.md) gains **five committed,
 > verbatim-imported vector files** — the first real vector bytes in the

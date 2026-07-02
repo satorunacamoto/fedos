@@ -1,10 +1,16 @@
-# FedOS Core — minimal Rust crate skeleton (Stage 69).
+# FedOS Core — minimal Rust crate skeleton (Stage 69) + first dependency (Stage 74).
 #
-# Placeholder crate ONLY. There is NO cryptography, NO WASM, and NO dependencies
-# here. A real RustCrypto-backed core is a future, explicitly-reviewed stage; it
-# must FIRST pass the crypto test vectors (docs/crypto_test_vectors.md) and ship
-# with a build manifest (docs/fedos_core_build_manifest.md) before it can be
-# selected at runtime.
+# Placeholder crate. There is still NO cryptography and NO WASM here — `src/lib.rs`
+# is unchanged (placeholder functions only; see docs/rust_dependency_adoption.md).
+# Stage 74 adds exactly ONE dependency, `chacha20poly1305` (RustCrypto), so a
+# FUTURE, explicitly-reviewed stage can wire the RFC 8439 vectors
+# (test-vectors/aead/chacha20poly1305-rfc8439.json) to `cargo test` and, later,
+# implement real AEAD behind this crate's placeholder API. That crate is not
+# imported, called, or exercised anywhere in this crate yet. Every other crypto
+# crate (aes-gcm / hkdf / argon2), rand / getrandom, zeroize / secrecy / subtle,
+# bip39 / secp256k1 / nostr, and wasm-bindgen remain ABSENT — each lands only in
+# its own future, explicitly-reviewed, one-crate-per-stage adoption
+# (docs/rust_dependency_adoption.md §1).
 
 [package]
 name = "fedos-core-rust"
@@ -18,7 +24,17 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
-# Intentionally EMPTY. No crypto crates (chacha20poly1305 / aes-gcm / hkdf /
-# argon2), no rand / getrandom, no zeroize / secrecy / subtle, no bip39 /
-# secp256k1 / nostr, and no wasm-bindgen. These land ONLY in a future audited
-# stage, never grown silently into this skeleton.
+# `chacha20poly1305` (RustCrypto, Apache-2.0 OR MIT) — the AEAD this crate will
+# eventually implement against the RFC 8439 test vectors already imported at
+# test-vectors/aead/chacha20poly1305-rfc8439.json. `default-features = false` +
+# `features = ["alloc"]` explicitly excludes the crate's default `getrandom`
+# feature (its default-feature OS-RNG convenience) — no random-number source is
+# adopted in this stage; CSPRNG adoption is its own future, separate stage
+# (docs/fedos_core_rust_safety.md §7, docs/rust_dependency_adoption.md §6).
+# NOT imported/used anywhere in src/lib.rs yet — dependency + build check only.
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+
+# Still intentionally ABSENT: aes-gcm, hkdf, argon2, rand / getrandom, zeroize /
+# secrecy / subtle, bip39 / secp256k1 / nostr, wasm-bindgen. One crate per
+# Stage, each with its own recorded dependency review
+# (docs/rust_dependency_adoption.md §1, §8).

@@ -17,10 +17,14 @@ import workerSource from "../src/worker.ts?raw";
 
 /**
  * Stage 69 — minimal FedOS Rust crate skeleton tests.
+ * Updated Stage 74: `Cargo.toml` now depends on `chacha20poly1305` (the crate's
+ * ONLY dependency; see test/fedos_core_rust_dependency.test.ts for the
+ * dedicated Stage 74 checks) — `src/lib.rs` is unchanged.
  *
- * The crate is a placeholder skeleton ONLY: no crypto deps, no wasm-bindgen, no
- * `unsafe`, no cryptography, no random, and no compiled/WASM artifact. The TS
- * boundary is unchanged and stays importable; the Runtime/Worker are not wired.
+ * The crate is still a placeholder skeleton: no wasm-bindgen, no `unsafe`, no
+ * cryptography *implementation*, no random, and no compiled/WASM artifact. The
+ * TS boundary is unchanged and stays importable; the Runtime/Worker are not
+ * wired.
  */
 describe("FedOS Rust crate skeleton", () => {
   it("1. Cargo.toml exists with the expected package identity", () => {
@@ -55,14 +59,14 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml has no crypto dependencies", () => {
+  it("3. Cargo.toml depends on chacha20poly1305 only — no other crypto dependency", () => {
     for (const dep of [
-      "chacha20poly1305",
       "aes-gcm",
       "aes_gcm",
       "hkdf",
       "argon2",
       "getrandom",
+      "rand_core",
       "zeroize",
       "secrecy",
       "subtle",
@@ -73,10 +77,14 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] table is present but empty (no `name = ...` line).
-    const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
+    // The [dependencies] table has exactly one entry: chacha20poly1305.
     expect(cargoCode).toContain("[dependencies]");
-    expect(depsSection).not.toMatch(/^\s*[a-z0-9_-]+\s*=/m);
+    const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
+    const depLines = depsSection
+      .split("\n")
+      .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
+    expect(depLines.length).toBe(1);
+    expect(depLines[0]).toContain("chacha20poly1305");
   });
 
   it("4. Cargo.toml has no wasm-bindgen / cdylib / WASM target", () => {
