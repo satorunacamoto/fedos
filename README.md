@@ -8,7 +8,72 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 88 — Internal domain separation label skeleton
+> **Status: Stage 89 — Internal operation context skeleton (internal-only
+> `operation_context` module; operation-kind labels only, no real
+> AEAD/HKDF/Argon2/NIP-44 connection, no Runtime/Worker/CryptoProvider
+> wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a sixth crate-private module,
+> `operation_context` (alongside Stage 79's `secret_handle`, Stage 80's
+> `aead_core`, Stage 82's `kdf_core`, Stage 87's `key_material`, and Stage
+> 88's `domain_label`, placed right after `domain_label`, still ahead of
+> this file's first module gated `cfg(test)`). It defines:
+> `OperationContextState` (`pub(crate) enum`, `Placeholder`/`Disabled` —
+> `Disabled` is the `Default`, same shape as `DomainLabelState`);
+> `OperationKind` (`pub(crate) enum`, `AeadEncryptPlaceholder`/
+> `AeadDecryptPlaceholder`/`HkdfExtractPlaceholder`/`HkdfExpandPlaceholder`/
+> `HkdfExtractExpandPlaceholder`/`Argon2idPlaceholder`/
+> `Nip44EncryptPlaceholder`/`Nip44DecryptPlaceholder`/
+> `NostrKeyDerivationPlaceholder`/`TestOnlyPlaceholder` — ten label-only
+> unit variants, no associated data); `OperationContextStatus`
+> (`pub(crate) struct`, a non-sensitive status snapshot carrying only the
+> state enum); and `OperationContext` (`pub(crate) struct`, holding
+> `kind`/`state`) with four methods: `new_placeholder(kind: OperationKind)`
+> (takes only the label — no user-, environment-, or config-derived input
+> of any kind), `kind()`, `status()`, and `is_placeholder()`. **NOT part of
+> this crate's public API**: every item is `pub(crate)` at most — never
+> `pub` — nothing is re-exported from the crate root, and the crate's
+> public `pub fn` surface is still exactly the same six placeholder
+> functions from Stage 69; none of them constructs, holds, or returns an
+> `OperationContext`. **Labels only — no dynamic allocation, no secret
+> bytes**: all ten `OperationKind` variants are bare unit variants,
+> `OperationContext` stores no `String`/`Vec<u8>`/borrowed-byte-slice field
+> of any kind. **Not connected to `secret_handle`, `aead_core`, `kdf_core`,
+> `key_material`, or `domain_label`** — `operation_context` never
+> constructs any of their types and runs no actual AEAD/HKDF/Argon2/NIP-44
+> operation, derives no Nostr key, same "when a skeleton-to-skeleton
+> connection is ambiguous, leave it unconnected" reasoning Stage
+> 80/82/87/88 already established; all five of those modules are UNCHANGED
+> this stage, still placeholder-only. `cargo test` is GREEN with all 46
+> tests passing (41 pre-existing + 5 new `operation_context::tests`);
+> `cargo check` and `cargo check --tests` stay GREEN with no warnings.
+> `Cargo.toml` is UNCHANGED this stage — no new dependency needed
+> (`operation_context` imports nothing beyond the standard library). New
+> [`test/fedos_core_rust_operation_context.test.ts`](test/fedos_core_rust_operation_context.test.ts)
+> (17 tests) checks: the module is internal-only and not `pub`;
+> `OperationContext` is `pub(crate)` at most and never re-exported; the
+> public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged; every
+> `OperationKind` variant is a label-only unit variant (no tuple/struct
+> data); no `String`/`Vec` field anywhere in the module; `new_placeholder`
+> takes only an `OperationKind` (no `&str`/`String` parameter); no
+> `std::env`/`env::`/`var_os`/`std::process` usage; no AEAD/HKDF/Argon2
+> usage (specific Rust-usage patterns only, not a bare word match — a bare
+> `\bnip.?44\b` check is deliberately NOT used here, since it would also
+> match this stage's own required `Nip44Encrypt`/`Nip44DecryptPlaceholder`
+> variant names and doc-comment prose, and there is no `nip44`-named crate
+> in this repo's dependency tree to import in the first place, so that
+> absence is structural, not text-banned); no connection to
+> `SecretHandle`/`AeadPlaceholderRequest`/`KdfPlaceholderRequest`/
+> `KeyMaterialHandle`/`DomainLabel` (nor do those five modules reference
+> `OperationContext*`); no `unsafe`; Runtime/Worker sources mention neither
+> `operation_context` nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; the state
+> enum has exactly its two variants and the handle exposes exactly its four
+> methods. Stage 90 candidate: **an internal request descriptor skeleton**
+> — non-sensitive metadata only, still no real bytes/secrets held. Prior
+> status:
+>
+> **Stage 88 — Internal domain separation label skeleton
 > (internal-only `domain_label` module; fixed static labels only, no
 > user/environment/config-derived string, no HKDF/AEAD/NIP-44/Nostr-key
 > connection yet, no Runtime/Worker/CryptoProvider wiring, no WASM

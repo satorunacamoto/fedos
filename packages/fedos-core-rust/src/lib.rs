@@ -100,6 +100,16 @@
 //! `secret_handle`, `aead_core`, `kdf_core`, or `key_material` today. Same
 //! rules apply: not part of the public API, no public function above
 //! constructs, holds, or returns one of its types.
+//!
+//! Stage 89 adds a sixth crate-private module, `operation_context`: an
+//! INTERNAL-ONLY operation-context skeleton naming a future AEAD/KDF/
+//! Argon2/NIP-44/Nostr-key-derivation operation (a label and a
+//! non-sensitive status only — no key, seed, plaintext, ciphertext,
+//! passphrase, or nonce byte, and no `String`/`Vec` field). It exists as a
+//! type basis for a future real operation, still not connected to
+//! `secret_handle`, `aead_core`, `kdf_core`, `key_material`, or
+//! `domain_label` today. Same rules apply: not part of the public API, no
+//! public function above constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -1027,6 +1037,202 @@ mod domain_label {
         #[test]
         fn disabled_state_is_the_default_placeholder_only_state() {
             assert_eq!(DomainLabelState::default(), DomainLabelState::Disabled);
+        }
+    }
+}
+
+/// Stage 89 — an INTERNAL-ONLY operation-context skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns an
+/// [`OperationContext`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or `String`
+/// field or parameter anywhere below, and no AEAD/HKDF/Argon2/NIP-44
+/// operation is implemented or called, and no Nostr key is derived. It
+/// takes no user-, environment-, or config-derived input of any kind —
+/// [`OperationContext::new_placeholder`] accepts only an [`OperationKind`]
+/// label. This module does not connect to `secret_handle` (Stage 79),
+/// `aead_core` (Stage 80), `kdf_core` (Stage 82), `key_material` (Stage 87),
+/// or `domain_label` (Stage 88): it never constructs any of their types and
+/// never reads a key/secret/label byte out of one — when in doubt about a
+/// connection between skeletons, this crate deliberately leaves them
+/// unconnected rather than guess at a future design (the same reasoning
+/// `aead_core`'s own doc comment already states). It exists as a type basis
+/// a later, explicitly-reviewed stage can extend to actually name and
+/// eventually run a real AEAD/KDF/NIP-44/Nostr-key-derivation operation,
+/// once it also implements that operation.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label` above do. This is
+/// expected for a skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod operation_context {
+    /// Coarse internal lifecycle state of an [`OperationContext`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum OperationContextState {
+        /// A placeholder operation context is active. Runs no cryptography.
+        Placeholder,
+        /// No operation context should be treated as active — the default,
+        /// inert state before any [`OperationContext`] is constructed for
+        /// use.
+        Disabled,
+    }
+
+    impl Default for OperationContextState {
+        fn default() -> Self {
+            OperationContextState::Disabled
+        }
+    }
+
+    /// Which future cryptographic operation an [`OperationContext`] names —
+    /// a label only, intent, not an implementation. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum OperationKind {
+        /// Intended future connection point: an AEAD seal/encrypt
+        /// operation. No AEAD encryption is performed here.
+        AeadEncryptPlaceholder,
+        /// Intended future connection point: an AEAD open/decrypt
+        /// operation. No AEAD decryption is performed here.
+        AeadDecryptPlaceholder,
+        /// Intended future connection point: an HKDF extract step. No HKDF
+        /// extraction is performed here.
+        HkdfExtractPlaceholder,
+        /// Intended future connection point: an HKDF expand step. No HKDF
+        /// expansion is performed here.
+        HkdfExpandPlaceholder,
+        /// Intended future connection point: a combined HKDF
+        /// extract-then-expand step. No HKDF operation is performed here.
+        HkdfExtractExpandPlaceholder,
+        /// Intended future connection point: an Argon2id hash operation. No
+        /// Argon2id hashing is performed here.
+        Argon2idPlaceholder,
+        /// Intended future connection point: a NIP-44 encrypt operation. No
+        /// NIP-44 encryption is performed here.
+        Nip44EncryptPlaceholder,
+        /// Intended future connection point: a NIP-44 decrypt operation. No
+        /// NIP-44 decryption is performed here.
+        Nip44DecryptPlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key
+        /// derivation. No Nostr key is derived here.
+        NostrKeyDerivationPlaceholder,
+        /// Reserved for this module's own tests / future test-only fixtures
+        /// — never used by production code paths.
+        TestOnlyPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for an [`OperationContext`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/nonce byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct OperationContextStatus {
+        pub(crate) state: OperationContextState,
+    }
+
+    /// An INTERNAL-ONLY operation-context handle skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds only an [`OperationKind`] label and an
+    /// [`OperationContextState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, or nonce byte, and no user-, environment-, or
+    /// config-derived input. A future, explicitly-reviewed stage may extend
+    /// this skeleton to actually run the named operation; until then it
+    /// accepts and stores none.
+    pub(crate) struct OperationContext {
+        kind: OperationKind,
+        state: OperationContextState,
+    }
+
+    impl OperationContext {
+        /// Construct a placeholder operation context of the given
+        /// [`OperationKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: OperationKind) -> Self {
+            Self {
+                kind,
+                state: OperationContextState::Placeholder,
+            }
+        }
+
+        /// The [`OperationKind`] label this context was constructed with —
+        /// intent only.
+        pub(crate) fn kind(&self) -> OperationKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> OperationContextStatus {
+            OperationContextStatus { state: self.state }
+        }
+
+        /// Whether this context is still in the [`OperationContextState::Placeholder`]
+        /// state — always `true` for any handle constructed via
+        /// [`OperationContext::new_placeholder`], since no other
+        /// constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == OperationContextState::Placeholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let context = OperationContext::new_placeholder(OperationKind::AeadEncryptPlaceholder);
+            assert_eq!(context.status().state, OperationContextState::Placeholder);
+            assert!(context.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                OperationKind::AeadEncryptPlaceholder,
+                OperationKind::AeadDecryptPlaceholder,
+                OperationKind::HkdfExtractPlaceholder,
+                OperationKind::HkdfExpandPlaceholder,
+                OperationKind::HkdfExtractExpandPlaceholder,
+                OperationKind::Argon2idPlaceholder,
+                OperationKind::Nip44EncryptPlaceholder,
+                OperationKind::Nip44DecryptPlaceholder,
+                OperationKind::NostrKeyDerivationPlaceholder,
+                OperationKind::TestOnlyPlaceholder,
+            ] {
+                let context = OperationContext::new_placeholder(kind);
+                assert_eq!(context.kind(), kind);
+                assert_eq!(context.status().state, OperationContextState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let context = OperationContext::new_placeholder(OperationKind::HkdfExtractPlaceholder);
+            let status = context.status();
+            assert_eq!(status.state, OperationContextState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_context() {
+            for kind in [
+                OperationKind::Argon2idPlaceholder,
+                OperationKind::Nip44DecryptPlaceholder,
+                OperationKind::TestOnlyPlaceholder,
+            ] {
+                assert!(OperationContext::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(OperationContextState::default(), OperationContextState::Disabled);
         }
     }
 }
