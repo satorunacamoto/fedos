@@ -8,7 +8,42 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 66 — Anti-analysis & Shadow Vault risk docs (docs only, no
+> **Status: Stage 67 — Crypto operation test-vector plan (docs only, no code,
+> no vectors committed).**
+> A new [`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md) fixes, in
+> writing, the KNOWN-ANSWER test vectors a FUTURE FedOS Rust crypto core must
+> reproduce — **no `src/` change, no `packages/fedos-core-rust/src/` change, no
+> vector JSON committed** in this stage — so that core can be built **test-first**.
+> It is a **verification plan, not an implementation spec**. It documents:
+> (1) the purpose (test-first plan for a future Rust core; no runtime dependency
+> yet — the runtime still selects only `NoopCryptoProvider` / the inert
+> `PlaceholderFedosCoreCrypto`); (2) candidate primitives (ChaCha20-Poly1305,
+> XChaCha20-Poly1305, AES-256-GCM, HKDF-SHA256, Argon2id, NIP-44 — with
+> BIP39/BIP32/NIP-06 deferred to a separate future candidate); (3) vector-adoption
+> rules (prefer standard RFC / upstream official vectors; no home-grown vectors, or
+> `generated` clearly labeled; do not freeze implementation-specific output);
+> (4) AEAD rules (key / nonce / plaintext / AAD / ciphertext / tag, tamper-failure
+> and no-nonce-reuse cases); (5) KDF rules (IKM / salt / info-context / length /
+> expected OKM, mandatory domain separation); (6) Argon2id rules (m/t/p / salt /
+> non-secret password label / length / expected, mobile-constraint note);
+> (7) NIP-44 rules (reference the upstream NIP-44 v2 vectors, conversation key /
+> nonce / payload, decrypt-failure cases; NIP-44 NOT implemented); (8) Rust
+> prerequisites (`zeroize` / `secrecy` / `subtle`, audited crates, no custom XOR,
+> no hand-rolled constant-time compare); (9) the forbidden list (XOR cipher,
+> unauthenticated encryption, nonce reuse, custom KDF, password-as-key,
+> Apple/Google/WebAuthn credential as seed); (10) the future `test-vectors/`
+> layout (`aead/*.json`, `kdf/*.json`, `nip44/*.json` — added only when official
+> vectors are copied with source notes, none added yet); and (11) the current
+> conclusion (docs only, no crypto code, no vectors committed unless a verified
+> source exists, and a future Rust implementation must pass these vectors before
+> runtime selection). It complements
+> [`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md) §10 (which
+> names AEAD/KDF test vectors as prerequisites) and the crypto boundary. This
+> stage adds no test — there is no new behavior to cover. Stage 68 candidate:
+> **FedOS Core build manifest skeleton docs** (fix build manifest / provenance /
+> pinned-digest management before any real Rust/WASM lands). Prior status:
+>
+> **Stage 66 — Anti-analysis & Shadow Vault risk docs (docs only, no
 > code).**
 > A new [`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md)
 > fixes, in writing, a set of **hard prohibitions** — **no `src/` change, no
@@ -2268,7 +2303,8 @@ D1 space directory caveats (do not over-promise on these):
 63. FedOS core WASM loader boundary, disabled by default (`packages/fedos-core-rust/src/wasm_loader.ts`; `FedosCoreWasmLoader` + Noop/Placeholder + bridge helpers; no WASM/Rust/fetch/instantiate, not wired) ✓
 64. FedOS core WASM loader safety docs ([`docs/fedos_core_wasm_safety.md`](docs/fedos_core_wasm_safety.md); docs only, no code) ✓
 65. Runtime crypto provider selection boundary, disabled by default (`createRuntime` selects a `CryptoProvider` from env; `AppRuntime.cryptoProvider`; FedOS option wraps the inert `PlaceholderFedosCoreCrypto` only; selection only, no WASM load, no cryptography, no crypto-op call) ✓
-66. Anti-analysis & Shadow Vault risk docs ([`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md); docs only, no code; binding prohibitions — no anti-debug/anti-VM, no self-destruct, no shadow/fake-data generator) ✓ ← you are here
+66. Anti-analysis & Shadow Vault risk docs ([`docs/anti_analysis_shadow_vault_risks.md`](docs/anti_analysis_shadow_vault_risks.md); docs only, no code; binding prohibitions — no anti-debug/anti-VM, no self-destruct, no shadow/fake-data generator) ✓
+67. Crypto operation test-vector plan ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md); docs only, no code, no vectors committed; test-first verification plan for a future Rust core — AEAD/HKDF/Argon2id/NIP-44, official vectors only) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
