@@ -8,7 +8,48 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 58 — Runtime external health check boundary, disabled by
+> **Status: Stage 59 — FedOS core crypto package boundary (no Rust, no WASM,
+> no cryptography).**
+> A new package [`packages/fedos-core-rust`](packages/fedos-core-rust/README.md)
+> is the INTENDED future home of a RustCrypto-backed WASM/FFI crypto core — but
+> this stage ships the **package boundary / TS adapter / placeholder core
+> ONLY**. It defines the standalone `FedosCoreCrypto` seam (`getStatus`,
+> `getCapabilities`, `randomBytes`, `deriveKey`, `encrypt`, `decrypt`) and a
+> permanently-inert `PlaceholderFedosCoreCrypto` / `createFedosCoreCrypto()`
+> that reports `state: "unavailable"`, advertises placeholder capabilities
+> (labels of FUTURE intent, all ending `_placeholder`), and refuses every
+> operation with a non-sensitive `FedosCoreDecision` (`{ allowed, state, reason }`
+> — no output/bytes field, since nothing is computed). The package's `types.ts`
+> imports nothing at all; its capability/state/decision string values mirror the
+> host `src/crypto/types.ts` seam so the host adapter can pass them straight
+> through. The host consumes it ONLY through the new
+> `FedosCoreCryptoProvider implements CryptoProvider`
+> (`src/crypto/fedos_core_adapter.ts`), which injects an optional
+> `FedosCoreCrypto`: built WITHOUT a core it is a drop-in `NoopCryptoProvider`
+> (delegates to one — `unavailable`, empty capabilities); built WITH the
+> placeholder core it delegates `getStatus`/`getCapabilities` and returns
+> `unavailable` for every operation. The adapter **never throws** (a core that
+> throws/rejects is caught and reported as a non-sensitive `error`
+> status/decision — the provider's own error text is dropped, never echoed),
+> **never mutates** the input request, and **retains no** secret/key/plaintext/
+> ciphertext bytes (requests carry only opaque handles). **This stage implements
+> no real cryptography**: no HKDF/Argon2/KDF, no AEAD/ChaCha20-Poly1305/AES-GCM/
+> encrypt/decrypt, no CSPRNG/random, no BIP39/BIP32, no NIP-44, no zeroize, no
+> WebAuthn/passkey, no Secure Enclave, and no Apple/Google integration. No
+> `.wasm`/`.rs`/Cargo file is committed. It is **NOT wired into the runtime or
+> the Worker** — `create_runtime.ts`/`worker.ts` construct nothing from these
+> files and contain zero `fedos` reference. 15+ tests in
+> `test/fedos_core_adapter.test.ts` cover: the package exports the placeholder
+> core, core status `unavailable`, capabilities placeholder-only, the adapter
+> implements `CryptoProvider`, delegates `getStatus`/`getCapabilities`, returns
+> `unavailable` for `randomBytes`/`deriveKey`/`encrypt`/`decrypt`, catches a
+> throwing core without leaking its error text, no input mutation, the Runtime
+> and Worker sources contain no `fedos` reference, no crypto/WASM library import,
+> and no Rust/WASM binary committed. Stage 60 candidate: **WebAuthn/Passkey
+> provider adapter skeleton** (a disabled-by-default browser-API boundary, so
+> Identity → Vault → Crypto wiring can proceed). Prior status:
+>
+> **Stage 58 — Runtime external health check boundary, disabled by
 > default.**
 > A new `src/runtime/health_check.ts` ships ONLY the boundary shape for a
 > future "is this selected provider/endpoint actually reachable?" seam — as

@@ -1,0 +1,11 @@
+{
+  "name": "@nostr-window/fedos-core-rust",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FedOS crypto core — TypeScript package boundary for a FUTURE Rust/WASM crypto core. Placeholder only: no real cryptography.",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
