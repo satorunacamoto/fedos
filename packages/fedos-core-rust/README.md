@@ -4,11 +4,11 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 78 — Adopt `zeroize` / `secrecy` / `subtle` secret-handling
-> foundation dependencies (build check only; no secret types, no
-> zeroization behavior, no constant-time compare, no Runtime/Worker/
-> CryptoProvider wiring, no WASM change). Public API STILL a placeholder
-> SKELETON. No cryptography reachable from any public function.**
+> **Status: Stage 79 — Add an internal secret-handle skeleton (crate-private
+> only; no public API change, no real secrets, no key/seed/plaintext/
+> ciphertext handling, no AEAD/HKDF/Argon2, no Runtime/Worker/CryptoProvider
+> wiring, no WASM change). Public API STILL a placeholder SKELETON. No
+> cryptography reachable from any public function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -20,23 +20,22 @@ app depends only on its *contract*, never on its internals.
 > `cfg(test)` in Stage 75 — see the "RFC 8439 vector wiring" section below.
 > Stage 76 adopted `hkdf` (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256
 > vectors under `cfg(test)` in Stage 77 — see the "RFC 5869 vector wiring"
-> section below. **Stage 78 adopts THREE more `[dependencies]` (production)
-> entries together — `zeroize` v1.9.0, `secrecy` v0.10.3, `subtle` v2.6.1** —
-> a secret-handling FOUNDATION, ahead of any real secret type, in
-> preparation for a future internal secret-handle skeleton (Stage 79
-> candidate) and eventual real key/seed/plaintext handling. **Why now:**
-> with both AEAD (RFC 8439) and KDF (RFC 5869) verification wired to
-> `cargo test`, the next natural step before touching any real secret byte
-> is the infrastructure that will hold, protect, and compare it safely —
-> adopting it as its own reviewed Stage keeps that infrastructure itself
-> auditable in isolation, before any secret-handling code exists to lean on
-> it. **No secret type exists yet** — no `Secret`/`SecretBox` wrapper is
-> defined; **no zeroization behavior exists yet** — no type derives
-> `Zeroize` and no `.zeroize()` is called; **no constant-time compare
-> behavior exists yet** — no `ConstantTimeEq`/`.ct_eq()` call exists
-> anywhere. `derive_key_placeholder` / `encrypt_placeholder` /
-> `decrypt_placeholder` remain byte-for-byte unchanged. See the "Secret-
-> handling foundation adoption" section below. The Rust crate still has no
+> section below. Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a
+> secret-handling FOUNDATION, ahead of any real secret type — see the
+> "Secret-handling foundation adoption" section below. **Stage 79 adds
+> `src/lib.rs`'s first consumer of that foundation: a crate-private
+> `secret_handle` module** defining an INTERNAL-ONLY `SecretHandle` skeleton —
+> see the "Internal secret-handle skeleton" section below. **Not part of the
+> public API** — every item in `secret_handle` is `pub(crate)` at most
+> (never `pub`), nothing is re-exported, and this crate's public `pub fn`
+> surface is still exactly the same six placeholder functions from Stage 69.
+> **No real secret** — `SecretHandle` accepts no key/seed/plaintext/
+> ciphertext/passphrase input and stores none; its only field is a fixed,
+> non-secret placeholder marker wrapped in `secrecy::SecretBox` purely to
+> exercise Stage 78's dependencies. **No AEAD/HKDF/Argon2** — nothing in
+> `secret_handle` implements or calls any of them.
+> `derive_key_placeholder` / `encrypt_placeholder` / `decrypt_placeholder`
+> remain byte-for-byte unchanged. The Rust crate still has no
 > `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**; the
 > runtime/Worker/`CryptoProvider` are **not** wired to any of this. A real
 > RustCrypto-backed core is a future, explicitly-reviewed stage that must pass
@@ -91,11 +90,12 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   either)
 - No BIP39 / BIP32
 - No NIP-44
-- No secret type — `zeroize` / `secrecy` / `subtle` are `[dependencies]`
-  (production) entries as of Stage 78, but no code anywhere in `src/lib.rs`
-  imports, references, or calls any of the three; no `Secret`/`SecretBox`
-  wrapper is defined; no type derives `Zeroize` or calls `.zeroize()`; no
-  `ConstantTimeEq`/`.ct_eq()` call exists
+- No PUBLIC secret type — Stage 79 adds an INTERNAL-ONLY `SecretHandle`
+  skeleton (crate-private `secret_handle` module, `pub(crate)` at most,
+  never `pub`, never re-exported) that uses `zeroize`/`secrecy` against a
+  fixed, non-secret placeholder marker only; it accepts and stores no real
+  key/seed/plaintext/ciphertext/passphrase byte. `subtle` remains
+  UNUSED — no `ConstantTimeEq`/`.ct_eq()` call exists anywhere
 - No WebAuthn / passkey, no Secure Enclave, no Apple/Google enclave integration
 - Handles no secret bytes: requests carry OPAQUE, non-secret handles/labels only
 
@@ -118,11 +118,11 @@ this stage.
 
 ```
 packages/fedos-core-rust
-  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78)
+  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78) — UNCHANGED this stage
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869; zeroize/secrecy/subtle (Stage 78) are not referenced anywhere yet
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker — not part of the public API
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -312,3 +312,78 @@ A future, explicitly-reviewed Stage 79 candidate is to introduce an internal
 secret-handle skeleton — the first code anywhere in this crate to actually
 import and use `zeroize`/`secrecy`/`subtle` — still without any real key
 derivation or encrypt/decrypt implementation.
+
+## Internal secret-handle skeleton (Stage 79)
+
+`src/lib.rs` gains a crate-private `secret_handle` module (still ahead of
+this file's first module gated `cfg(test)`) — the first PRODUCTION code in
+this crate (not `#[cfg(test)]`-only, unlike Stage 75/77's vector-verification
+modules) to actually import and use the `zeroize`/`secrecy` dependencies
+adopted Stage 78. It defines:
+
+- **`SecretHandleState`** (`pub(crate) enum`) — `Empty` / `Placeholder` /
+  `Cleared`.
+- **`SecretHandleStatus`** (`pub(crate) struct`) — a non-sensitive status
+  snapshot, carrying only the state enum.
+- **`PlaceholderMarker`** (private) — a fixed, non-secret `u8` newtype.
+  Exists ONLY so `SecretHandle` has a concrete `Zeroize`-able type to wrap in
+  `secrecy::SecretBox`; its value is a constant, never derived from or
+  holding any real key/seed/plaintext/ciphertext/passphrase byte.
+- **`SecretHandle`** (`pub(crate) struct`) — the skeleton itself, holding
+  `state: SecretHandleState` and `marker: SecretBox<PlaceholderMarker>`.
+  Four methods: `new_placeholder()` (constructs a handle — takes NO secret
+  input of any kind, no borrowed-byte-slice/`Vec<u8>`/`String` parameter),
+  `status()` (returns the non-sensitive snapshot), `clear()` (zeroizes the
+  placeholder marker and sets state to `Cleared` — does not return, expose,
+  or copy the marker), and `is_cleared()` (a boolean check).
+
+**NOT part of this crate's public API.** Every item above is `pub(crate)` at
+most — never `pub` — and nothing is re-exported from the crate root. This
+crate's public `pub fn` surface is still exactly the same six placeholder
+functions from Stage 69 (`fedos_core_status`, `fedos_core_capabilities`,
+`random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+`decrypt_placeholder`); none of them constructs, holds, or returns a
+`SecretHandle`. See
+[`test/fedos_core_rust_secret_handle.test.ts`](../../test/fedos_core_rust_secret_handle.test.ts)
+for the dedicated guard tests (internal-only visibility, no public export,
+public `pub fn` count still 6, no key/seed/plaintext/ciphertext/passphrase
+storage field, no `Vec<u8>`/`String`/borrowed-byte-slice secret field, no
+AEAD/HKDF/Argon2, no random/`getrandom`, no `unsafe`, no committed build
+artifact, Runtime/Worker untouched).
+
+**Why `zeroize`/`secrecy` but not `subtle` this stage:** `clear()` calling
+`marker.zeroize()` and wrapping `marker` in `secrecy::SecretBox` are both
+meaningful to exercise even against a placeholder value — they prove out the
+lifecycle pattern (allocate → hold → zeroize-on-clear) a future real secret
+type will reuse. `subtle`'s constant-time comparison, by contrast, exists to
+guard secret-DERIVED byte comparisons (e.g. an authentication tag) against
+timing side-channels — comparing this skeleton's own `SecretHandleState` enum
+(plain, non-secret, `#[derive(PartialEq)]`) would not exercise that use case
+meaningfully, so `subtle` stays adopted-but-unused, deferred to the stage
+that first needs a real secret-derived comparison.
+
+**Every unit test in `secret_handle`'s own nested `#[cfg(test)] mod tests`**
+(5 tests, `cargo test`-only) is intentionally placeholder-emphasizing in name
+— `new_placeholder_starts_in_placeholder_state_only`,
+`status_reports_placeholder_state_only_no_secret_bytes`,
+`clear_transitions_state_to_cleared_only`,
+`is_cleared_is_false_until_clear_is_called`,
+`empty_state_is_the_default_placeholder_only_state` — none exercises or
+asserts anything about a real secret byte, because there is none to assert
+about. `#[allow(dead_code)]` on the module suppresses the (expected) warning
+a plain, non-test `cargo check`/`cargo build` would otherwise emit, since
+nothing outside `secret_handle`'s own tests calls into it yet; this clears
+naturally once a future stage (e.g. an internal AEAD module) wires a real
+consumer.
+
+This is dependency + build-check-safe SKELETON work only: no key, seed,
+plaintext, ciphertext, or passphrase byte is accepted, stored, or handled
+anywhere in this crate; no AEAD/HKDF/Argon2/NIP-44 operation is implemented
+or called; `derive_key_placeholder`/`encrypt_placeholder`/
+`decrypt_placeholder` are unchanged; and nothing is wired into the Runtime,
+the Worker, or `CryptoProvider`/`FedosCoreCryptoProvider` — the host still
+selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+A future, explicitly-reviewed Stage 80 candidate is an internal AEAD module
+skeleton (the `chacha20poly1305`-analogue of this stage's KDF-adjacent
+secret-handle work) — still no public `encrypt`/`decrypt` implementation.

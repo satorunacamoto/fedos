@@ -8,7 +8,77 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 78 — Adopt `zeroize` / `secrecy` / `subtle` secret-handling
+> **Status: Stage 79 — Add an internal secret-handle skeleton (crate-private
+> only; no public API change, no real secrets, no AEAD/HKDF/Argon2, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a crate-private `secret_handle`
+> module — the first PRODUCTION code (not `#[cfg(test)]`-only, unlike Stage
+> 75/77's vector-verification modules) in this crate to actually import and
+> use `zeroize`/`secrecy` (adopted Stage 78), against a fixed, non-secret
+> `PlaceholderMarker` only. It defines `SecretHandleState` (`pub(crate) enum`:
+> `Empty` / `Placeholder` / `Cleared`), `SecretHandleStatus` (`pub(crate)
+> struct`: a non-sensitive status snapshot), and `SecretHandle` (`pub(crate)
+> struct`: `state: SecretHandleState` + `marker: SecretBox<PlaceholderMarker>`)
+> with four methods — `new_placeholder()` (takes NO secret input of any
+> kind), `status()`, `clear()` (zeroizes the placeholder marker, sets state
+> `Cleared`), `is_cleared()`. **NOT part of the public API**: every item is
+> `pub(crate)` at most — never `pub` — nothing is re-exported, and this
+> crate's public `pub fn` surface stays exactly the same six placeholder
+> functions from Stage 69; none of them constructs, holds, or returns a
+> `SecretHandle`. **No real secret**: `SecretHandle` accepts and stores no
+> key/seed/plaintext/ciphertext/passphrase byte — there is no
+> borrowed-byte-slice/`Vec<u8>`/`String` secret parameter or field anywhere;
+> `PlaceholderMarker` is a fixed, non-secret `u8` newtype, never derived from
+> real secret material. **No AEAD/HKDF/Argon2/NIP-44** implementation exists
+> in `secret_handle`. `subtle` (also adopted Stage 78) remains deliberately
+> UNUSED this stage — it exists to guard real secret-DERIVED byte comparisons
+> (e.g. an authentication tag), which this skeleton's own plain
+> `SecretHandleState` enum equality is not; a future stage that needs a real
+> comparison adopts it then. `derive_key_placeholder` /
+> `encrypt_placeholder` / `decrypt_placeholder` remain byte-for-byte
+> unchanged. `Cargo.toml` is UNCHANGED this stage (still the five production
+> entries from Stage 78). `cargo test` is GREEN with all 14 tests passing (9
+> pre-existing + 5 new `secret_handle::tests`, its own nested `#[cfg(test)]
+> mod tests` — the emphasis in every new test name is placeholder-only:
+> `new_placeholder_starts_in_placeholder_state_only`,
+> `status_reports_placeholder_state_only_no_secret_bytes`,
+> `clear_transitions_state_to_cleared_only`,
+> `is_cleared_is_false_until_clear_is_called`,
+> `empty_state_is_the_default_placeholder_only_state`); `cargo check` and
+> `cargo check --tests` stay GREEN with no warnings — `#[allow(dead_code)]`
+> on the module suppresses the (expected) unused-code warning a plain,
+> non-test build would otherwise emit, since nothing outside
+> `secret_handle`'s own tests calls into it yet. New
+> [`test/fedos_core_rust_secret_handle.test.ts`](test/fedos_core_rust_secret_handle.test.ts)
+> (15 tests) checks: `secret_handle` is present and not `pub mod`;
+> `SecretHandle`/`SecretHandleState`/`SecretHandleStatus` are `pub(crate)`,
+> never `pub`; no public re-export; the public `pub fn` surface is exactly
+> the six Stage 69 names; the six placeholder signatures/bodies are
+> byte-for-byte unchanged; no key/seed/plaintext/ciphertext/passphrase
+> storage field (a colon-typed field declaration, not doc-comment prose) and
+> no `Vec<u8>`/`String`/borrowed-byte-slice secret field anywhere in the
+> module; no AEAD/HKDF/Argon2/NIP-44 mention; no random/`getrandom`; no
+> `unsafe` anywhere in `lib.rs`; no `.wasm`/`Cargo.lock`/`target`/`build`
+> artifact committed; Runtime/Worker sources mention neither
+> `secret_handle`/`SecretHandle` nor auto-call a crypto operation; and
+> `secret_handle` uses `secrecy::SecretBox`/`zeroize::Zeroize` against
+> `PlaceholderMarker` while NOT using `subtle`/`ConstantTimeEq`/`.ct_eq()`.
+> Existing [`test/fedos_core_rust_dependency.test.ts`](test/fedos_core_rust_dependency.test.ts)
+> tests 12–13 were relaxed from "no `zeroize`/`secrecy` usage anywhere" to
+> "no PUBLIC exposure of it" (test 14, `subtle`, is unchanged — still "no
+> usage at all", since Stage 79 deliberately doesn't use it); test 15's
+> production-code slice now ends at `secret_handle`'s own nested
+> `#[cfg(test)]` (lib.rs's new first occurrence) instead of the pre-existing
+> placeholder tests module — harmlessly, since `secret_handle`'s own
+> production content mentions neither `chacha20poly1305` nor `hkdf`. Test 6 in
+> [`test/fedos_core_rust_skeleton.test.ts`](test/fedos_core_rust_skeleton.test.ts)
+> was updated to expect (not forbid) `zeroize`/`secrecy` in lib.rs's
+> production-code slice. Stage 80 candidate: **an internal AEAD module
+> skeleton** — the `chacha20poly1305`-analogue of this stage's KDF-adjacent
+> secret-handle work — still no public `encrypt`/`decrypt` implementation.
+> Prior status:
+>
+> **Stage 78 — Adopt `zeroize` / `secrecy` / `subtle` secret-handling
 > foundation dependencies (build check only; no secret types, no
 > zeroization behavior, no constant-time compare, no Runtime/Worker/
 > CryptoProvider wiring, no WASM change).**

@@ -45,11 +45,21 @@ import workerSource from "../src/worker.ts?raw";
  * module is added this stage (unlike Stage 75/77), since there is no vector
  * file for a dependency-adoption-only Stage to wire. Test 3 below now
  * expects FIVE production dependency-table entries.
+ * Updated Stage 79: `Cargo.toml` is UNCHANGED (still five production
+ * entries); `src/lib.rs` gains a crate-private `secret_handle` module — an
+ * INTERNAL-ONLY secret-handle skeleton, `pub(crate)` at most, never `pub` —
+ * that imports and uses `zeroize`/`secrecy` in PRODUCTION code for the first
+ * time, against a fixed non-secret placeholder marker only. Its own nested
+ * `#[cfg(test)] mod tests` is now lib.rs's FIRST `#[cfg(test)]` occurrence,
+ * so `firstCfgTestIdx` below shifts earlier accordingly (harmlessly — see
+ * test 6's own comment). See test/fedos_core_rust_secret_handle.test.ts for
+ * the dedicated Stage 79 checks.
  * Tests 3, 6, and 8 below are scoped to PRODUCTION code/dependencies only
  * (excluding `[dev-dependencies]` and excluding everything from the first
  * `#[cfg(test)]` onward) so they keep verifying exactly what they always
  * verified: the crate's public, non-test surface still implements no
- * cryptography.
+ * cryptography (Stage 79's `secret_handle` module is the sole, deliberate
+ * exception for `zeroize`/`secrecy`, per test 6 below).
  *
  * The crate is still a placeholder skeleton: no wasm-bindgen, no `unsafe`, no
  * *production* cryptography implementation, no random, and no compiled/WASM
@@ -153,16 +163,25 @@ describe("FedOS Rust crate skeleton", () => {
   // test/fedos_core_rust_rfc8439_wiring.test.ts). Tests 6 and 8 below scope
   // themselves to lib.rs's PRODUCTION code — everything before the first
   // `#[cfg(test)]` — which must still implement no cryptography at all.
+  // Stage 79 adds a crate-private `secret_handle` module (with its OWN
+  // nested `#[cfg(test)] mod tests`, now lib.rs's first `#[cfg(test)]`
+  // occurrence) that legitimately imports `zeroize`/`secrecy` in production
+  // code — see test/fedos_core_rust_secret_handle.test.ts.
   const firstCfgTestIdx = libRsSource.indexOf("#[cfg(test)]");
   const productionLibRs =
     firstCfgTestIdx === -1 ? libRsSource : libRsSource.slice(0, firstCfgTestIdx);
 
-  it("6. lib.rs's production code imports no crypto crate (no `use`/`extern crate` of a cipher/KDF)", () => {
+  it("6. lib.rs's production code imports no crypto/AEAD/KDF crate (zeroize/secrecy are the sole exception, Stage 79 secret-handle skeleton)", () => {
     expect(firstCfgTestIdx).toBeGreaterThan(-1);
     expect(productionLibRs).not.toMatch(/\bextern\s+crate\b/);
     expect(productionLibRs).not.toMatch(
-      /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|argon2|zeroize|secrecy|subtle|bip39|secp256k1|nostr|wasm_bindgen)\b/,
+      /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|argon2|subtle|bip39|secp256k1|nostr|wasm_bindgen)\b/,
     );
+    // zeroize/secrecy ARE used in production code as of Stage 79 (see
+    // test/fedos_core_rust_secret_handle.test.ts for the dedicated checks
+    // that this stays crate-private and touches no real secret byte).
+    expect(productionLibRs).toMatch(/\buse\s+zeroize\b/);
+    expect(productionLibRs).toMatch(/\buse\s+secrecy\b/);
   });
 
   it("7. lib.rs has no random / getrandom usage", () => {

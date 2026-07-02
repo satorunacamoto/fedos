@@ -17,20 +17,25 @@ import workerSource from "../src/worker.ts?raw";
  * test/fedos_core_rust_hkdf_wiring.test.ts.
  * Updated Stage 78 — `zeroize` / `secrecy` / `subtle` dependency-adoption
  * tests (tests 3–5 below). This trio is adopted together, ahead of any real
- * secret type, as a foundation for a future secret-handle skeleton (Stage 79
- * candidate) — no code anywhere in `src/lib.rs` imports, references, or
- * calls any of the three yet.
+ * secret type, as a foundation for a future secret-handle skeleton.
+ * Updated Stage 79 — the secret-handle skeleton itself lands: a
+ * crate-private `secret_handle` module in `src/lib.rs` that legitimately
+ * uses `zeroize`/`secrecy` internally, against a fixed non-secret
+ * placeholder marker only — see test/fedos_core_rust_secret_handle.test.ts
+ * for its dedicated checks, and tests 12/13 below for how this file's own
+ * `zeroize`/`secrecy` guards were relaxed accordingly.
  *
  * `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
  * has exactly FIVE entries: `chacha20poly1305` (Stage 74, RustCrypto AEAD,
  * wired to the RFC 8439 vectors under `#[cfg(test)]` in Stage 75), `hkdf`
  * (Stage 76, RustCrypto KDF, wired to the RFC 5869 HKDF-SHA256 vectors at
  * test-vectors/kdf/hkdf-rfc5869.json under `#[cfg(test)]` in Stage 77), and
- * `zeroize` / `secrecy` / `subtle` (Stage 78, secret-handling foundation —
- * no vector to wire, no code path uses them yet). `derive_key_placeholder`
- * is untouched, no random/key is generated, no secret type is defined, no
- * zeroization or constant-time-compare behavior exists, and no other crypto
- * crate (argon2 / aes-gcm / rand / getrandom) or wasm-bindgen is added.
+ * `zeroize` / `secrecy` / `subtle` (Stage 78, secret-handling foundation).
+ * `derive_key_placeholder` is untouched, no random/key is generated, no
+ * type anywhere holds a real key/seed/plaintext/ciphertext/passphrase byte,
+ * `subtle`-based constant-time-compare behavior does not exist yet (Stage 79
+ * deliberately does not use `subtle`), and no other crypto crate (argon2 /
+ * aes-gcm / rand / getrandom) or wasm-bindgen is added.
  *
  * `cargo check` (green as of this stage) is verified as its own separate
  * command outside `npm test`, consistent with how this repo has always kept
@@ -46,10 +51,25 @@ import workerSource from "../src/worker.ts?raw";
  * `#[cfg(test)]`-only module, `rfc5869_vectors`, that legitimately imports and
  * calls `hkdf` — it lands after lib.rs's FIRST `#[cfg(test)]` marker (the
  * pre-existing placeholder tests module), so test 15's slice cutoff still
- * excludes it and the production-code assertion is unaffected. Stage 78 adds
- * NO new `#[cfg(test)]` module (unlike Stage 75/77) — `zeroize`/`secrecy`/
- * `subtle` are not exercised anywhere in `src/lib.rs`, production or test —
- * so tests 12–14 below scan the ENTIRE file, not just the production slice.
+ * excludes it and the production-code assertion is unaffected.
+ *
+ * Update (Stage 79): `src/lib.rs` gains a crate-private `secret_handle`
+ * module — the first PRODUCTION code (not `#[cfg(test)]`-only) in this crate
+ * to actually import and use `zeroize`/`secrecy` — with its own nested
+ * `#[cfg(test)] mod tests` for its unit tests (see
+ * test/fedos_core_rust_secret_handle.test.ts for the dedicated Stage 79
+ * checks). Because that nested test module is now lib.rs's FIRST
+ * `#[cfg(test)]` occurrence, test 15's production-code slice below now ends
+ * there instead of at the pre-existing placeholder tests module — this does
+ * not change what test 15 asserts (the six placeholder functions and the
+ * chacha20poly1305/hkdf absence checks all still hold on the smaller slice,
+ * since `secret_handle`'s own production content mentions neither). Tests 12
+ * and 13 are relaxed from "no usage anywhere" to "no PUBLIC exposure" for
+ * exactly this reason: `secrecy`/`zeroize` are now legitimately used, but
+ * only inside the crate-private `secret_handle` module, never via a `pub`
+ * item. Test 14 (`subtle`) is UNCHANGED — Stage 79 deliberately does not use
+ * `subtle` yet (see the module's own doc comment in `src/lib.rs`), so the
+ * whole-file "no usage at all" check still holds.
  */
 describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle dependency adoption", () => {
   // TOML comments legitimately NAME both the adopted and the still-forbidden
@@ -135,23 +155,32 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(cargoCode).not.toContain("wasm32");
   });
 
-  it("12. production lib.rs has no Secret/SecretBox/ExposeSecret usage", () => {
-    // Stage 78 adds no #[cfg(test)] module either, so this scans the whole
-    // file — `secrecy` is not exercised anywhere, production or test.
-    expect(libRsSource).not.toMatch(/\buse\s+secrecy\b/);
-    expect(libRsSource).not.toMatch(/\bsecrecy::/);
-    expect(libRsSource).not.toMatch(/\bSecretBox\b/);
-    expect(libRsSource).not.toMatch(/\bSecret(String|Box|Vec)?\s*[<(]/);
-    expect(libRsSource).not.toMatch(/\bExposeSecret\b/);
-    expect(libRsSource).not.toMatch(/\bexpose_secret\s*\(/);
+  it("12. SecretBox/Secret usage (Stage 79, crate-private secret_handle module) is never exposed via a pub item", () => {
+    // Stage 79 adds a crate-private `secret_handle` module that legitimately
+    // imports and uses `secrecy::SecretBox` — see
+    // test/fedos_core_rust_secret_handle.test.ts for its dedicated checks
+    // (SecretHandle is `pub(crate)`, never `pub`, never re-exported, and
+    // holds no Vec<u8>/String secret field — that module-scoped check lives
+    // there, not here, since this file's `libRsSource` also legitimately
+    // contains unrelated `String` fields elsewhere, e.g. the `rfc8439_vectors`/
+    // `rfc5869_vectors` test-vector-parsing structs' `id: String` field).
+    // This test only asserts the PUBLIC-API boundary stays clean.
+    expect(libRsSource).not.toMatch(/\bpub\s+use\s+secrecy\b/);
+    expect(libRsSource).not.toMatch(/\bpub\s+struct\s+\w*[Ss]ecret\w*/);
+    expect(libRsSource).not.toMatch(/\bpub\s+enum\s+\w*[Ss]ecret\w*/);
+    expect(libRsSource).not.toMatch(/\bpub\s+fn\s+\w*[Ss]ecret\w*/);
   });
 
-  it("13. production lib.rs has no Zeroize derive or zeroize call", () => {
-    expect(libRsSource).not.toMatch(/\buse\s+zeroize\b/);
-    expect(libRsSource).not.toMatch(/\bzeroize::/);
-    expect(libRsSource).not.toMatch(/#\[derive\([^)]*\bZeroize/);
-    expect(libRsSource).not.toMatch(/\bZeroizing\b/);
-    expect(libRsSource).not.toMatch(/\.zeroize\s*\(\)/);
+  it("13. Zeroize usage (Stage 79, crate-private secret_handle module) is never exposed via a pub item", () => {
+    // `zeroize` is legitimately imported and called inside the crate-private
+    // `secret_handle` module (Stage 79), only against the non-secret
+    // `PlaceholderMarker` — see test/fedos_core_rust_secret_handle.test.ts.
+    expect(libRsSource).not.toMatch(/\bpub\s+use\s+zeroize\b/);
+    expect(libRsSource).not.toMatch(/\bpub\s+fn\s+\w*[Zz]eroiz\w*/);
+    expect(libRsSource).not.toMatch(/\bpub\s+struct\s+\w*[Zz]eroiz\w*/);
+    // derive_key_placeholder (the one placeholder function this stage's
+    // topic could plausibly touch) still calls nothing but the shared
+    // placeholder helper — see test 16 below for its exact body assertion.
   });
 
   it("14. production lib.rs has no ConstantTimeEq/subtle usage", () => {

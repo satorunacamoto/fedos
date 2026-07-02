@@ -28,6 +28,15 @@
 //! Stage 77 adds a second test-only module of the same shape, verifying
 //! Stage 76's KDF dependency against an official RFC 5869 HKDF known-answer
 //! vector file. Same rules apply: `cfg(test)` only, no public API change.
+//!
+//! Stage 79 adds a crate-private `secret_handle` module (below, still ahead
+//! of this file's first module gated `cfg(test)`): an INTERNAL-ONLY
+//! `SecretHandle` skeleton, the first code in this crate to actually import
+//! and use the `zeroize`/`secrecy` dependencies adopted Stage 78 — but only
+//! against a fixed, non-secret placeholder marker. It is not part of the
+//! public API (nothing below is `pub`, nothing is re-exported), holds no
+//! real key/seed/plaintext/ciphertext/passphrase byte, and none of the six
+//! functions above constructs, holds, or returns one.
 
 #![forbid(unsafe_code)]
 
@@ -96,6 +105,160 @@ fn placeholder_status() -> FedosCoreStatus {
     FedosCoreStatus {
         state: FedosCoreState::Placeholder,
         reason: "placeholder only (no cryptography performed)",
+    }
+}
+
+/// Stage 79 — an INTERNAL-ONLY secret-handle skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a [`SecretHandle`].
+///
+/// This is the first code in this crate to actually import and use the
+/// `zeroize`/`secrecy` dependencies adopted Stage 78 — but only against a
+/// fixed, non-secret [`PlaceholderMarker`]. It holds NO real key, seed,
+/// plaintext, ciphertext, or passphrase byte: no function below takes a
+/// borrowed-byte-slice, `Vec<u8>`, or `String` secret parameter, and no
+/// field below is typed as one either; no AEAD/HKDF/Argon2/NIP-44 operation
+/// is implemented or called here.
+/// `subtle` (also adopted Stage 78) is intentionally NOT used yet — a future
+/// stage that needs to compare real secret-derived bytes (e.g. an
+/// authentication tag) adopts it then; [`SecretHandleState`]'s derived
+/// `PartialEq` below is plain, non-secret enum equality, not a secret
+/// comparison `subtle` would need to guard.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`. This is expected for a skeleton not
+/// yet wired to any consumer; it clears once a future stage (e.g. an
+/// internal AEAD module) actually uses `SecretHandle`.
+#[allow(dead_code)]
+mod secret_handle {
+    use secrecy::SecretBox;
+    use zeroize::Zeroize;
+
+    /// Coarse internal lifecycle state of a [`SecretHandle`]. Crate-private
+    /// only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum SecretHandleState {
+        /// No placeholder marker has been allocated yet.
+        Empty,
+        /// A placeholder marker is allocated. Still holds no real secret.
+        Placeholder,
+        /// [`SecretHandle::clear`] was called: the placeholder marker was
+        /// zeroized and this handle must not be treated as holding anything.
+        Cleared,
+    }
+
+    impl Default for SecretHandleState {
+        fn default() -> Self {
+            SecretHandleState::Empty
+        }
+    }
+
+    /// A non-sensitive status snapshot for a [`SecretHandle`]. Crate-private
+    /// only. Never contains a key/seed/plaintext/ciphertext byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct SecretHandleStatus {
+        pub(crate) state: SecretHandleState,
+    }
+
+    /// A fixed, non-secret placeholder value. Exists ONLY so [`SecretHandle`]
+    /// has a concrete `Zeroize`-able type to wrap in `secrecy::SecretBox` —
+    /// its value is a constant, never derived from or holding any real
+    /// key/seed/plaintext/ciphertext/passphrase byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct PlaceholderMarker(u8);
+
+    impl Zeroize for PlaceholderMarker {
+        fn zeroize(&mut self) {
+            self.0 = 0;
+        }
+    }
+
+    /// An INTERNAL-ONLY secret-handle skeleton (crate-private; not part of
+    /// this crate's public API — see the module-level doc comment above).
+    /// Holds NO real key, seed, plaintext, ciphertext, or passphrase byte:
+    /// `marker` is the fixed, non-secret [`PlaceholderMarker`] above,
+    /// wrapped in `secrecy::SecretBox` purely to exercise the
+    /// secret-handling foundation adopted Stage 78 ahead of any real secret
+    /// type. A future, explicitly-reviewed stage may extend this skeleton to
+    /// hold real secret bytes; until then it accepts and stores none.
+    pub(crate) struct SecretHandle {
+        state: SecretHandleState,
+        marker: SecretBox<PlaceholderMarker>,
+    }
+
+    impl SecretHandle {
+        /// Construct a placeholder handle. Takes NO secret input of any
+        /// kind — there is no borrowed-byte-slice, `Vec<u8>`, or `String`
+        /// parameter here or anywhere else in this module.
+        pub(crate) fn new_placeholder() -> Self {
+            Self {
+                state: SecretHandleState::Placeholder,
+                marker: SecretBox::new(Box::new(PlaceholderMarker(0))),
+            }
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> SecretHandleStatus {
+            SecretHandleStatus { state: self.state }
+        }
+
+        /// Zeroizes the (non-secret) placeholder marker and marks this
+        /// handle `Cleared`. Does not return, expose, or copy the marker.
+        pub(crate) fn clear(&mut self) {
+            self.marker.zeroize();
+            self.state = SecretHandleState::Cleared;
+        }
+
+        /// Whether [`SecretHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.state == SecretHandleState::Cleared
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let handle = SecretHandle::new_placeholder();
+            assert_eq!(handle.status().state, SecretHandleState::Placeholder);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            // `SecretHandleStatus` carries only the coarse state enum — no
+            // secret byte, no marker, nothing derived from `marker`.
+            let handle = SecretHandle::new_placeholder();
+            let status = handle.status();
+            assert_eq!(status.state, SecretHandleState::Placeholder);
+        }
+
+        #[test]
+        fn clear_transitions_state_to_cleared_only() {
+            let mut handle = SecretHandle::new_placeholder();
+            handle.clear();
+            assert_eq!(handle.status().state, SecretHandleState::Cleared);
+            assert!(handle.is_cleared());
+        }
+
+        #[test]
+        fn is_cleared_is_false_until_clear_is_called() {
+            let handle = SecretHandle::new_placeholder();
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn empty_state_is_the_default_placeholder_only_state() {
+            assert_eq!(SecretHandleState::default(), SecretHandleState::Empty);
+        }
     }
 }
 
