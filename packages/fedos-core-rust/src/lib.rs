@@ -198,6 +198,16 @@
 //! `error_taxonomy` today. Same rules apply: not part of the public API,
 //! no public function above constructs, holds, or returns one of its
 //! types.
+//!
+//! Stage 97 adds a fourteenth crate-private module, `audit_policy`: an
+//! INTERNAL-ONLY audit-policy skeleton naming a future decision of which
+//! kind of observation would be permitted (a fixed, non-sensitive label
+//! and a fixed allow/deny label only — no event payload, no log output,
+//! and no `String`/`Vec` field). It exists as a fully independent,
+//! label-only type basis for a future real policy check, still not
+//! connected to — and not holding an instance of — any other module in
+//! this crate today. Same rules apply: not part of the public API, no
+//! public function above constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -2824,6 +2834,221 @@ mod audit_event {
         #[test]
         fn disabled_state_is_the_default_placeholder_only_state() {
             assert_eq!(AuditEventState::default(), AuditEventState::Disabled);
+        }
+    }
+}
+
+/// Stage 97 — an INTERNAL-ONLY audit-policy skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns an [`AuditPolicy`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It holds no observation payload of any kind — only fixed
+/// [`AuditPolicyKind`] and [`AuditPolicyDecision`] labels. Nothing in this
+/// module writes to stdout, stderr, or any log sink: there is no macro
+/// call that would emit a line anywhere below, and no observability crate
+/// is imported. It takes no user-, environment-, or config-derived input
+/// of any kind — [`AuditPolicy::new_placeholder`] accepts only an
+/// [`AuditPolicyKind`] label, and [`AuditPolicy::decision_placeholder`]
+/// takes nothing at all and always returns the same fixed, safe-default
+/// label ([`AuditPolicyDecision::DenyPlaceholder`]) regardless of `kind` —
+/// a real per-kind decision is deferred to a later, explicitly-reviewed
+/// stage. This module does NOT hold an instance of any other skeleton
+/// type in this crate — it never constructs, stores, or reads a field of
+/// any of them — when in doubt about a connection between skeletons, this
+/// crate deliberately leaves them unconnected rather than guess at a
+/// future design (the same reasoning `aead_core`'s own doc comment already
+/// states). It exists as a fully independent, label-only type basis a
+/// later, explicitly-reviewed stage can extend to actually decide a real
+/// observability policy, once it also implements the observation
+/// mechanism that policy would govern.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`. This is expected for a skeleton
+/// not yet wired to any consumer.
+#[allow(dead_code)]
+mod audit_policy {
+    /// Coarse internal lifecycle state of an [`AuditPolicy`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AuditPolicyState {
+        /// A placeholder policy is active. Decides no real observation;
+        /// emits no output.
+        Placeholder,
+        /// No policy should be treated as active — the default, inert
+        /// state before any [`AuditPolicy`] is constructed for use.
+        Disabled,
+    }
+
+    impl Default for AuditPolicyState {
+        fn default() -> Self {
+            AuditPolicyState::Disabled
+        }
+    }
+
+    /// Which future audit-policy profile an [`AuditPolicy`] names — a
+    /// label only, intent, not an implementation and not a real decision
+    /// rule set. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AuditPolicyKind {
+        /// Intended future connection point: the smallest, most
+        /// restrictive observability profile. No real profile is applied
+        /// here.
+        MinimalPlaceholder,
+        /// Intended future connection point: a broader, developer-focused
+        /// observability profile. No real profile is applied here.
+        DevelopmentPlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyPlaceholder,
+    }
+
+    /// A fixed allow/deny label an [`AuditPolicy`] would eventually
+    /// return for a real observation request — a label only, never a
+    /// real decision computed from any input. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AuditPolicyDecision {
+        /// Intended future meaning: the observation would be permitted.
+        /// No real permission is granted by this label alone.
+        AllowPlaceholder,
+        /// Intended future meaning: the observation would be refused.
+        /// This is the safe default this skeleton's
+        /// [`AuditPolicy::decision_placeholder`] always returns today.
+        DenyPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for an [`AuditPolicy`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte, and never an observation payload.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct AuditPolicyStatus {
+        pub(crate) state: AuditPolicyState,
+    }
+
+    /// An INTERNAL-ONLY audit-policy handle skeleton (crate-private; not
+    /// part of this crate's public API — see the module-level doc comment
+    /// above). Holds only an [`AuditPolicyKind`] label and an
+    /// [`AuditPolicyState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, no user-, environment-, or
+    /// config-derived input, no observation payload of any kind, and no
+    /// field of any other skeleton type in this crate. A future,
+    /// explicitly-reviewed stage may extend this skeleton to actually
+    /// decide a real policy; until then it accepts and stores none, and
+    /// emits no output of any kind.
+    pub(crate) struct AuditPolicy {
+        kind: AuditPolicyKind,
+        state: AuditPolicyState,
+    }
+
+    impl AuditPolicy {
+        /// Construct a placeholder policy of the given [`AuditPolicyKind`].
+        /// Takes NO user-, environment-, or config-derived input of any
+        /// kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: AuditPolicyKind) -> Self {
+            Self {
+                kind,
+                state: AuditPolicyState::Placeholder,
+            }
+        }
+
+        /// The [`AuditPolicyKind`] label this policy was constructed with
+        /// — intent only.
+        pub(crate) fn kind(&self) -> AuditPolicyKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> AuditPolicyStatus {
+            AuditPolicyStatus { state: self.state }
+        }
+
+        /// Whether this policy is still in the
+        /// [`AuditPolicyState::Placeholder`] state — always `true` for any
+        /// handle constructed via [`AuditPolicy::new_placeholder`], since
+        /// no other constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == AuditPolicyState::Placeholder
+        }
+
+        /// A fixed, non-secret decision label — takes NO input of any
+        /// kind and always returns the same safe-default label,
+        /// [`AuditPolicyDecision::DenyPlaceholder`], regardless of
+        /// `self.kind`. Never computed from a real observation request;
+        /// a real per-kind decision rule is deferred to a later,
+        /// explicitly-reviewed stage.
+        pub(crate) fn decision_placeholder(&self) -> AuditPolicyDecision {
+            AuditPolicyDecision::DenyPlaceholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let policy = AuditPolicy::new_placeholder(AuditPolicyKind::MinimalPlaceholder);
+            assert_eq!(policy.status().state, AuditPolicyState::Placeholder);
+            assert!(policy.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                AuditPolicyKind::MinimalPlaceholder,
+                AuditPolicyKind::DevelopmentPlaceholder,
+                AuditPolicyKind::TestOnlyPlaceholder,
+            ] {
+                let policy = AuditPolicy::new_placeholder(kind);
+                assert_eq!(policy.kind(), kind);
+                assert_eq!(policy.status().state, AuditPolicyState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let policy = AuditPolicy::new_placeholder(AuditPolicyKind::DevelopmentPlaceholder);
+            let status = policy.status();
+            assert_eq!(status.state, AuditPolicyState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_policy() {
+            for kind in [
+                AuditPolicyKind::MinimalPlaceholder,
+                AuditPolicyKind::DevelopmentPlaceholder,
+                AuditPolicyKind::TestOnlyPlaceholder,
+            ] {
+                assert!(AuditPolicy::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn decision_placeholder_always_returns_the_fixed_deny_label_for_every_kind() {
+            for kind in [
+                AuditPolicyKind::MinimalPlaceholder,
+                AuditPolicyKind::DevelopmentPlaceholder,
+                AuditPolicyKind::TestOnlyPlaceholder,
+            ] {
+                assert_eq!(
+                    AuditPolicy::new_placeholder(kind).decision_placeholder(),
+                    AuditPolicyDecision::DenyPlaceholder
+                );
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(AuditPolicyState::default(), AuditPolicyState::Disabled);
         }
     }
 }
