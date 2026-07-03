@@ -8,7 +8,77 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 110 — Federation + Social boundary foundation.** Fixes the
+> **Status: Stage 111 — Chat + Marketplace + Creator entitlement boundary
+> foundation.** Fixes three more upper-app-layer seams — still **no real
+> DM/encryption, no real payment/checkout, no entitlement issuance, no
+> Worker wiring, no Rust change.** New
+> [`src/chat/types.ts`](src/chat/types.ts) ADDS (does not replace) a
+> protocol-neutral `ChatProvider` transport seam
+> (`status`/`sendPlaceholder`/`fetchPlaceholder`) alongside the pre-existing
+> Stage 16 `ChatRoom`/`ChatMessage` model in the SAME file — the new types
+> are deliberately named `ChatProviderKind`/`ChatMessageDescriptor`/etc. to
+> avoid colliding with the existing `ChatKind`/`ChatMessage` (which keeps
+> its real `content` field and stays wired to notification/render, fully
+> untouched). `ChatMessageDescriptor` carries NO `content`/`body`/bytes
+> field — opaque `idRef`/`chatRef`/`authorRef`/metadata only. New
+> [`src/chat/noop_chat.ts`](src/chat/noop_chat.ts) ships the only
+> implementation, `NoopChatProvider` (permanently `unavailable`). New
+> [`src/marketplace/types.ts`](src/marketplace/types.ts) +
+> [`src/marketplace/noop_marketplace.ts`](src/marketplace/noop_marketplace.ts)
+> define `MarketplaceProvider` (`status`/`listPlaceholder`/
+> `purchasePlaceholder`) and `MarketplaceListingDescriptor` — six
+> `MarketplaceItemKind` placeholders, NO price/payment/checkout/download/
+> bytes field, no `PaymentProvider` import, no `PurchaseGrant`
+> construction; `NoopMarketplaceProvider` always lists nothing and grants
+> nothing. New [`src/creator/entitlement.ts`](src/creator/entitlement.ts)
+> defines `EntitlementProvider` (`status`/`checkPlaceholder`),
+> `EntitlementDecision`, and five `EntitlementKind` placeholders —
+> `NoopEntitlementProvider` is the only implementation and, like
+> `NoopFederationProvider`'s `connect()` before it, NEVER returns `allowed:
+> true`: no grant is ever issued and no payment is ever verified by this
+> boundary. All three deliberately stay uncoupled from `PaymentProvider`,
+> `src/commerce/`'s `PurchaseGrant`, `StorageBackend`, `CryptoProvider`,
+> and each other. `AppRuntime` gains `chatProvider`/`marketplaceProvider`/
+> `creatorEntitlementProvider`; three new `select*` functions in
+> [`src/runtime/create_runtime.ts`](src/runtime/create_runtime.ts) each
+> ALWAYS return their Noop default unless the matching `overrides.*` is
+> supplied — no env-selectable placeholder variant exists yet for any of
+> the three, and the Worker is UNTOUCHED (no reference to any of them).
+> Three new docs —
+> [`docs/chat_boundary.md`](docs/chat_boundary.md),
+> [`docs/marketplace_boundary.md`](docs/marketplace_boundary.md), and
+> [`docs/creator_entitlement_boundary.md`](docs/creator_entitlement_boundary.md)
+> — fix each seam's role and explicit non-scope, and why payment,
+> marketplace, and entitlement stay three separate decisions ("was this
+> paid for" vs. "what is offered" vs. "does this subject have access now").
+> New
+> [`test/chat_provider_boundary.test.ts`](test/chat_provider_boundary.test.ts)
+> (15 tests),
+> [`test/marketplace_boundary.test.ts`](test/marketplace_boundary.test.ts)
+> (15 tests), and
+> [`test/creator_entitlement_boundary.test.ts`](test/creator_entitlement_boundary.test.ts)
+> (14 tests) check: every Noop provider stays `unavailable`/denies every
+> attempt across every kind; `createRuntime` never calls any of the seven
+> new placeholder methods; the Worker references none of the three
+> providers; every descriptor carries no content/body/bytes/price/payment/
+> checkout/download field; and no source imports `PaymentProvider`,
+> `PurchaseGrant`/`src/commerce/`, `StorageBackend`, `CryptoProvider`, a
+> relay/WebSocket library, or performs NIP-04/NIP-44/NIP-17 encryption.
+> `npm run typecheck`, `npm test` (120 files, 1665 tests), `cargo check`,
+> `cargo check --tests`, and `cargo test` (108 tests, unchanged — no Rust
+> file was touched this stage) all stay GREEN. Where this stage stopped, on
+> purpose: no NIP-04/NIP-44/NIP-17 implementation, no encrypted-chat
+> implementation, no message content storage, no real payment/Stripe/
+> Lightning, no checkout, no download/signed URL, no entitlement/grant
+> issuance, and no Federation/Storage/Crypto/Worker wiring beyond Noop
+> selection. Stage 112 candidates: (1) Nostr adapter planning docs; (2) a
+> board route preview UI skeleton; (3) Creator monetization flow docs
+> (recommended — now that Chat/Marketplace/Entitlement boundaries exist,
+> fixing in docs how a sale, a membership, and a chat permission would
+> eventually connect is safer to do before any of the three is
+> implemented). Prior status:
+>
+> **Stage 110 — Federation + Social boundary foundation.** Fixes the
 > seam FedOS will eventually use to speak to multiple social
 > protocols/ecosystems (Nostr, Bluesky, Threads, RSS, and its own local
 > store) — **no real relay/WebSocket/HTTP/OAuth/AT-Protocol connection, no
