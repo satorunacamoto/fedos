@@ -118,8 +118,9 @@ describe("FedOS Rust crate — test-only Argon2id helper", () => {
       "derive_key_placeholder",
       "encrypt_placeholder",
       "decrypt_placeholder",
+      "fedos_crypto_boundary_status",
     ];
-    expect(pubFnNames.length).toBe(6);
+    expect(pubFnNames.length).toBe(7);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

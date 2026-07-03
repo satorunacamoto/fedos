@@ -63,6 +63,14 @@ import workerSource from "../src/worker.ts?raw";
  * does not use `subtle`), and no other crypto crate (rand / getrandom) or
  * wasm-bindgen is added.
  *
+ * Updated Stage 102: test 16's production-code scan is now specific
+ * crate-usage patterns rather than a bare AEAD-name substring match — the
+ * new public `FedosCryptoAlgorithm::Aes256Gcm`/`ChaCha20Poly1305` labels
+ * added in `src/lib.rs` legitimately contain those substrings without
+ * importing or calling any AEAD crate. See
+ * test/fedos_core_rust_public_api_boundary.test.ts for the dedicated Stage
+ * 102 checks; `Cargo.toml` itself is unchanged by Stage 102.
+ *
  * `cargo check` (green as of this stage) is verified as its own separate
  * command outside `npm test`, consistent with how this repo has always kept
  * the Rust toolchain check independent of the vitest/TypeScript test run.
@@ -169,9 +177,10 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     // test/fedos_core_rust_aes_gcm_wiring.test.ts for the dedicated Stage
     // 101 checks (helper presence/visibility, no production `aes-gcm`
     // reference, `aead_core` unchanged and still placeholder-only, public
-    // `pub fn` count still 6, no production key/nonce/plaintext/
-    // ciphertext/tag storage field, Runtime/Worker untouched, no committed
-    // build artifact).
+    // `pub fn` count still 6 as of Stage 101 — Stage 102 later adds a
+    // seventh, see test/fedos_core_rust_public_api_boundary.test.ts — no
+    // production key/nonce/plaintext/ciphertext/tag storage field,
+    // Runtime/Worker untouched, no committed build artifact).
     expect(cargoCode).toContain("[dependencies]");
     expect(cargoCode).toContain("aes-gcm");
     expect(productionDepsSection).toMatch(/aes-gcm\s*=/);
@@ -276,7 +285,16 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     const productionCode = libRsSource.slice(0, firstCfgTest);
     expect(productionCode).not.toMatch(/\buse\s+chacha20poly1305\b/);
     expect(productionCode).not.toMatch(/\bchacha20poly1305::/);
-    expect(productionCode).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
+    // Specific crate-usage patterns only — NOT a bare AEAD-name substring
+    // match: Stage 102's public `FedosCryptoAlgorithm::Aes256Gcm`/
+    // `ChaCha20Poly1305` labels legitimately contain these substrings
+    // without importing or calling any AEAD crate (see
+    // test/fedos_core_rust_public_api_boundary.test.ts for the dedicated
+    // Stage 102 checks).
+    expect(productionCode).not.toMatch(/\bChaCha20Poly1305::new\b/);
+    expect(productionCode).not.toMatch(/\buse\s+aes_gcm\b/);
+    expect(productionCode).not.toMatch(/\baes_gcm::/);
+    expect(productionCode).not.toMatch(/\bAes256Gcm::new\b/);
     expect(productionCode).not.toMatch(/\buse\s+hkdf\b/);
     expect(productionCode).not.toMatch(/\bhkdf::/i);
     expect(productionCode).not.toMatch(/\bHkdf\b/);

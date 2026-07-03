@@ -247,6 +247,18 @@
 //! of this crate-level doc so this production-facing summary stays free
 //! of any AEAD crate/algorithm name, same reasoning the Stage 75 note
 //! above already states.)
+//!
+//! Stage 102 adds this crate's first new PUBLIC items since Stage 69: a
+//! small group of label-only types (below, just ahead of the Stage 79
+//! module) fixing the shape of a FUTURE public crypto-API boundary, plus
+//! one new public function, `fedos_crypto_boundary_status`, that returns
+//! a fixed, permanently `Unavailable` status the same way
+//! `fedos_core_status` already does. None of it performs, or is wired
+//! toward performing, an AEAD, KDF, or NIP-44 operation, a random-byte
+//! draw, or a key derivation — no such operation is implemented by this
+//! crate. The six functions from Stage 69 are unchanged. See
+//! `docs/fedos_core_public_api_design.md` for the full design record this
+//! boundary follows and the roadmap for implementing behind it later.
 
 #![forbid(unsafe_code)]
 
@@ -315,6 +327,116 @@ fn placeholder_status() -> FedosCoreStatus {
     FedosCoreStatus {
         state: FedosCoreState::Placeholder,
         reason: "placeholder only (no cryptography performed)",
+    }
+}
+
+/// Stage 102 — a PUBLIC crypto-API placeholder boundary.
+///
+/// This is NOT a real `encrypt`/`decrypt`/`deriveKey`/`randomBytes`
+/// implementation: every type below is a non-sensitive LABEL only (an
+/// intended future operation/algorithm/state), and the one new function
+/// this stage adds, [`fedos_crypto_boundary_status`], returns a fixed,
+/// permanently `Unavailable` status — exactly like [`fedos_core_status`]
+/// above. It exists to fix, in the type system, the shape of the public
+/// boundary a FUTURE, explicitly-reviewed stage would implement behind —
+/// see `docs/fedos_core_public_api_design.md` for the full design record
+/// this boundary follows. Nothing here runs an AEAD, KDF, or NIP-44
+/// operation, generates a random byte, or derives a key — the existing
+/// six placeholder functions above (`random_bytes_placeholder`,
+/// `derive_key_placeholder`, `encrypt_placeholder`, `decrypt_placeholder`,
+/// plus the two status/capability functions) are UNCHANGED by this
+/// stage; this boundary is additive only.
+///
+/// Every type below holds ONLY fixed enum labels — no borrowed byte
+/// slice, growable byte vector, or owned string field or parameter
+/// anywhere, no key/seed/plaintext/ciphertext/passphrase/nonce/tag byte,
+/// and no field of any internal skeleton type from any module below.
+/// Nothing here is wired into the Runtime, the Worker, or a crypto
+/// provider; no WASM binding exists.
+
+/// A future cryptographic operation this boundary would eventually
+/// perform — a label of intent only, not an implementation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosCryptoOperation {
+    /// Intended future connection point: an AEAD encrypt operation.
+    Encrypt,
+    /// Intended future connection point: an AEAD decrypt operation.
+    Decrypt,
+    /// Intended future connection point: a KDF key-derivation operation.
+    DeriveKey,
+    /// Intended future connection point: a CSPRNG random-byte operation.
+    RandomBytes,
+}
+
+/// A future cryptographic algorithm this boundary would eventually use —
+/// a label of intent only, not an implementation. Named after the
+/// dependencies already verified against their official test vectors
+/// under `cargo test` (see `docs/fedos_core_public_api_design.md`,
+/// sections 5 and 6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosCryptoAlgorithm {
+    /// AEAD candidate, verified against official RFC 8439 vectors under
+    /// `cfg(test)`; not yet implemented for any public function.
+    ChaCha20Poly1305,
+    /// AEAD candidate, verified against official NIST CAVP vectors under
+    /// `cfg(test)`; not yet implemented for any public function.
+    Aes256Gcm,
+    /// KDF candidate, verified against official RFC 5869 vectors under
+    /// `cfg(test)`; not yet implemented for any public function.
+    HkdfSha256,
+    /// KDF candidate, verified against official RFC 9106 vectors under
+    /// `cfg(test)`; not yet implemented for any public function.
+    Argon2id,
+}
+
+/// Coarse observable state of the public crypto-API boundary. No secret is
+/// exposed at any state — same shape as [`FedosCoreState`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosCryptoBoundaryState {
+    /// No real public crypto API is implemented (the safe default).
+    Unavailable,
+    /// A placeholder result: a label of intent only — runs no cryptography.
+    Placeholder,
+}
+
+/// A non-sensitive status snapshot for the public crypto-API boundary.
+/// Never contains a key/seed/plaintext/ciphertext/passphrase/nonce byte.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosCryptoBoundaryStatus {
+    pub state: FedosCryptoBoundaryState,
+}
+
+/// A non-sensitive, label-only description of a future crypto-operation
+/// request this boundary would eventually accept — never a real
+/// key/seed/plaintext/passphrase/nonce byte. See
+/// `docs/fedos_core_public_api_design.md`, sections 3 and 4, for why real
+/// input will always be an opaque handle or reference, never a raw byte
+/// parameter, on this boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosCryptoRequestDescriptor {
+    pub operation: FedosCryptoOperation,
+    pub algorithm: FedosCryptoAlgorithm,
+}
+
+/// A non-sensitive, label-only description of a future crypto-operation
+/// result this boundary would eventually return — never a real
+/// ciphertext, plaintext, derived-key byte, error text, or stack trace.
+/// See `docs/fedos_core_public_api_design.md`, section 8, for the fixed
+/// error taxonomy this boundary would eventually use instead of raw
+/// error text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosCryptoResponseDescriptor {
+    pub operation: FedosCryptoOperation,
+    pub algorithm: FedosCryptoAlgorithm,
+    pub state: FedosCryptoBoundaryState,
+}
+
+/// Current status of the public crypto-API boundary: permanently
+/// `Unavailable` in this stage — exactly like [`fedos_core_status`] above.
+/// Reads nothing, computes nothing, stores nothing.
+pub fn fedos_crypto_boundary_status() -> FedosCryptoBoundaryStatus {
+    FedosCryptoBoundaryStatus {
+        state: FedosCryptoBoundaryState::Unavailable,
     }
 }
 

@@ -8,7 +8,75 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 101 — Adopt `aes-gcm` AND wire the NIST AES-256-GCM
+> **Status: Stage 102 — Public crypto API design docs + a placeholder API
+> boundary (no encrypt/decrypt/deriveKey/randomBytes implementation, no
+> Runtime/Worker/CryptoProvider/WASM wiring, `Cargo.toml` unchanged).**
+> [`docs/fedos_core_public_api_design.md`](docs/fedos_core_public_api_design.md)
+> (new) fixes the DESIGN — not the implementation — of a future public
+> `encrypt`/`decrypt`/`deriveKey`/`randomBytes` API in twelve numbered
+> sections: purpose; the future shape of each operation; why input stays
+> centered on an opaque secret handle/reference even in the future design;
+> why a raw key/seed/passphrase must never be a direct parameter; the two
+> AEAD candidates (ChaCha20-Poly1305, AES-256-GCM); the two KDF candidates
+> (HKDF-SHA256, Argon2id); why nonce/random generation is its own separate
+> design boundary; a fixed error taxonomy with no raw error text or stack
+> trace; an audit boundary recording labels only, never a payload;
+> Runtime/WASM wiring deferred to its own future stage; an explicit
+> statement that this stage is placeholder API boundary ONLY; and a
+> six-step implementation roadmap. `packages/fedos-core-rust/src/lib.rs`
+> gains this crate's first new PUBLIC items since Stage 69 (placed right
+> after the Stage 69 placeholder functions, still ahead of Stage 79's
+> `secret_handle` module): `FedosCryptoOperation` (`pub enum`: `Encrypt` /
+> `Decrypt` / `DeriveKey` / `RandomBytes`), `FedosCryptoAlgorithm`
+> (`pub enum`: `ChaCha20Poly1305` / `Aes256Gcm` / `HkdfSha256` /
+> `Argon2id`), `FedosCryptoBoundaryState` (`pub enum`: `Unavailable` /
+> `Placeholder`), `FedosCryptoBoundaryStatus` (`pub struct`, carries only
+> the state enum), `FedosCryptoRequestDescriptor` (`pub struct`, carries
+> only `operation`/`algorithm`), `FedosCryptoResponseDescriptor`
+> (`pub struct`, carries only `operation`/`algorithm`/`state`), and one new
+> public function, `fedos_crypto_boundary_status()`, which takes no input
+> and returns a fixed, permanently `Unavailable` status exactly like
+> `fedos_core_status()`. This grows the crate's public `pub fn` surface
+> from six to seven for the FIRST time since Stage 69 — the six Stage 69
+> placeholder functions are byte-for-byte unchanged. Every new type holds
+> ONLY fixed enum labels — no borrowed byte slice, `Vec<u8>`, or `String`
+> field anywhere, no key/seed/plaintext/ciphertext/passphrase/nonce/tag
+> byte, and no field of any crate-private skeleton type; nothing is wired
+> into the Runtime, the Worker, or `CryptoProvider`, and `Cargo.toml` is
+> UNCHANGED (no new dependency needed for label-only types). New
+> [`test/fedos_core_rust_public_api_boundary.test.ts`](test/fedos_core_rust_public_api_boundary.test.ts)
+> (19 tests) checks: the design doc exists and covers all twelve sections,
+> the six new type declarations, the seven-function `pub fn` surface, no
+> encrypt/decrypt/derive/random IMPLEMENTATION function, no raw byte
+> parameter or `Vec<u8>` field anywhere in the new boundary, the six Stage
+> 69 functions unchanged, no key/seed/plaintext/ciphertext/passphrase/
+> nonce/tag storage field, no actual AEAD/KDF crate usage (specific
+> crate-usage patterns, not a bare substring match — this stage's own
+> `FedosCryptoAlgorithm::Aes256Gcm`/`ChaCha20Poly1305` labels legitimately
+> contain "aes"/"gcm"/"chacha"/"poly1305" as substrings) or `SecretHandle`
+> connection, Runtime/Worker untouched, `Cargo.toml` byte-count and
+> seven-entry dependency-table check, no `unsafe`, no committed build
+> artifact. Because the new algorithm labels legitimately contain AEAD
+> substrings, four pre-existing guard test files with a bare
+> `chacha|poly1305|xchacha|aes|gcm` substring check against production code
+> (`test/fedos_core_rust_dependency.test.ts`,
+> `test/fedos_core_rust_skeleton.test.ts`,
+> `test/fedos_core_rust_aes_gcm_wiring.test.ts`,
+> `test/fedos_core_rust_aead_test_helper.test.ts`) were updated to specific
+> crate-usage patterns instead (`use chacha20poly1305`, `aes_gcm::`,
+> `Aes256Gcm::new`, etc.), and twenty-one pre-existing files' hard-coded
+> "exactly six `pub fn`" checks were updated to seven, including the new
+> `fedos_crypto_boundary_status` name. `npm run typecheck`, `npm test`
+> (1459 tests), `cargo check`, `cargo test` (106 tests, same count as Stage
+> 101 — no new Rust unit test this stage), and `cargo check --tests` all
+> stay GREEN. Stage 103 candidate: **a public `randomBytes` placeholder
+> boundary** — fixing nonce/random generation as its own design point
+> (per this stage's docs §7) before any public `encrypt`/`decrypt`
+> skeleton needs to consume its output; the two other candidates offered
+> were a WASM manifest validation skeleton and a NIP-44 vector
+> source/update check. Prior status:
+>
+> **Stage 101 — Adopt `aes-gcm` AND wire the NIST AES-256-GCM
 > vectors to `cargo test`, with the seal/open test-only helper extracted
 > from the start (one combined Stage; no public encrypt/decrypt API, no
 > Runtime/Worker/CryptoProvider wiring, no production `aes-gcm` use).**

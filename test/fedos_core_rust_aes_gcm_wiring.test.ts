@@ -132,19 +132,23 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     expect(testOnlyLibRs).toContain("mod aes256gcm_vectors");
   });
 
-  it("6. production code (before the first #[cfg(test)]) never imports or references aes-gcm", () => {
+  it("6. production code (before the first #[cfg(test)]) never imports or calls aes-gcm", () => {
+    // Specific Rust-usage/crate-name patterns only, NOT a bare "aes"/"gcm"
+    // substring match: as of Stage 102, production code legitimately
+    // contains the public, non-sensitive `FedosCryptoAlgorithm::Aes256Gcm`
+    // label (see test/fedos_core_rust_public_api_boundary.test.ts for the
+    // dedicated Stage 102 checks) — it names the algorithm without
+    // importing or calling any AEAD crate. `Aes256Gcm::new` (an actual
+    // cipher-construction call) remains forbidden.
     expect(productionLibRs).not.toMatch(/\buse\s+aes_gcm\b/);
     expect(productionLibRs).not.toMatch(/\baes_gcm::/);
-    expect(productionLibRs).not.toMatch(/\bAes256Gcm\b/);
-    // Specific Rust-usage/crate-name patterns only — the crate-level doc
-    // comment deliberately stays free of any AEAD crate/algorithm name
-    // (same convention Stage 75/77/85 already established), so a bare
-    // substring check for "aes"/"gcm" also holds across all of production
-    // code, not just an import-statement check.
-    expect(productionLibRs).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
+    expect(productionLibRs).not.toMatch(/\bAes256Gcm::new\b/);
+    expect(productionLibRs).not.toMatch(/\buse\s+chacha20poly1305\b/);
+    expect(productionLibRs).not.toMatch(/\bchacha20poly1305::/);
+    expect(productionLibRs).not.toMatch(/\bChaCha20Poly1305::new\b/);
   });
 
-  it("7. lib.rs's public pub fn surface is still exactly the six Stage 69 functions", () => {
+  it("7. lib.rs's public pub fn surface is exactly the six Stage 69 functions plus Stage 102's new one", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
@@ -155,8 +159,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "derive_key_placeholder",
       "encrypt_placeholder",
       "decrypt_placeholder",
+      "fedos_crypto_boundary_status",
     ];
-    expect(pubFnNames.length).toBe(6);
+    expect(pubFnNames.length).toBe(7);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -231,6 +236,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "derive_key_placeholder",
       "encrypt_placeholder",
       "decrypt_placeholder",
+      // Stage 102's label-only status function — see
+      // test/fedos_core_rust_public_api_boundary.test.ts for the dedicated
+      // checks that it implements no real AEAD/KDF/random operation.
+      "fedos_crypto_boundary_status",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

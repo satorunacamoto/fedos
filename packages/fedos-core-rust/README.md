@@ -4,12 +4,23 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 101 — Adopt `aes-gcm` AND wire the NIST AES-256-GCM
-> vectors to `cargo test`, with the seal/open test-only helper extracted
-> from the start (one combined Stage; no public encrypt/decrypt API, no
-> Runtime/Worker/CryptoProvider wiring, no production `aes-gcm` use).
-> Public API STILL a placeholder SKELETON. No cryptography reachable from
-> any public function.**
+> **Status: Stage 102 — Public crypto API design docs
+> ([`docs/fedos_core_public_api_design.md`](../../docs/fedos_core_public_api_design.md))
+> + a small, label-only PUBLIC placeholder API boundary in `src/lib.rs`
+> (`FedosCryptoOperation` / `FedosCryptoAlgorithm` /
+> `FedosCryptoBoundaryState` / `FedosCryptoBoundaryStatus` /
+> `FedosCryptoRequestDescriptor` / `FedosCryptoResponseDescriptor` +
+> `fedos_crypto_boundary_status()`) — this crate's public `pub fn` surface
+> grows from six to seven for the first time since Stage 69. No
+> encrypt/decrypt/deriveKey/randomBytes IMPLEMENTATION function is added,
+> no raw key/seed/plaintext/ciphertext/passphrase/nonce byte is accepted
+> or stored anywhere, no Runtime/Worker/CryptoProvider/WASM wiring, and
+> `Cargo.toml` is UNCHANGED. Prior status: Stage 101 adopted `aes-gcm` AND
+> wired the NIST AES-256-GCM vectors to `cargo test`, with the seal/open
+> test-only helper extracted from the start (one combined Stage; no public
+> encrypt/decrypt API, no Runtime/Worker/CryptoProvider wiring, no
+> production `aes-gcm` use). Public API STILL a placeholder SKELETON. No
+> cryptography reachable from any public function.**
 > See
 > [`docs/fedos_core_architecture_freeze_v1.md`](../../docs/fedos_core_architecture_freeze_v1.md)
 > for the fixed design record of every skeleton module Stage 79–99 added
@@ -2124,3 +2135,86 @@ design docs — fixing, in writing, what a future public
 secret-handling contract would look like, reusing the label vocabulary
 Stage 79–99's skeletons and the Architecture Freeze v1 (Stage 100) already
 fixed — still no public API implementation.
+
+## Public crypto API design docs + placeholder API boundary (Stage 102)
+
+Stage 102 combines a documentation deliverable with this crate's first new
+PUBLIC items since Stage 69:
+
+1. **[`docs/fedos_core_public_api_design.md`](../../docs/fedos_core_public_api_design.md)**
+   fixes the DESIGN (not the implementation) of a future public
+   `encrypt`/`decrypt`/`deriveKey`/`randomBytes` API in twelve numbered
+   sections: purpose; the future shape of each operation; why input stays
+   centered on an opaque secret handle/reference even in the future design;
+   why a raw key/seed/passphrase must never be a direct parameter; the two
+   AEAD candidates (ChaCha20-Poly1305, AES-256-GCM); the two KDF candidates
+   (HKDF-SHA256, Argon2id); why nonce/random generation is its own separate
+   boundary; a fixed error taxonomy with no raw error text or stack trace;
+   an audit boundary that records labels only, never a payload; Runtime/WASM
+   wiring deferred to its own future stage; an explicit statement that this
+   stage is placeholder API boundary ONLY; and a six-step implementation
+   roadmap for later stages.
+2. `src/lib.rs` gains a small, label-only PUBLIC boundary (placed right
+   after the Stage 69 placeholder functions, still ahead of Stage 79's
+   `secret_handle` module):
+   - **`FedosCryptoOperation`** (`pub enum`) — `Encrypt` / `Decrypt` /
+     `DeriveKey` / `RandomBytes` (a label only; no operation runs).
+   - **`FedosCryptoAlgorithm`** (`pub enum`) — `ChaCha20Poly1305` /
+     `Aes256Gcm` / `HkdfSha256` / `Argon2id` (a label only; no cipher or
+     KDF is instantiated).
+   - **`FedosCryptoBoundaryState`** (`pub enum`) — `Unavailable` /
+     `Placeholder`, the same shape as `FedosCoreState`.
+   - **`FedosCryptoBoundaryStatus`** (`pub struct`) — a non-sensitive
+     status snapshot, carrying only the state enum.
+   - **`FedosCryptoRequestDescriptor`** (`pub struct`) — carries only
+     `operation: FedosCryptoOperation` and `algorithm: FedosCryptoAlgorithm`
+     — never a key/seed/plaintext/passphrase/nonce byte.
+   - **`FedosCryptoResponseDescriptor`** (`pub struct`) — carries only
+     `operation`, `algorithm`, and `state: FedosCryptoBoundaryState` — never
+     a ciphertext/plaintext/derived-key byte or raw error text.
+   - **`fedos_crypto_boundary_status()`** (`pub fn`) — the one new public
+     function this stage adds. Takes no input and returns a fixed,
+     permanently `Unavailable` `FedosCryptoBoundaryStatus`, exactly like
+     `fedos_core_status()` above.
+
+This grows the crate's public `pub fn` surface from six to seven for the
+first time since Stage 69 — see
+[`test/fedos_core_rust_public_api_boundary.test.ts`](../../test/fedos_core_rust_public_api_boundary.test.ts)
+for the dedicated Stage 102 guard tests (design doc presence and
+twelve-section coverage, the six new type declarations, the seven-function
+`pub fn` surface, no encrypt/decrypt/derive/random IMPLEMENTATION function,
+no raw byte parameter or `Vec<u8>` field anywhere in the new boundary, the
+six Stage 69 placeholder functions byte-for-byte unchanged, no
+key/seed/plaintext/ciphertext/passphrase/nonce/tag storage field, no actual
+AEAD/KDF crate usage or `SecretHandle` connection, Runtime/Worker
+untouched, `Cargo.toml` unchanged, no `unsafe`, no committed build
+artifact).
+
+**No implementation — labels only.** No `pub fn` added this stage performs
+an AEAD, KDF, or NIP-44 operation, generates a random byte, or derives a
+key. `FedosCryptoRequestDescriptor`/`FedosCryptoResponseDescriptor` hold no
+borrowed-byte-slice, `Vec<u8>`, or `String` field — only the enum labels
+above. The six Stage 69 placeholder functions
+(`fedos_core_status`/`fedos_core_capabilities`/`random_bytes_placeholder`/
+`derive_key_placeholder`/`encrypt_placeholder`/`decrypt_placeholder`) are
+byte-for-byte unchanged; none of them constructs, holds, or returns any of
+the new types.
+
+**No real connection.** The new boundary does not construct, hold, or
+reference a `SecretHandle`, `AeadPlaceholderRequest`,
+`KdfPlaceholderRequest`, or any other crate-private skeleton's type — same
+"leave unconnected rather than guess at a future design" reasoning the
+internal skeletons already established, now applied to the public
+boundary too.
+
+**`Cargo.toml` is UNCHANGED this stage** — no new dependency is needed for
+label-only types. Nothing is wired into the Runtime, the Worker, or
+`CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
+`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. No WASM binding exists.
+
+Per the user's own Stage 103 candidate list, the recommended next step is
+a **public `randomBytes` placeholder boundary** — fixing nonce/random
+generation as its own design point (per this stage's docs §7) before any
+public `encrypt`/`decrypt` skeleton needs to consume its output. The two
+other candidates offered were a WASM manifest validation skeleton and a
+NIP-44 vector source/update check.

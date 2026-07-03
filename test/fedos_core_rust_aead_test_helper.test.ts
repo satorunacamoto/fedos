@@ -84,9 +84,15 @@ describe("FedOS Rust crate — test-only ChaCha20-Poly1305 helper", () => {
   });
 
   it("3. production code (before the first #[cfg(test)]) has no chacha20poly1305 import or reference", () => {
+    // Specific crate-usage patterns only — NOT a bare substring match:
+    // Stage 102's public `FedosCryptoAlgorithm::ChaCha20Poly1305` label
+    // legitimately contains "chacha"/"poly1305" without importing or
+    // calling the crate (see
+    // test/fedos_core_rust_public_api_boundary.test.ts for the dedicated
+    // Stage 102 checks).
     expect(productionLibRs).not.toMatch(/\buse\s+chacha20poly1305\b/);
     expect(productionLibRs).not.toMatch(/\bchacha20poly1305::/);
-    expect(productionLibRs).not.toMatch(/chacha|poly1305|xchacha/i);
+    expect(productionLibRs).not.toMatch(/\bChaCha20Poly1305::new\b/);
     expect(productionLibRs).not.toContain("seal_chacha20poly1305_for_test");
     expect(productionLibRs).not.toContain("open_chacha20poly1305_for_test");
   });
@@ -102,8 +108,9 @@ describe("FedOS Rust crate — test-only ChaCha20-Poly1305 helper", () => {
       "derive_key_placeholder",
       "encrypt_placeholder",
       "decrypt_placeholder",
+      "fedos_crypto_boundary_status",
     ];
-    expect(pubFnNames.length).toBe(6);
+    expect(pubFnNames.length).toBe(7);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

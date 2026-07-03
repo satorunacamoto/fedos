@@ -66,6 +66,17 @@ import workerSource from "../src/worker.ts?raw";
  * cryptography (Stage 79's `secret_handle` module is the sole, deliberate
  * exception for `zeroize`/`secrecy`, per test 6 below).
  *
+ * Updated Stage 102: `src/lib.rs` gains this crate's first new PUBLIC items
+ * since Stage 69 — a label-only crypto-API boundary (`FedosCryptoOperation`,
+ * `FedosCryptoAlgorithm`, `FedosCryptoBoundaryState`,
+ * `FedosCryptoBoundaryStatus`, `FedosCryptoRequestDescriptor`,
+ * `FedosCryptoResponseDescriptor`, and `fedos_crypto_boundary_status()`) —
+ * see test/fedos_core_rust_public_api_boundary.test.ts for the dedicated
+ * Stage 102 checks. Test 8 below is now scoped to specific crate-usage
+ * patterns rather than a bare AEAD-name substring match, because the new
+ * `FedosCryptoAlgorithm::Aes256Gcm`/`ChaCha20Poly1305` labels legitimately
+ * contain those substrings without importing or calling any AEAD crate.
+ *
  * The crate is still a placeholder skeleton: no wasm-bindgen, no `unsafe`, no
  * *production* cryptography implementation, no random, and no compiled/WASM
  * artifact. The TS boundary is unchanged and stays importable; the
@@ -207,8 +218,18 @@ describe("FedOS Rust crate skeleton", () => {
     expect(productionLibRs).toContain("encrypt_placeholder");
     expect(productionLibRs).toContain("decrypt_placeholder");
     // ...but no real AEAD/cipher primitive and no hand-rolled XOR cipher,
-    // outside the #[cfg(test)]-only RFC 8439 verification module.
-    expect(productionLibRs).not.toMatch(/chacha|poly1305|xchacha|aes|gcm/i);
+    // outside the #[cfg(test)]-only RFC 8439 verification module. Specific
+    // crate-usage patterns only — NOT a bare substring match: Stage 102's
+    // public `FedosCryptoAlgorithm::Aes256Gcm`/`ChaCha20Poly1305` labels
+    // legitimately contain these substrings without importing or calling
+    // any AEAD crate (see test/fedos_core_rust_public_api_boundary.test.ts
+    // for the dedicated Stage 102 checks).
+    expect(productionLibRs).not.toMatch(/\buse\s+chacha20poly1305\b/);
+    expect(productionLibRs).not.toMatch(/\bchacha20poly1305::/);
+    expect(productionLibRs).not.toMatch(/\bChaCha20Poly1305::new\b/);
+    expect(productionLibRs).not.toMatch(/\buse\s+aes_gcm\b/);
+    expect(productionLibRs).not.toMatch(/\baes_gcm::/);
+    expect(productionLibRs).not.toMatch(/\bAes256Gcm::new\b/);
     expect(productionLibRs).not.toContain("^=");
   });
 
