@@ -100,9 +100,10 @@ three of them beyond existing on the same public boundary.
 
 ## 6. Roadmap
 
-1. Design and review the raw-input-to-opaque-handle provisioning path
+1. ~~Design and review the raw-input-to-opaque-handle provisioning path
    this document's section 3 describes, as its own stage — still no
-   implementation.
+   implementation.~~ Done — see `docs/public_key_provisioning.md`
+   (Stage 104) for the full provisioning-contract design record.
 2. Implement real key generation behind `FedosKeyGenerationBoundary`,
    consuming the CSPRNG from `docs/public_random_boundary.md`'s roadmap
    once adopted.

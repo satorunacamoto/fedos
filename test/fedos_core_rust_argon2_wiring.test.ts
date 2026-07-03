@@ -185,10 +185,18 @@ describe("FedOS Rust crate — RFC 9106 Argon2id vectors wired to cargo test", (
     expect(kdfCoreModule).not.toMatch(/&\s*\[\s*u8\s*\]/);
   });
 
-  it("8. rand / getrandom is not a direct dependency", () => {
-    expect(cargoCode).not.toContain("getrandom");
+  it("8. argon2's own feature list has no direct rand opt-in", () => {
+    // Scoped to argon2's own dependency LINE, not the whole file: Stage
+    // 104 separately adopts `getrandom` itself as this crate's own,
+    // independent CSPRNG entry — see test/fedos_core_rust_dependency.test.ts
+    // for the dedicated Stage 104 checks — so a whole-file "does not
+    // contain getrandom" no longer holds, even though argon2's own
+    // `default-features = false` (excluding its default `rand` feature)
+    // still does.
+    const argon2Line = cargoCode.split("\n").find((line: string) => /^\s*argon2\s*=/.test(line));
+    expect(argon2Line, "expected to find the argon2 dependency line").toBeTruthy();
+    expect(argon2Line).not.toContain("rand");
     expect(cargoCode).not.toContain("rand_core");
-    expect(cargoCode).not.toMatch(/\brand\b/);
   });
 
   it("9. the password-hash feature is not enabled on argon2", () => {

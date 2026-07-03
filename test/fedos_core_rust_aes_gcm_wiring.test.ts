@@ -81,7 +81,7 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     expect(productionDepsSection).toMatch(/aes-gcm\s*=/);
   });
 
-  it("2. production dependencies now reflect seven entries, including aes-gcm", () => {
+  it("2. production dependencies include aes-gcm — at least the seven entries as of this Stage (later stages may add more)", () => {
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
     const productionDepsSection =
@@ -89,7 +89,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(7);
+    // Not an exact count here — Stage 104 later adds an eighth entry
+    // (`getrandom`); see test/fedos_core_rust_dependency.test.ts for the
+    // authoritative current total.
+    expect(depLines.length).toBeGreaterThanOrEqual(7);
     for (const dep of [
       "chacha20poly1305",
       "hkdf",
@@ -106,12 +109,20 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     }
   });
 
-  it("3. aes-gcm has no direct rand/getrandom dependency, and wasm-bindgen is still absent", () => {
+  it("3. aes-gcm's own feature list has no direct rand/getrandom opt-in, and wasm-bindgen is still absent", () => {
     // `aes-gcm`'s `default-features = false`, `features = ["aes", "alloc"]`
     // explicitly excludes its optional `getrandom` feature — see the
-    // Cargo.toml comment above the `aes-gcm` entry. This keeps the strict
-    // "does not contain" wording accurate.
-    expect(cargoCode).not.toContain("getrandom");
+    // Cargo.toml comment above the `aes-gcm` entry. Scoped to aes-gcm's own
+    // dependency LINE, not the whole file: Stage 104 separately adopts
+    // `getrandom` itself as this crate's own, independent CSPRNG entry —
+    // see test/fedos_core_rust_dependency.test.ts for the dedicated Stage
+    // 104 checks — so a whole-file "does not contain getrandom" no longer
+    // holds, even though aes-gcm's own feature opt-out still does.
+    const aesGcmLine = cargoCode
+      .split("\n")
+      .find((line: string) => /^\s*aes-gcm\s*=/.test(line));
+    expect(aesGcmLine, "expected to find the aes-gcm dependency line").toBeTruthy();
+    expect(aesGcmLine).not.toContain("getrandom");
     expect(cargoCode).not.toContain("rand_core");
     expect(cargoCode).not.toMatch(/\brand\b/);
     expect(cargoCode).not.toContain("wasm-bindgen");

@@ -259,9 +259,14 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     expect(workerSource).not.toMatch(/\.\s*(randomBytes|deriveKey|encrypt|decrypt)\s*\(/);
   });
 
-  it("13. Cargo.toml is unchanged from Stage 101 — still exactly seven production dependencies, no new entry", () => {
+  it("13. Cargo.toml was not touched BY Stage 102 specifically — it still has no 'Stage 102' mention", () => {
+    // Updated Stage 104: Cargo.toml legitimately changes again at Stage
+    // 104 (the `getrandom` CSPRNG adoption — see
+    // test/fedos_core_rust_dependency.test.ts for the dedicated checks),
+    // so this no longer asserts an exact byte length or dependency count
+    // — only that Stage 102 ITSELF never touched Cargo.toml, which stays
+    // true regardless of what later stages add.
     expect(cargoTomlSource).not.toContain("Stage 102");
-    expect(cargoTomlSource.length).toBe(8916);
     // The header comment block mentions "[dev-dependencies]" in prose, so
     // the real section header is searched for AFTER the `[dependencies]`
     // header, not from the start of the file.
@@ -271,7 +276,7 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(7);
+    expect(depLines.length).toBeGreaterThanOrEqual(7);
   });
 
   it("14. no println/eprintln/dbg!/log/tracing usage anywhere in the new boundary", () => {

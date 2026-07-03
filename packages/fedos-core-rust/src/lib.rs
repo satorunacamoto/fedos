@@ -276,6 +276,21 @@
 //! `docs/public_random_boundary.md`, `docs/public_key_boundary.md`, and
 //! `docs/public_boundary_versioning.md` for the design records this
 //! consolidation follows.
+//!
+//! Stage 104 adopts a SEVENTH production dependency, `getrandom` — this
+//! crate's first CSPRNG entropy source — as a dependency + build-check
+//! ADOPTION ONLY, exactly like every prior first-adoption stage: it is
+//! not imported or referenced anywhere in this file, production or test.
+//! A fourth test-only module of the same `cfg(test)` shape as the ones
+//! above (at the bottom of this file), `csprng_verification_infrastructure`,
+//! fixes — as a label enumeration only — which categories a FUTURE,
+//! separately-reviewed wiring stage would need to verify; unlike the
+//! AEAD/KDF vector modules above, it does not call `getrandom` at all,
+//! since randomness has no known-answer vector to reproduce. The
+//! seventeen functions from Stage 69/102/103 are unchanged;
+//! `Cargo.toml`'s public surface implications are zero (no new type, no
+//! new function beyond what Stage 103 already added). See
+//! `docs/public_random_design.md` for the full design record.
 
 #![forbid(unsafe_code)]
 
@@ -5120,5 +5135,68 @@ mod aes256gcm_vectors {
             result.is_err(),
             "expected authentication failure for tampered sealed bytes"
         );
+    }
+}
+
+/// Stage 104 — `getrandom` CSPRNG dependency adoption (build check ONLY)
+/// AND a future RNG-verification-infrastructure PLACEHOLDER.
+///
+/// Unlike every prior AEAD/KDF dependency (each verified against an
+/// official known-answer vector file), a CSPRNG has no "correct" output
+/// to reproduce — there is no known-answer vector for randomness. The
+/// module below therefore does NOT import or call `getrandom` at all,
+/// even under `#[cfg(test)]`: it exists ONLY to fix, as a label
+/// enumeration, which categories a FUTURE, separately-reviewed wiring
+/// stage would need to verify (entropy-source linkage, requested-length
+/// matching, error surfaced as a `Result` rather than a panic, and that
+/// repeated calls are not obviously constant) — see
+/// `docs/public_random_design.md` for the full design record this
+/// placeholder follows. No random byte is drawn, read, or asserted about
+/// anywhere in this crate; asserting anything about actual randomness
+/// QUALITY is explicitly out of scope for this stage. `getrandom` itself
+/// is adopted as a `[dependencies]` (production) entry — see
+/// `docs/rust_dependency_adoption.md` for the full crate review — but is
+/// not imported or referenced anywhere in `src/lib.rs`, production or
+/// test; `random_bytes_placeholder`/`fedos_random_boundary_status` are
+/// byte-for-byte unchanged.
+#[cfg(test)]
+mod csprng_verification_infrastructure {
+    /// A FUTURE verification category a real `getrandom`-wiring stage
+    /// would need to cover — a label only, never exercised here.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum RngVerificationCategory {
+        /// The entropy source links and can be called at all.
+        EntropySourceLinked,
+        /// A requested output length is honored exactly.
+        OutputLengthMatchesRequest,
+        /// A failure surfaces as a `Result::Err`, never a panic.
+        ErrorSurfacedAsResult,
+        /// Two calls in immediate succession are not obviously identical.
+        RepeatedCallsNotObviouslyConstant,
+    }
+
+    /// The fixed, non-exhaustive plan of future verification categories —
+    /// intent only, never executed against a real entropy source here.
+    const RNG_VERIFICATION_PLAN: &[RngVerificationCategory] = &[
+        RngVerificationCategory::EntropySourceLinked,
+        RngVerificationCategory::OutputLengthMatchesRequest,
+        RngVerificationCategory::ErrorSurfacedAsResult,
+        RngVerificationCategory::RepeatedCallsNotObviouslyConstant,
+    ];
+
+    /// The plan is fixed at exactly four categories — a literal length
+    /// check, never a runtime-derived count.
+    #[test]
+    fn rng_verification_plan_is_fixed_and_non_empty() {
+        assert_eq!(RNG_VERIFICATION_PLAN.len(), 4);
+    }
+
+    /// No category is listed twice — the plan itself is well-formed.
+    #[test]
+    fn rng_verification_plan_contains_no_duplicate_category() {
+        let mut seen = std::collections::HashSet::new();
+        for category in RNG_VERIFICATION_PLAN {
+            assert!(seen.insert(*category), "duplicate category: {category:?}");
+        }
     }
 }

@@ -247,7 +247,11 @@ describe("FedOS Rust crate — consolidated placeholder API boundary (Stage 103)
     expect(workerSource).not.toMatch(/\.\s*(randomBytes|deriveKey|encrypt|decrypt)\s*\(/);
   });
 
-  it("10. Cargo.toml is unchanged from Stage 102 — still exactly seven production dependencies, no new entry", () => {
+  it("10. Cargo.toml was not touched BY Stage 103 specifically — it still has no 'Stage 103' mention", () => {
+    // Updated Stage 104: Cargo.toml legitimately changes again at Stage
+    // 104 (the `getrandom` CSPRNG adoption), so this no longer asserts an
+    // exact dependency count — only that Stage 103 ITSELF never touched
+    // Cargo.toml, which stays true regardless of what later stages add.
     expect(cargoTomlSource).not.toContain("Stage 103");
     const depsIdx = cargoTomlSource.indexOf("\n[dependencies]");
     const devDepsIdx = cargoTomlSource.indexOf("\n[dev-dependencies]", depsIdx);
@@ -255,7 +259,7 @@ describe("FedOS Rust crate — consolidated placeholder API boundary (Stage 103)
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(7);
+    expect(depLines.length).toBeGreaterThanOrEqual(7);
   });
 
   it("11. no println/eprintln/dbg!/log/tracing usage anywhere in the Stage 103 section", () => {

@@ -115,7 +115,7 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 + aes-gcm only — no other crypto dependency", () => {
+  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 + aes-gcm + getrandom only — no other crypto dependency", () => {
     for (const dep of [
       // sha2 is NOT in this list: since Stage 77 it is a legitimate
       // [dev-dependencies] entry (used only by the #[cfg(test)]-only
@@ -131,8 +131,11 @@ describe("FedOS Rust crate skeleton", () => {
       // NOT in this list: since Stage 101 it is a legitimate PRODUCTION
       // dependency, adopted AND wired to the NIST AES-256-GCM vectors in
       // the same Stage — see
-      // test/fedos_core_rust_aes_gcm_wiring.test.ts.
-      "getrandom",
+      // test/fedos_core_rust_aes_gcm_wiring.test.ts. getrandom is likewise
+      // NOT in this list: since Stage 104 it is a legitimate PRODUCTION
+      // dependency, this crate's own CSPRNG entropy source, adopted
+      // build-check ONLY — see test/fedos_core_rust_dependency.test.ts
+      // test 21 and docs/public_random_design.md.
       "rand_core",
       "bip39",
       "secp256k1",
@@ -141,12 +144,12 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] (production) table has exactly seven entries:
+    // The [dependencies] (production) table has exactly eight entries:
     // chacha20poly1305 (Stage 74), hkdf (Stage 76), zeroize/secrecy/subtle
-    // (Stage 78), argon2 (Stage 84), and aes-gcm (Stage 101). Stop at the
-    // next top-level `[section]` header (Stage 75 adds `[dev-dependencies]`
-    // right after it) so its test-only entries (serde/serde_json/hex/sha2)
-    // are not counted here.
+    // (Stage 78), argon2 (Stage 84), aes-gcm (Stage 101), and getrandom
+    // (Stage 104). Stop at the next top-level `[section]` header (Stage 75
+    // adds `[dev-dependencies]` right after it) so its test-only entries
+    // (serde/serde_json/hex/sha2) are not counted here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -155,7 +158,8 @@ describe("FedOS Rust crate skeleton", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(7);
+    expect(depLines.length).toBe(8);
+    expect(depLines.some((line: string) => line.includes("getrandom"))).toBe(true);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
@@ -206,8 +210,16 @@ describe("FedOS Rust crate skeleton", () => {
     expect(productionLibRs).toMatch(/\buse\s+secrecy\b/);
   });
 
-  it("7. lib.rs has no random / getrandom usage", () => {
-    expect(libRsSource).not.toContain("getrandom");
+  it("7. lib.rs has no random / getrandom CALL usage — the crate-level doc comment legitimately NAMES getrandom (Stage 104's adoption note)", () => {
+    // Specific crate-usage patterns only — NOT a bare substring match:
+    // Stage 104's crate-level doc comment (top of file) legitimately
+    // names `getrandom` in prose describing its own adoption, without
+    // importing or calling it (see
+    // test/fedos_core_rust_dependency.test.ts test 21 for the dedicated
+    // "not imported/called anywhere" check).
+    expect(libRsSource).not.toMatch(/\buse\s+getrandom\b/);
+    expect(libRsSource).not.toMatch(/\bgetrandom::/);
+    expect(libRsSource).not.toMatch(/\bgetrandom\s*\(/);
     expect(libRsSource).not.toMatch(/\buse\s+rand\b/);
     expect(libRsSource).not.toMatch(/\brand::/);
     expect(libRsSource).not.toMatch(/\bthread_rng\b/);

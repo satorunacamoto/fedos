@@ -186,16 +186,28 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(productionDepsSection).toMatch(/aes-gcm\s*=/);
   });
 
-  it("9. Cargo.toml does not contain rand / getrandom", () => {
-    // `argon2` (Stage 84) is adopted with `default-features = false` (no
-    // `features` enabled) specifically to exclude its default `rand`
-    // feature (which would otherwise pull in `password-hash`'s optional
-    // `rand_core` dependency) — see the Cargo.toml comment above the
-    // `argon2` entry. This keeps the strict "does not contain" wording
-    // accurate rather than relaxing it to "unless argon2 pulls it in".
-    expect(cargoCode).not.toContain("getrandom");
+  it("9. Cargo.toml contains getrandom (production dependency, Stage 104), but not the full rand/rand_core crates", () => {
+    // Stage 104 adopts `getrandom` directly — this crate's first CSPRNG
+    // entropy source — as its own, independent `[dependencies]`
+    // (production) entry, build-check ONLY (not imported/called anywhere
+    // in src/lib.rs — see test/fedos_core_rust_dependency.test.ts test 21
+    // below and docs/public_random_design.md for the dedicated Stage 104
+    // checks/design record). `argon2` (Stage 84) and `aes-gcm` (Stage 101)
+    // are separately configured to exclude THEIR OWN optional `rand`/
+    // `getrandom` convenience features (see their own Cargo.toml comments)
+    // — that remains true and unrelated to this crate's own direct
+    // `getrandom` adoption. The full, higher-level `rand`/`rand_core`
+    // crates (the `Rng`/`CryptoRng` trait ecosystem) remain ABSENT.
+    expect(cargoCode).toContain("[dependencies]");
+    const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
+    const nextSectionIdx = depsSection.indexOf("\n[", 1);
+    const productionDepsSection =
+      nextSectionIdx === -1 ? depsSection : depsSection.slice(0, nextSectionIdx);
+    expect(productionDepsSection).toMatch(/^getrandom\s*=/m);
     expect(cargoCode).not.toContain("rand_core");
-    expect(cargoCode).not.toMatch(/\brand\b/);
+    // No standalone `rand = "..."` dependency LINE anywhere (comments are
+    // already stripped from cargoCode, so this only matches a real entry).
+    expect(cargoCode).not.toMatch(/^rand\s*=/m);
   });
 
   it("10. Cargo.toml does not contain wasm-bindgen", () => {

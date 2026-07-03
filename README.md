@@ -8,7 +8,66 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 103 — Consolidated placeholder API boundary: ten more
+> **Status: Stage 104 — `getrandom` CSPRNG dependency adopted (build check
+> ONLY, an EIGHTH `packages/fedos-core-rust/Cargo.toml` `[dependencies]`
+> entry) + a `#[cfg(test)]`-only RNG-verification-infrastructure
+> PLACEHOLDER (`csprng_verification_infrastructure`, a fixed four-category
+> label plan, never calling `getrandom`) + two new design docs
+> ([`docs/public_random_design.md`](docs/public_random_design.md),
+> [`docs/public_key_provisioning.md`](docs/public_key_provisioning.md)).**
+> The public `pub fn` surface stays UNCHANGED at seventeen (Stage 103) —
+> this stage adds no new public type or function. `getrandom` is not
+> imported or called ANYWHERE in `src/lib.rs`, production or test; no
+> `randomBytes`/nonce/encrypt/decrypt/deriveKey/key-generation/import/export
+> IMPLEMENTATION exists. New
+> [`test/fedos_core_rust_getrandom_adoption.test.ts`](test/fedos_core_rust_getrandom_adoption.test.ts)
+> (16 tests) checks all of the above; six pre-existing guard test files
+> (`fedos_core_rust_dependency.test.ts`, `fedos_core_rust_skeleton.test.ts`,
+> `fedos_core_rust_aes_gcm_wiring.test.ts`,
+> `fedos_core_rust_argon2_wiring.test.ts`,
+> `fedos_core_rust_hkdf_wiring.test.ts`,
+> `fedos_core_rust_rfc8439_wiring.test.ts`) had their whole-file
+> "getrandom is absent" checks narrowed to each dependency's OWN line
+> (Stage 104 makes `getrandom` legitimately present at the top level, even
+> though `aes-gcm`/`argon2` still separately exclude their OWN optional
+> `rand`/`getrandom` convenience features); two more
+> (`fedos_core_rust_public_api_boundary.test.ts`,
+> `fedos_core_rust_public_boundary_consolidation.test.ts`) had their
+> "Cargo.toml is unchanged" tests narrowed to "not touched BY that
+> specific stage" — still true. `src/lib.rs`'s own Stage 104 doc comment
+> hit the same self-referential trap Stage 75 first documented — it
+> initially wrote the literal text `` `#[cfg(test)]` `` while describing
+> its own new test-only module, colliding with the `firstCfgTestIdx`
+> "first #[cfg(test)] in the file" boundary a dozen pre-existing guard
+> tests rely on to slice out "production code"; fixed by writing
+> `` `cfg(test)` `` (no brackets) instead, matching how Stage 77's
+> paragraph already phrased the identical situation. `packages/fedos-core-rust/README.md`
+> also gained a new "Public boundary overview" table (Stage 102–104,
+> unifying the by-then-long stage-by-stage narrative into one reference)
+> and two design docs (`docs/public_random_design.md`,
+> `docs/public_key_provisioning.md`) extending Stage 103's
+> `public_random_boundary.md`/`public_key_boundary.md` now that the CSPRNG
+> dependency choice is fixed and the key-import provisioning contract is
+> designed — still no implementation. `npm run typecheck`, `npm test`
+> (108 files, 1494 tests), `cargo check`, `cargo test` (108 tests, +2 from
+> the new verification-plan unit tests), and `cargo check --tests` all
+> stay GREEN. Where this stage stopped: the raw-input-to-opaque-handle
+> provisioning path is now DESIGNED
+> (`docs/public_key_provisioning.md`) but deliberately NOT implemented —
+> and NOT even given a concrete request/response type — because fixing
+> its exact byte-level shape would mean picking a real serialization
+> format, which is implementation, not design; similarly, no CSPRNG
+> feature configuration decision beyond "default features, native only"
+> was made, since choosing a WASM-specific feature flag would anticipate a
+> WASM target this crate does not have yet. Stage 105 candidates: (1) the
+> key-format label enumeration `docs/public_key_provisioning.md` section 6
+> step 2 references (still design-only, no implementation) — recommended,
+> since it is the smallest remaining boundary-design gap and stays
+> squarely on the "design, not implementation" side of the line the last
+> three stages have held; (2) a WASM manifest validation skeleton; (3) a
+> NIP-44 vector source/update check. Prior status:
+>
+> **Stage 103 — Consolidated placeholder API boundary: ten more
 > label-only PUBLIC types
 > (`FedosRandomBoundary`/`FedosNonceBoundary`/`FedosKeyGenerationBoundary`/
 > `FedosKeyImportBoundary`/`FedosKeyExportBoundary` +

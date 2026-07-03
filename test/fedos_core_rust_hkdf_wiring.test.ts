@@ -68,7 +68,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(7);
+    expect(depLines.length).toBe(8);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
@@ -76,6 +76,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     expect(depLines.some((line: string) => /^\s*subtle\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*aes-gcm\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*getrandom\s*=/.test(line))).toBe(true);
   });
 
   it("2. serde / serde_json / hex / sha2 are dev-dependencies only — not production dependencies", () => {
@@ -105,8 +106,10 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
       // likewise NOT in this list: since Stage 101 it is a legitimate
       // PRODUCTION dependency, adopted AND wired to the NIST AES-256-GCM
       // vectors in the same Stage — see
-      // test/fedos_core_rust_aes_gcm_wiring.test.ts.
-      "getrandom",
+      // test/fedos_core_rust_aes_gcm_wiring.test.ts. getrandom is likewise
+      // NOT in this list: since Stage 104 it is a legitimate PRODUCTION
+      // dependency, this crate's own CSPRNG entropy source, adopted
+      // build-check ONLY — see test/fedos_core_rust_dependency.test.ts.
       "rand_core",
       "wasm-bindgen",
       "wasm_bindgen",

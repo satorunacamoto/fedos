@@ -81,8 +81,11 @@ both existing on the same public boundary.
 
 ## 5. Roadmap
 
-1. Adopt and review a CSPRNG dependency, as its own explicitly-reviewed
-   stage, with no `randomBytes`/nonce implementation yet.
+1. ~~Adopt and review a CSPRNG dependency, as its own explicitly-reviewed
+   stage, with no `randomBytes`/nonce implementation yet.~~ Done —
+   Stage 104 adopted `getrandom`, build-check only; see
+   `docs/public_random_design.md` for the design record extending this
+   document now that the dependency choice is fixed.
 2. Implement the real `randomBytes` function behind
    `FedosRandomBoundary`, consuming the CSPRNG from step 1, with a fixed,
    bounded, label-selected output size.

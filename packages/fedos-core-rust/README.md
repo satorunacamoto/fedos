@@ -4,24 +4,32 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 103 — Consolidated placeholder API boundary: ten more
-> label-only PUBLIC types across five operation-boundary status groups
-> (`FedosRandomBoundary` / `FedosNonceBoundary` /
+> **Status: Stage 104 — `getrandom` CSPRNG dependency adopted (build check
+> ONLY, an EIGHTH `[dependencies]` entry) + a `#[cfg(test)]`-only
+> RNG-verification-infrastructure PLACEHOLDER
+> (`csprng_verification_infrastructure`, a fixed label plan, never calling
+> `getrandom`) + two new design docs
+> ([`docs/public_random_design.md`](../../docs/public_random_design.md),
+> [`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)).**
+> The public `pub fn` surface is UNCHANGED at seventeen (Stage 103) — this
+> stage adds no new public type or function. No
+> `randomBytes`/nonce/encrypt/decrypt/deriveKey/key-generation/import/export
+> IMPLEMENTATION exists; `getrandom` is not imported or called ANYWHERE in
+> `src/lib.rs`, production or test. See "`getrandom` CSPRNG adoption + RNG
+> verification-infrastructure placeholder (Stage 104)" and "Public boundary
+> overview" below for the full record. Prior status: Stage 103 added ten
+> more label-only PUBLIC types across five operation-boundary status
+> groups (`FedosRandomBoundary` / `FedosNonceBoundary` /
 > `FedosKeyGenerationBoundary` / `FedosKeyImportBoundary` /
 > `FedosKeyExportBoundary`) and five descriptor/metadata groups
 > (`FedosCapabilityDescriptor` / `FedosAlgorithmDescriptor` /
 > `FedosBoundaryVersion` / `FedosBoundaryFeature` / `FedosBoundaryPolicy`),
-> plus three new design docs
+> plus three design docs
 > ([`docs/public_random_boundary.md`](../../docs/public_random_boundary.md),
 > [`docs/public_key_boundary.md`](../../docs/public_key_boundary.md),
-> [`docs/public_boundary_versioning.md`](../../docs/public_boundary_versioning.md)).
-> This crate's public `pub fn` surface grows from seven (Stage 102) to
-> seventeen. No encrypt/decrypt/deriveKey/randomBytes/nonce/key
-> generation/import/export IMPLEMENTATION function is added, no raw
-> key/seed/plaintext/ciphertext/passphrase/nonce byte is accepted or
-> stored anywhere, no Runtime/Worker/CryptoProvider/WASM wiring, and
-> `Cargo.toml` is UNCHANGED. See "Consolidated placeholder API boundary
-> (Stage 103)" below for the full record. Prior status: Stage 102 added
+> [`docs/public_boundary_versioning.md`](../../docs/public_boundary_versioning.md))
+> — the public `pub fn` surface grew from seven (Stage 102) to seventeen.
+> Prior status: Stage 102 added
 > a small, label-only PUBLIC placeholder API boundary in `src/lib.rs`
 > (`FedosCryptoOperation` / `FedosCryptoAlgorithm` /
 > `FedosCryptoBoundaryState` / `FedosCryptoBoundaryStatus` /
@@ -388,10 +396,10 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 `FedosCoreStatus` and runs no cryptography. `#![forbid(unsafe_code)]` bans
 `unsafe`. No WASM target is declared; nothing compiles to `.wasm`.
 
-## Dependencies (Stage 74/76/78/84/101 production + Stage 75/77 dev-dependencies)
+## Dependencies (Stage 74/76/78/84/101/104 production + Stage 75/77 dev-dependencies)
 
 - **`chacha20poly1305` v0.11.0** (RustCrypto, Apache-2.0 OR MIT,
-  `default-features = false`, `features = ["alloc"]`) — one of SEVEN entries
+  `default-features = false`, `features = ["alloc"]`) — one of EIGHT entries
   in `[dependencies]` (production). Pulls in, transitively, only other
   RustCrypto/utility crates (`aead`, `chacha20`, `cipher`, `poly1305`,
   `crypto-common`, `inout`, `hybrid-array`, `universal-hash`, `block-buffer`,
@@ -431,7 +439,7 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   `src/lib.rs` yet — production or `cfg(test)` — dependency + build check
   only.
 - **`aes-gcm` v0.10.3** (RustCrypto, Apache-2.0 OR MIT, `default-features =
-  false`, `features = ["aes", "alloc"]`) — the seventh and newest entry in
+  false`, `features = ["aes", "alloc"]`) — the seventh entry in
   `[dependencies]` (production), and this crate's SECOND AEAD, adopted AND
   wired to the NIST CAVP AES-256-GCM vectors IN THE SAME Stage (101) — see
   "AES-256-GCM vector wiring (Stage 101)" below for the full review. Pulls
@@ -451,6 +459,20 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   floor, so no MSRV bump was needed. As of this same Stage, this dependency
   is exercised — but only inside `cfg(test)`, by the `aes256gcm_vectors`
   module (see below); production code still neither imports nor calls it.
+- **`getrandom` v0.3.4** (rust-random project, MIT OR Apache-2.0, default
+  features) — the eighth and newest entry in `[dependencies]` (production),
+  and this crate's first CSPRNG entropy source, adopted Stage 104. Adopted
+  DIRECTLY rather than the full `rand`/`rand_core` crates — the minimal
+  entropy-source wrapper alone, with no `Rng`/`CryptoRng` trait ecosystem
+  to also review. Pulls in ONE new transitive package (itself); `cfg-if`
+  v1.0.4 is reused at its existing pinned version. Has a `build.rs` (target
+  detection, its normal documented mechanism) and uses `unsafe` internally
+  (direct OS syscall/FFI bindings — inherent to an entropy source). MSRV
+  1.63, well below the 1.85 floor. NOT imported or called anywhere in
+  `src/lib.rs` — production or `cfg(test)` — this stage: dependency + build
+  check only, exactly like every prior first-adoption stage. See
+  "`getrandom` CSPRNG adoption + RNG verification-infrastructure placeholder
+  (Stage 104)" below for the full review.
 - **`[dev-dependencies]` (Stage 75/77, test-only, NOT production
   dependencies):** `serde` v1.0.228 (`features = ["derive"]`), `serde_json`
   v1.0.150, `hex` v0.4.3 (Stage 75) — used by the `cfg(test)`-only
@@ -2354,3 +2376,134 @@ the raw-input-to-opaque-handle provisioning path itself — would require
 picking a real dependency or a real byte-level protocol, which is
 implementation, not boundary design; this stage stops short of that
 line.
+
+## `getrandom` CSPRNG adoption + RNG verification-infrastructure placeholder (Stage 104)
+
+Stage 104 picks up exactly where Stage 103 stopped: the CSPRNG dependency
+choice `docs/public_random_boundary.md`'s roadmap deferred. Three things
+land in one reviewed stage — a dependency, a test-only infrastructure
+placeholder, and two design docs — all build-check/design only.
+
+**1. `getrandom` v0.3.4 adopted** as an EIGHTH `[dependencies]`
+(production) entry — see "Dependencies" above for the full crate review.
+Not imported or called anywhere in `src/lib.rs`, production or test — a
+dependency + build-check ADOPTION ONLY, exactly like `chacha20poly1305`
+(Stage 74), `hkdf` (Stage 76), and `argon2` (Stage 84) each were at their
+own first-adoption stage.
+
+**2. A new `#[cfg(test)]`-only module, `csprng_verification_infrastructure`**
+(at the bottom of `src/lib.rs`, alongside the RFC 8439/5869/9106/NIST
+AES-256-GCM vector modules). Unlike those four, it wires no known-answer
+vector — randomness has no known-answer vector to reproduce. Instead it
+fixes, as a label enumeration (`RngVerificationCategory`: 4 variants —
+`EntropySourceLinked` / `OutputLengthMatchesRequest` /
+`ErrorSurfacedAsResult` / `RepeatedCallsNotObviouslyConstant`) and a
+fixed `RNG_VERIFICATION_PLAN` constant, which categories a FUTURE wiring
+stage would need to verify. Two unit tests assert the plan itself is
+well-formed (fixed length 4, no duplicate category) — neither test calls
+`getrandom`, draws a random byte, or asserts anything about randomness
+QUALITY. This is a deliberately narrower scope than the vector-wiring
+modules: it fixes the SHAPE of a future check, not an executed one.
+
+**3. Two new design docs:**
+[`docs/public_random_design.md`](../../docs/public_random_design.md)
+extends `docs/public_random_boundary.md` now that the CSPRNG dependency
+is fixed (why `getrandom` over `rand`, the expected call shape, error
+mapping onto the fixed taxonomy, and what the verification-infrastructure
+placeholder is/is-not) and
+[`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)
+designs the raw-input-to-opaque-handle provisioning contract
+`docs/public_key_boundary.md` deferred (exactly one raw input per call, a
+fixed bounded length, conversion to a handle as the only visible effect,
+never logged/echoed/returned).
+
+See
+[`test/fedos_core_rust_getrandom_adoption.test.ts`](../../test/fedos_core_rust_getrandom_adoption.test.ts)
+(16 tests) for the dedicated Stage 104 guard tests (dependency presence,
+eight-entry production dependency count, no direct `rand`/`rand_core`
+sibling, no production `getrandom` reference, public `pub fn` surface
+unchanged at seventeen, the verification module gated behind `cfg(test)`
+only and never calling `getrandom`, the fixed four-category plan, no
+key/seed/plaintext/ciphertext/passphrase/nonce/tag byte, no
+Runtime/Worker/`CryptoProvider` connection, `aead_core`/`kdf_core`/
+`secret_handle` unchanged and unconnected, no `unsafe`, both new docs
+exist, no committed build artifact). Six pre-existing guard test files
+(`fedos_core_rust_dependency.test.ts`, `fedos_core_rust_skeleton.test.ts`,
+`fedos_core_rust_aes_gcm_wiring.test.ts`,
+`fedos_core_rust_argon2_wiring.test.ts`,
+`fedos_core_rust_hkdf_wiring.test.ts`,
+`fedos_core_rust_rfc8439_wiring.test.ts`) were updated because they
+previously asserted `getrandom`'s ABSENCE from `Cargo.toml` at the
+whole-file level and a seven-entry production dependency count — both
+flipped to presence and an eight-entry count, narrowing each dependency's
+own "no direct rand opt-in" check to that dependency's own line instead
+of the whole file (consistent with every prior dependency-adoption
+stage's update pattern). Two more
+(`fedos_core_rust_public_api_boundary.test.ts`,
+`fedos_core_rust_public_boundary_consolidation.test.ts`) had their
+"Cargo.toml is unchanged" tests narrowed to "Cargo.toml was not touched
+BY that specific stage" — still true, since Stage 104 is a later, separate
+change. `src/lib.rs`'s own crate-level doc comment for this stage
+deliberately avoids the literal text `` `#[cfg(test)]` `` (writing
+`` `cfg(test)` `` without brackets instead) — the same self-referential
+regex trap Stage 75's note first documented, now hit and fixed again
+while describing this stage's own new module.
+
+## Public boundary overview (Stage 102–104)
+
+A consolidated reference for the full label-only public boundary, since
+the stage-by-stage narrative above has grown long. All types are `pub`;
+all functions take only label parameters (never a byte buffer) and
+return only label/status values (never `Vec<u8>`/`String`/secret data).
+
+| Group | Types | Function(s) | Stage |
+| --- | --- | --- | --- |
+| Core status | `FedosCoreState`, `FedosCoreStatus` | `fedos_core_status`, `fedos_core_capabilities` | 69 |
+| Placeholder ops | — | `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`, `decrypt_placeholder` | 69 |
+| Crypto boundary | `FedosCryptoOperation`, `FedosCryptoAlgorithm`, `FedosCryptoBoundaryState`, `FedosCryptoBoundaryStatus`, `FedosCryptoRequestDescriptor`, `FedosCryptoResponseDescriptor` | `fedos_crypto_boundary_status` | 102 |
+| Random/nonce boundaries | `FedosRandomBoundary`(+`State`), `FedosNonceBoundary`(+`State`) | `fedos_random_boundary_status`, `fedos_nonce_boundary_status` | 103 |
+| Key boundaries | `FedosKeyGenerationBoundary`, `FedosKeyImportBoundary`, `FedosKeyExportBoundary` (each +`State`) | `fedos_key_generation_boundary_status`, `fedos_key_import_boundary_status`, `fedos_key_export_boundary_status` | 103 |
+| Capability/algorithm metadata | `FedosCapabilityKind`, `FedosCapabilityDescriptor`, `FedosAlgorithmCategory`, `FedosAlgorithmDescriptor` | `fedos_capability_descriptors`, `fedos_algorithm_descriptors` | 103 |
+| Boundary shape metadata | `FedosBoundaryVersion`, `FedosBoundaryFeature`, `FedosBoundaryPolicyKind`, `FedosBoundaryPolicyDecision`, `FedosBoundaryPolicy` | `fedos_boundary_version`, `fedos_boundary_features`, `fedos_boundary_policy_decision` | 103 |
+
+Seventeen `pub fn`s total, unchanged since Stage 103 (Stage 104 added a
+dependency and a design record, not a public type). `FedosBoundaryVersion`
+stays `1.0.0` — no existing type's SHAPE changed since Stage 103 (per
+`docs/public_boundary_versioning.md` section 4's own policy, only a shape
+change warrants a bump; this overview and Stage 104's dependency addition
+are not shape changes). `FedosCapabilityDescriptor`
+(Stage 103) and `FEDOS_CORE_CAPABILITIES`/`fedos_core_capabilities()`
+(Stage 69) intentionally coexist as two different views over a similar
+concept — see `docs/public_boundary_versioning.md` section 2; nothing was
+deprecated or merged in this cleanup, since removing either would be a
+public API change this cleanup stage does not have authorization to make.
+
+**Design docs, in reading order:**
+[`docs/fedos_core_public_api_design.md`](../../docs/fedos_core_public_api_design.md)
+(Stage 102, the original 12-section design) →
+[`docs/public_random_boundary.md`](../../docs/public_random_boundary.md) /
+[`docs/public_key_boundary.md`](../../docs/public_key_boundary.md) /
+[`docs/public_boundary_versioning.md`](../../docs/public_boundary_versioning.md)
+(Stage 103, per-group detail) →
+[`docs/public_random_design.md`](../../docs/public_random_design.md) /
+[`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)
+(Stage 104, post-dependency-adoption detail).
+
+**Updated roadmap (supersedes the individual docs' own roadmap sections
+where they overlap):**
+
+1. ~~Fix the public API design (Stage 102).~~ Done.
+2. ~~Consolidate the placeholder boundary (Stage 103).~~ Done.
+3. ~~Adopt a CSPRNG dependency, build-check only (Stage 104).~~ Done.
+4. Design and review the key-import provisioning contract on its own
+   (`docs/public_key_provisioning.md` section 6, step 1) — still no
+   implementation.
+5. Implement real `randomBytes` behind `FedosRandomBoundary`.
+6. Implement real key generation/import behind
+   `FedosKeyGenerationBoundary`/`FedosKeyImportBoundary`.
+7. Implement real `deriveKey`, then real `encrypt`/`decrypt`, consuming
+   the now-implemented random/key boundaries.
+8. Separately review whether `FedosKeyExportBoundary` should ever be
+   implemented at all.
+9. Only after 4–8 are each independently implemented and reviewed, wire
+   the boundary into the Runtime/Worker/`CryptoProvider`.

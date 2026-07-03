@@ -158,11 +158,17 @@ This is a safety contract, not a marketing claim. It complements
   eventually need randomness.
 - **Only an audited CSPRNG source** (e.g. `rand` with the OS-backed
   `getrandom`/`OsRng` path) — never a non-cryptographic PRNG used for key
-  material or nonces.
+  material or nonces. **Stage 104 adopted `getrandom` directly** rather
+  than the full `rand` crate — see §12's dedicated entry for the
+  reasoning (the minimal entropy-source wrapper alone is sufficient for a
+  future `randomBytes`/nonce implementation; the broader `Rng`/`CryptoRng`
+  trait ecosystem `rand` adds is not needed and is not adopted). The full
+  `rand`/`rand_core` crates remain ABSENT.
 - **Deterministic/seeded RNG stays test-only.** A seeded RNG used to
   reproduce a known-answer vector never shares a code path with production
   key/nonce generation; the adopting Stage states how the two are kept
-  separate in the crate's structure.
+  separate in the crate's structure. Stage 104 uses no seeded RNG at
+  all — `getrandom` is adopted build-check only, not called anywhere.
 
 ## 7. Semver update policy
 
@@ -628,3 +634,72 @@ edited in place, by the Stage that adopted the crate.
   nonce/key generation; no Runtime/Worker/`CryptoProvider` wiring;
   `Cargo.lock` was generated to verify the resolved dependency graph and
   run `cargo test` (§ above) and then deleted, not committed.
+
+### `getrandom` — Stage 104
+
+- **Crate + exact version:** `getrandom` v0.3.4 (pinned in `Cargo.toml`;
+  `Cargo.lock` is not committed — same convention as every prior entry
+  above).
+- **Primitive served:** this crate's first CSPRNG entropy source — the
+  minimal OS-backed random-byte syscall wrapper, not the higher-level
+  `rand`/`rand_core` `Rng`/`CryptoRng` trait ecosystem (§6 above). No
+  vector file is wired — randomness has no known-answer vector to
+  reproduce; see `docs/public_random_design.md` §4 for why this Stage's
+  `#[cfg(test)]`-only `csprng_verification_infrastructure` module fixes a
+  label-only future verification PLAN instead of an executed check.
+- **Why this crate (§2–§3):** the `rust-random` project's own reference
+  entropy-source crate — the same crate every RustCrypto-family crate
+  already in this tree (`chacha20poly1305`/`aes-gcm`/`argon2`) would
+  reach for internally if their own `getrandom`-gated convenience
+  features were enabled (they are not — see `chacha20poly1305`/`aes-gcm`
+  entries above). Adopting it directly, rather than the full `rand`
+  crate, keeps this Stage's addition scoped to exactly the "produce
+  OS-grade random bytes" primitive a future `randomBytes` needs, with no
+  adjacent seedable-PRNG or trait-abstraction surface to also review.
+- **Feature configuration:** default features, unmodified. On every
+  target this crate currently builds for (native only — no WASM target
+  is declared, `[lib]` above), the default feature set reaches the
+  platform's CSPRNG syscall directly; the `wasm_js` opt-in feature
+  `getrandom` 0.3 requires for browser/WASM targets is deliberately NOT
+  enabled, since no WASM target exists yet (a future WASM-adoption Stage
+  would need to revisit this).
+- **Transitive dependency count:** ONE new package — `getrandom` itself.
+  `cfg-if` v1.0.4 is REUSED at its existing pinned version (already in
+  the tree via `chacha20poly1305`'s transitive dependencies). No
+  platform-specific sibling crate (e.g. a `windows-sys`/`libc`/`wasi`
+  binding) was pulled in on this repo's build target. Combined production
+  dependency graph as of this Stage: 40 unique (name, version) packages
+  total, per `cargo tree -e normal`'s output at adoption time (up from 39
+  at the `aes-gcm` entry above).
+- **Build-script presence:** YES — `getrandom` ships a `build.rs` that
+  selects its per-target entropy-source backend at compile time (this is
+  the crate's normal, documented mechanism, not a code-generation or
+  network-access script; it performs target/feature detection only).
+- **`unsafe` presence:** `getrandom` uses `unsafe` internally (direct
+  OS syscall/FFI bindings — this is inherent to what the crate does: an
+  entropy source ultimately has to cross an FFI boundary to the
+  operating system). It does not declare `#![forbid(unsafe_code)]` or
+  `#![deny(unsafe_code)]` at its crate root. This does not affect
+  `packages/fedos-core-rust`'s own `#![forbid(unsafe_code)]`, which
+  governs only this crate's code, not a dependency's — the same
+  reasoning already stated for `aes`'s/`chacha20`'s/`argon2`'s
+  hardware-acceleration `unsafe` usage in the entries above.
+- **License:** MIT OR Apache-2.0 — same dual-license family as every
+  other adopted crate so far.
+- **MSRV impact:** `getrandom` 0.3.4 publishes `rust-version = "1.63"` —
+  well below the existing 1.85 floor, so no bump.
+- **What was DONE:** a `[dependencies]` (production) entry, and a new
+  `#[cfg(test)]`-only module, `csprng_verification_infrastructure`, that
+  fixes four FUTURE verification categories as a label enumeration
+  (entropy-source linkage, requested-length matching, error-as-`Result`,
+  repeated-calls-not-obviously-constant) plus two unit tests asserting
+  the plan itself is well-formed (fixed length, no duplicate category) —
+  see `docs/public_random_design.md` §4.
+- **What was NOT done:** no import or call of `getrandom` ANYWHERE in
+  `src/lib.rs` — production or `#[cfg(test)]`; no random byte is drawn,
+  read, or asserted about anywhere in this crate;
+  `random_bytes_placeholder`/`fedos_random_boundary_status` (Stage
+  69/103) are byte-for-byte unchanged; no nonce generation; no key
+  generation; no Runtime/Worker/`CryptoProvider` wiring; `Cargo.lock` was
+  generated to verify the resolved dependency graph (§ above) and run
+  `cargo test` and then deleted, not committed.
