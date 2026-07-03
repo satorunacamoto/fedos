@@ -8,7 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 106 — Public Boundary Freeze v2.** Two more label-only
+> **Status: Stage 107 — `StorageBackend` abstraction boundary skeleton.**
+> A MINIMAL, future-facing seam for pluggable storage backends: new
+> [`src/storage/types.ts`](src/storage/types.ts) defines `StorageBackend`
+> (`getStatus`/`put`/`get`/`delete`), `StorageBackendKind` (six PLACEHOLDER
+> labels — `google_drive_placeholder`, `nostr_relay_placeholder`,
+> `local_sqlite_placeholder`, `local_mesh_placeholder`, `ipfs_placeholder`,
+> `external_placeholder`), `StorageVisibility`, `StoragePacket`, `StorageRef`,
+> `StorageDecision`, and `StorageReadDecision`. This is the seam that would
+> eventually let the Python v8.6 host's Google Drive coupling be replaced by
+> a real backend selected behind one interface — without the rest of the app
+> depending on any concrete backend. New
+> [`src/storage/policy.ts`](src/storage/policy.ts) (`reviewStoragePacket`)
+> rejects a packet whose metadata key/value contains a
+> secret/key/seed/token/payment/entitlement/dm/body/content/message marker,
+> or whose `idRef` is shaped like a URL or file path (e.g. a Google Drive
+> share link or a local path) rather than an opaque label. New
+> [`src/storage/noop_storage.ts`](src/storage/noop_storage.ts) provides two
+> safe defaults: `NoopStorageBackend` (permanently `unavailable`, denies
+> every `put`/`get`/`delete`) and `PlaceholderStorageBackend` (`put`
+> evaluates the policy and returns `accepted_placeholder`/`rejected`; `get`
+> always resolves `unavailable`; `delete` is a safe no-op) — NEITHER stores
+> a byte, calls the Google Drive API, opens a Nostr relay WebSocket, touches
+> SQLite, a Bluetooth/Wi-Fi mesh, or an IPFS gateway, performs file IO, or
+> issues a `fetch`. No packet ever carries raw bytes or a plaintext/
+> ciphertext body — only opaque labels and non-sensitive metadata strings.
+> This boundary is NOT wired into the runtime, the Worker, or any
+> `CryptoProvider`; constructing either implementation does nothing. New
+> [`test/storage_backend_boundary.test.ts`](test/storage_backend_boundary.test.ts)
+> (18 tests) checks: `NoopStorageBackend` stays `unavailable` for every
+> operation; `PlaceholderStorageBackend` accepts a policy-clean packet and
+> rejects sensitive metadata or a URL/path-shaped `idRef`; `get` always
+> reports `unavailable` and `delete` is always a safe no-op; no function
+> mutates its input or throws; the packet/ref/decision shapes carry no
+> `bytes`/`body`/`content` field; the source imports no Google Drive /
+> `google.colab` / Nostr WebSocket / SQLite / Bluetooth / Wi-Fi / IPFS client
+> and issues no `fetch`/file IO; and the Runtime and Worker sources reference
+> neither `StorageBackend` nor either implementation. `npm run typecheck`,
+> `npm test` (112 files, 1553 tests), `cargo check`, `cargo test` (108
+> tests, unchanged — no Rust file was touched this stage), and
+> `cargo check --tests` all stay GREEN. Where this stage stopped, on
+> purpose: no Google Drive, Nostr relay, SQLite, Bluetooth/Wi-Fi mesh, or
+> IPFS implementation was written; nothing connects to a `CryptoProvider`;
+> nothing is wired into the runtime or Worker. Stage 108 candidates: (1)
+> nearby-area indexing research docs (recommended — location data warrants
+> fixing a privacy boundary in docs before any implementation); (2) a
+> storage-provider environment-selection boundary (mirroring how
+> `createRuntime` selects a `PaymentProvider`/`NotificationBridge` from
+> env, but for `StorageBackend` — still no real backend); (3) a public
+> key-usage label enumeration on the Rust side (`docs/public_key_usage.md`
+> section 5, step 1). Prior status:
+>
+> **Stage 106 — Public Boundary Freeze v2.** Two more label-only
 > PUBLIC groups land in `packages/fedos-core-rust/src/lib.rs`:
 > `FedosKeyUsageLabel` (eight labels — separating "what is this key for"
 > from Stage 105's "what format is this key," see
