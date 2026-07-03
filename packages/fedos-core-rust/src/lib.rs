@@ -291,6 +291,19 @@
 //! `Cargo.toml`'s public surface implications are zero (no new type, no
 //! new function beyond what Stage 103 already added). See
 //! `docs/public_random_design.md` for the full design record.
+//!
+//! Stage 105 adds one more label-only PUBLIC group (below, right after
+//! Stage 103's group, still ahead of the Stage 79 module):
+//! `FedosKeyFormatLabel` — the key-format planning-label enumeration
+//! `docs/public_key_provisioning.md` section 6 deferred — plus
+//! `FedosKeyFormatState`, `FedosKeyFormatStatus`,
+//! `FedosKeyFormatDescriptor`, and one new function,
+//! `fedos_key_format_descriptor_placeholder`, which returns a fixed
+//! sentinel descriptor. No raw key byte, parser, validator, or
+//! serialization format is added; `Cargo.toml` is untouched; no CSPRNG
+//! entropy source is consulted. The seventeen functions from Stage
+//! 69/102/103/104 are unchanged. See `docs/public_key_provisioning.md`
+//! for the full design record this addition follows.
 
 #![forbid(unsafe_code)]
 
@@ -832,6 +845,84 @@ pub fn fedos_boundary_policy_decision(kind: FedosBoundaryPolicyKind) -> FedosBou
     FedosBoundaryPolicy {
         kind,
         decision: FedosBoundaryPolicyDecision::DenyPlaceholder,
+    }
+}
+
+/// Stage 105 — public key-format label enumeration (planning only).
+///
+/// `docs/public_key_provisioning.md` section 6 (Stage 104) deferred the
+/// concrete key-format label enumeration a future provisioning function
+/// would eventually select by. The type below fixes that enumeration as
+/// FUTURE PLANNING LABELS only — not a decision about which raw format is
+/// actually supported, not a serialization format, and not a parser or
+/// validator for any byte layout. No raw key byte, no owned string, and
+/// no growable byte collection exists anywhere in this section: every
+/// type holds ONLY fixed enum labels, the exact same non-sensitive-label
+/// shape Stage 102/103's `FedosCrypto*`/`FedosBoundary*` groups already
+/// established. Nothing here draws a random byte, imports or exports a
+/// key, or performs any AEAD/KDF/NIP-44 operation — the raw-input format
+/// decision itself stays UNIMPLEMENTED, exactly as
+/// `docs/public_key_provisioning.md` left it.
+
+/// A future key-format LABEL a provisioning path would eventually accept
+/// or a generation path would eventually produce — planning intent only,
+/// never a decision about a real byte layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosKeyFormatLabel {
+    /// Planned future label: a raw symmetric key sized for one of Stage
+    /// 102's AEAD candidates.
+    RawAeadKeyPlaceholder,
+    /// Planned future label: raw output-keying-material bytes from one of
+    /// Stage 102's KDF candidates.
+    RawKdfOutputPlaceholder,
+    /// Planned future label: a Nostr secret key.
+    NostrSecretKeyPlaceholder,
+    /// Planned future label: a Nostr public key.
+    NostrPublicKeyPlaceholder,
+    /// Planned future label: a NIP-44 conversation key.
+    Nip44ConversationKeyPlaceholder,
+    /// Planned future label: an opaque reference to a key held entirely
+    /// outside this crate (e.g. a hardware/OS-level key store).
+    ExternalOpaqueKeyRefPlaceholder,
+    /// A fixed sentinel this stage's own placeholder function returns —
+    /// never a real key format.
+    TestOnlyPlaceholder,
+}
+
+/// Coarse observable state of the key-format planning boundary. No key
+/// byte is accepted, parsed, or validated at any state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosKeyFormatState {
+    Unavailable,
+    Placeholder,
+}
+
+/// A non-sensitive status snapshot for the key-format planning boundary.
+/// Never contains a key byte.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosKeyFormatStatus {
+    pub state: FedosKeyFormatState,
+}
+
+/// A non-sensitive descriptor pairing one [`FedosKeyFormatLabel`] with its
+/// [`FedosKeyFormatStatus`] — planning intent only, never a real key byte,
+/// parsed structure, or validated layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosKeyFormatDescriptor {
+    pub label: FedosKeyFormatLabel,
+    pub status: FedosKeyFormatStatus,
+}
+
+/// A fixed placeholder key-format descriptor: always labels
+/// [`FedosKeyFormatLabel::TestOnlyPlaceholder`] with a permanently
+/// `Unavailable` status, regardless of any future input this function
+/// does not yet accept. Reads nothing, computes nothing, parses nothing.
+pub fn fedos_key_format_descriptor_placeholder() -> FedosKeyFormatDescriptor {
+    FedosKeyFormatDescriptor {
+        label: FedosKeyFormatLabel::TestOnlyPlaceholder,
+        status: FedosKeyFormatStatus {
+            state: FedosKeyFormatState::Unavailable,
+        },
     }
 }
 

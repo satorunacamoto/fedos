@@ -8,9 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 104 — `getrandom` CSPRNG dependency adopted (build check
+> **Status: Stage 105 — Public key-format label enumeration
+> (`FedosKeyFormatLabel`, seven FUTURE PLANNING LABELS, plus
+> `FedosKeyFormatState`/`FedosKeyFormatStatus`/`FedosKeyFormatDescriptor`
+> and one fixed accessor, `fedos_key_format_descriptor_placeholder()`).**
+> `packages/fedos-core-rust/src/lib.rs`'s public `pub fn` surface grows
+> from seventeen (Stage 103) to eighteen. Every label is planning intent
+> only — no raw key byte, no owned string, no growable byte collection,
+> no parser, no serializer, no validator, and no import/export function
+> exists anywhere; the raw-input FORMAT decision itself stays
+> UNIMPLEMENTED, exactly as `docs/public_key_provisioning.md` left it. No
+> CSPRNG entropy source is consulted (no `getrandom`/`rand` usage
+> anywhere in the new section); `Cargo.toml` is UNCHANGED; no
+> Runtime/Worker/CryptoProvider/WASM wiring. New
+> [`test/fedos_core_rust_key_format_label.test.ts`](test/fedos_core_rust_key_format_label.test.ts)
+> (14 tests) checks all of the above; twenty-three pre-existing guard test
+> files' hard-coded "pub fn total" checks were updated from 17 to 18 with
+> the new function name (the same mass-update pattern every prior public
+> API growth stage has used), and
+> `test/fedos_core_rust_public_boundary_consolidation.test.ts`'s own
+> Stage-103-scoped section extraction was narrowed to end at Stage 105's
+> new marker instead of Stage 79's, so it stays scoped to exactly what
+> Stage 103 added.
+> `docs/public_key_provisioning.md` section 6 step 2 is marked complete;
+> `packages/fedos-core-rust/README.md`'s "Public boundary overview" table
+> and roadmap were updated to include the new group. `npm run typecheck`,
+> `npm test` (109 files, 1508 tests), `cargo check`, `cargo test` (108
+> tests, same count as Stage 104 — no new Rust unit test this stage,
+> since no new `#[cfg(test)]` module was added), and `cargo check --tests`
+> all stay GREEN. Where this stage stopped: no raw-input byte layout, no
+> serialization/parsing format, and no import/export implementation were
+> decided — deciding any of those would mean picking a real byte-level
+> protocol, which is implementation, not label planning; the
+> `FedosKeyExportBoundary` non-implementation question from Stage 103
+> also remains untouched. Stage 106 candidates: (1) a public key-USAGE
+> label enumeration (separating "what format is this key" from "what is
+> this key allowed to be used for") — recommended, since it is the
+> natural next boundary-design gap before any real
+> import/generate/export decision has to conflate the two; (2) a WASM
+> manifest validation skeleton; (3) a NIP-44 vector source/update check.
+> Prior status:
+>
+> **Stage 104 — `getrandom` CSPRNG dependency adopted (build check
 > ONLY, an EIGHTH `packages/fedos-core-rust/Cargo.toml` `[dependencies]`
-> entry) + a `#[cfg(test)]`-only RNG-verification-infrastructure
+> entry) + a `cfg(test)`-only RNG-verification-infrastructure
 > PLACEHOLDER (`csprng_verification_infrastructure`, a fixed four-category
 > label plan, never calling `getrandom`) + two new design docs
 > ([`docs/public_random_design.md`](docs/public_random_design.md),

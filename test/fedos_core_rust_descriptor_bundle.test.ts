@@ -126,8 +126,9 @@ describe("FedOS Rust crate — internal descriptor bundle skeleton", () => {
       "fedos_boundary_version",
       "fedos_boundary_features",
       "fedos_boundary_policy_decision",
+      "fedos_key_format_descriptor_placeholder",
     ];
-    expect(pubFnNames.length).toBe(17);
+    expect(pubFnNames.length).toBe(18);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

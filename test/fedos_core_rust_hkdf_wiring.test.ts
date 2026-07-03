@@ -199,6 +199,11 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
       "fedos_boundary_version",
       "fedos_boundary_features",
       "fedos_boundary_policy_decision",
+      // Stage 105's key-format planning-label function — see
+      // test/fedos_core_rust_key_format_label.test.ts for the dedicated
+      // checks that it accepts no raw byte and performs no real format
+      // decision.
+      "fedos_key_format_descriptor_placeholder",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

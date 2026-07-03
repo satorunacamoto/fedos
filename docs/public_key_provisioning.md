@@ -89,9 +89,24 @@ this document fixes has been reviewed on its own.
 1. Review this document's contract (section 2–3) on its own, as an
    explicitly-reviewed design decision, before any implementation stage
    begins.
-2. Design the concrete key-format label enumeration section 2
+2. ~~Design the concrete key-format label enumeration section 2
    references (e.g. raw symmetric key vs. a future asymmetric format),
-   as its own small addition — still no implementation.
+   as its own small addition — still no implementation.~~ Done — Stage
+   105 fixed `FedosKeyFormatLabel` (`packages/fedos-core-rust/src/lib.rs`)
+   as seven FUTURE PLANNING LABELS
+   (`RawAeadKeyPlaceholder`/`RawKdfOutputPlaceholder`/
+   `NostrSecretKeyPlaceholder`/`NostrPublicKeyPlaceholder`/
+   `Nip44ConversationKeyPlaceholder`/`ExternalOpaqueKeyRefPlaceholder`/
+   `TestOnlyPlaceholder`), plus `FedosKeyFormatState`/`FedosKeyFormatStatus`/
+   `FedosKeyFormatDescriptor` and one fixed accessor,
+   `fedos_key_format_descriptor_placeholder()`. Each label is explicitly a
+   FUTURE PLANNING LABEL, not a statement of "format support" — no label
+   accepts, parses, or validates a real byte layout, and the raw-input
+   format decision itself (which of these labels a real provisioning call
+   would actually accept, and in what byte shape) remains UNIMPLEMENTED,
+   exactly as this document originally left it. See
+   `packages/fedos-core-rust/README.md`'s "Public key-format label
+   boundary (Stage 105)" section for the full record.
 3. Implement the real provisioning function behind
    `FedosKeyImportBoundary`, consuming the CSPRNG-adjacent secret-handling
    foundation (`zeroize`/`secrecy`, Stage 78) for the raw input's

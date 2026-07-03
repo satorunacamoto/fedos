@@ -4,18 +4,30 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 104 — `getrandom` CSPRNG dependency adopted (build check
-> ONLY, an EIGHTH `[dependencies]` entry) + a `#[cfg(test)]`-only
-> RNG-verification-infrastructure PLACEHOLDER
+> **Status: Stage 105 — Public key-format label enumeration
+> (`FedosKeyFormatLabel`, seven FUTURE PLANNING LABELS, plus
+> `FedosKeyFormatState`/`FedosKeyFormatStatus`/`FedosKeyFormatDescriptor`
+> and one fixed accessor, `fedos_key_format_descriptor_placeholder()`).**
+> The public `pub fn` surface grows from seventeen (Stage 103) to
+> eighteen. Every label is planning intent only — no raw key byte, no
+> owned string, no growable byte collection, no parser, no serializer, no
+> validator, and no import/export function exists anywhere; the
+> raw-input FORMAT decision itself stays UNIMPLEMENTED, exactly as
+> `docs/public_key_provisioning.md` left it. No CSPRNG entropy source is
+> consulted; `Cargo.toml` is UNCHANGED; no Runtime/Worker/CryptoProvider/
+> WASM wiring. See "Public key-format label boundary (Stage 105)" below
+> for the full record. Prior status: Stage 104 adopted the `getrandom`
+> CSPRNG dependency (build check ONLY, an EIGHTH `[dependencies]` entry)
+> + a `cfg(test)`-only RNG-verification-infrastructure PLACEHOLDER
 > (`csprng_verification_infrastructure`, a fixed label plan, never calling
 > `getrandom`) + two new design docs
 > ([`docs/public_random_design.md`](../../docs/public_random_design.md),
-> [`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)).**
-> The public `pub fn` surface is UNCHANGED at seventeen (Stage 103) — this
-> stage adds no new public type or function. No
+> [`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)).
+> The public `pub fn` surface stayed UNCHANGED at seventeen (Stage 103) —
+> that stage added no new public type or function. No
 > `randomBytes`/nonce/encrypt/decrypt/deriveKey/key-generation/import/export
-> IMPLEMENTATION exists; `getrandom` is not imported or called ANYWHERE in
-> `src/lib.rs`, production or test. See "`getrandom` CSPRNG adoption + RNG
+> IMPLEMENTATION existed; `getrandom` was not imported or called ANYWHERE
+> in `src/lib.rs`, production or test. See "`getrandom` CSPRNG adoption + RNG
 > verification-infrastructure placeholder (Stage 104)" and "Public boundary
 > overview" below for the full record. Prior status: Stage 103 added ten
 > more label-only PUBLIC types across five operation-boundary status
@@ -2449,7 +2461,7 @@ deliberately avoids the literal text `` `#[cfg(test)]` `` (writing
 regex trap Stage 75's note first documented, now hit and fixed again
 while describing this stage's own new module.
 
-## Public boundary overview (Stage 102–104)
+## Public boundary overview (Stage 102–105)
 
 A consolidated reference for the full label-only public boundary, since
 the stage-by-stage narrative above has grown long. All types are `pub`;
@@ -2465,13 +2477,16 @@ return only label/status values (never `Vec<u8>`/`String`/secret data).
 | Key boundaries | `FedosKeyGenerationBoundary`, `FedosKeyImportBoundary`, `FedosKeyExportBoundary` (each +`State`) | `fedos_key_generation_boundary_status`, `fedos_key_import_boundary_status`, `fedos_key_export_boundary_status` | 103 |
 | Capability/algorithm metadata | `FedosCapabilityKind`, `FedosCapabilityDescriptor`, `FedosAlgorithmCategory`, `FedosAlgorithmDescriptor` | `fedos_capability_descriptors`, `fedos_algorithm_descriptors` | 103 |
 | Boundary shape metadata | `FedosBoundaryVersion`, `FedosBoundaryFeature`, `FedosBoundaryPolicyKind`, `FedosBoundaryPolicyDecision`, `FedosBoundaryPolicy` | `fedos_boundary_version`, `fedos_boundary_features`, `fedos_boundary_policy_decision` | 103 |
+| Key-format planning labels | `FedosKeyFormatLabel`, `FedosKeyFormatState`, `FedosKeyFormatStatus`, `FedosKeyFormatDescriptor` | `fedos_key_format_descriptor_placeholder` | 105 |
 
-Seventeen `pub fn`s total, unchanged since Stage 103 (Stage 104 added a
-dependency and a design record, not a public type). `FedosBoundaryVersion`
-stays `1.0.0` — no existing type's SHAPE changed since Stage 103 (per
-`docs/public_boundary_versioning.md` section 4's own policy, only a shape
-change warrants a bump; this overview and Stage 104's dependency addition
-are not shape changes). `FedosCapabilityDescriptor`
+Eighteen `pub fn`s total (Stage 104 added a dependency and a design
+record, not a public type or function — the count stayed at seventeen
+through that stage; Stage 105 is the one that grew it to eighteen).
+`FedosBoundaryVersion` stays `1.0.0` — no EXISTING type's SHAPE changed
+through Stage 105 (per `docs/public_boundary_versioning.md` section 4's
+own policy, only a shape change warrants a bump; adding a wholly new
+group, as Stage 105 did, is not a shape change to an existing type).
+`FedosCapabilityDescriptor`
 (Stage 103) and `FEDOS_CORE_CAPABILITIES`/`fedos_core_capabilities()`
 (Stage 69) intentionally coexist as two different views over a similar
 concept — see `docs/public_boundary_versioning.md` section 2; nothing was
@@ -2487,7 +2502,8 @@ public API change this cleanup stage does not have authorization to make.
 (Stage 103, per-group detail) →
 [`docs/public_random_design.md`](../../docs/public_random_design.md) /
 [`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)
-(Stage 104, post-dependency-adoption detail).
+(Stage 104, post-dependency-adoption detail; `public_key_provisioning.md`
+updated again at Stage 105 to record the key-format label enumeration).
 
 **Updated roadmap (supersedes the individual docs' own roadmap sections
 where they overlap):**
@@ -2498,12 +2514,76 @@ where they overlap):**
 4. Design and review the key-import provisioning contract on its own
    (`docs/public_key_provisioning.md` section 6, step 1) — still no
    implementation.
-5. Implement real `randomBytes` behind `FedosRandomBoundary`.
-6. Implement real key generation/import behind
-   `FedosKeyGenerationBoundary`/`FedosKeyImportBoundary`.
-7. Implement real `deriveKey`, then real `encrypt`/`decrypt`, consuming
+5. ~~Design the key-format label enumeration
+   (`docs/public_key_provisioning.md` section 6, step 2) — still no
+   implementation.~~ Done — Stage 105 (`FedosKeyFormatLabel`, see below).
+6. Implement real `randomBytes` behind `FedosRandomBoundary`.
+7. Implement real key generation/import behind
+   `FedosKeyGenerationBoundary`/`FedosKeyImportBoundary`, consuming
+   `FedosKeyFormatLabel` to name the format being generated/imported —
+   still without deciding its raw byte shape (step 4 above).
+8. Implement real `deriveKey`, then real `encrypt`/`decrypt`, consuming
    the now-implemented random/key boundaries.
-8. Separately review whether `FedosKeyExportBoundary` should ever be
+9. Separately review whether `FedosKeyExportBoundary` should ever be
    implemented at all.
-9. Only after 4–8 are each independently implemented and reviewed, wire
-   the boundary into the Runtime/Worker/`CryptoProvider`.
+10. Only after 4–9 are each independently implemented and reviewed, wire
+    the boundary into the Runtime/Worker/`CryptoProvider`.
+
+## Public key-format label boundary (Stage 105)
+
+Stage 105 fixes the key-format label enumeration
+`docs/public_key_provisioning.md` section 6 (step 2) deferred at Stage
+104 — the last remaining named gap in that document's roadmap short of
+implementation itself.
+
+**`FedosKeyFormatLabel`** (`pub enum`, placed right after Stage 103's
+`fedos_boundary_policy_decision`, still ahead of Stage 79's
+`secret_handle` module) — seven FUTURE PLANNING LABELS, each documented
+as intent only, never a statement of "format support":
+
+- `RawAeadKeyPlaceholder` — a raw symmetric key sized for one of Stage
+  102's AEAD candidates.
+- `RawKdfOutputPlaceholder` — raw output-keying-material bytes from one
+  of Stage 102's KDF candidates.
+- `NostrSecretKeyPlaceholder` — a Nostr secret key.
+- `NostrPublicKeyPlaceholder` — a Nostr public key.
+- `Nip44ConversationKeyPlaceholder` — a NIP-44 conversation key.
+- `ExternalOpaqueKeyRefPlaceholder` — an opaque reference to a key held
+  entirely outside this crate (e.g. a hardware/OS-level key store).
+- `TestOnlyPlaceholder` — the fixed sentinel this stage's own placeholder
+  function returns; never a real key format.
+
+**`FedosKeyFormatState`** (`Unavailable` / `Placeholder`),
+**`FedosKeyFormatStatus`** (carries only the state), and
+**`FedosKeyFormatDescriptor`** (carries only `label`/`status`) round out
+the group. **`fedos_key_format_descriptor_placeholder()`** — the one new
+public function — takes no input and always returns
+`FedosKeyFormatLabel::TestOnlyPlaceholder` paired with a permanently
+`Unavailable` status, growing the crate's public `pub fn` surface from
+seventeen to eighteen. The seventeen prior functions are byte-for-byte
+unchanged.
+
+**No raw byte, no parser, no serializer, no format decision.** Every
+type holds ONLY fixed enum labels — no borrowed byte slice, growable byte
+vector, or owned string field or parameter anywhere. No function parses,
+serializes, deserializes, or validates a real byte layout; no
+import/export function exists. Which of these seven labels a real
+provisioning call would eventually accept, and in what byte shape, stays
+UNIMPLEMENTED — exactly the decision
+`docs/public_key_provisioning.md` originally deferred, still deferred
+here. No CSPRNG entropy source is consulted; `Cargo.toml` is UNCHANGED;
+nothing is wired into the Runtime, the Worker, or a crypto provider; no
+WASM binding exists.
+
+See
+[`test/fedos_core_rust_key_format_label.test.ts`](../../test/fedos_core_rust_key_format_label.test.ts)
+(14 tests) for the dedicated Stage 105 guard tests (all seven variants
+present as bare unit variants, all four type declarations, no
+`Vec`/`String`/borrowed-byte-slice field, no key/seed/plaintext/
+ciphertext/passphrase/nonce/tag storage field, no parser/serializer/
+import/export/validate function anywhere in `lib.rs`, the
+eighteen-function `pub fn` surface, all seventeen prior functions
+unchanged, no Runtime/Worker/`CryptoProvider` connection, `Cargo.toml`
+unchanged, no `getrandom`/`rand` usage, no `println!`/`eprintln!`/`log`/
+`tracing`/`dbg!` usage, no `unsafe`, the placeholder function's fixed
+body, the design doc records completion, no committed build artifact).
