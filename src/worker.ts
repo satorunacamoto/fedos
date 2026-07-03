@@ -126,6 +126,8 @@ import {
 import { invokePromotionProviderPreview } from "./promotion/invocation.js";
 import type { PromotionProvider } from "./promotion/adapter.js";
 import type { PromotionRequest } from "./promotion/types.js";
+import { renderBoardPreviewPage, SAMPLE_BOARDS } from "./render/board_preview.js";
+import { renderMarketplacePreviewPage, SAMPLE_LISTINGS } from "./render/marketplace_preview.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -272,6 +274,34 @@ export function isRuntimeStatusEnabled(url: URL): boolean {
  */
 export function isRuntimeStatusJsonRequested(url: URL): boolean {
   return url.searchParams.get("format") === "json";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Board
+ * preview page via `?boardPreview=1` or `?boardPreview=true` (Stage 114).
+ * Takes precedence over `?marketplacePreview=1` and every other route
+ * (relay/sample board/product/space/chat) except `?runtimeStatus=1`. The
+ * page it gates (`renderBoardPreviewPage`) uses ONLY sample/static board
+ * descriptors, calls no runtime-selected boundary, and issues no `fetch`.
+ */
+export function isBoardPreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("boardPreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Marketplace
+ * listing preview page via `?marketplacePreview=1` or
+ * `?marketplacePreview=true` (Stage 114). Takes precedence over every
+ * other route (relay/sample board/product/space/chat) except
+ * `?runtimeStatus=1`/`?boardPreview=1`. The page it gates
+ * (`renderMarketplacePreviewPage`) uses ONLY sample/static listing
+ * descriptors, calls no marketplace/payment boundary, and issues no
+ * `fetch`.
+ */
+export function isMarketplacePreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("marketplacePreview");
+  return value === "1" || value === "true";
 }
 
 /** Builds the query-status HTML for a result page. */
@@ -786,6 +816,24 @@ export async function handleRequest(
     }
     return htmlResponse(
       renderPage(buildThreads([]), { status: renderRuntimeStatusPage(view) }),
+    );
+  }
+
+  // Stage 114: `?boardPreview=1` / `?marketplacePreview=1` are entirely
+  // read-only, sample-data-only preview pages — no board is built, no
+  // relay/live path runs, and no runtime-selected boundary (storage,
+  // federation, marketplace, payment, entitlement, or chat) is ever
+  // called from either branch; `runtime` is not even read here.
+  // `boardPreview` takes precedence over `marketplacePreview` when both
+  // are present; either falls through to normal routing when absent.
+  if (isBoardPreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), { status: renderBoardPreviewPage(SAMPLE_BOARDS) }),
+    );
+  }
+  if (isMarketplacePreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), { status: renderMarketplacePreviewPage(SAMPLE_LISTINGS) }),
     );
   }
 
