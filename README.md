@@ -8,7 +8,71 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 109 — Storage provider env selection + Nearby consent
+> **Status: Stage 110 — Federation + Social boundary foundation.** Fixes the
+> seam FedOS will eventually use to speak to multiple social
+> protocols/ecosystems (Nostr, Bluesky, Threads, RSS, and its own local
+> store) — **no real relay/WebSocket/HTTP/OAuth/AT-Protocol connection, no
+> signing, no publish/subscribe.** New
+> [`src/federation/types.ts`](src/federation/types.ts) defines
+> `FederationProvider` (`status`/`connect`/`disconnect`/
+> `publishPlaceholder`/`fetchPlaceholder`), `FederationProviderKind` (six
+> PLACEHOLDER labels — `nostr_placeholder`, `bluesky_placeholder`,
+> `threads_placeholder`, `rss_placeholder`, `local_placeholder`,
+> `test_placeholder`), `FederationCapability`, `FederationStatus`, and
+> `FederationDescriptor`. New
+> [`src/federation/noop_federation.ts`](src/federation/noop_federation.ts)
+> ships `NoopFederationProvider` — the ONLY implementation this stage
+> ships, and unlike every other boundary's placeholder, its `connect()`
+> NEVER reaches `connected_placeholder` (claiming a session exists is
+> closer to the Nearby consent boundary's "never claim granted" posture
+> than to a payment/storage placeholder's "policy-clean" acceptance — see
+> [`docs/federation_boundary.md`](docs/federation_boundary.md) §5). New
+> [`src/social/event.ts`](src/social/event.ts) defines a protocol-neutral
+> `SocialEventDescriptor` (ten `SocialEventKind` labels — post/reply/
+> repost/reaction/profile/article/marketplace/chat/moderation/test — and
+> four `SocialVisibility` labels) with NO bytes/content/body field — opaque
+> labels and metadata only. New [`src/social/board.ts`](src/social/board.ts)
+> defines a protocol-neutral `BoardDescriptor` (six `BoardKind` labels —
+> thread/board/channel/marketplace/knowledge/test — plus `TopicLabel`/
+> `CategoryLabel`), also label-only. Social/Board are deliberately decoupled
+> from `FederationProvider`/`StorageBackend`/`CryptoProvider` — no
+> cross-import in either direction. `AppRuntime` gains `federationProvider`;
+> new `selectFederationProvider(env?, overrides?)` in
+> [`src/runtime/create_runtime.ts`](src/runtime/create_runtime.ts) ALWAYS
+> returns `NoopFederationProvider` unless `overrides.federationProvider` is
+> supplied — there is no env-selectable placeholder adapter yet, unlike
+> Storage/Payment/Notification/WebAuthn/Crypto's two-way switches. The
+> Worker is untouched (no `FederationProvider` reference at all). New
+> [`docs/federation_boundary.md`](docs/federation_boundary.md) fixes each
+> future adapter's role (read/write/reply only) and explicit non-scope
+> (never Storage, never Crypto, never Identity/consent — swapping or adding
+> a protocol adapter must never require touching those, and vice versa).
+> New [`test/federation_boundary.test.ts`](test/federation_boundary.test.ts)
+> (17 tests) and
+> [`test/social_board_skeleton.test.ts`](test/social_board_skeleton.test.ts)
+> (12 tests) check: `NoopFederationProvider` stays `disconnected` through
+> `connect()`/`disconnect()`, denies `publishPlaceholder`/`fetchPlaceholder`
+> (`items` always empty); Runtime selection defaults to
+> `NoopFederationProvider` and never calls any of its four methods; the
+> Worker references neither `FederationProvider` nor the social model; every
+> label is a fixed, complete `_placeholder`-suffixed or plain set; no
+> `bytes`/`content`/`body` field exists anywhere; and no source imports a
+> relay/WebSocket/HTTP/OAuth/AT-Protocol/EventSource library or
+> `StorageBackend`/`CryptoProvider`. `npm run typecheck`, `npm test` (117
+> files, 1621 tests), `cargo check`, `cargo test` (108 tests, unchanged — no
+> Rust file was touched this stage), and `cargo check --tests` all stay
+> GREEN. Where this stage stopped, on purpose: no Nostr relay/WebSocket, no
+> Bluesky/AT-Protocol/OAuth session, no Threads/ActivityPub call, no RSS
+> fetch/parse, no event signing (NIP-44/NIP-17 or otherwise) or publish/
+> subscribe, and no connection to `StorageBackend` or any `CryptoProvider`.
+> Stage 111 candidates: (1) a Chat boundary skeleton and (2) a Marketplace
+> boundary skeleton, done together in one review unit (recommended — FedOS's
+> target order is Identity → Crypto → Storage → Federation → Board → Chat →
+> Marketplace, so finishing Chat+Marketplace next keeps the foundation
+> complete before any real Nostr/Bluesky/Threads adapter is attempted); (3)
+> a Creator entitlement boundary. Prior status:
+>
+> **Stage 109 — Storage provider env selection + Nearby consent
 > boundary + storage metadata sanitizer.** Three small, independent
 > additions consolidate the Stage 107/108 boundaries into selectable/usable
 > shape, still with NO real storage, NO real location, and NO wiring beyond
