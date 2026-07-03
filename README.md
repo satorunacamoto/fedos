@@ -8,7 +8,78 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 108 — Nearby / storage-metadata privacy boundaries
+> **Status: Stage 109 — Storage provider env selection + Nearby consent
+> boundary + storage metadata sanitizer.** Three small, independent
+> additions consolidate the Stage 107/108 boundaries into selectable/usable
+> shape, still with NO real storage, NO real location, and NO wiring beyond
+> selection. (1) **Storage provider env selection**: `RuntimeEnv` gains
+> `STORAGE_PROVIDER?`/`ENABLE_STORAGE_PLACEHOLDER?`, `RuntimeOverrides` gains
+> `storageBackend?`, and `AppRuntime` gains `storageBackend` — new
+> `selectStorageBackend(env, overrides?)` in
+> [`src/runtime/create_runtime.ts`](src/runtime/create_runtime.ts) picks
+> `NoopStorageBackend` (default) or `PlaceholderStorageBackend` (Stage 107),
+> exactly mirroring how `selectPaymentProvider`/`selectNotificationBridge`
+> already work. The Worker's `Env` interface gains the same two fields for
+> parity; the Worker still never calls `put()`/`get()`/`delete()`, and
+> `createRuntime` never calls them either — selection only. (2) **Nearby
+> consent boundary skeleton**: new
+> [`src/nearby/types.ts`](src/nearby/types.ts) defines
+> `NearbyConsentProvider` (`getStatus`/`getCapabilities`/`requestConsent`/
+> `revokeConsent`/`isGranted`) and new
+> [`src/nearby/noop_consent.ts`](src/nearby/noop_consent.ts) provides
+> `NoopNearbyConsentProvider` (permanently `unavailable`) and
+> `PlaceholderNearbyConsentProvider` — which, unlike every other placeholder
+> in this codebase, can NEVER reach an "accepted" state: `requestConsent`
+> ALWAYS resolves `denied`, because Nearby Discovery has no real, informed
+> consent UI yet (see `docs/nearby_consent_policy.md`) and granting consent
+> without one would misrepresent it. No GPS, no
+> `navigator.geolocation` call, no permission request, no area-id
+> computation; NOT wired into the runtime, the Worker, or `StorageBackend`.
+> (3) **Storage metadata sanitizer**: new `sanitizeStorageMetadata` in
+> [`src/storage/policy.ts`](src/storage/policy.ts) is a pure function that
+> strips the EXISTING sensitive markers (secret/key/seed/token/payment/
+> entitlement/dm/body/content/message) AND a NEW, independent
+> location-derived marker set (area id/geohash/H3/S2/lat/lon/coordinate/
+> GPS) from a metadata object, per `docs/storage_metadata_policy.md` §2 —
+> deliberately kept a standalone helper, NOT called from
+> `reviewStoragePacket` or `PlaceholderStorageBackend.put()`, so
+> `NoopStorageBackend`/`PlaceholderStorageBackend` are UNCHANGED by this
+> stage. New
+> [`test/runtime_storage_env.test.ts`](test/runtime_storage_env.test.ts)
+> (13 tests),
+> [`test/nearby_consent_boundary.test.ts`](test/nearby_consent_boundary.test.ts)
+> (13 tests), and
+> [`test/storage_metadata_sanitizer.test.ts`](test/storage_metadata_sanitizer.test.ts)
+> (13 tests) check: env/override selection picks the right backend and
+> never calls `put`/`get`/`delete`; the Worker exposes the two new fields
+> but never constructs a backend or calls its methods; `PlaceholderNearbyConsentProvider`
+> never grants consent even after repeated requests, leaks no coordinate,
+> and stays unwired; `sanitizeStorageMetadata` drops both marker families
+> without mutating its input and is not called from `noop_storage.ts`; and
+> no source imports Google Drive/Nostr WebSocket/SQLite/Bluetooth/geolocation/
+> H3/geohash/S2. Two Stage 107 assertions in
+> [`test/storage_backend_boundary.test.ts`](test/storage_backend_boundary.test.ts)
+> were updated (same pattern Stage 46/Stage 42 used for payment/notification
+> selection): they now allow the Runtime/Worker sources to reference
+> `StorageBackend` for SELECTION, while still asserting `put`/`get`/`delete`
+> are never called from either. `npm run typecheck`, `npm test` (115 files,
+> 1592 tests), `cargo check`, `cargo test` (108 tests, unchanged — no Rust
+> file was touched this stage), and `cargo check --tests` all stay GREEN.
+> Where this stage stopped, on purpose: no real Google Drive/Nostr
+> relay/SQLite/Bluetooth-Wi-Fi/IPFS storage, no GPS/browser geolocation, no
+> area-id computation, no H3/Geohash/S2 dependency, no peer discovery, no
+> bandwidth priority, and no automatic storage operation from the Runtime or
+> Worker. Stage 110 candidates: (1) a Nostr federation boundary skeleton —
+> a `FederationProvider`-shaped seam naming relay-set/federation concepts
+> with NO real relay connection (recommended, since it is FedOS's core
+> not-yet-abstracted coupling now that Storage/consent/metadata boundaries
+> are in place); (2) a board/event model skeleton (Reddit-style
+> board/thread shapes decoupled from the Nostr event they're rendered from);
+> (3) a storage packet preview route (a read-only `?storageStatus=1`-style
+> page mirroring `renderRuntimeStatusPage`, showing the selected backend's
+> type label only). Prior status:
+>
+> **Stage 108 — Nearby / storage-metadata privacy boundaries
 > (docs only).** Three new research/policy documents fix the privacy
 > boundary for a not-yet-built "Nearby Discovery" feature and extend the
 > `StorageBackend` metadata policy — **no source file changed, no test file
