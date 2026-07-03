@@ -172,6 +172,19 @@
 //! `crypto_pipeline`, or `descriptor_bundle` today. Same rules apply: not
 //! part of the public API, no public function above constructs, holds, or
 //! returns one of its types.
+//!
+//! Stage 95 adds a twelfth crate-private module, `error_taxonomy`: an
+//! INTERNAL-ONLY error-taxonomy skeleton classifying a future AEAD/KDF/
+//! Argon2/NIP-44/Nostr-key-derivation operation FAILURE, as a fixed,
+//! non-sensitive label only — no error message, no source error, no stack
+//! trace, and no `String`/`Vec` field. It exists as a fully independent,
+//! label-only type basis for a future real error type, still not
+//! connected to — and not holding an instance of — `secret_handle`,
+//! `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+//! `operation_context`, `request_descriptor`, `response_descriptor`,
+//! `crypto_pipeline`, `descriptor_bundle`, or `execution_plan` today. Same
+//! rules apply: not part of the public API, no public function above
+//! constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -2371,6 +2384,220 @@ mod execution_plan {
                 ExecutionPlanState::default(),
                 ExecutionPlanState::Disabled
             );
+        }
+    }
+}
+
+/// Stage 95 — an INTERNAL-ONLY error-taxonomy skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`CryptoErrorDescriptor`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It holds no textual explanation of any failure, no wrapped underlying
+/// error value, and no captured call-stack information of any kind — only
+/// a fixed [`CryptoErrorKind`] label. It takes no user-, environment-, or
+/// config-derived input of any kind —
+/// [`CryptoErrorDescriptor::new_placeholder`] accepts only a
+/// [`CryptoErrorKind`] label. This module does NOT hold an instance of any
+/// other skeleton type: it does not connect to `secret_handle` (Stage 79),
+/// `aead_core` (Stage 80), `kdf_core` (Stage 82), `key_material` (Stage
+/// 87), `domain_label` (Stage 88), `operation_context` (Stage 89),
+/// `request_descriptor` (Stage 90), `response_descriptor` (Stage 91),
+/// `crypto_pipeline` (Stage 92), `descriptor_bundle` (Stage 93), or
+/// `execution_plan` (Stage 94) — it never constructs, stores, or reads a
+/// field of any of their types — when in doubt about a connection between
+/// skeletons, this crate deliberately leaves them unconnected rather than
+/// guess at a future design (the same reasoning `aead_core`'s own doc
+/// comment already states). It exists as a fully independent, label-only
+/// type basis a later, explicitly-reviewed stage can extend to actually
+/// classify a real AEAD/KDF/NIP-44/Nostr-key-derivation failure, once it
+/// also implements the operation that failure would come from.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`/
+/// `request_descriptor`/`response_descriptor`/`crypto_pipeline`/
+/// `descriptor_bundle`/`execution_plan` above do. This is expected for a
+/// skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod error_taxonomy {
+    /// Coarse internal lifecycle state of a [`CryptoErrorDescriptor`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum CryptoErrorState {
+        /// A placeholder error descriptor is active. Classifies no real
+        /// failure; runs no cryptography.
+        Placeholder,
+        /// No error descriptor should be treated as active — the default,
+        /// inert state before any [`CryptoErrorDescriptor`] is constructed
+        /// for use.
+        Disabled,
+    }
+
+    impl Default for CryptoErrorState {
+        fn default() -> Self {
+            CryptoErrorState::Disabled
+        }
+    }
+
+    /// Which future cryptographic operation FAILURE a
+    /// [`CryptoErrorDescriptor`] names — a label only, intent, not an
+    /// implementation and not a real failure explanation. Crate-private
+    /// only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum CryptoErrorKind {
+        /// Intended future connection point: an AEAD seal/open failure.
+        /// No AEAD failure is classified here.
+        AeadFailurePlaceholder,
+        /// Intended future connection point: an HKDF extract/expand
+        /// failure. No KDF failure is classified here.
+        KdfFailurePlaceholder,
+        /// Intended future connection point: an Argon2id hashing failure.
+        /// No Argon2id failure is classified here.
+        Argon2idFailurePlaceholder,
+        /// Intended future connection point: a NIP-44 encrypt/decrypt
+        /// failure. No NIP-44 failure is classified here.
+        Nip44FailurePlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key
+        /// derivation failure. No Nostr key failure is classified here.
+        NostrKeyFailurePlaceholder,
+        /// Intended future connection point: an invalid request shape (a
+        /// future request descriptor rejected before any primitive runs).
+        InvalidRequestPlaceholder,
+        /// Intended future connection point: a requested operation kind
+        /// with no supporting implementation yet.
+        UnsupportedOperationPlaceholder,
+        /// Intended future connection point: this crate's own internal
+        /// invariant violated (a bug, not caller input).
+        InternalInvariantPlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyFailurePlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`CryptoErrorDescriptor`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte, and never a failure explanation.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct CryptoErrorStatus {
+        pub(crate) state: CryptoErrorState,
+    }
+
+    /// An INTERNAL-ONLY error-taxonomy handle skeleton (crate-private; not
+    /// part of this crate's public API — see the module-level doc comment
+    /// above). Holds only a [`CryptoErrorKind`] label and a
+    /// [`CryptoErrorState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, no user-, environment-, or
+    /// config-derived input, no textual explanation of any failure, no
+    /// wrapped underlying error value, no captured call-stack information,
+    /// and no field of any other skeleton's type from `secret_handle`,
+    /// `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+    /// `operation_context`, `request_descriptor`, `response_descriptor`,
+    /// `crypto_pipeline`, `descriptor_bundle`, or `execution_plan`. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually classify a real failure; until then it accepts and stores
+    /// none.
+    pub(crate) struct CryptoErrorDescriptor {
+        kind: CryptoErrorKind,
+        state: CryptoErrorState,
+    }
+
+    impl CryptoErrorDescriptor {
+        /// Construct a placeholder error descriptor of the given
+        /// [`CryptoErrorKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind, and classifies no real
+        /// failure of any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: CryptoErrorKind) -> Self {
+            Self {
+                kind,
+                state: CryptoErrorState::Placeholder,
+            }
+        }
+
+        /// The [`CryptoErrorKind`] label this descriptor was constructed
+        /// with — intent only.
+        pub(crate) fn kind(&self) -> CryptoErrorKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> CryptoErrorStatus {
+            CryptoErrorStatus { state: self.state }
+        }
+
+        /// Whether this descriptor is still in the
+        /// [`CryptoErrorState::Placeholder`] state — always `true` for any
+        /// handle constructed via
+        /// [`CryptoErrorDescriptor::new_placeholder`], since no other
+        /// constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == CryptoErrorState::Placeholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let descriptor =
+                CryptoErrorDescriptor::new_placeholder(CryptoErrorKind::AeadFailurePlaceholder);
+            assert_eq!(descriptor.status().state, CryptoErrorState::Placeholder);
+            assert!(descriptor.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                CryptoErrorKind::AeadFailurePlaceholder,
+                CryptoErrorKind::KdfFailurePlaceholder,
+                CryptoErrorKind::Argon2idFailurePlaceholder,
+                CryptoErrorKind::Nip44FailurePlaceholder,
+                CryptoErrorKind::NostrKeyFailurePlaceholder,
+                CryptoErrorKind::InvalidRequestPlaceholder,
+                CryptoErrorKind::UnsupportedOperationPlaceholder,
+                CryptoErrorKind::InternalInvariantPlaceholder,
+                CryptoErrorKind::TestOnlyFailurePlaceholder,
+            ] {
+                let descriptor = CryptoErrorDescriptor::new_placeholder(kind);
+                assert_eq!(descriptor.kind(), kind);
+                assert_eq!(descriptor.status().state, CryptoErrorState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let descriptor =
+                CryptoErrorDescriptor::new_placeholder(CryptoErrorKind::KdfFailurePlaceholder);
+            let status = descriptor.status();
+            assert_eq!(status.state, CryptoErrorState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_descriptor() {
+            for kind in [
+                CryptoErrorKind::Argon2idFailurePlaceholder,
+                CryptoErrorKind::Nip44FailurePlaceholder,
+                CryptoErrorKind::TestOnlyFailurePlaceholder,
+            ] {
+                assert!(CryptoErrorDescriptor::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(CryptoErrorState::default(), CryptoErrorState::Disabled);
         }
     }
 }

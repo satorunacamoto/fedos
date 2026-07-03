@@ -8,7 +8,92 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 94 — Internal execution plan skeleton (internal-only
+> **Status: Stage 95 — Internal error taxonomy skeleton (internal-only
+> `error_taxonomy` module; fixed error-kind labels only, no raw error
+> strings, no stack traces, no descriptor/pipeline/plan wiring yet, no
+> real AEAD/HKDF/Argon2/NIP-44 connection, no Runtime/Worker/
+> CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a twelfth crate-private
+> module, `error_taxonomy` (alongside Stage 79's `secret_handle`, Stage
+> 80's `aead_core`, Stage 82's `kdf_core`, Stage 87's `key_material`, Stage
+> 88's `domain_label`, Stage 89's `operation_context`, Stage 90's
+> `request_descriptor`, Stage 91's `response_descriptor`, Stage 92's
+> `crypto_pipeline`, Stage 93's `descriptor_bundle`, and Stage 94's
+> `execution_plan`, placed right after `execution_plan`, still ahead of
+> this file's first module gated `cfg(test)`). It defines:
+> `CryptoErrorState` (`pub(crate) enum`, `Placeholder`/`Disabled` —
+> `Disabled` is the `Default`, same shape as `ExecutionPlanState`);
+> `CryptoErrorKind` (`pub(crate) enum`, `AeadFailurePlaceholder`/
+> `KdfFailurePlaceholder`/`Argon2idFailurePlaceholder`/
+> `Nip44FailurePlaceholder`/`NostrKeyFailurePlaceholder`/
+> `InvalidRequestPlaceholder`/`UnsupportedOperationPlaceholder`/
+> `InternalInvariantPlaceholder`/`TestOnlyFailurePlaceholder` — nine
+> label-only unit variants); `CryptoErrorStatus` (`pub(crate) struct`, a
+> non-sensitive status snapshot carrying only the state enum); and
+> `CryptoErrorDescriptor` (`pub(crate) struct`, holding `kind`/`state`)
+> with four methods: `new_placeholder(kind: CryptoErrorKind)` (takes only
+> the label — no user-, environment-, or config-derived input of any
+> kind, classifies no real failure of any kind), `kind()`, `status()`, and
+> `is_placeholder()`. **NOT part of this crate's public API**: every item
+> is `pub(crate)` at most — never `pub` — nothing is re-exported from the
+> crate root, and the crate's public `pub fn` surface is still exactly the
+> same six placeholder functions from Stage 69; none of them constructs,
+> holds, or returns a `CryptoErrorDescriptor`. **No raw error strings, no
+> stack traces**: `CryptoErrorDescriptor` holds no error message field, no
+> wrapped source-error field (no `impl std::error::Error`, no
+> `std::fmt::Display` implementation), and no captured call-stack
+> information of any kind. **No descriptor/pipeline/plan wiring — a fully
+> independent, label-only skeleton**: `CryptoErrorDescriptor` does not
+> construct or hold a `SecretHandle`, `AeadPlaceholderRequest`,
+> `KdfPlaceholderRequest`, `KeyMaterialHandle`, `DomainLabel`,
+> `OperationContext`, `RequestDescriptor`, `ResponseDescriptor`,
+> `CryptoPipeline`, `DescriptorBundle`, or `ExecutionPlan` — same "if in
+> doubt, stay fully independent" choice Stage 93/94 already made;
+> `CryptoErrorDescriptor` stores no `String`/`Vec<u8>`/borrowed-byte-slice
+> field of any kind. **Not connected to `secret_handle`, `aead_core`,
+> `kdf_core`, `key_material`, `domain_label`, `operation_context`,
+> `request_descriptor`, `response_descriptor`, `crypto_pipeline`,
+> `descriptor_bundle`, or `execution_plan`** — `error_taxonomy` never
+> constructs any of their types and runs no actual AEAD/HKDF/Argon2/
+> NIP-44 operation, derives no Nostr key, same "when a
+> skeleton-to-skeleton connection is ambiguous, leave it unconnected"
+> reasoning Stage 80/82/87/88/89/90/91/92/93/94 already established; all
+> eleven of those modules are UNCHANGED this stage, still
+> placeholder-only. `cargo test` is GREEN with all 77 tests passing (72
+> pre-existing + 5 new `error_taxonomy::tests`); `cargo check` and `cargo
+> check --tests` stay GREEN with no warnings. `Cargo.toml` is UNCHANGED
+> this stage — no new dependency needed (`error_taxonomy` imports nothing
+> beyond the standard library). New
+> [`test/fedos_core_rust_error_taxonomy.test.ts`](test/fedos_core_rust_error_taxonomy.test.ts)
+> (18 tests) checks: the module is internal-only and not `pub`;
+> `CryptoErrorDescriptor` is `pub(crate)` at most and never re-exported;
+> the public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged; every
+> `CryptoErrorKind` variant is a label-only unit variant (no tuple/struct
+> data); no `String`/`Vec` field anywhere in the module; no error
+> message/source/stack field-declaration anywhere (nor `impl
+> std::error::Error`/`std::fmt::Display`); `new_placeholder` takes only a
+> `CryptoErrorKind` (no `&str`/`String` parameter); no
+> `std::env`/`env::`/`var_os`/`std::process` usage; no AEAD/HKDF/Argon2
+> usage (specific Rust-usage patterns only, not a bare word match, same
+> "no bare `\bnip.?44\b` check" reasoning Stage 89-94 established, since
+> it would also match this stage's own required `Nip44FailurePlaceholder`
+> variant name — there is no `nip44`-named crate in this repo's
+> dependency tree to import in the first place, so that absence is
+> structural, not text-banned); no field DECLARATION storing
+> `SecretHandle`/`AeadPlaceholderRequest`/`KdfPlaceholderRequest`/
+> `KeyMaterialHandle`/`DomainLabel`/`OperationContext`/
+> `RequestDescriptor`/`ResponseDescriptor`/`CryptoPipeline`/
+> `DescriptorBundle`/`ExecutionPlan` (nor do those eleven modules
+> reference `CryptoError*`); no `unsafe`; Runtime/Worker sources mention
+> neither `error_taxonomy` nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; the state
+> enum has exactly its two variants and the handle exposes exactly its
+> four methods. Stage 96 candidate: **an internal audit event label
+> skeleton** — observing future crypto-internal state changes without any
+> secret information, still no logging or Runtime wiring. Prior status:
+>
+> **Stage 94 — Internal execution plan skeleton (internal-only
 > `execution_plan` module; fixed plan/step labels only, no descriptor/
 > pipeline wiring yet, no real AEAD/HKDF/Argon2/NIP-44 connection, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**
