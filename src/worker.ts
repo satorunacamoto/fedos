@@ -128,6 +128,14 @@ import type { PromotionProvider } from "./promotion/adapter.js";
 import type { PromotionRequest } from "./promotion/types.js";
 import { renderBoardPreviewPage, SAMPLE_BOARDS } from "./render/board_preview.js";
 import { renderMarketplacePreviewPage, SAMPLE_LISTINGS } from "./render/marketplace_preview.js";
+import {
+  renderCreatorProfilePreviewPage,
+  SAMPLE_CREATOR_PROFILES,
+} from "./render/creator_profile_preview.js";
+import {
+  renderCommunityRulesPreviewPage,
+  SAMPLE_COMMUNITY_RULES,
+} from "./render/community_rules_preview.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -301,6 +309,36 @@ export function isBoardPreviewEnabled(url: URL): boolean {
  */
 export function isMarketplacePreviewEnabled(url: URL): boolean {
   const value = url.searchParams.get("marketplacePreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Creator
+ * profile preview page via `?creatorPreview=1` or `?creatorPreview=true`
+ * (Stage 115). Takes precedence over every other route (relay/sample
+ * board/product/space/chat) except `?runtimeStatus=1`/`?boardPreview=1`/
+ * `?marketplacePreview=1`. The page it gates
+ * (`renderCreatorProfilePreviewPage`) uses ONLY sample/static profile
+ * descriptors, calls no runtime-selected boundary, performs no real
+ * identity verification, and issues no `fetch`.
+ */
+export function isCreatorPreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("creatorPreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Community
+ * ruleset preview page via `?communityRulesPreview=1` or
+ * `?communityRulesPreview=true` (Stage 116). Takes precedence over every
+ * other route (relay/sample board/product/space/chat) except
+ * `?runtimeStatus=1`/`?boardPreview=1`/`?marketplacePreview=1`/
+ * `?creatorPreview=1`. The page it gates (`renderCommunityRulesPreviewPage`)
+ * uses ONLY sample/static rule entries, calls no runtime-selected boundary,
+ * applies no real moderation action, and issues no `fetch`.
+ */
+export function isCommunityRulesPreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("communityRulesPreview");
   return value === "1" || value === "true";
 }
 
@@ -819,13 +857,16 @@ export async function handleRequest(
     );
   }
 
-  // Stage 114: `?boardPreview=1` / `?marketplacePreview=1` are entirely
-  // read-only, sample-data-only preview pages — no board is built, no
-  // relay/live path runs, and no runtime-selected boundary (storage,
-  // federation, marketplace, payment, entitlement, or chat) is ever
-  // called from either branch; `runtime` is not even read here.
-  // `boardPreview` takes precedence over `marketplacePreview` when both
-  // are present; either falls through to normal routing when absent.
+  // Stage 114/115/116: `?boardPreview=1` / `?marketplacePreview=1` /
+  // `?creatorPreview=1` / `?communityRulesPreview=1` are entirely read-only,
+  // sample-data-only preview pages — no board is built, no relay/live path
+  // runs, and no runtime-selected boundary (storage, federation,
+  // marketplace, payment, entitlement, or chat) is ever called from any
+  // branch; `runtime` is not even read here. `boardPreview` takes
+  // precedence over `marketplacePreview`, which takes precedence over
+  // `creatorPreview`, which takes precedence over `communityRulesPreview`,
+  // when more than one is present; each falls through to normal routing
+  // when absent.
   if (isBoardPreviewEnabled(url)) {
     return htmlResponse(
       renderPage(buildThreads([]), { status: renderBoardPreviewPage(SAMPLE_BOARDS) }),
@@ -834,6 +875,26 @@ export async function handleRequest(
   if (isMarketplacePreviewEnabled(url)) {
     return htmlResponse(
       renderPage(buildThreads([]), { status: renderMarketplacePreviewPage(SAMPLE_LISTINGS) }),
+    );
+  }
+  // Stage 115: `?creatorPreview=1` — same read-only, sample-data-only
+  // treatment as the board/marketplace preview branches above; no runtime-
+  // selected boundary is called and `runtime` is not read here.
+  if (isCreatorPreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), {
+        status: renderCreatorProfilePreviewPage(SAMPLE_CREATOR_PROFILES),
+      }),
+    );
+  }
+  // Stage 116: `?communityRulesPreview=1` — same read-only, sample-data-only
+  // treatment as the preview branches above; no runtime-selected boundary
+  // is called and `runtime` is not read here.
+  if (isCommunityRulesPreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), {
+        status: renderCommunityRulesPreviewPage(SAMPLE_COMMUNITY_RULES),
+      }),
     );
   }
 
