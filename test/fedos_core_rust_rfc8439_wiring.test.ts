@@ -209,6 +209,15 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       // checks that it accepts no raw byte and performs no real format
       // decision.
       "fedos_key_format_descriptor_placeholder",
+      // Stage 106's key-usage planning-label function and algorithm
+      // policy metadata functions — see
+      // test/fedos_core_rust_key_usage_label.test.ts and
+      // test/fedos_core_rust_algorithm_policy.test.ts for the dedicated
+      // checks that none enforces a real authorization/validation rule.
+      "fedos_key_usage_descriptor_placeholder",
+      "fedos_algorithm_requirements",
+      "fedos_algorithm_capabilities",
+      "fedos_algorithm_policy_decision",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

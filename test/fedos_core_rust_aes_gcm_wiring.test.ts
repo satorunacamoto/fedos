@@ -182,8 +182,12 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_boundary_features",
       "fedos_boundary_policy_decision",
       "fedos_key_format_descriptor_placeholder",
+      "fedos_key_usage_descriptor_placeholder",
+      "fedos_algorithm_requirements",
+      "fedos_algorithm_capabilities",
+      "fedos_algorithm_policy_decision",
     ];
-    expect(pubFnNames.length).toBe(18);
+    expect(pubFnNames.length).toBe(22);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -280,6 +284,15 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // checks that it accepts no raw byte and performs no real format
       // decision.
       "fedos_key_format_descriptor_placeholder",
+      // Stage 106's key-usage planning-label function and algorithm
+      // policy metadata functions — see
+      // test/fedos_core_rust_key_usage_label.test.ts and
+      // test/fedos_core_rust_algorithm_policy.test.ts for the dedicated
+      // checks that none enforces a real authorization/validation rule.
+      "fedos_key_usage_descriptor_placeholder",
+      "fedos_algorithm_requirements",
+      "fedos_algorithm_capabilities",
+      "fedos_algorithm_policy_decision",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

@@ -304,6 +304,23 @@
 //! entropy source is consulted. The seventeen functions from Stage
 //! 69/102/103/104 are unchanged. See `docs/public_key_provisioning.md`
 //! for the full design record this addition follows.
+//!
+//! Stage 106 adds two more label-only PUBLIC groups (below, right after
+//! Stage 105's group, still ahead of the Stage 79 module):
+//! `FedosKeyUsageLabel` (eight variants — separating "what is this key
+//! for" from Stage 105's "what format is this key") plus
+//! `FedosKeyUsageState`/`FedosKeyUsageStatus`/`FedosKeyUsageDescriptor`
+//! and one new function, `fedos_key_usage_descriptor_placeholder`; and
+//! `FedosAlgorithmRequirement`/`FedosAlgorithmCapability`/
+//! `FedosAlgorithmPolicy` (fixed relational label tables over Stage
+//! 102's four algorithm candidates) plus three new functions,
+//! `fedos_algorithm_requirements`, `fedos_algorithm_capabilities`, and
+//! `fedos_algorithm_policy_decision`. No raw key byte, parser,
+//! validator, or enforced authorization rule is added anywhere;
+//! `Cargo.toml` is untouched; no CSPRNG entropy source is consulted. The
+//! eighteen functions from Stage 69/102/103/104/105 are unchanged. See
+//! `docs/public_key_usage.md` and `docs/public_algorithm_policy.md` for
+//! the full design records.
 
 #![forbid(unsafe_code)]
 
@@ -923,6 +940,210 @@ pub fn fedos_key_format_descriptor_placeholder() -> FedosKeyFormatDescriptor {
         status: FedosKeyFormatStatus {
             state: FedosKeyFormatState::Unavailable,
         },
+    }
+}
+
+/// Stage 106 — public key-usage label enumeration + algorithm policy
+/// metadata (planning only).
+///
+/// Two more label-only PUBLIC groups. `FedosKeyUsageLabel` separates
+/// "what is this key allowed to be used for" from Stage 105's "what
+/// format is this key" — planning intent only, never an enforced
+/// authorization rule. `FedosAlgorithmRequirement`/
+/// `FedosAlgorithmCapability`/`FedosAlgorithmPolicy` fix, as fixed
+/// relational tables of labels, what Stage 102's four algorithm
+/// candidates would eventually need as input and would eventually be
+/// capable of, plus a fixed approval-policy decision mirroring Stage
+/// 103's `FedosBoundaryPolicy` pattern. No raw byte, no owned string, and
+/// no growable byte collection exists anywhere in this section: every
+/// type holds ONLY fixed enum labels. Nothing here enforces a real
+/// authorization rule, validates a real algorithm requirement, or grants
+/// a real capability — every function returns a fixed, non-sensitive
+/// label or status. See `docs/public_key_usage.md` and
+/// `docs/public_algorithm_policy.md` for the full design records.
+
+/// A future key-USAGE label a provisioning or generation path would
+/// eventually attach to a key — planning intent only, never an enforced
+/// authorization rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosKeyUsageLabel {
+    EncryptionPlaceholder,
+    DecryptionPlaceholder,
+    SigningPlaceholder,
+    VerificationPlaceholder,
+    KeyDerivationPlaceholder,
+    StoragePlaceholder,
+    TransportPlaceholder,
+    /// A fixed sentinel this stage's own placeholder function returns —
+    /// never a real key usage.
+    TestOnlyPlaceholder,
+}
+
+/// Coarse observable state of the key-usage planning boundary. No key
+/// byte is accepted, bound, or enforced at any state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosKeyUsageState {
+    Unavailable,
+    Placeholder,
+}
+
+/// A non-sensitive status snapshot for the key-usage planning boundary.
+/// Never contains a key byte.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosKeyUsageStatus {
+    pub state: FedosKeyUsageState,
+}
+
+/// A non-sensitive descriptor pairing one [`FedosKeyUsageLabel`] with its
+/// [`FedosKeyUsageStatus`] — planning intent only, never an enforced
+/// authorization decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosKeyUsageDescriptor {
+    pub label: FedosKeyUsageLabel,
+    pub status: FedosKeyUsageStatus,
+}
+
+/// A fixed placeholder key-usage descriptor: always labels
+/// [`FedosKeyUsageLabel::TestOnlyPlaceholder`] with a permanently
+/// `Unavailable` status, regardless of any future input this function
+/// does not yet accept. Reads nothing, computes nothing, authorizes
+/// nothing.
+pub fn fedos_key_usage_descriptor_placeholder() -> FedosKeyUsageDescriptor {
+    FedosKeyUsageDescriptor {
+        label: FedosKeyUsageLabel::TestOnlyPlaceholder,
+        status: FedosKeyUsageStatus {
+            state: FedosKeyUsageState::Unavailable,
+        },
+    }
+}
+
+/// A REQUIREMENT label describing one kind of input a
+/// [`FedosCryptoAlgorithm`] (Stage 102) would eventually need supplied to
+/// it — planning intent only, never a real validation rule enforced
+/// anywhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosAlgorithmRequirementLabel {
+    RequiresKeyPlaceholder,
+    RequiresNoncePlaceholder,
+    RequiresSaltPlaceholder,
+    RequiresNoAdditionalInputPlaceholder,
+}
+
+/// A non-sensitive pairing of one [`FedosCryptoAlgorithm`] with one
+/// [`FedosAlgorithmRequirementLabel`] — explicit, direct reuse of Stage
+/// 102's algorithm label vocabulary, not a guess at a future design.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosAlgorithmRequirement {
+    pub algorithm: FedosCryptoAlgorithm,
+    pub requirement: FedosAlgorithmRequirementLabel,
+}
+
+const FEDOS_ALGORITHM_REQUIREMENTS: &[FedosAlgorithmRequirement] = &[
+    FedosAlgorithmRequirement {
+        algorithm: FedosCryptoAlgorithm::ChaCha20Poly1305,
+        requirement: FedosAlgorithmRequirementLabel::RequiresKeyPlaceholder,
+    },
+    FedosAlgorithmRequirement {
+        algorithm: FedosCryptoAlgorithm::ChaCha20Poly1305,
+        requirement: FedosAlgorithmRequirementLabel::RequiresNoncePlaceholder,
+    },
+    FedosAlgorithmRequirement {
+        algorithm: FedosCryptoAlgorithm::Aes256Gcm,
+        requirement: FedosAlgorithmRequirementLabel::RequiresKeyPlaceholder,
+    },
+    FedosAlgorithmRequirement {
+        algorithm: FedosCryptoAlgorithm::Aes256Gcm,
+        requirement: FedosAlgorithmRequirementLabel::RequiresNoncePlaceholder,
+    },
+    FedosAlgorithmRequirement {
+        algorithm: FedosCryptoAlgorithm::HkdfSha256,
+        requirement: FedosAlgorithmRequirementLabel::RequiresSaltPlaceholder,
+    },
+    FedosAlgorithmRequirement {
+        algorithm: FedosCryptoAlgorithm::Argon2id,
+        requirement: FedosAlgorithmRequirementLabel::RequiresSaltPlaceholder,
+    },
+];
+
+/// The fixed list of algorithm requirements this crate's public boundary
+/// currently enumerates — intent only. Reads nothing, computes nothing.
+pub fn fedos_algorithm_requirements() -> &'static [FedosAlgorithmRequirement] {
+    FEDOS_ALGORITHM_REQUIREMENTS
+}
+
+/// A CAPABILITY label describing one operation a [`FedosCryptoAlgorithm`]
+/// would eventually be capable of performing — planning intent only,
+/// never a real capability grant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosAlgorithmCapabilityLabel {
+    AeadEncryptPlaceholder,
+    AeadDecryptPlaceholder,
+    KdfDerivePlaceholder,
+}
+
+/// A non-sensitive pairing of one [`FedosCryptoAlgorithm`] with one
+/// [`FedosAlgorithmCapabilityLabel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosAlgorithmCapability {
+    pub algorithm: FedosCryptoAlgorithm,
+    pub capability: FedosAlgorithmCapabilityLabel,
+}
+
+const FEDOS_ALGORITHM_CAPABILITIES: &[FedosAlgorithmCapability] = &[
+    FedosAlgorithmCapability {
+        algorithm: FedosCryptoAlgorithm::ChaCha20Poly1305,
+        capability: FedosAlgorithmCapabilityLabel::AeadEncryptPlaceholder,
+    },
+    FedosAlgorithmCapability {
+        algorithm: FedosCryptoAlgorithm::ChaCha20Poly1305,
+        capability: FedosAlgorithmCapabilityLabel::AeadDecryptPlaceholder,
+    },
+    FedosAlgorithmCapability {
+        algorithm: FedosCryptoAlgorithm::Aes256Gcm,
+        capability: FedosAlgorithmCapabilityLabel::AeadEncryptPlaceholder,
+    },
+    FedosAlgorithmCapability {
+        algorithm: FedosCryptoAlgorithm::Aes256Gcm,
+        capability: FedosAlgorithmCapabilityLabel::AeadDecryptPlaceholder,
+    },
+    FedosAlgorithmCapability {
+        algorithm: FedosCryptoAlgorithm::HkdfSha256,
+        capability: FedosAlgorithmCapabilityLabel::KdfDerivePlaceholder,
+    },
+    FedosAlgorithmCapability {
+        algorithm: FedosCryptoAlgorithm::Argon2id,
+        capability: FedosAlgorithmCapabilityLabel::KdfDerivePlaceholder,
+    },
+];
+
+/// The fixed list of algorithm capabilities this crate's public boundary
+/// currently enumerates — intent only. Reads nothing, computes nothing.
+pub fn fedos_algorithm_capabilities() -> &'static [FedosAlgorithmCapability] {
+    FEDOS_ALGORITHM_CAPABILITIES
+}
+
+/// A fixed approval decision for a [`FedosCryptoAlgorithm`] — mirrors
+/// Stage 103's `FedosBoundaryPolicy` always-`DenyPlaceholder` pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosAlgorithmPolicyDecision {
+    NotYetApprovedPlaceholder,
+}
+
+/// A non-sensitive pairing of one [`FedosCryptoAlgorithm`] with its fixed
+/// [`FedosAlgorithmPolicyDecision`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosAlgorithmPolicy {
+    pub algorithm: FedosCryptoAlgorithm,
+    pub decision: FedosAlgorithmPolicyDecision,
+}
+
+/// The fixed policy decision for a given [`FedosCryptoAlgorithm`]: always
+/// `NotYetApprovedPlaceholder`, regardless of `algorithm` — no algorithm
+/// is approved for real use yet. Reads nothing, computes nothing.
+pub fn fedos_algorithm_policy_decision(algorithm: FedosCryptoAlgorithm) -> FedosAlgorithmPolicy {
+    FedosAlgorithmPolicy {
+        algorithm,
+        decision: FedosAlgorithmPolicyDecision::NotYetApprovedPlaceholder,
     }
 }
 

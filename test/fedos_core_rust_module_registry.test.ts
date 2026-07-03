@@ -132,8 +132,12 @@ describe("FedOS Rust crate — internal module registry skeleton", () => {
       "fedos_boundary_features",
       "fedos_boundary_policy_decision",
       "fedos_key_format_descriptor_placeholder",
+      "fedos_key_usage_descriptor_placeholder",
+      "fedos_algorithm_requirements",
+      "fedos_algorithm_capabilities",
+      "fedos_algorithm_policy_decision",
     ];
-    expect(pubFnNames.length).toBe(18);
+    expect(pubFnNames.length).toBe(22);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

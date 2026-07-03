@@ -130,12 +130,14 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     // (without the `_placeholder` suffix) or any `*_impl`/`*_real` name.
     // Updated Stage 103: `_descriptors`/`_version`/`_features`/`_decision`
     // added as safe suffixes for the new boundary-consolidation functions.
+    // Updated Stage 106: `_requirements` added for
+    // `fedos_algorithm_requirements`.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
     for (const name of pubFnNames) {
       expect(
-        /_placeholder$|_status$|_capabilities$|_descriptors$|_version$|_features$|_decision$/.test(
+        /_placeholder$|_status$|_capabilities$|_descriptors$|_version$|_features$|_decision$|_requirements$/.test(
           name,
         ),
         `unexpected public function name: ${name}`,

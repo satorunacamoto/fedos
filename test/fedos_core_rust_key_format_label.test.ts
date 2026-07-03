@@ -52,10 +52,13 @@ describe("FedOS Rust crate — public key-format label boundary (Stage 105)", ()
     .join("\n")
     .toLowerCase();
 
+  // Ends right before Stage 106's own key-usage/algorithm-policy groups
+  // (added later) so this section stays scoped to exactly Stage 105's
+  // types.
   const stage105Section = extractSection(
     libRsSource,
     "Stage 105 — public key-format label enumeration",
-    "Stage 79 — an INTERNAL-ONLY secret-handle skeleton",
+    "Stage 106 — public key-usage label enumeration",
   );
 
   it("1. FedosKeyFormatLabel exists, with the seven specified variants", () => {
@@ -143,7 +146,7 @@ describe("FedOS Rust crate — public key-format label boundary (Stage 105)", ()
     expect(stage105Section).not.toMatch(/#\[derive\([^)]*Deserialize[^)]*\)\]/);
   });
 
-  it("6. lib.rs's public `pub fn` surface is exactly eighteen functions, reflecting the new increase", () => {
+  it("6. lib.rs's public `pub fn` surface is exactly twenty-two functions, reflecting Stage 105/106's increases", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
@@ -166,8 +169,12 @@ describe("FedOS Rust crate — public key-format label boundary (Stage 105)", ()
       "fedos_boundary_features",
       "fedos_boundary_policy_decision",
       "fedos_key_format_descriptor_placeholder",
+      "fedos_key_usage_descriptor_placeholder",
+      "fedos_algorithm_requirements",
+      "fedos_algorithm_capabilities",
+      "fedos_algorithm_policy_decision",
     ];
-    expect(pubFnNames.length).toBe(18);
+    expect(pubFnNames.length).toBe(22);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

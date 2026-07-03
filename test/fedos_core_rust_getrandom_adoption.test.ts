@@ -109,7 +109,7 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     expect(productionLibRs).not.toMatch(/\bgetrandom\s*\(/);
   });
 
-  it("5. lib.rs's public pub fn surface is unaffected — still exactly seventeen functions", () => {
+  it("5. lib.rs's public pub fn surface reflects the current total (getrandom adoption itself added no function)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
@@ -132,8 +132,12 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
       "fedos_boundary_features",
       "fedos_boundary_policy_decision",
       "fedos_key_format_descriptor_placeholder",
+      "fedos_key_usage_descriptor_placeholder",
+      "fedos_algorithm_requirements",
+      "fedos_algorithm_capabilities",
+      "fedos_algorithm_policy_decision",
     ];
-    expect(pubFnNames.length).toBe(18);
+    expect(pubFnNames.length).toBe(22);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
