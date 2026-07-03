@@ -91,3 +91,18 @@ None of these connections exists today; `checkPlaceholder` always resolves
   `unavailable`, and never reports `allowed: true`.
 - Payment, marketplace, and entitlement remain three separate, uncoupled
   boundaries until a future stage deliberately connects them.
+
+---
+
+## 6. Stage 112 update note
+
+`docs/creator_monetization_flow.md` §5 restates and relies on this
+document's central rule — "paid" and "accessible" are different facts,
+and `EntitlementProvider` is the ONLY boundary allowed to answer the
+access question — as the permission model for the whole future
+monetization flow (listing → purchase intent → payment placeholder →
+entitlement check → gated chat/content). It also fixes that an
+`EntitlementDecision` must never be placed on a public Nostr/federation
+event (§10 there; see also `docs/nostr_adapter_planning.md` §9). Neither
+doc changes anything shipped here; `NoopEntitlementProvider` remains the
+only implementation and still never returns `allowed: true`.

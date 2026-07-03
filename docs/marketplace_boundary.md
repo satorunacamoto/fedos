@@ -92,3 +92,17 @@ resolves `unavailable`/`rejected` and never reaches any of them.
 - `src/commerce/`, `src/payment/`, and this new boundary remain three
   separate, uncoupled pieces until a future stage deliberately connects
   them.
+
+---
+
+## 7. Stage 112 update note
+
+`docs/creator_monetization_flow.md` fixes the intended FUTURE sequence
+this boundary sits in: listing → purchase intent → payment placeholder →
+entitlement check → gated chat/content → federation announcement (see its
+§3). It also names fee concepts (platform fee, creator share, developer
+fund, community treasury — all policy-only, §6) that a future listing
+might reference, and states that a listing announcement's PUBLIC metadata
+only (never price/payment) is a `docs/nostr_adapter_planning.md`-style
+federation-announcement candidate. Neither doc changes anything shipped
+here; `NoopMarketplaceProvider` remains the only implementation.

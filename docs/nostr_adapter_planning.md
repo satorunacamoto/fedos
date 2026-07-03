@@ -1,0 +1,187 @@
+# Nostr Adapter Planning (research/design docs only — no implementation)
+
+**Status: docs only. This document adds NO relay connection, NO WebSocket,
+NO signing, NO NIP-44/NIP-17, NO DM, NO publish/subscribe, and NO change
+to `src/`, `packages/`, or `Cargo.toml`.** It fixes how a future real Nostr
+adapter behind `FederationProvider` (Stage 110) would connect FedOS's
+Board/Chat/Marketplace layers to the Nostr protocol — before any of it is
+built.
+
+---
+
+## 1. Purpose
+
+Design, in advance, how FedOS's Board (`src/social/board.ts`), Social
+Event Model (`src/social/event.ts`), Chat (`src/chat/`), and Marketplace
+(`src/marketplace/`) layers would connect to Nostr specifically, as the
+first concrete protocol behind `FederationProvider`
+(`docs/federation_boundary.md`). Fixing this now — before any relay code
+exists — avoids conflating "how Nostr works" with "how FedOS models social
+content", which `src/social/` was already built to keep separate (Stage
+110).
+
+---
+
+## 2. Nostr's role, correctly scoped
+
+- **Nostr is a publish/relay layer, not a moderation layer.** A NIP-09
+  "delete" is a *request* relays may ignore; copies persist elsewhere (see
+  `docs/deniable_storage_research.md` §7 for the same point made about
+  storage). FedOS must not model Nostr interactions as if content can be
+  reliably erased.
+- **Correct mental model: visibility/filter/moderation, not deletion.**
+  What FedOS controls is whether IT shows/hides/filters a piece of
+  content in ITS OWN board/chat rendering — never whether the underlying
+  Nostr event still exists somewhere.
+- **Publish layer** — where a signed event is sent (a relay's `["EVENT",
+  ...]` handling). Already scaffolded, unconnected to any of this, in
+  `src/nostr/publish.ts`.
+- **Relay layer** — the transport/network of relay servers themselves.
+  FedOS does not operate relays; it is a client of them.
+- **FedOS is the context/render/moderation/commerce layer on top.** Board
+  grouping, thread rendering, moderation decisions, and any future
+  marketplace/entitlement logic are FedOS's own responsibility — Nostr
+  supplies raw public events; FedOS decides what they mean and how they're
+  shown.
+
+---
+
+## 3. Compatibility posture: interoperate with existing Nostr clients
+
+FedOS should aim for public posts, replies, and reactions to remain
+visible and correctly interpreted by existing Nostr clients — Damus,
+Primal, Amethyst — using the SAME public event kinds/tags those clients
+already expect (NIP-01 kind 1 notes, standard `e`/`p` tags for
+replies/reactions). This is a compatibility GOAL for future
+implementation, not something built by this document:
+
+- A FedOS "board thread" reply should still look like a normal reply to
+  a Damus/Primal user, not a FedOS-proprietary shape they can't render.
+- FedOS-specific concepts (a board id, a marketplace listing kind) that
+  have no Nostr-native equivalent should degrade gracefully — e.g. as a
+  normal note with FedOS-only tags other clients simply ignore, not as a
+  malformed event other clients might reject or mis-render.
+
+---
+
+## 4. What FedOS-specific metadata may and may not ride on a Nostr event
+
+- **PUBLIC metadata only.** A future event built from a
+  `SocialEventDescriptor`/`BoardDescriptor`/`MarketplaceListingDescriptor`
+  may carry public, non-sensitive labels (a board reference, a topic, a
+  listing kind) as tags — the same class of information a Reddit
+  crosspost flair or a forum category already is.
+- **Private, gated, payment, and entitlement data must NEVER be placed on
+  a Nostr event.** This includes: gated chat content, an
+  `EntitlementDecision`, any `PaymentRequest`/`PaymentDecision` field, a
+  buyer's identity tied to a purchase, or a `StoragePacket`'s metadata.
+  See `docs/creator_monetization_flow.md` §10 for the monetization-specific
+  version of this rule.
+- Rationale: a Nostr event is permanently public and effectively
+  undeletable in practice (§2) — anything that must stay private or
+  access-controlled cannot depend on "nobody will look at this event".
+
+---
+
+## 5. Candidate event mappings (naming only, nothing built)
+
+| FedOS concept | Nostr mapping candidate | Notes |
+| --- | --- | --- |
+| `post` (`SocialEventKind`) | kind 1 note | Standard NIP-01 text note |
+| `reply` | kind 1 note + `e`/`p` tags | Standard reply convention (Damus/Primal-compatible) |
+| Board thread (`BoardDescriptor`, kind `thread`) | kind 1 root note + replies, with a FedOS-only board-ref tag | Root note stays a normal note to other clients; the board tag is additive |
+| Marketplace announcement (`MarketplaceListingDescriptor`) | kind 1 note (or a future NIP-99-style classified listing kind) | PUBLIC fields only — see §4; price/payment never included |
+| Creator profile | kind 0 metadata | Standard NIP-01 profile event |
+| Moderation signal | a FedOS-local decision, NOT necessarily a Nostr event | See §7 — moderation is FedOS's own visibility choice, not something that must be published |
+
+This table names candidates for a FUTURE mapping function (e.g. a pure
+`socialEventToNostrCandidate`-shaped helper) — none is implemented, and no
+event kind number is finalized here.
+
+---
+
+## 6. What this document does NOT implement
+
+- A real relay connection or WebSocket of any kind
+- Event signing (NIP-01, or any encrypted variant)
+- NIP-44 (versioned encrypted payloads)
+- NIP-17 (gift-wrapped private DMs)
+- Any DM of any kind
+- `publish` (sending an event to a relay)
+- `subscribe` (opening a live/filtered event stream)
+- Any change to `FederationProvider`'s shipped shape (Stage 110) — this
+  document plans a future adapter BEHIND that seam, it does not modify it
+
+---
+
+## 7. Moderation model (design intent, not implemented)
+
+- **Hide/mute/filter, never claim deletion.** FedOS's own board/chat
+  rendering can choose not to show an event — this is a LOCAL visibility
+  decision, not a request that changes what exists on any relay.
+- **Community visibility rules** — a future board/community could set its
+  own filter policy (e.g. hide replies from a muted pubkey within that
+  board) independent of any other board's rules.
+- **Relay choice as a moderation lever** — which relays FedOS reads
+  from/publishes to is itself a moderation-adjacent decision (a relay with
+  its own moderation policy), tracked as a future design question, not
+  decided here.
+
+---
+
+## 8. Cross-protocol future: Nostr is the first adapter, not the only one
+
+`FederationProvider` (Stage 110) already names `bluesky_placeholder` and
+`threads_placeholder` alongside `nostr_placeholder` for exactly this
+reason: nothing in FedOS's Board/Social/Chat/Marketplace layers should
+assume Nostr-only semantics. This document's mapping table (§5) is
+Nostr-specific by necessity (protocols differ), but the SocialEventKind/
+BoardKind vocabulary it maps FROM stays protocol-neutral on purpose (Stage
+110) — a future Bluesky or Threads adapter would need its OWN mapping
+table, not a reuse of Nostr's event-kind numbers.
+
+---
+
+## 9. Security / privacy rules for any future implementation
+
+- **No private content in a public event.** Restated from §4: gated chat,
+  gated marketplace content, or anything a user marked non-public must
+  never be serialized into a Nostr event.
+- **No payment state in a public event.** A payment id, amount, or status
+  must never appear in event content or tags.
+- **No entitlement leak.** Whether a specific pubkey has access to a
+  specific gated resource must never be inferable from a public event —
+  neither directly (an explicit tag) nor indirectly (e.g. a
+  "purchased-by" reply thread).
+
+---
+
+## 10. Future implementation order (design intent, not scheduled)
+
+1. A pure, unsigned mapping function: `SocialEventDescriptor` →
+   Nostr-event-candidate shape (no relay, no signing) — the natural next
+   boundary skeleton (see Stage 113 candidates).
+2. A read-only fetch adapter behind `FederationProvider.fetchPlaceholder`
+   for `nostr_placeholder`, still no WebSocket — likely an HTTP-based relay
+   query or an injected client, mirroring how `EdgeRecPromotionProvider`
+   isolates its `fetch` behind an injected client with a clamped timeout.
+3. Real signing, via `CryptoProvider`/identity boundaries — never
+   reimplemented inside the adapter (see `docs/federation_boundary.md` §7).
+4. A real WebSocket publish path, reusing the ALREADY-scaffolded
+   `src/nostr/publish.ts`/`src/nostr/ws_relay.ts` machinery rather than a
+   new one.
+5. NIP-44/NIP-17 DM support only after the above is stable, and only
+   behind `ChatProvider` (`docs/chat_boundary.md`), never inline in the
+   federation adapter.
+
+---
+
+## 11. Conclusion
+
+- Nostr is treated as a publish/relay layer FedOS is a CLIENT of — not a
+  moderation or deletion mechanism, and not the only protocol
+  `FederationProvider` will ever speak.
+- Compatibility with Damus/Primal/Amethyst for public posts/replies/
+  reactions is a goal for the eventual real adapter.
+- No relay connection, signing, encryption, publish, or subscribe exists
+  after this document — it fixes the plan, not the implementation.

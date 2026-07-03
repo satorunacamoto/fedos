@@ -8,7 +8,60 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 111 — Chat + Marketplace + Creator entitlement boundary
+> **Status: Stage 112 — Creator monetization + Nostr adapter planning
+> (docs only).** Two new design docs fix how the already-shipped
+> boundaries are EXPECTED to eventually connect — **no source file
+> changed, no test file changed, no new provider/API, no `src/worker.ts`/
+> `src/runtime/*`/Rust/`Cargo.toml` change.** New
+> [`docs/creator_monetization_flow.md`](docs/creator_monetization_flow.md)
+> fixes the sequence a future sale would follow — listing
+> (`MarketplaceProvider`) → purchase intent → payment placeholder
+> (`PaymentProvider`) → entitlement check (`EntitlementProvider`) → gated
+> chat/content (`ChatProvider`) → federation announcement
+> (`FederationProvider`) — states the central rule that "paid" and
+> "accessible" are different facts and `EntitlementProvider` alone answers
+> the access question, names fee concepts (platform fee/creator share/
+> developer fund/community treasury) as POLICY-ONLY with no calculation or
+> ledger, names community self-governance concepts (moderation/listing
+> visibility/creator trust/appeal) with an explicit "no DAO implemented"
+> line, and fixes security rules (payment metadata never in chat/
+> federation payloads, no entitlement decision on a public event, no buyer-
+> identity leak via a public announcement). New
+> [`docs/nostr_adapter_planning.md`](docs/nostr_adapter_planning.md) fixes
+> how a future real Nostr adapter behind `FederationProvider` would work:
+> Nostr as a visibility/filter/moderation-only layer (never a deletion
+> guarantee), a Damus/Primal/Amethyst compatibility goal for public posts/
+> replies/reactions, a PUBLIC-metadata-only rule for what FedOS-specific
+> data may ride on an event, a candidate event-mapping table (post/reply/
+> board-thread/marketplace-announcement/profile/moderation-signal — naming
+> only, no kind numbers finalized), and a hide/mute/filter moderation model
+> instead of relying on NIP-09 delete. Both docs end with a "future
+> implementation order" naming Stage 113's likely next step (a pure,
+> unsigned `SocialEventDescriptor` → Nostr-event-candidate mapping
+> function) without building it. Short **Stage 112 update notes** were
+> appended to
+> [`docs/chat_boundary.md`](docs/chat_boundary.md#6-stage-112-update-note),
+> [`docs/marketplace_boundary.md`](docs/marketplace_boundary.md#7-stage-112-update-note),
+> and
+> [`docs/creator_entitlement_boundary.md`](docs/creator_entitlement_boundary.md#6-stage-112-update-note)
+> cross-linking the new flow/planning docs — none of their shipped
+> boundary content changed. `npm run typecheck`, `npm test` (120 files,
+> 1665 tests, unchanged — no test file was touched), `cargo check`,
+> `cargo test` (108 tests, unchanged), and `cargo check --tests` all stay
+> GREEN, since no source or test file was touched. Where this stage
+> stopped, on purpose: no relay connection, no WebSocket/`fetch`, no
+> signing, no NIP-44/NIP-17, no `PaymentProvider` connection, no
+> `PurchaseGrant` issuance, no checkout/invoice, no download unlock, and no
+> chat-content implementation — every flow step named is still exactly the
+> placeholder it was before this stage. Stage 113 candidates: (1) a board
+> route preview UI skeleton; (2) a Nostr event mapping boundary skeleton —
+> a PURE function from `SocialEventDescriptor` to a Nostr-event-candidate
+> shape, still no relay/signing (recommended, since
+> `docs/nostr_adapter_planning.md` §10 step 1 names this as the natural
+> next step and it can be built and tested with zero network/crypto
+> surface); (3) a creator listing preview UI skeleton. Prior status:
+>
+> **Stage 111 — Chat + Marketplace + Creator entitlement boundary
 > foundation.** Fixes three more upper-app-layer seams — still **no real
 > DM/encryption, no real payment/checkout, no entitlement issuance, no
 > Worker wiring, no Rust change.** New

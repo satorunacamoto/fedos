@@ -86,3 +86,16 @@ None of these connections exists today.
 - `ChatProvider` is a naming/shape boundary only.
 - `NoopChatProvider` is the only implementation, permanently `unavailable`.
 - The existing Stage 16 chat rendering model is untouched and unaffected.
+
+---
+
+## 6. Stage 112 update note
+
+`docs/creator_monetization_flow.md` §3 step 5 and §5 name the intended
+FUTURE role of `ChatProvider` in a monetization flow: a real gated-chat
+route would call `EntitlementProvider.checkPlaceholder` FIRST, before any
+send/fetch is allowed — `ChatProvider` itself would never re-derive access
+from payment state. `docs/nostr_adapter_planning.md` §10 step 5 notes that
+NIP-44/NIP-17 DM support, if ever built, belongs behind THIS seam, not
+inline in a federation adapter. Neither doc changes anything shipped here;
+`NoopChatProvider` remains the only implementation.
