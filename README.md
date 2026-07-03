@@ -8,7 +8,72 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 117 — Protocol adapter capability matrix + Creator
+> **Status: Stage 118 — Federation outbound queue skeleton + Creator
+> analytics preview boundary + Protocol moderation compatibility docs.** One
+> more pure, in-memory queue boundary, one more opt-in read-only preview
+> page, and a new docs-only note — still **no real network send, no real
+> analytics aggregation, no real moderation action, and only the one new
+> preview route touches the Worker.** New
+> [`src/federation/outbound_queue.ts`](src/federation/outbound_queue.ts)
+> defines `OutboundQueueItemDescriptor` (`idRef?`/`intentRef?`/
+> `adapterKind`/`createdAt?`/`metadata?`, NO content/body/bytes field) and
+> `OutboundQueueState` (`queued_placeholder`/`dequeued_placeholder`/
+> `rejected`), with pure `enqueuePlaceholder`/`dequeuePlaceholder` functions
+> that reject the same signing/relay-specific sensitive-marker family as
+> `src/federation/publish_intent.ts` and return a NEW array rather than
+> mutating the one passed in — no `fetch`, no `WebSocket`, no signing, no
+> publish/subscribe anywhere. New
+> [`src/render/creator_analytics_preview.ts`](src/render/creator_analytics_preview.ts)
+> (`renderCreatorAnalyticsPreview`/`renderCreatorAnalyticsPreviewPage`, plus
+> static `SAMPLE_CREATOR_ANALYTICS`) shows a sample creator's `creatorRef`,
+> four PLACEHOLDER counts (posts/replies/reactions/moderation events —
+> static numbers, never a real aggregation), and a fixed
+> `ModerationVisibilityDecision`-label summary, HTML-escaped, ending in a
+> permanently `disabled` "view detail" button — no real purchaser identity
+> and no monetary/settlement field of any kind. Gated behind an EXPLICIT
+> `?creatorAnalyticsPreview=1` flag in
+> [`src/worker.ts`](src/worker.ts) (`isCreatorAnalyticsPreviewEnabled`),
+> inserted right after the Stage 117 `?creatorDashboardPreview=1` branch so
+> priority is runtimeStatus → boardPreview → marketplacePreview →
+> creatorPreview → communityRulesPreview → creatorDashboardPreview →
+> creatorAnalyticsPreview → normal routing; the new branch reads no
+> `runtime` and calls no Runtime-selected boundary, and every pre-existing
+> route is unaffected. New
+> [`docs/protocol_moderation_compatibility.md`](docs/protocol_moderation_compatibility.md)
+> fixes, per protocol, how a future adapter would express moderation
+> (Nostr's NIP-09/NIP-51 hide/mute/filter model restated protocol-
+> specifically; Bluesky's label-and-single-host differences; Threads'
+> centralized-platform-authority differences; RSS's "no primitive at all")
+> and how FedOS's own `ModerationVisibilityDecision`
+> (`src/community/moderation.ts`) stays the single source of truth for
+> FedOS's own rendering regardless of protocol — docs only, no AT Protocol/
+> Threads API/RSS-fetch call, no change to any shipped boundary's shape.
+> New
+> [`test/outbound_queue_creator_analytics.test.ts`](test/outbound_queue_creator_analytics.test.ts)
+> (26 tests) checks: `enqueuePlaceholder`/`dequeuePlaceholder` are FIFO,
+> pure, and never mutate their input queue, both reject the sensitive-marker
+> family without enqueuing, the analytics preview escapes every label
+> (including an XSS-shaped one), every button is permanently `disabled`, no
+> revenue/amount/payment/checkout/invoice/buyer/email word appears anywhere
+> in the new preview file, the `creatorAnalyticsPreview` flag gates
+> correctly and yields precedence to every earlier preview flag, and no
+> source imports a relay/WebSocket library, calls a provider method, or
+> reads a Runtime-selected boundary from the Worker. `npm run typecheck` and
+> `npm test` (127 files, 1843 tests) stay GREEN; `cargo check`/`cargo test`
+> are unchanged — no Rust file was touched this stage (this environment's
+> shell has no `cargo` on `PATH` to re-run it, but nothing under
+> `Cargo.toml`/`*.rs` was edited). Where this stage stopped, on purpose: no
+> real network send/signing/publish, no real analytics aggregation, no real
+> moderation action, no `StorageBackend`/`PaymentProvider`/
+> `EntitlementProvider`/`MarketplaceProvider`/`FederationProvider`/
+> `ChatProvider` call from any new file, and no Runtime auto-call. Stage 119
+> candidates: (1) a Federation outbound queue Worker-visible status preview
+> (still no send); (2) a Bluesky adapter planning doc (mirroring
+> `docs/nostr_adapter_planning.md`'s structure); (3) a Creator moderation
+> appeal boundary (naming-only, no enforcement).
+> Prior status:
+>
+> **Stage 117 — Protocol adapter capability matrix + Creator
 > dashboard preview UI.** One more fixed, cross-protocol naming boundary
 > plus one more opt-in, read-only preview page — still **no real relay/
 > WebSocket/OAuth/AT-Protocol connection, no real analytics/settlement
