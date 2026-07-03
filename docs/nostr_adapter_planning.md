@@ -185,3 +185,37 @@ table, not a reuse of Nostr's event-kind numbers.
   reactions is a goal for the eventual real adapter.
 - No relay connection, signing, encryption, publish, or subscribe exists
   after this document — it fixes the plan, not the implementation.
+
+---
+
+## 12. Stage 113 update note
+
+§10 step 1's "pure, unsigned mapping function" is now shipped as a
+SKELETON: `src/federation/nostr_mapping.ts`
+(`socialEventToNostrCandidate`/`boardToNostrCandidate`/
+`marketplaceListingToNostrCandidate`/`moderationSignalToNostrCandidate`)
+and the `NostrEventCandidate`/`NostrEventCandidateKind`/
+`NostrEventMappingDecision`/`ModerationSignalInput` types in
+`src/federation/types.ts`. This realizes §5's candidate-mapping table as
+actual (still unsigned, unconnected) code: `post`/`reply`/`repost`/
+`reaction`/`profile`/`article`/`marketplace` (`SocialEventKind`) map to
+`text_note_placeholder`/`reply_placeholder`/`text_note_placeholder`/
+`reaction_placeholder`/`profile_placeholder`/`long_form_placeholder`/
+`marketplace_announcement_placeholder` respectively; `chat` is REJECTED
+unconditionally (§9's "no private content" rule applied concretely: chat/
+DM activity can never become a public candidate, full stop, regardless of
+its declared visibility); a `BoardDescriptor` maps to a root
+`text_note_placeholder` candidate carrying its title and topic/category
+labels as tags; a `MarketplaceListingDescriptor` maps to a
+`marketplace_announcement_placeholder` candidate that structurally cannot
+carry a price/payment/checkout/download field (the type has none); and a
+new `ModerationSignalInput`/`ModerationAction` (`hide_placeholder`/
+`mute_placeholder`/`filter_placeholder`) realizes §7's "hide/mute/filter,
+never deletion" model as a `moderation_signal_placeholder` candidate. Only
+`public` visibility (`SocialEventDescriptor`) / `public`/`unlisted`
+(`MarketplaceListingDescriptor`) is ever candidate-ized; every other
+visibility is rejected outright. No relay connection, WebSocket, `fetch`,
+signing, private key, NIP-44/NIP-17, publish, or subscribe was added by
+this stage; `NostrEventCandidate` still has no event id, signature, or
+real pubkey field. See `README.md`'s Stage 113 entry and
+`test/nostr_event_mapping.test.ts` for the full verification.

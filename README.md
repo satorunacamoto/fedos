@@ -8,7 +8,65 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 112 — Creator monetization + Nostr adapter planning
+> **Status: Stage 113 — Nostr event mapping boundary skeleton.** Realizes
+> `docs/nostr_adapter_planning.md` §10 step 1 as a PURE mapping
+> boundary — still **no relay connection, no WebSocket/`fetch`, no
+> signing, no private key, no NIP-44/NIP-17, no publish/subscribe, and no
+> private/gated/payment/entitlement data on any candidate.** New types in
+> [`src/federation/types.ts`](src/federation/types.ts) (additive):
+> `NostrEventCandidate` (`kindLabel`/`tags`/`contentPreview?`/
+> `pubkeyRef?`/`createdAt?`/`metadata?` — no event id, signature, or real
+> pubkey field), eight `NostrEventCandidateKind` labels (`text_note_`/
+> `reply_`/`reaction_`/`profile_`/`long_form_`/
+> `marketplace_announcement_`/`moderation_signal_`/`test_placeholder`),
+> `NostrEventMappingDecision`, and a new `ModerationSignalInput`/
+> `ModerationAction` (`hide_`/`mute_`/`filter_placeholder`) pair for the
+> fourth mapping function. New
+> [`src/federation/nostr_mapping.ts`](src/federation/nostr_mapping.ts)
+> ships four PURE functions — `socialEventToNostrCandidate`,
+> `boardToNostrCandidate`, `marketplaceListingToNostrCandidate`,
+> `moderationSignalToNostrCandidate` — each returning an
+> `accepted_placeholder`/`candidate` pair or a `rejected` decision, never
+> mutating input, never throwing. Policy: only `public` visibility
+> (`SocialEventDescriptor`; it has no "unlisted" value) or `public`/
+> `unlisted` (`MarketplaceListingDescriptor`) is ever candidate-ized —
+> `followers`/`community`/`private_placeholder`/`private` are rejected
+> outright; `SocialEventKind: "chat"` is rejected UNCONDITIONALLY
+> regardless of visibility (chat/DM activity never becomes a public
+> candidate); and metadata/reason/title strings containing a secret/key/
+> seed/token/payment/entitlement/buyer/checkout/invoice/download/signed/
+> url/dm/message/body/content marker are dropped from `metadata` or cause
+> outright rejection for a single field like `reason`/`title`.
+> `contentPreview` is always either a FIXED placeholder string or (for a
+> board's already-display-only `title`) that same sanitized label — never
+> real post/message content. New
+> [`test/nostr_event_mapping.test.ts`](test/nostr_event_mapping.test.ts)
+> (28 tests) checks all four mapping functions against a clean input, a
+> rejected chat/non-public/private visibility, sensitive metadata/reason/
+> title rejection, the fixed-placeholder `contentPreview`, no mutation, no
+> `id`/`sig`/`privateKey`/`pubkey` field on any candidate, and that no
+> source imports a relay/WebSocket/signing/crypto library or
+> `PaymentProvider`/`EntitlementProvider`/`StorageBackend`/`CryptoProvider`,
+> and that neither the Runtime nor the Worker references any of the four
+> mapping functions. Short **Stage 113 update notes** were appended to
+> [`docs/nostr_adapter_planning.md`](docs/nostr_adapter_planning.md#12-stage-113-update-note)
+> cross-linking the shipped mapping table to §5's candidate table. `npm
+> run typecheck`, `npm test` (121 files, 1693 tests), `cargo check`,
+> `cargo check --tests`, and `cargo test` (108 tests, unchanged — no Rust
+> file was touched this stage) all stay GREEN. Where this stage stopped,
+> on purpose: no relay/WebSocket/HTTP connection, no `fetch`, no event
+> signing of any kind, no NIP-44/NIP-17, no publish/subscribe, no
+> connection to `PaymentProvider`/`EntitlementProvider`/`StorageBackend`/
+> `CryptoProvider`/any `FederationProvider` implementation, and no
+> Runtime/Worker wiring — constructing a candidate is the only thing any
+> of the four functions does. Stage 114 candidates: (1) a board route
+> preview UI skeleton; (2) a creator listing preview UI skeleton
+> (recommended together — with mapping candidates in place, a read-only
+> preview of how a board/listing WOULD render gives the product a visible
+> shape while relay/payment/entitlement all remain unimplemented); (3)
+> Nostr mapping diagnostics docs. Prior status:
+>
+> **Stage 112 — Creator monetization + Nostr adapter planning
 > (docs only).** Two new design docs fix how the already-shipped
 > boundaries are EXPECTED to eventually connect — **no source file
 > changed, no test file changed, no new provider/API, no `src/worker.ts`/
