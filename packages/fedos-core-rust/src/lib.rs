@@ -185,6 +185,19 @@
 //! `crypto_pipeline`, `descriptor_bundle`, or `execution_plan` today. Same
 //! rules apply: not part of the public API, no public function above
 //! constructs, holds, or returns one of its types.
+//!
+//! Stage 96 adds a thirteenth crate-private module, `audit_event`: an
+//! INTERNAL-ONLY audit-event-label skeleton naming a future crypto-internal
+//! state change (a fixed, non-sensitive label only — no event payload, no
+//! log output, and no `String`/`Vec` field). It exists as a fully
+//! independent, label-only type basis for a future real observability
+//! mechanism, still not connected to — and not holding an instance of —
+//! `secret_handle`, `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+//! `operation_context`, `request_descriptor`, `response_descriptor`,
+//! `crypto_pipeline`, `descriptor_bundle`, `execution_plan`, or
+//! `error_taxonomy` today. Same rules apply: not part of the public API,
+//! no public function above constructs, holds, or returns one of its
+//! types.
 
 #![forbid(unsafe_code)]
 
@@ -2598,6 +2611,219 @@ mod error_taxonomy {
         #[test]
         fn disabled_state_is_the_default_placeholder_only_state() {
             assert_eq!(CryptoErrorState::default(), CryptoErrorState::Disabled);
+        }
+    }
+}
+
+/// Stage 96 — an INTERNAL-ONLY audit-event-label skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns an
+/// [`AuditEventLabel`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It holds no event payload of any kind — only a fixed [`AuditEventKind`]
+/// label. Nothing in this module writes to stdout, stderr, or any log
+/// sink: there is no macro call that would emit a line anywhere below,
+/// and no observability crate is imported. It takes no user-,
+/// environment-, or config-derived input of any kind —
+/// [`AuditEventLabel::new_placeholder`] accepts only an [`AuditEventKind`]
+/// label. This module does NOT hold an instance of any other skeleton
+/// type: it does not connect to `secret_handle` (Stage 79), `aead_core`
+/// (Stage 80), `kdf_core` (Stage 82), `key_material` (Stage 87),
+/// `domain_label` (Stage 88), `operation_context` (Stage 89),
+/// `request_descriptor` (Stage 90), `response_descriptor` (Stage 91),
+/// `crypto_pipeline` (Stage 92), `descriptor_bundle` (Stage 93),
+/// `execution_plan` (Stage 94), or `error_taxonomy` (Stage 95) — it never
+/// constructs, stores, or reads a field of any of their types — when in
+/// doubt about a connection between skeletons, this crate deliberately
+/// leaves them unconnected rather than guess at a future design (the same
+/// reasoning `aead_core`'s own doc comment already states). It exists as a
+/// fully independent, label-only type basis a later, explicitly-reviewed
+/// stage can extend to actually observe a real crypto-internal state
+/// change, once it also implements the observability mechanism (and
+/// policy) that event would feed.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`/
+/// `request_descriptor`/`response_descriptor`/`crypto_pipeline`/
+/// `descriptor_bundle`/`execution_plan`/`error_taxonomy` above do. This is
+/// expected for a skeleton not yet wired to any consumer.
+#[allow(dead_code)]
+mod audit_event {
+    /// Coarse internal lifecycle state of an [`AuditEventLabel`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AuditEventState {
+        /// A placeholder audit-event label is active. Observes no real
+        /// state change; emits no output.
+        Placeholder,
+        /// No audit-event label should be treated as active — the
+        /// default, inert state before any [`AuditEventLabel`] is
+        /// constructed for use.
+        Disabled,
+    }
+
+    impl Default for AuditEventState {
+        fn default() -> Self {
+            AuditEventState::Disabled
+        }
+    }
+
+    /// Which future crypto-internal state change an [`AuditEventLabel`]
+    /// names — a label only, intent, not an implementation and not a real
+    /// observation. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum AuditEventKind {
+        /// Intended future connection point: a `CryptoProvider`
+        /// implementation was selected. No selection is observed here.
+        CryptoProviderSelectedPlaceholder,
+        /// Intended future connection point: an incoming request was
+        /// accepted. No acceptance is observed here.
+        RequestAcceptedPlaceholder,
+        /// Intended future connection point: an incoming request was
+        /// rejected. No rejection is observed here.
+        RequestRejectedPlaceholder,
+        /// Intended future connection point: an execution plan was
+        /// prepared. No preparation is observed here.
+        PlanPreparedPlaceholder,
+        /// Intended future connection point: an underlying cryptographic
+        /// primitive was executed. No execution is observed here.
+        PrimitiveExecutedPlaceholder,
+        /// Intended future connection point: a response was built. No
+        /// build is observed here.
+        ResponseBuiltPlaceholder,
+        /// Intended future connection point: a secret was cleared. No
+        /// clearing is observed here.
+        SecretClearedPlaceholder,
+        /// Intended future connection point: a failure was classified
+        /// (see `error_taxonomy`, Stage 95). No classification is
+        /// observed here.
+        ErrorClassifiedPlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for an [`AuditEventLabel`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte, and never an event payload.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct AuditEventStatus {
+        pub(crate) state: AuditEventState,
+    }
+
+    /// An INTERNAL-ONLY audit-event-label handle skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds only an [`AuditEventKind`] label and an
+    /// [`AuditEventState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, no user-, environment-, or
+    /// config-derived input, no event payload of any kind, and no field
+    /// of any other skeleton's type from `secret_handle`, `aead_core`,
+    /// `kdf_core`, `key_material`, `domain_label`, `operation_context`,
+    /// `request_descriptor`, `response_descriptor`, `crypto_pipeline`,
+    /// `descriptor_bundle`, `execution_plan`, or `error_taxonomy`. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually observe a real state change; until then it accepts and
+    /// stores none, and emits no output of any kind.
+    pub(crate) struct AuditEventLabel {
+        kind: AuditEventKind,
+        state: AuditEventState,
+    }
+
+    impl AuditEventLabel {
+        /// Construct a placeholder audit-event label of the given
+        /// [`AuditEventKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind, and observes no real state
+        /// change of any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: AuditEventKind) -> Self {
+            Self {
+                kind,
+                state: AuditEventState::Placeholder,
+            }
+        }
+
+        /// The [`AuditEventKind`] label this handle was constructed with
+        /// — intent only.
+        pub(crate) fn kind(&self) -> AuditEventKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> AuditEventStatus {
+            AuditEventStatus { state: self.state }
+        }
+
+        /// Whether this label is still in the
+        /// [`AuditEventState::Placeholder`] state — always `true` for any
+        /// handle constructed via [`AuditEventLabel::new_placeholder`],
+        /// since no other constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == AuditEventState::Placeholder
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let label =
+                AuditEventLabel::new_placeholder(AuditEventKind::CryptoProviderSelectedPlaceholder);
+            assert_eq!(label.status().state, AuditEventState::Placeholder);
+            assert!(label.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                AuditEventKind::CryptoProviderSelectedPlaceholder,
+                AuditEventKind::RequestAcceptedPlaceholder,
+                AuditEventKind::RequestRejectedPlaceholder,
+                AuditEventKind::PlanPreparedPlaceholder,
+                AuditEventKind::PrimitiveExecutedPlaceholder,
+                AuditEventKind::ResponseBuiltPlaceholder,
+                AuditEventKind::SecretClearedPlaceholder,
+                AuditEventKind::ErrorClassifiedPlaceholder,
+                AuditEventKind::TestOnlyPlaceholder,
+            ] {
+                let label = AuditEventLabel::new_placeholder(kind);
+                assert_eq!(label.kind(), kind);
+                assert_eq!(label.status().state, AuditEventState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let label = AuditEventLabel::new_placeholder(AuditEventKind::RequestAcceptedPlaceholder);
+            let status = label.status();
+            assert_eq!(status.state, AuditEventState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_label() {
+            for kind in [
+                AuditEventKind::SecretClearedPlaceholder,
+                AuditEventKind::ErrorClassifiedPlaceholder,
+                AuditEventKind::TestOnlyPlaceholder,
+            ] {
+                assert!(AuditEventLabel::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(AuditEventState::default(), AuditEventState::Disabled);
         }
     }
 }

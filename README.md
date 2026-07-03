@@ -8,7 +8,90 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 95 — Internal error taxonomy skeleton (internal-only
+> **Status: Stage 96 — Internal audit event label skeleton (internal-only
+> `audit_event` module; fixed event-kind labels only, no logging, no
+> event payload, no descriptor/pipeline/plan/error wiring yet, no real
+> AEAD/HKDF/Argon2/NIP-44 connection, no Runtime/Worker/CryptoProvider
+> wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a thirteenth crate-private
+> module, `audit_event` (alongside Stage 79's `secret_handle`, Stage 80's
+> `aead_core`, Stage 82's `kdf_core`, Stage 87's `key_material`, Stage 88's
+> `domain_label`, Stage 89's `operation_context`, Stage 90's
+> `request_descriptor`, Stage 91's `response_descriptor`, Stage 92's
+> `crypto_pipeline`, Stage 93's `descriptor_bundle`, Stage 94's
+> `execution_plan`, and Stage 95's `error_taxonomy`, placed right after
+> `error_taxonomy`, still ahead of this file's first module gated
+> `cfg(test)`). It defines: `AuditEventState` (`pub(crate) enum`,
+> `Placeholder`/`Disabled` — `Disabled` is the `Default`, same shape as
+> `CryptoErrorState`); `AuditEventKind` (`pub(crate) enum`,
+> `CryptoProviderSelectedPlaceholder`/`RequestAcceptedPlaceholder`/
+> `RequestRejectedPlaceholder`/`PlanPreparedPlaceholder`/
+> `PrimitiveExecutedPlaceholder`/`ResponseBuiltPlaceholder`/
+> `SecretClearedPlaceholder`/`ErrorClassifiedPlaceholder`/
+> `TestOnlyPlaceholder` — nine label-only unit variants);
+> `AuditEventStatus` (`pub(crate) struct`, a non-sensitive status snapshot
+> carrying only the state enum); and `AuditEventLabel` (`pub(crate)
+> struct`, holding `kind`/`state`) with four methods:
+> `new_placeholder(kind: AuditEventKind)` (takes only the label — no
+> user-, environment-, or config-derived input of any kind, observes no
+> real state change of any kind), `kind()`, `status()`, and
+> `is_placeholder()`. **NOT part of this crate's public API**: every item
+> is `pub(crate)` at most — never `pub` — nothing is re-exported from the
+> crate root, and the crate's public `pub fn` surface is still exactly the
+> same six placeholder functions from Stage 69; none of them constructs,
+> holds, or returns an `AuditEventLabel`. **No logging, no event
+> payload**: `AuditEventLabel` writes to no stdout/stderr/log sink of any
+> kind (no `println!`/`eprintln!`/`tracing`/`log` crate usage anywhere)
+> and holds no payload field of any kind. **No descriptor/pipeline/plan/
+> error wiring — a fully independent, label-only skeleton**:
+> `AuditEventLabel` does not construct or hold a `SecretHandle`,
+> `AeadPlaceholderRequest`, `KdfPlaceholderRequest`, `KeyMaterialHandle`,
+> `DomainLabel`, `OperationContext`, `RequestDescriptor`,
+> `ResponseDescriptor`, `CryptoPipeline`, `DescriptorBundle`,
+> `ExecutionPlan`, or `CryptoErrorDescriptor` — same "if in doubt, stay
+> fully independent" choice Stage 93/94/95 already made; `AuditEventLabel`
+> stores no `String`/`Vec<u8>`/borrowed-byte-slice field of any kind.
+> **Not connected to `secret_handle`, `aead_core`, `kdf_core`,
+> `key_material`, `domain_label`, `operation_context`,
+> `request_descriptor`, `response_descriptor`, `crypto_pipeline`,
+> `descriptor_bundle`, `execution_plan`, or `error_taxonomy`** —
+> `audit_event` never constructs any of their types and runs no actual
+> AEAD/HKDF/Argon2/NIP-44 operation, derives no Nostr key, same "when a
+> skeleton-to-skeleton connection is ambiguous, leave it unconnected"
+> reasoning Stage 80/82/87/88/89/90/91/92/93/94/95 already established;
+> all twelve of those modules are UNCHANGED this stage, still
+> placeholder-only. `cargo test` is GREEN with all 82 tests passing (77
+> pre-existing + 5 new `audit_event::tests`); `cargo check` and `cargo
+> check --tests` stay GREEN with no warnings. `Cargo.toml` is UNCHANGED
+> this stage — no new dependency needed (`audit_event` imports nothing
+> beyond the standard library, and no observability crate). New
+> [`test/fedos_core_rust_audit_event.test.ts`](test/fedos_core_rust_audit_event.test.ts)
+> (19 tests) checks: the module is internal-only and not `pub`;
+> `AuditEventLabel` is `pub(crate)` at most and never re-exported; the
+> public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged; every
+> `AuditEventKind` variant is a label-only unit variant (no tuple/struct
+> data); no `String`/`Vec` field anywhere in the module; no event-payload
+> field-declaration (`payload`/`data`/`details`); no
+> `println!`/`eprintln!`/`print!`/`eprint!`/`tracing::`/`log::`/`dbg!`
+> usage; `new_placeholder` takes only an `AuditEventKind` (no
+> `&str`/`String` parameter); no `std::env`/`env::`/`var_os`/
+> `std::process` usage; no AEAD/HKDF/Argon2 usage (specific Rust-usage
+> patterns only, not a bare word match, same lesson learned Stage 89-95);
+> no field DECLARATION storing `SecretHandle`/`AeadPlaceholderRequest`/
+> `KdfPlaceholderRequest`/`KeyMaterialHandle`/`DomainLabel`/
+> `OperationContext`/`RequestDescriptor`/`ResponseDescriptor`/
+> `CryptoPipeline`/`DescriptorBundle`/`ExecutionPlan`/
+> `CryptoErrorDescriptor` (nor do those twelve modules reference
+> `AuditEvent*`); no `unsafe`; Runtime/Worker sources mention neither
+> `audit_event` nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; the state
+> enum has exactly its two variants and the handle exposes exactly its
+> four methods. Stage 97 candidate: **an internal audit policy skeleton**
+> — deciding which future events are observable without any secret
+> information, still no logging or Runtime wiring. Prior status:
+>
+> **Stage 95 — Internal error taxonomy skeleton (internal-only
 > `error_taxonomy` module; fixed error-kind labels only, no raw error
 > strings, no stack traces, no descriptor/pipeline/plan wiring yet, no
 > real AEAD/HKDF/Argon2/NIP-44 connection, no Runtime/Worker/
