@@ -8,7 +8,74 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 116 — Nostr publish intent + Creator membership plan +
+> **Status: Stage 117 — Protocol adapter capability matrix + Creator
+> dashboard preview UI.** One more fixed, cross-protocol naming boundary
+> plus one more opt-in, read-only preview page — still **no real relay/
+> WebSocket/OAuth/AT-Protocol connection, no real analytics/settlement
+> calculation, and only the one new preview route touches the Worker.** New
+> [`src/federation/capability_matrix.ts`](src/federation/capability_matrix.ts)
+> defines `ProtocolAdapterKind` (mirroring `FederationProviderKind`'s six
+> labels: `nostr_`/`bluesky_`/`threads_`/`rss_`/`local_`/`test_placeholder`)
+> and `ProtocolAdapterCapability` (`read_public_`/`publish_public_`/
+> `reply_`/`reaction_`/`profile_`/`marketplace_announcement_`/
+> `moderation_signal_`/`private_message_`/`paid_content_`/`test_placeholder`),
+> with a pure `getProtocolAdapterCapabilities(adapter)` returning a FIXED row
+> of `ProtocolAdapterCapabilityDecision` (`allowed`/`state`/`reason?`) and
+> `canProtocolAdapterSupport(adapter, capability)` for a single lookup.
+> `nostr_placeholder` marks the public-surface set (read/publish/reply/
+> reaction/profile/marketplace-announcement/moderation-signal)
+> `available_placeholder`; `private_message_placeholder`/
+> `paid_content_placeholder` are `rejected` for Nostr STRUCTURALLY (never
+> "not yet built") — private/paid content must never ride on a public relay
+> event, matching the existing Nostr adapter planning docs.
+> `bluesky_placeholder`/`threads_placeholder`/`rss_placeholder` are
+> `unavailable` across every non-test capability — a placeholder matrix
+> only, no OAuth/API/adapter design committed this stage. New
+> [`src/render/creator_dashboard_preview.ts`](src/render/creator_dashboard_preview.ts)
+> (`renderCreatorDashboardPreview`/`renderCreatorDashboardPreviewPage`, plus
+> static `SAMPLE_CREATOR_DASHBOARDS`) shows a sample creator's `creatorRef`,
+> three PLACEHOLDER counts (listings/membership plans/community rules —
+> static numbers, never a real tally), and two fixed label lists (a
+> federation capability summary pulled from the new matrix, and a
+> moderation visibility summary), HTML-escaped, ending in three permanently
+> `disabled` navigation buttons — no listing/plan/rule fetch and no
+> monetary/settlement field of any kind. Gated behind an EXPLICIT
+> `?creatorDashboardPreview=1` flag in
+> [`src/worker.ts`](src/worker.ts) (`isCreatorDashboardPreviewEnabled`),
+> inserted right after the Stage 116 `?communityRulesPreview=1` branch so
+> priority is runtimeStatus → boardPreview → marketplacePreview →
+> creatorPreview → communityRulesPreview → creatorDashboardPreview → normal
+> routing; the new branch reads no `runtime` and calls no Runtime-selected
+> boundary, and every pre-existing route is unaffected. Short **Stage 117+
+> update notes** were appended to
+> [`docs/nostr_adapter_planning.md`](docs/nostr_adapter_planning.md#16-stage-117-update-note--protocol-adapter-capability-matrix)
+> and
+> [`docs/creator_monetization_flow.md`](docs/creator_monetization_flow.md#16-stage-117-update-note--creator-dashboard-preview).
+> New
+> [`test/capability_matrix_creator_dashboard.test.ts`](test/capability_matrix_creator_dashboard.test.ts)
+> (26 tests) checks: the matrix returns a fixed row for every adapter/
+> capability pair, Nostr's public-surface labels are `available_placeholder`,
+> `private_message_placeholder`/`paid_content_placeholder` are never
+> `available_placeholder` for ANY adapter, Bluesky/Threads/RSS stay
+> `unavailable` outside the trivial test capability, the dashboard preview
+> escapes every label (including an XSS-shaped one), every button is
+> permanently `disabled`, no revenue/amount/payment/checkout/invoice/buyer/
+> email word appears anywhere in the new preview file, the
+> `creatorDashboardPreview` flag gates correctly and yields precedence to
+> every earlier preview flag, and no source imports a relay/WebSocket
+> library, calls a provider method, or reads a Runtime-selected boundary
+> from the Worker. `npm run typecheck` and `npm test` stay GREEN; `cargo
+> check`/`cargo test` are unchanged — no Rust file was touched this stage.
+> Where this stage stopped, on purpose: no real relay/WebSocket/OAuth/AT-
+> Protocol connection, no real analytics/settlement calculation, no
+> `StorageBackend`/`PaymentProvider`/`EntitlementProvider`/
+> `MarketplaceProvider`/`FederationProvider`/`ChatProvider` call from any
+> new file, and no Runtime auto-call. Stage 118 candidates: (1) a Federation
+> outbound queue skeleton; (2) a Creator analytics preview boundary; (3)
+> Protocol moderation compatibility docs.
+> Prior status:
+>
+> **Stage 116 — Nostr publish intent + Creator membership plan +
 > Community ruleset preview UI.** Two more pure boundaries plus one more
 > opt-in, read-only preview page — still **no real publish, no relay
 > connection, no signing, no real payment/checkout, no real moderation

@@ -136,6 +136,10 @@ import {
   renderCommunityRulesPreviewPage,
   SAMPLE_COMMUNITY_RULES,
 } from "./render/community_rules_preview.js";
+import {
+  renderCreatorDashboardPreviewPage,
+  SAMPLE_CREATOR_DASHBOARDS,
+} from "./render/creator_dashboard_preview.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -339,6 +343,22 @@ export function isCreatorPreviewEnabled(url: URL): boolean {
  */
 export function isCommunityRulesPreviewEnabled(url: URL): boolean {
   const value = url.searchParams.get("communityRulesPreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Creator
+ * dashboard preview page via `?creatorDashboardPreview=1` or
+ * `?creatorDashboardPreview=true` (Stage 117). Takes precedence over every
+ * other route (relay/sample board/product/space/chat) except
+ * `?runtimeStatus=1`/`?boardPreview=1`/`?marketplacePreview=1`/
+ * `?creatorPreview=1`/`?communityRulesPreview=1`. The page it gates
+ * (`renderCreatorDashboardPreviewPage`) uses ONLY sample/static dashboard
+ * descriptors, calls no runtime-selected boundary, performs no real
+ * listing/plan/rule lookup, and issues no `fetch`.
+ */
+export function isCreatorDashboardPreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("creatorDashboardPreview");
   return value === "1" || value === "true";
 }
 
@@ -857,16 +877,17 @@ export async function handleRequest(
     );
   }
 
-  // Stage 114/115/116: `?boardPreview=1` / `?marketplacePreview=1` /
-  // `?creatorPreview=1` / `?communityRulesPreview=1` are entirely read-only,
-  // sample-data-only preview pages — no board is built, no relay/live path
-  // runs, and no runtime-selected boundary (storage, federation,
-  // marketplace, payment, entitlement, or chat) is ever called from any
-  // branch; `runtime` is not even read here. `boardPreview` takes
-  // precedence over `marketplacePreview`, which takes precedence over
-  // `creatorPreview`, which takes precedence over `communityRulesPreview`,
-  // when more than one is present; each falls through to normal routing
-  // when absent.
+  // Stage 114/115/116/117: `?boardPreview=1` / `?marketplacePreview=1` /
+  // `?creatorPreview=1` / `?communityRulesPreview=1` /
+  // `?creatorDashboardPreview=1` are entirely read-only, sample-data-only
+  // preview pages — no board is built, no relay/live path runs, and no
+  // runtime-selected boundary (storage, federation, marketplace, payment,
+  // entitlement, or chat) is ever called from any branch; `runtime` is not
+  // even read here. `boardPreview` takes precedence over
+  // `marketplacePreview`, which takes precedence over `creatorPreview`,
+  // which takes precedence over `communityRulesPreview`, which takes
+  // precedence over `creatorDashboardPreview`, when more than one is
+  // present; each falls through to normal routing when absent.
   if (isBoardPreviewEnabled(url)) {
     return htmlResponse(
       renderPage(buildThreads([]), { status: renderBoardPreviewPage(SAMPLE_BOARDS) }),
@@ -894,6 +915,16 @@ export async function handleRequest(
     return htmlResponse(
       renderPage(buildThreads([]), {
         status: renderCommunityRulesPreviewPage(SAMPLE_COMMUNITY_RULES),
+      }),
+    );
+  }
+  // Stage 117: `?creatorDashboardPreview=1` — same read-only, sample-data-
+  // only treatment as the preview branches above; no runtime-selected
+  // boundary is called and `runtime` is not read here.
+  if (isCreatorDashboardPreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), {
+        status: renderCreatorDashboardPreviewPage(SAMPLE_CREATOR_DASHBOARDS),
       }),
     );
   }

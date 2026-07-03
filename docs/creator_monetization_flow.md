@@ -270,3 +270,32 @@ of this addition. `docs/nostr_adapter_planning.md`'s Stage 116 note covers
 the same stage's Nostr publish-intent addition, which is unrelated to
 membership plans beyond sharing this codebase's placeholder-vocabulary
 convention.
+
+---
+
+## 16. Stage 117 update note — creator dashboard preview
+
+A read-only "creator dashboard" surface — implied by §7's per-creator name
+list but not previously built — now exists as
+`src/render/creator_dashboard_preview.ts`
+(`renderCreatorDashboardPreview`/`renderCreatorDashboardPreviewPage`, plus
+static `SAMPLE_CREATOR_DASHBOARDS`), gated by an EXPLICIT
+`?creatorDashboardPreview=1` flag in `src/worker.ts`
+(`isCreatorDashboardPreviewEnabled`). It shows, per sample creator: a
+`creatorRef`, three PLACEHOLDER counts (`listingCountPlaceholder`/
+`membershipPlanCountPlaceholder`/`communityRuleCountPlaceholder` — static
+numbers, never a real tally from `src/marketplace/`, `src/creator/
+membership.ts`, or `src/community/moderation.ts` storage), and two fixed
+label lists pulled from existing pure boundaries: a federation capability
+summary (`src/federation/capability_matrix.ts`'s
+`getProtocolAdapterCapabilities`, filtered to `available_placeholder`
+entries) and a moderation visibility summary (fixed
+`ModerationVisibilityDecision` labels). Every field is HTML-escaped, and the
+page ends in three permanently `disabled` navigation buttons — no listing/
+plan/rule fetch, no real purchaser count, and no monetary/settlement field
+of any kind (this stage's denylist: revenue/amount/payment/checkout/
+invoice/buyer/email — none appears anywhere in the new file, comments
+included). This does not move §3's flow past step 1 ("Listing"): no
+checkout, no entitlement issuance, and no gated-chat unlock exist because of
+this addition. `docs/nostr_adapter_planning.md`'s Stage 117 note covers the
+same stage's capability-matrix addition this dashboard reads labels from.

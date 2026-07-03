@@ -281,3 +281,32 @@ any other `./nostr_mapping.js` function, and nothing here signs, opens a
 relay connection, or publishes/subscribes anything. §6's list of
 NOT-implemented items (relay connection, signing, NIP-44/NIP-17, DM,
 publish, subscribe) remains entirely unchanged by this addition.
+
+---
+
+## 16. Stage 117 update note — protocol adapter capability matrix
+
+§8's "Nostr is the first adapter, not the only one" now has a fixed,
+cross-protocol NAMING boundary: `src/federation/capability_matrix.ts`
+defines `ProtocolAdapterKind` (mirroring `FederationProviderKind`'s six
+labels) and `ProtocolAdapterCapability` (`read_public_`/`publish_public_`/
+`reply_`/`reaction_`/`profile_`/`marketplace_announcement_`/
+`moderation_signal_`/`private_message_`/`paid_content_`/`test_placeholder`),
+with a pure `getProtocolAdapterCapabilities(adapter)` returning a FIXED row
+of `ProtocolAdapterCapabilityDecision` (`allowed`/`state`/`reason?`) for
+every capability, and `canProtocolAdapterSupport(adapter, capability)` for a
+single lookup. `nostr_placeholder` marks the public-surface set — read/
+publish/reply/reaction/profile/marketplace-announcement/moderation-signal —
+`available_placeholder`, matching §3/§5's compatibility scope; per §4/§9,
+`private_message_placeholder` and `paid_content_placeholder` are `rejected`
+for `nostr_placeholder` STRUCTURALLY, never "not yet built" — a private
+message or paid/gated content must never ride on a permanently public relay
+event. `bluesky_placeholder`/`threads_placeholder`/`rss_placeholder` are
+`unavailable` across every non-test capability: a placeholder matrix only,
+naming no OAuth/API/adapter design this stage. A new read-only Creator
+dashboard preview (`src/render/creator_dashboard_preview.ts`, gated by
+`?creatorDashboardPreview=1`) calls `getProtocolAdapterCapabilities` to
+display which capability labels a sample creator's federation summary would
+show — a pure label lookup, opening no relay/HTTP/OAuth connection. No
+adapter behind `FederationProvider` (Stage 110) was built, wired, or changed
+by this addition; §6's NOT-implemented list is unchanged.
