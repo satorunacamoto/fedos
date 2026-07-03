@@ -8,7 +8,97 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 93 — Internal descriptor bundle skeleton (internal-only
+> **Status: Stage 94 — Internal execution plan skeleton (internal-only
+> `execution_plan` module; fixed plan/step labels only, no descriptor/
+> pipeline wiring yet, no real AEAD/HKDF/Argon2/NIP-44 connection, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains an eleventh crate-private
+> module, `execution_plan` (alongside Stage 79's `secret_handle`, Stage
+> 80's `aead_core`, Stage 82's `kdf_core`, Stage 87's `key_material`, Stage
+> 88's `domain_label`, Stage 89's `operation_context`, Stage 90's
+> `request_descriptor`, Stage 91's `response_descriptor`, Stage 92's
+> `crypto_pipeline`, and Stage 93's `descriptor_bundle`, placed right after
+> `descriptor_bundle`, still ahead of this file's first module gated
+> `cfg(test)`). It defines: `ExecutionPlanState` (`pub(crate) enum`,
+> `Placeholder`/`Disabled` — `Disabled` is the `Default`, same shape as
+> `CryptoPipelineState`); `ExecutionPlanKind` (`pub(crate) enum`,
+> `AeadPlanPlaceholder`/`KdfPlanPlaceholder`/`Argon2idPlanPlaceholder`/
+> `Nip44PlanPlaceholder`/`NostrKeyPlanPlaceholder`/`TestOnlyPlanPlaceholder`
+> — six label-only unit variants); `ExecutionStepKind` (`pub(crate) enum`,
+> this crate's canonical six-step placeholder sequence:
+> `ValidateRequestPlaceholder`/`ResolveDomainPlaceholder`/
+> `ResolveKeyMaterialPlaceholder`/`ExecutePrimitivePlaceholder`/
+> `BuildResponsePlaceholder`/`ClearTemporaryStatePlaceholder` — six
+> label-only unit variants); `ExecutionPlanStatus` (`pub(crate) struct`, a
+> non-sensitive status snapshot carrying only the state enum); and
+> `ExecutionPlan` (`pub(crate) struct`, holding `kind`/`state`) with five
+> methods: `new_placeholder(kind: ExecutionPlanKind)` (takes only the
+> label — no user-, environment-, or config-derived input of any kind,
+> orders no step of any kind), `kind()`, `status()`, `is_placeholder()`,
+> and `step_count()` (returns the fixed `usize` `6` via a `match` on
+> `kind` — never a `.len()`/collection-derived count). **NOT part of this
+> crate's public API**: every item is `pub(crate)` at most — never `pub` —
+> nothing is re-exported from the crate root, and the crate's public
+> `pub fn` surface is still exactly the same six placeholder functions
+> from Stage 69; none of them constructs, holds, or returns an
+> `ExecutionPlan`. **No descriptor/pipeline wiring — a fully independent,
+> label-only skeleton**: `ExecutionPlan` does not construct or hold a
+> `SecretHandle`, `AeadPlaceholderRequest`, `KdfPlaceholderRequest`,
+> `KeyMaterialHandle`, `DomainLabel`, `OperationContext`,
+> `RequestDescriptor`, `ResponseDescriptor`, `CryptoPipeline`, or
+> `DescriptorBundle` — same "if in doubt, stay fully independent" choice
+> Stage 93 already made; `ExecutionPlan` stores no
+> `String`/`Vec<u8>`/borrowed-byte-slice field of any kind. **Not
+> connected to `secret_handle`, `aead_core`, `kdf_core`, `key_material`,
+> `domain_label`, `operation_context`, `request_descriptor`,
+> `response_descriptor`, `crypto_pipeline`, or `descriptor_bundle`** —
+> `execution_plan` never constructs any of their types and runs no actual
+> AEAD/HKDF/Argon2/NIP-44 operation, derives no Nostr key, same "when a
+> skeleton-to-skeleton connection is ambiguous, leave it unconnected"
+> reasoning Stage 80/82/87/88/89/90/91/92/93 already established; all ten
+> of those modules are UNCHANGED this stage, still placeholder-only.
+> `cargo test` is GREEN with all 72 tests passing (66 pre-existing + 6 new
+> `execution_plan::tests`); `cargo check` and `cargo check --tests` stay
+> GREEN with no warnings. `Cargo.toml` is UNCHANGED this stage — no new
+> dependency needed (`execution_plan` imports nothing beyond the standard
+> library). New
+> [`test/fedos_core_rust_execution_plan.test.ts`](test/fedos_core_rust_execution_plan.test.ts)
+> (18 tests) checks: the module is internal-only and not `pub`;
+> `ExecutionPlan` is `pub(crate)` at most and never re-exported; the
+> public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged; every
+> `ExecutionPlanKind`/`ExecutionStepKind` variant is a label-only unit
+> variant (no tuple/struct data); no `String`/`Vec` field anywhere in the
+> module; `new_placeholder` takes only an `ExecutionPlanKind` (no
+> `&str`/`String` parameter); `step_count()` returns a fixed `usize` via
+> `match` with no `.len()`/collection call; no
+> `std::env`/`env::`/`var_os`/`std::process` usage; no AEAD/HKDF/Argon2
+> usage (specific Rust-usage patterns only, not a bare word match, same
+> "no bare `\bnip.?44\b` check" reasoning Stage 89-93 established, since
+> it would also match this stage's own required `Nip44PlanPlaceholder`
+> variant name — there is no `nip44`-named crate in this repo's
+> dependency tree to import in the first place, so that absence is
+> structural, not text-banned); no field DECLARATION storing
+> `SecretHandle`/`AeadPlaceholderRequest`/`KdfPlaceholderRequest`/
+> `KeyMaterialHandle`/`DomainLabel`/`OperationContext`/
+> `RequestDescriptor`/`ResponseDescriptor`/`CryptoPipeline`/
+> `DescriptorBundle` (nor do those ten modules reference
+> `ExecutionPlan*`); no `unsafe`; Runtime/Worker sources mention neither
+> `execution_plan` nor auto-call a crypto operation; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; the state
+> enum has exactly its two variants and the handle exposes exactly its
+> five methods. **Fix during this stage**: the module's own doc comments
+> originally wrote the literal text `Vec<ExecutionStepKind>` when
+> describing what does NOT exist in this module, which collided with the
+> guard test's own bare-pattern absence check for that exact string (the
+> same self-referential doc-comment trap as Stage 81/84/88/89/90/91/92/93)
+> — fixed by rewording to "a growable, heap-allocated collection ... " in
+> prose instead of the literal generic-type spelling. Stage 95 candidate:
+> **an internal error taxonomy skeleton** — classifying future
+> cryptographic operation failure without any secret information, still
+> no real cryptography wired in. Prior status:
+>
+> **Stage 93 — Internal descriptor bundle skeleton (internal-only
 > `descriptor_bundle` module; fixed bundle-kind labels only, no descriptor
 > value wiring yet, no real AEAD/HKDF/Argon2/NIP-44 connection, no
 > Runtime/Worker/CryptoProvider wiring, no WASM change).**

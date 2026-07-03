@@ -159,6 +159,19 @@
 //! `crypto_pipeline` today. Same rules apply: not part of the public API,
 //! no public function above constructs, holds, or returns one of its
 //! types.
+//!
+//! Stage 94 adds an eleventh crate-private module, `execution_plan`: an
+//! INTERNAL-ONLY execution-plan skeleton naming a future AEAD/KDF/Argon2/
+//! NIP-44/Nostr-key-derivation processing ORDER, as fixed, non-sensitive
+//! plan/step labels only — no key, seed, plaintext, ciphertext, passphrase,
+//! tag, or nonce byte, and no `String`/`Vec` field. It exists as a fully
+//! independent, label-only type basis for a future real plan, still not
+//! connected to — and not holding an instance of — `secret_handle`,
+//! `aead_core`, `kdf_core`, `key_material`, `domain_label`,
+//! `operation_context`, `request_descriptor`, `response_descriptor`,
+//! `crypto_pipeline`, or `descriptor_bundle` today. Same rules apply: not
+//! part of the public API, no public function above constructs, holds, or
+//! returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -2107,6 +2120,256 @@ mod descriptor_bundle {
             assert_eq!(
                 DescriptorBundleState::default(),
                 DescriptorBundleState::Disabled
+            );
+        }
+    }
+}
+
+/// Stage 94 — an INTERNAL-ONLY execution-plan skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns an [`ExecutionPlan`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It takes no user-, environment-, or config-derived input of any kind —
+/// [`ExecutionPlan::new_placeholder`] accepts only an [`ExecutionPlanKind`]
+/// label. [`ExecutionPlan::step_count`] returns a fixed, non-secret
+/// `usize` chosen by a `match` — never a runtime-computed length, never a
+/// growable, heap-allocated collection of [`ExecutionStepKind`] values or
+/// any other dynamically-sized collection. This
+/// module does NOT hold an instance of any other skeleton type: it does
+/// not connect to `secret_handle` (Stage 79), `aead_core` (Stage 80),
+/// `kdf_core` (Stage 82), `key_material` (Stage 87), `domain_label` (Stage
+/// 88), `operation_context` (Stage 89), `request_descriptor` (Stage 90),
+/// `response_descriptor` (Stage 91), `crypto_pipeline` (Stage 92), or
+/// `descriptor_bundle` (Stage 93) — it never constructs, stores, or reads a
+/// field of any of their types — when in doubt about a connection between
+/// skeletons, this crate deliberately leaves them unconnected rather than
+/// guess at a future design (the same reasoning `aead_core`'s own doc
+/// comment already states). It exists as a fully independent, label-only
+/// type basis a later, explicitly-reviewed stage can extend to actually
+/// order a real AEAD/KDF/NIP-44/Nostr-key-derivation execution, once it
+/// also implements the operation that plan would run.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, exactly as `secret_handle`/
+/// `aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`/
+/// `request_descriptor`/`response_descriptor`/`crypto_pipeline`/
+/// `descriptor_bundle` above do. This is expected for a skeleton not yet
+/// wired to any consumer.
+#[allow(dead_code)]
+mod execution_plan {
+    /// Coarse internal lifecycle state of an [`ExecutionPlan`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ExecutionPlanState {
+        /// A placeholder plan is active. Runs no cryptography and orders
+        /// no real step.
+        Placeholder,
+        /// No plan should be treated as active — the default, inert state
+        /// before any [`ExecutionPlan`] is constructed for use.
+        Disabled,
+    }
+
+    impl Default for ExecutionPlanState {
+        fn default() -> Self {
+            ExecutionPlanState::Disabled
+        }
+    }
+
+    /// Which future cryptographic operation an [`ExecutionPlan`] would
+    /// eventually order — a label only, intent, not an implementation and
+    /// not a real processing order. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ExecutionPlanKind {
+        /// Intended future connection point: an AEAD encrypt/decrypt plan.
+        /// No AEAD plan is ordered here.
+        AeadPlanPlaceholder,
+        /// Intended future connection point: an HKDF extract/expand plan.
+        /// No KDF plan is ordered here.
+        KdfPlanPlaceholder,
+        /// Intended future connection point: an Argon2id hashing plan. No
+        /// Argon2id plan is ordered here.
+        Argon2idPlanPlaceholder,
+        /// Intended future connection point: a NIP-44 encrypt/decrypt
+        /// plan. No NIP-44 plan is ordered here.
+        Nip44PlanPlaceholder,
+        /// Intended future connection point: a Nostr identity/signing key
+        /// derivation plan. No Nostr key plan is ordered here.
+        NostrKeyPlanPlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyPlanPlaceholder,
+    }
+
+    /// A single named step a future real [`ExecutionPlan`] would order —
+    /// a label only, intent, not an implementation. Crate-private only.
+    /// This crate's canonical six-step placeholder sequence, in the order
+    /// a future real plan would eventually run them (still not ordered or
+    /// executed by anything in this module today).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ExecutionStepKind {
+        /// Intended future step: validate a request descriptor's shape.
+        ValidateRequestPlaceholder,
+        /// Intended future step: resolve a domain-separation label.
+        ResolveDomainPlaceholder,
+        /// Intended future step: resolve key material for the operation.
+        ResolveKeyMaterialPlaceholder,
+        /// Intended future step: execute the underlying cryptographic
+        /// primitive.
+        ExecutePrimitivePlaceholder,
+        /// Intended future step: build a response descriptor from the
+        /// primitive's result.
+        BuildResponsePlaceholder,
+        /// Intended future step: clear any temporary state used along the
+        /// way.
+        ClearTemporaryStatePlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for an [`ExecutionPlan`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct ExecutionPlanStatus {
+        pub(crate) state: ExecutionPlanState,
+    }
+
+    /// An INTERNAL-ONLY execution-plan handle skeleton (crate-private; not
+    /// part of this crate's public API — see the module-level doc comment
+    /// above). Holds only an [`ExecutionPlanKind`] label and an
+    /// [`ExecutionPlanState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, no user-, environment-, or
+    /// config-derived input, and no field of any other skeleton's type
+    /// from `secret_handle`, `aead_core`, `kdf_core`, `key_material`,
+    /// `domain_label`, `operation_context`, `request_descriptor`,
+    /// `response_descriptor`, `crypto_pipeline`, or `descriptor_bundle`. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually order a real plan; until then it accepts and stores none.
+    pub(crate) struct ExecutionPlan {
+        kind: ExecutionPlanKind,
+        state: ExecutionPlanState,
+    }
+
+    impl ExecutionPlan {
+        /// Construct a placeholder plan of the given [`ExecutionPlanKind`].
+        /// Takes NO user-, environment-, or config-derived input of any
+        /// kind, and orders no step of any kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: ExecutionPlanKind) -> Self {
+            Self {
+                kind,
+                state: ExecutionPlanState::Placeholder,
+            }
+        }
+
+        /// The [`ExecutionPlanKind`] label this plan was constructed with
+        /// — intent only.
+        pub(crate) fn kind(&self) -> ExecutionPlanKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> ExecutionPlanStatus {
+            ExecutionPlanStatus { state: self.state }
+        }
+
+        /// Whether this plan is still in the
+        /// [`ExecutionPlanState::Placeholder`] state — always `true` for
+        /// any handle constructed via [`ExecutionPlan::new_placeholder`],
+        /// since no other constructor exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == ExecutionPlanState::Placeholder
+        }
+
+        /// A fixed, non-secret step count for this plan's
+        /// [`ExecutionPlanKind`] — this crate's canonical six-step
+        /// placeholder sequence ([`ExecutionStepKind`]'s six variants),
+        /// chosen by a `match`, never computed from a growable,
+        /// heap-allocated collection (none exists anywhere in this
+        /// module).
+        pub(crate) fn step_count(&self) -> usize {
+            match self.kind {
+                ExecutionPlanKind::AeadPlanPlaceholder => 6,
+                ExecutionPlanKind::KdfPlanPlaceholder => 6,
+                ExecutionPlanKind::Argon2idPlanPlaceholder => 6,
+                ExecutionPlanKind::Nip44PlanPlaceholder => 6,
+                ExecutionPlanKind::NostrKeyPlanPlaceholder => 6,
+                ExecutionPlanKind::TestOnlyPlanPlaceholder => 6,
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let plan = ExecutionPlan::new_placeholder(ExecutionPlanKind::AeadPlanPlaceholder);
+            assert_eq!(plan.status().state, ExecutionPlanState::Placeholder);
+            assert!(plan.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                ExecutionPlanKind::AeadPlanPlaceholder,
+                ExecutionPlanKind::KdfPlanPlaceholder,
+                ExecutionPlanKind::Argon2idPlanPlaceholder,
+                ExecutionPlanKind::Nip44PlanPlaceholder,
+                ExecutionPlanKind::NostrKeyPlanPlaceholder,
+                ExecutionPlanKind::TestOnlyPlanPlaceholder,
+            ] {
+                let plan = ExecutionPlan::new_placeholder(kind);
+                assert_eq!(plan.kind(), kind);
+                assert_eq!(plan.status().state, ExecutionPlanState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let plan = ExecutionPlan::new_placeholder(ExecutionPlanKind::KdfPlanPlaceholder);
+            let status = plan.status();
+            assert_eq!(status.state, ExecutionPlanState::Placeholder);
+        }
+
+        #[test]
+        fn is_placeholder_is_true_for_every_constructed_plan() {
+            for kind in [
+                ExecutionPlanKind::Argon2idPlanPlaceholder,
+                ExecutionPlanKind::Nip44PlanPlaceholder,
+                ExecutionPlanKind::TestOnlyPlanPlaceholder,
+            ] {
+                assert!(ExecutionPlan::new_placeholder(kind).is_placeholder());
+            }
+        }
+
+        #[test]
+        fn step_count_is_the_fixed_six_step_placeholder_sequence_for_every_kind() {
+            for kind in [
+                ExecutionPlanKind::AeadPlanPlaceholder,
+                ExecutionPlanKind::KdfPlanPlaceholder,
+                ExecutionPlanKind::Argon2idPlanPlaceholder,
+                ExecutionPlanKind::Nip44PlanPlaceholder,
+                ExecutionPlanKind::NostrKeyPlanPlaceholder,
+                ExecutionPlanKind::TestOnlyPlanPlaceholder,
+            ] {
+                assert_eq!(ExecutionPlan::new_placeholder(kind).step_count(), 6);
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(
+                ExecutionPlanState::default(),
+                ExecutionPlanState::Disabled
             );
         }
     }
