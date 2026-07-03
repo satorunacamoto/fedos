@@ -78,6 +78,12 @@ import {
 import type { StorageBackend } from "../storage/types.js";
 import { NoopFederationProvider } from "../federation/noop_federation.js";
 import type { FederationProvider } from "../federation/types.js";
+import { NoopChatProvider } from "../chat/noop_chat.js";
+import type { ChatProvider } from "../chat/types.js";
+import { NoopMarketplaceProvider } from "../marketplace/noop_marketplace.js";
+import type { MarketplaceProvider } from "../marketplace/types.js";
+import { NoopEntitlementProvider } from "../creator/entitlement.js";
+import type { EntitlementProvider } from "../creator/entitlement.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -481,6 +487,60 @@ export function selectFederationProvider(
 }
 
 /**
+ * Select the `ChatProvider` (Stage 111's protocol-neutral chat/DM transport
+ * seam — unrelated to the Stage 16 `ChatRoom`/`ChatMessage` model). Priority:
+ *   1. `overrides.chatProvider` — wins unconditionally.
+ *   2. Otherwise → `NoopChatProvider` (safe default, always `unavailable`).
+ *
+ * There is no env-selectable real/placeholder adapter yet. Selection only:
+ * constructing the provider opens no relay/WebSocket session and encrypts/
+ * decrypts/sends nothing. `env` is never mutated.
+ */
+export function selectChatProvider(
+  _env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): ChatProvider {
+  if (overrides.chatProvider) return overrides.chatProvider;
+  return new NoopChatProvider();
+}
+
+/**
+ * Select the `MarketplaceProvider` (Stage 111). Priority:
+ *   1. `overrides.marketplaceProvider` — wins unconditionally.
+ *   2. Otherwise → `NoopMarketplaceProvider` (safe default, always
+ *      `unavailable`).
+ *
+ * There is no env-selectable real/placeholder adapter yet. Selection only:
+ * constructing the provider lists nothing, charges nothing, and issues no
+ * `PurchaseGrant`. `env` is never mutated.
+ */
+export function selectMarketplaceProvider(
+  _env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): MarketplaceProvider {
+  if (overrides.marketplaceProvider) return overrides.marketplaceProvider;
+  return new NoopMarketplaceProvider();
+}
+
+/**
+ * Select the `EntitlementProvider` (Stage 111). Priority:
+ *   1. `overrides.creatorEntitlementProvider` — wins unconditionally.
+ *   2. Otherwise → `NoopEntitlementProvider` (safe default, always
+ *      `unavailable`, never `allowed: true`).
+ *
+ * There is no env-selectable real/placeholder adapter yet. Selection only:
+ * constructing the provider grants no access and contacts no payment rail.
+ * `env` is never mutated.
+ */
+export function selectCreatorEntitlementProvider(
+  _env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): EntitlementProvider {
+  if (overrides.creatorEntitlementProvider) return overrides.creatorEntitlementProvider;
+  return new NoopEntitlementProvider();
+}
+
+/**
  * Whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy — HALF of the Stage 52
  * dual-flag gate for invoking a real `promotionProvider` for a preview. Pure;
  * never mutates `env`.
@@ -535,5 +595,8 @@ export function createRuntime(
     cryptoProvider: selectCryptoProvider(env, overrides),
     storageBackend: selectStorageBackend(env, overrides),
     federationProvider: selectFederationProvider(env, overrides),
+    chatProvider: selectChatProvider(env, overrides),
+    marketplaceProvider: selectMarketplaceProvider(env, overrides),
+    creatorEntitlementProvider: selectCreatorEntitlementProvider(env, overrides),
   };
 }

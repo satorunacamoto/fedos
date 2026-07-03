@@ -32,6 +32,9 @@ import type { WebAuthnProvider } from "../identity/webauthn_adapter.js";
 import type { CryptoProvider } from "../crypto/types.js";
 import type { StorageBackend } from "../storage/types.js";
 import type { FederationProvider } from "../federation/types.js";
+import type { ChatProvider } from "../chat/types.js";
+import type { MarketplaceProvider } from "../marketplace/types.js";
+import type { EntitlementProvider } from "../creator/entitlement.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -280,6 +283,25 @@ export interface RuntimeOverrides {
    * `connect`/`disconnect`/`publishPlaceholder`/`fetchPlaceholder`.
    */
   readonly federationProvider?: FederationProvider;
+  /**
+   * Pre-built chat provider (Stage 111's `ChatProvider` seam — a
+   * protocol-neutral DM/chat TRANSPORT boundary, unrelated to the Stage 16
+   * `ChatRoom`/`ChatMessage` model). Wins over the default. Selection only
+   * — the runtime never calls its `sendPlaceholder`/`fetchPlaceholder`.
+   */
+  readonly chatProvider?: ChatProvider;
+  /**
+   * Pre-built marketplace provider (Stage 111's `MarketplaceProvider`
+   * seam). Wins over the default. Selection only — the runtime never calls
+   * its `listPlaceholder`/`purchasePlaceholder`.
+   */
+  readonly marketplaceProvider?: MarketplaceProvider;
+  /**
+   * Pre-built creator entitlement provider (Stage 111's
+   * `EntitlementProvider` seam). Wins over the default. Selection only —
+   * the runtime never calls its `checkPlaceholder`.
+   */
+  readonly creatorEntitlementProvider?: EntitlementProvider;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -357,4 +379,32 @@ export interface AppRuntime {
    * OAuth/AT-Protocol session and signs/publishes/fetches nothing.
    */
   readonly federationProvider: FederationProvider;
+  /**
+   * The selected chat provider (Stage 111's `ChatProvider` seam — a
+   * protocol-neutral DM/chat TRANSPORT boundary, unrelated to the Stage 16
+   * `ChatRoom`/`ChatMessage` model already used for in-app chat
+   * rendering). ALWAYS a `NoopChatProvider` unless
+   * `overrides.chatProvider` is supplied. `sendPlaceholder()`/
+   * `fetchPlaceholder()` are NEVER called automatically. Constructing a
+   * runtime opens no relay/WebSocket session and encrypts/decrypts/sends
+   * nothing.
+   */
+  readonly chatProvider: ChatProvider;
+  /**
+   * The selected marketplace provider (Stage 111's `MarketplaceProvider`
+   * seam). ALWAYS a `NoopMarketplaceProvider` unless
+   * `overrides.marketplaceProvider` is supplied. `listPlaceholder()`/
+   * `purchasePlaceholder()` are NEVER called automatically. Constructing a
+   * runtime lists nothing, charges nothing, and issues no `PurchaseGrant`.
+   */
+  readonly marketplaceProvider: MarketplaceProvider;
+  /**
+   * The selected creator entitlement provider (Stage 111's
+   * `EntitlementProvider` seam). ALWAYS a `NoopEntitlementProvider` unless
+   * `overrides.creatorEntitlementProvider` is supplied.
+   * `checkPlaceholder()` is NEVER called automatically, and `allowed:
+   * true` is never produced by the default. Constructing a runtime grants
+   * no access and contacts no payment rail.
+   */
+  readonly creatorEntitlementProvider: EntitlementProvider;
 }
