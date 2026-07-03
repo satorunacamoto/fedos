@@ -4,19 +4,25 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 105 — Public key-format label enumeration
+> **Status: Stage 106 — Public Boundary Freeze v2: public key-USAGE label
+> enumeration (`FedosKeyUsageLabel`, eight labels) + public algorithm
+> policy metadata (`FedosAlgorithmRequirement`/`FedosAlgorithmCapability`/
+> `FedosAlgorithmPolicy`) + a Capability/Feature/Policy/Version/Usage/
+> Format/Algorithm README reorganization.** The public `pub fn` surface
+> grows from eighteen (Stage 105) to twenty-two. Every label remains
+> planning intent only — no raw key byte, no owned string, no growable
+> byte collection, no parser, no validator, no enforced authorization or
+> approval rule, and no import/export/generate function exists anywhere;
+> `Cargo.toml` is UNCHANGED; no CSPRNG entropy source is consulted; no
+> Runtime/Worker/CryptoProvider/WASM wiring. See "Public key-usage label
+> boundary (Stage 106)", "Public algorithm policy metadata (Stage 106)",
+> and "Public boundary overview" below for the full record. Prior status:
+> Stage 105 added a public key-format label enumeration
 > (`FedosKeyFormatLabel`, seven FUTURE PLANNING LABELS, plus
 > `FedosKeyFormatState`/`FedosKeyFormatStatus`/`FedosKeyFormatDescriptor`
-> and one fixed accessor, `fedos_key_format_descriptor_placeholder()`).**
-> The public `pub fn` surface grows from seventeen (Stage 103) to
-> eighteen. Every label is planning intent only — no raw key byte, no
-> owned string, no growable byte collection, no parser, no serializer, no
-> validator, and no import/export function exists anywhere; the
-> raw-input FORMAT decision itself stays UNIMPLEMENTED, exactly as
-> `docs/public_key_provisioning.md` left it. No CSPRNG entropy source is
-> consulted; `Cargo.toml` is UNCHANGED; no Runtime/Worker/CryptoProvider/
-> WASM wiring. See "Public key-format label boundary (Stage 105)" below
-> for the full record. Prior status: Stage 104 adopted the `getrandom`
+> and one fixed accessor, `fedos_key_format_descriptor_placeholder()`) —
+> the public `pub fn` surface grew from seventeen (Stage 103) to eighteen.
+> Prior status: Stage 104 adopted the `getrandom`
 > CSPRNG dependency (build check ONLY, an EIGHTH `[dependencies]` entry)
 > + a `cfg(test)`-only RNG-verification-infrastructure PLACEHOLDER
 > (`csprng_verification_infrastructure`, a fixed label plan, never calling
@@ -2461,12 +2467,24 @@ deliberately avoids the literal text `` `#[cfg(test)]` `` (writing
 regex trap Stage 75's note first documented, now hit and fixed again
 while describing this stage's own new module.
 
-## Public boundary overview (Stage 102–105)
+## Public Boundary Freeze v2 (Stage 102–106)
+
+Stage 106 closes a five-stage arc (102–106) the user named **Public
+Boundary Freeze v2**: the public-API boundary is now as complete as it
+can be made without crossing into real cryptography, real randomness,
+real key import/export, or real wiring — see "Boundary overview" and
+"Updated roadmap" below, and the stop condition this stage was run under
+in "Where the boundary stops" further down.
+
+### Boundary overview — seven label/metadata groups
 
 A consolidated reference for the full label-only public boundary, since
-the stage-by-stage narrative above has grown long. All types are `pub`;
-all functions take only label parameters (never a byte buffer) and
-return only label/status values (never `Vec<u8>`/`String`/secret data).
+the stage-by-stage narrative above has grown long.
+[`docs/public_capability_matrix.md`](../../docs/public_capability_matrix.md)
+is the authoritative record for how these seven groups differ from each
+other; this table is its condensed form. All types are `pub`; all
+functions take only label parameters (never a byte buffer) and return
+only label/status values (never `Vec<u8>`/`String`/secret data).
 
 | Group | Types | Function(s) | Stage |
 | --- | --- | --- | --- |
@@ -2475,17 +2493,21 @@ return only label/status values (never `Vec<u8>`/`String`/secret data).
 | Crypto boundary | `FedosCryptoOperation`, `FedosCryptoAlgorithm`, `FedosCryptoBoundaryState`, `FedosCryptoBoundaryStatus`, `FedosCryptoRequestDescriptor`, `FedosCryptoResponseDescriptor` | `fedos_crypto_boundary_status` | 102 |
 | Random/nonce boundaries | `FedosRandomBoundary`(+`State`), `FedosNonceBoundary`(+`State`) | `fedos_random_boundary_status`, `fedos_nonce_boundary_status` | 103 |
 | Key boundaries | `FedosKeyGenerationBoundary`, `FedosKeyImportBoundary`, `FedosKeyExportBoundary` (each +`State`) | `fedos_key_generation_boundary_status`, `fedos_key_import_boundary_status`, `fedos_key_export_boundary_status` | 103 |
-| Capability/algorithm metadata | `FedosCapabilityKind`, `FedosCapabilityDescriptor`, `FedosAlgorithmCategory`, `FedosAlgorithmDescriptor` | `fedos_capability_descriptors`, `fedos_algorithm_descriptors` | 103 |
-| Boundary shape metadata | `FedosBoundaryVersion`, `FedosBoundaryFeature`, `FedosBoundaryPolicyKind`, `FedosBoundaryPolicyDecision`, `FedosBoundaryPolicy` | `fedos_boundary_version`, `fedos_boundary_features`, `fedos_boundary_policy_decision` | 103 |
-| Key-format planning labels | `FedosKeyFormatLabel`, `FedosKeyFormatState`, `FedosKeyFormatStatus`, `FedosKeyFormatDescriptor` | `fedos_key_format_descriptor_placeholder` | 105 |
+| **1. Capability** | `FedosCapabilityKind`, `FedosCapabilityDescriptor` | `fedos_capability_descriptors` | 103 |
+| **2. Feature** | `FedosBoundaryFeature` | `fedos_boundary_features` | 103 |
+| **3. Policy (boundary)** | `FedosBoundaryPolicyKind`, `FedosBoundaryPolicyDecision`, `FedosBoundaryPolicy` | `fedos_boundary_policy_decision` | 103 |
+| **4. Version** | `FedosBoundaryVersion` | `fedos_boundary_version` | 103 |
+| **5. Format** | `FedosKeyFormatLabel`, `FedosKeyFormatState`, `FedosKeyFormatStatus`, `FedosKeyFormatDescriptor` | `fedos_key_format_descriptor_placeholder` | 105 |
+| **6. Usage** | `FedosKeyUsageLabel`, `FedosKeyUsageState`, `FedosKeyUsageStatus`, `FedosKeyUsageDescriptor` | `fedos_key_usage_descriptor_placeholder` | 106 |
+| **7. Algorithm** | `FedosAlgorithmCategory`, `FedosAlgorithmDescriptor` (103); `FedosAlgorithmRequirement`, `FedosAlgorithmCapability`, `FedosAlgorithmPolicy` (106) | `fedos_algorithm_descriptors` (103); `fedos_algorithm_requirements`, `fedos_algorithm_capabilities`, `fedos_algorithm_policy_decision` (106) | 103, 106 |
 
-Eighteen `pub fn`s total (Stage 104 added a dependency and a design
+Twenty-two `pub fn`s total (Stage 104 added a dependency and a design
 record, not a public type or function — the count stayed at seventeen
-through that stage; Stage 105 is the one that grew it to eighteen).
-`FedosBoundaryVersion` stays `1.0.0` — no EXISTING type's SHAPE changed
-through Stage 105 (per `docs/public_boundary_versioning.md` section 4's
-own policy, only a shape change warrants a bump; adding a wholly new
-group, as Stage 105 did, is not a shape change to an existing type).
+through that stage). `FedosBoundaryVersion` stays `1.0.0` — no EXISTING
+type's SHAPE changed through Stage 106 (per
+`docs/public_boundary_versioning.md` section 4's own policy, only a
+shape change warrants a bump; adding wholly new groups, as Stage 105/106
+each did, is not a shape change to an existing type).
 `FedosCapabilityDescriptor`
 (Stage 103) and `FEDOS_CORE_CAPABILITIES`/`fedos_core_capabilities()`
 (Stage 69) intentionally coexist as two different views over a similar
@@ -2503,10 +2525,14 @@ public API change this cleanup stage does not have authorization to make.
 [`docs/public_random_design.md`](../../docs/public_random_design.md) /
 [`docs/public_key_provisioning.md`](../../docs/public_key_provisioning.md)
 (Stage 104, post-dependency-adoption detail; `public_key_provisioning.md`
-updated again at Stage 105 to record the key-format label enumeration).
+updated again at Stage 105 to record the key-format label enumeration) →
+[`docs/public_key_usage.md`](../../docs/public_key_usage.md) /
+[`docs/public_algorithm_policy.md`](../../docs/public_algorithm_policy.md)
+(Stage 106, usage/policy detail) →
+[`docs/public_capability_matrix.md`](../../docs/public_capability_matrix.md)
+(Stage 106, the seven-group map — no new design of its own).
 
-**Updated roadmap (supersedes the individual docs' own roadmap sections
-where they overlap):**
+### Updated roadmap (supersedes the individual docs' own roadmap sections where they overlap)
 
 1. ~~Fix the public API design (Stage 102).~~ Done.
 2. ~~Consolidate the placeholder boundary (Stage 103).~~ Done.
@@ -2515,19 +2541,60 @@ where they overlap):**
    (`docs/public_key_provisioning.md` section 6, step 1) — still no
    implementation.
 5. ~~Design the key-format label enumeration
-   (`docs/public_key_provisioning.md` section 6, step 2) — still no
-   implementation.~~ Done — Stage 105 (`FedosKeyFormatLabel`, see below).
-6. Implement real `randomBytes` behind `FedosRandomBoundary`.
-7. Implement real key generation/import behind
+   (`docs/public_key_provisioning.md` section 6, step 2).~~ Done — Stage
+   105 (`FedosKeyFormatLabel`).
+6. ~~Design the key-usage label enumeration and algorithm policy
+   metadata.~~ Done — Stage 106 (`FedosKeyUsageLabel`,
+   `FedosAlgorithmRequirement`/`FedosAlgorithmCapability`/
+   `FedosAlgorithmPolicy`).
+7. Design the `(FedosKeyFormatLabel, FedosKeyUsageLabel)` authorization
+   rule set (`docs/public_key_usage.md` section 5, step 1) — still no
+   implementation.
+8. Implement real `randomBytes` behind `FedosRandomBoundary`.
+9. Implement real key generation/import behind
    `FedosKeyGenerationBoundary`/`FedosKeyImportBoundary`, consuming
-   `FedosKeyFormatLabel` to name the format being generated/imported —
-   still without deciding its raw byte shape (step 4 above).
-8. Implement real `deriveKey`, then real `encrypt`/`decrypt`, consuming
-   the now-implemented random/key boundaries.
-9. Separately review whether `FedosKeyExportBoundary` should ever be
-   implemented at all.
-10. Only after 4–9 are each independently implemented and reviewed, wire
-    the boundary into the Runtime/Worker/`CryptoProvider`.
+   `FedosKeyFormatLabel`/`FedosKeyUsageLabel` to name the format/usage
+   being generated/imported — still without deciding a raw byte shape
+   (step 4 above) or an enforced rule (step 7 above).
+10. Implement real `deriveKey`, then real `encrypt`/`decrypt`, consuming
+    the now-implemented random/key boundaries and the algorithm-policy
+    approval decision from a future, real `FedosAlgorithmPolicyDecision`
+    value (`docs/public_algorithm_policy.md` section 4).
+11. Separately review whether `FedosKeyExportBoundary` should ever be
+    implemented at all.
+12. Only after 4–11 are each independently implemented and reviewed,
+    wire the boundary into the Runtime/Worker/`CryptoProvider`.
+
+### Where the boundary stops
+
+Public Boundary Freeze v2 completes every remaining LABEL-ONLY gap the
+prior stages' own roadmaps had flagged. What is deliberately still
+missing, and why each is a stop condition rather than a to-do:
+
+- **No raw byte is handled anywhere.** Every type across all seven
+  groups holds only fixed enum labels or (in `FedosBoundaryVersion`'s
+  case) a fixed `u32` triple — never a borrowed byte slice, growable
+  byte vector, or owned string.
+- **No serialization format is chosen.** `FedosKeyFormatLabel` names
+  future formats; it does not fix how any of them would be encoded on
+  the wire or in memory.
+- **No import/export is implemented.** `FedosKeyImportBoundary`/
+  `FedosKeyExportBoundary` (Stage 103) remain permanently `Unavailable`
+  status types; Stage 104's provisioning-contract design
+  (`docs/public_key_provisioning.md`) fixes the CONTRACT, not a
+  concrete request/response type.
+- **No `randomBytes` is implemented.** `getrandom` (Stage 104) is
+  adopted but never called; `FedosRandomBoundary`/`FedosNonceBoundary`
+  remain permanently `Unavailable`.
+- **No nonce is generated anywhere**, for the same reason.
+- **Nothing is wired into the Runtime, the Worker, or a crypto
+  provider.** Every function across Stage 102–106 is reachable only by
+  directly calling this crate — no host code path touches any of them.
+
+Reaching any of the six items above from here is, by the definition this
+multi-stage arc has used throughout, the START of the Implementation
+Phase, not further boundary design — the next stage that touches any of
+them should be scoped and reviewed as such.
 
 ## Public key-format label boundary (Stage 105)
 
@@ -2587,3 +2654,96 @@ unchanged, no Runtime/Worker/`CryptoProvider` connection, `Cargo.toml`
 unchanged, no `getrandom`/`rand` usage, no `println!`/`eprintln!`/`log`/
 `tracing`/`dbg!` usage, no `unsafe`, the placeholder function's fixed
 body, the design doc records completion, no committed build artifact).
+
+## Public key-usage label boundary (Stage 106)
+
+Stage 106 fixes `FedosKeyUsageLabel` — the "what is this key allowed to
+be used for" dimension `docs/public_key_usage.md` separates from Stage
+105's `FedosKeyFormatLabel` ("what shape is this key"). See
+`docs/public_key_usage.md` section 1 for the full reasoning behind
+keeping the two independent.
+
+**`FedosKeyUsageLabel`** (`pub enum`, placed right after Stage 105's
+`fedos_key_format_descriptor_placeholder`, still ahead of Stage 79's
+`secret_handle` module) — eight FUTURE PLANNING LABELS:
+`EncryptionPlaceholder`, `DecryptionPlaceholder`, `SigningPlaceholder`,
+`VerificationPlaceholder`, `KeyDerivationPlaceholder`,
+`StoragePlaceholder`, `TransportPlaceholder`, `TestOnlyPlaceholder`.
+**`FedosKeyUsageState`** (`Unavailable` / `Placeholder`),
+**`FedosKeyUsageStatus`** (carries only the state), and
+**`FedosKeyUsageDescriptor`** (carries only `label`/`status`) round out
+the group. **`fedos_key_usage_descriptor_placeholder()`** takes no input
+and always returns `FedosKeyUsageLabel::TestOnlyPlaceholder` paired with
+a permanently `Unavailable` status — the exact same shape Stage 105's
+`fedos_key_format_descriptor_placeholder()` established.
+
+**No enforced authorization.** No function anywhere binds a usage label
+to a real key, restricts a real operation, or checks a
+`(FedosKeyFormatLabel, FedosKeyUsageLabel)` pair against anything — that
+authorization design is reserved for a future, separately-reviewed stage
+(`docs/public_key_usage.md` section 5, step 1). No raw key byte, owned
+string, or growable byte collection exists anywhere in this group.
+
+See
+[`test/fedos_core_rust_key_usage_label.test.ts`](../../test/fedos_core_rust_key_usage_label.test.ts)
+(13 tests) for the dedicated Stage 106 guard tests (all eight variants
+present as bare unit variants, all four type declarations, no
+`Vec`/`String`/raw-byte field, no key/seed/plaintext/ciphertext/
+passphrase/secret storage field, no parser/serializer/import/export/
+generate/validate/authorize function anywhere in `lib.rs`, the
+placeholder function's fixed body, the `pub fn` surface includes the new
+function among twenty-two total, no Runtime/Worker/`CryptoProvider`
+connection, `Cargo.toml` unchanged, no `getrandom`/`rand` usage, no
+`println!`/`log`/`unsafe` usage, the design doc exists, no committed
+build artifact).
+
+## Public algorithm policy metadata (Stage 106)
+
+Stage 106 also fixes three more label-only metadata types over Stage
+102's four `FedosCryptoAlgorithm` candidates — what each would need,
+what each would be capable of, and whether each is currently approved.
+See `docs/public_algorithm_policy.md` for the full design record.
+
+**`FedosAlgorithmRequirement`** (`algorithm: FedosCryptoAlgorithm`,
+`requirement: FedosAlgorithmRequirementLabel`) → a fixed, const-backed
+relational table (`fedos_algorithm_requirements()`) pairing each
+algorithm with one or more of `RequiresKeyPlaceholder` /
+`RequiresNoncePlaceholder` / `RequiresSaltPlaceholder` /
+`RequiresNoAdditionalInputPlaceholder` — an algorithm needing more than
+one kind of input appears as more than one row.
+
+**`FedosAlgorithmCapability`** (`algorithm: FedosCryptoAlgorithm`,
+`capability: FedosAlgorithmCapabilityLabel`) → a fixed, const-backed
+relational table (`fedos_algorithm_capabilities()`) pairing each
+algorithm with one or more of `AeadEncryptPlaceholder` /
+`AeadDecryptPlaceholder` / `KdfDerivePlaceholder` — a finer-grained
+statement than Stage 103's `FedosAlgorithmDescriptor`/
+`FedosAlgorithmCategory` (which only says "this is an AEAD algorithm,"
+not "this algorithm would encrypt AND decrypt").
+
+**`FedosAlgorithmPolicy`** (`algorithm: FedosCryptoAlgorithm`, `decision:
+FedosAlgorithmPolicyDecision`) →
+`fedos_algorithm_policy_decision(algorithm)` always returns
+`NotYetApprovedPlaceholder`, regardless of `algorithm` — mirrors Stage
+103's `FedosBoundaryPolicy` always-deny pattern. `FedosAlgorithmPolicyDecision`
+has exactly one variant today; this is NOT a real approval system.
+
+**No real validation, capability grant, or approval.** All three tables
+are fixed `const` arrays — no `Vec`/`HashMap`/dynamic collection, no
+runtime-computed length. No function validates a real requirement
+against real input, grants a real capability, or approves a real
+algorithm for use.
+
+See
+[`test/fedos_core_rust_algorithm_policy.test.ts`](../../test/fedos_core_rust_algorithm_policy.test.ts)
+(14 tests) for the dedicated Stage 106 guard tests (all three type
+groups and their variant sets, both relational tables const-backed with
+no dynamic collection, the policy function's fixed no-branching body, no
+`Vec<u8>`/`String`/raw-byte field, no actual AEAD/KDF crate usage
+(specific crate-usage patterns, not a bare substring match — the tables
+legitimately reuse Stage 102's algorithm labels), no
+Runtime/Worker/`CryptoProvider` connection, `Cargo.toml` unchanged, no
+`getrandom`/`rand` usage, no `unsafe`/`println!`/`log` usage, the `pub
+fn` surface includes all three new functions among twenty-two total, the
+design doc exists and names all three types, no committed build
+artifact).

@@ -8,7 +8,61 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 105 — Public key-format label enumeration
+> **Status: Stage 106 — Public Boundary Freeze v2.** Two more label-only
+> PUBLIC groups land in `packages/fedos-core-rust/src/lib.rs`:
+> `FedosKeyUsageLabel` (eight labels — separating "what is this key for"
+> from Stage 105's "what format is this key," see
+> `docs/public_key_usage.md`) plus `FedosKeyUsageState`/
+> `FedosKeyUsageStatus`/`FedosKeyUsageDescriptor` and one new function,
+> `fedos_key_usage_descriptor_placeholder()`; and
+> `FedosAlgorithmRequirement`/`FedosAlgorithmCapability`/
+> `FedosAlgorithmPolicy` — three fixed relational/policy label tables
+> over Stage 102's four algorithm candidates (see
+> `docs/public_algorithm_policy.md`) plus three new functions,
+> `fedos_algorithm_requirements`, `fedos_algorithm_capabilities`, and
+> `fedos_algorithm_policy_decision`. The public `pub fn` surface grows
+> from eighteen (Stage 105) to twenty-two. Every label remains planning
+> intent only — no raw key byte, no owned string, no growable byte
+> collection, no parser, no validator, no enforced authorization or
+> approval rule, and no import/export/generate function exists anywhere;
+> `Cargo.toml` is UNCHANGED; no CSPRNG entropy source is consulted; no
+> Runtime/Worker/CryptoProvider/WASM wiring. A new
+> [`docs/public_capability_matrix.md`](docs/public_capability_matrix.md)
+> maps all seven label/metadata groups added across Stage 103/105/106
+> (Capability, Feature, Policy, Version, Format, Usage, Algorithm) in one
+> table, and `packages/fedos-core-rust/README.md`'s "Public boundary
+> overview" was rewritten as **Public Boundary Freeze v2** (Stage
+> 102–106), consolidating the roadmap and adding an explicit "where the
+> boundary stops" section (no raw byte, no serialization format, no
+> import/export implementation, no `randomBytes` implementation, no
+> nonce generation, no Runtime/Worker/CryptoProvider wiring — reaching
+> any of these is the Implementation Phase, not further boundary
+> design). New
+> [`test/fedos_core_rust_key_usage_label.test.ts`](test/fedos_core_rust_key_usage_label.test.ts)
+> (13 tests) and
+> [`test/fedos_core_rust_algorithm_policy.test.ts`](test/fedos_core_rust_algorithm_policy.test.ts)
+> (14 tests) check all of the above; twenty-four pre-existing guard test
+> files' hard-coded "pub fn total" checks were updated from 18 to 22 with
+> the four new function names, and
+> `test/fedos_core_rust_key_format_label.test.ts`'s own Stage-105-scoped
+> section extraction was narrowed to end at Stage 106's new marker
+> instead of Stage 79's. `npm run typecheck`, `npm test` (111 files, 1535
+> tests), `cargo check`, `cargo test` (108 tests, same count as Stage 105
+> — no new Rust unit test this stage, since no new `#[cfg(test)]` module
+> was added), and `cargo check --tests` all stay GREEN. This closes the
+> Public Boundary Freeze v2 arc (Stage 102–106) at the stop condition the
+> user specified: no raw byte, serialization format, import/export
+> implementation, `randomBytes` implementation, nonce generation, or
+> Runtime wiring was touched — the next stage that touches any of those
+> is Implementation Phase, not boundary design. Stage 107 candidates: (1)
+> design the `(FedosKeyFormatLabel, FedosKeyUsageLabel)` authorization
+> rule set (`docs/public_key_usage.md` section 5, step 1 — still
+> design-only) — recommended, since it's the last remaining label-design
+> gap the Freeze v2 roadmap lists before the arc has to cross into
+> Implementation Phase; (2) a WASM manifest validation skeleton; (3) a
+> NIP-44 vector source/update check. Prior status:
+>
+> **Stage 105 — Public key-format label enumeration
 > (`FedosKeyFormatLabel`, seven FUTURE PLANNING LABELS, plus
 > `FedosKeyFormatState`/`FedosKeyFormatStatus`/`FedosKeyFormatDescriptor`
 > and one fixed accessor, `fedos_key_format_descriptor_placeholder()`).**
