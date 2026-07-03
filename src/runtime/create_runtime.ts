@@ -76,6 +76,8 @@ import {
   PlaceholderStorageBackend,
 } from "../storage/noop_storage.js";
 import type { StorageBackend } from "../storage/types.js";
+import { NoopFederationProvider } from "../federation/noop_federation.js";
+import type { FederationProvider } from "../federation/types.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -459,6 +461,26 @@ export function selectStorageBackend(
 }
 
 /**
+ * Select the `FederationProvider`. Priority:
+ *   1. `overrides.federationProvider` — wins unconditionally.
+ *   2. Otherwise → `NoopFederationProvider` (safe default, always
+ *      `disconnected`).
+ *
+ * There is no env-selectable real/placeholder adapter yet — Stage 110 ships
+ * only `NoopFederationProvider` (see `docs/federation_boundary.md`).
+ * Selection only: constructing the provider opens no relay/WebSocket/HTTP/
+ * OAuth/AT-Protocol session and calls no `connect`/`disconnect`/
+ * `publishPlaceholder`/`fetchPlaceholder`. `env` is never mutated.
+ */
+export function selectFederationProvider(
+  _env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): FederationProvider {
+  if (overrides.federationProvider) return overrides.federationProvider;
+  return new NoopFederationProvider();
+}
+
+/**
  * Whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy — HALF of the Stage 52
  * dual-flag gate for invoking a real `promotionProvider` for a preview. Pure;
  * never mutates `env`.
@@ -512,5 +534,6 @@ export function createRuntime(
     webAuthnProvider: selectWebAuthnProvider(env, overrides),
     cryptoProvider: selectCryptoProvider(env, overrides),
     storageBackend: selectStorageBackend(env, overrides),
+    federationProvider: selectFederationProvider(env, overrides),
   };
 }

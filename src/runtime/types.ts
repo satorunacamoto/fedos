@@ -31,6 +31,7 @@ import type { EdgeRecFetchLike } from "../promotion/edge_rec_adapter.js";
 import type { WebAuthnProvider } from "../identity/webauthn_adapter.js";
 import type { CryptoProvider } from "../crypto/types.js";
 import type { StorageBackend } from "../storage/types.js";
+import type { FederationProvider } from "../federation/types.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -273,6 +274,12 @@ export interface RuntimeOverrides {
    * only — the runtime never calls its `put`/`get`/`delete`.
    */
   readonly storageBackend?: StorageBackend;
+  /**
+   * Pre-built federation provider (Stage 110's `FederationProvider` seam).
+   * Wins over the default. Selection only — the runtime never calls its
+   * `connect`/`disconnect`/`publishPlaceholder`/`fetchPlaceholder`.
+   */
+  readonly federationProvider?: FederationProvider;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -340,4 +347,14 @@ export interface AppRuntime {
    * mesh, and no content-addressed gateway, and issues no `fetch`/file IO.
    */
   readonly storageBackend: StorageBackend;
+  /**
+   * The selected federation provider (Stage 110's `FederationProvider`
+   * seam). Currently ALWAYS a `NoopFederationProvider` unless an
+   * `overrides.federationProvider` is supplied — there is no env-selectable
+   * real/placeholder adapter yet. `connect()`/`disconnect()`/
+   * `publishPlaceholder()`/`fetchPlaceholder()` are NEVER called
+   * automatically. Constructing a runtime opens no relay/WebSocket/HTTP/
+   * OAuth/AT-Protocol session and signs/publishes/fetches nothing.
+   */
+  readonly federationProvider: FederationProvider;
 }
