@@ -8,7 +8,59 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 107 — `StorageBackend` abstraction boundary skeleton.**
+> **Status: Stage 108 — Nearby / storage-metadata privacy boundaries
+> (docs only).** Three new research/policy documents fix the privacy
+> boundary for a not-yet-built "Nearby Discovery" feature and extend the
+> `StorageBackend` metadata policy — **no source file changed, no test file
+> changed, no new dependency, no location implementation.** New
+> [`docs/nearby_area_indexing_research.md`](docs/nearby_area_indexing_research.md)
+> documents why the Python v8.6 host's `get_area_id(lat, lon, precision=4)`
+> (independent `round(lat, 1)`/`round(lon, 1)`) is not production safe — a
+> fixed rectangular grid has a boundary problem (two nearby points can land
+> in different cells while distant ones share a cell), cell size is not
+> uniform across latitude, and even a coarse rounded coordinate is a
+> non-zero privacy cost — then compares Geohash/H3/S2/a coarser fixed grid
+> as candidates ONLY (none adopted, no dependency added), lists H3's
+> hex-cell/neighbor-ring/deterministic-adjacency advantages alongside its
+> dependency, WASM-footprint, exact-location-inference, and
+> resolution-choice risks, and fixes the privacy rules any future
+> implementation must follow (no raw-coordinate storage or transmission, an
+> area id is itself a tracking identifier, salt/epoch/rotation design is a
+> separate future stage, explicit opt-in consent, off by default) plus the
+> broader metadata leak surface (area-id frequency, time correlation, peer
+> count, bandwidth priority, relay observation). New
+> [`docs/nearby_consent_policy.md`](docs/nearby_consent_policy.md) fixes the
+> consent rules for that same not-yet-built feature (explicit/informed/
+> separable consent, off by default, revocation stops new signal generation
+> rather than just hiding UI, consent is not retroactive, and consent does
+> not by itself authorize storing an area id in `StorageBackend`). New
+> [`docs/storage_metadata_policy.md`](docs/storage_metadata_policy.md)
+> restates the EXISTING `reviewStoragePacket` marker policy
+> (`src/storage/policy.ts`, Stage 107 — unchanged by this stage) and fixes
+> the explicit rule that a location-derived value (an area id, geohash, H3
+> index, etc.) is NOT cleared for `StorageBackend` metadata just because it
+> passes today's secret/key/seed/token/payment/entitlement/dm/body/content/
+> message check — that check was never a location-privacy control, and
+> storing one requires its own future policy stage gated on both the
+> area-indexing and consent preconditions. `npm run typecheck`, `npm test`
+> (112 files, 1553 tests, unchanged), `cargo check`, `cargo test` (108
+> tests, unchanged), and `cargo check --tests` all stay GREEN, since no
+> source or test file was touched. Where this stage stopped, on purpose: no
+> H3/Geohash/S2 dependency was added, no GPS/`navigator.geolocation` call
+> was written, no area-id function exists in this codebase, no consent UI
+> or permission flow was built, no `StorageBackend`/Runtime/Worker wiring
+> changed. Stage 109 candidates: (1) a storage-provider environment-
+> selection boundary — mirroring how `createRuntime` already selects a
+> `PaymentProvider`/`NotificationBridge` from env, but for `StorageBackend`
+> (still no real backend) (recommended, since it is the natural next step
+> now that the metadata-privacy boundary around it is fixed in docs); (2) a
+> Nearby consent boundary **skeleton** (types/decision shapes only, no UI,
+> no permission call); (3) a storage metadata sanitizer boundary (a pure
+> function mirroring `sanitizePaymentMetadata`/`sanitizeNotificationPayload`
+> for `StoragePacket.metadata`, still no location-value support). Prior
+> status:
+>
+> **Stage 107 — `StorageBackend` abstraction boundary skeleton.**
 > A MINIMAL, future-facing seam for pluggable storage backends: new
 > [`src/storage/types.ts`](src/storage/types.ts) defines `StorageBackend`
 > (`getStatus`/`put`/`get`/`delete`), `StorageBackendKind` (six PLACEHOLDER
