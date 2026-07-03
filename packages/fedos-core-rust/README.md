@@ -4,12 +4,13 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 98 — Internal lifecycle state skeleton (internal-only
-> `lifecycle_state` module; fixed lifecycle states/kinds only, no logging,
-> no payload, no timestamp/counter, no existing-module wiring yet, no real
-> AEAD/HKDF/Argon2/NIP-44 connection, no Runtime/Worker/CryptoProvider
-> wiring, no WASM change). Public API STILL a placeholder SKELETON. No
-> cryptography reachable from any public function.**
+> **Status: Stage 99 — Internal module registry skeleton (internal-only
+> `module_registry` module; fixed enumeration labels only for every
+> skeleton module added since Stage 79, no dynamic registry mechanism,
+> `registered_module_count()` hardcoded to 15, no logging, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change). Public API STILL
+> a placeholder SKELETON. No cryptography reachable from any public
+> function.**
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -33,51 +34,58 @@ app depends only on its *contract*, never on its internals.
 > Stage 90 a seventh, `request_descriptor`, Stage 91 an eighth,
 > `response_descriptor`, Stage 92 a ninth, `crypto_pipeline`, Stage 93 a
 > tenth, `descriptor_bundle`, Stage 94 an eleventh, `execution_plan`, Stage
-> 95 a twelfth, `error_taxonomy`, Stage 96 a thirteenth, `audit_event`, and
-> Stage 97 a fourteenth, `audit_policy` — see the "Internal key material
-> skeleton" / "Internal domain separation label skeleton" / "Internal
-> operation context skeleton" / "Internal request descriptor skeleton" /
-> "Internal response descriptor skeleton" / "Internal crypto pipeline
-> skeleton" / "Internal descriptor bundle skeleton" / "Internal execution
-> plan skeleton" / "Internal error taxonomy skeleton" / "Internal audit
-> event label skeleton" / "Internal audit policy skeleton" sections below;
-> all eleven are UNCHANGED this stage, still placeholder-only. **Stage 98
-> adds a fifteenth crate-private module, `lifecycle_state`** — an
-> INTERNAL-ONLY lifecycle-state skeleton naming a future coarse state
-> transition for a crypto-provider/request/secret/audit/pipeline
-> lifecycle, plus a `LifecycleKind` label enum
-> (`CryptoProviderLifecyclePlaceholder` / `RequestLifecyclePlaceholder` /
-> `SecretLifecyclePlaceholder` / `AuditLifecyclePlaceholder` /
-> `PipelineLifecyclePlaceholder` / `TestOnlyLifecyclePlaceholder`) and a
-> six-variant `LifecycleState` (`Disabled` / `Placeholder` /
-> `PreparedPlaceholder` / `ActivePlaceholder` / `ClearedPlaceholder` /
-> `ErrorPlaceholder`) — see the "Internal lifecycle state skeleton"
-> section below. **No logging, no payload, no timestamp, no counter** —
-> `LifecycleMarker` writes to no stdout/stderr/log sink (no
-> `println!`/`eprintln!`/`tracing`/`log` crate usage anywhere), holds no
-> payload/timestamp/counter field of any kind, and its four
-> `mark_*_placeholder(&mut self)` transition methods take no input beyond
-> `&mut self` and only ever set the fixed `state` label. **No
-> existing-module wiring yet** — `LifecycleMarker` does not construct or
-> hold a `SecretHandle`, `AeadPlaceholderRequest`, `KdfPlaceholderRequest`,
-> `KeyMaterialHandle`, `DomainLabel`, `OperationContext`,
-> `RequestDescriptor`, `ResponseDescriptor`, `CryptoPipeline`,
-> `DescriptorBundle`, `ExecutionPlan`, `CryptoErrorDescriptor`,
-> `AuditEventLabel`, or `AuditPolicy`. **Not connected to `secret_handle`,
+> 95 a twelfth, `error_taxonomy`, Stage 96 a thirteenth, `audit_event`,
+> Stage 97 a fourteenth, `audit_policy`, and Stage 98 a fifteenth,
+> `lifecycle_state` — see the "Internal key material skeleton" / "Internal
+> domain separation label skeleton" / "Internal operation context
+> skeleton" / "Internal request descriptor skeleton" / "Internal response
+> descriptor skeleton" / "Internal crypto pipeline skeleton" / "Internal
+> descriptor bundle skeleton" / "Internal execution plan skeleton" /
+> "Internal error taxonomy skeleton" / "Internal audit event label
+> skeleton" / "Internal audit policy skeleton" / "Internal lifecycle
+> state skeleton" sections below; all twelve are UNCHANGED this stage,
+> still placeholder-only. **Stage 99 adds a sixteenth crate-private
+> module, `module_registry`** — an INTERNAL-ONLY module-registry skeleton
+> that ENUMERATES, by fixed label only, every crate-private skeleton
+> module added since Stage 79, plus a `ModuleRegistryKind` label enum
+> (`SecretHandlePlaceholder` / `AeadCorePlaceholder` / `KdfCorePlaceholder`
+> / `KeyMaterialPlaceholder` / `DomainLabelPlaceholder` /
+> `OperationContextPlaceholder` / `RequestDescriptorPlaceholder` /
+> `ResponseDescriptorPlaceholder` / `CryptoPipelinePlaceholder` /
+> `DescriptorBundlePlaceholder` / `ExecutionPlanPlaceholder` /
+> `ErrorTaxonomyPlaceholder` / `AuditEventPlaceholder` /
+> `AuditPolicyPlaceholder` / `LifecycleStatePlaceholder` /
+> `TestOnlyPlaceholder`) — see the "Internal module registry skeleton"
+> section below. **No dynamic registry mechanism** —
+> `ModuleRegistry::registered_module_count()` returns the hardcoded
+> literal `15` (the real skeleton count, excluding `TestOnlyPlaceholder`)
+> — never a length method call, never a `Vec`/`HashMap`/`BTreeMap`/
+> static-array-derived count, and no `lazy_static`/`once_cell`/
+> `inventory`-crate mechanism anywhere. **No logging** — `ModuleRegistry`
+> writes to no stdout/stderr/log sink (no
+> `println!`/`eprintln!`/`tracing`/`log` crate usage anywhere). **No
+> module construction or reference** — `module_registry`'s
+> `ModuleRegistryKind` variants are ENUMERATION labels only; it never
+> constructs, holds, or reads a field of a `SecretHandle`,
+> `AeadPlaceholderRequest`, `KdfPlaceholderRequest`, `KeyMaterialHandle`,
+> `DomainLabel`, `OperationContext`, `RequestDescriptor`,
+> `ResponseDescriptor`, `CryptoPipeline`, `DescriptorBundle`,
+> `ExecutionPlan`, `CryptoErrorDescriptor`, `AuditEventLabel`,
+> `AuditPolicy`, or `LifecycleMarker`. **Not connected to `secret_handle`,
 > `aead_core`, `kdf_core`, `key_material`, `domain_label`,
 > `operation_context`, `request_descriptor`, `response_descriptor`,
 > `crypto_pipeline`, `descriptor_bundle`, `execution_plan`,
-> `error_taxonomy`, `audit_event`, or `audit_policy`** — same "when in
-> doubt, leave unconnected" reasoning those modules already state; all
-> fourteen are UNCHANGED this stage, still placeholder-only. **No
-> production `deriveKey`/password KDF** — production code (everything
-> before this file's first `cfg(test)`-gated module) still does not
-> import `argon2` at all; `derive_key_placeholder` remains byte-for-byte
-> unchanged. `Cargo.toml` is UNCHANGED this stage (no new dependency
-> needed). The Rust crate still has no `wasm-bindgen`, no `unsafe`, and
-> produces **no `.wasm`**; the runtime/Worker/`CryptoProvider` are **not**
-> wired to any of this. A real RustCrypto-backed core is a future,
-> explicitly-reviewed stage
+> `error_taxonomy`, `audit_event`, `audit_policy`, or `lifecycle_state`**
+> — same "when in doubt, leave unconnected" reasoning those modules
+> already state; all fifteen are UNCHANGED this stage, still
+> placeholder-only. **No production `deriveKey`/password KDF** —
+> production code (everything before this file's first
+> `cfg(test)`-gated module) still does not import `argon2` at all;
+> `derive_key_placeholder` remains byte-for-byte unchanged. `Cargo.toml`
+> is UNCHANGED this stage (no new dependency needed). The Rust crate
+> still has no `wasm-bindgen`, no `unsafe`, and produces **no `.wasm`**;
+> the runtime/Worker/`CryptoProvider` are **not** wired to any of this. A
+> real RustCrypto-backed core is a future, explicitly-reviewed stage
 > that must pass the full crypto test-vector plan
 > ([`docs/crypto_test_vectors.md`](../../docs/crypto_test_vectors.md)) and ship a
 > build manifest ([`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md))
@@ -282,6 +290,24 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   `operation_context`/`request_descriptor`/`response_descriptor`/
   `crypto_pipeline`/`descriptor_bundle`/`execution_plan`/`error_taxonomy`/
   `audit_event`/`audit_policy`'s types
+- No PUBLIC registry type, no dynamic registry mechanism, no logging —
+  Stage 99 adds an INTERNAL-ONLY `ModuleRegistry` skeleton (crate-private
+  `module_registry` module, `pub(crate)` at most, never `pub`, never
+  re-exported) that ENUMERATES, by fixed `ModuleRegistryKind` label only,
+  every crate-private skeleton module added since Stage 79;
+  `registered_module_count()` returns the hardcoded literal `15` — never
+  a length method call, never a `Vec`/`HashMap`/`BTreeMap`/static-array-
+  derived count, and no `lazy_static`/`once_cell`/`inventory`-crate
+  mechanism anywhere; it accepts no user-, environment-, or
+  config-derived input, holds no key/seed/plaintext/ciphertext/
+  passphrase/tag/nonce byte, no observation-payload/timestamp/counter
+  field, no `String`/`Vec` field, writes to no stdout/stderr/log sink (no
+  `println!`/`eprintln!`/`tracing`/`log` crate usage anywhere), and does
+  not construct or hold any of
+  `secret_handle`/`aead_core`/`kdf_core`/`key_material`/`domain_label`/
+  `operation_context`/`request_descriptor`/`response_descriptor`/
+  `crypto_pipeline`/`descriptor_bundle`/`execution_plan`/`error_taxonomy`/
+  `audit_event`/`audit_policy`/`lifecycle_state`'s types
 - No WebAuthn / passkey, no Secure Enclave, no Apple/Google enclave integration
 - Handles no secret bytes: requests carry OPAQUE, non-secret handles/labels only
 
@@ -308,7 +334,7 @@ packages/fedos-core-rust
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a third `cfg(test)`-only `rfc9106_vectors` module (Stage 85) verifies argon2 against RFC 9106 Argon2id, refactored Stage 86 to share derivation logic via one test-only helper fn; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `key_material` module (Stage 87) is an INTERNAL-ONLY `KeyMaterialHandle` skeleton reusing `secret_handle`'s zeroize/secrecy placeholder-marker pattern, plus a `KeyMaterialKind` label enum; a crate-private `domain_label` module (Stage 88) is an INTERNAL-ONLY `DomainLabel` skeleton holding only a fixed `&'static str` label per `DomainLabelKind`; a crate-private `operation_context` module (Stage 89) is an INTERNAL-ONLY `OperationContext` skeleton naming a future crypto operation via an `OperationKind` label only; a crate-private `request_descriptor` module (Stage 90) is an INTERNAL-ONLY `RequestDescriptor` skeleton naming a future crypto operation REQUEST via a `RequestDescriptorKind` label only, non-sensitive metadata only; a crate-private `response_descriptor` module (Stage 91) is an INTERNAL-ONLY `ResponseDescriptor` skeleton naming a future crypto operation RESULT via a `ResponseDescriptorKind` label only, non-sensitive metadata only; a crate-private `crypto_pipeline` module (Stage 92) is an INTERNAL-ONLY `CryptoPipeline` skeleton naming a future crypto PIPELINE via a `CryptoPipelineKind` label only, not yet bundling any other skeleton; a crate-private `descriptor_bundle` module (Stage 93) is an INTERNAL-ONLY `DescriptorBundle` skeleton naming a future crypto BUNDLE via a `DescriptorBundleKind` label only, not yet grouping any other skeleton's value; a crate-private `execution_plan` module (Stage 94) is an INTERNAL-ONLY `ExecutionPlan` skeleton naming a future crypto processing ORDER via an `ExecutionPlanKind` label and a fixed `ExecutionStepKind` six-step label sequence only; a crate-private `error_taxonomy` module (Stage 95) is an INTERNAL-ONLY `CryptoErrorDescriptor` skeleton classifying a future crypto operation FAILURE via a `CryptoErrorKind` label only, no error message/source/stack field; a crate-private `audit_event` module (Stage 96) is an INTERNAL-ONLY `AuditEventLabel` skeleton naming a future crypto-internal state change via an `AuditEventKind` label only, no event payload and no logging; a crate-private `audit_policy` module (Stage 97) is an INTERNAL-ONLY `AuditPolicy` skeleton naming a future observability decision via an `AuditPolicyKind` label and a fixed `AuditPolicyDecision` label (always `DenyPlaceholder` today), no observation payload, no logging, and no reference to `audit_event`; a crate-private `lifecycle_state` module (Stage 98) is an INTERNAL-ONLY `LifecycleMarker` skeleton naming a future coarse lifecycle transition via a `LifecycleKind` label and a six-variant `LifecycleState`, no payload/timestamp/counter, no logging — none of the fifteen skeletons is part of the public API, and none is connected to any other
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a third `cfg(test)`-only `rfc9106_vectors` module (Stage 85) verifies argon2 against RFC 9106 Argon2id, refactored Stage 86 to share derivation logic via one test-only helper fn; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `key_material` module (Stage 87) is an INTERNAL-ONLY `KeyMaterialHandle` skeleton reusing `secret_handle`'s zeroize/secrecy placeholder-marker pattern, plus a `KeyMaterialKind` label enum; a crate-private `domain_label` module (Stage 88) is an INTERNAL-ONLY `DomainLabel` skeleton holding only a fixed `&'static str` label per `DomainLabelKind`; a crate-private `operation_context` module (Stage 89) is an INTERNAL-ONLY `OperationContext` skeleton naming a future crypto operation via an `OperationKind` label only; a crate-private `request_descriptor` module (Stage 90) is an INTERNAL-ONLY `RequestDescriptor` skeleton naming a future crypto operation REQUEST via a `RequestDescriptorKind` label only, non-sensitive metadata only; a crate-private `response_descriptor` module (Stage 91) is an INTERNAL-ONLY `ResponseDescriptor` skeleton naming a future crypto operation RESULT via a `ResponseDescriptorKind` label only, non-sensitive metadata only; a crate-private `crypto_pipeline` module (Stage 92) is an INTERNAL-ONLY `CryptoPipeline` skeleton naming a future crypto PIPELINE via a `CryptoPipelineKind` label only, not yet bundling any other skeleton; a crate-private `descriptor_bundle` module (Stage 93) is an INTERNAL-ONLY `DescriptorBundle` skeleton naming a future crypto BUNDLE via a `DescriptorBundleKind` label only, not yet grouping any other skeleton's value; a crate-private `execution_plan` module (Stage 94) is an INTERNAL-ONLY `ExecutionPlan` skeleton naming a future crypto processing ORDER via an `ExecutionPlanKind` label and a fixed `ExecutionStepKind` six-step label sequence only; a crate-private `error_taxonomy` module (Stage 95) is an INTERNAL-ONLY `CryptoErrorDescriptor` skeleton classifying a future crypto operation FAILURE via a `CryptoErrorKind` label only, no error message/source/stack field; a crate-private `audit_event` module (Stage 96) is an INTERNAL-ONLY `AuditEventLabel` skeleton naming a future crypto-internal state change via an `AuditEventKind` label only, no event payload and no logging; a crate-private `audit_policy` module (Stage 97) is an INTERNAL-ONLY `AuditPolicy` skeleton naming a future observability decision via an `AuditPolicyKind` label and a fixed `AuditPolicyDecision` label (always `DenyPlaceholder` today), no observation payload, no logging, and no reference to `audit_event`; a crate-private `lifecycle_state` module (Stage 98) is an INTERNAL-ONLY `LifecycleMarker` skeleton naming a future coarse lifecycle transition via a `LifecycleKind` label and a six-variant `LifecycleState`, no payload/timestamp/counter, no logging; a crate-private `module_registry` module (Stage 99) is an INTERNAL-ONLY `ModuleRegistry` skeleton that ENUMERATES, by fixed `ModuleRegistryKind` label only, every skeleton module added since Stage 79, `registered_module_count()` hardcoded to `15`, no dynamic registry mechanism, no logging — none of the sixteen skeletons is part of the public API, and none is connected to any other
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -1852,6 +1878,103 @@ unchanged; and nothing is wired into the Runtime, the Worker, or
 `CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
 `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
 
-A future, explicitly-reviewed Stage 99 candidate is an internal module
-registry skeleton — listing the internal skeleton modules added so far by
-fixed label only, still not connecting any of them together.
+## Internal module registry skeleton (Stage 99)
+
+`src/lib.rs` gains a sixteenth crate-private module, `module_registry`
+(alongside Stage 79's `secret_handle`, Stage 80's `aead_core`, Stage 82's
+`kdf_core`, Stage 87's `key_material`, Stage 88's `domain_label`, Stage
+89's `operation_context`, Stage 90's `request_descriptor`, Stage 91's
+`response_descriptor`, Stage 92's `crypto_pipeline`, Stage 93's
+`descriptor_bundle`, Stage 94's `execution_plan`, Stage 95's
+`error_taxonomy`, Stage 96's `audit_event`, Stage 97's `audit_policy`,
+and Stage 98's `lifecycle_state`, placed right after `lifecycle_state`,
+still ahead of this file's first module gated `cfg(test)`). It defines:
+
+- **`ModuleRegistryState`** (`pub(crate) enum`) — `Disabled` /
+  `Placeholder`. `Disabled` is the `Default` — the inert state before any
+  `ModuleRegistry` is constructed for use.
+- **`ModuleRegistryKind`** (`pub(crate) enum`) — sixteen variants, one
+  ENUMERATION label per crate-private skeleton module added since Stage
+  79, plus `TestOnlyPlaceholder`: `SecretHandlePlaceholder` /
+  `AeadCorePlaceholder` / `KdfCorePlaceholder` / `KeyMaterialPlaceholder`
+  / `DomainLabelPlaceholder` / `OperationContextPlaceholder` /
+  `RequestDescriptorPlaceholder` / `ResponseDescriptorPlaceholder` /
+  `CryptoPipelinePlaceholder` / `DescriptorBundlePlaceholder` /
+  `ExecutionPlanPlaceholder` / `ErrorTaxonomyPlaceholder` /
+  `AuditEventPlaceholder` / `AuditPolicyPlaceholder` /
+  `LifecycleStatePlaceholder` / `TestOnlyPlaceholder` — a label only;
+  none of these variants ever constructs, holds, or reads a field of the
+  module it names.
+- **`ModuleRegistryStatus`** (`pub(crate) struct`) — a non-sensitive
+  status snapshot, carrying only the state enum.
+- **`ModuleRegistry`** (`pub(crate) struct`) — the skeleton itself,
+  holding only `kind: ModuleRegistryKind` and `state: ModuleRegistryState`.
+  Five methods: `new_placeholder(kind: ModuleRegistryKind)` (constructs a
+  registry entry — takes only the label, no user-, environment-, or
+  config-derived input of any kind), `kind()` (returns the label —
+  intent only), `status()` (returns the non-sensitive snapshot),
+  `is_placeholder()` (a boolean check — always `true` for any handle,
+  since `new_placeholder` is the only constructor), and
+  `registered_module_count()` (returns the hardcoded `usize` literal
+  `15` — the real skeleton count, excluding `TestOnlyPlaceholder` —
+  regardless of `self.kind`, never a length method call and never
+  computed from any collection).
+
+**NOT part of this crate's public API.** Every item above is `pub(crate)` at
+most — never `pub` — and nothing is re-exported from the crate root. This
+crate's public `pub fn` surface is still exactly the same six placeholder
+functions from Stage 69 (`fedos_core_status`, `fedos_core_capabilities`,
+`random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+`decrypt_placeholder`); none of them constructs, holds, or returns a
+`ModuleRegistry`. See
+[`test/fedos_core_rust_module_registry.test.ts`](../../test/fedos_core_rust_module_registry.test.ts)
+for the dedicated guard tests (internal-only visibility, no public export,
+public `pub fn` count still 6, `ModuleRegistry` holds only `kind`/`state`,
+`registered_module_count()` returns the hardcoded literal `15`, no
+`.len()`/`Vec`/`HashMap`/`BTreeMap`/`HashSet`/`BTreeSet`/static-array/
+`lazy_static`/`once_cell`/`inventory`-crate usage, no `String`/`Vec`
+field, no payload/timestamp/counter field-declaration, no
+`println!`/`eprintln!`/`log`/`tracing`/`dbg!` usage, no Runtime/Worker/
+`CryptoProvider` reference, no field-declaration storage of any other
+skeleton's type, no `unsafe`, no committed build artifact).
+
+**Enumeration labels only — no dynamic registry, no logging.**
+`ModuleRegistryKind`'s sixteen variants are all bare unit variants (no
+associated data); `ModuleRegistry` stores no `String`, no `Vec<u8>`, and
+no borrowed-byte-slice field of any kind — only the two labels
+(`kind`/`state`). It does not construct or hold a `SecretHandle`,
+`AeadPlaceholderRequest`, `KdfPlaceholderRequest`, `KeyMaterialHandle`,
+`DomainLabel`, `OperationContext`, `RequestDescriptor`,
+`ResponseDescriptor`, `CryptoPipeline`, `DescriptorBundle`,
+`ExecutionPlan`, `CryptoErrorDescriptor`, `AuditEventLabel`,
+`AuditPolicy`, or `LifecycleMarker` — same "if in doubt, stay fully
+independent" choice Stage 93/94/95/96/97/98 already made, extended here
+to naming (not just avoiding) the crate's own skeleton inventory.
+
+**No connection to `secret_handle`, `aead_core`, `kdf_core`,
+`key_material`, `domain_label`, `operation_context`, `request_descriptor`,
+`response_descriptor`, `crypto_pipeline`, `descriptor_bundle`,
+`execution_plan`, `error_taxonomy`, `audit_event`, `audit_policy`, or
+`lifecycle_state`.** `module_registry` never constructs any of their
+types and runs no actual AEAD/HKDF/Argon2/NIP-44 operation, and derives
+no Nostr key — same "when a skeleton-to-skeleton connection is
+ambiguous, leave it unconnected rather than guess at a future design"
+reasoning Stage 80/82/87/88/89/90/91/92/93/94/95/96/97/98 already
+established.
+
+This is dependency-free SKELETON work only (no new `Cargo.toml` entry this
+stage): no key, seed, plaintext, ciphertext, passphrase, tag, or nonce
+byte is accepted, stored, or handled anywhere in `module_registry`; no
+AEAD/HKDF/Argon2/NIP-44 operation is implemented or called, no Nostr key
+is derived, and nothing is logged anywhere;
+`derive_key_placeholder`/`encrypt_placeholder`/`decrypt_placeholder` are
+unchanged; and nothing is wired into the Runtime, the Worker, or
+`CryptoProvider`/`FedosCoreCryptoProvider` — the host still selects only
+`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+Per the user's own guidance for the next stage, Stage 100 is recommended
+to be an **Architecture Freeze v1** — a documentation-only checkpoint
+fixing the roles, boundaries, and non-connection rules of every internal
+skeleton added Stage 79 through Stage 99 into a single design record,
+without changing any implementation, before moving on to a real
+cryptography-adoption phase (e.g. AES-GCM).

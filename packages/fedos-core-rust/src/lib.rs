@@ -219,6 +219,18 @@
 //! instance of — any other module in this crate today. Same rules apply:
 //! not part of the public API, no public function above constructs,
 //! holds, or returns one of its types.
+//!
+//! Stage 99 adds a sixteenth crate-private module, `module_registry`: an
+//! INTERNAL-ONLY module-registry skeleton that ENUMERATES, by fixed label
+//! only, every crate-private skeleton module added since Stage 79 — never
+//! constructing, holding, or referencing an instance of any of them, and
+//! never using a `Vec`/`HashMap`/`BTreeMap`/slice/static array/reflection/
+//! macro-registry mechanism to do so. It exists purely to document and
+//! fix, in one place, which internal skeletons exist today; it is not
+//! connected to the Runtime, the Worker, or `CryptoProvider`, and holds
+//! no `String`/`Vec` field, no payload, no timestamp, and no counter.
+//! Same rules apply: not part of the public API, no public function
+//! above constructs, holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -3317,6 +3329,252 @@ mod lifecycle_state {
         #[test]
         fn disabled_state_is_the_default_placeholder_only_state() {
             assert_eq!(LifecycleState::default(), LifecycleState::Disabled);
+        }
+    }
+}
+
+/// Stage 99 — an INTERNAL-ONLY module-registry skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`ModuleRegistry`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It holds no observation payload, no timestamp, and no counter of any
+/// kind — only fixed [`ModuleRegistryKind`] and [`ModuleRegistryState`]
+/// labels. Nothing in this module writes to stdout, stderr, or any log
+/// sink: there is no macro call that would emit a line anywhere below.
+/// [`ModuleRegistry::registered_module_count`] returns a fixed `usize`
+/// literal — never a length method call, never anything computed from a
+/// growable, heap-allocated collection, a fixed-size array, or any lookup
+/// table; there is no `Vec`, no `HashMap`, no `BTreeMap`, no static array,
+/// and no macro-based or reflection-based registry mechanism anywhere in
+/// this module. It takes no user-, environment-, or config-derived input
+/// of any kind — [`ModuleRegistry::new_placeholder`] accepts only a
+/// [`ModuleRegistryKind`] label. This module does NOT hold, construct, or
+/// reference an instance of any other skeleton type in this crate — its
+/// [`ModuleRegistryKind`] variants are ENUMERATION labels only, one per
+/// crate-private skeleton module added since Stage 79, existing purely to
+/// document and fix which internal skeletons exist today — when in doubt
+/// about a connection between skeletons, this crate deliberately leaves
+/// them unconnected rather than guess at a future design (the same
+/// reasoning `aead_core`'s own doc comment already states).
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`. This is expected for a skeleton
+/// not yet wired to any consumer.
+#[allow(dead_code)]
+mod module_registry {
+    /// Coarse internal lifecycle state of a [`ModuleRegistry`].
+    /// Crate-private only — never exposed via this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ModuleRegistryState {
+        /// No registry entry should be treated as active — the default,
+        /// inert state before any [`ModuleRegistry`] is constructed for
+        /// use.
+        Disabled,
+        /// A placeholder registry entry is active. Enumerates a module
+        /// label only; emits no output.
+        Placeholder,
+    }
+
+    impl Default for ModuleRegistryState {
+        fn default() -> Self {
+            ModuleRegistryState::Disabled
+        }
+    }
+
+    /// Which crate-private skeleton module a [`ModuleRegistry`] entry
+    /// names — a fixed enumeration label only, never a constructed
+    /// instance of the module it names. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum ModuleRegistryKind {
+        /// Names the Stage 79 skeleton module — enumeration label only.
+        SecretHandlePlaceholder,
+        /// Names the Stage 80 skeleton module — enumeration label only.
+        AeadCorePlaceholder,
+        /// Names the Stage 82 skeleton module — enumeration label only.
+        KdfCorePlaceholder,
+        /// Names the Stage 87 skeleton module — enumeration label only.
+        KeyMaterialPlaceholder,
+        /// Names the Stage 88 skeleton module — enumeration label only.
+        DomainLabelPlaceholder,
+        /// Names the Stage 89 skeleton module — enumeration label only.
+        OperationContextPlaceholder,
+        /// Names the Stage 90 skeleton module — enumeration label only.
+        RequestDescriptorPlaceholder,
+        /// Names the Stage 91 skeleton module — enumeration label only.
+        ResponseDescriptorPlaceholder,
+        /// Names the Stage 92 skeleton module — enumeration label only.
+        CryptoPipelinePlaceholder,
+        /// Names the Stage 93 skeleton module — enumeration label only.
+        DescriptorBundlePlaceholder,
+        /// Names the Stage 94 skeleton module — enumeration label only.
+        ExecutionPlanPlaceholder,
+        /// Names the Stage 95 skeleton module — enumeration label only.
+        ErrorTaxonomyPlaceholder,
+        /// Names the Stage 96 skeleton module — enumeration label only.
+        AuditEventPlaceholder,
+        /// Names the Stage 97 skeleton module — enumeration label only.
+        AuditPolicyPlaceholder,
+        /// Names the Stage 98 skeleton module — enumeration label only.
+        LifecycleStatePlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyPlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`ModuleRegistry`] entry.
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte, and never an observation payload.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct ModuleRegistryStatus {
+        pub(crate) state: ModuleRegistryState,
+    }
+
+    /// An INTERNAL-ONLY module-registry entry skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds only a [`ModuleRegistryKind`] label and a
+    /// [`ModuleRegistryState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, no user-, environment-, or
+    /// config-derived input, no observation payload, no timestamp, no
+    /// counter, and no field of any other skeleton type in this crate. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually track a real module registry; until then it accepts and
+    /// stores none, and emits no output of any kind.
+    pub(crate) struct ModuleRegistry {
+        kind: ModuleRegistryKind,
+        state: ModuleRegistryState,
+    }
+
+    impl ModuleRegistry {
+        /// Construct a placeholder registry entry of the given
+        /// [`ModuleRegistryKind`]. Takes NO user-, environment-, or
+        /// config-derived input of any kind — `kind` is a fixed
+        /// enumeration label only.
+        pub(crate) fn new_placeholder(kind: ModuleRegistryKind) -> Self {
+            Self {
+                kind,
+                state: ModuleRegistryState::Placeholder,
+            }
+        }
+
+        /// The [`ModuleRegistryKind`] label this entry was constructed
+        /// with — an enumeration label only, never a constructed instance
+        /// of the module it names.
+        pub(crate) fn kind(&self) -> ModuleRegistryKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> ModuleRegistryStatus {
+            ModuleRegistryStatus { state: self.state }
+        }
+
+        /// Whether this entry is still in the
+        /// [`ModuleRegistryState::Placeholder`] state — always `true` for
+        /// any handle constructed via
+        /// [`ModuleRegistry::new_placeholder`], since no other constructor
+        /// exists.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == ModuleRegistryState::Placeholder
+        }
+
+        /// A fixed, non-secret count of the crate-private skeleton
+        /// modules named by [`ModuleRegistryKind`] (Stage 79 through
+        /// Stage 98, excluding [`ModuleRegistryKind::TestOnlyPlaceholder`])
+        /// — a hardcoded `usize` literal, never a length method call and
+        /// never computed from any collection.
+        pub(crate) fn registered_module_count(&self) -> usize {
+            15
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let registry = ModuleRegistry::new_placeholder(ModuleRegistryKind::SecretHandlePlaceholder);
+            assert_eq!(registry.status().state, ModuleRegistryState::Placeholder);
+            assert!(registry.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                ModuleRegistryKind::SecretHandlePlaceholder,
+                ModuleRegistryKind::AeadCorePlaceholder,
+                ModuleRegistryKind::KdfCorePlaceholder,
+                ModuleRegistryKind::KeyMaterialPlaceholder,
+                ModuleRegistryKind::DomainLabelPlaceholder,
+                ModuleRegistryKind::OperationContextPlaceholder,
+                ModuleRegistryKind::RequestDescriptorPlaceholder,
+                ModuleRegistryKind::ResponseDescriptorPlaceholder,
+                ModuleRegistryKind::CryptoPipelinePlaceholder,
+                ModuleRegistryKind::DescriptorBundlePlaceholder,
+                ModuleRegistryKind::ExecutionPlanPlaceholder,
+                ModuleRegistryKind::ErrorTaxonomyPlaceholder,
+                ModuleRegistryKind::AuditEventPlaceholder,
+                ModuleRegistryKind::AuditPolicyPlaceholder,
+                ModuleRegistryKind::LifecycleStatePlaceholder,
+                ModuleRegistryKind::TestOnlyPlaceholder,
+            ] {
+                let registry = ModuleRegistry::new_placeholder(kind);
+                assert_eq!(registry.kind(), kind);
+                assert_eq!(registry.status().state, ModuleRegistryState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let registry = ModuleRegistry::new_placeholder(ModuleRegistryKind::AeadCorePlaceholder);
+            let status = registry.status();
+            assert_eq!(status.state, ModuleRegistryState::Placeholder);
+        }
+
+        #[test]
+        fn registered_module_count_is_the_fixed_fifteen_for_every_kind() {
+            for kind in [
+                ModuleRegistryKind::SecretHandlePlaceholder,
+                ModuleRegistryKind::AeadCorePlaceholder,
+                ModuleRegistryKind::KdfCorePlaceholder,
+                ModuleRegistryKind::KeyMaterialPlaceholder,
+                ModuleRegistryKind::DomainLabelPlaceholder,
+                ModuleRegistryKind::OperationContextPlaceholder,
+                ModuleRegistryKind::RequestDescriptorPlaceholder,
+                ModuleRegistryKind::ResponseDescriptorPlaceholder,
+                ModuleRegistryKind::CryptoPipelinePlaceholder,
+                ModuleRegistryKind::DescriptorBundlePlaceholder,
+                ModuleRegistryKind::ExecutionPlanPlaceholder,
+                ModuleRegistryKind::ErrorTaxonomyPlaceholder,
+                ModuleRegistryKind::AuditEventPlaceholder,
+                ModuleRegistryKind::AuditPolicyPlaceholder,
+                ModuleRegistryKind::LifecycleStatePlaceholder,
+                ModuleRegistryKind::TestOnlyPlaceholder,
+            ] {
+                assert_eq!(
+                    ModuleRegistry::new_placeholder(kind).registered_module_count(),
+                    15
+                );
+            }
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(
+                ModuleRegistryState::default(),
+                ModuleRegistryState::Disabled
+            );
         }
     }
 }

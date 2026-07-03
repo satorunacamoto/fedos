@@ -8,7 +8,117 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 98 — Internal lifecycle state skeleton (internal-only
+> **Status: Stage 99 — Internal module registry skeleton (internal-only
+> `module_registry` module; fixed enumeration labels only for every
+> skeleton module added since Stage 79, no dynamic registry mechanism,
+> `registered_module_count()` hardcoded to 15, no logging, no
+> Runtime/Worker/CryptoProvider wiring, no WASM change).**
+> `packages/fedos-core-rust/src/lib.rs` gains a sixteenth crate-private
+> module, `module_registry` (alongside Stage 79's `secret_handle`, Stage
+> 80's `aead_core`, Stage 82's `kdf_core`, Stage 87's `key_material`,
+> Stage 88's `domain_label`, Stage 89's `operation_context`, Stage 90's
+> `request_descriptor`, Stage 91's `response_descriptor`, Stage 92's
+> `crypto_pipeline`, Stage 93's `descriptor_bundle`, Stage 94's
+> `execution_plan`, Stage 95's `error_taxonomy`, Stage 96's
+> `audit_event`, Stage 97's `audit_policy`, and Stage 98's
+> `lifecycle_state`, placed right after `lifecycle_state`, still ahead
+> of this file's first module gated `cfg(test)`). It defines:
+> `ModuleRegistryState` (`pub(crate) enum`, `Disabled`/`Placeholder` —
+> `Disabled` is the `Default`); `ModuleRegistryKind` (`pub(crate) enum`,
+> sixteen label-only unit variants, one ENUMERATION label per
+> crate-private skeleton module added since Stage 79 plus
+> `TestOnlyPlaceholder` — `SecretHandlePlaceholder`/`AeadCorePlaceholder`/
+> `KdfCorePlaceholder`/`KeyMaterialPlaceholder`/`DomainLabelPlaceholder`/
+> `OperationContextPlaceholder`/`RequestDescriptorPlaceholder`/
+> `ResponseDescriptorPlaceholder`/`CryptoPipelinePlaceholder`/
+> `DescriptorBundlePlaceholder`/`ExecutionPlanPlaceholder`/
+> `ErrorTaxonomyPlaceholder`/`AuditEventPlaceholder`/
+> `AuditPolicyPlaceholder`/`LifecycleStatePlaceholder`/
+> `TestOnlyPlaceholder` — none of these variants ever constructs, holds,
+> or reads a field of the module it names); `ModuleRegistryStatus`
+> (`pub(crate) struct`, a non-sensitive status snapshot carrying only the
+> state enum); and `ModuleRegistry` (`pub(crate) struct`, holding
+> `kind`/`state`) with five methods: `new_placeholder(kind:
+> ModuleRegistryKind)` (takes only the label — no user-, environment-, or
+> config-derived input of any kind), `kind()`, `status()`,
+> `is_placeholder()`, and `registered_module_count()` (returns the
+> hardcoded `usize` literal `15` — the real skeleton count, excluding
+> `TestOnlyPlaceholder` — regardless of `kind`, never a length method
+> call and never computed from any collection). **NOT part of this
+> crate's public API**: every item is `pub(crate)` at most — never
+> `pub` — nothing is re-exported from the crate root, and the crate's
+> public `pub fn` surface is still exactly the same six placeholder
+> functions from Stage 69; none of them constructs, holds, or returns a
+> `ModuleRegistry`. **Enumeration labels only — no dynamic registry, no
+> logging**: `ModuleRegistry` writes to no stdout/stderr/log sink of any
+> kind (no `println!`/`eprintln!`/`tracing`/`log` crate usage anywhere),
+> uses no `.len()`/`Vec`/`HashMap`/`BTreeMap`/`HashSet`/`BTreeSet`/
+> static-array/`lazy_static`/`once_cell`/`inventory`-crate mechanism
+> anywhere, and holds no `String`/`Vec<u8>`/borrowed-byte-slice field of
+> any kind. **No module construction or reference**: `ModuleRegistry`
+> does not construct or hold a `SecretHandle`, `AeadPlaceholderRequest`,
+> `KdfPlaceholderRequest`, `KeyMaterialHandle`, `DomainLabel`,
+> `OperationContext`, `RequestDescriptor`, `ResponseDescriptor`,
+> `CryptoPipeline`, `DescriptorBundle`, `ExecutionPlan`,
+> `CryptoErrorDescriptor`, `AuditEventLabel`, `AuditPolicy`, or
+> `LifecycleMarker` — same "if in doubt, stay fully independent" choice
+> Stage 93/94/95/96/97/98 already made. **Not connected to
+> `secret_handle`, `aead_core`, `kdf_core`, `key_material`,
+> `domain_label`, `operation_context`, `request_descriptor`,
+> `response_descriptor`, `crypto_pipeline`, `descriptor_bundle`,
+> `execution_plan`, `error_taxonomy`, `audit_event`, `audit_policy`, or
+> `lifecycle_state`** — `module_registry` never constructs any of their
+> types and runs no actual AEAD/HKDF/Argon2/NIP-44 operation, derives no
+> Nostr key, same "when a skeleton-to-skeleton connection is ambiguous,
+> leave it unconnected" reasoning Stage
+> 80/82/87/88/89/90/91/92/93/94/95/96/97/98 already established; all
+> fifteen of those modules are UNCHANGED this stage, still
+> placeholder-only. `cargo test` is GREEN with all 101 tests passing (96
+> pre-existing + 5 new `module_registry::tests`); `cargo check` and
+> `cargo check --tests` stay GREEN with no warnings. `Cargo.toml` is
+> UNCHANGED this stage — no new dependency needed (`module_registry`
+> imports nothing beyond the standard library). New
+> [`test/fedos_core_rust_module_registry.test.ts`](test/fedos_core_rust_module_registry.test.ts)
+> (21 tests) checks: the module is internal-only and not `pub`;
+> `ModuleRegistry` is `pub(crate)` at most and never re-exported; the
+> public `pub fn` surface is exactly the six Stage 69 names; the six
+> placeholder function bodies are byte-for-byte unchanged;
+> `ModuleRegistry` holds only `kind`/`state`; `registered_module_count()`
+> returns the hardcoded literal `15`; no
+> `.len()`/`Vec`/`HashMap`/`BTreeMap`/`HashSet`/`BTreeSet`/static-array/
+> `lazy_static`/`once_cell`/`inventory`-crate usage; no `String`/`Vec`
+> field anywhere in the module; no payload/timestamp/counter
+> field-declaration; no
+> `println!`/`eprintln!`/`print!`/`eprint!`/`tracing::`/`log::`/`dbg!`
+> usage; `new_placeholder` takes only a `ModuleRegistryKind`; no
+> `std::env`/`env::`/`var_os`/`std::process` usage; no
+> `CryptoProvider`/`Runtime`/`Worker` bare-word reference; no AEAD/HKDF/
+> Argon2 usage (specific Rust-usage patterns only, not a bare word
+> match, same lesson learned Stage 89-98); no field DECLARATION storing
+> `SecretHandle`/`AeadPlaceholderRequest`/`KdfPlaceholderRequest`/
+> `KeyMaterialHandle`/`DomainLabel`/`OperationContext`/
+> `RequestDescriptor`/`ResponseDescriptor`/`CryptoPipeline`/
+> `DescriptorBundle`/`ExecutionPlan`/`CryptoErrorDescriptor`/
+> `AuditEventLabel`/`AuditPolicy`/`LifecycleMarker` (nor do those
+> fifteen modules reference `ModuleRegistry*`); no `unsafe`; no
+> `.wasm`/`Cargo.lock`/`target`/`build` artifact is committed; the
+> registry has exactly sixteen `ModuleRegistryKind` enumeration labels,
+> two `ModuleRegistryState` variants, and the handle exposes exactly its
+> five methods. **Fix during this stage**: the module's own doc
+> comments originally wrote the literal text `.len()` when describing
+> what does NOT happen (never a `.len()` call), which would have
+> collided with the guard test's own bare-pattern absence check for
+> that exact string (the same self-referential doc-comment trap as
+> Stage 81/84/88-93/94) — fixed by rewording to "a length method call"
+> in prose instead of the literal method-call spelling. Stage 100
+> recommendation (per the user's own guidance): an **Architecture
+> Freeze v1** — a documentation-only checkpoint fixing the roles,
+> boundaries, and non-connection rules of every internal skeleton added
+> Stage 79 through Stage 99 into a single design record, without
+> changing any implementation, before moving on to a real
+> cryptography-adoption phase (e.g. AES-GCM). Prior status:
+>
+> **Stage 98 — Internal lifecycle state skeleton (internal-only
 > `lifecycle_state` module; fixed lifecycle states/kinds only, no
 > logging, no payload, no timestamp/counter, no existing-module wiring
 > yet, no real AEAD/HKDF/Argon2/NIP-44 connection, no
