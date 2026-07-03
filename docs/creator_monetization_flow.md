@@ -201,3 +201,22 @@ future stage.
   `EntitlementProvider` alone.
 - Checkout, invoicing, settlement, grant issuance, download unlock, paid
   chat unlock, and DM delivery are all explicitly future work.
+
+---
+
+## 13. Stage 114+ update note
+
+Two read-only preview surfaces now exist: a Marketplace listing preview
+(`src/render/marketplace_preview.ts`, gated by `?marketplacePreview=1`)
+showing sample listings' kind/visibility/creator label with a permanently
+`disabled` "buy" button (no checkout, no price, no download — the type has
+none of those fields), and a new `MarketplaceIntentDescriptor`
+(`src/marketplace/intent.ts`) naming what §3's "purchase intent" step would
+eventually carry (`view_listing_placeholder`/`purchase_intent_placeholder`/
+`subscribe_intent_placeholder`/`tip_intent_placeholder`/
+`request_access_placeholder`) — reviewed by `reviewMarketplaceIntent`
+(policy-only: rejects any price/card/payment/checkout/invoice/download
+metadata), still with NO connection to `PaymentProvider` or
+`EntitlementProvider`. Neither addition moves the flow past step 2
+("purchase intent") in §3 — payment, entitlement, and everything after
+remain exactly as unimplemented as before.

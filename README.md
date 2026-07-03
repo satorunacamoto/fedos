@@ -8,7 +8,86 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 113 — Nostr event mapping boundary skeleton.** Realizes
+> **Status: Stage 114 — Board/Marketplace preview UI + interaction intent
+> boundaries.** Two opt-in, read-only preview pages plus two new pure
+> "intent" boundaries — still **no real post/purchase, no relay
+> connection, no payment/entitlement processing, no storage, and only the
+> two preview routes touch the Worker.** New
+> [`src/render/board_preview.ts`](src/render/board_preview.ts)
+> (`renderBoardPreview`/`renderBoardPreviewPage`, plus static
+> `SAMPLE_BOARDS`) shows a `BoardDescriptor`'s title/topics/categories
+> (HTML-escaped) and — by directly calling the Stage 113
+> `boardToNostrCandidate` PURE mapping function — its candidate
+> `kindLabel` only; there is no post/reply form and no content/body/bytes
+> field to display. New
+> [`src/render/marketplace_preview.ts`](src/render/marketplace_preview.ts)
+> (`renderMarketplaceListingPreview`/`renderMarketplacePreviewPage`, plus
+> static `SAMPLE_LISTINGS`) shows a listing's kind/visibility/creator
+> reference and its `marketplaceListingToNostrCandidate` kindLabel, ending
+> in a permanently `disabled` "buy" button — no price/payment/checkout/
+> download/signed-URL field exists on the type to show. Both routes are
+> gated behind an EXPLICIT `?boardPreview=1`/`?marketplacePreview=1` flag
+> in [`src/worker.ts`](src/worker.ts) (`isBoardPreviewEnabled`/
+> `isMarketplacePreviewEnabled`), inserted right after the existing
+> `?runtimeStatus=1` branch so priority is runtimeStatus → boardPreview →
+> marketplacePreview → normal routing; neither branch reads `runtime` or
+> calls any Runtime-selected boundary (storage/federation/marketplace/
+> payment/entitlement/chat), and every pre-existing route is unaffected.
+> New [`src/social/intent.ts`](src/social/intent.ts) defines
+> `BoardInteractionIntentDescriptor` (`idRef?`/`boardRef?`/`actorRef?`/
+> `targetRef?`/`kind`/`createdAt?`/`metadata?`, NO content/body/bytes
+> field) with seven `BoardInteractionIntentKind` placeholders
+> (`create_post_`/`reply_`/`react_`/`hide_`/`mute_`/`report_`/
+> `test_placeholder`) and a pure `reviewBoardInteractionIntent` — an
+> `accepted_placeholder` decision means "policy-clean", NEVER "posted" or
+> "sent". New [`src/marketplace/intent.ts`](src/marketplace/intent.ts)
+> defines `MarketplaceIntentDescriptor` with six `MarketplaceIntentKind`
+> placeholders (`view_listing_`/`purchase_intent_`/`subscribe_intent_`/
+> `tip_intent_`/`request_access_`/`test_placeholder`) and a pure
+> `reviewMarketplaceIntent` that rejects any price/card/payment/checkout/
+> invoice/download metadata and imports neither `PaymentProvider` nor
+> `EntitlementProvider`. Short **Stage 114+ update notes** were appended to
+> [`docs/nostr_adapter_planning.md`](docs/nostr_adapter_planning.md#13-stage-114-update-note)
+> and
+> [`docs/creator_monetization_flow.md`](docs/creator_monetization_flow.md#13-stage-114-update-note).
+> New
+> [`test/board_marketplace_preview.test.ts`](test/board_marketplace_preview.test.ts)
+> (36 tests) checks: both preview flags gate correctly (absent/`1`/`true`,
+> `boardPreview` winning when both are present), every label is
+> HTML-escaped (including an XSS-shaped title), no price/payment/checkout/
+> download/signed-URL field is ever shown, the buy button is present but
+> `disabled` with no surrounding `<form>`, both intent boundaries accept a
+> clean input and reject their respective sensitive-marker families
+> without mutating input, and no source imports a relay/WebSocket/signing
+> library, calls a provider method
+> (`put`/`get`/`delete`/`requestPayment`/`purchasePlaceholder`/
+> `listPlaceholder`/`checkPlaceholder`/`sendPlaceholder`/
+> `publishPlaceholder`/`connect`/`disconnect`), or reads
+> `runtime.storageBackend`/`.federationProvider`/`.marketplaceProvider`/
+> `.creatorEntitlementProvider`/`.chatProvider` from the Worker. Two
+> existing tests (`test/social_board_skeleton.test.ts` #10 and four
+> `*_boundary.test.ts` "Worker source does not select/call a
+> FederationProvider/ChatProvider/EntitlementProvider/MarketplaceProvider"
+> checks) needed their Worker-source assertions kept passing by rewording
+> two `worker.ts` doc comments that had named those types in prose — the
+> underlying invariant (the Worker still never selects or calls any of
+> them) did not change. `npm run typecheck`, `npm test` (122 files, 1729
+> tests), `cargo check`, `cargo check --tests`, and `cargo test` (108
+> tests, unchanged — no Rust file was touched this stage) all stay GREEN.
+> Where this stage stopped, on purpose: no real post/reply/react/purchase,
+> no relay connection, no `fetch`/WebSocket, no signing, no
+> `StorageBackend`/`PaymentProvider`/`EntitlementProvider`/
+> `MarketplaceProvider`/`FederationProvider`/`ChatProvider` call from any
+> new file, and no Runtime auto-call. Stage 115 candidates: (1) a Creator
+> profile preview UI + creator trust label boundary; (2) a Nostr publish
+> intent boundary; (3) a Community moderation policy boundary
+> (recommended together with (1) — with Board/Marketplace display and
+> intent now in place, fixing Creator profile display and Community
+> moderation policy next completes the creator-economy/self-governance
+> foundation before any of them is wired to a real relay or payment rail).
+> Prior status:
+>
+> **Stage 113 — Nostr event mapping boundary skeleton.** Realizes
 > `docs/nostr_adapter_planning.md` §10 step 1 as a PURE mapping
 > boundary — still **no relay connection, no WebSocket/`fetch`, no
 > signing, no private key, no NIP-44/NIP-17, no publish/subscribe, and no

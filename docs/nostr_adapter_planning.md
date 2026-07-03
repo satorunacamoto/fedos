@@ -219,3 +219,18 @@ signing, private key, NIP-44/NIP-17, publish, or subscribe was added by
 this stage; `NostrEventCandidate` still has no event id, signature, or
 real pubkey field. See `README.md`'s Stage 113 entry and
 `test/nostr_event_mapping.test.ts` for the full verification.
+
+---
+
+## 13. Stage 114+ update note
+
+A read-only Board preview page (`src/render/board_preview.ts`, gated by
+`?boardPreview=1`) now calls `boardToNostrCandidate` directly to display a
+board's candidate `kindLabel` — this is the first real call site for the
+Stage 113 mapping boundary, and it remains a PURE, unsigned call: no relay
+is opened, nothing is published, and only the label is shown (never a real
+event id/signature/pubkey). A new `BoardInteractionIntentDescriptor`
+(`src/social/intent.ts`) also now exists for a future "user clicked
+reply/react" flow, entirely separate from this document's event-mapping
+concern — an intent is reviewed by `reviewBoardInteractionIntent`
+(policy-only), never mapped to a Nostr candidate or sent anywhere.
