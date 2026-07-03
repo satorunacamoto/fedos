@@ -4,13 +4,14 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 99 — Internal module registry skeleton (internal-only
-> `module_registry` module; fixed enumeration labels only for every
-> skeleton module added since Stage 79, no dynamic registry mechanism,
-> `registered_module_count()` hardcoded to 15, no logging, no
-> Runtime/Worker/CryptoProvider wiring, no WASM change). Public API STILL
-> a placeholder SKELETON. No cryptography reachable from any public
-> function.**
+> **Status: Stage 100 — FedOS Core Architecture Freeze v1 (docs only — no
+> `src/` change, no `Cargo.toml` change, no crypto implementation). Public
+> API STILL a placeholder SKELETON. No cryptography reachable from any
+> public function.**
+> See
+> [`docs/fedos_core_architecture_freeze_v1.md`](../../docs/fedos_core_architecture_freeze_v1.md)
+> for the fixed design record of every skeleton module Stage 79–99 added
+> below.
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -1978,3 +1979,32 @@ fixing the roles, boundaries, and non-connection rules of every internal
 skeleton added Stage 79 through Stage 99 into a single design record,
 without changing any implementation, before moving on to a real
 cryptography-adoption phase (e.g. AES-GCM).
+
+## Architecture Freeze v1 (Stage 100, docs only)
+
+Stage 100 is a **documentation-only checkpoint**: it changes no `src/`
+file, no `Cargo.toml` entry, no test, and adds no new skeleton module. It
+fixes, in one design record, everything the sixteen crate-private skeleton
+modules above (`secret_handle` through `module_registry`, Stage 79–99)
+already established independently — a role table for all sixteen, which
+pairs are explicitly NOT connected, confirmation that the public API is
+still exactly the six Stage 69 placeholder functions, confirmation that
+none of the sixteen is wired into the Runtime/Worker/`CryptoProvider`, a
+summary of what IS verified today (RFC 8439/5869/9106, all under
+`cfg(test)` only), an explicit list of what is NOT yet implemented, a
+non-claims section, and a recommended next-phase order (AES-GCM dependency
+adoption → AES-GCM NIST vector wiring → test-only AES-GCM helper →
+internal public-API design docs → only then a public `encrypt`/`decrypt`
+skeleton). See
+[`docs/fedos_core_architecture_freeze_v1.md`](../../docs/fedos_core_architecture_freeze_v1.md)
+for the full record.
+
+`npm run typecheck`, `npm test` (1422 tests, same count as Stage 99),
+`cargo check`, `cargo test` (101 tests, same count as Stage 99), and
+`cargo check --tests` all stay GREEN because nothing they check changed —
+this stage is purely additive at the documentation level.
+
+A future, explicitly-reviewed Stage 101 candidate is adopting the
+`aes-gcm` dependency — a dependency + build-check ADOPTION ONLY, exactly
+like every prior dependency stage (`chacha20poly1305` Stage 74, `hkdf`
+Stage 76, `argon2` Stage 84); no code would import or call it yet.

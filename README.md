@@ -8,7 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 99 — Internal module registry skeleton (internal-only
+> **Status: Stage 100 — FedOS Core Architecture Freeze v1 (docs only, no
+> src changes, no `Cargo.toml` changes, no crypto implementation).**
+> [`docs/fedos_core_architecture_freeze_v1.md`](docs/fedos_core_architecture_freeze_v1.md)
+> (new) fixes, in writing, the internal type architecture Stage 79–99
+> built: sixteen crate-private, label-only skeleton modules inside
+> `packages/fedos-core-rust/src/lib.rs`
+> (`secret_handle`/`aead_core`/`kdf_core`/`key_material`/`domain_label`/
+> `operation_context`/`request_descriptor`/`response_descriptor`/
+> `crypto_pipeline`/`descriptor_bundle`/`execution_plan`/`error_taxonomy`/
+> `audit_event`/`audit_policy`/`lifecycle_state`/`module_registry`), a
+> role table for all sixteen, which pairs are explicitly NOT connected
+> (with the three narrow, label-reuse-only exceptions already established
+> in prior stages), confirmation that the public API is still exactly the
+> six Stage 69 placeholder functions, confirmation that none of the
+> sixteen modules is wired into the Runtime/Worker/`CryptoProvider`, a
+> summary of what IS verified today (RFC 8439 ChaCha20-Poly1305, RFC 5869
+> HKDF, and RFC 9106 Argon2id — all under `cfg(test)` only, none reachable
+> from any public function), an explicit list of what is NOT yet
+> implemented (public `encrypt`/`decrypt`, public `deriveKey`, CSPRNG,
+> key generation, NIP-44, Nostr key derivation, AES-GCM, WASM loading,
+> Runtime crypto execution), a non-claims section banning
+> "military-grade"/"zero-trace"/"unbreakable"-style language and
+> confirming no skeleton holds a log/secret/stack-trace, and a
+> recommended next-phase order (AES-GCM dependency adoption → AES-GCM
+> NIST vector wiring → a test-only AES-GCM helper → internal public-API
+> design docs → only then a public `encrypt`/`decrypt` skeleton). **This
+> stage changes NO code**: `src/`,
+> `packages/fedos-core-rust/src/lib.rs`, `packages/fedos-core-rust/Cargo.toml`,
+> and every existing test file are byte-for-byte unchanged; `npm run
+> typecheck`, `npm test` (1422 tests, same count as Stage 99), `cargo
+> check`, and `cargo test` (101 tests, same count as Stage 99) all stay
+> GREEN because nothing they check changed. Stage 101 candidate: **adopt
+> the `aes-gcm` dependency** — a dependency + build-check ADOPTION ONLY,
+> exactly like every prior dependency stage (`chacha20poly1305` Stage 74,
+> `hkdf` Stage 76, `argon2` Stage 84); no code imports or calls it yet.
+> Prior status:
+>
+> **Stage 99 — Internal module registry skeleton (internal-only
 > `module_registry` module; fixed enumeration labels only for every
 > skeleton module added since Stage 79, no dynamic registry mechanism,
 > `registered_module_count()` hardcoded to 15, no logging, no
@@ -4392,7 +4429,9 @@ D1 space directory caveats (do not over-promise on these):
 67. Crypto operation test-vector plan ([`docs/crypto_test_vectors.md`](docs/crypto_test_vectors.md); docs only, no code, no vectors committed; test-first verification plan for a future Rust core — AEAD/HKDF/Argon2id/NIP-44, official vectors only) ✓
 68. FedOS Core build manifest plan ([`docs/fedos_core_build_manifest.md`](docs/fedos_core_build_manifest.md); docs only, no code, no manifest committed; provenance contract — manifest skeleton, digest/signature/reproducible-build policy, no validation ⇒ no load) ✓
 69. Minimal FedOS Rust crate skeleton ([`packages/fedos-core-rust`](packages/fedos-core-rust/README.md); `Cargo.toml` + `src/lib.rs` placeholder API; no dependencies, no crypto, no `unsafe`, no WASM/cdylib, no build artifacts; TS boundary unchanged, not wired) ✓
-70. FedOS Core Rust crate safety docs ([`docs/fedos_core_rust_safety.md`](docs/fedos_core_rust_safety.md); docs only, no code; guardrails for unsafe / dependencies / crypto-crate adoption / secrets / randomness / WASM / build artifacts) ✓ ← you are here
+70. FedOS Core Rust crate safety docs ([`docs/fedos_core_rust_safety.md`](docs/fedos_core_rust_safety.md); docs only, no code; guardrails for unsafe / dependencies / crypto-crate adoption / secrets / randomness / WASM / build artifacts) ✓
+71–99. FedOS Core Rust crate internal skeleton build-out (`packages/fedos-core-rust/src/lib.rs`; sixteen crate-private, label-only skeleton modules — `secret_handle`/`aead_core`/`kdf_core`/`key_material`/`domain_label`/`operation_context`/`request_descriptor`/`response_descriptor`/`crypto_pipeline`/`descriptor_bundle`/`execution_plan`/`error_taxonomy`/`audit_event`/`audit_policy`/`lifecycle_state`/`module_registry`; plus `chacha20poly1305`/`hkdf`/`zeroize`/`secrecy`/`subtle`/`argon2` dependency adoption and RFC 8439/5869/9106 `cargo test` vector wiring; public API UNCHANGED since Stage 69, not wired to Runtime/Worker/CryptoProvider) ✓
+100. FedOS Core Architecture Freeze v1 ([`docs/fedos_core_architecture_freeze_v1.md`](docs/fedos_core_architecture_freeze_v1.md); docs only, no code, no `Cargo.toml` change; fixes the Stage 79–99 internal skeleton architecture — role table, explicitly-unconnected pairs, public API/Runtime/Worker/CryptoProvider non-wiring confirmed, what IS verified today vs. what is NOT yet implemented, non-claims section, recommended next-phase order) ✓ ← you are here
 
 ### Future candidate boundaries (design notes only — not scheduled)
 
