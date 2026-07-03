@@ -234,16 +234,22 @@ describe("storage boundary stays unwired and free of real backends", () => {
     expect(storageSources).not.toMatch(/api\.telegram|ipfs\.io/i);
   });
 
-  it("16. Runtime source does not select or call a StorageBackend", () => {
-    expect(runtimeSource).not.toMatch(/StorageBackend/);
-    expect(runtimeSource).not.toMatch(/NoopStorageBackend|PlaceholderStorageBackend/);
-    expect(runtimeSource).not.toMatch(/from\s+['"].*storage\//);
+  it("16. Runtime source SELECTS a StorageBackend (Stage 109) but never calls put/get/delete", () => {
+    // Stage 109: createRuntime now SELECTS a StorageBackend from env, so the
+    // runtime source IS allowed to reference storage imports/selection helpers.
+    // The invariant is that put()/get()/delete() are NEVER called automatically.
+    expect(runtimeSource).toMatch(/from\s+['"].*storage\//);
+    expect(runtimeSource).not.toMatch(/\.\s*(put|get|delete)\s*\(\s*(packet|ref)/);
   });
 
-  it("17. Worker source does not select or call a StorageBackend", () => {
-    expect(workerSource).not.toMatch(/StorageBackend/);
-    expect(workerSource).not.toMatch(/NoopStorageBackend|PlaceholderStorageBackend/);
-    expect(workerSource).not.toMatch(/from\s+['"].*storage\//);
+  it("17. Worker source exposes storage env fields (Stage 109) but never calls put/get/delete", () => {
+    // Stage 109: the Worker Env interface now includes STORAGE_PROVIDER/
+    // ENABLE_STORAGE_PLACEHOLDER fields, so the worker source IS allowed to
+    // reference storage-related strings. The invariant is that put()/get()/
+    // delete() are NEVER called automatically, and the Worker never
+    // constructs a backend directly itself.
+    expect(workerSource).not.toMatch(/runtime\.storageBackend\s*\.\s*(put|get|delete)\s*\(/);
+    expect(workerSource).not.toMatch(/new\s+(Noop|Placeholder)StorageBackend/);
   });
 
   it("18. storage boundary does not import any crypto provider", () => {

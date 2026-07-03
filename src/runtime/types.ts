@@ -30,6 +30,7 @@ import type { PromotionProvider, RecommendationProvider } from "../promotion/ada
 import type { EdgeRecFetchLike } from "../promotion/edge_rec_adapter.js";
 import type { WebAuthnProvider } from "../identity/webauthn_adapter.js";
 import type { CryptoProvider } from "../crypto/types.js";
+import type { StorageBackend } from "../storage/types.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -209,6 +210,23 @@ export interface RuntimeEnv {
    * same result as `CRYPTO_PROVIDER=fedos`. Selection only; runs no cryptography.
    */
   readonly ENABLE_CRYPTO_PLACEHOLDER?: string | boolean;
+  /**
+   * Which storage backend to build (Stage 107's `StorageBackend` seam).
+   *   - "noop"        → `NoopStorageBackend` (safe default — always `unavailable`, denies every attempt).
+   *   - "placeholder" → `PlaceholderStorageBackend` (dev/test — still stores nothing).
+   *   - absent/other  → `NoopStorageBackend`.
+   * Selection only. `put()`/`get()`/`delete()` are NEVER auto-called, and no
+   * Google Drive API, Nostr relay WebSocket, SQLite, Bluetooth/Wi-Fi mesh, or
+   * content-addressed gateway is contacted.
+   */
+  readonly STORAGE_PROVIDER?: string;
+  /**
+   * Explicit opt-in to use the placeholder backend. Truthy = `true` or a
+   * truthy string ("1"/"true"/"yes"/"on"). Takes effect when `STORAGE_PROVIDER`
+   * is not "noop" or "placeholder" but this flag is truthy — same result as
+   * `STORAGE_PROVIDER=placeholder`. Selection only; stores nothing.
+   */
+  readonly ENABLE_STORAGE_PLACEHOLDER?: string | boolean;
 }
 
 /**
@@ -250,6 +268,11 @@ export interface RuntimeOverrides {
    * — the runtime never calls its `randomBytes`/`deriveKey`/`encrypt`/`decrypt`.
    */
   readonly cryptoProvider?: CryptoProvider;
+  /**
+   * Pre-built storage backend. Wins over any `env` storage fields. Selection
+   * only — the runtime never calls its `put`/`get`/`delete`.
+   */
+  readonly storageBackend?: StorageBackend;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -308,4 +331,13 @@ export interface AppRuntime {
    * no KDF/AEAD, and generates no randomness.
    */
   readonly cryptoProvider: CryptoProvider;
+  /**
+   * The selected storage backend (Stage 107's `StorageBackend` seam).
+   * Selected from env; `put()`/`get()`/`delete()` are NEVER called
+   * automatically. The safe default (`NoopStorageBackend`) is permanently
+   * `unavailable`. Constructing a runtime contacts no Google Drive API,
+   * opens no Nostr relay WebSocket, touches no SQLite, no Bluetooth/Wi-Fi
+   * mesh, and no content-addressed gateway, and issues no `fetch`/file IO.
+   */
+  readonly storageBackend: StorageBackend;
 }

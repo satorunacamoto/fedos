@@ -71,6 +71,11 @@ import { NoopCryptoProvider } from "../crypto/noop_crypto.js";
 import { FedosCoreCryptoProvider } from "../crypto/fedos_core_adapter.js";
 import type { CryptoProvider } from "../crypto/types.js";
 import { PlaceholderFedosCoreCrypto } from "../../packages/fedos-core-rust/src/index.js";
+import {
+  NoopStorageBackend,
+  PlaceholderStorageBackend,
+} from "../storage/noop_storage.js";
+import type { StorageBackend } from "../storage/types.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -428,6 +433,32 @@ export function selectCryptoProvider(
 }
 
 /**
+ * Select the `StorageBackend` from env / overrides. Priority:
+ *   1. `overrides.storageBackend` — wins unconditionally.
+ *   2. `STORAGE_PROVIDER=noop` → `NoopStorageBackend`.
+ *   3. `STORAGE_PROVIDER=placeholder` OR `ENABLE_STORAGE_PLACEHOLDER` truthy →
+ *      `PlaceholderStorageBackend`.
+ *   4. Otherwise → `NoopStorageBackend` (safe default, stores nothing).
+ *
+ * Selection only: constructing the backend contacts no Google Drive API,
+ * opens no Nostr relay WebSocket, touches no SQLite, no Bluetooth/Wi-Fi
+ * mesh, and no content-addressed gateway, and calls no `put`/`get`/`delete`. `env` is
+ * never mutated.
+ */
+export function selectStorageBackend(
+  env?: RuntimeEnv,
+  overrides: RuntimeOverrides = {},
+): StorageBackend {
+  if (overrides.storageBackend) return overrides.storageBackend;
+  const provider = env?.STORAGE_PROVIDER;
+  if (provider === "noop") return new NoopStorageBackend();
+  if (provider === "placeholder" || isEnvFlagTruthy(env?.ENABLE_STORAGE_PLACEHOLDER)) {
+    return new PlaceholderStorageBackend();
+  }
+  return new NoopStorageBackend();
+}
+
+/**
  * Whether `ENABLE_PROMOTION_PROVIDER_PREVIEW` was truthy — HALF of the Stage 52
  * dual-flag gate for invoking a real `promotionProvider` for a preview. Pure;
  * never mutates `env`.
@@ -480,5 +511,6 @@ export function createRuntime(
     promotionProviderPreviewAllowed: isPromotionProviderPreviewAllowed(env),
     webAuthnProvider: selectWebAuthnProvider(env, overrides),
     cryptoProvider: selectCryptoProvider(env, overrides),
+    storageBackend: selectStorageBackend(env, overrides),
   };
 }

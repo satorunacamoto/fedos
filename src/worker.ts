@@ -915,6 +915,16 @@ export interface Env {
    */
   CRYPTO_PROVIDER?: string;
   ENABLE_CRYPTO_PLACEHOLDER?: string;
+  /**
+   * Storage backend selection config (Stage 109). These only let
+   * `createRuntime` SELECT a `StorageBackend`; the Worker NEVER calls
+   * `put()`/`get()`/`delete()`, contacts no Google Drive API, opens no
+   * Nostr relay WebSocket, touches no SQLite, no Bluetooth/Wi-Fi mesh, and
+   * no content-addressed gateway. Selection only — no storage operation happens from
+   * the Worker.
+   */
+  STORAGE_PROVIDER?: string;
+  ENABLE_STORAGE_PLACEHOLDER?: string;
 }
 
 /**
