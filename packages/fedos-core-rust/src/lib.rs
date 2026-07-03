@@ -208,6 +208,17 @@
 //! connected to — and not holding an instance of — any other module in
 //! this crate today. Same rules apply: not part of the public API, no
 //! public function above constructs, holds, or returns one of its types.
+//!
+//! Stage 98 adds a fifteenth crate-private module, `lifecycle_state`: an
+//! INTERNAL-ONLY lifecycle-state skeleton naming a future coarse state
+//! transition for a crypto-provider/request/secret/audit/pipeline
+//! lifecycle (fixed, non-sensitive labels only — no timestamp, no
+//! counter, no error text, no log output, and no `String`/`Vec` field).
+//! It exists as a fully independent, label-only type basis for a future
+//! real lifecycle tracker, still not connected to — and not holding an
+//! instance of — any other module in this crate today. Same rules apply:
+//! not part of the public API, no public function above constructs,
+//! holds, or returns one of its types.
 
 #![forbid(unsafe_code)]
 
@@ -3049,6 +3060,263 @@ mod audit_policy {
         #[test]
         fn disabled_state_is_the_default_placeholder_only_state() {
             assert_eq!(AuditPolicyState::default(), AuditPolicyState::Disabled);
+        }
+    }
+}
+
+/// Stage 98 — an INTERNAL-ONLY lifecycle-state skeleton.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)` at
+/// most (never `pub`), nothing is re-exported from the crate root, and none
+/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
+/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
+/// `decrypt_placeholder`) constructs, holds, or returns a
+/// [`LifecycleMarker`].
+///
+/// This module holds NO real key, seed, plaintext, ciphertext, passphrase,
+/// tag, or nonce byte — there is no borrowed-byte-slice, `Vec<u8>`, or
+/// `String` field or parameter anywhere below, and no AEAD/HKDF/Argon2/
+/// NIP-44 operation is implemented or called, and no Nostr key is derived.
+/// It holds no observation payload, no error text, no timestamp, and no
+/// counter of any kind — only fixed [`LifecycleKind`] and [`LifecycleState`]
+/// labels. Nothing in this module writes to stdout, stderr, or any log
+/// sink: there is no macro call that would emit a line anywhere below, and
+/// no observability crate is imported. It takes no user-, environment-, or
+/// config-derived input of any kind — [`LifecycleMarker::new_placeholder`]
+/// accepts only a [`LifecycleKind`] label, and every `mark_*_placeholder`
+/// transition method takes nothing beyond `&mut self`. This module does
+/// NOT hold an instance of any other skeleton type in this crate — it
+/// never constructs, stores, or reads a field of any of them — when in
+/// doubt about a connection between skeletons, this crate deliberately
+/// leaves them unconnected rather than guess at a future design (the same
+/// reasoning `aead_core`'s own doc comment already states). It exists as a
+/// fully independent, label-only type basis a later, explicitly-reviewed
+/// stage can extend to actually track a real crypto-provider/request/
+/// secret/audit/pipeline lifecycle, once it also implements the mechanism
+/// that lifecycle would govern.
+///
+/// Every item in this module is currently exercised ONLY by its own unit
+/// tests below (gated `cfg(test)`) — nothing outside this module calls it —
+/// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`. This is expected for a skeleton
+/// not yet wired to any consumer.
+#[allow(dead_code)]
+mod lifecycle_state {
+    /// Coarse internal lifecycle state a [`LifecycleMarker`] may be in —
+    /// a fixed label only, never derived from a timestamp, a counter, or
+    /// any other real observation. Crate-private only — never exposed via
+    /// this crate's public API.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum LifecycleState {
+        /// No lifecycle marker should be treated as active — the
+        /// default, inert state before any [`LifecycleMarker`] is
+        /// constructed for use.
+        Disabled,
+        /// A placeholder marker is active. Tracks no real transition;
+        /// emits no output.
+        Placeholder,
+        /// Intended future meaning: the tracked resource was prepared.
+        /// No real preparation is observed by reaching this label.
+        PreparedPlaceholder,
+        /// Intended future meaning: the tracked resource became active.
+        /// No real activation is observed by reaching this label.
+        ActivePlaceholder,
+        /// Intended future meaning: the tracked resource's state was
+        /// cleared. No real clearing is observed by reaching this label.
+        ClearedPlaceholder,
+        /// Intended future meaning: the tracked resource entered an
+        /// error state. No real error text is carried by this label.
+        ErrorPlaceholder,
+    }
+
+    impl Default for LifecycleState {
+        fn default() -> Self {
+            LifecycleState::Disabled
+        }
+    }
+
+    /// Which future crypto-internal lifecycle a [`LifecycleMarker`] names
+    /// — a label only, intent, not an implementation and not a real
+    /// tracked resource. Crate-private only.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum LifecycleKind {
+        /// Intended future connection point: a `CryptoProvider`
+        /// implementation's own lifecycle. No provider lifecycle is
+        /// tracked here.
+        CryptoProviderLifecyclePlaceholder,
+        /// Intended future connection point: an incoming request's
+        /// lifecycle. No request lifecycle is tracked here.
+        RequestLifecyclePlaceholder,
+        /// Intended future connection point: a secret's lifecycle. No
+        /// secret lifecycle is tracked here.
+        SecretLifecyclePlaceholder,
+        /// Intended future connection point: an audit mechanism's own
+        /// lifecycle. No audit lifecycle is tracked here.
+        AuditLifecyclePlaceholder,
+        /// Intended future connection point: a crypto pipeline's
+        /// lifecycle. No pipeline lifecycle is tracked here.
+        PipelineLifecyclePlaceholder,
+        /// Reserved for this module's own tests / future test-only
+        /// fixtures — never used by production code paths.
+        TestOnlyLifecyclePlaceholder,
+    }
+
+    /// A non-sensitive status snapshot for a [`LifecycleMarker`].
+    /// Crate-private only. Never contains a key/seed/plaintext/ciphertext/
+    /// passphrase/tag/nonce byte, never an observation payload, and never
+    /// a timestamp or counter.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct LifecycleStatus {
+        pub(crate) state: LifecycleState,
+    }
+
+    /// An INTERNAL-ONLY lifecycle-state handle skeleton (crate-private;
+    /// not part of this crate's public API — see the module-level doc
+    /// comment above). Holds only a [`LifecycleKind`] label and a
+    /// [`LifecycleState`] — no key, seed, plaintext, ciphertext,
+    /// passphrase, tag, or nonce byte, no user-, environment-, or
+    /// config-derived input, no observation payload, no timestamp, no
+    /// counter, and no field of any other skeleton type in this crate. A
+    /// future, explicitly-reviewed stage may extend this skeleton to
+    /// actually track a real lifecycle; until then it accepts and stores
+    /// none, and emits no output of any kind.
+    pub(crate) struct LifecycleMarker {
+        kind: LifecycleKind,
+        state: LifecycleState,
+    }
+
+    impl LifecycleMarker {
+        /// Construct a placeholder marker of the given [`LifecycleKind`].
+        /// Takes NO user-, environment-, or config-derived input of any
+        /// kind — `kind` is a label only.
+        pub(crate) fn new_placeholder(kind: LifecycleKind) -> Self {
+            Self {
+                kind,
+                state: LifecycleState::Placeholder,
+            }
+        }
+
+        /// The [`LifecycleKind`] label this marker was constructed with —
+        /// intent only.
+        pub(crate) fn kind(&self) -> LifecycleKind {
+            self.kind
+        }
+
+        /// A non-sensitive status snapshot.
+        pub(crate) fn status(&self) -> LifecycleStatus {
+            LifecycleStatus { state: self.state }
+        }
+
+        /// Whether this marker is still in the
+        /// [`LifecycleState::Placeholder`] state — `true` only before any
+        /// `mark_*_placeholder` transition method has been called.
+        pub(crate) fn is_placeholder(&self) -> bool {
+            self.state == LifecycleState::Placeholder
+        }
+
+        /// Coarse label-only transition: sets the state to
+        /// [`LifecycleState::PreparedPlaceholder`]. Takes NO input beyond
+        /// `&mut self` — never a real preparation payload, error text, or
+        /// timestamp.
+        pub(crate) fn mark_prepared_placeholder(&mut self) {
+            self.state = LifecycleState::PreparedPlaceholder;
+        }
+
+        /// Coarse label-only transition: sets the state to
+        /// [`LifecycleState::ActivePlaceholder`]. Takes NO input beyond
+        /// `&mut self`.
+        pub(crate) fn mark_active_placeholder(&mut self) {
+            self.state = LifecycleState::ActivePlaceholder;
+        }
+
+        /// Coarse label-only transition: sets the state to
+        /// [`LifecycleState::ClearedPlaceholder`]. Takes NO input beyond
+        /// `&mut self` — does not zeroize or clear any real byte, since
+        /// this marker holds none.
+        pub(crate) fn mark_cleared_placeholder(&mut self) {
+            self.state = LifecycleState::ClearedPlaceholder;
+        }
+
+        /// Coarse label-only transition: sets the state to
+        /// [`LifecycleState::ErrorPlaceholder`]. Takes NO input beyond
+        /// `&mut self` — never a real error message, source error, or
+        /// stack trace.
+        pub(crate) fn mark_error_placeholder(&mut self) {
+            self.state = LifecycleState::ErrorPlaceholder;
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn new_placeholder_starts_in_placeholder_state_only() {
+            let marker =
+                LifecycleMarker::new_placeholder(LifecycleKind::CryptoProviderLifecyclePlaceholder);
+            assert_eq!(marker.status().state, LifecycleState::Placeholder);
+            assert!(marker.is_placeholder());
+        }
+
+        #[test]
+        fn kind_reports_the_constructed_placeholder_kind_only() {
+            for kind in [
+                LifecycleKind::CryptoProviderLifecyclePlaceholder,
+                LifecycleKind::RequestLifecyclePlaceholder,
+                LifecycleKind::SecretLifecyclePlaceholder,
+                LifecycleKind::AuditLifecyclePlaceholder,
+                LifecycleKind::PipelineLifecyclePlaceholder,
+                LifecycleKind::TestOnlyLifecyclePlaceholder,
+            ] {
+                let marker = LifecycleMarker::new_placeholder(kind);
+                assert_eq!(marker.kind(), kind);
+                assert_eq!(marker.status().state, LifecycleState::Placeholder);
+            }
+        }
+
+        #[test]
+        fn status_reports_placeholder_state_only_no_secret_bytes() {
+            let marker = LifecycleMarker::new_placeholder(LifecycleKind::RequestLifecyclePlaceholder);
+            let status = marker.status();
+            assert_eq!(status.state, LifecycleState::Placeholder);
+        }
+
+        #[test]
+        fn mark_prepared_placeholder_transitions_state_only() {
+            let mut marker =
+                LifecycleMarker::new_placeholder(LifecycleKind::SecretLifecyclePlaceholder);
+            marker.mark_prepared_placeholder();
+            assert_eq!(marker.status().state, LifecycleState::PreparedPlaceholder);
+            assert!(!marker.is_placeholder());
+        }
+
+        #[test]
+        fn mark_active_placeholder_transitions_state_only() {
+            let mut marker =
+                LifecycleMarker::new_placeholder(LifecycleKind::AuditLifecyclePlaceholder);
+            marker.mark_active_placeholder();
+            assert_eq!(marker.status().state, LifecycleState::ActivePlaceholder);
+        }
+
+        #[test]
+        fn mark_cleared_placeholder_transitions_state_only() {
+            let mut marker =
+                LifecycleMarker::new_placeholder(LifecycleKind::PipelineLifecyclePlaceholder);
+            marker.mark_cleared_placeholder();
+            assert_eq!(marker.status().state, LifecycleState::ClearedPlaceholder);
+        }
+
+        #[test]
+        fn mark_error_placeholder_transitions_state_only() {
+            let mut marker =
+                LifecycleMarker::new_placeholder(LifecycleKind::TestOnlyLifecyclePlaceholder);
+            marker.mark_error_placeholder();
+            assert_eq!(marker.status().state, LifecycleState::ErrorPlaceholder);
+        }
+
+        #[test]
+        fn disabled_state_is_the_default_placeholder_only_state() {
+            assert_eq!(LifecycleState::default(), LifecycleState::Disabled);
         }
     }
 }
