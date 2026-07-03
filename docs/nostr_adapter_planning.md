@@ -234,3 +234,50 @@ event id/signature/pubkey). A new `BoardInteractionIntentDescriptor`
 reply/react" flow, entirely separate from this document's event-mapping
 concern — an intent is reviewed by `reviewBoardInteractionIntent`
 (policy-only), never mapped to a Nostr candidate or sent anywhere.
+
+---
+
+## 14. Stage 115+ update note — moderation/visibility
+
+§7's "hide/mute/filter, never deletion" model now has a COMMUNITY-POLICY-
+layer counterpart, one level more general than this document's own
+`ModerationSignalInput`/`moderationSignalToNostrCandidate` (§10 step 1's
+Nostr-specific mapping): `src/community/moderation.ts` defines
+`ModerationVisibilityDecision` (`visible_placeholder`/`hidden_placeholder`/
+`muted_placeholder`/`filtered_placeholder`/`rejected`),
+`CommunityModerationPolicyKind`, `CommunityModerationTargetKind`, and a
+pure `reviewCommunityModerationTarget` that maps a requested
+`hide_placeholder`/`mute_placeholder`/`filter_placeholder` action 1:1 to
+its visibility label (or `rejected` for a policy-dirty request) — no
+delete/remove/purge action exists on the type, by construction. This
+boundary has NO Nostr dependency at all and does not call
+`moderationSignalToNostrCandidate`; the two stay separate layers, exactly
+as §2's "FedOS is the context/render/moderation layer on top" already
+described. See `docs/community_moderation_policy.md` for the full
+description, including a new read-only preview
+(`src/render/community_rules_preview.ts`, gated by
+`?communityRulesPreview=1`, added Stage 116) that displays sample rules'
+hide/mute/filter effects.
+
+---
+
+## 15. Stage 116+ update note — publish intent
+
+§10 step 1 named a "pure, unsigned mapping function" as the natural next
+boundary skeleton; a step BEFORE that mapping now also exists:
+`src/federation/publish_intent.ts` defines `PublishIntentDescriptor`
+(`idRef?`/`actorRef?`/`targetRef?`/`kind`/`createdAt?`/`metadata?`, no
+content/body/bytes field) with seven `PublishIntentKind` placeholders
+(`post_`/`reply_`/`reaction_`/`marketplace_announcement_`/
+`creator_profile_`/`moderation_signal_`/`test_placeholder` — deliberately
+mirroring `NostrEventCandidateKind`'s vocabulary) and a pure
+`reviewPublishIntent` that rejects sensitive metadata (including a
+signing-specific family: `sig`/`signature`/`privkey`/`nsec`/`relay`, on top
+of this codebase's usual conservative marker list). A publish intent is
+STRICTLY EARLIER than a `NostrEventCandidate`: it names WHAT a caller wants
+to eventually publish, before any mapping, signing, or relay send exists
+for it — `reviewPublishIntent` never calls `socialEventToNostrCandidate` or
+any other `./nostr_mapping.js` function, and nothing here signs, opens a
+relay connection, or publishes/subscribes anything. §6's list of
+NOT-implemented items (relay connection, signing, NIP-44/NIP-17, DM,
+publish, subscribe) remains entirely unchanged by this addition.

@@ -8,7 +8,126 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 114 — Board/Marketplace preview UI + interaction intent
+> **Status: Stage 116 — Nostr publish intent + Creator membership plan +
+> Community ruleset preview UI.** Two more pure boundaries plus one more
+> opt-in, read-only preview page — still **no real publish, no relay
+> connection, no signing, no real payment/checkout, no real moderation
+> action, and only the one new preview route touches the Worker.** New
+> [`src/federation/publish_intent.ts`](src/federation/publish_intent.ts)
+> defines `PublishIntentDescriptor` (`idRef?`/`actorRef?`/`targetRef?`/
+> `kind`/`createdAt?`/`metadata?`, NO content/body/bytes field) with seven
+> `PublishIntentKind` placeholders (`post_`/`reply_`/`reaction_`/
+> `marketplace_announcement_`/`creator_profile_`/`moderation_signal_`/
+> `test_placeholder`) and a pure `reviewPublishIntent` that rejects
+> sensitive metadata — including a signing-specific
+> `sig`/`signature`/`privkey`/`nsec`/`relay` family on top of this
+> codebase's usual conservative marker list. An `accepted_placeholder`
+> decision means "policy-clean", NEVER "published" or "sent"; nothing here
+> signs anything, opens a relay connection, or publishes/subscribes. New
+> [`src/creator/membership.ts`](src/creator/membership.ts) defines
+> `MembershipPlanDescriptor` (`idRef?`/`creatorRef?`/`kind`/`visibility`/
+> `metadata?`) with six `MembershipPlanKind` placeholders (`free_`/
+> `supporter_`/`premium_`/`community_`/`private_chat_`/`test_placeholder`)
+> and a pure `reviewMembershipPlan` that rejects any
+> price/card/payment/checkout/invoice/download/entitlement metadata and
+> imports neither `PaymentProvider` nor `EntitlementProvider`. New
+> [`src/render/community_rules_preview.ts`](src/render/community_rules_preview.ts)
+> (`renderCommunityRulePreview`/`renderCommunityRulesPreviewPage`, plus
+> static `SAMPLE_COMMUNITY_RULES`) shows four sample rules' policy/target/
+> action labels (HTML-escaped) plus the visibility label the Stage 115
+> `reviewCommunityModerationTarget` maps each one to — never a claim of
+> deletion/removal/purge, and no `content`/`body`/bytes field anywhere on
+> the page. Gated behind an EXPLICIT `?communityRulesPreview=1` flag in
+> [`src/worker.ts`](src/worker.ts) (`isCommunityRulesPreviewEnabled`),
+> inserted right after the Stage 115 `?creatorPreview=1` branch so priority
+> is runtimeStatus → boardPreview → marketplacePreview → creatorPreview →
+> communityRulesPreview → normal routing; the new branch reads no `runtime`
+> and calls no Runtime-selected boundary, and every pre-existing route is
+> unaffected. Short **Stage 116+ update notes** were appended to
+> [`docs/nostr_adapter_planning.md`](docs/nostr_adapter_planning.md#15-stage-116-update-note--publish-intent),
+> [`docs/creator_monetization_flow.md`](docs/creator_monetization_flow.md#15-stage-116-update-note),
+> and [`docs/community_moderation_policy.md`](docs/community_moderation_policy.md)
+> (§6). New
+> [`test/publish_intent_membership_ruleset.test.ts`](test/publish_intent_membership_ruleset.test.ts)
+> (30 tests) checks: both new boundaries accept a clean input and reject
+> their respective sensitive-marker families without mutating input, the
+> ruleset preview page shows a hide/mute/filter visibility label per rule
+> and never a delete/remove/purge action value, the `communityRulesPreview`
+> flag gates correctly (absent/`1`/`true`, `creatorPreview` winning when
+> both are present), every label is HTML-escaped (including an XSS-shaped
+> label), and no source imports a relay/WebSocket/signing library, calls a
+> provider method, or reads a Runtime-selected boundary from the Worker.
+> `npm run typecheck` and `npm test` (124 files, 1791 tests) stay GREEN;
+> `cargo check`/`cargo test` are unchanged — no Rust file was touched this
+> stage (this environment's shell has no `cargo` on `PATH` to re-run it,
+> but nothing under `Cargo.toml`/`*.rs` was edited). Where this stage
+> stopped, on purpose: no real publish/signing/relay, no real payment/
+> checkout, no real moderation hide/mute/filter/apply action, no
+> `StorageBackend`/`PaymentProvider`/`EntitlementProvider`/
+> `MarketplaceProvider`/`FederationProvider`/`ChatProvider` call from any
+> new file, and no Runtime auto-call. Stage 117 candidates: (1) a Protocol
+> adapter capability matrix (docs); (2) a Creator dashboard preview UI; (3)
+> a Federation outbound queue skeleton.
+> Prior status:
+>
+> **Stage 115 — Creator profile preview UI + creator trust label boundary
+> + Community moderation policy boundary.** One opt-in, read-only preview
+> page plus two new pure boundaries — still **no real identity
+> verification, no real moderation action, no relay connection, and only
+> the one new preview route touches the Worker.** New
+> [`src/creator/profile.ts`](src/creator/profile.ts) defines
+> `CreatorProfileDescriptor` (`creatorRef?`/`displayName?`/`bioPreview?`/
+> `category?`/`trustLabels?`/`createdAt?`/`metadata?`, no payment/
+> entitlement field) with six `CreatorTrustLabel` placeholders (`unknown_`/
+> `verified_`/`community_trusted_`/`new_creator_`/`reported_`/
+> `test_placeholder`) and a pure `reviewCreatorProfile` that rejects
+> sensitive bio/metadata content — `"verified_placeholder"` is documented
+> explicitly as a FUTURE label name only; nothing in this stage performs
+> KYC, OAuth, or any document check, and no code path can produce that
+> label from a real verification step. New
+> [`src/community/moderation.ts`](src/community/moderation.ts) defines
+> `ModerationVisibilityDecision` (`visible_`/`hidden_`/`muted_`/
+> `filtered_placeholder`/`rejected`), `CommunityModerationPolicyKind`,
+> `CommunityModerationTargetKind`, and a pure
+> `reviewCommunityModerationTarget` that maps a requested
+> `hide_placeholder`/`mute_placeholder`/`filter_placeholder` action 1:1 to
+> its visibility label (or `rejected` for a policy-dirty request) — no
+> delete/remove/purge action exists on the type, by construction; nothing
+> here mutates or deletes any content. New
+> [`src/render/creator_profile_preview.ts`](src/render/creator_profile_preview.ts)
+> (`renderCreatorProfilePreview`/`renderCreatorProfilePreviewPage`, plus
+> static `SAMPLE_CREATOR_PROFILES`) shows a profile's display name/bio/
+> category/trust labels (HTML-escaped) plus the `reviewCreatorProfile`
+> review state, ending in a permanently `disabled` "follow" button — no
+> profile fetch, no metadata display, no follow/subscribe/buy/message flow.
+> Gated behind an EXPLICIT `?creatorPreview=1` flag in
+> [`src/worker.ts`](src/worker.ts) (`isCreatorPreviewEnabled`), inserted
+> right after the Stage 114 `?marketplacePreview=1` branch so priority is
+> runtimeStatus → boardPreview → marketplacePreview → creatorPreview →
+> normal routing; the new branch reads no `runtime` and calls no
+> Runtime-selected boundary. Short **Stage 115+ update notes** were
+> appended to
+> [`docs/creator_monetization_flow.md`](docs/creator_monetization_flow.md#14-stage-115-update-note)
+> and a new
+> [`docs/community_moderation_policy.md`](docs/community_moderation_policy.md)
+> was added (cross-referenced from
+> [`docs/nostr_adapter_planning.md`](docs/nostr_adapter_planning.md#14-stage-115-update-note--moderationvisibility)
+> §14). New
+> [`test/creator_profile_community_moderation.test.ts`](test/creator_profile_community_moderation.test.ts)
+> (32 tests) checks: the profile preview escapes every label (including an
+> XSS-shaped name), never renders `metadata`, the `creatorPreview` flag
+> gates correctly and yields precedence to `boardPreview`, every trust
+> label/policy/target/action kind is a `_placeholder`, sensitive
+> metadata/bio content is rejected without mutation, `verified_placeholder`
+> is never produced by `reviewCreatorProfile` itself, moderation actions
+> map 1:1 to their visibility label with no delete/remove/purge action
+> ever definable, and no source imports a relay/WebSocket/signing library,
+> calls a provider method, or reads a Runtime-selected boundary from the
+> Worker. `npm run typecheck` and `npm test` (123 files, 1761 tests) stayed
+> GREEN at this point; `cargo check`/`cargo test` unchanged — no Rust file
+> was touched.
+>
+> **Stage 114 — Board/Marketplace preview UI + interaction intent
 > boundaries.** Two opt-in, read-only preview pages plus two new pure
 > "intent" boundaries — still **no real post/purchase, no relay
 > connection, no payment/entitlement processing, no storage, and only the

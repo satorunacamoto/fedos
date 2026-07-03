@@ -220,3 +220,53 @@ metadata), still with NO connection to `PaymentProvider` or
 `EntitlementProvider`. Neither addition moves the flow past step 2
 ("purchase intent") in §3 — payment, entitlement, and everything after
 remain exactly as unimplemented as before.
+
+---
+
+## 14. Stage 115+ update note
+
+§7's "Creator trust" name is now a shipped boundary:
+`src/creator/profile.ts` defines `CreatorProfileDescriptor`
+(`creatorRef?`/`displayName?`/`bioPreview?`/`category?`/`trustLabels?`/
+`createdAt?`/`metadata?`, no payment/entitlement field) and six
+`CreatorTrustLabel` placeholders (`unknown_`/`verified_`/
+`community_trusted_`/`new_creator_`/`reported_`/`test_placeholder`),
+reviewed by a pure `reviewCreatorProfile` that rejects sensitive bio/
+metadata content and NEVER performs real identity verification —
+`"verified_placeholder"` is documented explicitly as a FUTURE label name
+only, never something any code path in this stage can produce from an
+actual check. A new read-only preview
+(`src/render/creator_profile_preview.ts`, gated by `?creatorPreview=1`)
+shows a sample profile's display name/bio/category/trust labels
+(HTML-escaped) plus the review state, ending in a permanently `disabled`
+"follow" button — no profile fetch, no metadata display, no follow/
+subscribe/buy/message flow. §7's "Moderation" and "Appeal" names are
+likewise now partly shipped as `src/community/moderation.ts` — see
+`docs/community_moderation_policy.md` for the full boundary description;
+that boundary answers "what would this hide/mute/filter action visually
+do", strictly separate from payment/entitlement and from this document's
+own flow. Neither addition moves any step of §3 forward — payment,
+checkout, entitlement issuance, and download unlock remain exactly as
+unimplemented as before.
+
+---
+
+## 15. Stage 116+ update note
+
+A creator "membership tier" — implied by §1's "a membership tier" and by
+listings already nameable via `MarketplaceItemKind:
+"membership_placeholder"` — is now a shipped, separate boundary:
+`src/creator/membership.ts` defines `MembershipPlanDescriptor`
+(`idRef?`/`creatorRef?`/`kind`/`visibility`/`metadata?`) and six
+`MembershipPlanKind` placeholders (`free_`/`supporter_`/`premium_`/
+`community_`/`private_chat_`/`test_placeholder`), reviewed by a pure
+`reviewMembershipPlan` that rejects any price/card/payment/checkout/
+invoice/download/entitlement metadata and imports neither `PaymentProvider`
+nor `EntitlementProvider`. This is a NAMING boundary only — it names WHAT
+tier a creator offers, exactly as `MarketplaceListingDescriptor` names WHAT
+is listed, and does not move §3's flow past step 1 ("Listing"): no
+checkout, no entitlement issuance, and no gated-chat unlock exist because
+of this addition. `docs/nostr_adapter_planning.md`'s Stage 116 note covers
+the same stage's Nostr publish-intent addition, which is unrelated to
+membership plans beyond sharing this codebase's placeholder-vocabulary
+convention.
