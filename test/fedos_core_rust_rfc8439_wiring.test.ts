@@ -188,6 +188,19 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       // test/fedos_core_rust_public_api_boundary.test.ts for the dedicated
       // checks that it implements no real AEAD/KDF/random operation.
       "fedos_crypto_boundary_status",
+      // Stage 103's ten label-only boundary-consolidation functions — see
+      // test/fedos_core_rust_public_boundary_consolidation.test.ts for the
+      // dedicated checks that none implements a real operation.
+      "fedos_random_boundary_status",
+      "fedos_nonce_boundary_status",
+      "fedos_key_generation_boundary_status",
+      "fedos_key_import_boundary_status",
+      "fedos_key_export_boundary_status",
+      "fedos_capability_descriptors",
+      "fedos_algorithm_descriptors",
+      "fedos_boundary_version",
+      "fedos_boundary_features",
+      "fedos_boundary_policy_decision",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

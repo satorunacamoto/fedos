@@ -8,7 +8,52 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 102 — Public crypto API design docs + a placeholder API
+> **Status: Stage 103 — Consolidated placeholder API boundary: ten more
+> label-only PUBLIC types
+> (`FedosRandomBoundary`/`FedosNonceBoundary`/`FedosKeyGenerationBoundary`/
+> `FedosKeyImportBoundary`/`FedosKeyExportBoundary` +
+> `FedosCapabilityDescriptor`/`FedosAlgorithmDescriptor`/
+> `FedosBoundaryVersion`/`FedosBoundaryFeature`/`FedosBoundaryPolicy`) and
+> three new design docs
+> ([`docs/public_random_boundary.md`](docs/public_random_boundary.md),
+> [`docs/public_key_boundary.md`](docs/public_key_boundary.md),
+> [`docs/public_boundary_versioning.md`](docs/public_boundary_versioning.md)),
+> bundled into one reviewed stage per the user's explicit direction to
+> consolidate as much of the public-API boundary's design as possible
+> before any real implementation. `packages/fedos-core-rust/src/lib.rs`'s
+> public `pub fn` surface grows from seven (Stage 102) to seventeen — the
+> sixteen prior functions are byte-for-byte unchanged. No
+> encrypt/decrypt/deriveKey/randomBytes/nonce/key generation/import/export
+> IMPLEMENTATION function exists anywhere; every new function returns a
+> fixed, non-sensitive label or status (`FedosBoundaryVersion`'s `u32`
+> triple is the only non-enum field added, and it is a fixed constant).
+> `Cargo.toml` is UNCHANGED — no new dependency. Nothing is wired into the
+> host's execution environment, its background worker, or a crypto
+> provider; no WASM binding exists. New
+> [`test/fedos_core_rust_public_boundary_consolidation.test.ts`](test/fedos_core_rust_public_boundary_consolidation.test.ts)
+> (19 tests) checks all of the above; twenty-four pre-existing guard test
+> files' hard-coded "pub fn total" checks were updated from 7 to 17 with
+> the ten new names (the same mass-update pattern Stage 102 used for
+> 6→7), and `test/fedos_core_rust_public_api_boundary.test.ts`'s own
+> Stage-102-scoped section extraction was narrowed to end at Stage 103's
+> new marker instead of Stage 79's, so it stays scoped to exactly what
+> Stage 102 added. Where this stage stopped: a real key-import boundary
+> design touches the one place raw secret bytes would legitimately cross
+> this boundary, so `docs/public_key_boundary.md` reserves that
+> provisioning-path design as its own future, separately-reviewed stage
+> rather than sketching it here — consolidating further would mean
+> picking a real CSPRNG dependency or a real byte-level protocol, which is
+> implementation, not boundary design. `npm run typecheck`, `npm test`
+> (107 files, 1478 tests), `cargo check`, `cargo test` (106 tests, same
+> count as Stage 102 — no new Rust unit test this stage, since no new
+> `#[cfg(test)]` module was added), and `cargo check --tests` all stay
+> GREEN. Stage 104 candidates: (1) a CSPRNG dependency adoption (no
+> `randomBytes`/nonce implementation yet) — the natural next step per
+> `docs/public_random_boundary.md`'s own roadmap; (2) a WASM manifest
+> validation skeleton; (3) a NIP-44 vector source/update check. Prior
+> status:
+>
+> **Stage 102 — Public crypto API design docs + a placeholder API
 > boundary (no encrypt/decrypt/deriveKey/randomBytes implementation, no
 > Runtime/Worker/CryptoProvider/WASM wiring, `Cargo.toml` unchanged).**
 > [`docs/fedos_core_public_api_design.md`](docs/fedos_core_public_api_design.md)

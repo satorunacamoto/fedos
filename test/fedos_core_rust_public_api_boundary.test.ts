@@ -64,10 +64,13 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     return source.slice(start, end);
   }
 
+  // Ends right before Stage 103's own consolidated boundary group (added
+  // later) so this section stays scoped to exactly Stage 102's types, even
+  // though nothing else in `packages/fedos-core-rust` changed since.
   const boundarySection = extractSection(
     libRsSource,
     "pub enum FedosCryptoOperation",
-    "Stage 79 — an INTERNAL-ONLY secret-handle skeleton",
+    "Stage 103 — consolidated placeholder API boundary additions",
   );
   const secretHandleModule = extractModule(libRsSource, "mod secret_handle");
   const aeadCoreModule = extractModule(libRsSource, "mod aead_core");
@@ -97,11 +100,17 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     }
   });
 
-  it("3. lib.rs's public `pub fn` surface is exactly the six Stage 69 functions plus one new one", () => {
+  it("3. lib.rs's public `pub fn` surface includes the six Stage 69 functions plus Stage 102's new one", () => {
+    // Updated Stage 103: the crate's pub fn surface grows further (to 17)
+    // as Stage 103's ten boundary-consolidation functions land — this
+    // check only asserts Stage 102's seven are still present as a subset,
+    // not an exact total; see
+    // test/fedos_core_rust_public_boundary_consolidation.test.ts for the
+    // dedicated Stage 103 total-count check.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    const expected = [
+    const expectedSubset = [
       "fedos_core_status",
       "fedos_core_capabilities",
       "random_bytes_placeholder",
@@ -110,20 +119,25 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
       "decrypt_placeholder",
       "fedos_crypto_boundary_status",
     ];
-    expect(pubFnNames.length).toBe(7);
-    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    for (const name of expectedSubset) {
+      expect(pubFnNames, `expected ${name} in the pub fn surface`).toContain(name);
+    }
   });
 
   it("4. no encrypt/decrypt/derive/random IMPLEMENTATION function is added — only status/label functions exist", () => {
     // Every public function name must end in one of these safe suffixes;
     // none may be a bare `encrypt`/`decrypt`/`derive_key`/`random_bytes`
     // (without the `_placeholder` suffix) or any `*_impl`/`*_real` name.
+    // Updated Stage 103: `_descriptors`/`_version`/`_features`/`_decision`
+    // added as safe suffixes for the new boundary-consolidation functions.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
     for (const name of pubFnNames) {
       expect(
-        /_placeholder$|_status$|_capabilities$/.test(name),
+        /_placeholder$|_status$|_capabilities$|_descriptors$|_version$|_features$|_decision$/.test(
+          name,
+        ),
         `unexpected public function name: ${name}`,
       ).toBe(true);
     }

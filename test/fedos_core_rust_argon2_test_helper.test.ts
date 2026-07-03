@@ -119,8 +119,18 @@ describe("FedOS Rust crate — test-only Argon2id helper", () => {
       "encrypt_placeholder",
       "decrypt_placeholder",
       "fedos_crypto_boundary_status",
+      "fedos_random_boundary_status",
+      "fedos_nonce_boundary_status",
+      "fedos_key_generation_boundary_status",
+      "fedos_key_import_boundary_status",
+      "fedos_key_export_boundary_status",
+      "fedos_capability_descriptors",
+      "fedos_algorithm_descriptors",
+      "fedos_boundary_version",
+      "fedos_boundary_features",
+      "fedos_boundary_policy_decision",
     ];
-    expect(pubFnNames.length).toBe(7);
+    expect(pubFnNames.length).toBe(17);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

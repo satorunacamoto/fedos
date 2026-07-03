@@ -4,18 +4,32 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 102 — Public crypto API design docs
-> ([`docs/fedos_core_public_api_design.md`](../../docs/fedos_core_public_api_design.md))
-> + a small, label-only PUBLIC placeholder API boundary in `src/lib.rs`
+> **Status: Stage 103 — Consolidated placeholder API boundary: ten more
+> label-only PUBLIC types across five operation-boundary status groups
+> (`FedosRandomBoundary` / `FedosNonceBoundary` /
+> `FedosKeyGenerationBoundary` / `FedosKeyImportBoundary` /
+> `FedosKeyExportBoundary`) and five descriptor/metadata groups
+> (`FedosCapabilityDescriptor` / `FedosAlgorithmDescriptor` /
+> `FedosBoundaryVersion` / `FedosBoundaryFeature` / `FedosBoundaryPolicy`),
+> plus three new design docs
+> ([`docs/public_random_boundary.md`](../../docs/public_random_boundary.md),
+> [`docs/public_key_boundary.md`](../../docs/public_key_boundary.md),
+> [`docs/public_boundary_versioning.md`](../../docs/public_boundary_versioning.md)).
+> This crate's public `pub fn` surface grows from seven (Stage 102) to
+> seventeen. No encrypt/decrypt/deriveKey/randomBytes/nonce/key
+> generation/import/export IMPLEMENTATION function is added, no raw
+> key/seed/plaintext/ciphertext/passphrase/nonce byte is accepted or
+> stored anywhere, no Runtime/Worker/CryptoProvider/WASM wiring, and
+> `Cargo.toml` is UNCHANGED. See "Consolidated placeholder API boundary
+> (Stage 103)" below for the full record. Prior status: Stage 102 added
+> a small, label-only PUBLIC placeholder API boundary in `src/lib.rs`
 > (`FedosCryptoOperation` / `FedosCryptoAlgorithm` /
 > `FedosCryptoBoundaryState` / `FedosCryptoBoundaryStatus` /
 > `FedosCryptoRequestDescriptor` / `FedosCryptoResponseDescriptor` +
-> `fedos_crypto_boundary_status()`) — this crate's public `pub fn` surface
-> grows from six to seven for the first time since Stage 69. No
-> encrypt/decrypt/deriveKey/randomBytes IMPLEMENTATION function is added,
-> no raw key/seed/plaintext/ciphertext/passphrase/nonce byte is accepted
-> or stored anywhere, no Runtime/Worker/CryptoProvider/WASM wiring, and
-> `Cargo.toml` is UNCHANGED. Prior status: Stage 101 adopted `aes-gcm` AND
+> `fedos_crypto_boundary_status()`) plus
+> [`docs/fedos_core_public_api_design.md`](../../docs/fedos_core_public_api_design.md)
+> — this crate's public `pub fn` surface grew from six to seven for the
+> first time since Stage 69. Prior status: Stage 101 adopted `aes-gcm` AND
 > wired the NIST AES-256-GCM vectors to `cargo test`, with the seal/open
 > test-only helper extracted from the start (one combined Stage; no public
 > encrypt/decrypt API, no Runtime/Worker/CryptoProvider wiring, no
@@ -2218,3 +2232,125 @@ generation as its own design point (per this stage's docs §7) before any
 public `encrypt`/`decrypt` skeleton needs to consume its output. The two
 other candidates offered were a WASM manifest validation skeleton and a
 NIP-44 vector source/update check.
+
+## Consolidated placeholder API boundary (Stage 103)
+
+Stage 103 consolidates what would otherwise have been several separate
+stages into one reviewed unit, per the user's explicit direction to bundle
+as much of the public-API boundary's design as possible before any real
+implementation. Three new design docs and ten new PUBLIC, label-only
+types land on `src/lib.rs` in this single stage.
+
+**Docs:**
+
+- [`docs/public_random_boundary.md`](../../docs/public_random_boundary.md)
+  — fixes the design of a future public `randomBytes` and its nonce
+  counterpart as two INDEPENDENT boundaries (different uniqueness/failure
+  requirements), extending
+  [`docs/fedos_core_public_api_design.md`](../../docs/fedos_core_public_api_design.md)
+  section 7.
+- [`docs/public_key_boundary.md`](../../docs/public_key_boundary.md) —
+  fixes the design of three future public boundaries around key material
+  (generation, import, export) as three INDEPENDENT trust boundaries —
+  import is the one deliberate place a raw key/seed may cross the public
+  boundary, immediately converted to an opaque handle; export is flagged
+  as a candidate for never being implemented at all, pending a dedicated
+  authorization review.
+- [`docs/public_boundary_versioning.md`](../../docs/public_boundary_versioning.md)
+  — fixes the design of five descriptor/metadata types that describe the
+  SHAPE of the boundary itself (capabilities, algorithms, version,
+  feature flags, policy decisions), as distinct from the operation-status
+  types that report whether ONE operation is available.
+
+**Rust — five operation-boundary status groups** (`src/lib.rs`, placed
+right after Stage 102's group, still ahead of Stage 79's `secret_handle`
+module), each with its own independent state enum and one accessor
+function:
+
+- **`FedosRandomBoundary`** / `FedosRandomBoundaryState` →
+  `fedos_random_boundary_status()`
+- **`FedosNonceBoundary`** / `FedosNonceBoundaryState` →
+  `fedos_nonce_boundary_status()`
+- **`FedosKeyGenerationBoundary`** / `FedosKeyGenerationBoundaryState` →
+  `fedos_key_generation_boundary_status()`
+- **`FedosKeyImportBoundary`** / `FedosKeyImportBoundaryState` →
+  `fedos_key_import_boundary_status()`
+- **`FedosKeyExportBoundary`** / `FedosKeyExportBoundaryState` →
+  `fedos_key_export_boundary_status()`
+
+Each status struct carries only its own `state` field
+(`Unavailable`/`Placeholder`); each function takes no input and returns a
+fixed, permanently `Unavailable` status — the exact same shape as
+`fedos_core_status()` and Stage 102's `fedos_crypto_boundary_status()`.
+
+**Rust — five descriptor/metadata groups**, each describing the shape of
+the boundary rather than one operation's status:
+
+- **`FedosCapabilityDescriptor`** (`kind: FedosCapabilityKind`,
+  `state: FedosCryptoBoundaryState`) → `fedos_capability_descriptors()`
+  returns a fixed eight-entry list (`AeadPlaceholder` /
+  `KdfPlaceholder` / `RandomPlaceholder` / `NoncePlaceholder` /
+  `KeyGenerationPlaceholder` / `KeyImportPlaceholder` /
+  `KeyExportPlaceholder` / `Nip44Placeholder`). Deliberately reuses Stage
+  102's `FedosCryptoBoundaryState` — an explicit, direct reuse of an
+  already-fixed label, not a guess.
+- **`FedosAlgorithmDescriptor`** (`algorithm: FedosCryptoAlgorithm`,
+  `category: FedosAlgorithmCategory`) → `fedos_algorithm_descriptors()`
+  returns a fixed four-entry list pairing each of Stage 102's four
+  algorithm labels with `Aead`/`Kdf`.
+- **`FedosBoundaryVersion`** (`major`/`minor`/`patch`, plain `u32` fields
+  — not secret, not a byte buffer) → `fedos_boundary_version()` returns
+  the fixed `1.0.0` triple, versioning the SHAPE of the boundary itself,
+  not the crate's own package version.
+- **`FedosBoundaryFeature`** (`PlaceholderOnly` / `AuditLabelOnly` /
+  `ErrorTaxonomyFixed` / `VersionedBoundary`) → `fedos_boundary_features()`
+  returns this fixed four-entry list, restating this crate's own design
+  commitments as machine-checkable labels.
+- **`FedosBoundaryPolicy`** (`kind: FedosBoundaryPolicyKind`,
+  `decision: FedosBoundaryPolicyDecision`) →
+  `fedos_boundary_policy_decision(kind)` always returns
+  `DenyPlaceholder`, regardless of `kind` — mirrors the crate-private
+  `audit_policy` skeleton's (Stage 97) always-deny pattern, now surfaced
+  publicly. `FedosBoundaryPolicyDecision` has exactly one variant today;
+  this is NOT a real authorization system.
+
+**This crate's public `pub fn` surface grows from seven to seventeen** —
+the sixteen functions from Stage 69/102 are byte-for-byte unchanged. See
+[`test/fedos_core_rust_public_boundary_consolidation.test.ts`](../../test/fedos_core_rust_public_boundary_consolidation.test.ts)
+(19 tests) for the dedicated Stage 103 guard tests (design docs exist and
+name their types, all ten type declarations, the seventeen-function `pub
+fn` surface, no encrypt/decrypt/derive/random/nonce/key-generation/
+import/export IMPLEMENTATION function, every status function's fixed
+body, no raw byte parameter or growable-byte-vector/owned-string field,
+no key/seed/plaintext/ciphertext/passphrase/nonce/tag storage field, no
+actual AEAD/KDF crate usage (specific crate-usage patterns, not a bare
+substring match — `FedosAlgorithmDescriptor`'s fixed table legitimately
+reuses Stage 102's algorithm labels) or `SecretHandle` connection, no
+Runtime/Worker/`CryptoProvider` connection, `Cargo.toml` unchanged, no
+`println!`/`eprintln!`/`log`/`tracing`/`dbg!` usage, no `unsafe`, each
+enum's exact variant set, `fedos_boundary_policy_decision`'s
+no-branching fixed body, `fedos_boundary_version`'s fixed `1.0.0` body,
+no committed build artifact).
+
+**No implementation — labels and fixed metadata only.** None of the ten
+new functions performs an AEAD, KDF, or NIP-44 operation, generates a
+random byte or nonce, or produces, imports, or exports a key. No type
+holds a borrowed byte slice, growable byte vector, or owned string field
+— `FedosBoundaryVersion`'s `u32` triple is the only non-enum field
+anywhere in this stage's additions, and it is a fixed constant, never
+derived from anything. `Cargo.toml` is UNCHANGED — no new dependency is
+needed for label-only types and fixed metadata. Nothing is wired into
+the host's execution environment, its background worker, or a crypto
+provider; no WASM binding exists.
+
+**Where this stage stopped.** Ten type groups is already a large surface
+for one stage; a real key-IMPORT boundary in particular starts to brush
+against implementation territory (the ONE place raw secret bytes would
+legitimately cross this boundary), which is exactly why
+`docs/public_key_boundary.md` reserves that provisioning-path design as
+its own future, separately-reviewed stage rather than sketching it here.
+Consolidating further — e.g. also fixing the CSPRNG dependency choice, or
+the raw-input-to-opaque-handle provisioning path itself — would require
+picking a real dependency or a real byte-level protocol, which is
+implementation, not boundary design; this stage stops short of that
+line.
