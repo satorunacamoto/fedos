@@ -62,7 +62,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     .join("\n")
     .toLowerCase();
 
-  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 (plus hkdf, Stage 76; plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84)", () => {
+  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 (plus hkdf, Stage 76; plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84; plus aes-gcm, Stage 101)", () => {
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -71,13 +71,14 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(6);
+    expect(depLines.length).toBe(7);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*secrecy\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*subtle\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*aes-gcm\s*=/.test(line))).toBe(true);
   });
 
   it("2. serde / serde_json / hex are dev-dependencies only — not production dependencies", () => {
@@ -98,8 +99,6 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
 
   it("3. Cargo.toml still excludes every other named crypto crate and wasm-bindgen", () => {
     for (const dep of [
-      "aes-gcm",
-      "aes_gcm",
       // sha2 is NOT in this list: since Stage 77 it is a legitimate
       // [dev-dependencies] entry (used only by the #[cfg(test)]-only
       // rfc5869_vectors module) — see test/fedos_core_rust_hkdf_wiring.test.ts
@@ -110,7 +109,11 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       // test/fedos_core_rust_dependency.test.ts tests 3–5. argon2 is
       // likewise NOT in this list: since Stage 84 it is a legitimate
       // PRODUCTION dependency — see
-      // test/fedos_core_rust_dependency.test.ts test 6.
+      // test/fedos_core_rust_dependency.test.ts test 6. aes-gcm is
+      // likewise NOT in this list: since Stage 101 it is a legitimate
+      // PRODUCTION dependency, adopted AND wired to the NIST AES-256-GCM
+      // vectors in the same Stage — see
+      // test/fedos_core_rust_aes_gcm_wiring.test.ts.
       "getrandom",
       "rand_core",
       "wasm-bindgen",

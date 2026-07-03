@@ -537,3 +537,94 @@ edited in place, by the Stage that adopted the crate.
   no Runtime/Worker/`CryptoProvider` wiring; `Cargo.lock` was generated to
   verify the resolved dependency graph (§ above) and then deleted, not
   committed.
+
+### `aes-gcm` — Stage 101
+
+- **Crate + exact version:** `aes-gcm` v0.10.3 (pinned in `Cargo.toml`;
+  `Cargo.lock` is not committed — same convention as every prior entry
+  above).
+- **Primitive served / vector file:** AES-256-GCM (this crate's SECOND
+  AEAD); wired to
+  [`../test-vectors/aead/aes256gcm-nist.json`](../test-vectors/aead/aes256gcm-nist.json)
+  (imported Stage 73, NIST CAVP AES-256-GCM known-answer test vectors) IN
+  THE SAME STAGE — unlike every prior entry in this log, which adopted its
+  crate as a dependency-only step and deferred vector wiring to a later
+  Stage (`chacha20poly1305` Stage 74 → wired Stage 75; `hkdf` Stage 76 →
+  wired Stage 77; `argon2` Stage 84 → wired Stage 85), this Stage combines
+  adoption + wiring + test-only helper extraction into one reviewed unit,
+  per this Stage's own explicit scope.
+- **Why this crate (§2–§3):** RustCrypto (default preference, §3); no
+  libsodium binding needed since RustCrypto has a maintained, audited-family
+  AES-GCM implementation (§4 does not apply here) — the same crate family
+  already used for `chacha20poly1305`/`hkdf`/`argon2`.
+- **Feature configuration:** `default-features = false`, `features =
+  ["aes", "alloc"]` — explicitly selects only the AES block-cipher backend
+  and `alloc`-based buffer support. `aes-gcm`'s optional `getrandom`
+  feature (which would pull in a CSPRNG dependency for nonce-generation
+  convenience) is NOT enabled — no random-number source is adopted in this
+  Stage (docs/fedos_core_rust_safety.md §7, §6 above), same explicit
+  opt-out pattern as `chacha20poly1305` (Stage 74) and `argon2` (Stage 84).
+  Note: unlike `chacha20poly1305`/`argon2`, `aes-gcm`'s own *default*
+  feature set (`["aes", "alloc"]`) already excludes `getrandom` — this
+  Stage's explicit `default-features = false` override is therefore
+  belt-and-suspenders (guards against a future upstream default-feature
+  change), not strictly required to avoid `getrandom` today.
+- **Transitive dependency count:** 10 NEW packages beyond the existing
+  29-package `chacha20poly1305`/`hkdf`/`zeroize`/`secrecy`/`subtle`/`argon2`
+  tree — `aes-gcm` itself, `aead` v0.5.2 (a SECOND, older generation,
+  distinct from the `aead` v0.6.1 already in the tree via
+  `chacha20poly1305`), `aes`, `cipher` v0.4.4 (a second, older generation,
+  distinct from `cipher` v0.5.2), `ctr`, `ghash`, `opaque-debug`,
+  `polyval`, and `universal-hash` v0.5.1 (a second, older generation,
+  distinct from `universal-hash` v0.6.1). `crypto-common` v0.1.7,
+  `generic-array` v0.14.7, `cpufeatures` v0.2.17, `subtle` v2.6.1, and
+  `cfg-if` v1.0.4 are REUSED at their existing pinned versions (no
+  duplicate) — the same "two generations of a RustCrypto trait crate
+  coexist" pattern already noted in the `argon2` entry above (there,
+  `digest` v0.10 vs v0.11; here, `aead`/`cipher`/`universal-hash`/`inout`
+  each v0.4–0.5 vs v0.5–0.6), which Cargo permits and is a binary-size/
+  compile-time note, not a build failure. Combined production dependency
+  graph as of this Stage: 39 unique (name, version) packages total, per
+  `cargo tree -e normal`'s output at adoption time. **No `getrandom`, no
+  `rand`/`rand_core`** appear in the resolved graph (verified by
+  inspecting the generated `Cargo.lock` before deleting it) — a direct
+  consequence of the feature configuration above.
+- **Build-script presence:** none for `aes-gcm`, `aead` v0.5.2, `aes`,
+  `cipher` v0.4.4, `ctr`, `ghash`, `opaque-debug`, `polyval`, or
+  `universal-hash` v0.5.1.
+- **`unsafe` presence:** `aes-gcm` itself declares `#![deny(unsafe_code)]`
+  — no `unsafe` in its own source. `aes` uses `unsafe` internally across
+  its AES-NI (x86/x86_64 hardware AES instruction set) and ARMv8
+  cryptography-extension backends, plus their CPU-feature autodetection —
+  the same SIMD/hardware-acceleration pattern already acknowledged for
+  `chacha20poly1305`'s and `argon2`'s transitive trees in their own
+  entries above. None of this affects `packages/fedos-core-rust`'s own
+  `#![forbid(unsafe_code)]`, which governs only this crate's code.
+- **License:** Apache-2.0 OR MIT (`aes-gcm`, `ghash`, `polyval`,
+  `universal-hash` v0.5.1) / MIT OR Apache-2.0 (`aes`, `cipher` v0.4.4,
+  `ctr`) — same dual-license family as every other adopted crate so far.
+- **MSRV impact:** `aes-gcm` 0.10.3, `aes` 0.8.4, `ctr` 0.9.2, `ghash`
+  0.5.1, and `polyval` 0.6.2 each publish `rust-version = "1.56"` — well
+  below the existing 1.85 floor established by
+  `chacha20poly1305`/`hkdf`/`zeroize`, so no bump.
+- **What was DONE (unlike every prior "adoption only" entry above):** a
+  new `#[cfg(test)]`-only module, `aes256gcm_vectors`, reads
+  [`../test-vectors/aead/aes256gcm-nist.json`](../test-vectors/aead/aes256gcm-nist.json)
+  via `include_str!` and asserts `aes-gcm` reproduces its known-answer
+  bytes; two private, test-only helper functions,
+  `seal_aes256gcm_for_test`/`open_aes256gcm_for_test`, exist ONLY inside
+  that module (never `pub`/`pub(crate)`, never re-exported), mirroring the
+  byte-level shape `seal_chacha20poly1305_for_test`/
+  `open_chacha20poly1305_for_test` (Stage 81) and
+  `derive_argon2id_for_test` (Stage 86) already established — but
+  extracted from the start in this Stage, rather than as a later
+  refactor.
+- **What was NOT done:** no import of `aes-gcm` anywhere in `src/lib.rs`'s
+  PRODUCTION code (everything before the file's first `#[cfg(test)]`-gated
+  module); no public `encrypt`/`decrypt` implementation using it; the
+  crate-private `aead_core` skeleton (Stage 80) is UNCHANGED and still
+  placeholder-only, not connected to the new module;
+  `encrypt_placeholder`/`decrypt_placeholder` are unchanged; no random/
+  nonce/key generation; no Runtime/Worker/`CryptoProvider` wiring;
+  `Cargo.lock` was generated to verify the resolved dependency graph and
+  run `cargo test` (§ above) and then deleted, not committed.

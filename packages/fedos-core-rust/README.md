@@ -4,14 +4,17 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 100 — FedOS Core Architecture Freeze v1 (docs only — no
-> `src/` change, no `Cargo.toml` change, no crypto implementation). Public
-> API STILL a placeholder SKELETON. No cryptography reachable from any
-> public function.**
+> **Status: Stage 101 — Adopt `aes-gcm` AND wire the NIST AES-256-GCM
+> vectors to `cargo test`, with the seal/open test-only helper extracted
+> from the start (one combined Stage; no public encrypt/decrypt API, no
+> Runtime/Worker/CryptoProvider wiring, no production `aes-gcm` use).
+> Public API STILL a placeholder SKELETON. No cryptography reachable from
+> any public function.**
 > See
 > [`docs/fedos_core_architecture_freeze_v1.md`](../../docs/fedos_core_architecture_freeze_v1.md)
 > for the fixed design record of every skeleton module Stage 79–99 added
-> below.
+> below (Stage 100, docs only — still accurate; this Stage adds a
+> dependency + test-only vector wiring, not a new skeleton).
 > This package ships the TypeScript `FedosCoreCrypto` seam, a permanently-inert
 > `PlaceholderFedosCoreCrypto`, and (Stage 69) a **minimal Rust crate skeleton**
 > (`Cargo.toml` + `src/lib.rs`) with **placeholder functions only**. That public
@@ -23,7 +26,19 @@ app depends only on its *contract*, never on its internals.
 > `cfg(test)` in Stage 75 (refactored into a test-only helper Stage 81). Stage
 > 76 adopted `hkdf` (RustCrypto KDF), wired to the RFC 5869 HKDF-SHA256
 > vectors under `cfg(test)` in Stage 77 (refactored into a test-only helper
-> Stage 83). Stage 78 adopted `zeroize` / `secrecy` / `subtle` as a
+> Stage 83). **Stage 101 adopts `aes-gcm` v0.10.3 (RustCrypto AEAD,
+> `default-features = false`, `features = ["aes", "alloc"]` — no
+> `getrandom`), this crate's SECOND AEAD, AND wires it to the NIST CAVP
+> AES-256-GCM vectors at
+> [`test-vectors/aead/aes256gcm-nist.json`](../../test-vectors/aead/aes256gcm-nist.json)
+> under `cfg(test)` — in the SAME Stage, with the
+> `seal_aes256gcm_for_test`/`open_aes256gcm_for_test` test-only helper
+> pair extracted from the start (unlike `chacha20poly1305`/`argon2`,
+> which each wired their vector in a later Stage and refactored a helper
+> in a later Stage still) — see "RFC 8439 vector wiring" below for the
+> byte-level pattern this reuses; `aead_core` (Stage 80) remains
+> unchanged and placeholder-only, unconnected to it.** Stage 78 adopted
+> `zeroize` / `secrecy` / `subtle` as a
 > secret-handling FOUNDATION. Stage 79 added a crate-private `secret_handle`
 > module. Stage 80 added a second crate-private module, `aead_core`. Stage 82
 > added a third crate-private module, `kdf_core` — see the "Internal KDF
@@ -139,20 +154,23 @@ field** because nothing is computed. `PlaceholderFedosCoreCrypto` /
   path imports, calls, or exercises it, and there is still no Argon2id
   hash/verify function any caller can reach
 - No PUBLIC AEAD implementation — `chacha20poly1305` is exercised ONLY inside
-  the `cfg(test)`-only `rfc8439_vectors` module added Stage 75, to check the
-  dependency against the RFC 8439 vectors; no production code path imports,
-  calls, or exercises it, and there is still no ChaCha20-Poly1305 /
-  XChaCha20-Poly1305 / AES-GCM encrypt/decrypt function any caller can reach.
-  Stage 80 adds an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton
-  (crate-private `aead_core` module, `pub(crate)` at most, never `pub`,
-  never re-exported) that holds only an algorithm label and an
-  encrypt-or-decrypt intent label — no key, nonce, plaintext, ciphertext, or
-  tag byte, and its production code does not import `chacha20poly1305`
-  either
+  the `cfg(test)`-only `rfc8439_vectors` module added Stage 75, and `aes-gcm`
+  (this crate's SECOND AEAD, adopted Stage 101) is exercised ONLY inside the
+  `cfg(test)`-only `aes256gcm_vectors` module added the SAME Stage, to check
+  each dependency against its own official vectors (RFC 8439, NIST CAVP
+  AES-256-GCM); no production code path imports, calls, or exercises
+  either, and there is still no ChaCha20-Poly1305 / XChaCha20-Poly1305 /
+  AES-GCM encrypt/decrypt function any caller can reach. Stage 80 adds an
+  INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (crate-private
+  `aead_core` module, `pub(crate)` at most, never `pub`, never
+  re-exported) that holds only an algorithm label and an encrypt-or-decrypt
+  intent label — no key, nonce, plaintext, ciphertext, or tag byte, and its
+  production code does not import `chacha20poly1305` or `aes-gcm` either
 - No CSPRNG / random generation (chacha20poly1305's default `getrandom`
   feature is explicitly disabled; `hkdf` pulls in no `rand`/`getrandom`
   either; `argon2`'s default `rand` feature is explicitly disabled too, so
-  it pulls in no `rand_core` either)
+  it pulls in no `rand_core` either; `aes-gcm`'s optional `getrandom`
+  feature is likewise explicitly disabled)
 - No BIP39 / BIP32
 - No NIP-44
 - No PUBLIC secret type — Stage 79 adds an INTERNAL-ONLY `SecretHandle`
@@ -331,11 +349,11 @@ this stage.
 
 ```
 packages/fedos-core-rust
-  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78) + argon2 dependency (Stage 84) — UNCHANGED since Stage 84
+  Cargo.toml     — Rust crate skeleton (v0.0.0, edition 2021, rlib) + chacha20poly1305 dependency (Stage 74) + serde/serde_json/hex dev-dependencies (Stage 75) + hkdf dependency (Stage 76) + sha2 dev-dependency (Stage 77) + zeroize/secrecy/subtle dependencies (Stage 78) + argon2 dependency (Stage 84) + aes-gcm dependency (Stage 101) — UNCHANGED since Stage 101
   src/index.ts   — entry point: FedosCoreCrypto seam + PlaceholderFedosCoreCrypto / createFedosCoreCrypto
   src/types.ts   — FedosCoreCrypto contract, status/decision/capability, request shapes (imports nothing)
   src/wasm_loader.ts — WASM loader seam (Noop/Placeholder) — loads nothing (Stage 63)
-  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a third `cfg(test)`-only `rfc9106_vectors` module (Stage 85) verifies argon2 against RFC 9106 Argon2id, refactored Stage 86 to share derivation logic via one test-only helper fn; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `key_material` module (Stage 87) is an INTERNAL-ONLY `KeyMaterialHandle` skeleton reusing `secret_handle`'s zeroize/secrecy placeholder-marker pattern, plus a `KeyMaterialKind` label enum; a crate-private `domain_label` module (Stage 88) is an INTERNAL-ONLY `DomainLabel` skeleton holding only a fixed `&'static str` label per `DomainLabelKind`; a crate-private `operation_context` module (Stage 89) is an INTERNAL-ONLY `OperationContext` skeleton naming a future crypto operation via an `OperationKind` label only; a crate-private `request_descriptor` module (Stage 90) is an INTERNAL-ONLY `RequestDescriptor` skeleton naming a future crypto operation REQUEST via a `RequestDescriptorKind` label only, non-sensitive metadata only; a crate-private `response_descriptor` module (Stage 91) is an INTERNAL-ONLY `ResponseDescriptor` skeleton naming a future crypto operation RESULT via a `ResponseDescriptorKind` label only, non-sensitive metadata only; a crate-private `crypto_pipeline` module (Stage 92) is an INTERNAL-ONLY `CryptoPipeline` skeleton naming a future crypto PIPELINE via a `CryptoPipelineKind` label only, not yet bundling any other skeleton; a crate-private `descriptor_bundle` module (Stage 93) is an INTERNAL-ONLY `DescriptorBundle` skeleton naming a future crypto BUNDLE via a `DescriptorBundleKind` label only, not yet grouping any other skeleton's value; a crate-private `execution_plan` module (Stage 94) is an INTERNAL-ONLY `ExecutionPlan` skeleton naming a future crypto processing ORDER via an `ExecutionPlanKind` label and a fixed `ExecutionStepKind` six-step label sequence only; a crate-private `error_taxonomy` module (Stage 95) is an INTERNAL-ONLY `CryptoErrorDescriptor` skeleton classifying a future crypto operation FAILURE via a `CryptoErrorKind` label only, no error message/source/stack field; a crate-private `audit_event` module (Stage 96) is an INTERNAL-ONLY `AuditEventLabel` skeleton naming a future crypto-internal state change via an `AuditEventKind` label only, no event payload and no logging; a crate-private `audit_policy` module (Stage 97) is an INTERNAL-ONLY `AuditPolicy` skeleton naming a future observability decision via an `AuditPolicyKind` label and a fixed `AuditPolicyDecision` label (always `DenyPlaceholder` today), no observation payload, no logging, and no reference to `audit_event`; a crate-private `lifecycle_state` module (Stage 98) is an INTERNAL-ONLY `LifecycleMarker` skeleton naming a future coarse lifecycle transition via a `LifecycleKind` label and a six-variant `LifecycleState`, no payload/timestamp/counter, no logging; a crate-private `module_registry` module (Stage 99) is an INTERNAL-ONLY `ModuleRegistry` skeleton that ENUMERATES, by fixed `ModuleRegistryKind` label only, every skeleton module added since Stage 79, `registered_module_count()` hardcoded to `15`, no dynamic registry mechanism, no logging — none of the sixteen skeletons is part of the public API, and none is connected to any other
+  src/lib.rs     — Rust placeholder API (status/capabilities + *_placeholder fns), UNCHANGED since Stage 69 — NO crypto, NO unsafe, NO WASM in the public API; a `cfg(test)`-only `rfc8439_vectors` module (Stage 75) verifies chacha20poly1305 against RFC 8439, refactored Stage 81 to share seal/open logic via two test-only helper fns; a second `cfg(test)`-only `rfc5869_vectors` module (Stage 77) verifies hkdf against RFC 5869, refactored Stage 83 to share extract/expand logic via three test-only helper fns; a third `cfg(test)`-only `rfc9106_vectors` module (Stage 85) verifies argon2 against RFC 9106 Argon2id, refactored Stage 86 to share derivation logic via one test-only helper fn; a crate-private `secret_handle` module (Stage 79) is an INTERNAL-ONLY `SecretHandle` skeleton using zeroize/secrecy against a placeholder marker; a crate-private `aead_core` module (Stage 80, unchanged since) is an INTERNAL-ONLY `AeadPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `kdf_core` module (Stage 82, unchanged since) is an INTERNAL-ONLY `KdfPlaceholderRequest` skeleton (algorithm + operation labels only); a crate-private `key_material` module (Stage 87) is an INTERNAL-ONLY `KeyMaterialHandle` skeleton reusing `secret_handle`'s zeroize/secrecy placeholder-marker pattern, plus a `KeyMaterialKind` label enum; a crate-private `domain_label` module (Stage 88) is an INTERNAL-ONLY `DomainLabel` skeleton holding only a fixed `&'static str` label per `DomainLabelKind`; a crate-private `operation_context` module (Stage 89) is an INTERNAL-ONLY `OperationContext` skeleton naming a future crypto operation via an `OperationKind` label only; a crate-private `request_descriptor` module (Stage 90) is an INTERNAL-ONLY `RequestDescriptor` skeleton naming a future crypto operation REQUEST via a `RequestDescriptorKind` label only, non-sensitive metadata only; a crate-private `response_descriptor` module (Stage 91) is an INTERNAL-ONLY `ResponseDescriptor` skeleton naming a future crypto operation RESULT via a `ResponseDescriptorKind` label only, non-sensitive metadata only; a crate-private `crypto_pipeline` module (Stage 92) is an INTERNAL-ONLY `CryptoPipeline` skeleton naming a future crypto PIPELINE via a `CryptoPipelineKind` label only, not yet bundling any other skeleton; a crate-private `descriptor_bundle` module (Stage 93) is an INTERNAL-ONLY `DescriptorBundle` skeleton naming a future crypto BUNDLE via a `DescriptorBundleKind` label only, not yet grouping any other skeleton's value; a crate-private `execution_plan` module (Stage 94) is an INTERNAL-ONLY `ExecutionPlan` skeleton naming a future crypto processing ORDER via an `ExecutionPlanKind` label and a fixed `ExecutionStepKind` six-step label sequence only; a crate-private `error_taxonomy` module (Stage 95) is an INTERNAL-ONLY `CryptoErrorDescriptor` skeleton classifying a future crypto operation FAILURE via a `CryptoErrorKind` label only, no error message/source/stack field; a crate-private `audit_event` module (Stage 96) is an INTERNAL-ONLY `AuditEventLabel` skeleton naming a future crypto-internal state change via an `AuditEventKind` label only, no event payload and no logging; a crate-private `audit_policy` module (Stage 97) is an INTERNAL-ONLY `AuditPolicy` skeleton naming a future observability decision via an `AuditPolicyKind` label and a fixed `AuditPolicyDecision` label (always `DenyPlaceholder` today), no observation payload, no logging, and no reference to `audit_event`; a crate-private `lifecycle_state` module (Stage 98) is an INTERNAL-ONLY `LifecycleMarker` skeleton naming a future coarse lifecycle transition via a `LifecycleKind` label and a six-variant `LifecycleState`, no payload/timestamp/counter, no logging; a crate-private `module_registry` module (Stage 99) is an INTERNAL-ONLY `ModuleRegistry` skeleton that ENUMERATES, by fixed `ModuleRegistryKind` label only, every skeleton module added since Stage 79, `registered_module_count()` hardcoded to `15`, no dynamic registry mechanism, no logging — none of the sixteen skeletons is part of the public API, and none is connected to any other; a fourth `cfg(test)`-only `aes256gcm_vectors` module (Stage 101) verifies aes-gcm against the NIST CAVP AES-256-GCM vectors, with its `seal_aes256gcm_for_test`/`open_aes256gcm_for_test` test-only helper pair extracted from the start
 ```
 
 The Rust `src/lib.rs` mirrors the TS `FedosCoreCrypto` shape with placeholder-only
@@ -345,11 +363,11 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 `FedosCoreStatus` and runs no cryptography. `#![forbid(unsafe_code)]` bans
 `unsafe`. No WASM target is declared; nothing compiles to `.wasm`.
 
-## Dependencies (Stage 74/76/78/84 production + Stage 75/77 dev-dependencies)
+## Dependencies (Stage 74/76/78/84/101 production + Stage 75/77 dev-dependencies)
 
 - **`chacha20poly1305` v0.11.0** (RustCrypto, Apache-2.0 OR MIT,
-  `default-features = false`, `features = ["alloc"]`) — one of six entries in
-  `[dependencies]` (production). Pulls in, transitively, only other
+  `default-features = false`, `features = ["alloc"]`) — one of SEVEN entries
+  in `[dependencies]` (production). Pulls in, transitively, only other
   RustCrypto/utility crates (`aead`, `chacha20`, `cipher`, `poly1305`,
   `crypto-common`, `inout`, `hybrid-array`, `universal-hash`, `block-buffer`,
   `typenum`, `cfg-if`, `cpufeatures`, `cmov`, `ctutils` — plus itself) — **no
@@ -382,11 +400,32 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
   referenced, or exercised anywhere in `src/lib.rs` — production or
   `cfg(test)` — yet.
 - **`argon2` v0.5.3** (RustCrypto, MIT OR Apache-2.0, `default-features =
-  false`, NO `features` enabled) — the sixth and newest entry in
-  `[dependencies]` (production), adopted Stage 84. See "`argon2` dependency
-  adoption (Stage 84)" below for the full review; NOT imported/used
-  anywhere in `src/lib.rs` yet — production or `cfg(test)` — dependency +
-  build check only.
+  false`, NO `features` enabled) — the sixth entry in `[dependencies]`
+  (production), adopted Stage 84. See "`argon2` dependency adoption
+  (Stage 84)" below for the full review; NOT imported/used anywhere in
+  `src/lib.rs` yet — production or `cfg(test)` — dependency + build check
+  only.
+- **`aes-gcm` v0.10.3** (RustCrypto, Apache-2.0 OR MIT, `default-features =
+  false`, `features = ["aes", "alloc"]`) — the seventh and newest entry in
+  `[dependencies]` (production), and this crate's SECOND AEAD, adopted AND
+  wired to the NIST CAVP AES-256-GCM vectors IN THE SAME Stage (101) — see
+  "AES-256-GCM vector wiring (Stage 101)" below for the full review. Pulls
+  in 10 NEW transitive packages beyond the existing tree — `aead` v0.5.2
+  (a second, older generation, distinct from the `aead` v0.6.1 already
+  pulled in by `chacha20poly1305`), `aes`, `cipher` v0.4.4 (a second, older
+  generation, distinct from `cipher` v0.5.2), `ctr`, `ghash`,
+  `opaque-debug`, `polyval`, and `universal-hash` v0.5.1 (a second, older
+  generation, distinct from `universal-hash` v0.6.1) — **no `getrandom`, no
+  `rand`/`rand_core`, no build script (`build.rs`) in any of them.**
+  `aes-gcm` itself declares `#![deny(unsafe_code)]`; `aes` uses `unsafe`
+  internally for its AES-NI/ARMv8 hardware-acceleration backends and their
+  CPU-feature autodetection, the same pattern already noted for
+  `chacha20poly1305`'s/`argon2`'s transitive trees above — this crate's own
+  `#![forbid(unsafe_code)]` is unaffected. MSRV for `aes-gcm` 0.10.3 (and
+  its new transitive crates) is Rust 1.56 — well below the existing 1.85
+  floor, so no MSRV bump was needed. As of this same Stage, this dependency
+  is exercised — but only inside `cfg(test)`, by the `aes256gcm_vectors`
+  module (see below); production code still neither imports nor calls it.
 - **`[dev-dependencies]` (Stage 75/77, test-only, NOT production
   dependencies):** `serde` v1.0.228 (`features = ["derive"]`), `serde_json`
   v1.0.150, `hex` v0.4.3 (Stage 75) — used by the `cfg(test)`-only
@@ -406,8 +445,9 @@ functions (`fedos_core_status`, `fedos_core_capabilities`,
 - See
   [`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
   for the full adoption record and policy (§12 has dedicated `hkdf` — Stage
-  76, `zeroize`/`secrecy`/`subtle` — Stage 78, and `argon2` — Stage 84
-  entries). **`Cargo.lock` is intentionally NOT committed** (library crate;
+  76, `zeroize`/`secrecy`/`subtle` — Stage 78, `argon2` — Stage 84, and
+  `aes-gcm` — Stage 101 entries). **`Cargo.lock` is intentionally NOT
+  committed** (library crate;
   reproducibility via a lockfile digest is deferred to the future
   build-manifest stage,
   [`docs/fedos_core_build_manifest.md`](../../docs/fedos_core_build_manifest.md)).
@@ -2004,7 +2044,83 @@ for the full record.
 `cargo check --tests` all stay GREEN because nothing they check changed —
 this stage is purely additive at the documentation level.
 
-A future, explicitly-reviewed Stage 101 candidate is adopting the
-`aes-gcm` dependency — a dependency + build-check ADOPTION ONLY, exactly
-like every prior dependency stage (`chacha20poly1305` Stage 74, `hkdf`
-Stage 76, `argon2` Stage 84); no code would import or call it yet.
+## AES-256-GCM dependency adoption + vector wiring (Stage 101)
+
+Stage 101 combines three steps into one reviewed Stage — unlike every
+prior AEAD/KDF dependency, which spread "adopt" / "wire" / "extract a
+helper" across separate, later Stages:
+
+1. **`aes-gcm` v0.10.3** becomes a `[dependencies]` (production) entry —
+   this crate's SECOND AEAD, alongside `chacha20poly1305` (Stage 74). See
+   "Dependencies" above for the full crate review, and
+   [`docs/rust_dependency_adoption.md`](../../docs/rust_dependency_adoption.md)
+   §12 for the recorded review (version, features, transitive dependencies,
+   license, MSRV, `unsafe`/build-script presence).
+2. **The NIST CAVP AES-256-GCM known-answer vectors** already imported at
+   [`test-vectors/aead/aes256gcm-nist.json`](../../test-vectors/aead/aes256gcm-nist.json)
+   (Stage 73) are wired to `cargo test` via a new `#[cfg(test)]`-only
+   module, `aes256gcm_vectors`, reading the file with `include_str!` and
+   running four tests:
+   - `aes256gcm_json_parses_and_is_non_empty` — the vector file parses and
+     is non-empty.
+   - `aes256gcm_positive_vectors_encrypt_and_decrypt_correctly` — for every
+     `shouldPass: true` vector, `aes-gcm` both seals (encrypts)
+     plaintext+AAD to exactly the NIST vector's expected ciphertext‖tag,
+     and opens (decrypts) that same ciphertext‖tag back to exactly the
+     NIST vector's expected plaintext.
+   - `aes256gcm_negative_vectors_fail_to_decrypt_if_present` — for the
+     `shouldPass: false` vector (NIST's own official negative case — the
+     source `.rsp` file records `FAIL` in place of a `PT =` line, imported
+     verbatim, not fabricated, per
+     [`docs/crypto_vector_sources.md`](../../docs/crypto_vector_sources.md)
+     §2), decryption/authentication must fail.
+   - `seal_then_open_round_trip_for_test_helper` /
+     `open_fails_for_tampered_sealed_bytes_for_test_helper` — the same
+     helper-focused unit-test pair Stage 81/83/86 established for the
+     other AEAD/KDF vector modules.
+3. **The seal/open test-only helper pair is extracted from the start** —
+   `seal_aes256gcm_for_test(key_bytes, iv_bytes, plaintext_bytes,
+   aad_bytes) -> Result<Vec<u8>, AeadError>` and
+   `open_aes256gcm_for_test(key_bytes, iv_bytes, sealed_bytes, aad_bytes)
+   -> Result<Vec<u8>, AeadError>` (`sealed_bytes` is `ciphertext‖tag`),
+   mirroring `seal_chacha20poly1305_for_test`/
+   `open_chacha20poly1305_for_test`'s (Stage 81) byte-level shape and
+   `_for_test` naming convention exactly. Both are private `fn`s — never
+   `pub`/`pub(crate)`, never re-exported — that exist ONLY inside this
+   `cfg(test)`-only module, and are NOT connected to the crate-private
+   `aead_core` skeleton (Stage 80) or `secret_handle` (Stage 79) in any
+   way. Unlike `chacha20poly1305` (helper extracted a separate Stage 81,
+   four stages after Stage 77's wiring) or `argon2` (helper extracted a
+   separate Stage 86), this Stage extracts the helper from the start —
+   there is no earlier "inline, then refactor" step to redo.
+
+This is the "wired" step of the vector lifecycle in
+[`docs/verification_infrastructure.md`](../../docs/verification_infrastructure.md)
+§5 for AES-256-GCM — it does not, by itself, make any public API real:
+`encrypt_placeholder`/`decrypt_placeholder` are unchanged, and the runtime
+still selects only `NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`. See
+[`test/fedos_core_rust_aes_gcm_wiring.test.ts`](../../test/fedos_core_rust_aes_gcm_wiring.test.ts)
+for the dedicated Stage 101 guard tests (dependency presence, seven-entry
+production dependency count, no direct `rand`/`getrandom`/`wasm-bindgen`,
+module gated behind `cfg(test)` only, no production `aes-gcm` reference,
+public `pub fn` count still 6, `aead_core` unchanged and still
+placeholder-only and unconnected, helper presence/visibility, positive/
+negative vector coverage, no production key/nonce/plaintext/ciphertext/tag
+storage field, Runtime/Worker untouched, no committed build artifact).
+
+This is dependency-adoption-AND-wiring work in one Stage: no key, seed,
+plaintext, ciphertext, passphrase, or nonce byte is accepted, stored, or
+handled anywhere in production code (everything before this file's first
+`cfg(test)`-gated module); no public `encrypt`/`decrypt` implementation
+exists; `derive_key_placeholder`/`encrypt_placeholder`/
+`decrypt_placeholder` are byte-for-byte unchanged; and nothing is wired
+into the Runtime, the Worker, or `CryptoProvider`/`FedosCoreCryptoProvider`
+— the host still selects only
+`NoopCryptoProvider`/`PlaceholderFedosCoreCrypto`.
+
+A future, explicitly-reviewed Stage 102 candidate is internal public-API
+design docs — fixing, in writing, what a future public
+`encrypt`/`decrypt`/`deriveKey` signature, error taxonomy, and
+secret-handling contract would look like, reusing the label vocabulary
+Stage 79–99's skeletons and the Architecture Freeze v1 (Stage 100) already
+fixed — still no public API implementation.

@@ -8,7 +8,78 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 100 — FedOS Core Architecture Freeze v1 (docs only, no
+> **Status: Stage 101 — Adopt `aes-gcm` AND wire the NIST AES-256-GCM
+> vectors to `cargo test`, with the seal/open test-only helper extracted
+> from the start (one combined Stage; no public encrypt/decrypt API, no
+> Runtime/Worker/CryptoProvider wiring, no production `aes-gcm` use).**
+> `packages/fedos-core-rust/Cargo.toml` gains a SEVENTH `[dependencies]`
+> (production) entry, `aes-gcm` v0.10.3 (RustCrypto, Apache-2.0 OR MIT,
+> `default-features = false`, `features = ["aes", "alloc"]` — no
+> `getrandom`), this crate's SECOND AEAD alongside `chacha20poly1305`
+> (Stage 74). Unlike every prior AEAD/KDF dependency (which spread
+> "adopt"/"wire"/"extract a helper" across separate, later Stages —
+> `chacha20poly1305` Stage 74→75→81; `argon2` Stage 84→85→86), this Stage
+> combines all three into one reviewed unit: `packages/fedos-core-rust/src/lib.rs`
+> gains a new `#[cfg(test)]`-only module, `aes256gcm_vectors`, that reads
+> [`test-vectors/aead/aes256gcm-nist.json`](test-vectors/aead/aes256gcm-nist.json)
+> (NIST CAVP AES-256-GCM known-answer vectors, imported Stage 73) via
+> `include_str!` and asserts `aes-gcm` reproduces its expected bytes, via
+> two private, test-only helpers extracted from the start —
+> `seal_aes256gcm_for_test`/`open_aes256gcm_for_test` — mirroring
+> `seal_chacha20poly1305_for_test`/`open_chacha20poly1305_for_test`'s
+> (Stage 81) byte-level shape exactly; neither is `pub`/`pub(crate)`, and
+> neither is re-exported. The crate-private `aead_core` skeleton (Stage
+> 80) is UNCHANGED and remains placeholder-only, not connected to the new
+> module — same "when in doubt, leave unconnected" reasoning every
+> skeleton stage already established. `cargo test` is GREEN with all 106
+> tests passing (101 pre-existing + 5 new `aes256gcm_vectors` tests);
+> `cargo check` and `cargo check --tests` stay GREEN with no warnings.
+> Production code (everything before `src/lib.rs`'s first
+> `cfg(test)`-gated module) still does not import, reference, or call
+> `aes-gcm` anywhere, and the crate-level doc comment stays free of any
+> AEAD crate/algorithm name (same convention Stage 75/77/85 already
+> established) — its Stage 101 paragraph describes the new module only as
+> "an official NIST-sourced AEAD known-answer vector file" and "a SECOND
+> AEAD dependency", never spelling out "AES"/"GCM"/"aes-gcm" literally, to
+> avoid colliding with this repo's own bare-substring production-code
+> guard checks. `encrypt_placeholder`/`decrypt_placeholder`/
+> `derive_key_placeholder` remain byte-for-byte unchanged, and the crate's
+> public `pub fn` surface stays exactly the same six placeholder functions
+> from Stage 69. New
+> [`test/fedos_core_rust_aes_gcm_wiring.test.ts`](test/fedos_core_rust_aes_gcm_wiring.test.ts)
+> (18 tests) checks: `aes-gcm` dependency presence and the seven-entry
+> production dependency count, no direct `rand`/`getrandom` and no
+> `wasm-bindgen`, the vector module is gated behind `cfg(test)` only, no
+> production `aes-gcm`/`Aes256Gcm` reference (a bare `chacha|poly1305|
+> xchacha|aes|gcm` substring check across ALL of production code, not
+> just an import-statement check), public `pub fn` count still 6,
+> `aead_core` unchanged and still placeholder-only with no reference to
+> the new module (and vice versa), the two test-only helpers exist,
+> are private, and are never re-exported, `include_str!` reads the exact
+> NIST vector path, positive AND negative vector coverage both exist and
+> are exercised, no production key/nonce/plaintext/ciphertext/tag storage
+> field, Runtime/Worker untouched, no committed build artifact. Three
+> pre-existing guard test files
+> (`test/fedos_core_rust_dependency.test.ts`,
+> `test/fedos_core_rust_skeleton.test.ts`,
+> `test/fedos_core_rust_rfc8439_wiring.test.ts`,
+> `test/fedos_core_rust_hkdf_wiring.test.ts`) were updated because they
+> previously asserted `aes-gcm`'s ABSENCE from `Cargo.toml` and a
+> six-entry production dependency count — both now flipped to assert
+> presence and a seven-entry count, consistent with every prior
+> dependency-adoption stage's update pattern.
+> [`docs/rust_dependency_adoption.md`](docs/rust_dependency_adoption.md)
+> §12 gains a dedicated `aes-gcm` — Stage 101 entry (crate review, feature
+> configuration, 10 new transitive packages, 39-package combined
+> production graph, `unsafe`/build-script/license/MSRV review, what was
+> done vs. NOT done). Stage 102 candidate: **internal public-API design
+> docs** — fixing, in writing, what a future public `encrypt`/`decrypt`/
+> `deriveKey` signature, error taxonomy, and secret-handling contract
+> would look like, reusing the label vocabulary Stage 79–99's skeletons
+> and the Architecture Freeze v1 (Stage 100) already fixed — still no
+> public API implementation. Prior status:
+>
+> **Stage 100 — FedOS Core Architecture Freeze v1 (docs only, no
 > src changes, no `Cargo.toml` changes, no crypto implementation).**
 > [`docs/fedos_core_architecture_freeze_v1.md`](docs/fedos_core_architecture_freeze_v1.md)
 > (new) fixes, in writing, the internal type architecture Stage 79–99

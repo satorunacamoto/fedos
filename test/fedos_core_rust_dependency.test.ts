@@ -37,20 +37,31 @@ import workerSource from "../src/worker.ts?raw";
  * feature configuration avoids that transitive dependency entirely; see
  * `packages/fedos-core-rust/Cargo.toml`'s own comment above the `argon2`
  * entry for the full reasoning).
+ * Updated Stage 101 — `aes-gcm` dependency-adoption test (test 8 below,
+ * replacing the old "does not contain aes-gcm" check — this crate's SECOND
+ * AEAD, adopted AND wired to the NIST AES-256-GCM vectors in the same
+ * Stage, unlike every prior dependency which wired its vector file in a
+ * later Stage). `aes-gcm`'s `default-features = false`, `features =
+ * ["aes", "alloc"]` explicitly excludes its optional `getrandom` feature,
+ * so it pulls in no CSPRNG dependency either.
  *
  * `packages/fedos-core-rust/Cargo.toml`'s `[dependencies]` (production) table
- * has exactly SIX entries: `chacha20poly1305` (Stage 74, RustCrypto AEAD,
+ * has exactly SEVEN entries: `chacha20poly1305` (Stage 74, RustCrypto AEAD,
  * wired to the RFC 8439 vectors under `#[cfg(test)]` in Stage 75), `hkdf`
  * (Stage 76, RustCrypto KDF, wired to the RFC 5869 HKDF-SHA256 vectors at
  * test-vectors/kdf/hkdf-rfc5869.json under `#[cfg(test)]` in Stage 77),
  * `zeroize` / `secrecy` / `subtle` (Stage 78, secret-handling foundation),
- * and `argon2` (Stage 84, password-hashing/KDF — not yet wired to
- * test-vectors/kdf/argon2id-rfc9106.json, imported Stage 73).
- * `derive_key_placeholder` is untouched, no random/key is generated, no
- * type anywhere holds a real key/seed/plaintext/ciphertext/passphrase byte,
- * `subtle`-based constant-time-compare behavior does not exist yet (Stage 79
- * deliberately does not use `subtle`), and no other crypto crate (aes-gcm /
- * rand / getrandom) or wasm-bindgen is added.
+ * `argon2` (Stage 84, password-hashing/KDF — not yet wired to
+ * test-vectors/kdf/argon2id-rfc9106.json, imported Stage 73), and `aes-gcm`
+ * (Stage 101, RustCrypto AEAD, wired to the NIST AES-256-GCM vectors at
+ * test-vectors/aead/aes256gcm-nist.json under `#[cfg(test)]` in the SAME
+ * Stage — see test/fedos_core_rust_aes_gcm_wiring.test.ts).
+ * `derive_key_placeholder`/`encrypt_placeholder`/`decrypt_placeholder` are
+ * untouched, no random/key is generated, no type anywhere holds a real
+ * key/seed/plaintext/ciphertext/passphrase byte, `subtle`-based
+ * constant-time-compare behavior does not exist yet (Stage 79 deliberately
+ * does not use `subtle`), and no other crypto crate (rand / getrandom) or
+ * wasm-bindgen is added.
  *
  * `cargo check` (green as of this stage) is verified as its own separate
  * command outside `npm test`, consistent with how this repo has always kept
@@ -152,9 +163,18 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(devDepsSection).toMatch(/\bsha2\s*=/);
   });
 
-  it("8. Cargo.toml does not contain aes-gcm", () => {
-    expect(cargoCode).not.toContain("aes-gcm");
-    expect(cargoCode).not.toContain("aes_gcm");
+  it("8. Cargo.toml contains aes-gcm (production dependency, Stage 101)", () => {
+    // Stage 101 adopts `aes-gcm` AND wires it to the NIST AES-256-GCM
+    // vectors in the same stage — see
+    // test/fedos_core_rust_aes_gcm_wiring.test.ts for the dedicated Stage
+    // 101 checks (helper presence/visibility, no production `aes-gcm`
+    // reference, `aead_core` unchanged and still placeholder-only, public
+    // `pub fn` count still 6, no production key/nonce/plaintext/
+    // ciphertext/tag storage field, Runtime/Worker untouched, no committed
+    // build artifact).
+    expect(cargoCode).toContain("[dependencies]");
+    expect(cargoCode).toContain("aes-gcm");
+    expect(productionDepsSection).toMatch(/aes-gcm\s*=/);
   });
 
   it("9. Cargo.toml does not contain rand / getrandom", () => {

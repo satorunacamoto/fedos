@@ -231,6 +231,22 @@
 //! no `String`/`Vec` field, no payload, no timestamp, and no counter.
 //! Same rules apply: not part of the public API, no public function
 //! above constructs, holds, or returns one of its types.
+//!
+//! Stage 101 adds a THIRD test-only module of the same shape as Stage
+//! 75/77/85: a `cfg(test)`-only module (at the bottom of this file) that
+//! reads an official NIST-sourced AEAD known-answer vector file and
+//! asserts a SECOND AEAD dependency (also adopted this Stage) reproduces
+//! its expected bytes under `cargo test` — with its seal/open helper
+//! extracted from the start, mirroring the byte-level shape Stage 81/83/86
+//! already established for the other two AEAD/KDF vector modules. Same
+//! rules apply: `cfg(test)` only, no public API change, production code
+//! still does not import this Stage's AEAD dependency anywhere, and the
+//! crate-private `aead_core` skeleton (Stage 80) remains placeholder-only
+//! and unconnected to it. (Its own doc comment, just above its
+//! declaration, names the specific dependency and vector file — kept out
+//! of this crate-level doc so this production-facing summary stays free
+//! of any AEAD crate/algorithm name, same reasoning the Stage 75 note
+//! above already states.)
 
 #![forbid(unsafe_code)]
 
@@ -4354,6 +4370,253 @@ mod rfc9106_vectors {
         assert!(
             result.is_err(),
             "expected an error for an out-of-range memory cost"
+        );
+    }
+}
+
+/// Stage 101 — NIST CAVP AES-256-GCM known-answer verification,
+/// `#[cfg(test)]` ONLY, with the seal/open helper extracted from the start
+/// (unlike RFC 8439/RFC 9106, which were wired in one stage and refactored
+/// into a shared helper in a later stage, this module adopts `aes-gcm` and
+/// wires it with the helper already extracted, in the same Stage).
+///
+/// This module is not part of the crate's public API: it is compiled only
+/// under `cargo test`, imports `aes-gcm` (adopted as a production
+/// dependency in this same Stage) purely to check that dependency against
+/// the official NIST vectors, and implements no encrypt/decrypt function
+/// that any other code — production or otherwise — can call. The
+/// placeholder functions above (`encrypt_placeholder`, `decrypt_placeholder`,
+/// etc.) are untouched, and production code (everything before this file's
+/// first `#[cfg(test)]`-gated module) still does not import `aes-gcm`
+/// anywhere. The crate-private `aead_core` skeleton (Stage 80) remains
+/// placeholder-only and is NOT connected to this module — same
+/// "when a skeleton-to-skeleton connection is ambiguous, leave it
+/// unconnected" reasoning `aead_core`'s own doc comment already states.
+///
+/// [`seal_aes256gcm_for_test`] and [`open_aes256gcm_for_test`] are private
+/// `fn`s that exist ONLY inside this `cfg(test)`-only module, are not
+/// `pub`/`pub(crate)`, are not re-exported, and mirror the byte-level shape
+/// and `_for_test` naming convention `seal_chacha20poly1305_for_test`/
+/// `open_chacha20poly1305_for_test` (Stage 81) and
+/// `derive_argon2id_for_test` (Stage 86) already established.
+#[cfg(test)]
+mod aes256gcm_vectors {
+    use aes_gcm::aead::{Aead, Error as AeadError, KeyInit, Payload};
+    use aes_gcm::{Aes256Gcm, Key, Nonce};
+    use serde::Deserialize;
+
+    /// One vector entry. Only the fields this test needs are named; unknown
+    /// JSON fields (`sourceFile`, `sourceCount`, `description`,
+    /// `expectedResult`, ...) are ignored by serde rather than mirrored
+    /// here. `plaintext` is `#[serde(default)]` because NIST's own official
+    /// negative case (see `aes256gcm-nist.json`'s `notes` field) has no
+    /// `plaintext` value at all — its source `.rsp` line reads `FAIL`.
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vector {
+        id: String,
+        should_pass: bool,
+        key: String,
+        iv: String,
+        aad: String,
+        #[serde(default)]
+        plaintext: String,
+        ciphertext: String,
+        tag: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct VectorFile {
+        vectors: Vec<Vector>,
+    }
+
+    /// The NIST CAVP AES-256-GCM vector file imported verbatim in Stage 73,
+    /// read at compile time so this test has no filesystem/IO dependency at
+    /// runtime.
+    const AES256GCM_JSON: &str =
+        include_str!("../../../test-vectors/aead/aes256gcm-nist.json");
+
+    fn decode_hex(field: &str, id: &str, value: &str) -> Vec<u8> {
+        hex::decode(value).unwrap_or_else(|err| {
+            panic!("{id}: invalid hex in field `{field}`: {err}")
+        })
+    }
+
+    /// Test-only AES-256-GCM SEAL (encrypt-then-tag) helper — private `fn`,
+    /// exists ONLY under `cfg(test)`, never `pub`/`pub(crate)`. Takes raw
+    /// key/IV/plaintext/AAD bytes (all test-vector bytes, never a real
+    /// secret) and returns `ciphertext‖tag` on success, or the underlying
+    /// AEAD error on failure (e.g. a malformed key/IV length).
+    fn seal_aes256gcm_for_test(
+        key_bytes: &[u8],
+        iv_bytes: &[u8],
+        plaintext_bytes: &[u8],
+        aad_bytes: &[u8],
+    ) -> Result<Vec<u8>, AeadError> {
+        assert_eq!(key_bytes.len(), 32, "test helper: key is not 32 bytes");
+        assert_eq!(iv_bytes.len(), 12, "test helper: iv is not 12 bytes");
+        let key = Key::<Aes256Gcm>::from_slice(key_bytes);
+        let nonce = Nonce::from_slice(iv_bytes);
+        let cipher = Aes256Gcm::new(key);
+        cipher.encrypt(
+            nonce,
+            Payload {
+                msg: plaintext_bytes,
+                aad: aad_bytes,
+            },
+        )
+    }
+
+    /// Test-only AES-256-GCM OPEN (verify-then-decrypt) helper — same
+    /// scope/rules as [`seal_aes256gcm_for_test`] above. `sealed_bytes` is
+    /// `ciphertext‖tag`; returns the plaintext on success, or an error if
+    /// authentication fails (e.g. for NIST's own official negative vector).
+    fn open_aes256gcm_for_test(
+        key_bytes: &[u8],
+        iv_bytes: &[u8],
+        sealed_bytes: &[u8],
+        aad_bytes: &[u8],
+    ) -> Result<Vec<u8>, AeadError> {
+        assert_eq!(key_bytes.len(), 32, "test helper: key is not 32 bytes");
+        assert_eq!(iv_bytes.len(), 12, "test helper: iv is not 12 bytes");
+        let key = Key::<Aes256Gcm>::from_slice(key_bytes);
+        let nonce = Nonce::from_slice(iv_bytes);
+        let cipher = Aes256Gcm::new(key);
+        cipher.decrypt(
+            nonce,
+            Payload {
+                msg: sealed_bytes,
+                aad: aad_bytes,
+            },
+        )
+    }
+
+    #[test]
+    fn aes256gcm_json_parses_and_is_non_empty() {
+        let file: VectorFile =
+            serde_json::from_str(AES256GCM_JSON).expect("AES-256-GCM vector JSON must parse");
+        assert!(
+            !file.vectors.is_empty(),
+            "expected at least one AES-256-GCM vector"
+        );
+    }
+
+    /// `shouldPass=true` vectors: [`seal_aes256gcm_for_test`] must seal
+    /// plaintext+AAD to exactly the NIST vector's expected ciphertext||tag,
+    /// and [`open_aes256gcm_for_test`] must open that same ciphertext||tag
+    /// back to exactly the NIST vector's expected plaintext.
+    #[test]
+    fn aes256gcm_positive_vectors_encrypt_and_decrypt_correctly() {
+        let file: VectorFile =
+            serde_json::from_str(AES256GCM_JSON).expect("AES-256-GCM vector JSON must parse");
+
+        let mut checked = 0usize;
+        for vector in file.vectors.iter().filter(|v| v.should_pass) {
+            let key_bytes = decode_hex("key", &vector.id, &vector.key);
+            let iv_bytes = decode_hex("iv", &vector.id, &vector.iv);
+            let aad_bytes = decode_hex("aad", &vector.id, &vector.aad);
+            let plaintext_bytes = decode_hex("plaintext", &vector.id, &vector.plaintext);
+            let ciphertext_bytes = decode_hex("ciphertext", &vector.id, &vector.ciphertext);
+            let tag_bytes = decode_hex("tag", &vector.id, &vector.tag);
+
+            let mut expected_sealed = ciphertext_bytes.clone();
+            expected_sealed.extend_from_slice(&tag_bytes);
+
+            let sealed = seal_aes256gcm_for_test(&key_bytes, &iv_bytes, &plaintext_bytes, &aad_bytes)
+                .unwrap_or_else(|err| panic!("{}: encrypt failed: {err}", vector.id));
+            assert_eq!(
+                sealed, expected_sealed,
+                "{}: ciphertext||tag did not match the AES-256-GCM vector",
+                vector.id
+            );
+
+            let opened = open_aes256gcm_for_test(&key_bytes, &iv_bytes, &expected_sealed, &aad_bytes)
+                .unwrap_or_else(|err| panic!("{}: decrypt failed: {err}", vector.id));
+            assert_eq!(
+                opened, plaintext_bytes,
+                "{}: decrypted plaintext did not match the AES-256-GCM vector",
+                vector.id
+            );
+
+            checked += 1;
+        }
+        assert!(
+            checked > 0,
+            "expected at least one shouldPass=true AES-256-GCM vector to be checked"
+        );
+    }
+
+    /// `shouldPass=false` vectors must fail to decrypt/authenticate via
+    /// [`open_aes256gcm_for_test`] — NIST's own official negative case (see
+    /// `aes256gcm-nist.json`'s `notes` field): an authentication-tag
+    /// mismatch that MUST cause decryption to fail closed.
+    #[test]
+    fn aes256gcm_negative_vectors_fail_to_decrypt_if_present() {
+        let file: VectorFile =
+            serde_json::from_str(AES256GCM_JSON).expect("AES-256-GCM vector JSON must parse");
+
+        let mut checked = 0usize;
+        for vector in file.vectors.iter().filter(|v| !v.should_pass) {
+            let key_bytes = decode_hex("key", &vector.id, &vector.key);
+            let iv_bytes = decode_hex("iv", &vector.id, &vector.iv);
+            let aad_bytes = decode_hex("aad", &vector.id, &vector.aad);
+            let ciphertext_bytes = decode_hex("ciphertext", &vector.id, &vector.ciphertext);
+            let tag_bytes = decode_hex("tag", &vector.id, &vector.tag);
+
+            let mut sealed = ciphertext_bytes.clone();
+            sealed.extend_from_slice(&tag_bytes);
+
+            let result = open_aes256gcm_for_test(&key_bytes, &iv_bytes, &sealed, &aad_bytes);
+            assert!(
+                result.is_err(),
+                "{}: expected decrypt/authentication failure for a shouldPass=false vector",
+                vector.id
+            );
+
+            checked += 1;
+        }
+        assert!(
+            checked > 0,
+            "expected at least one shouldPass=false AES-256-GCM vector to be checked"
+        );
+    }
+
+    /// Unit test for the helpers themselves, independent of the vector
+    /// file: a seal-then-open round trip over fixed, non-secret, test-only
+    /// bytes must return the original plaintext.
+    #[test]
+    fn seal_then_open_round_trip_for_test_helper() {
+        let key_bytes = [0x11u8; 32];
+        let iv_bytes = [0x22u8; 12];
+        let aad_bytes = b"aad-for-test";
+        let plaintext_bytes = b"plaintext-for-test";
+
+        let sealed = seal_aes256gcm_for_test(&key_bytes, &iv_bytes, plaintext_bytes, aad_bytes)
+            .expect("seal should succeed with a well-formed key/iv");
+        let opened = open_aes256gcm_for_test(&key_bytes, &iv_bytes, &sealed, aad_bytes)
+            .expect("open should succeed against its own sealed output");
+        assert_eq!(opened, plaintext_bytes);
+    }
+
+    /// Unit test for the OPEN helper's failure path: tampering with the
+    /// sealed bytes (the authentication tag, here) must make
+    /// [`open_aes256gcm_for_test`] return an error.
+    #[test]
+    fn open_fails_for_tampered_sealed_bytes_for_test_helper() {
+        let key_bytes = [0x33u8; 32];
+        let iv_bytes = [0x44u8; 12];
+        let aad_bytes = b"aad-for-test";
+        let plaintext_bytes = b"plaintext-for-test";
+
+        let mut sealed = seal_aes256gcm_for_test(&key_bytes, &iv_bytes, plaintext_bytes, aad_bytes)
+            .expect("seal should succeed with a well-formed key/iv");
+        let last = sealed.len() - 1;
+        sealed[last] ^= 0xff;
+
+        let result = open_aes256gcm_for_test(&key_bytes, &iv_bytes, &sealed, aad_bytes);
+        assert!(
+            result.is_err(),
+            "expected authentication failure for tampered sealed bytes"
         );
     }
 }
