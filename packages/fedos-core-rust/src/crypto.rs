@@ -101,17 +101,28 @@
 //! minimal. No ECDH function, no conversation-key derivation, no NIP-44
 //! code, no public API addition.
 //!
-//! Stage 198–199 add `conversation_key` — a `SecretHandle`-backed
-//! `ConversationKey` type with a Stage 198 placeholder path, plus Stage
-//! 199's REAL `derive_conversation_key_via_ecdh_internal`: secp256k1 ECDH
-//! (manual `k256` `arithmetic`-only point multiplication — no `ecdh`
-//! Cargo feature added) followed by HKDF-extract-only (fixed salt
-//! `"nip44-v2"`), vector-verified against
-//! `test-vectors/nip44/nip44-v2.json`'s `valid`/`invalid .get_conversation_key`
-//! categories (43 cases total) by the sibling `#[cfg(test)]`-only
-//! `nip44_conversation_key_vectors` module. No message-key derivation, no
-//! padding, no NIP-44 encrypt/decrypt, no public API addition, no
-//! Runtime/Worker/Storage/Relay connection.
+//! Stage 198–201 implement NIP-44's key-derivation half. `conversation_key`
+//! (Stage 198–199) adds `ConversationKey` — a `SecretHandle`-backed type
+//! with a Stage 198 placeholder path, plus Stage 199's REAL
+//! `derive_conversation_key_via_ecdh_internal`: secp256k1 ECDH (manual
+//! `k256` `arithmetic`-only point multiplication — no `ecdh` Cargo feature
+//! added) followed by HKDF-extract-only (fixed salt `"nip44-v2"`),
+//! vector-verified against `test-vectors/nip44/nip44-v2.json`'s
+//! `valid`/`invalid .get_conversation_key` categories (43 cases total) by
+//! the sibling `#[cfg(test)]`-only `nip44_conversation_key_vectors`
+//! module. `message_key` (Stage 200) adds `MessageKey` — the same
+//! `SecretHandle`-backed, placeholder-first shape, with zero derivation
+//! logic of its own. `hkdf_bridge` (Stage 201) adds the one function that
+//! connects them: `derive_message_key_from_conversation_key_internal`,
+//! reusing `kdf_core::derive_secret_handle_internal`'s pre-existing,
+//! ALREADY-REAL `HkdfDomain::Conversation` — a generic architectural
+//! bridge, deliberately NOT NIP-44 v2's real per-message nonce-salted
+//! derivation (a future, separate stage). `capability_matrix` gains four
+//! more variants (`MessageKey`, `Padding`, `Encrypt`, `Decrypt`);
+//! `diagnostics` promotes `Ecdh`/`ConversationKey` to `Ready` and reports
+//! `MessageKey` as `Ready`, `Encrypt`/`Decrypt` as `NotConnected`, and
+//! `Padding` as `NotImplemented`. No padding, no NIP-44 encrypt/decrypt,
+//! no public API addition, no Runtime/Worker/Storage/Relay connection.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -123,8 +134,12 @@ pub(crate) mod ciphertext_serialization;
 pub(crate) mod ciphertext_transport;
 pub(crate) mod conversation_key;
 pub(crate) mod diagnostics;
+pub(crate) mod hkdf_bridge;
+pub(crate) mod message_key;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
+#[cfg(test)]
+mod nip44_key_derivation_guard;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]
