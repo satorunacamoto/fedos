@@ -39,18 +39,27 @@
 //! NIP-44/WASM connection.
 //!
 //! Stage 157–158 add `ciphertext_envelope` — an INTERNAL-ONLY ciphertext
-//! envelope SKELETON (`AeadCiphertextEnvelope`, holding a version/
-//! algorithm/AAD-domain label, a real 12-byte nonce, and a fixed,
-//! non-secret ciphertext PLACEHOLDER — never real ciphertext) plus
+//! envelope (`AeadCiphertextEnvelope`, holding a version/algorithm/
+//! AAD-domain label, a real 12-byte nonce, and a ciphertext buffer) plus
 //! `validate_envelope_internal`, which validates untrusted candidate
 //! field values structurally (no AEAD authentication, no serialization).
-//! Deliberately unconnected from `aead_internal`'s real `AeadCipher`/
-//! `AeadAadDomain` types — see `ciphertext_envelope`'s own module-level
-//! doc comment for the full design and
-//! `docs/ciphertext_envelope_plan.md` for the planning record.
+//! Its algorithm/AAD-domain labels are deliberately SEPARATE types from
+//! `aead_internal`'s own `AeadCipher`/`AeadAadDomain` — see
+//! `ciphertext_envelope`'s own module-level doc comment for the full
+//! design and `docs/ciphertext_envelope_plan.md` for the planning record.
+//!
+//! Stage 161–163 add `aead_envelope_bridge` — the ONE reviewed connection
+//! point between `aead_internal`'s real seal/open results and
+//! `ciphertext_envelope`'s type: `envelope_from_seal_decision_internal`
+//! (AEAD → envelope) and `open_decision_from_envelope_internal`
+//! (envelope → AEAD), both `pub(crate)`-only. See
+//! `aead_envelope_bridge`'s own module-level doc comment for the full
+//! design and `docs/ciphertext_envelope_plan.md` section 9 for the
+//! planning record this implements.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
+pub(crate) mod aead_envelope_bridge;
 pub(crate) mod aead_internal;
 pub(crate) mod capability_matrix;
 pub(crate) mod ciphertext_envelope;

@@ -1,9 +1,11 @@
 //! Stage 150 — a fixed, non-sensitive crypto capability label enumeration.
-//! Crate-private only — see `src/crypto.rs`'s module-level doc comment for
-//! the full scope of this module and its `diagnostics` sibling.
+//! Stage 164 adds a tenth variant, `Envelope`, now that Stage 161–163's
+//! AEAD ↔ ciphertext-envelope bridge is real. Crate-private only — see
+//! `src/crypto.rs`'s module-level doc comment for the full scope of this
+//! module and its `diagnostics` sibling.
 #![allow(dead_code)]
 
-/// One of this crate's nine tracked crypto capabilities — a label ONLY,
+/// One of this crate's ten tracked crypto capabilities — a label ONLY,
 /// never a byte, never an operation. Crate-private only; never exposed via
 /// this crate's public API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,10 +18,14 @@ pub(crate) enum CryptoCapability {
     SecretHandle,
     /// `derive_secret_handle_internal` (`kdf_core` module, Stage 147).
     Hkdf,
-    /// AEAD seal/open (`aead_core` module, Stage 80 skeleton; real
-    /// implementation staged, not yet built — see
-    /// `docs/hkdf_internal_plan.md`'s AEAD staging section).
+    /// `crypto::aead_internal::seal_internal`/`open_internal` (Stage
+    /// 152–154). The pre-existing `aead_core` (Stage 80) skeleton remains
+    /// a separate, still-unconnected placeholder.
     Aead,
+    /// `crypto::ciphertext_envelope`/`aead_envelope_bridge` (Stage
+    /// 157–163): a real AEAD seal result bridged into a real
+    /// `AeadCiphertextEnvelope`, and back again for opening.
+    Envelope,
     /// NIP-44 encrypted direct messages — not yet implemented.
     Nip44,
     /// Schnorr (BIP-340/Nostr event) signing — not yet implemented.
@@ -37,12 +43,13 @@ impl CryptoCapability {
     /// Every `CryptoCapability` variant, in a fixed, stable order — the same
     /// order `diagnostics::crypto_diagnostics_preview` reports them in.
     /// Crate-private only.
-    pub(crate) const ALL: [CryptoCapability; 9] = [
+    pub(crate) const ALL: [CryptoCapability; 10] = [
         CryptoCapability::Random,
         CryptoCapability::Nonce,
         CryptoCapability::SecretHandle,
         CryptoCapability::Hkdf,
         CryptoCapability::Aead,
+        CryptoCapability::Envelope,
         CryptoCapability::Nip44,
         CryptoCapability::Schnorr,
         CryptoCapability::StorageKey,
@@ -59,6 +66,7 @@ impl CryptoCapability {
             CryptoCapability::SecretHandle => "secret_handle",
             CryptoCapability::Hkdf => "hkdf",
             CryptoCapability::Aead => "aead",
+            CryptoCapability::Envelope => "envelope",
             CryptoCapability::Nip44 => "nip44",
             CryptoCapability::Schnorr => "schnorr",
             CryptoCapability::StorageKey => "storage_key",
@@ -81,6 +89,7 @@ mod tests {
                 CryptoCapability::SecretHandle,
                 CryptoCapability::Hkdf,
                 CryptoCapability::Aead,
+                CryptoCapability::Envelope,
                 CryptoCapability::Nip44,
                 CryptoCapability::Schnorr,
                 CryptoCapability::StorageKey,
@@ -97,6 +106,7 @@ mod tests {
             (CryptoCapability::SecretHandle, "secret_handle"),
             (CryptoCapability::Hkdf, "hkdf"),
             (CryptoCapability::Aead, "aead"),
+            (CryptoCapability::Envelope, "envelope"),
             (CryptoCapability::Nip44, "nip44"),
             (CryptoCapability::Schnorr, "schnorr"),
             (CryptoCapability::StorageKey, "storage_key"),

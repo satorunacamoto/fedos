@@ -1,46 +1,53 @@
 //! Stage 157–158 — an INTERNAL-ONLY ciphertext envelope skeleton +
-//! validation. Crate-private only — see `src/crypto.rs`'s module-level
-//! doc comment for this module's place in the `crypto` tree.
+//! validation. Stage 161 extends it to hold REAL ciphertext bytes,
+//! bridged from this crate's own AEAD seal operation (see
+//! `super::aead_envelope_bridge`). Crate-private only — see
+//! `src/crypto.rs`'s module-level doc comment for this module's place in
+//! the `crypto` tree.
 //!
 //! Fixes `docs/ciphertext_envelope_plan.md`'s six planned fields
 //! (version, algorithm, nonce, ciphertext, tag, AAD domain) into a
-//! CONCRETE skeleton type, [`AeadCiphertextEnvelope`] — but this is a
-//! SKELETON, not a real envelope: the `ciphertext`/`tag` field is a fixed,
-//! non-secret [`CIPHERTEXT_PLACEHOLDER_MARKER`] constant, never the real
-//! output of this crate's own AEAD seal operation. Connecting this
-//! envelope to a real seal/open result is Stage 161 candidate work — see
-//! `docs/ciphertext_envelope_plan.md` section 8 for that future bridge's
-//! planned shape, not built here.
+//! CONCRETE type, [`AeadCiphertextEnvelope`]. `ciphertext` (combined with
+//! its authentication tag, matching this crate's own AEAD seal
+//! convention) is a `Vec<u8>` — either the fixed, non-secret
+//! [`CIPHERTEXT_PLACEHOLDER_MARKER`] (via
+//! [`AeadCiphertextEnvelope::new_for_internal_use`], the Stage 157–158
+//! skeleton path, still used by this module's own tests) or REAL bytes
+//! bridged from this crate's own AEAD seal operation (via
+//! [`AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use`],
+//! Stage 161's real path — see `super::aead_envelope_bridge`).
 //!
 //! [`validate_envelope_internal`] validates UNTRUSTED CANDIDATE field
 //! values (raw version/algorithm/AAD-domain discriminant bytes, a nonce
-//! byte slice, and a ciphertext-placeholder byte slice) — the same shape
-//! a future deserializer would need to check before trusting bytes read
-//! off the wire. It checks structure and labels ONLY: version first (per
+//! byte slice, and a ciphertext byte slice) — the same shape a future
+//! deserializer would need to check before trusting bytes read off the
+//! wire. It checks structure and labels ONLY: version first (per
 //! `docs/ciphertext_envelope_plan.md`'s "MUST be checked before any other
 //! field is interpreted" rule), then algorithm, then AAD domain, then
-//! nonce length, then the ciphertext placeholder's fixed marker value. It
-//! does NOT perform authenticated-decryption verification — there is no
-//! real ciphertext yet to authenticate — and it does NOT serialize or
-//! deserialize any structured text or binary wire format (no length-
-//! prefixed/tagged encoding, no byte-offset parsing of a single combined
-//! buffer) — it accepts already-split candidate values, exactly as far as
-//! "validation" goes without also being "codec implementation," which
-//! remains its own, later, separate, explicitly-reviewed stage.
+//! nonce length, then that the ciphertext candidate is non-empty. It does
+//! NOT perform authenticated-decryption verification (structural
+//! non-emptiness is not, and does not claim to be, a proof of
+//! authenticity — that check belongs to the actual AEAD open call, see
+//! `super::aead_envelope_bridge`) and it does NOT serialize or
+//! deserialize any structured text or binary wire format — it accepts
+//! already-split candidate values, exactly as far as "validation" goes
+//! without also being "codec implementation," which remains its own,
+//! later, separate, explicitly-reviewed stage.
 //!
 //! The algorithm and AAD-domain labels here are deliberately NEW, SEPARATE
 //! enums from this crate's real AEAD implementation's own equivalents —
-//! this skeleton stays unconnected from the real cipher wiring, per this
-//! crate's standing "leave unrelated skeletons unconnected" discipline
-//! (the same choice Stage 147 made for `domain_label`, and Stage 152–154
-//! made for the pre-existing placeholder AEAD request skeleton).
+//! this type's OWN labels stay independent of the real cipher wiring's
+//! own labels, even though Stage 161's bridge now converts between them
+//! at the one reviewed boundary point (`super::aead_envelope_bridge`).
 //!
 //! Not part of this crate's public API: every item below is `pub(crate)`
 //! at most (never `pub`), nothing is re-exported from the crate root, and
-//! this crate's public `pub fn` surface is unchanged (still twenty-four
-//! functions). No public `encrypt`/`decrypt`, no Runtime/Worker/storage/
-//! Nostr connection, no Nostr encrypted-message scheme, no `Cargo.toml`
-//! change.
+//! this crate's public `pub fn` surface is unaffected by this module
+//! directly (see `src/lib.rs`'s own `pub fn fedos_encrypt`/`fedos_decrypt`,
+//! Stage 166–167, for the actual public boundary that uses this type
+//! internally). No public `encrypt`/`decrypt` is implemented HERE, no
+//! Runtime/Worker/storage/Nostr connection, no Nostr encrypted-message
+//! scheme, no `Cargo.toml` change.
 #![allow(dead_code)]
 
 /// Which envelope wire-format version a candidate claims, and which
@@ -139,17 +146,20 @@ impl AeadEnvelopeAadDomain {
     }
 }
 
-/// A fixed, non-secret marker standing in for a future real
-/// ciphertext‖tag buffer. Exactly one valid value exists today;
-/// [`validate_envelope_internal`] rejects any candidate that does not
-/// match it exactly. Never real ciphertext, never variable-length, never
-/// derived from a `SecretHandle` or any AEAD operation.
+/// A fixed, non-secret marker standing in for a real ciphertext‖tag
+/// buffer — used ONLY by [`AeadCiphertextEnvelope::new_for_internal_use`]
+/// (the Stage 157–158 skeleton path, still exercised by this module's own
+/// tests). Never used by the real Stage 161 bridge
+/// (`super::aead_envelope_bridge`), which populates `ciphertext` with
+/// actual AEAD seal output instead.
 const CIPHERTEXT_PLACEHOLDER_MARKER: [u8; 4] = [0xC1, 0x7E, 0xC1, 0x7E];
 
 /// Coarse observable outcome of a [`validate_envelope_internal`] call.
 /// Crate-private only. No secret byte is exposed through this label
-/// itself — the fields this skeleton validates (version/algorithm/AAD
-/// domain tags, nonce, ciphertext placeholder) are none of them secret.
+/// itself — the fields this type validates (version/algorithm/AAD domain
+/// tags, nonce, ciphertext bytes) are none of them secret (ciphertext is
+/// not a secret once sealed — it is meant to be transmitted/stored
+/// alongside its nonce and AAD domain).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AeadEnvelopeStatus {
     /// Every field validated; `AeadEnvelopeDecision::envelope` is `Some`.
@@ -167,34 +177,40 @@ pub(crate) enum AeadEnvelopeStatus {
     InvalidAadDomain,
     /// The candidate nonce slice was not exactly 12 bytes.
     InvalidNonceLength,
-    /// The candidate ciphertext-placeholder slice did not exactly match
-    /// [`CIPHERTEXT_PLACEHOLDER_MARKER`].
-    InvalidCiphertextPlaceholder,
+    /// The candidate ciphertext slice was empty. This is a STRUCTURAL
+    /// check only — it does NOT prove the ciphertext authenticates; that
+    /// is the actual AEAD open call's job
+    /// (`super::aead_envelope_bridge::open_decision_from_envelope_internal`).
+    InvalidCiphertext,
 }
 
-/// An INTERNAL-ONLY ciphertext envelope skeleton (crate-private; not part
-/// of this crate's public API — see the module-level doc comment above).
-/// Holds a version/algorithm/AAD-domain label, a real fixed-size 12-byte
-/// nonce (a nonce is not a secret, per `docs/nonce_generation_policy.md`
-/// section 9, so it is plain data here, not `SecretHandle`-wrapped), and a
-/// fixed, non-secret ciphertext PLACEHOLDER — never real ciphertext, never
-/// a `Vec<u8>`, never derived from a `SecretHandle` or any AEAD operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// An INTERNAL-ONLY ciphertext envelope (crate-private; not part of this
+/// crate's public API — see the module-level doc comment above). Holds a
+/// version/algorithm/AAD-domain label, a real fixed-size 12-byte nonce (a
+/// nonce is not a secret, per `docs/nonce_generation_policy.md` section
+/// 9, so it is plain data here, not `SecretHandle`-wrapped), and a
+/// ciphertext buffer that is EITHER the fixed, non-secret
+/// [`CIPHERTEXT_PLACEHOLDER_MARKER`] (skeleton path) OR real AEAD seal
+/// output (Stage 161 bridge path) — never derived from a `SecretHandle`
+/// directly (only from an `AeadSealDecision`'s already-sealed output).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AeadCiphertextEnvelope {
     version: AeadEnvelopeVersion,
     algorithm: AeadEnvelopeAlgorithm,
     nonce: [u8; 12],
-    ciphertext_placeholder: [u8; 4],
+    ciphertext: Vec<u8>,
     aad_domain: AeadEnvelopeAadDomain,
 }
 
 impl AeadCiphertextEnvelope {
-    /// Construct an envelope from already-typed, already-valid fields —
-    /// this constructor cannot represent an invalid version/algorithm/
-    /// domain (the type system already rules that out) and always uses
-    /// the fixed [`CIPHERTEXT_PLACEHOLDER_MARKER`] for its ciphertext
-    /// field, since no real ciphertext exists yet. Takes NO `SecretHandle`
-    /// and calls no AEAD operation.
+    /// Construct a SKELETON envelope from already-typed, already-valid
+    /// fields — this constructor cannot represent an invalid version/
+    /// algorithm/domain (the type system already rules that out) and
+    /// always uses the fixed [`CIPHERTEXT_PLACEHOLDER_MARKER`] for its
+    /// ciphertext field, since it takes no ciphertext input at all. Takes
+    /// NO `SecretHandle` and calls no AEAD operation. Still used by this
+    /// module's own tests to exercise the field-holding shape
+    /// independently of the real AEAD bridge.
     pub(crate) fn new_for_internal_use(
         version: AeadEnvelopeVersion,
         algorithm: AeadEnvelopeAlgorithm,
@@ -205,7 +221,29 @@ impl AeadCiphertextEnvelope {
             version,
             algorithm,
             nonce,
-            ciphertext_placeholder: CIPHERTEXT_PLACEHOLDER_MARKER,
+            ciphertext: CIPHERTEXT_PLACEHOLDER_MARKER.to_vec(),
+            aad_domain,
+        }
+    }
+
+    /// Construct an envelope carrying REAL ciphertext bytes — the ONE
+    /// constructor `super::aead_envelope_bridge`'s Stage 161
+    /// `envelope_from_seal_decision_internal` uses. Takes ownership of
+    /// `ciphertext` (expected to be an `AeadSealDecision::ciphertext`'s
+    /// `Ready`-state bytes) — never a `SecretHandle`, never calls any AEAD
+    /// operation itself (the caller has already sealed the data).
+    pub(crate) fn new_with_ciphertext_for_internal_use(
+        version: AeadEnvelopeVersion,
+        algorithm: AeadEnvelopeAlgorithm,
+        nonce: [u8; 12],
+        aad_domain: AeadEnvelopeAadDomain,
+        ciphertext: Vec<u8>,
+    ) -> Self {
+        Self {
+            version,
+            algorithm,
+            nonce,
+            ciphertext,
             aad_domain,
         }
     }
@@ -228,11 +266,20 @@ impl AeadCiphertextEnvelope {
         self.aad_domain
     }
 
-    /// The fixed, non-secret ciphertext placeholder marker. Not real
-    /// ciphertext — exists only so this skeleton's own tests (and a
-    /// future Stage 161 bridge) have something concrete to check.
-    pub(crate) fn ciphertext_placeholder(&self) -> [u8; 4] {
-        self.ciphertext_placeholder
+    /// The ciphertext buffer — either the fixed skeleton placeholder or
+    /// real AEAD seal output (`ciphertext‖tag`), depending on which
+    /// constructor built this envelope. Not a secret once sealed.
+    pub(crate) fn ciphertext(&self) -> &[u8] {
+        &self.ciphertext
+    }
+
+    /// Whether this envelope still carries the Stage 157–158 skeleton
+    /// placeholder rather than real ciphertext — used by
+    /// `super::aead_envelope_bridge`'s own guard tests to prove a
+    /// placeholder envelope is rejected rather than silently
+    /// misinterpreted as real ciphertext.
+    pub(crate) fn is_placeholder_ciphertext(&self) -> bool {
+        self.ciphertext == CIPHERTEXT_PLACEHOLDER_MARKER
     }
 }
 
@@ -248,17 +295,18 @@ pub(crate) struct AeadEnvelopeDecision {
 /// bytes read off the wire (no such deserializer exists yet; see this
 /// module's own doc comment above). Checks, in order: `version_tag`
 /// first, then `algorithm_tag`, then `aad_domain_tag`, then `nonce`'s
-/// length, then `ciphertext_placeholder`'s exact bytes. The first failing
-/// check short-circuits with its own fixed [`AeadEnvelopeStatus`] and
+/// length, then that `ciphertext` is non-empty. The first failing check
+/// short-circuits with its own fixed [`AeadEnvelopeStatus`] and
 /// `envelope: None` — no partial/best-effort envelope is ever returned.
-/// Performs NO AEAD authentication/decryption and NO byte-format
-/// parsing/serialization of any kind.
+/// Performs NO AEAD authentication/decryption (non-emptiness is a
+/// structural check only) and NO byte-format parsing/serialization of
+/// any kind.
 pub(crate) fn validate_envelope_internal(
     version_tag: u8,
     algorithm_tag: u8,
     aad_domain_tag: u8,
     nonce: &[u8],
-    ciphertext_placeholder: &[u8],
+    ciphertext: &[u8],
 ) -> AeadEnvelopeDecision {
     let version = match AeadEnvelopeVersion::from_tag(version_tag) {
         Some(version) => version,
@@ -296,16 +344,20 @@ pub(crate) fn validate_envelope_internal(
             };
         }
     };
-    if ciphertext_placeholder != CIPHERTEXT_PLACEHOLDER_MARKER {
+    if ciphertext.is_empty() {
         return AeadEnvelopeDecision {
-            status: AeadEnvelopeStatus::InvalidCiphertextPlaceholder,
+            status: AeadEnvelopeStatus::InvalidCiphertext,
             envelope: None,
         };
     }
     AeadEnvelopeDecision {
         status: AeadEnvelopeStatus::Valid,
-        envelope: Some(AeadCiphertextEnvelope::new_for_internal_use(
-            version, algorithm, nonce_bytes, aad_domain,
+        envelope: Some(AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
+            version,
+            algorithm,
+            nonce_bytes,
+            aad_domain,
+            ciphertext.to_vec(),
         )),
     }
 }
@@ -328,10 +380,22 @@ mod tests {
         assert_eq!(envelope.algorithm(), AeadEnvelopeAlgorithm::ChaCha20Poly1305);
         assert_eq!(envelope.nonce(), TEST_NONCE);
         assert_eq!(envelope.aad_domain(), AeadEnvelopeAadDomain::TestOnly);
-        assert_eq!(
-            envelope.ciphertext_placeholder(),
-            CIPHERTEXT_PLACEHOLDER_MARKER
+        assert_eq!(envelope.ciphertext(), &CIPHERTEXT_PLACEHOLDER_MARKER[..]);
+        assert!(envelope.is_placeholder_ciphertext());
+    }
+
+    #[test]
+    fn new_with_ciphertext_for_internal_use_holds_real_bytes_and_is_not_a_placeholder() {
+        let real_ciphertext = vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE];
+        let envelope = AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
+            AeadEnvelopeVersion::V1,
+            AeadEnvelopeAlgorithm::Aes256Gcm,
+            TEST_NONCE,
+            AeadEnvelopeAadDomain::Storage,
+            real_ciphertext.clone(),
         );
+        assert_eq!(envelope.ciphertext(), real_ciphertext.as_slice());
+        assert!(!envelope.is_placeholder_ciphertext());
     }
 
     #[test]
@@ -388,6 +452,22 @@ mod tests {
         assert_eq!(envelope.algorithm(), AeadEnvelopeAlgorithm::ChaCha20Poly1305);
         assert_eq!(envelope.aad_domain(), AeadEnvelopeAadDomain::TestOnly);
         assert_eq!(envelope.nonce(), TEST_NONCE);
+        assert_eq!(envelope.ciphertext(), &CIPHERTEXT_PLACEHOLDER_MARKER[..]);
+    }
+
+    #[test]
+    fn validate_envelope_internal_succeeds_for_real_variable_length_ciphertext() {
+        let real_ciphertext = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        let decision = validate_envelope_internal(
+            AeadEnvelopeVersion::V1.as_tag(),
+            AeadEnvelopeAlgorithm::Aes256Gcm.as_tag(),
+            AeadEnvelopeAadDomain::Conversation.as_tag(),
+            &TEST_NONCE,
+            &real_ciphertext,
+        );
+        assert_eq!(decision.status, AeadEnvelopeStatus::Valid);
+        let envelope = decision.envelope.expect("Valid decision must carry an envelope");
+        assert_eq!(envelope.ciphertext(), real_ciphertext.as_slice());
     }
 
     #[test]
@@ -444,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_ciphertext_placeholder_is_rejected() {
+    fn empty_ciphertext_is_rejected() {
         let decision = validate_envelope_internal(
             AeadEnvelopeVersion::V1.as_tag(),
             AeadEnvelopeAlgorithm::ChaCha20Poly1305.as_tag(),
@@ -452,25 +532,7 @@ mod tests {
             &TEST_NONCE,
             &[],
         );
-        assert_eq!(decision.status, AeadEnvelopeStatus::InvalidCiphertextPlaceholder);
-        assert!(decision.envelope.is_none());
-    }
-
-    #[test]
-    fn tampered_ciphertext_placeholder_is_rejected() {
-        let mut tampered = CIPHERTEXT_PLACEHOLDER_MARKER;
-        tampered[0] ^= 0xFF;
-        let decision = validate_envelope_internal(
-            AeadEnvelopeVersion::V1.as_tag(),
-            AeadEnvelopeAlgorithm::Aes256Gcm.as_tag(),
-            AeadEnvelopeAadDomain::Storage.as_tag(),
-            &TEST_NONCE,
-            &tampered,
-        );
-        assert_eq!(
-            decision.status,
-            AeadEnvelopeStatus::InvalidCiphertextPlaceholder
-        );
+        assert_eq!(decision.status, AeadEnvelopeStatus::InvalidCiphertext);
         assert!(decision.envelope.is_none());
     }
 

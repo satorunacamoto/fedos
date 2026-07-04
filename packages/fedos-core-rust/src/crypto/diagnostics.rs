@@ -45,9 +45,9 @@ pub(crate) struct CapabilityReport {
 /// A fixed, hand-maintained, display-only snapshot of every
 /// [`CryptoCapability`]'s current readiness — see this module's own doc
 /// comment above for why this is a fixed table, not a live probe. Returns
-/// exactly nine rows, in [`CryptoCapability::ALL`]'s order, one per
+/// exactly ten rows, in [`CryptoCapability::ALL`]'s order, one per
 /// capability, every time it is called — takes no parameter of any kind.
-pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 9] {
+pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 10] {
     [
         CapabilityReport {
             capability: CryptoCapability::Random,
@@ -67,6 +67,10 @@ pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 9] {
         },
         CapabilityReport {
             capability: CryptoCapability::Aead,
+            readiness: CapabilityReadiness::Ready,
+        },
+        CapabilityReport {
+            capability: CryptoCapability::Envelope,
             readiness: CapabilityReadiness::Ready,
         },
         CapabilityReport {
@@ -93,16 +97,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_reports_exactly_nine_rows_matching_capability_all_order() {
+    fn preview_reports_exactly_ten_rows_matching_capability_all_order() {
         let preview = crypto_diagnostics_preview();
-        assert_eq!(preview.len(), 9);
+        assert_eq!(preview.len(), 10);
         for (row, expected_capability) in preview.iter().zip(CryptoCapability::ALL.iter()) {
             assert_eq!(row.capability, *expected_capability);
         }
     }
 
     #[test]
-    fn ready_capabilities_are_exactly_random_nonce_secret_handle_hkdf_and_aead() {
+    fn ready_capabilities_are_exactly_random_nonce_secret_handle_hkdf_aead_and_envelope() {
         let preview = crypto_diagnostics_preview();
         let ready: Vec<CryptoCapability> = preview
             .iter()
@@ -117,18 +121,21 @@ mod tests {
                 CryptoCapability::SecretHandle,
                 CryptoCapability::Hkdf,
                 CryptoCapability::Aead,
+                CryptoCapability::Envelope,
             ]
         );
     }
 
     #[test]
-    fn aead_is_ready_as_of_stage_152_154() {
+    fn aead_and_envelope_are_ready_as_of_stage_161_164() {
         let preview = crypto_diagnostics_preview();
-        let aead = preview
-            .iter()
-            .find(|row| row.capability == CryptoCapability::Aead)
-            .expect("Aead row must exist");
-        assert_eq!(aead.readiness, CapabilityReadiness::Ready);
+        for capability in [CryptoCapability::Aead, CryptoCapability::Envelope] {
+            let row = preview
+                .iter()
+                .find(|row| row.capability == capability)
+                .expect("expected capability row to exist");
+            assert_eq!(row.readiness, CapabilityReadiness::Ready);
+        }
     }
 
     #[test]
