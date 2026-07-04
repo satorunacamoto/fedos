@@ -8,11 +8,122 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 118 — Federation outbound queue skeleton + Creator
+> **Status: Stage 119–130 — Boundary Completion Batch (Protocol Adapter /
+> Creator Governance / Identity & Device suites).** A twelve-stage batch
+> completing FedOS's design-boundary phase — still **no relay/WebSocket/
+> fetch/OAuth connection, no signing, no publish/subscribe, no real crypto,
+> no real storage, no payment/Lightning/Stripe, no Runtime auto-call, no
+> Worker auto-communication, and no `Cargo.toml`/Rust change of any kind.**
+> Every addition is a fixed TypeScript type, a pure review/summary
+> function, or a read-only preview page — exactly the "Placeholder /
+> Label-only / Pure function" posture this batch was scoped to stop at.
+>
+> **Protocol Adapter suite (Stage 119–122):** new
+> [`docs/bluesky_adapter_planning.md`](docs/bluesky_adapter_planning.md),
+> [`docs/threads_adapter_planning.md`](docs/threads_adapter_planning.md),
+> and [`docs/rss_adapter_planning.md`](docs/rss_adapter_planning.md) mirror
+> `docs/nostr_adapter_planning.md`'s structure for the three other
+> `ProtocolAdapterKind`s named since Stage 117 — each fixes a compatibility
+> posture and a candidate-mapping table, and each confirms its
+> `capability_matrix.ts` row stays `unavailable` outside the trivial test
+> capability. New
+> [`src/federation/queue_status_preview.ts`](src/federation/queue_status_preview.ts)
+> defines a narrower, DISPLAY-ONLY vocabulary over the Stage 118 outbound
+> queue — `QueueStatusPreviewState` (`queued_placeholder`/`idle_placeholder`
+> ONLY) and a pure `summarizeQueueStatusPreview(queue)` fold reporting one
+> `QueuePreviewDescriptor` (`adapterKind`/`itemCountPlaceholder`/`state`)
+> per adapter kind — it never calls `enqueuePlaceholder`/
+> `dequeuePlaceholder` itself, just counts an array a caller already holds.
+> New [`src/render/queue_preview.ts`](src/render/queue_preview.ts), gated by
+> `?queuePreview=1`, and [`docs/federation_queue.md`](docs/federation_queue.md)
+> round out the boundary docs.
+>
+> **Creator Governance suite (Stage 123–126):** four new pure boundaries —
+> [`src/creator/appeal.ts`](src/creator/appeal.ts) (`CreatorAppealDescriptor`/
+> `reviewCreatorAppeal`, a labeled DISPUTE record, never an enforcement/
+> reversal), [`src/creator/reputation.ts`](src/creator/reputation.ts)
+> (`ReputationSignalDescriptor`/`reviewReputationSignal`, a FIXED
+> `CreatorReputationLabel` — never a numeric score/weight/rank),
+> [`src/creator/subscription_policy.ts`](src/creator/subscription_policy.ts)
+> (`SubscriptionPolicyTargetInput`/`reviewSubscriptionPolicyTarget` —
+> STRUCTURALLY conservative: only `public_placeholder` ever resolves to
+> `visible_placeholder`; every gated tier resolves to
+> `restricted_placeholder` UNCONDITIONALLY, no real entitlement ever
+> checked), and
+> [`src/community/treasury_policy.ts`](src/community/treasury_policy.ts)
+> (`CommunityTreasuryDisclosureRequest`/`reviewCommunityTreasuryDisclosure`
+> — a CATEGORY-name disclosure policy that computes no balance/amount/fund
+> of any kind). New
+> [`src/render/creator_governance_preview.ts`](src/render/creator_governance_preview.ts),
+> gated by `?creatorGovernancePreview=1`, and
+> [`docs/creator_governance.md`](docs/creator_governance.md) cover all four.
+> None of the four implements a DAO, a vote, a payment, a settlement, or a
+> real treasury balance.
+>
+> **Identity & Device suite (Stage 127–130):** four new pure boundaries —
+> [`src/identity/device_registration.ts`](src/identity/device_registration.ts)
+> (`DeviceRegistrationDescriptor`/`reviewDeviceRegistration`, a device NAME
+> label, never a pairing/key exchange/sync),
+> [`src/identity/device_trust.ts`](src/identity/device_trust.ts)
+> (`DeviceTrustLabel`/`reviewDeviceTrust`, mirroring
+> `src/creator/profile.ts`'s trust-label convention — never a real
+> attestation),
+> [`src/identity/session_boundary.ts`](src/identity/session_boundary.ts)
+> (`SessionRequestDescriptor`/`reviewSessionRequest` — `start_`/`end_`/
+> `refresh_placeholder` map 1:1 to `active_`/`ended_`/`refreshed_placeholder`,
+> never a real session created/stored/invalidated), and
+> [`src/identity/recovery_policy.ts`](src/identity/recovery_policy.ts)
+> (`IdentityRecoveryRequestDescriptor`/`reviewIdentityRecoveryRequest` — the
+> strictest boundary in this batch, given the subject matter). ALL FOUR
+> reject any password/recovery-phrase/mnemonic/seed/backup/export/import/
+> sync/authentication field in metadata, on top of this codebase's usual
+> conservative marker family — the strictest guardrail set in this
+> codebase. New
+> [`src/render/device_preview.ts`](src/render/device_preview.ts), gated by
+> `?devicePreview=1`, and
+> [`docs/device_identity_boundary.md`](docs/device_identity_boundary.md)
+> cover all four.
+>
+> **Worker wiring:** three new EXPLICIT flags —
+> `?queuePreview=1`/`?creatorGovernancePreview=1`/`?devicePreview=1` — were
+> inserted into [`src/worker.ts`](src/worker.ts) right after the Stage 118
+> `?creatorAnalyticsPreview=1` branch, extending the SAME precedence chain:
+> runtimeStatus → boardPreview → marketplacePreview → creatorPreview →
+> communityRulesPreview → creatorDashboardPreview → creatorAnalyticsPreview
+> → queuePreview → creatorGovernancePreview → devicePreview → normal
+> routing. Every new branch reads no `runtime` and calls no Runtime-selected
+> boundary; every pre-existing route is unaffected. New
+> [`test/protocol_adapter_suite.test.ts`](test/protocol_adapter_suite.test.ts)
+> (20 tests),
+> [`test/creator_governance_suite.test.ts`](test/creator_governance_suite.test.ts)
+> (30 tests), and
+> [`test/identity_device_suite.test.ts`](test/identity_device_suite.test.ts)
+> (30 tests) check: every new type is placeholder-labeled, every review
+> function rejects its sensitive-marker family without mutating input, the
+> subscription policy stays structurally conservative regardless of any
+> supplied viewer tier, the treasury/reputation boundaries carry no numeric
+> field, all three new preview flags gate correctly with the full
+> precedence chain verified, and no new source imports a relay/WebSocket/
+> fetch/OAuth library, calls a provider method, or reads a Runtime-selected
+> boundary from the Worker. `npm run typecheck` and `npm test` (132 files,
+> 1923 tests) stay GREEN; `cargo check`/`cargo test` are unchanged — no Rust
+> file was touched this batch (this environment's shell has no `cargo` on
+> `PATH` to re-run it, but nothing under `Cargo.toml`/`*.rs` was edited).
+> Where this batch stopped, on purpose: no relay/WebSocket/fetch/OAuth/
+> OAuth-token/signing/publish/subscribe, no AES/HKDF/NIP-44 implementation,
+> no storage implementation (SQLite/IndexedDB/Google Drive or otherwise), no
+> payment/Lightning/Stripe, no Runtime auto-call, no Worker
+> auto-communication, and no `Cargo.toml`/Rust/crypto change of any kind.
+> Stage 131 candidates: (1) a Marketplace listing search/filter preview
+> boundary (label-only); (2) a Notification digest preview (opt-in,
+> read-only); (3) a cross-suite "Boundary Phase index" doc summarizing every
+> boundary shipped Stage 1–130 in one place.
+> Prior status:
+>
+> **Stage 118 — Federation outbound queue skeleton + Creator
 > analytics preview boundary + Protocol moderation compatibility docs.** One
 > more pure, in-memory queue boundary, one more opt-in read-only preview
 > page, and a new docs-only note — still **no real network send, no real
-> analytics aggregation, no real moderation action, and only the one new
 > preview route touches the Worker.** New
 > [`src/federation/outbound_queue.ts`](src/federation/outbound_queue.ts)
 > defines `OutboundQueueItemDescriptor` (`idRef?`/`intentRef?`/

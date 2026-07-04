@@ -144,6 +144,21 @@ import {
   renderCreatorAnalyticsPreviewPage,
   SAMPLE_CREATOR_ANALYTICS,
 } from "./render/creator_analytics_preview.js";
+import { renderQueueStatusPreviewPage, SAMPLE_QUEUE_ITEMS } from "./render/queue_preview.js";
+import {
+  renderCreatorGovernancePreviewPage,
+  SAMPLE_CREATOR_APPEALS,
+  SAMPLE_REPUTATION_SIGNALS,
+  SAMPLE_SUBSCRIPTION_TARGETS,
+  SAMPLE_TREASURY_REQUESTS,
+} from "./render/creator_governance_preview.js";
+import {
+  renderDevicePreviewPage,
+  SAMPLE_DEVICE_REGISTRATIONS,
+  SAMPLE_DEVICE_TRUST,
+  SAMPLE_SESSION_REQUESTS,
+  SAMPLE_RECOVERY_REQUESTS,
+} from "./render/device_preview.js";
 import { SAMPLE_EVENTS } from "./render/sample.js";
 import {
   createRuntime,
@@ -380,6 +395,49 @@ export function isCreatorDashboardPreviewEnabled(url: URL): boolean {
  */
 export function isCreatorAnalyticsPreviewEnabled(url: URL): boolean {
   const value = url.searchParams.get("creatorAnalyticsPreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Federation
+ * queue status preview page via `?queuePreview=1` or `?queuePreview=true`
+ * (Stage 119). Takes precedence over every other route (relay/sample
+ * board/product/space/chat) except every earlier preview flag. The page it
+ * gates (`renderQueueStatusPreviewPage`) uses ONLY a sample/static queue
+ * array, calls no runtime-selected boundary, sends nothing, and issues no
+ * `fetch`.
+ */
+export function isQueuePreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("queuePreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Creator
+ * governance preview page via `?creatorGovernancePreview=1` or
+ * `?creatorGovernancePreview=true` (Stage 126). Takes precedence over
+ * every other route (relay/sample board/product/space/chat) except every
+ * earlier preview flag. The page it gates
+ * (`renderCreatorGovernancePreviewPage`) uses ONLY sample/static appeal/
+ * reputation/subscription/treasury descriptors, calls no runtime-selected
+ * boundary, and issues no `fetch`.
+ */
+export function isCreatorGovernancePreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("creatorGovernancePreview");
+  return value === "1" || value === "true";
+}
+
+/**
+ * True ONLY when the caller explicitly opts into the read-only Device &
+ * identity preview page via `?devicePreview=1` or `?devicePreview=true`
+ * (Stage 130). Takes precedence over every other route (relay/sample
+ * board/product/space/chat) except every earlier preview flag. The page it
+ * gates (`renderDevicePreviewPage`) uses ONLY sample/static device/session/
+ * recovery descriptors, calls no runtime-selected boundary, and issues no
+ * `fetch`.
+ */
+export function isDevicePreviewEnabled(url: URL): boolean {
+  const value = url.searchParams.get("devicePreview");
   return value === "1" || value === "true";
 }
 
@@ -898,18 +956,22 @@ export async function handleRequest(
     );
   }
 
-  // Stage 114/115/116/117/118: `?boardPreview=1` / `?marketplacePreview=1` /
+  // Stage 114–119/126/130: `?boardPreview=1` / `?marketplacePreview=1` /
   // `?creatorPreview=1` / `?communityRulesPreview=1` /
-  // `?creatorDashboardPreview=1` / `?creatorAnalyticsPreview=1` are entirely
-  // read-only, sample-data-only preview pages — no board is built, no
-  // relay/live path runs, and no runtime-selected boundary (storage,
-  // federation, marketplace, payment, entitlement, or chat) is ever called
-  // from any branch; `runtime` is not even read here. `boardPreview` takes
-  // precedence over `marketplacePreview`, which takes precedence over
-  // `creatorPreview`, which takes precedence over `communityRulesPreview`,
-  // which takes precedence over `creatorDashboardPreview`, which takes
-  // precedence over `creatorAnalyticsPreview`, when more than one is
-  // present; each falls through to normal routing when absent.
+  // `?creatorDashboardPreview=1` / `?creatorAnalyticsPreview=1` /
+  // `?queuePreview=1` / `?creatorGovernancePreview=1` / `?devicePreview=1`
+  // are entirely read-only, sample-data-only preview pages — no board is
+  // built, no relay/live path runs, and no runtime-selected boundary
+  // (storage, federation, marketplace, payment, entitlement, or chat) is
+  // ever called from any branch; `runtime` is not even read here.
+  // `boardPreview` takes precedence over `marketplacePreview`, which takes
+  // precedence over `creatorPreview`, which takes precedence over
+  // `communityRulesPreview`, which takes precedence over
+  // `creatorDashboardPreview`, which takes precedence over
+  // `creatorAnalyticsPreview`, which takes precedence over `queuePreview`,
+  // which takes precedence over `creatorGovernancePreview`, which takes
+  // precedence over `devicePreview`, when more than one is present; each
+  // falls through to normal routing when absent.
   if (isBoardPreviewEnabled(url)) {
     return htmlResponse(
       renderPage(buildThreads([]), { status: renderBoardPreviewPage(SAMPLE_BOARDS) }),
@@ -957,6 +1019,46 @@ export async function handleRequest(
     return htmlResponse(
       renderPage(buildThreads([]), {
         status: renderCreatorAnalyticsPreviewPage(SAMPLE_CREATOR_ANALYTICS),
+      }),
+    );
+  }
+  // Stage 119: `?queuePreview=1` — same read-only, sample-data-only
+  // treatment as the preview branches above; no runtime-selected boundary
+  // is called and `runtime` is not read here.
+  if (isQueuePreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), {
+        status: renderQueueStatusPreviewPage(SAMPLE_QUEUE_ITEMS),
+      }),
+    );
+  }
+  // Stage 126: `?creatorGovernancePreview=1` — same read-only, sample-data-
+  // only treatment as the preview branches above; no runtime-selected
+  // boundary is called and `runtime` is not read here.
+  if (isCreatorGovernancePreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), {
+        status: renderCreatorGovernancePreviewPage(
+          SAMPLE_CREATOR_APPEALS,
+          SAMPLE_REPUTATION_SIGNALS,
+          SAMPLE_SUBSCRIPTION_TARGETS,
+          SAMPLE_TREASURY_REQUESTS,
+        ),
+      }),
+    );
+  }
+  // Stage 130: `?devicePreview=1` — same read-only, sample-data-only
+  // treatment as the preview branches above; no runtime-selected boundary
+  // is called and `runtime` is not read here.
+  if (isDevicePreviewEnabled(url)) {
+    return htmlResponse(
+      renderPage(buildThreads([]), {
+        status: renderDevicePreviewPage(
+          SAMPLE_DEVICE_REGISTRATIONS,
+          SAMPLE_DEVICE_TRUST,
+          SAMPLE_SESSION_REQUESTS,
+          SAMPLE_RECOVERY_REQUESTS,
+        ),
       }),
     );
   }
