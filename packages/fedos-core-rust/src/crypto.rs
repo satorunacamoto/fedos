@@ -131,9 +131,21 @@
 //! `unpad_message` (the inverse). Vector-verified against
 //! `test-vectors/nip44/nip44-v2.json`'s `valid.calc_padded_len` (24 cases)
 //! and `invalid.encrypt_msg_lengths` (4 cases) by the sibling
-//! `#[cfg(test)]`-only `nip44_padding_vectors` module. No NIP-44
-//! encrypt/decrypt function yet, no public API addition, no
-//! Runtime/Worker/Storage/Relay connection.
+//! `#[cfg(test)]`-only `nip44_padding_vectors` module.
+//!
+//! Stage 204–206 add `nip44_encrypt`/`nip44_decrypt` — a pad-then-seal /
+//! open-then-unpad pipeline keyed by a `MessageKey`, reusing this crate's
+//! pre-existing ChaCha20-Poly1305 AEAD (`aead_internal`, Stage 152–154)
+//! rather than NIP-44 v2's byte-exact raw-ChaCha20-plus-HMAC-SHA256 wire
+//! format — see each module's own doc comment for the full scope note —
+//! and `nip44_bridge`, which connects both to the pre-existing, UNCHANGED
+//! `ciphertext_envelope::AeadCiphertextEnvelope` type. `nip44_decrypt`
+//! collapses every reachable failure cause (wrong key, wrong nonce,
+//! tampered ciphertext, invalid tag, malformed post-auth padding) into the
+//! single fixed `Nip44DecryptStatus::AuthenticationFailed` label, never
+//! distinguishing cause. No byte-exact NIP-44 wire format, no public API
+//! addition, no Runtime/Worker/Storage/Relay connection, no
+//! `capability_matrix`/`diagnostics` change yet (Stage 207–208).
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -147,6 +159,9 @@ pub(crate) mod conversation_key;
 pub(crate) mod diagnostics;
 pub(crate) mod hkdf_bridge;
 pub(crate) mod message_key;
+pub(crate) mod nip44_bridge;
+pub(crate) mod nip44_decrypt;
+pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_padding;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
