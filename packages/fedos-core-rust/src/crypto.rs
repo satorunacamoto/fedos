@@ -171,6 +171,26 @@
 //! `capability_matrix`/`diagnostics` change, no public API addition, no
 //! Runtime/Worker/Storage/Relay connection, no new `Cargo.toml`
 //! dependency.
+//!
+//! Stage 214–218 ("NIP-44 v2 exact wire preparation") add
+//! `nip44_message_keys` — a LABEL-ONLY skeleton
+//! (`Nip44DerivedKeyKind`/`Nip44MessageKeyStatus`/
+//! `Nip44MessageKeyDecision`/`derive_message_keys_exact_placeholder`,
+//! always reporting `Placeholder`) naming the three per-message values
+//! (`chacha_key`/`chacha_nonce`/`hmac_key`) `docs/nip44_message_key_review.md`
+//! confirms byte-for-byte against `test-vectors/nip44/nip44-v2.json`'s
+//! `valid.get_message_keys` category — HKDF-Expand(PRK =
+//! `conversation_key`, info = `nonce`, L = 76), NOT a second extract, NOT
+//! this crate's currently-implemented `hkdf_bridge` (which uses a FIXED
+//! domain info/salt and produces one 32-byte `MessageKey`, not this
+//! three-way 76-byte split). `docs/nip44_wire_nonce.md` and
+//! `docs/nip44_wire_payload_layout.md` review the 32-byte per-message
+//! nonce and the fixed wire field order/lengths respectively — docs only,
+//! no serialize/deserialize code. No HKDF call, no nonce generation, no
+//! HMAC-SHA256, no ChaCha20 stream cipher, no `ConversationKey`/
+//! `HkdfDomain` change, no `capability_matrix`/`diagnostics` change, no
+//! public API addition, no Runtime/Worker/Storage/Relay connection, no
+//! new `Cargo.toml` dependency.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -187,6 +207,7 @@ pub(crate) mod message_key;
 pub(crate) mod nip44_bridge;
 pub(crate) mod nip44_decrypt;
 pub(crate) mod nip44_encrypt;
+pub(crate) mod nip44_message_keys;
 pub(crate) mod nip44_padding;
 pub(crate) mod nip44_wire;
 #[cfg(test)]
