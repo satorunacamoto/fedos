@@ -5,19 +5,27 @@
 # foundation adopted (Stage 78) + `argon2` dependency adopted (Stage 84) +
 # `aes-gcm` dependency adopted AND NIST AES-256-GCM vectors wired to
 # `cargo test` (Stage 101) + `getrandom` CSPRNG dependency adopted, build
-# check ONLY, still no `randomBytes`/nonce implementation (Stage 104).
+# check ONLY (Stage 104) + `SecretHandle` real-byte storage (Stage 144–146,
+# no `Cargo.toml` change) + `sha2` PROMOTED from `[dev-dependencies]` to
+# `[dependencies]` (Stage 147) — the ONLY `Cargo.toml` change this batch
+# makes, required because `kdf_core`'s new internal HKDF-SHA256
+# implementation instantiates `Hkdf::<Sha256>` in PRODUCTION code for the
+# first time (previously only the `#[cfg(test)]`-only `rfc5869_vectors`
+# module, Stage 77, needed a concrete hash algorithm).
 #
-# Placeholder crate. There is still NO cryptography and NO WASM here — the
-# PUBLIC API in `src/lib.rs` is unchanged (placeholder functions only; see
+# Placeholder crate. There is still NO WASM here — the PUBLIC API in
+# `src/lib.rs` is unchanged (placeholder functions only; see
 # docs/rust_dependency_adoption.md). Stage 74 added `chacha20poly1305`
 # (RustCrypto), wired to the RFC 8439 vectors under `#[cfg(test)]` in
 # Stage 75. Stage 76 adopted a SECOND production dependency, `hkdf`
 # (RustCrypto), wired to the RFC 5869 HKDF-SHA256 vectors already imported
 # at test-vectors/kdf/hkdf-rfc5869.json to a `#[cfg(test)]`-only module in
-# Stage 77 — this requires a concrete hash algorithm to instantiate
-# `Hkdf::<Sha256>`, so `sha2` is added ONLY under `[dev-dependencies]`
-# (test-only): production code still neither imports nor calls `hkdf`/`sha2`,
-# and `derive_key_placeholder` is unchanged. Stage 78 adopted THREE more
+# Stage 77 — this originally required a concrete hash algorithm to
+# instantiate `Hkdf::<Sha256>` ONLY under `#[cfg(test)]`, so `sha2` was
+# added ONLY under `[dev-dependencies]` at that time. Stage 147 promotes
+# `sha2` to a PRODUCTION dependency (see below) now that `kdf_core` calls
+# `hkdf` for real, crate-private HKDF-SHA256 derivation — see
+# `docs/hkdf_internal_plan.md` for the full design record. Stage 78 adopted THREE more
 # production dependencies together — `zeroize`, `secrecy`, `subtle` — a
 # secret-handling FOUNDATION, ahead of any real secret type, in preparation
 # for the secret-handle skeleton (Stage 79) and eventual real
@@ -64,16 +72,18 @@ crate-type = ["rlib"]
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
 
 # `hkdf` (RustCrypto, MIT OR Apache-2.0) — the extract-and-expand KDF this
-# crate will eventually implement against the RFC 5869 HKDF-SHA256 test
-# vectors already imported at test-vectors/kdf/hkdf-rfc5869.json. Default
-# features are fine as-is: `hkdf`'s only optional feature is `kdf` (an
-# unrelated trait-abstraction crate), which is NOT enabled here and pulls in
-# no `rand`/`getrandom`/`zeroize`. Production code still does not import or
-# call `hkdf` anywhere — it is exercised ONLY inside the `#[cfg(test)]`-only
-# `rfc5869_vectors` module added Stage 77 (see src/lib.rs), instantiated
-# there with `sha2::Sha256` (a dev-dependency, below — never production).
-# NOT imported/used anywhere in src/lib.rs's PRODUCTION code — dependency +
-# build check only.
+# crate implements RFC 5869 HKDF-SHA256 against. Default features are fine
+# as-is: `hkdf`'s only optional feature is `kdf` (an unrelated
+# trait-abstraction crate), which is NOT enabled here and pulls in no
+# `rand`/`getrandom`/`zeroize`. Verified against the RFC 5869 known-answer
+# vectors at test-vectors/kdf/hkdf-rfc5869.json inside the `#[cfg(test)]`-only
+# `rfc5869_vectors` module since Stage 77. Stage 147 adds the FIRST
+# PRODUCTION use: the crate-private `kdf_core` module's
+# `derive_secret_handle_internal` calls `Hkdf::<Sha256>::new(...)`/`.expand(...)`
+# to derive a `SecretHandle(HkdfOutputMaterial)` from a
+# `SecretHandle(HkdfInputMaterial)`, with a fixed, per-`HkdfDomain` salt/info
+# — never a caller-supplied salt/info, never a public function (see
+# `docs/hkdf_internal_plan.md`).
 hkdf = "0.13.0"
 
 # `zeroize` (RustCrypto, Apache-2.0 OR MIT) — clears secret buffers on drop.
@@ -141,6 +151,19 @@ aes-gcm = { version = "0.10.3", default-features = false, features = ["aes", "al
 # `random_bytes_placeholder`/`fedos_random_boundary_status` are unchanged.
 getrandom = "0.3"
 
+# `sha2` (RustCrypto, MIT OR Apache-2.0) — PROMOTED from `[dev-dependencies]`
+# to `[dependencies]` in Stage 147 (the only `Cargo.toml` change in this
+# batch). Originally added Stage 77 as a `[dev-dependencies]`-only concrete
+# hash algorithm for the `#[cfg(test)]`-only `rfc5869_vectors` module to
+# instantiate `Hkdf::<Sha256>` against the RFC 5869 vectors. `kdf_core`'s new
+# internal HKDF-SHA256 implementation (Stage 147,
+# `derive_secret_handle_internal`) needs that same concrete hash algorithm in
+# PRODUCTION code — `hkdf`'s own API is generic over the hash function, so a
+# concrete one is mandatory to call `Hkdf::<H>::new`/`.expand` at all. Default
+# features are used as-is (`std`, no `asm` acceleration). Still not connected
+# to any AEAD/NIP-44/Runtime/Worker/WASM path.
+sha2 = "0.11.0"
+
 [dev-dependencies]
 # Test-only plumbing (Stage 75) to read and assert against the RFC 8439
 # vector JSON from `#[cfg(test)]` — none of these three crates is a
@@ -151,15 +174,7 @@ hex = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 
-# `sha2` (RustCrypto, MIT OR Apache-2.0) — Stage 77, test-only. The concrete
-# hash algorithm needed to instantiate `Hkdf::<Sha256>` and verify the `hkdf`
-# dependency (adopted Stage 76) against the RFC 5869 HKDF-SHA256 vectors
-# already imported at test-vectors/kdf/hkdf-rfc5869.json. Used ONLY by the
-# `#[cfg(test)]`-only `rfc5869_vectors` module in src/lib.rs — never a
-# production dependency, never reachable from the crate's public API.
-sha2 = "0.11.0"
-
-# Still intentionally ABSENT from [dependencies] (production): sha2, the
+# Still intentionally ABSENT from [dependencies] (production): the
 # full `rand`/`rand_core` crates (only `getrandom` itself is adopted, Stage
 # 104 — the minimal entropy source, not the higher-level `Rng`/`CryptoRng`
 # trait ecosystem), bip39 / secp256k1 / nostr, wasm-bindgen. One crate per

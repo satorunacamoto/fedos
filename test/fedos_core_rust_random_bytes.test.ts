@@ -236,7 +236,7 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+fedos_random_bytes_32_/);
   });
 
-  it("14. Cargo.toml is UNCHANGED — still eight production dependencies, no new entry, no 'Stage 137' mention", () => {
+  it("14. Cargo.toml has no 'Stage 137' mention (Stage 147 later adds a ninth production dependency, sha2, unrelated to this stage's own topic)", () => {
     expect(cargoTomlSource).not.toContain("Stage 137");
     const depsIdx = cargoTomlSource.indexOf("\n[dependencies]");
     const devDepsIdx = cargoTomlSource.indexOf("\n[dev-dependencies]", depsIdx);
@@ -244,7 +244,7 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    expect(depLines.length).toBe(9);
     expect(productionDepsSection).toMatch(/^getrandom\s*=/m);
   });
 

@@ -115,7 +115,7 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 + aes-gcm + getrandom only — no other crypto dependency", () => {
+  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 + aes-gcm + getrandom + sha2 only — no other crypto dependency", () => {
     for (const dep of [
       // sha2 is NOT in this list: since Stage 77 it is a legitimate
       // [dev-dependencies] entry (used only by the #[cfg(test)]-only
@@ -144,12 +144,14 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] (production) table has exactly eight entries:
+    // The [dependencies] (production) table has exactly nine entries:
     // chacha20poly1305 (Stage 74), hkdf (Stage 76), zeroize/secrecy/subtle
-    // (Stage 78), argon2 (Stage 84), aes-gcm (Stage 101), and getrandom
-    // (Stage 104). Stop at the next top-level `[section]` header (Stage 75
-    // adds `[dev-dependencies]` right after it) so its test-only entries
-    // (serde/serde_json/hex/sha2) are not counted here.
+    // (Stage 78), argon2 (Stage 84), aes-gcm (Stage 101), getrandom
+    // (Stage 104), and sha2 (Stage 147, PROMOTED from [dev-dependencies] —
+    // see test/fedos_core_rust_hkdf_internal.test.ts for the dedicated Stage
+    // 147 checks). Stop at the next top-level `[section]` header (Stage 75
+    // adds `[dev-dependencies]` right after it) so its remaining test-only
+    // entries (serde/serde_json/hex) are not counted here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -158,7 +160,7 @@ describe("FedOS Rust crate skeleton", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    expect(depLines.length).toBe(9);
     expect(depLines.some((line: string) => line.includes("getrandom"))).toBe(true);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
@@ -167,7 +169,7 @@ describe("FedOS Rust crate skeleton", () => {
     expect(depLines.some((line: string) => /^\s*subtle\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*aes-gcm\s*=/.test(line))).toBe(true);
-    expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(false);
+    expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(true);
   });
 
   it("4. Cargo.toml has no wasm-bindgen / cdylib / WASM target", () => {
@@ -197,11 +199,19 @@ describe("FedOS Rust crate skeleton", () => {
   const productionLibRs =
     firstCfgTestIdx === -1 ? libRsSource : libRsSource.slice(0, firstCfgTestIdx);
 
-  it("6. lib.rs's production code imports no crypto/AEAD/KDF crate (zeroize/secrecy are the sole exception, Stage 79 secret-handle skeleton)", () => {
+  it("6. lib.rs's production code (up to the FIRST #[cfg(test)] marker, inside secret_handle's own nested tests) imports no crypto/AEAD/KDF crate (zeroize/secrecy are the sole exception, Stage 79 secret-handle skeleton)", () => {
+    // NOTE: `kdf_core` (and its Stage 147 `hkdf`/`sha2` usage) lands textually
+    // AFTER this slice's cutoff (the first `#[cfg(test)]` marker is inside
+    // `secret_handle`'s own nested `#[cfg(test)] mod tests`, Stage 79) — so
+    // this test's scope never reaches kdf_core at all, exactly as it never
+    // reached `aead_core`'s or `kdf_core`'s OWN pre-existing content before
+    // Stage 147 either. See test/fedos_core_rust_hkdf_internal.test.ts and
+    // test/fedos_core_rust_kdf_skeleton.test.ts for the dedicated checks on
+    // kdf_core's real hkdf/sha2 usage.
     expect(firstCfgTestIdx).toBeGreaterThan(-1);
     expect(productionLibRs).not.toMatch(/\bextern\s+crate\b/);
     expect(productionLibRs).not.toMatch(
-      /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|argon2|subtle|bip39|secp256k1|nostr|wasm_bindgen)\b/,
+      /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|sha2|argon2|subtle|bip39|secp256k1|nostr|wasm_bindgen)\b/,
     );
     // zeroize/secrecy ARE used in production code as of Stage 79 (see
     // test/fedos_core_rust_secret_handle.test.ts for the dedicated checks

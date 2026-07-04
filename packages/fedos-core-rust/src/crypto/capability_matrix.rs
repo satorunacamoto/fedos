@@ -1,0 +1,127 @@
+//! Stage 150 — a fixed, non-sensitive crypto capability label enumeration.
+//! Crate-private only — see `src/crypto.rs`'s module-level doc comment for
+//! the full scope of this module and its `diagnostics` sibling.
+#![allow(dead_code)]
+
+/// One of this crate's nine tracked crypto capabilities — a label ONLY,
+/// never a byte, never an operation. Crate-private only; never exposed via
+/// this crate's public API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CryptoCapability {
+    /// `fedos_random_bytes_32` (Stage 137).
+    Random,
+    /// `fedos_aead_nonce_96` (Stage 138).
+    Nonce,
+    /// `SecretHandle` (`secret_handle` module, Stage 79/144–146).
+    SecretHandle,
+    /// `derive_secret_handle_internal` (`kdf_core` module, Stage 147).
+    Hkdf,
+    /// AEAD seal/open (`aead_core` module, Stage 80 skeleton; real
+    /// implementation staged, not yet built — see
+    /// `docs/hkdf_internal_plan.md`'s AEAD staging section).
+    Aead,
+    /// NIP-44 encrypted direct messages — not yet implemented.
+    Nip44,
+    /// Schnorr (BIP-340/Nostr event) signing — not yet implemented.
+    Schnorr,
+    /// A storage-encryption-key derivation (an `HkdfDomain::Storage`
+    /// consumer) — domain label exists (Stage 147); no consumer wired yet.
+    StorageKey,
+    /// A conversation/messaging-key derivation (an
+    /// `HkdfDomain::Conversation` consumer) — domain label exists (Stage
+    /// 147); no consumer wired yet.
+    ConversationKey,
+}
+
+impl CryptoCapability {
+    /// Every `CryptoCapability` variant, in a fixed, stable order — the same
+    /// order `diagnostics::crypto_diagnostics_preview` reports them in.
+    /// Crate-private only.
+    pub(crate) const ALL: [CryptoCapability; 9] = [
+        CryptoCapability::Random,
+        CryptoCapability::Nonce,
+        CryptoCapability::SecretHandle,
+        CryptoCapability::Hkdf,
+        CryptoCapability::Aead,
+        CryptoCapability::Nip44,
+        CryptoCapability::Schnorr,
+        CryptoCapability::StorageKey,
+        CryptoCapability::ConversationKey,
+    ];
+
+    /// The fixed `&'static str` label for this capability — never built,
+    /// formatted, concatenated, or derived from any input, mirroring
+    /// `crate::domain_label::DomainLabelKind::as_static_label` (Stage 88).
+    pub(crate) const fn as_static_label(self) -> &'static str {
+        match self {
+            CryptoCapability::Random => "random",
+            CryptoCapability::Nonce => "nonce",
+            CryptoCapability::SecretHandle => "secret_handle",
+            CryptoCapability::Hkdf => "hkdf",
+            CryptoCapability::Aead => "aead",
+            CryptoCapability::Nip44 => "nip44",
+            CryptoCapability::Schnorr => "schnorr",
+            CryptoCapability::StorageKey => "storage_key",
+            CryptoCapability::ConversationKey => "conversation_key",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_contains_every_variant_exactly_once_in_the_documented_order() {
+        assert_eq!(
+            CryptoCapability::ALL,
+            [
+                CryptoCapability::Random,
+                CryptoCapability::Nonce,
+                CryptoCapability::SecretHandle,
+                CryptoCapability::Hkdf,
+                CryptoCapability::Aead,
+                CryptoCapability::Nip44,
+                CryptoCapability::Schnorr,
+                CryptoCapability::StorageKey,
+                CryptoCapability::ConversationKey,
+            ]
+        );
+    }
+
+    #[test]
+    fn as_static_label_returns_the_documented_fixed_string_per_variant() {
+        let expected = [
+            (CryptoCapability::Random, "random"),
+            (CryptoCapability::Nonce, "nonce"),
+            (CryptoCapability::SecretHandle, "secret_handle"),
+            (CryptoCapability::Hkdf, "hkdf"),
+            (CryptoCapability::Aead, "aead"),
+            (CryptoCapability::Nip44, "nip44"),
+            (CryptoCapability::Schnorr, "schnorr"),
+            (CryptoCapability::StorageKey, "storage_key"),
+            (CryptoCapability::ConversationKey, "conversation_key"),
+        ];
+        for (capability, label) in expected {
+            assert_eq!(capability.as_static_label(), label);
+        }
+    }
+
+    #[test]
+    fn as_static_label_is_stable_across_repeated_calls() {
+        let capability = CryptoCapability::Hkdf;
+        assert_eq!(capability.as_static_label(), capability.as_static_label());
+    }
+
+    #[test]
+    fn every_label_is_unique() {
+        let labels: Vec<&'static str> = CryptoCapability::ALL
+            .iter()
+            .map(|c| c.as_static_label())
+            .collect();
+        let mut sorted = labels.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), labels.len());
+    }
+}

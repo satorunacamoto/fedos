@@ -62,7 +62,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     .join("\n")
     .toLowerCase();
 
-  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 (plus hkdf, Stage 76; plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84; plus aes-gcm, Stage 101)", () => {
+  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 (plus hkdf, Stage 76; plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84; plus aes-gcm, Stage 101; plus sha2, Stage 147)", () => {
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -71,7 +71,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    expect(depLines.length).toBe(9);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
@@ -80,6 +80,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*aes-gcm\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*getrandom\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(true);
   });
 
   it("2. serde / serde_json / hex are dev-dependencies only — not production dependencies", () => {

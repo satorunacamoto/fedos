@@ -59,7 +59,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     .join("\n")
     .toLowerCase();
 
-  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 + hkdf (plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84; plus aes-gcm, Stage 101)", () => {
+  it("1. Cargo.toml's [dependencies] (production) table still has chacha20poly1305 + hkdf (plus zeroize/secrecy/subtle, Stage 78; plus argon2, Stage 84; plus aes-gcm, Stage 101; plus sha2, Stage 147)", () => {
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -68,7 +68,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    expect(depLines.length).toBe(9);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
@@ -77,22 +77,28 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     expect(depLines.some((line: string) => /^\s*argon2\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*aes-gcm\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*getrandom\s*=/.test(line))).toBe(true);
+    expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(true);
   });
 
-  it("2. serde / serde_json / hex / sha2 are dev-dependencies only — not production dependencies", () => {
+  it("2. serde / serde_json / hex are dev-dependencies only; sha2 is a PRODUCTION dependency (Stage 147, promoted from [dev-dependencies])", () => {
     expect(cargoCode).toContain("[dev-dependencies]");
     const devDepsSection = cargoCode.slice(cargoCode.indexOf("[dev-dependencies]"));
-    for (const dep of ["serde", "serde_json", "hex", "sha2"]) {
+    for (const dep of ["serde", "serde_json", "hex"]) {
       expect(devDepsSection, `expected ${dep} under [dev-dependencies]`).toContain(dep);
     }
-    // None of them appear inside the [dependencies] (production) table.
+    // sha2 no longer lives under [dev-dependencies] — it moved to
+    // [dependencies] (production) this stage.
+    expect(devDepsSection).not.toMatch(/^sha2\s*=/m);
+    // None of serde/serde_json/hex appear inside the [dependencies]
+    // (production) table; sha2 DOES (checked in test 1 above).
     const depsSection = cargoCode.slice(
       cargoCode.indexOf("[dependencies]"),
       cargoCode.indexOf("[dev-dependencies]"),
     );
-    for (const dep of ["serde", "serde_json", "hex", "sha2"]) {
+    for (const dep of ["serde", "serde_json", "hex"]) {
       expect(depsSection, `${dep} must not be a production dependency`).not.toContain(dep);
     }
+    expect(depsSection).toMatch(/^sha2\s*=/m);
   });
 
   it("3. Cargo.toml still excludes every other named crypto crate and wasm-bindgen", () => {

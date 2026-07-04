@@ -89,19 +89,25 @@ describe("FedOS Rust crate — test-only HKDF-SHA256 helper", () => {
     expect(libRsSource).not.toMatch(/\bpub\s+use\s+[\w:]*hkdf_sha256_for_test\b/);
   });
 
-  it("3. production code (before the first #[cfg(test)]) has no hkdf import or reference", () => {
-    expect(productionLibRs).not.toMatch(/\buse\s+hkdf\b/);
-    expect(productionLibRs).not.toMatch(/\bhkdf::/);
-    expect(productionLibRs).not.toMatch(/\bHkdf::/);
+  it("3. production code (before the first #[cfg(test)]) has no hkdf import or reference to the TEST-ONLY helper names — kdf_core's own real hkdf usage (Stage 147) is checked separately", () => {
+    // Updated Stage 147: `kdf_core` now legitimately imports/calls `hkdf` in
+    // production code (see test/fedos_core_rust_hkdf_internal.test.ts and
+    // test/fedos_core_rust_kdf_skeleton.test.ts test 6 for those dedicated
+    // checks) — this test is scoped to confirm the TEST-ONLY helper names
+    // from this stage's own topic never leak into production code, not that
+    // `hkdf` itself is absent from all of it.
     expect(productionLibRs).not.toContain("extract_hkdf_sha256_for_test");
     expect(productionLibRs).not.toContain("expand_hkdf_sha256_for_test");
     expect(productionLibRs).not.toContain("extract_expand_hkdf_sha256_for_test");
   });
 
-  it("4. production code (before the first #[cfg(test)]) has no sha2 import or reference", () => {
-    expect(productionLibRs).not.toMatch(/\buse\s+sha2\b/);
-    expect(productionLibRs).not.toMatch(/\bsha2::/);
-    expect(productionLibRs).not.toContain("Sha256::new");
+  it("4. production code (before the first #[cfg(test)]) has no sha2 import OUTSIDE kdf_core (Stage 147's one reviewed production call site)", () => {
+    const productionCodeOutsideKdfCore = productionLibRs.replace(kdfCoreModule, "");
+    expect(productionCodeOutsideKdfCore).not.toMatch(/\buse\s+sha2\b/);
+    expect(productionCodeOutsideKdfCore).not.toMatch(/\bsha2::/);
+    expect(productionCodeOutsideKdfCore).not.toContain("Sha256::new");
+    // kdf_core itself DOES use sha2 (Stage 147) — confirmed positively here.
+    expect(kdfCoreModule).toMatch(/\buse\s+sha2::Sha256\b/);
   });
 
   it("5. lib.rs's public `pub fn` surface is still exactly the six Stage 69 functions", () => {
@@ -138,13 +144,14 @@ describe("FedOS Rust crate — test-only HKDF-SHA256 helper", () => {
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
-  it("6. production kdf_core remains placeholder-only, unconnected to the new helpers", () => {
-    // Stage 82's skeleton is untouched: no hkdf/sha2 import, no reference to
-    // the new test-only helper names, and its six methods are unchanged.
-    expect(kdfCoreModule).not.toMatch(/\buse\s+hkdf\b/);
-    expect(kdfCoreModule).not.toMatch(/\bhkdf::/);
-    expect(kdfCoreModule).not.toMatch(/\buse\s+sha2\b/);
-    expect(kdfCoreModule).not.toMatch(/\bsha2::/);
+  it("6. production kdf_core is NOT connected to the rfc5869_vectors module's TEST-ONLY helpers (Stage 147's own real hkdf/sha2 usage is a separate, direct call, not a reuse of these test-only fns)", () => {
+    // Updated Stage 147: kdf_core's `derive_secret_handle_internal` calls
+    // `Hkdf::<Sha256>::new`/`.expand` DIRECTLY — it does not call, and is
+    // not called by, `extract_hkdf_sha256_for_test`/
+    // `expand_hkdf_sha256_for_test`/`extract_expand_hkdf_sha256_for_test`
+    // (those remain exactly as this stage's own topic, `rfc5869_vectors`,
+    // scoped them: test-only, private, unrelated to kdf_core). The
+    // Stage 82 placeholder's six original methods are unchanged.
     expect(kdfCoreModule).not.toContain("extract_hkdf_sha256_for_test");
     expect(kdfCoreModule).not.toContain("expand_hkdf_sha256_for_test");
     expect(kdfCoreModule).not.toContain("extract_expand_hkdf_sha256_for_test");
@@ -160,16 +167,25 @@ describe("FedOS Rust crate — test-only HKDF-SHA256 helper", () => {
     }
   });
 
-  it("7. no production IKM/salt/info/PRK/OKM storage field anywhere in kdf_core", () => {
+  it("7. no IKM/salt/info/PRK/OKM storage FIELD anywhere in kdf_core (Stage 147's fixed &'static [u8] domain labels are a return type, not a stored field)", () => {
     // Field/parameter DECLARATIONS only (name immediately followed by a
-    // colon-typed annotation) — not prose in a doc comment. The
-    // rfc5869_vectors module's test-only helper PARAMETERS (ikm_bytes: &[u8],
-    // etc.) are expected and out of scope here — this check is specific to
-    // the production kdf_core skeleton, which must still hold no such field.
+    // colon-typed annotation) — not prose in a doc comment, and not the
+    // fixed byte-string literals `HkdfDomain::salt`/`HkdfDomain::info`
+    // return (those use hyphens, e.g. `b"fedos-hkdf-salt-root-key-v1"`, so
+    // they never form a `word:` pattern this regex would match anyway). The
+    // rfc5869_vectors module's test-only helper PARAMETERS (ikm_bytes:
+    // &[u8], etc.) remain expected and out of scope here.
     expect(kdfCoreModule).not.toMatch(/\b(ikm|salt|info|prk|okm|secret)\s*:\s*\w/i);
     expect(kdfCoreModule).not.toMatch(/:\s*Vec<u8>/);
     expect(kdfCoreModule).not.toMatch(/:\s*String\b/);
+    // A bare, non-`'static` `&[u8]` (a borrowed-slice PARAMETER a caller
+    // could feed arbitrary bytes through) is still forbidden — but
+    // `HkdfDomain::salt`/`::info`'s fixed `&'static [u8]` return type does
+    // NOT match this pattern at all (the literal `'static` text between `&`
+    // and `[` is not whitespace, so `&\s*\[` cannot span it), mirroring
+    // `domain_label`'s own `&'static str` exception.
     expect(kdfCoreModule).not.toMatch(/&\s*\[\s*u8\s*\]/);
+    expect(kdfCoreModule).toMatch(/&'static\s*\[\s*u8\s*\]/);
   });
 
   it("8. Runtime / Worker sources are unchanged: no test-helper reference and no crypto-op auto-call", () => {

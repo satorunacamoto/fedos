@@ -8,7 +8,12 @@ import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 import workerSource from "../src/worker.ts?raw";
 
 /**
- * Stage 82 — internal KDF module skeleton.
+ * Stage 82 — internal KDF module skeleton. Stage 147 extends it with this
+ * crate's first REAL HKDF-SHA256 implementation (see
+ * test/fedos_core_rust_hkdf_internal.test.ts for the dedicated Stage 147
+ * guard suite) — this file covers the parts of the Stage 82 shape that
+ * still apply unchanged (`KdfPlaceholderRequest` and its three labels) plus
+ * the tests that needed updating as a direct result of the new connection.
  *
  * `packages/fedos-core-rust/src/lib.rs` gains a third crate-private module,
  * `kdf_core` (alongside Stage 79's `secret_handle` and Stage 80's
@@ -16,22 +21,25 @@ import workerSource from "../src/worker.ts?raw";
  * `Expand` / `ExtractExpand`), `KdfRequestStatus` (wraps this crate's
  * existing `FedosCoreState`), and `KdfPlaceholderRequest` itself
  * (`new_placeholder_extract()`/`new_placeholder_expand()`/
- * `new_placeholder_extract_expand()`/`status()`/`algorithm()`/`operation()`).
+ * `new_placeholder_extract_expand()`/`status()`/`algorithm()`/`operation()`)
+ * — all UNCHANGED by Stage 147.
  *
  * `KdfPlaceholderRequest` is an INTERNAL skeleton, not a public API: every
  * item in `kdf_core` is `pub(crate)` at most (never `pub`), nothing is
  * re-exported, and this crate's public `pub fn` surface is still exactly the
- * same six placeholder functions from Stage 69. No real IKM, salt, info,
- * PRK, or OKM byte is accepted, stored, or handled anywhere — the three
- * `new_placeholder_*` constructors take no such input, and
- * `KdfPlaceholderRequest` stores only the two labels. Production code in
- * `kdf_core` does NOT import `hkdf` or `sha2` — those dependencies are still
- * exercised ONLY inside the pre-existing `cfg(test)`-only `rfc5869_vectors`
- * module (Stage 77, refactored Stage 81's AEAD-side sibling), unchanged this
- * stage. `kdf_core` does not connect to `aead_core` or `secret_handle`: it
- * never constructs an `AeadPlaceholderRequest` or a `SecretHandle`, and
- * extracts no key/secret byte from either. Nothing is wired into the
- * Runtime, the Worker, or `CryptoProvider`.
+ * same twenty-four functions from Stage 138. No real IKM, salt, info, PRK,
+ * or OKM byte is accepted, stored, or handled by `KdfPlaceholderRequest`
+ * itself — the three `new_placeholder_*` constructors take no such input.
+ * Stage 147 adds a SEPARATE real path, `derive_secret_handle_internal`,
+ * alongside it: this crate's first PRODUCTION (not `#[cfg(test)]`-only) use
+ * of `hkdf`/`sha2` (`sha2` promoted from `[dev-dependencies]` to
+ * `[dependencies]` the same stage), and `kdf_core`'s first connection to
+ * `secret_handle` — reading bytes ONLY via `SecretHandle`'s own
+ * narrowly-scoped `expose_bytes_for_internal_derivation` accessor (also
+ * added Stage 147), never a raw `secrecy::expose_secret` call. `kdf_core`
+ * still does NOT connect to `aead_core`: it never constructs an
+ * `AeadPlaceholderRequest`. Nothing is wired into the Runtime, the Worker,
+ * or `CryptoProvider`.
  *
  * `cargo test` (green as of this stage, including `kdf_core`'s own
  * `#[cfg(test)] mod tests`) and `cargo check` / `cargo check --tests` are
@@ -148,19 +156,19 @@ describe("FedOS Rust crate — internal KDF module skeleton", () => {
     );
   });
 
-  it("6. kdf_core's production code does not import hkdf", () => {
-    // `kdf_core` itself has no nested cfg(test) usage of hkdf — that
-    // dependency stays exercised only by the pre-existing `rfc5869_vectors`
-    // module (Stage 77), which this test does not touch.
-    expect(kdfCoreModule).not.toMatch(/\buse\s+hkdf\b/);
-    expect(kdfCoreModule).not.toMatch(/\bhkdf::/);
-    expect(kdfCoreModule).not.toMatch(/\bHkdf::/);
+  it("6. kdf_core's production code DOES import hkdf (Stage 147 — see test/fedos_core_rust_hkdf_internal.test.ts for the dedicated checks)", () => {
+    // Updated Stage 147: kdf_core gains this crate's first PRODUCTION `hkdf`
+    // call site, `derive_secret_handle_internal`. The pre-existing
+    // `rfc5869_vectors` module (Stage 77) is unchanged and still separately
+    // exercises `hkdf` under `#[cfg(test)]` — this test only confirms
+    // kdf_core's own real usage now exists.
+    expect(kdfCoreModule).toMatch(/\buse\s+hkdf::Hkdf\b/);
+    expect(kdfCoreModule).toContain("Hkdf::<Sha256>::new(");
   });
 
-  it("7. kdf_core's production code does not import sha2", () => {
-    expect(kdfCoreModule).not.toMatch(/\buse\s+sha2\b/);
-    expect(kdfCoreModule).not.toMatch(/\bsha2::/);
-    expect(kdfCoreModule).not.toContain("Sha256::new");
+  it("7. kdf_core's production code DOES import sha2 (Stage 147 — sha2 promoted to a production dependency)", () => {
+    expect(kdfCoreModule).toMatch(/\buse\s+sha2::Sha256\b/);
+    expect(kdfCoreModule).toContain("Hkdf::<Sha256>");
   });
 
   it("8. no IKM/salt/info/PRK/OKM storage field anywhere in kdf_core", () => {
@@ -193,10 +201,19 @@ describe("FedOS Rust crate — internal KDF module skeleton", () => {
     expect(kdfCoreModule).not.toMatch(/\bchacha20poly1305\b/i);
   });
 
-  it("12. no SecretHandle key extraction anywhere in kdf_core — the skeletons are unconnected", () => {
-    expect(kdfCoreModule).not.toMatch(/\bSecretHandle\b/);
-    expect(kdfCoreModule).not.toMatch(/\bsecret_handle::/);
-    expect(kdfCoreModule).not.toMatch(/\bexpose_secret\s*\(/);
+  it("12. kdf_core DOES connect to SecretHandle (Stage 147) — but ONLY via the one reviewed accessor, never a raw secrecy::expose_secret call", () => {
+    // Updated Stage 147: `derive_secret_handle_internal` is this module's
+    // first, deliberate, reviewed connection to `secret_handle` — it
+    // constructs SecretHandle(HkdfInputMaterial)-consuming,
+    // SecretHandle(HkdfOutputMaterial)-producing logic. It reads bytes ONLY
+    // via SecretHandle's own narrowly-scoped
+    // `expose_bytes_for_internal_derivation()` accessor — never
+    // `secrecy::expose_secret` directly (kdf_core does not import `secrecy`
+    // at all), and it never mutates the input handle.
+    expect(kdfCoreModule).toMatch(/\buse\s+crate::secret_handle::\{SecretHandle,\s*SecretHandleKind\}/);
+    expect(kdfCoreModule).toContain("expose_bytes_for_internal_derivation()");
+    expect(kdfCoreModule).not.toMatch(/\bsecrecy::/);
+    expect(kdfCoreModule).not.toMatch(/\.expose_secret\s*\(/);
   });
 
   it("13. no `unsafe` anywhere in lib.rs (crate-level forbid stays intact)", () => {

@@ -213,8 +213,12 @@ describe("FedOS Rust crate — internal secret handle skeleton", () => {
     expect(runtimeSource).not.toMatch(/\.\s*load\s*\(/);
   });
 
-  it("13. secret_handle uses zeroize/secrecy only against the fixed placeholder marker, and does not use subtle yet", () => {
-    expect(secretHandleModule).toMatch(/\buse\s+secrecy::SecretBox\b/);
+  it("13. secret_handle uses zeroize/secrecy against both the placeholder marker and (Stage 144–146/147) real bytes, and does not use subtle yet", () => {
+    // Stage 147 adds `ExposeSecret` (for `expose_bytes_for_internal_derivation`)
+    // alongside the pre-existing `SecretBox` import — both now arrive via one
+    // braced `use secrecy::{...}` rather than a single-item `use`.
+    expect(secretHandleModule).toMatch(/\buse\s+secrecy::\{[^}]*\bSecretBox\b[^}]*\}/);
+    expect(secretHandleModule).toMatch(/\buse\s+secrecy::\{[^}]*\bExposeSecret\b[^}]*\}/);
     expect(secretHandleModule).toMatch(/\buse\s+zeroize::Zeroize\b/);
     expect(secretHandleModule).toContain("PlaceholderMarker");
     // subtle is deliberately not used yet (see the module's own doc
@@ -231,7 +235,7 @@ describe("FedOS Rust crate — internal secret handle skeleton", () => {
     }
   });
 
-  it("15. SecretHandle exposes exactly the six specified methods (Stage 144–146 adds new_from_32_bytes_for_internal_use and kind)", () => {
+  it("15. SecretHandle exposes exactly the seven specified methods (Stage 144–146 adds new_from_32_bytes_for_internal_use and kind; Stage 147 adds expose_bytes_for_internal_derivation)", () => {
     for (const method of [
       "new_placeholder",
       "new_from_32_bytes_for_internal_use",
@@ -239,6 +243,7 @@ describe("FedOS Rust crate — internal secret handle skeleton", () => {
       "kind",
       "clear",
       "is_cleared",
+      "expose_bytes_for_internal_derivation",
     ]) {
       expect(secretHandleModule).toMatch(new RegExp(`\\bfn\\s+${method}\\b`));
     }

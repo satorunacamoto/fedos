@@ -77,7 +77,7 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
   const kdfCoreModule = extractModule(libRsSource, "mod kdf_core");
   const secretHandleModule = extractModule(libRsSource, "mod secret_handle");
 
-  it("1. Cargo.toml's [dependencies] (production) table contains getrandom, an eighth entry", () => {
+  it("1. Cargo.toml's [dependencies] (production) table contains getrandom, an eighth entry at this stage (Stage 147 later adds a ninth, sha2)", () => {
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
     const nextSectionIdx = depsSection.indexOf("\n[", 1);
@@ -87,7 +87,7 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    expect(depLines.length).toBe(9);
   });
 
   it("2. getrandom has no direct rand/rand_core sibling dependency, and wasm-bindgen is still absent", () => {

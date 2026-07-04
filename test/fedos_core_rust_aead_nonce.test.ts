@@ -248,7 +248,7 @@ describe("FedOS Rust crate — AEAD nonce helper (Stage 138)", () => {
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+fedos_aead_nonce_96_/);
   });
 
-  it("14. Cargo.toml is UNCHANGED — still eight production dependencies, no new entry, no 'Stage 138' mention", () => {
+  it("14. Cargo.toml has no 'Stage 138' mention (Stage 147 later adds a ninth production dependency, sha2, unrelated to this stage's own topic)", () => {
     expect(cargoTomlSource).not.toContain("Stage 138");
     const depsIdx = cargoTomlSource.indexOf("\n[dependencies]");
     const devDepsIdx = cargoTomlSource.indexOf("\n[dev-dependencies]", depsIdx);
@@ -256,7 +256,11 @@ describe("FedOS Rust crate — AEAD nonce helper (Stage 138)", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    // Updated Stage 147: sha2 is promoted from [dev-dependencies] to
+    // [dependencies] (see test/fedos_core_rust_dependency.test.ts test 7 and
+    // test/fedos_core_rust_hkdf_internal.test.ts for the dedicated checks),
+    // making this nine, not eight — unrelated to this stage's own topic.
+    expect(depLines.length).toBe(9);
     expect(productionDepsSection).toMatch(/^getrandom\s*=/m);
   });
 

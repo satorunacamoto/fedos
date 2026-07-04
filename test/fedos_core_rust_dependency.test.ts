@@ -123,6 +123,25 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
   const productionDepsSection =
     devDepsIdx === -1 ? cargoCode.slice(depsIdx) : cargoCode.slice(depsIdx, devDepsIdx);
 
+  /** Extracts a `mod name { ... }` block via brace matching (same helper
+   * pattern used throughout this repo's other fedos_core_rust_*.test.ts
+   * files). */
+  function extractModule(source: string, marker: string): string {
+    const start = source.indexOf(marker);
+    expect(start, `expected to find "${marker}" in lib.rs`).toBeGreaterThan(-1);
+    const braceStart = source.indexOf("{", start);
+    expect(braceStart, `expected an opening brace after "${marker}"`).toBeGreaterThan(-1);
+    let depth = 0;
+    for (let i = braceStart; i < source.length; i++) {
+      if (source[i] === "{") depth++;
+      else if (source[i] === "}") {
+        depth--;
+        if (depth === 0) return source.slice(start, i + 1);
+      }
+    }
+    throw new Error(`unbalanced braces while extracting module: ${marker}`);
+  }
+
   it("1. Cargo.toml contains chacha20poly1305", () => {
     expect(cargoCode).toContain("[dependencies]");
     expect(cargoCode).toContain("chacha20poly1305");
@@ -158,17 +177,21 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(productionDepsSection).toMatch(/\bargon2\s*=/);
   });
 
-  it("7. sha2 remains a dev-dependency only — never production", () => {
-    // Stage 77 wires the RFC 5869 HKDF-SHA256 vectors to `cargo test`, which
-    // requires a concrete hash algorithm crate to instantiate
-    // `Hkdf::<Sha256>`. `sha2` is added, but ONLY under [dev-dependencies] —
-    // it is used exclusively by the #[cfg(test)]-only `rfc5869_vectors`
-    // module and must never become a production dependency of this crate.
+  it("7. sha2 is a PRODUCTION dependency (Stage 147, promoted from [dev-dependencies])", () => {
+    // Stage 77 originally added `sha2` under [dev-dependencies] only, for the
+    // #[cfg(test)]-only `rfc5869_vectors` module to instantiate
+    // `Hkdf::<Sha256>` against the RFC 5869 vectors. Stage 147 promotes it to
+    // [dependencies] (production) — the ONLY Cargo.toml change that stage
+    // makes — because `kdf_core`'s new `derive_secret_handle_internal`
+    // instantiates `Hkdf::<Sha256>` in PRODUCTION code for the first time.
+    // sha2 must NOT also remain listed under [dev-dependencies] (a stale
+    // duplicate entry, not a real dependency-adoption pattern anywhere else
+    // in this crate).
     expect(cargoCode).not.toContain("sha-2");
-    expect(productionDepsSection).not.toMatch(/\bsha2\b/);
+    expect(productionDepsSection).toMatch(/^sha2\s*=/m);
     expect(cargoCode).toContain("[dev-dependencies]");
     const devDepsSection = cargoCode.slice(devDepsIdx);
-    expect(devDepsSection).toMatch(/\bsha2\s*=/);
+    expect(devDepsSection).not.toMatch(/^sha2\s*=/m);
   });
 
   it("8. Cargo.toml contains aes-gcm (production dependency, Stage 101)", () => {
@@ -280,21 +303,33 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(libRsSource).not.toMatch(/\.ct_eq\s*\(/);
   });
 
-  it("16. lib.rs's production code implements neither AEAD, HKDF, nor Argon2 (placeholder names only, no chacha20poly1305/hkdf/argon2 usage outside #[cfg(test)])", () => {
+  it("16. lib.rs's production code implements neither AEAD nor Argon2 anywhere, and implements HKDF ONLY inside the reviewed kdf_core module (Stage 147)", () => {
     // Stage 75 wires the RFC 8439 vectors to a #[cfg(test)]-only module
     // (see test/fedos_core_rust_rfc8439_wiring.test.ts), which DOES import
     // and call chacha20poly1305 — but only inside #[cfg(test)]. The
     // PRODUCTION code (everything before the first #[cfg(test)]) must still
     // neither import, reference, nor call into chacha20poly1305 (or any
-    // other AEAD), exactly as Stage 74 left it — and, as of Stage 76, must
-    // likewise neither import, reference, nor call into hkdf. Stage 84
-    // extends the same rule to `argon2`: adopted as a dependency, but not
+    // other AEAD), exactly as Stage 74 left it. Stage 84 extends the same
+    // rule to `argon2`: adopted as a dependency, but not
     // imported/referenced/called anywhere in production code (there is no
     // #[cfg(test)] module using it yet either — that is Stage 85 candidate
     // work; test 12 above covers this same rule as its own dedicated check).
+    //
+    // Update (Stage 147): `hkdf` is now legitimately used in PRODUCTION code,
+    // but ONLY inside the crate-private `kdf_core` module's
+    // `derive_secret_handle_internal` — see
+    // test/fedos_core_rust_hkdf_internal.test.ts for the dedicated checks
+    // that this real implementation stays crate-private, adds no `pub fn`,
+    // and does not connect to AEAD/Runtime/Worker/WASM. This test's `hkdf`
+    // checks are scoped to PRODUCTION code MINUS `kdf_core` (mirroring how
+    // tests 13/14 above were relaxed, Stage 79, for `secret_handle`'s own
+    // legitimate `zeroize`/`secrecy` usage) — every OTHER production module
+    // must still have no `hkdf` reference at all.
     const firstCfgTest = libRsSource.indexOf("#[cfg(test)]");
     expect(firstCfgTest).toBeGreaterThan(-1);
     const productionCode = libRsSource.slice(0, firstCfgTest);
+    const kdfCoreModule = extractModule(libRsSource, "mod kdf_core");
+    const productionCodeOutsideKdfCore = productionCode.replace(kdfCoreModule, "");
     expect(productionCode).not.toMatch(/\buse\s+chacha20poly1305\b/);
     expect(productionCode).not.toMatch(/\bchacha20poly1305::/);
     // Specific crate-usage patterns only — NOT a bare AEAD-name substring
@@ -307,9 +342,13 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(productionCode).not.toMatch(/\buse\s+aes_gcm\b/);
     expect(productionCode).not.toMatch(/\baes_gcm::/);
     expect(productionCode).not.toMatch(/\bAes256Gcm::new\b/);
-    expect(productionCode).not.toMatch(/\buse\s+hkdf\b/);
-    expect(productionCode).not.toMatch(/\bhkdf::/i);
-    expect(productionCode).not.toMatch(/\bHkdf\b/);
+    expect(productionCodeOutsideKdfCore).not.toMatch(/\buse\s+hkdf\b/);
+    expect(productionCodeOutsideKdfCore).not.toMatch(/\bhkdf::/i);
+    expect(productionCodeOutsideKdfCore).not.toMatch(/\bHkdf\b/);
+    // Inside kdf_core itself, hkdf IS legitimately used — confirm the
+    // reviewed call site actually exists rather than merely permitting it.
+    expect(kdfCoreModule).toMatch(/\buse\s+hkdf::Hkdf\b/);
+    expect(kdfCoreModule).toContain("Hkdf::<Sha256>::new(");
     expect(productionCode).not.toMatch(/\buse\s+argon2\b/);
     expect(productionCode).not.toMatch(/\bargon2::/i);
     // `\bArgon2\b` (bare word) is NOT checked here — see test 12's own

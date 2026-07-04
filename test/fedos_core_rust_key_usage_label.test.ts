@@ -148,7 +148,7 @@ describe("FedOS Rust crate — public key-usage label boundary (Stage 106)", () 
     expect(workerSource).not.toMatch(/\.\s*(randomBytes|deriveKey|encrypt|decrypt)\s*\(/);
   });
 
-  it("9. Cargo.toml is unchanged from Stage 105 — still exactly eight production dependencies, no new entry", () => {
+  it("9. Cargo.toml has no 'Stage 106' mention (Stage 147 later adds a ninth production dependency, sha2, unrelated to this stage's own topic)", () => {
     expect(cargoTomlSource).not.toContain("Stage 106");
     const depsIdx = cargoTomlSource.indexOf("\n[dependencies]");
     const devDepsIdx = cargoTomlSource.indexOf("\n[dev-dependencies]", depsIdx);
@@ -156,7 +156,7 @@ describe("FedOS Rust crate — public key-usage label boundary (Stage 106)", () 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(8);
+    expect(depLines.length).toBe(9);
   });
 
   it("10. no getrandom/rand call anywhere in the key-usage group", () => {

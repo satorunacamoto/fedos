@@ -394,8 +394,40 @@
 //! document, `docs/secret_handle_api_shape.md`, and
 //! `docs/secret_memory_test_strategy.md` for the full design/test records
 //! this addition builds against.
+//!
+//! Stage 147 gives `kdf_core` (Stage 82) its first REAL implementation:
+//! `derive_secret_handle_internal` derives a NEW
+//! `SecretHandle(HkdfOutputMaterial)` from an existing
+//! `SecretHandle(HkdfInputMaterial)` via HKDF-SHA256 (RFC 5869, the `hkdf`
+//! dependency adopted Stage 76), using a fixed, `HkdfDomain`-selected
+//! salt/info — never a caller-supplied or randomly-drawn byte. `sha2` is
+//! PROMOTED from `[dev-dependencies]` to `[dependencies]` this stage (the
+//! only `Cargo.toml` change) since production code now needs a concrete
+//! hash algorithm for HKDF-SHA256. `SecretHandle` gains one
+//! new, narrowly-scoped `pub(crate)` accessor,
+//! `expose_bytes_for_internal_derivation`, confined to this one reviewed
+//! call site — still no public raw-byte accessor, still `pub(crate)`-at-
+//! most throughout, still twenty-four `pub fn`s. This module does NOT call
+//! `fedos_random_bytes_32`/`fedos_aead_nonce_96`, does NOT connect to
+//! `aead_core` (Stage 80), does NOT implement `encrypt`/`decrypt`/NIP-44,
+//! and is NOT wired into the Runtime/Worker/WASM — each remains its own
+//! future, separate stage. See `docs/hkdf_internal_plan.md` (Stage 147–149,
+//! including the AEAD staging preparation notes for the future AEAD
+//! connection) for the full design record.
+//!
+//! Stage 150–151 add a crate-private `crypto` module (`src/crypto.rs` +
+//! `src/crypto/capability_matrix.rs` + `src/crypto/diagnostics.rs`): a fixed
+//! `CryptoCapability` label enumeration (Random/Nonce/SecretHandle/HKDF/
+//! AEAD/NIP-44/Schnorr/StorageKey/ConversationKey) and a fixed, hand-
+//! maintained `crypto_diagnostics_preview()` snapshot reporting each
+//! capability's `CapabilityReadiness` (`Ready`/`NotConnected`/
+//! `NotImplemented`) — display-only, non-secret, `pub(crate)`-at-most, not
+//! wired into the Runtime/Worker/WASM, and adding no `pub fn`. See
+//! `docs/crypto_capability_matrix.md` and `docs/crypto_diagnostics.md`.
 
 #![forbid(unsafe_code)]
+
+mod crypto;
 
 /// Coarse observable state of the core. No secret is exposed at any state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1495,7 +1527,7 @@ pub fn fedos_aead_nonce_96() -> FedosAeadNonceDecision {
 /// internal HKDF module) actually uses `SecretHandle`.
 #[allow(dead_code)]
 mod secret_handle {
-    use secrecy::SecretBox;
+    use secrecy::{ExposeSecret, SecretBox};
     use zeroize::Zeroize;
 
     // Used ONLY to prove `zeroize` actually runs on `clear()`/drop (see
@@ -1700,6 +1732,26 @@ mod secret_handle {
         pub(crate) fn is_cleared(&self) -> bool {
             self.state == SecretHandleState::Cleared
         }
+
+        /// Stage 147 — a narrowly-scoped internal accessor exposing a COPY
+        /// of the real 32-byte payload, for the sole reviewed use of
+        /// `kdf_core`'s `derive_secret_handle_internal` (its key-derivation
+        /// call site). Returns `None` for the Stage 79 placeholder path and
+        /// after `clear()` — only a `Holding`-state real payload has bytes
+        /// to expose. This is the ONE deliberate, narrow raw-byte exposure
+        /// `docs/secret_lifecycle_implementation_plan.md` section 8 and
+        /// `docs/secret_handle_api_shape.md` section 6 anticipated: confined
+        /// to `pub(crate)`, named for exactly its one legitimate caller
+        /// (mirroring the `_for_internal_use` suffix convention), never
+        /// re-exported, and never reachable from this crate's public API.
+        /// The caller is responsible for zeroizing its own copy once the
+        /// derivation that needs it is done — `kdf_core` does so.
+        pub(crate) fn expose_bytes_for_internal_derivation(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
     }
 
     #[cfg(test)]
@@ -1852,6 +1904,31 @@ mod secret_handle {
             assert_eq!(placeholder.status().state, SecretHandleState::Placeholder);
             assert_eq!(real.status().state, SecretHandleState::Holding);
         }
+
+        #[test]
+        fn expose_bytes_for_internal_derivation_returns_none_for_placeholder_and_cleared() {
+            let placeholder = SecretHandle::new_placeholder();
+            assert!(placeholder.expose_bytes_for_internal_derivation().is_none());
+
+            let mut real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            real.clear();
+            assert!(real.expose_bytes_for_internal_derivation().is_none());
+        }
+
+        #[test]
+        fn expose_bytes_for_internal_derivation_returns_the_stored_bytes_for_a_holding_handle() {
+            let real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            assert_eq!(
+                real.expose_bytes_for_internal_derivation(),
+                Some(TEST_FIXTURE_BYTES)
+            );
+        }
     }
 }
 
@@ -1993,26 +2070,41 @@ mod aead_core {
     }
 }
 
-/// Stage 82 — an INTERNAL-ONLY KDF request skeleton.
+/// Stage 82 — an INTERNAL-ONLY KDF request skeleton. Stage 147 extends it
+/// with this crate's FIRST real HKDF-SHA256 implementation.
 ///
 /// NOT part of this crate's public API: every item below is `pub(crate)` at
 /// most (never `pub`), nothing is re-exported from the crate root, and none
-/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
-/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
-/// `decrypt_placeholder`) constructs, holds, or returns a
-/// [`KdfPlaceholderRequest`].
+/// of this crate's `pub fn` functions constructs, holds, or returns a
+/// [`KdfPlaceholderRequest`] or an [`HkdfDecision`].
 ///
-/// This module holds NO IKM, salt, info, PRK, OKM, or other secret byte —
-/// there is no borrowed-byte-slice, `Vec<u8>`, or `String` field or
-/// parameter anywhere below, and no real extract/expand operation is
-/// implemented or called. Production code here does NOT import `hkdf` or
-/// `sha2` — those dependencies are exercised only by the `cfg(test)`-only
-/// `rfc5869_vectors` module above, unchanged since Stage 77/81. This module
-/// does not connect to `aead_core` (above) or `secret_handle` (further
-/// above): it never constructs an `AeadPlaceholderRequest` or a
-/// `SecretHandle`, and never reads a key/secret byte out of either — when in
-/// doubt about a connection between skeletons, this crate deliberately
-/// leaves them unconnected rather than guess at a future design.
+/// The Stage 82 [`KdfPlaceholderRequest`] skeleton is UNCHANGED: it still
+/// holds NO IKM, salt, info, PRK, OKM, or other secret byte, and its three
+/// `new_placeholder_*` constructors still take no such input. Stage 147
+/// adds a SEPARATE, real derivation path alongside it:
+/// [`derive_secret_handle_internal`] is this crate's first PRODUCTION
+/// (not `#[cfg(test)]`-only) use of the `hkdf`/`sha2` dependencies —
+/// previously exercised only by the `cfg(test)`-only `rfc5869_vectors`
+/// module above (Stage 77/81/83), which remains unchanged and still passes
+/// its own RFC 5869 vectors unmodified.
+///
+/// [`derive_secret_handle_internal`] is this module's first connection to
+/// `secret_handle` (Stage 79/144–146): it takes a
+/// `&`[`SecretHandle`](crate::secret_handle::SecretHandle) as input,
+/// validates its [`SecretHandleKind`](crate::secret_handle::SecretHandleKind)
+/// is `HkdfInputMaterial`, reads its bytes ONLY via `SecretHandle`'s own
+/// narrowly-scoped `expose_bytes_for_internal_derivation` accessor (added
+/// this stage, per `docs/secret_handle_api_shape.md` section 6/10), and
+/// returns a brand-new `SecretHandle(HkdfOutputMaterial)` — it never
+/// mutates the input handle, never returns a raw byte to its own caller,
+/// and never constructs an `AeadPlaceholderRequest` or calls `aead_core`
+/// (Stage 80) in any way: HKDF connects to `SecretHandle` in this stage,
+/// AEAD connects to HKDF's output in a later, separate stage
+/// (`docs/hkdf_internal_plan.md`, `docs/secret_lifecycle_implementation_plan.md`
+/// section 9). This module also never calls `fedos_random_bytes_32` or
+/// `fedos_aead_nonce_96` — both the salt and the info context are FIXED,
+/// compile-time constants selected by [`HkdfDomain`], never a
+/// caller-supplied or randomly-drawn byte.
 ///
 /// Every item in this module is currently exercised ONLY by its own unit
 /// tests below (gated `cfg(test)`) — nothing outside this module calls it —
@@ -2022,7 +2114,11 @@ mod aead_core {
 /// any consumer.
 #[allow(dead_code)]
 mod kdf_core {
+    use crate::secret_handle::{SecretHandle, SecretHandleKind};
     use crate::FedosCoreState;
+    use hkdf::Hkdf;
+    use sha2::Sha256;
+    use zeroize::Zeroize;
 
     /// A supported KDF algorithm label — intent only, no implementation.
     /// Crate-private only — never exposed via this crate's public API.
@@ -2110,6 +2206,151 @@ mod kdf_core {
         }
     }
 
+    /// Stage 147 — which fixed domain a [`derive_secret_handle_internal`]
+    /// call separates its output for. A non-sensitive label only — never a
+    /// byte. Each variant maps to its OWN fixed salt and info context (see
+    /// [`HkdfDomain::salt`]/[`HkdfDomain::info`]) so keys derived for
+    /// different purposes from the SAME input `SecretHandle` never collide,
+    /// per `docs/crypto_test_vectors.md` section 5's domain-separation rule.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum HkdfDomain {
+        /// A top-level FedOS root-key derivation.
+        RootKey,
+        /// An identity/signing-key derivation.
+        Identity,
+        /// A storage-encryption-key derivation.
+        Storage,
+        /// A conversation/messaging-key derivation.
+        Conversation,
+        /// Reserved for this module's own tests / future test-only fixtures
+        /// — never used by production call sites.
+        TestOnly,
+    }
+
+    impl HkdfDomain {
+        /// The fixed HKDF salt for this domain. Never derived from caller
+        /// input, never random, never a parameter accepted from outside
+        /// this module — a plain `&'static` byte-string literal chosen at
+        /// compile time, the same "fixed label chosen at compile time"
+        /// shape this crate's other label-holding types already use for
+        /// their own fixed strings.
+        const fn salt(self) -> &'static [u8] {
+            match self {
+                HkdfDomain::RootKey => b"fedos-hkdf-salt-root-key-v1",
+                HkdfDomain::Identity => b"fedos-hkdf-salt-identity-v1",
+                HkdfDomain::Storage => b"fedos-hkdf-salt-storage-v1",
+                HkdfDomain::Conversation => b"fedos-hkdf-salt-conversation-v1",
+                HkdfDomain::TestOnly => b"fedos-hkdf-salt-test-only-v1",
+            }
+        }
+
+        /// The fixed HKDF `info` context for this domain — same rules as
+        /// [`HkdfDomain::salt`]: fixed, `'static`, never caller-supplied.
+        const fn info(self) -> &'static [u8] {
+            match self {
+                HkdfDomain::RootKey => b"fedos-hkdf-info-root-key-v1",
+                HkdfDomain::Identity => b"fedos-hkdf-info-identity-v1",
+                HkdfDomain::Storage => b"fedos-hkdf-info-storage-v1",
+                HkdfDomain::Conversation => b"fedos-hkdf-info-conversation-v1",
+                HkdfDomain::TestOnly => b"fedos-hkdf-info-test-only-v1",
+            }
+        }
+    }
+
+    /// Coarse observable outcome of a [`derive_secret_handle_internal`]
+    /// call. Crate-private only. No secret byte is exposed through this
+    /// label itself — only through [`HkdfDecision::output`] on `Ready`, and
+    /// even then only as an opaque [`SecretHandle`], never a raw byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum HkdfStatus {
+        /// Derivation succeeded; `HkdfDecision::output` is `Some`.
+        Ready,
+        /// The input `SecretHandle` was not `HkdfInputMaterial`-kinded, or
+        /// held no real bytes (Stage 79 placeholder, or already `clear()`-ed)
+        /// — `HkdfDecision::output` is `None`.
+        InvalidInput,
+        /// The underlying `hkdf` crate's `expand` step failed (RFC 5869
+        /// section 2.3's `255 * HashLen` output-length ceiling) —
+        /// unreachable in practice at this module's fixed 32-byte output,
+        /// but matched exhaustively rather than assumed infallible,
+        /// exactly like `fedos_random_bytes_32`/`fedos_aead_nonce_96`
+        /// exhaustively match their own CSPRNG failure branch.
+        InternalFailure,
+    }
+
+    /// The result of a [`derive_secret_handle_internal`] call. Crate-private
+    /// only; never `Clone`/`Debug`-over-raw-bytes (deriving either would
+    /// fail to compile, since `output: Option<SecretHandle>` and
+    /// `SecretHandle` itself implements neither).
+    pub(crate) struct HkdfDecision {
+        pub(crate) domain: HkdfDomain,
+        pub(crate) status: HkdfStatus,
+        pub(crate) output: Option<SecretHandle>,
+    }
+
+    /// Derive a NEW `SecretHandle(HkdfOutputMaterial)` from an existing
+    /// `SecretHandle(HkdfInputMaterial)` via HKDF-SHA256 (RFC 5869), using a
+    /// fixed, `domain`-selected salt/info (never caller-supplied, never
+    /// random). This is the ONLY place in this crate's production code that
+    /// calls `hkdf`/`sha2`.
+    ///
+    /// Input validation: if `input.kind()` is not
+    /// [`SecretHandleKind::HkdfInputMaterial`], or `input` holds no real
+    /// bytes (the Stage 79 placeholder path, or a handle already
+    /// `clear()`-ed), this returns [`HkdfStatus::InvalidInput`] with
+    /// `output: None` — it never attempts a derivation against a
+    /// wrong-kinded or empty handle.
+    ///
+    /// Does NOT call `fedos_random_bytes_32`, `fedos_aead_nonce_96`,
+    /// `aead_core`, or any message-encryption operation — this function
+    /// derives a key; it does not use one. Does not mutate `input` — the
+    /// input handle is borrowed, not consumed, and is left exactly as it
+    /// was (still `Holding`, still holding the same bytes) after this call
+    /// returns, so the same input can be derived from again under a
+    /// different `domain` for domain-separated sub-keys.
+    pub(crate) fn derive_secret_handle_internal(
+        input: &SecretHandle,
+        domain: HkdfDomain,
+    ) -> HkdfDecision {
+        if input.kind() != SecretHandleKind::HkdfInputMaterial {
+            return HkdfDecision {
+                domain,
+                status: HkdfStatus::InvalidInput,
+                output: None,
+            };
+        }
+        let mut ikm = match input.expose_bytes_for_internal_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                return HkdfDecision {
+                    domain,
+                    status: HkdfStatus::InvalidInput,
+                    output: None,
+                };
+            }
+        };
+        let hk = Hkdf::<Sha256>::new(Some(domain.salt()), &ikm);
+        ikm.zeroize();
+        let mut okm = [0u8; 32];
+        let decision = match hk.expand(domain.info(), &mut okm) {
+            Ok(()) => HkdfDecision {
+                domain,
+                status: HkdfStatus::Ready,
+                output: Some(SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::HkdfOutputMaterial,
+                    okm,
+                )),
+            },
+            Err(_) => HkdfDecision {
+                domain,
+                status: HkdfStatus::InternalFailure,
+                output: None,
+            },
+        };
+        okm.zeroize();
+        decision
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -2146,6 +2387,137 @@ mod kdf_core {
                 KdfPlaceholderRequest::new_placeholder_extract_expand(),
             ] {
                 assert_eq!(request.status().state, FedosCoreState::Placeholder);
+            }
+        }
+
+        // A clearly-labeled, non-production test fixture — a fixed
+        // repeating pattern, never a real key/seed/passphrase (mirrors
+        // `secret_handle`'s own `TEST_FIXTURE_BYTES`).
+        const TEST_IKM: [u8; 32] = [0xCD; 32];
+
+        #[test]
+        fn derive_secret_handle_internal_holds_input_and_produces_ready_output() {
+            let input = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_IKM,
+            );
+            let decision = derive_secret_handle_internal(&input, HkdfDomain::TestOnly);
+            assert_eq!(decision.status, HkdfStatus::Ready);
+            assert_eq!(decision.domain, HkdfDomain::TestOnly);
+            // The input handle is untouched: still Holding, still HkdfInputMaterial.
+            assert_eq!(input.kind(), SecretHandleKind::HkdfInputMaterial);
+            assert!(!input.is_cleared());
+        }
+
+        #[test]
+        fn derive_secret_handle_internal_produces_an_hkdf_output_material_secret_handle() {
+            let input = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_IKM,
+            );
+            let decision = derive_secret_handle_internal(&input, HkdfDomain::RootKey);
+            let output = decision.output.expect("Ready decision must carry output");
+            assert_eq!(output.kind(), SecretHandleKind::HkdfOutputMaterial);
+        }
+
+        #[test]
+        fn derive_secret_handle_internal_preserves_the_requested_domain_for_every_variant() {
+            let input = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_IKM,
+            );
+            for domain in [
+                HkdfDomain::RootKey,
+                HkdfDomain::Identity,
+                HkdfDomain::Storage,
+                HkdfDomain::Conversation,
+                HkdfDomain::TestOnly,
+            ] {
+                let decision = derive_secret_handle_internal(&input, domain);
+                assert_eq!(decision.domain, domain);
+                assert_eq!(decision.status, HkdfStatus::Ready);
+            }
+        }
+
+        #[test]
+        fn derive_secret_handle_internal_rejects_wrong_kind_input() {
+            for input in [
+                SecretHandle::new_placeholder(),
+                SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::AeadKeyMaterial,
+                    TEST_IKM,
+                ),
+                SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::TestOnlySecretMaterial,
+                    TEST_IKM,
+                ),
+            ] {
+                let decision = derive_secret_handle_internal(&input, HkdfDomain::TestOnly);
+                assert_eq!(decision.status, HkdfStatus::InvalidInput);
+                assert!(decision.output.is_none());
+            }
+        }
+
+        #[test]
+        fn derive_secret_handle_internal_rejects_a_cleared_input() {
+            let mut input = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_IKM,
+            );
+            input.clear();
+            let decision = derive_secret_handle_internal(&input, HkdfDomain::TestOnly);
+            assert_eq!(decision.status, HkdfStatus::InvalidInput);
+            assert!(decision.output.is_none());
+        }
+
+        #[test]
+        fn derive_secret_handle_internal_is_deterministic_for_the_same_input_and_domain() {
+            let input = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_IKM,
+            );
+            let first = derive_secret_handle_internal(&input, HkdfDomain::Storage)
+                .output
+                .expect("Ready decision must carry output");
+            let second = derive_secret_handle_internal(&input, HkdfDomain::Storage)
+                .output
+                .expect("Ready decision must carry output");
+            assert_eq!(
+                first.expose_bytes_for_internal_derivation(),
+                second.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        #[test]
+        fn derive_secret_handle_internal_separates_output_by_domain() {
+            let input = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_IKM,
+            );
+            let storage = derive_secret_handle_internal(&input, HkdfDomain::Storage)
+                .output
+                .expect("Ready decision must carry output");
+            let conversation = derive_secret_handle_internal(&input, HkdfDomain::Conversation)
+                .output
+                .expect("Ready decision must carry output");
+            assert_ne!(
+                storage.expose_bytes_for_internal_derivation(),
+                conversation.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        /// `HkdfDomain` supports exactly the five specified variants — an
+        /// exhaustive match with no wildcard arm compiles only because no
+        /// other variant exists to add one for.
+        #[test]
+        fn hkdf_domain_has_no_variant_other_than_the_five_specified() {
+            let domain = HkdfDomain::TestOnly;
+            match domain {
+                HkdfDomain::RootKey => {}
+                HkdfDomain::Identity => {}
+                HkdfDomain::Storage => {}
+                HkdfDomain::Conversation => {}
+                HkdfDomain::TestOnly => {}
             }
         }
     }
