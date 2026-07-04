@@ -8,7 +8,64 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 147–151 — Crypto Core Boundary Completion (HKDF internal
+> **Status: Stage 152–156 — AEAD Internal Foundation.** A new
+> `src/crypto/aead_internal.rs` gives this crate its FIRST real AEAD
+> implementation: `seal_internal`/`open_internal` implement BOTH
+> ChaCha20-Poly1305 (Stage 74) and AES-256-GCM (Stage 101), consuming
+> ONLY a `SecretHandle(AeadKeyMaterial)` key and a `Ready`
+> `FedosAeadNonceDecision` nonce (from `fedos_aead_nonce_96`, Stage 138) —
+> never a caller-supplied raw key/nonce byte. AAD is a fixed
+> `AeadAadDomain` label (`RootKey`/`Identity`/`Storage`/`Conversation`/
+> `TestOnly`), mirroring `kdf_core::HkdfDomain`'s shape (Stage 147) as its
+> own, separate enum. `SecretHandle` gains a SECOND narrowly-scoped
+> accessor, `expose_bytes_for_internal_aead` (method count seven → eight)
+> — a sibling of Stage 147's HKDF accessor, not a reuse of it.
+>
+> Misuse guards run BEFORE any cipher is touched: a wrong-kinded/cleared
+> key returns `InvalidKey`; a non-`Ready` nonce decision returns
+> `InvalidNonce`. Decryption failure is a SINGLE fixed
+> `AuthenticationFailed` label, never distinguishing the tamper cause (per
+> RFC 8439/NIST AEAD guidance — distinguishing why is itself a side
+> channel). Nonce-reuse prevention is a documented CALLER obligation, not
+> runtime-tracked state (this crate has no persistent, cross-call nonce
+> registry). `Cargo.toml` is COMPLETELY UNCHANGED — both cipher crates
+> were already production dependencies since Stage 74/101.
+>
+> Stage 155 adds `src/crypto/aead_diagnostics.rs`: a fixed, display-only
+> `aead_diagnostics_preview()` reporting both `ChaCha20Poly1305` and
+> `Aes256Gcm` as `Ready`; `crypto::diagnostics`'s own `Aead` row flips from
+> `NotConnected` to `Ready` — no capability reports `NotConnected` anymore.
+>
+> **Still NOT implemented**: public `encrypt`/`decrypt`, a ciphertext
+> envelope/serialization format (`docs/ciphertext_envelope_plan.md` fixes
+> six future fields — version/algorithm/nonce/ciphertext/tag/AAD-domain —
+> in writing only, no code), NIP-44, Runtime/Worker/storage/WASM wiring,
+> and the pre-existing `aead_core` (Stage 80) skeleton stays unconnected
+> (left untouched, same discipline Stage 147 used for `domain_label`).
+>
+> This crate's public `pub fn` surface is UNCHANGED (still twenty-four
+> functions) — every new item is `pub(crate)`-at-most. `cargo check`/
+> `cargo test` (162 crate unit tests, up from 146 — 10 net new
+> `aead_internal` tests, 3 new `aead_diagnostics` tests, 2 new
+> `secret_handle` tests)/`cargo check --tests` all GREEN, zero new
+> warnings. `npm run typecheck`/`npm test` GREEN (136 files, 2031 tests, up
+> from 134/2006 — two new guard files,
+> [`test/fedos_core_rust_aead_internal.test.ts`](test/fedos_core_rust_aead_internal.test.ts)
+> (16 tests) and
+> [`test/fedos_core_rust_aead_diagnostics.test.ts`](test/fedos_core_rust_aead_diagnostics.test.ts)
+> (9 tests), plus two existing `secret_handle` guard files updated for the
+> eight-method set). `git status` clean aside from this batch's intended
+> files.
+>
+> See `docs/aead_internal_implementation.md` and
+> `docs/ciphertext_envelope_plan.md` for the full design records. Stage 157
+> candidates: (1) Ciphertext envelope skeleton (recommended first — fixing
+> the wire format before a public `encrypt`/`decrypt` API means less
+> rework later); (2) NIP-44 internal implementation planning; (3) Public
+> `encrypt`/`decrypt` API planning.
+> Prior status:
+>
+> **Stage 147–151 — Crypto Core Boundary Completion (HKDF internal
 > implementation + capability matrix + diagnostics preview).** The
 > crate-private `kdf_core` module (Stage 82) gains its FIRST real
 > implementation: `derive_secret_handle_internal(input: &SecretHandle,
@@ -38,36 +95,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > **Still NOT implemented**: AEAD execution, `encrypt`/`decrypt`, NIP-44,
 > public `deriveKey` API, Runtime/Worker/WASM wiring, `domain_label`
-> (Stage 88) connection. AEAD staging preparation (labels/shape only, no
-> code) is fixed in writing in `docs/hkdf_internal_plan.md` section 10:
-> AEAD will accept only `SecretHandle(AeadKeyMaterial)` and use the
-> existing `fedos_aead_nonce_96()` nonce helper; ciphertext production
-> itself remains a future, separate stage.
->
-> This crate's public `pub fn` surface is UNCHANGED (still twenty-four
-> functions) — every new item across both HKDF and the crypto module is
-> `pub(crate)`-at-most. `cargo check`/`cargo test` (146 crate unit tests, up
-> from 127 — 12 net new `kdf_core` tests, 2 new `secret_handle` tests, 9 new
-> `crypto` module tests)/`cargo check --tests` all GREEN. `npm run
-> typecheck`/`npm test` GREEN (134 files, 2006 tests, up from 132/1979 —
-> two new guard files,
-> [`test/fedos_core_rust_hkdf_internal.test.ts`](test/fedos_core_rust_hkdf_internal.test.ts)
-> (14 tests) and
-> [`test/fedos_core_rust_crypto_capability.test.ts`](test/fedos_core_rust_crypto_capability.test.ts)
-> (13 tests), plus six existing guard files relaxed from "no hkdf/sha2/
-> SecretHandle connection" to "connected ONLY in the one reviewed kdf_core
-> call site," the same relaxation style `secret_handle`'s own guards
-> underwent at Stage 79). `git status` clean aside from this batch's
-> intended files.
->
-> See `docs/hkdf_internal_plan.md`, `docs/crypto_capability_matrix.md`, and
-> `docs/crypto_diagnostics.md` for the full design records. Stage 152
-> candidates: (1) Internal AEAD implementation (ChaCha20-Poly1305/
-> AES-256-GCM connected to `SecretHandle` + the nonce helper) —
-> recommended first, the last piece of the crypto core (SecretHandle →
-> HKDF → AEAD) before a public `encrypt`/`decrypt` API can be safely
-> designed; (2) Public `encrypt`/`decrypt` planning update; (3) NIP-44
-> internal implementation planning.
+> (Stage 88) connection.
 > Prior status:
 >
 > **Stage 144–146 — SecretHandle real-byte implementation.** The

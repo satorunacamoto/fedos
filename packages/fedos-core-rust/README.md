@@ -3230,3 +3230,92 @@ and the preview is stable across repeated calls).
 See
 [`test/fedos_core_rust_crypto_capability.test.ts`](../../test/fedos_core_rust_crypto_capability.test.ts)
 (13 tests) for the dedicated Stage 150–151 guard suite.
+
+## Internal AEAD implementation + diagnostics (Stage 152–156)
+
+Stage 152–154 implement `docs/aead_internal_implementation.md`: a new
+[`src/crypto/aead_internal.rs`](src/crypto/aead_internal.rs) gives this
+crate its first REAL AEAD implementation — `seal_internal`/`open_internal`
+implement BOTH ChaCha20-Poly1305 (Stage 74) and AES-256-GCM (Stage 101),
+consuming ONLY a `SecretHandle(AeadKeyMaterial)` key and a `Ready`
+`FedosAeadNonceDecision` nonce (from `fedos_aead_nonce_96`, Stage 138) —
+never a caller-supplied raw key or nonce byte. AAD is a fixed
+`AeadAadDomain` label (`RootKey`/`Identity`/`Storage`/`Conversation`/
+`TestOnly`), mirroring `kdf_core::HkdfDomain`'s shape (Stage 147) as its
+own, separate enum.
+
+**New types** (all `pub(crate)`-at-most, inside `crypto::aead_internal`):
+`AeadCipher` (`ChaCha20Poly1305` / `Aes256Gcm`), `AeadAadDomain` (five
+fixed AAD labels), `AeadStatus` (`Ready` / `InvalidKey` / `InvalidNonce` /
+`AuthenticationFailed` / `InternalFailure`), `AeadSealDecision`
+(`algorithm`/`status`/`ciphertext: Option<Vec<u8>>`), `AeadOpenDecision`
+(`algorithm`/`status`/`plaintext: Option<Vec<u8>>`).
+
+**`SecretHandle` gains a SECOND narrowly-scoped accessor**,
+`expose_bytes_for_internal_aead` (method count seven → eight) — a sibling
+of Stage 147's `expose_bytes_for_internal_derivation`, not a reuse of it,
+confined to `aead_internal`'s own reviewed call site.
+
+**Misuse guards run before any cipher is touched**: a wrong-kinded or
+cleared key returns `InvalidKey`; a non-`Ready` nonce decision returns
+`InvalidNonce`. Decryption failure (wrong key/nonce/AAD, or a tampered
+ciphertext) is a SINGLE fixed `AuthenticationFailed` label — this
+implementation never distinguishes WHY authentication failed, per RFC
+8439/NIST AEAD guidance (distinguishing the cause is itself a side
+channel). Nonce-reuse prevention is a documented CALLER obligation (see
+`docs/aead_internal_implementation.md` section 6), not runtime-tracked
+state — this crate has no persistent, cross-call nonce registry.
+
+**`Cargo.toml` is completely UNCHANGED** — `chacha20poly1305`/`aes-gcm`
+were already production dependencies (Stage 74/101); no new dependency was
+needed.
+
+**What is explicitly NOT implemented or connected:**
+
+- No public `encrypt`/`decrypt` API.
+- No ciphertext envelope/serialization format — see
+  `docs/ciphertext_envelope_plan.md` (a separate, docs-only planning
+  record: version/algorithm/nonce/ciphertext/tag/AAD-domain fields named,
+  not built).
+- No NIP-44, no Nostr encrypted-message scheme.
+- No Runtime/Worker/storage/WASM connection.
+- No connection to the pre-existing `aead_core` (Stage 80) skeleton —
+  left exactly as it was, per this crate's standing "leave unrelated
+  skeletons unconnected" discipline (the same choice Stage 147 made for
+  `domain_label`).
+
+**Stage 155** adds
+[`src/crypto/aead_diagnostics.rs`](src/crypto/aead_diagnostics.rs): a
+fixed, hand-maintained, display-only `aead_diagnostics_preview() ->
+[AeadAlgorithmReport; 2]` reporting both `ChaCha20Poly1305` and
+`Aes256Gcm` as `Ready` — never a live probe. `crypto::diagnostics`'s own
+coarse `crypto_diagnostics_preview()` has its `Aead` row flipped from
+`NotConnected` to `Ready` this stage, so no capability reports
+`NotConnected` anymore.
+
+**Rust-side `cargo test` coverage**: 10 new tests in `aead_internal.rs`
+(ChaCha20-Poly1305 round-trip, AES-256-GCM round-trip, wrong AAD domain
+fails for both ciphers, wrong nonce fails for both ciphers, tampered
+ciphertext fails for both ciphers, wrong key kind rejected before
+touching the cipher, cleared key rejected, non-`Ready` nonce rejected,
+seal is deterministic for the same inputs, and `AeadCipher`'s exhaustive
+two-variant match), 3 new tests in `aead_diagnostics.rs`, 2 new tests in
+`secret_handle` for `expose_bytes_for_internal_aead`, and `diagnostics.rs`
+tests updated for `Aead` now being `Ready`.
+
+**Verified against a real Rust toolchain**: `cargo check`, `cargo test`
+(162 crate unit tests, up from 146 at Stage 151), and
+`cargo check --tests` all GREEN, with zero new warnings (an initial
+`Array::from_slice` deprecation warning from the `chacha20poly1305`/`aead`
+0.6 upgrade path was fixed by switching to `Array::from`).
+
+See
+[`test/fedos_core_rust_aead_internal.test.ts`](../../test/fedos_core_rust_aead_internal.test.ts)
+(16 tests) and
+[`test/fedos_core_rust_aead_diagnostics.test.ts`](../../test/fedos_core_rust_aead_diagnostics.test.ts)
+(9 tests) for the dedicated Stage 152–156 guard suites: no public
+`encrypt`/`decrypt`, no public raw key getter, no Runtime/Worker/Storage/
+Nostr/NIP-44/WASM connection, no `Cargo.toml` change (still 9 production
+dependencies), no `Vec<u8>` exposed publicly, no `unwrap`/`expect`/
+`panic!`/`unsafe`, the twenty-four-function `pub fn` surface unchanged,
+and diagnostics carrying no secret byte.
