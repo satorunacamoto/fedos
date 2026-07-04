@@ -342,3 +342,39 @@ the earlier binding docs win.
 - See `docs/secret_handle_api_shape.md` (the concrete type/method shape)
   and `docs/secret_memory_test_strategy.md` (the concrete test gates) for
   the two documents this update introduces alongside it.
+
+## 15. Stage 144–146 update — SecretHandle real bytes are now IMPLEMENTED
+
+- **`SecretHandle` (`packages/fedos-core-rust/src/lib.rs`) now holds real
+  secret bytes.** `new_from_32_bytes_for_internal_use(kind: SecretHandleKind,
+  bytes: [u8; 32])` is a real, `cargo test`-verified constructor — the
+  precondition item 3 of `docs/implementation_phase_roadmap.md` §1's fixed
+  order is now DONE. `new_placeholder()` (Stage 79) is unchanged; both
+  construction paths coexist on the same type.
+- **Every policy fixed above was satisfied in this one stage**, per §1's
+  "binding on whichever future stage implements it, ... in one commit/PR,
+  not incrementally": `secrecy::SecretBox` wraps the real 32-byte buffer
+  (§3), zeroize runs on `clear()` and again on drop (§6, proven via a
+  `#[cfg(test)]`-only call-count counter — never a production code path),
+  `Clone` is not implemented anywhere in the real-secret-holding types (§4),
+  no `Debug`/`Display`/logging exposes a raw byte (§5), and no public
+  function anywhere returns or accepts a raw secret byte (§8) —
+  `SecretHandle` and every new item remain `pub(crate)`-at-most.
+- **`SecretHandle` still does not generate its own bytes or a nonce**, per
+  §14's restated rule: it never calls `fedos_random_bytes_32` or
+  `fedos_aead_nonce_96` itself.
+- **HKDF and AEAD remain unconnected**, exactly as §9 requires: this stage
+  did not, in the same stage, wire `SecretHandle` into `kdf_core` or
+  `aead_core`. Those remain their own, later, separate, explicitly-reviewed
+  stages — Stage 147 is recommended to begin with an HKDF planning update
+  (re-confirming domain separation and the derived-output `SecretHandle`'s
+  shape in writing) before any HKDF implementation stage.
+- **The §10 memory-safety limitations remain exactly as named, not
+  solved**: compiler-introduced copies, OS/hardware paging, and core
+  dumps/debuggers can still observe live secret memory before `Drop` runs.
+  Nothing in this stage's implementation claims otherwise.
+- See `packages/fedos-core-rust/README.md`'s "Internal secret-handle
+  real-byte storage (Stage 144–146)" section for the full implementation
+  writeup, and
+  [`test/fedos_core_rust_secret_handle_real_bytes.test.ts`](../test/fedos_core_rust_secret_handle_real_bytes.test.ts)
+  for the guard suite verifying every constraint above.

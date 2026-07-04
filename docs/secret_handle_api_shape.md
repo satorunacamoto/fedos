@@ -267,3 +267,35 @@ binding constraint on this shape specifically:
   this document does not implement, schedule, or narrow either.
 - No code, test, or `Cargo.toml` change is authorized or made by this
   document.
+
+## 12. Stage 144–146 update — this shape is now IMPLEMENTED
+
+- **`SecretHandle` real bytes landed** in
+  `packages/fedos-core-rust/src/lib.rs`, matching this shape with one
+  deliberate, documented deviation from §6's exact five-method list:
+  `new_placeholder()` (Stage 79) was KEPT rather than replaced, so
+  `SecretHandle`'s method set is SIX, not five —
+  `new_placeholder`/`new_from_32_bytes_for_internal_use`/`status`/`kind`/
+  `clear`/`is_cleared`. This was a deliberate choice (not breaking the
+  Stage 79 placeholder path callers/tests may still rely on) rather than an
+  oversight; no method beyond these six exists, so the spirit of §6 — no
+  "just this once" raw-byte accessor — still holds, verified by
+  [`test/fedos_core_rust_secret_handle_real_bytes.test.ts`](../test/fedos_core_rust_secret_handle_real_bytes.test.ts)'s
+  exact-method-set assertion.
+- **All five candidate types exist**, with `SecretHandleKind` gaining a
+  sixth label (`Placeholder`, for the Stage 79 path) beyond the "five real
+  labels" this document's §4 sketch implied, plus two additional
+  real-secret labels (`HkdfOutputMaterial`, `NostrKeyMaterial`) beyond the
+  minimal set §4 named — all still non-sensitive labels, still
+  `pub(crate)`-only.
+- **§5's input shape is unchanged**: exactly `[u8; 32]`, no `Vec<u8>`, no
+  `String`/password.
+- **§7's forbidden list holds in full**: no `Clone`, no `Debug` over raw
+  bytes, no public `AsRef<[u8]>`, no `Display`, no `Serialize`, no
+  raw-secret `Eq`/`PartialEq` — verified by dedicated guard-test assertions
+  scanning the actual implementation, not merely asserted in prose.
+- **§10's future HKDF/AEAD connection remains exactly as undesigned as
+  this document left it** — Stage 144–146 did not narrow that gap.
+- See `docs/secret_lifecycle_implementation_plan.md` §15 and
+  `packages/fedos-core-rust/README.md`'s Stage 144–146 section for the full
+  implementation writeup.

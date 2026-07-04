@@ -251,3 +251,42 @@ earlier binding docs win.
   considered complete.
 - No code, test, or `Cargo.toml` change is authorized or made by this
   document.
+
+## 13. Stage 144–146 update — these gates are now IMPLEMENTED and GREEN
+
+- **Every gate in §11 was run and passed** for `SecretHandle`'s real-byte
+  implementation: `cargo check`, `cargo test` (127 crate unit tests,
+  including 12 net new `secret_handle` tests), `cargo check --tests`,
+  `npm run typecheck`, and `npm test` (132 files, 1979 tests) are all
+  GREEN, with `git status` clean aside from this stage's intended files.
+- **§2 (`Clone`-absence)**: implemented as the source-string guard-test
+  fallback (§2's second bullet), not a `trybuild` compile-fail fixture —
+  `trybuild` was judged not worth adopting for this alone, exactly as §2
+  anticipated as an acceptable fallback.
+- **§3 (`Debug`-no-raw-byte)**: `SecretHandle` has NO `Debug` impl at all
+  (neither derived nor manual), so the guard test asserts its absence via
+  the source-string fallback §3's second bullet names, rather than
+  constructing a fixture and inspecting `format!("{:?}", ...)` output.
+- **§4 (`clear()`/`is_cleared()` state machine)**: implemented exactly as
+  specified, including the double-clear idempotency check.
+- **§5 (drop-time zeroize)**: implemented via the NAMED FALLBACK — a
+  `#[cfg(test)]`-only wrapper type (`RealSecretBytes`) records each
+  `zeroize()` call via an atomic counter, rather than the raw-pointer
+  introspection hook §5's preferred mechanism describes. The raw-pointer
+  approach was ruled out because this crate's `#![forbid(unsafe_code)]`
+  (unconditional, no `cfg(test)` exception) makes it impossible to
+  implement, not merely undesirable — the fallback's weaker-but-safe
+  guarantee (zeroize IS CALLED, both on explicit `clear()` and on an
+  ordinary drop with no `clear()` call) is exactly what §5 anticipated as
+  an acceptable alternative when the raw-pointer tradeoff is unacceptable.
+- **§6 (no-raw-exposure and exact-method-set)**: the exact-method-set
+  assertion was widened from five to six methods (`new_placeholder` is
+  kept alongside the five named here) — see
+  `docs/secret_handle_api_shape.md` §12 for why, and
+  `docs/secret_lifecycle_implementation_plan.md` §15 for the full record.
+- **§7 (no `Vec`/`String`/`serde`)**: verified, including that
+  `Cargo.toml` gained no new dependency of any kind (not just no `serde`).
+- **§8/§9 (panic-time/WASM-time limits)**: unchanged — still not tested,
+  still named as open limitations, exactly as this document specifies.
+- **§10 (Miri/Valgrind/sanitizer tooling)**: still not adopted — still
+  future work, not a blocker, exactly as this document specifies.

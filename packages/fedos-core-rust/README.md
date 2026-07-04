@@ -777,6 +777,11 @@ adopted Stage 78. It defines:
   placeholder marker and sets state to `Cleared` — does not return, expose,
   or copy the marker), and `is_cleared()` (a boolean check).
 
+> **Stage 144–146 extends this skeleton to hold real secret bytes** — see
+> [Internal secret-handle real-byte storage (Stage 144–146)](#internal-secret-handle-real-byte-storage-stage-144146)
+> below. Everything described in this Stage 79 section remains true of the
+> `new_placeholder()` path, unchanged.
+
 **NOT part of this crate's public API.** Every item above is `pub(crate)` at
 most — never `pub` — and nothing is re-exported from the crate root. This
 crate's public `pub fn` surface is still exactly the same six placeholder
@@ -2989,3 +2994,107 @@ connection, no `println!`/`log`/`unsafe` usage, the `aead_nonce_wiring`
 test module itself calls no `getrandom`, no raw secret exposed on the
 public API, no committed build artifact, and the nonce policy doc
 exists and names this helper's design).
+
+## Internal secret-handle real-byte storage (Stage 144–146)
+
+Stage 144–146 implements `docs/secret_lifecycle_implementation_plan.md`,
+`docs/secret_handle_api_shape.md`, and `docs/secret_memory_test_strategy.md`
+(Stage 141–143): the crate-private `secret_handle` module (Stage 79) gains
+its FIRST real-byte construction path. `new_placeholder()` (Stage 79) is
+completely unchanged; both construction paths coexist on the same
+`SecretHandle` type.
+
+**New/changed types (all `pub(crate)`-at-most, none re-exported):**
+
+- **`SecretHandleState`** gains a fourth variant, `Holding` (real bytes are
+  allocated), alongside the existing `Empty` / `Placeholder` / `Cleared`.
+- **`SecretHandleKind`** (NEW) — a non-sensitive classification label:
+  `Placeholder` (the Stage 79 path) plus five real-secret labels —
+  `AeadKeyMaterial`, `HkdfInputMaterial`, `HkdfOutputMaterial`,
+  `NostrKeyMaterial`, `TestOnlySecretMaterial`. Never a byte, never a length
+  that narrows down which secret is held.
+- **`SecretInputLength`** (NEW) — exactly one variant, `ThirtyTwo`, mirroring
+  `FedosRandomBytesLength`/`FedosAeadNonceKind`'s "no open, caller-supplied
+  count" shape.
+- **`RealSecretBytes`** (private) — wraps a fixed `[u8; 32]`. Never `Clone`/
+  `Copy`/`Debug`-over-raw-bytes/`Display`/`Serialize`; `secrecy`'s own
+  `Clone for SecretBox<S>` requires `S: CloneableSecret`, which this type
+  deliberately never implements, so `SecretBox<RealSecretBytes>` gets no
+  `Clone` either. Its `Zeroize` impl bumps a `#[cfg(test)]`-only atomic
+  counter so a test can prove `zeroize` actually runs — that counter never
+  compiles into a production build and never exposes a secret byte.
+- **`SecretPayload`** (private enum) — `Placeholder(SecretBox<PlaceholderMarker>)`
+  or `Real(SecretBox<RealSecretBytes>)`; exactly one of `SecretHandle`'s two
+  construction paths is active at a time.
+- **`SecretHandle`** now holds `state: SecretHandleState`,
+  `kind: SecretHandleKind`, and `payload: Option<SecretPayload>` — six
+  methods total: `new_placeholder()` (Stage 79, unchanged),
+  `new_from_32_bytes_for_internal_use(kind: SecretHandleKind, bytes: [u8; 32]) -> Self`
+  (NEW — takes ownership of a fixed-size 32-byte array, never a slice/
+  `Vec<u8>`/`String`, wraps it in `secrecy::SecretBox`, and returns a
+  `Holding`-state handle), `status()` (unchanged shape), `kind()` (NEW —
+  returns the label fixed at construction), `clear()` (zeroizes whichever
+  payload is held and transitions to `Cleared`; safe to call twice — a
+  second call is a no-op), and `is_cleared()` (unchanged).
+
+**What `SecretHandle` still does NOT do** (per
+`docs/secret_handle_api_shape.md` §3): it never calls
+`fedos_random_bytes_32` or `fedos_aead_nonce_96` itself (a caller draws
+bytes first and hands them to the constructor), never executes HKDF or
+AEAD, never logs anything, and exposes no accessor that returns its raw
+bytes anywhere — not even under `#[cfg(test)]`. `Cargo.toml` is UNCHANGED —
+no new dependency. This crate's public `pub fn` surface is UNCHANGED (still
+twenty-four functions) — every new item is `pub(crate)`-at-most.
+
+**Rust-side `cargo test` coverage** (`secret_handle`'s own nested
+`#[cfg(test)] mod tests`, now 15 tests, up from 5 at Stage 79): the
+placeholder path's five original tests, plus new tests asserting
+`new_from_32_bytes_for_internal_use` starts in `Holding` state with the
+given `kind`; every one of the five real-secret `SecretHandleKind` variants
+is preserved through construction; `clear()` on a real-byte handle
+transitions to `Cleared`; calling `clear()` twice is idempotent and does not
+panic; `zeroize` is proven to run (via the `#[cfg(test)]`-only atomic
+counter) both on an explicit `clear()` call AND on an ordinary drop with NO
+`clear()` call (proving `secrecy::SecretBox`'s own `Drop` impl zeroizes
+real bytes, not just the placeholder path); `SecretInputLength` has no
+variant besides `ThirtyTwo`; and the placeholder/real-byte paths stay
+independent of each other.
+
+**Verified against a real Rust toolchain**
+(`stable-x86_64-pc-windows-msvc`): `cargo check`, `cargo test` (127 crate
+unit tests, up from 119 at Stage 138 — 12 net new `secret_handle` tests),
+and `cargo check --tests` all GREEN.
+
+See
+[`test/fedos_core_rust_secret_handle.test.ts`](../../test/fedos_core_rust_secret_handle.test.ts)
+(updated: the `SecretHandleState` variant list and `SecretHandle` method-set
+assertions now reflect four variants / six methods) and
+[`test/fedos_core_rust_secret_handle_real_bytes.test.ts`](../../test/fedos_core_rust_secret_handle_real_bytes.test.ts)
+(NEW, 16 tests) for the dedicated Stage 144–146 guard suite: the real-byte
+constructor's fixed `[u8; 32]` signature, `SecretHandleKind`/
+`SecretInputLength` existing as `pub(crate)`-only with the expected labels,
+`SecretHandleState` gaining exactly `Holding`, no `Clone`/`Copy` derive or
+impl on any real-secret-holding type, no `Debug`/`Display`/`Serialize`/
+raw-secret `Eq`/`PartialEq`, no `AsRef<[u8]>` exposure, no public raw-byte
+accessor and no sixth `pub(crate)` method beyond the expected six, the
+twenty-four-function public `pub fn` surface unchanged, no connection to
+HKDF/AEAD/`randomBytes`/nonce/`Cargo.toml`/Runtime/Worker, and no `unwrap`/
+`expect`/`panic!`/`unsafe` anywhere in `secret_handle`.
+
+**Limitations — named, not solved** (per
+`docs/secret_lifecycle_implementation_plan.md` §10 and
+`docs/secret_handle_api_shape.md` §9): zeroize-on-drop narrows the exposure
+window, it does not eliminate it. Compiler-introduced copies (moves the
+optimizer implements as a memory copy, stack slots/registers that
+transiently held a copy) are not erased by `zeroize` alone. OS/hardware
+paging (a page swapped to disk before it is zeroized) and core dumps/
+attached debuggers can still observe live secret memory before `Drop` runs.
+WASM's own memory model is a future, still-open question once a WASM
+target exists (none does yet). None of this is a reason to skip `zeroize`/
+`secrecy` — it is the honest, narrower claim this stage makes.
+
+**What Stage 144–146 deliberately does NOT do** (each is its own future,
+separate, explicitly-reviewed stage): no HKDF connection (`kdf_core` remains
+exactly as unconnected as before), no AEAD connection (`aead_core` likewise),
+no `deriveKey`/`encrypt`/`decrypt` public API change, and no Runtime/Worker/
+WASM wiring of any kind.

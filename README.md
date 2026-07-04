@@ -8,7 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 141–143 — SecretHandle real-byte implementation
+> **Status: Stage 144–146 — SecretHandle real-byte implementation.** The
+> crate-private `secret_handle` module (Stage 79) gains its FIRST real-byte
+> construction path,
+> `new_from_32_bytes_for_internal_use(kind: SecretHandleKind, bytes: [u8; 32])`,
+> alongside a new `SecretHandleKind` classification label (`Placeholder` /
+> `AeadKeyMaterial` / `HkdfInputMaterial` / `HkdfOutputMaterial` /
+> `NostrKeyMaterial` / `TestOnlySecretMaterial`) and `SecretInputLength`
+> (exactly one variant, `ThirtyTwo`). `new_placeholder()` (Stage 79) is
+> UNCHANGED; both construction paths coexist on the same type. Implements
+> the design the Stage 141–143 docs-only batch fixed in writing (below,
+> under "Prior status").
+>
+> `SecretHandle` now holds real 32-byte secret material wrapped in
+> `secrecy::SecretBox`, zeroized on `clear()` and again on drop (proven via
+> a `#[cfg(test)]`-only atomic counter — never a production code path, never
+> exposing a byte). No `Clone`, no `Debug` over raw bytes, no `Display`, no
+> `Serialize`, no raw-secret `Eq`/`PartialEq`, no public raw-byte accessor,
+> and no connection to `fedos_random_bytes_32`/`fedos_aead_nonce_96`/HKDF/
+> AEAD/Runtime/Worker/WASM — all remain exactly as unconnected as before
+> this stage. `Cargo.toml` is UNCHANGED. This crate's public `pub fn`
+> surface is UNCHANGED (still twenty-four functions) — every new item is
+> `pub(crate)`-at-most.
+>
+> `cargo check`/`cargo test` (127 crate unit tests, up from 119 — 12 net
+> new `secret_handle` tests)/`cargo check --tests` all GREEN. `npm run
+> typecheck`/`npm test` GREEN (132 files, 1979 tests, up from 131/1963 — one
+> new guard file
+> ([`test/fedos_core_rust_secret_handle_real_bytes.test.ts`](test/fedos_core_rust_secret_handle_real_bytes.test.ts),
+> 16 tests) plus the existing
+> [`test/fedos_core_rust_secret_handle.test.ts`](test/fedos_core_rust_secret_handle.test.ts)
+> updated for the four-variant state enum and six-method set). `git status`
+> clean aside from this stage's intended files.
+>
+> **What this stage deliberately does NOT do**: no HKDF connection, no AEAD
+> connection, no `deriveKey`/`encrypt`/`decrypt` public API change, and no
+> Runtime/Worker/WASM wiring — each is its own future, separate,
+> explicitly-reviewed stage. Stage 147 candidates: (1) HKDF internal
+> implementation planning update (recommended first — worth re-confirming
+> domain separation and the derived-output `SecretHandle`'s shape in
+> writing now that `SecretHandle` can hold a real input); (2) HKDF internal
+> implementation using `SecretHandle`; (3) AEAD implementation staging
+> docs.
+> Prior status:
+>
+> **Stage 141–143 — SecretHandle real-byte implementation
 > preparation (docs only).** A three-stage, **docs-only** batch that
 > fixes the concrete type/method shape and test strategy a future stage
 > must satisfy before `SecretHandle` (Stage 79) is extended to hold real
