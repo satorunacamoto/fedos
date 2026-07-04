@@ -315,3 +315,32 @@ fills in the policy gap they left open on purpose.
   (`docs/implementation_phase_roadmap.md` §1 item 2) is the Rust
   `randomBytes` implementation itself, which this nonce policy was
   written to precede.
+
+## 16. Stage 138 update — first implementation against this policy
+
+- **`fedos_aead_nonce_96()`** (`packages/fedos-core-rust/src/lib.rs`,
+  Stage 138) is the first code anywhere in this codebase to draw a real
+  nonce, and it implements §6's MVP decision exactly: a CSPRNG-drawn
+  random nonce via `getrandom::fill`, fixed at 96 bits
+  (`FedosAeadNonceKind::NinetySixBit`, `[u8; 12]`) — matching both
+  currently-adopted AEAD candidates' shared nonce size (§3, §4).
+- **§7's determinism prohibition and §8's seed/password/user-id
+  prohibition hold exactly as fixed** — `fedos_aead_nonce_96` accepts no
+  parameter of any kind (no length, no seed, no password, no user id, no
+  counter), and never derives its output from anything but the OS CSPRNG.
+- **§11's failure-time handling holds exactly as fixed** — a CSPRNG
+  failure returns a fixed `FedosNonceState::EntropySourceUnavailable`
+  with `nonce: None`; there is no fallback PRNG and no panic.
+- **§10's "never a standalone public function" framing is intentionally
+  NOT what this stage does** — `fedos_aead_nonce_96` IS a standalone
+  public function (unlike the internal-only design §10 originally
+  sketched), because no AEAD `encrypt` implementation exists yet for it
+  to be internal to. It is documented, both in code and in
+  `test/fedos_core_rust_aead_nonce.test.ts`, as NOT connected to any
+  encrypt/decrypt/AEAD function — a future AEAD implementation stage
+  would need to be the one to call it, and that wiring does not exist
+  yet. This is a deliberate, reviewed sequencing choice (helper before
+  consumer), not a reopening of §10's policy.
+- **Still not implemented**: any AEAD seal/open, any connection to
+  `SecretHandle`/`aead_core`/`kdf_core`, any Runtime/Worker/WASM wiring,
+  and NIP-44 (§13 stands unchanged).

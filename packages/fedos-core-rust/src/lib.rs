@@ -353,6 +353,30 @@
 //! `docs/secret_lifecycle_implementation_plan.md` for the full design
 //! records this addition follows (and deliberately does not yet build
 //! against).
+//!
+//! Stage 138 adds a second real function, `fedos_aead_nonce_96` (below,
+//! right after `fedos_random_bytes_32`, still ahead of the Stage 79
+//! module): draws exactly 12 bytes (96 bits) from the OS's CSPRNG, the
+//! shared nonce size of this crate's two adopted AEAD candidates
+//! (ChaCha20-Poly1305, AES-256-GCM). It is a standalone nonce-drawing
+//! helper, independent of `fedos_random_bytes_32` and not implemented by
+//! calling it, and does not call — and is not called by — any encrypt/
+//! decrypt/AEAD function. `FedosAeadNonceKind` (one variant,
+//! `NinetySixBit`), `FedosNonceState` (`Ready` /
+//! `EntropySourceUnavailable`), and `FedosAeadNonceDecision`
+//! (`kind`/`state`/`nonce: Option<[u8; 12]>`) round out the group — the
+//! crate's public `pub fn` surface grows from twenty-three (Stage 137) to
+//! twenty-four. Same shape as Stage 137 throughout: a fixed,
+//! label-selected size, no zero-length or caller-supplied count, no
+//! fallback PRNG, no panic on CSPRNG failure. The nonce is never
+//! deterministic, never a counter, and never derived from a seed,
+//! password, or user input — see `docs/nonce_generation_policy.md`
+//! (Stage 134) for the policy this stage implements against.
+//! `encrypt_placeholder`/`decrypt_placeholder` (Stage 69), `aead_core`
+//! (Stage 80), `kdf_core` (Stage 82), and `SecretHandle` (Stage 79)
+//! remain UNCHANGED and unconnected. `Cargo.toml` is untouched; nothing is
+//! wired into the Runtime, the Worker, or a crypto provider; no WASM
+//! binding exists.
 
 #![forbid(unsafe_code)]
 
@@ -1279,6 +1303,120 @@ pub fn fedos_random_bytes_32() -> FedosRandomBytesDecision {
             length: FedosRandomBytesLength::ThirtyTwo,
             state: FedosRandomBytesState::EntropySourceUnavailable,
             bytes: None,
+        },
+    }
+}
+
+/// Stage 138 — a fixed-size AEAD nonce helper, drawn from the OS CSPRNG,
+/// following `docs/nonce_generation_policy.md`'s MVP decision (a
+/// CSPRNG-drawn random nonce, never a counter, never deterministic, never
+/// derived from a seed/password/user input).
+///
+/// [`fedos_aead_nonce_96`] draws exactly 12 bytes (96 bits) from the OS
+/// CSPRNG via `getrandom::fill` — the SECOND real call site of the
+/// `getrandom` dependency (adopted Stage 104), independent of
+/// [`fedos_random_bytes_32`] (Stage 137) and not implemented by calling
+/// it. 96 bits is this crate's two currently-adopted AEAD candidates'
+/// shared nonce size (ChaCha20-Poly1305 and AES-256-GCM both use a 96-bit
+/// nonce, per RFC 8439 and NIST SP 800-38D). Scope is deliberately narrow,
+/// mirroring [`fedos_random_bytes_32`]'s shape exactly: a fixed,
+/// label-selected size ([`FedosAeadNonceKind::NinetySixBit`]) rather than
+/// an open, caller-supplied count — there is no zero-length or
+/// variable-length request anywhere on this boundary, and no
+/// caller-facing parameter of any kind. On success the caller gets
+/// exactly 12 fresh CSPRNG bytes; on any OS CSPRNG failure the call
+/// returns a fixed [`FedosNonceState::EntropySourceUnavailable`] with
+/// `nonce: None` — there is no fallback PRNG, no `rand`/`thread_rng`/
+/// deterministic substitute, and this function never panics
+/// (`getrandom::fill`'s `Result` is matched exhaustively, never
+/// `.unwrap()`/`.expect()`-ed).
+///
+/// This is a nonce-DRAWING helper ONLY. It performs NO AEAD seal/open, NO
+/// encryption, NO decryption, and NO key derivation/generation; it is not
+/// connected to `encrypt_placeholder`/`decrypt_placeholder` (Stage 69),
+/// `aead_core` (Stage 80), `kdf_core` (Stage 82), or [`SecretHandle`]
+/// (`secret_handle`, Stage 79) — those remain exactly as placeholder as
+/// before this stage, and a future AEAD implementation would need its
+/// OWN, separately-reviewed stage to actually call this helper.
+/// [`fedos_nonce_boundary_status`]/[`FedosNonceBoundary`] (Stage 103) are
+/// also UNCHANGED — this stage adds a new, independent function rather
+/// than editing it. The nonce is never derived from a counter, a
+/// timestamp, a seed, a password, or any user-supplied input — see
+/// `docs/nonce_generation_policy.md` sections 5-8 for why a counter nonce
+/// is explicitly deferred (this codebase has no durable, crash-safe
+/// counter-persistence mechanism yet). Not wired into the Runtime, the
+/// Worker, or any `CryptoProvider`; no WASM binding exists.
+
+/// The fixed, label-selected nonce size this boundary supports — never an
+/// open, caller-supplied byte count. Exactly one variant exists today,
+/// matching this crate's two currently-adopted AEAD candidates' shared
+/// 96-bit nonce size; a future 192-bit (XChaCha20-Poly1305-style) variant
+/// would be its own reviewed addition, never a numeric parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosAeadNonceKind {
+    /// Exactly 12 bytes (96 bits) — ChaCha20-Poly1305's and
+    /// AES-256-GCM's shared nonce size.
+    NinetySixBit,
+}
+
+/// Coarse observable outcome of a [`fedos_aead_nonce_96`] call. No
+/// generated byte is exposed through this label itself — only through
+/// [`FedosAeadNonceDecision::nonce`] on the `Ready` state. A separate type
+/// from [`FedosRandomBytesState`] — each independent boundary this crate
+/// exposes gets its own state enum rather than sharing one generic status
+/// across unrelated operations, the same choice Stage 103 already made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosNonceState {
+    /// The OS CSPRNG produced the requested nonce bytes.
+    Ready,
+    /// The OS CSPRNG reported a failure. There is no fallback PRNG and no
+    /// degraded output.
+    EntropySourceUnavailable,
+}
+
+/// The result of a [`fedos_aead_nonce_96`] call. On
+/// [`FedosNonceState::Ready`], `nonce` holds exactly 12 freshly drawn
+/// CSPRNG bytes; on [`FedosNonceState::EntropySourceUnavailable`],
+/// `nonce` is `None` — never a zeroed, truncated, counter-derived, or
+/// otherwise degraded substitute.
+///
+/// `nonce` is a fixed-size `[u8; 12]`, never a `Vec<u8>` or a borrowed
+/// slice — there is no length for a caller to separately validate. A
+/// nonce is not a secret (it is expected to travel alongside its
+/// ciphertext, per `docs/nonce_generation_policy.md` section 9-10), so
+/// this type is plain returned data, not a [`SecretHandle`]-wrapped
+/// value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosAeadNonceDecision {
+    pub kind: FedosAeadNonceKind,
+    pub state: FedosNonceState,
+    pub nonce: Option<[u8; 12]>,
+}
+
+/// Draw exactly 12 bytes (96 bits) from the OS CSPRNG via
+/// `getrandom::fill`, for use as a future AEAD nonce. Never accepts a
+/// caller-supplied length, a seed, a password, a user id, or any other
+/// parameter, and never derives its output from a counter or a
+/// timestamp. Returns [`FedosNonceState::Ready`] with the drawn bytes on
+/// success; on any CSPRNG failure, returns
+/// [`FedosNonceState::EntropySourceUnavailable`] with `nonce: None` —
+/// there is no fallback PRNG, no `rand`/`thread_rng` substitute, and no
+/// panic (the `Result` `getrandom::fill` returns is matched exhaustively,
+/// never `.unwrap()`/`.expect()`-ed). This function is NOT called by, and
+/// does NOT call, any encrypt/decrypt/AEAD function — it is a standalone
+/// nonce-drawing helper, not part of an AEAD implementation.
+pub fn fedos_aead_nonce_96() -> FedosAeadNonceDecision {
+    let mut buf = [0u8; 12];
+    match getrandom::fill(&mut buf) {
+        Ok(()) => FedosAeadNonceDecision {
+            kind: FedosAeadNonceKind::NinetySixBit,
+            state: FedosNonceState::Ready,
+            nonce: Some(buf),
+        },
+        Err(_) => FedosAeadNonceDecision {
+            kind: FedosAeadNonceKind::NinetySixBit,
+            state: FedosNonceState::EntropySourceUnavailable,
+            nonce: None,
         },
     }
 }
@@ -5734,5 +5872,96 @@ mod random_bytes_wiring {
             assert_eq!(decision.length, FedosRandomBytesLength::ThirtyTwo);
             assert_eq!(decision.state, FedosRandomBytesState::Ready);
         }
+    }
+}
+
+/// Stage 138 — `cargo test` coverage for [`fedos_aead_nonce_96`], the
+/// real `getrandom`-backed nonce helper added this stage.
+///
+/// Mirrors `random_bytes_wiring`'s (Stage 137) shape exactly: a genuine
+/// OS CSPRNG failure cannot be triggered deterministically from a
+/// portable `cargo test` without fault-injection machinery this crate
+/// does not have, so the failure PATH is exercised structurally (the
+/// fixed `EntropySourceUnavailable` state is constructed directly and its
+/// shape asserted) rather than by forcing a real `getrandom` error.
+#[cfg(test)]
+mod aead_nonce_wiring {
+    use super::*;
+
+    /// A successful call always returns exactly 12 bytes, tagged
+    /// `NinetySixBit`/`Ready`.
+    #[test]
+    fn fedos_aead_nonce_96_returns_ready_with_exactly_12_bytes() {
+        let decision = fedos_aead_nonce_96();
+        assert_eq!(decision.kind, FedosAeadNonceKind::NinetySixBit);
+        assert_eq!(decision.state, FedosNonceState::Ready);
+        let nonce = decision.nonce.expect("Ready state must carry a nonce");
+        assert_eq!(nonce.len(), 12);
+    }
+
+    /// Two calls in immediate succession are not obviously identical — a
+    /// basic non-determinism sanity check, NOT a statistical proof of
+    /// randomness quality. Two genuine 12-byte CSPRNG draws colliding has
+    /// probability 1 in 2^96 — this is not treated as a flaky assertion.
+    #[test]
+    fn fedos_aead_nonce_96_two_calls_are_not_obviously_identical() {
+        let first = fedos_aead_nonce_96()
+            .nonce
+            .expect("first call should succeed");
+        let second = fedos_aead_nonce_96()
+            .nonce
+            .expect("second call should succeed");
+        assert_ne!(first, second);
+    }
+
+    /// The fixed failure state exists and carries no bytes — standing in
+    /// for a real CSPRNG-failure test, which would require fault-injecting
+    /// the OS entropy source (not available here).
+    #[test]
+    fn entropy_source_unavailable_state_carries_no_nonce() {
+        let failure = FedosAeadNonceDecision {
+            kind: FedosAeadNonceKind::NinetySixBit,
+            state: FedosNonceState::EntropySourceUnavailable,
+            nonce: None,
+        };
+        assert_eq!(failure.state, FedosNonceState::EntropySourceUnavailable);
+        assert!(failure.nonce.is_none());
+    }
+
+    /// `FedosAeadNonceKind` supports exactly one variant today — an
+    /// exhaustive match with no wildcard arm compiles only because no
+    /// zero-length, variable-length, or caller-chosen-length variant
+    /// exists to add one for.
+    #[test]
+    fn fedos_aead_nonce_kind_has_no_variant_other_than_ninety_six_bit() {
+        let kind = FedosAeadNonceKind::NinetySixBit;
+        match kind {
+            FedosAeadNonceKind::NinetySixBit => {}
+        }
+    }
+
+    /// Repeated calls do not panic — ten calls in a row all succeed with
+    /// the fixed shape (guards against a non-total implementation, not a
+    /// performance benchmark).
+    #[test]
+    fn fedos_aead_nonce_96_does_not_panic_across_repeated_calls() {
+        for _ in 0..10 {
+            let decision = fedos_aead_nonce_96();
+            assert_eq!(decision.kind, FedosAeadNonceKind::NinetySixBit);
+            assert_eq!(decision.state, FedosNonceState::Ready);
+        }
+    }
+
+    /// The nonce helper is independent of `fedos_random_bytes_32` — two
+    /// calls, one to each function, both succeed independently (guards
+    /// against a future refactor accidentally making one call the other
+    /// internally, which would violate the "two boundaries, not one"
+    /// design `docs/public_random_boundary.md` section 1 fixed).
+    #[test]
+    fn fedos_aead_nonce_96_and_fedos_random_bytes_32_both_succeed_independently() {
+        let nonce_decision = fedos_aead_nonce_96();
+        let random_decision = fedos_random_bytes_32();
+        assert_eq!(nonce_decision.state, FedosNonceState::Ready);
+        assert_eq!(random_decision.state, FedosRandomBytesState::Ready);
     }
 }

@@ -187,8 +187,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
       "fedos_random_bytes_32",
+      "fedos_aead_nonce_96",
     ];
-    expect(pubFnNames.length).toBe(23);
+    expect(pubFnNames.length).toBe(24);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -295,6 +296,7 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
       "fedos_random_bytes_32",
+      "fedos_aead_nonce_96",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);
@@ -305,10 +307,32 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+open_aes256gcm/);
   });
 
-  it("14. no key/nonce/plaintext/ciphertext/tag storage field anywhere in production code", () => {
+  it("14. no key/nonce/plaintext/ciphertext/tag storage field anywhere in production code, except the one reviewed Stage 138 nonce field", () => {
     // Field/parameter DECLARATIONS only (name immediately followed by a
-    // colon-typed annotation) — not prose in a doc comment.
-    expect(productionLibRs).not.toMatch(
+    // colon-typed annotation) — not prose in a doc comment. Stage 138
+    // adds exactly one reviewed exception: `FedosAeadNonceDecision.nonce`
+    // (a fixed-size `[u8; 12]`, not a secret — see
+    // test/fedos_core_rust_aead_nonce.test.ts for the dedicated checks).
+    // Excise its own top-of-file summary paragraph AND its code block
+    // (declaration + both construction sites) before checking the rest
+    // of production code carries no such field.
+    const summaryStart = productionLibRs.indexOf("Stage 138 adds a second real function");
+    const summaryEnd = productionLibRs.indexOf("#![forbid(unsafe_code)]");
+    const codeStart = productionLibRs.indexOf(
+      "Stage 138 — a fixed-size AEAD nonce helper, drawn from the OS CSPRNG",
+    );
+    const codeEnd = productionLibRs.indexOf(
+      "Stage 79 — an INTERNAL-ONLY secret-handle skeleton",
+    );
+    expect(summaryStart, "expected the Stage 138 crate-doc summary").toBeGreaterThan(-1);
+    expect(summaryEnd, "expected #![forbid(unsafe_code)] after the summary").toBeGreaterThan(-1);
+    expect(codeStart, "expected the Stage 138 code marker").toBeGreaterThan(-1);
+    expect(codeEnd, "expected the Stage 79 marker after Stage 138's code").toBeGreaterThan(-1);
+    const withoutStage138 =
+      productionLibRs.slice(0, summaryStart) +
+      productionLibRs.slice(summaryEnd, codeStart) +
+      productionLibRs.slice(codeEnd);
+    expect(withoutStage138).not.toMatch(
       /\b(key|nonce|iv|plaintext|ciphertext|tag)\s*:\s*\w/i,
     );
   });

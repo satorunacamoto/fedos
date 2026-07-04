@@ -75,13 +75,15 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
   const testOnlyLibRs = firstCfgTestIdx === -1 ? "" : libRsSource.slice(firstCfgTestIdx);
 
   // Bounded exactly to what Stage 137 added: from its own marker to the
-  // start of Stage 79's secret_handle module (the same "narrow to the
-  // next stage's marker" convention every prior public-boundary stage
-  // used — see e.g. test/fedos_core_rust_key_format_label.test.ts).
+  // start of Stage 138's marker (narrowed from "Stage 79" once Stage 138
+  // added new content between Stage 137's addition and the secret_handle
+  // module — the same "narrow to the next stage's marker" convention
+  // every prior public-boundary stage used — see e.g.
+  // test/fedos_core_rust_key_format_label.test.ts).
   const stage137Section = extractSection(
     libRsSource,
     "Stage 137 — first REAL implementation behind this crate's random-byte",
-    "Stage 79 — an INTERNAL-ONLY secret-handle skeleton",
+    "Stage 138 — a fixed-size AEAD nonce helper, drawn from the OS CSPRNG",
   );
 
   const aeadCoreModule = extractModule(libRsSource, "mod aead_core");
@@ -137,14 +139,17 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
     expect(stage137Section).not.toMatch(/->\s*Vec\s*<\s*u8\s*>/);
   });
 
-  it("7. getrandom::fill is CALLED in production code exactly once, inside fedos_random_bytes_32", () => {
+  it("7. getrandom::fill is CALLED in production code inside fedos_random_bytes_32 (and, since Stage 138, fedos_aead_nonce_96 — nowhere else)", () => {
     // Several doc comments legitimately NAME `getrandom::fill` in prose
     // (to describe what the function below does); count actual CALL
     // sites (the `(` invocation syntax), not bare "getrandom::" mentions.
+    // Updated Stage 138: fedos_aead_nonce_96 is a second, independent
+    // call site (see test/fedos_core_rust_aead_nonce.test.ts) — this
+    // still asserts there are no OTHER call sites beyond those two.
     const fnBody = extractSection(stage137Section, "pub fn fedos_random_bytes_32", "\n}");
     expect(fnBody).toMatch(/getrandom::fill\s*\(\s*&mut\s+buf\s*\)/);
     const callSites = productionLibRs.match(/getrandom::fill\s*\(/g) ?? [];
-    expect(callSites.length).toBe(1);
+    expect(callSites.length).toBe(2);
   });
 
   it("8. the call site matches getrandom::fill exhaustively — Ok/Err both produce a fixed decision, never a panic", () => {
@@ -224,7 +229,7 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
       (m) => m[1],
     );
     expect(pubFnNames).toContain("fedos_random_bytes_32");
-    expect(pubFnNames.length).toBe(23);
+    expect(pubFnNames.length).toBe(24);
     // The #[cfg(test)]-only wiring module's own test functions are not
     // `pub` — this stage's tests live behind cfg(test) like every other
     // vector/wiring module in this crate.

@@ -124,11 +124,11 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     }
   });
 
-  it("4. no encrypt/decrypt/derive IMPLEMENTATION function is added — only status/label functions and Stage 137's one explicit exception exist", () => {
+  it("4. no encrypt/decrypt/derive IMPLEMENTATION function is added — only status/label functions and the two explicit Stage 137/138 exceptions exist", () => {
     // Every public function name must end in one of these safe suffixes,
-    // OR be the one explicit, individually-reviewed exception below; none
-    // may be a bare `encrypt`/`decrypt`/`derive_key` (without the
-    // `_placeholder` suffix) or any `*_impl`/`*_real` name.
+    // OR be one of the two explicit, individually-reviewed exceptions
+    // below; none may be a bare `encrypt`/`decrypt`/`derive_key` (without
+    // the `_placeholder` suffix) or any `*_impl`/`*_real` name.
     // Updated Stage 103: `_descriptors`/`_version`/`_features`/`_decision`
     // added as safe suffixes for the new boundary-consolidation functions.
     // Updated Stage 106: `_requirements` added for
@@ -140,10 +140,17 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     // since it is not a placeholder. Rather than widen the suffix regex
     // (which would silently allow any future `..._32`/`..._bytes` name),
     // it is named as a single, explicit, closed exception.
+    // Updated Stage 138: `fedos_aead_nonce_96` (see
+    // test/fedos_core_rust_aead_nonce.test.ts) joins the same closed
+    // exception set for the same reason — a real nonce-drawing function,
+    // not a placeholder.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    const explicitImplementationExceptions = new Set(["fedos_random_bytes_32"]);
+    const explicitImplementationExceptions = new Set([
+      "fedos_random_bytes_32",
+      "fedos_aead_nonce_96",
+    ]);
     for (const name of pubFnNames) {
       const hasSafeSuffix =
         /_placeholder$|_status$|_capabilities$|_descriptors$|_version$|_features$|_decision$|_requirements$/.test(

@@ -112,8 +112,9 @@ describe("FedOS Rust crate — internal domain label skeleton", () => {
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
       "fedos_random_bytes_32",
+      "fedos_aead_nonce_96",
     ];
-    expect(pubFnNames.length).toBe(23);
+    expect(pubFnNames.length).toBe(24);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

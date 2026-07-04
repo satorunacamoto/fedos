@@ -4,7 +4,38 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 137 — first REAL implementation behind this crate's
+> **Status: Stage 138 — a fixed-size AEAD nonce helper:
+> `fedos_aead_nonce_96`.** `FedosAeadNonceKind` (one variant,
+> `NinetySixBit`), `FedosNonceState` (`Ready` / `EntropySourceUnavailable`
+> — independent of `FedosRandomBytesState`), and `FedosAeadNonceDecision`
+> (`kind`/`state`/`nonce: Option<[u8; 12]>`) round out the group.
+> `fedos_aead_nonce_96()` draws exactly 12 bytes (96 bits) from the OS
+> CSPRNG via `getrandom::fill` — a SECOND real call site of `getrandom`,
+> independent of `fedos_random_bytes_32` (Stage 137) and not implemented
+> by calling it. The public `pub fn` surface grows from twenty-three
+> (Stage 137) to twenty-four. 96 bits matches both currently-adopted AEAD
+> candidates' shared nonce size (ChaCha20-Poly1305, AES-256-GCM). Same
+> shape as Stage 137 throughout: fixed, label-selected size, no
+> zero-length/caller-supplied count, a fixed
+> `EntropySourceUnavailable`/`nonce: None` failure with no fallback PRNG
+> and no panic. The nonce is never deterministic, never a counter, and
+> never derived from a seed/password/user input, per
+> `docs/nonce_generation_policy.md` (Stage 134, updated §16 this stage).
+> This is a nonce-DRAWING helper ONLY — no AEAD seal/open, no encryption,
+> no decryption, and no connection to
+> `encrypt_placeholder`/`decrypt_placeholder` (Stage 69), `aead_core`
+> (Stage 80), `kdf_core` (Stage 82), or `SecretHandle` (Stage 79).
+> `Cargo.toml` is UNCHANGED; no Runtime/Worker/CryptoProvider/WASM
+> wiring. **Stage 137's cargo verification gate is also now confirmed
+> GREEN** in a real toolchain environment
+> (`stable-x86_64-pc-windows-msvc`, rustc/cargo 1.96.1) —
+> `cargo check`/`cargo test`/`cargo check --tests` all passed, no code
+> fix was needed (see `docs/random_bytes_implementation_plan.md` §15).
+> See "Rust AEAD nonce helper (Stage 138)" below, and
+> [`docs/nonce_generation_policy.md`](../../docs/nonce_generation_policy.md)
+> §16 for the full record. Prior status:
+>
+> **Stage 137 — first REAL implementation behind this crate's
 > public API: `fedos_random_bytes_32`.** `FedosRandomBytesLength` (one
 > variant, `ThirtyTwo`), `FedosRandomBytesState` (`Ready` /
 > `EntropySourceUnavailable`), and `FedosRandomBytesDecision`
@@ -2860,3 +2891,101 @@ Runtime/Worker/`CryptoProvider` connection, no `println!`/`log`/`unsafe`
 usage, the `random_bytes_wiring` test module itself calls no `getrandom`,
 no raw secret exposed on the public API, no committed build artifact, and
 all three design docs exist).
+
+## Rust AEAD nonce helper (Stage 138)
+
+Stage 138 implements `docs/nonce_generation_policy.md`'s MVP decision
+(Stage 134): a CSPRNG-drawn random nonce, fixed at 96 bits, never a
+counter, never deterministic, never derived from a seed/password/user
+input. It is the second real implementation this crate ships (after
+Stage 137's `fedos_random_bytes_32`), deliberately scoped as narrowly:
+nonce drawing ONLY, no AEAD seal/open, no encrypt/decrypt, no key
+derivation, and no connection to the crate's crypto skeletons.
+
+**`FedosAeadNonceKind`** (`pub enum`, placed right after
+`fedos_random_bytes_32`, still ahead of Stage 79's `secret_handle`
+module) — exactly ONE variant, `NinetySixBit`, matching this crate's two
+adopted AEAD candidates' (ChaCha20-Poly1305, AES-256-GCM) shared nonce
+size. No zero-length, custom-length, or caller-selected-length variant
+exists; a future 192-bit (XChaCha20-Poly1305-style) variant would be its
+own reviewed addition.
+
+**`FedosNonceState`** (`Ready` / `EntropySourceUnavailable`) is a
+DELIBERATELY SEPARATE type from `FedosRandomBytesState` — each
+independent boundary this crate exposes gets its own state enum, the
+same "each future operation gets its own type" choice Stage 103 already
+established. **`FedosAeadNonceDecision`** (`kind: FedosAeadNonceKind`,
+`state: FedosNonceState`, `nonce: Option<[u8; 12]>`) rounds out the
+group — `nonce` is `Some` only on `Ready`, always `None` on
+`EntropySourceUnavailable`, and is a fixed-size `[u8; 12]` never a
+`Vec<u8>` or borrowed slice.
+
+**`fedos_aead_nonce_96()`** — the one new public function — takes NO
+parameter of any kind and draws exactly 12 bytes from the OS CSPRNG via
+`getrandom::fill(&mut buf)`, matched exhaustively (`Ok(())` / `Err(_)`,
+never `.unwrap()`/`.expect()`/`panic!`) — the crate's SECOND real
+`getrandom` call site, textually and functionally independent of
+`fedos_random_bytes_32` (neither calls the other). On success it returns
+`Ready` with the 12 drawn bytes; on any CSPRNG failure it returns
+`EntropySourceUnavailable` with `nonce: None` — no fallback PRNG, no
+`rand`/`thread_rng` substitute, and no degraded/partial/counter-derived
+output.
+
+**What is explicitly NOT implemented or connected:**
+
+- No AEAD seal/open, no encryption, no decryption, and no key
+  derivation/generation of any kind.
+- No connection to `encrypt_placeholder`/`decrypt_placeholder` (Stage
+  69), `aead_core` (Stage 80), `kdf_core` (Stage 82), or `SecretHandle`
+  (`secret_handle`, Stage 79) — all remain exactly as placeholder as
+  before this stage. A future AEAD implementation stage would need to be
+  the one to call this helper — that wiring does not exist yet.
+- No deterministic nonce, no counter nonce, and no nonce derived from a
+  seed, password, user id, or timestamp — the function accepts no
+  parameter that could carry one.
+- `fedos_nonce_boundary_status`/`FedosNonceBoundary` (Stage 103) are
+  byte-for-byte UNCHANGED — this stage adds a new, independent function
+  rather than editing either.
+- `Cargo.toml` is UNCHANGED — no dependency change of any kind.
+- No WASM target, loader, or artifact; no Runtime/Worker/`CryptoProvider`
+  wiring.
+
+**Rust-side `cargo test` coverage** (`aead_nonce_wiring`, a new
+`#[cfg(test)]`-only module at the end of `src/lib.rs`, mirroring
+Stage 137's `random_bytes_wiring` shape exactly): a successful call
+returns exactly 12 bytes tagged `Ready`; two calls in immediate
+succession are asserted to differ (a non-determinism sanity check, not a
+statistical randomness proof); the fixed
+`EntropySourceUnavailable`/`nonce: None` failure shape is constructed and
+asserted directly, since fault-injecting a real OS CSPRNG failure isn't
+practical in a portable `cargo test`; `FedosAeadNonceKind` is asserted to
+have no variant beyond `NinetySixBit`; ten repeated calls are asserted
+not to panic; and `fedos_aead_nonce_96`/`fedos_random_bytes_32` are
+asserted to both succeed independently (guarding against a future
+refactor accidentally making one call the other).
+
+**Verified against a real Rust toolchain**
+(`stable-x86_64-pc-windows-msvc`, rustc/cargo 1.96.1): `cargo check`,
+`cargo test` (119 crate unit tests, up from 113 at Stage 137 — the six
+new `aead_nonce_wiring` tests), and `cargo check --tests` all GREEN on
+the first run; no code fix was needed.
+
+See
+[`test/fedos_core_rust_aead_nonce.test.ts`](../../test/fedos_core_rust_aead_nonce.test.ts)
+(20 tests) for the dedicated Stage 138 guard tests (all three new types
+and the function declared, the kind enum has no zero/variable/
+caller-length escape hatch, the function takes no parameter, `nonce` is
+`Option<[u8; 12]>` never `Vec<u8>`, `getrandom::fill` is called exactly
+once inside this helper and independently of `fedos_random_bytes_32`'s
+own call, matched exhaustively with no panic path, no fallback PRNG/
+deterministic/counter/seed/password/user-input nonce construct —
+checked structurally rather than by a bare word match, since this
+stage's own doc comments legitimately NAME each of those concepts to say
+none is done — not connected to
+`SecretHandle`/`aead_core`/`kdf_core`/`fedos_random_bytes_32`, the prior
+functions verified byte-for-byte, the twenty-four-function `pub fn`
+surface, `Cargo.toml` unchanged, no Runtime/Worker/`CryptoProvider`
+connection, no `println!`/`log`/`unsafe` usage, the `aead_nonce_wiring`
+test module itself calls no `getrandom`, no raw secret exposed on the
+public API, no committed build artifact, and the nonce policy doc
+exists and names this helper's design).

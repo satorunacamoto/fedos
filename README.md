@@ -8,7 +8,68 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 137 — Rust `randomBytes` implementation.** The
+> **Status: Stage 138–140 — Fixed-size AEAD nonce helper + Stage 137
+> cargo-verification gate closed.** `packages/fedos-core-rust/src/lib.rs`
+> gains `fedos_aead_nonce_96()` — the crate's SECOND real implementation,
+> drawing exactly 12 bytes (96 bits) from the OS CSPRNG via
+> `getrandom::fill`, independent of Stage 137's `fedos_random_bytes_32`
+> (neither calls the other). `FedosAeadNonceKind` (one variant,
+> `NinetySixBit`), `FedosNonceState` (`Ready` / `EntropySourceUnavailable`
+> — its own independent type, not shared with `FedosRandomBytesState`),
+> and `FedosAeadNonceDecision` (`kind`/`state`/`nonce: Option<[u8; 12]>`)
+> round out the group. The public `pub fn` surface grows from twenty-three
+> (Stage 137) to twenty-four.
+>
+> **Implements `docs/nonce_generation_policy.md`'s MVP decision (Stage
+> 134) exactly**: a CSPRNG-drawn random nonce, never a counter, never
+> deterministic, never derived from a seed/password/user id — the
+> function accepts no parameter of any kind. A CSPRNG failure returns
+> `EntropySourceUnavailable` with `nonce: None` — no fallback PRNG, no
+> panic. **This is a nonce-DRAWING helper ONLY**: no AEAD seal/open, no
+> encrypt/decrypt, no key derivation, and no connection to
+> `encrypt_placeholder`/`decrypt_placeholder` (Stage 69), `aead_core`
+> (Stage 80), `kdf_core` (Stage 82), or `SecretHandle` (Stage 79) — a
+> future AEAD stage would need to be the one to call this helper, and
+> that wiring does not exist yet. `Cargo.toml` is UNCHANGED; no
+> Runtime/Worker/WASM wiring.
+>
+> New [`test/fedos_core_rust_aead_nonce.test.ts`](test/fedos_core_rust_aead_nonce.test.ts)
+> (20 tests) and a new `#[cfg(test)]`-only `aead_nonce_wiring` module in
+> `src/lib.rs` (6 tests: exact 12 bytes returned, two calls differ — a
+> non-determinism sanity check, not a randomness proof — the fixed
+> failure shape, the single-variant kind enum, no panic across repeated
+> calls, and independence from `fedos_random_bytes_32`) cover the new
+> boundary. Thirty-one existing `fedos_core_rust_*.test.ts` guard files
+> were updated for the new twenty-four-function `pub fn` total, and one
+> pre-existing invariant test
+> ([`test/fedos_core_rust_aes_gcm_wiring.test.ts`](test/fedos_core_rust_aes_gcm_wiring.test.ts))
+> gained a narrow, explicit exception for the one reviewed `nonce` field
+> this stage introduces.
+>
+> **Stage 137's cargo-verification gate — outstanding since that stage's
+> own status report — is now CLOSED.** No Rust toolchain existed in the
+> working environment; a `stable-x86_64-pc-windows-msvc` toolchain
+> (rustc/cargo 1.96.1) was installed (Visual Studio Build Tools 2026 +
+> `rustup`, after the GNU host's bundled linker turned out to be
+> incomplete) and `cargo check`/`cargo test`/`cargo check --tests` all ran
+> GREEN — 113 crate unit tests passed at Stage 137 (119 after this
+> stage's own nonce tests), including all five dedicated
+> `random_bytes_wiring` tests. **No code fix was needed** — Stage 137's
+> implementation compiled and passed on the first real `cargo test` run.
+> `docs/random_bytes_implementation_plan.md` §15 and
+> `docs/nonce_generation_policy.md` §16 record this. `npm run typecheck`
+> and `npm test` stay GREEN (131 files, 1963 tests). Where this batch
+> stopped, on purpose: no AEAD/encrypt/decrypt/deriveKey implementation,
+> no `SecretHandle` real bytes, no WASM, and no Runtime/Worker wiring —
+> see `docs/implementation_phase_roadmap.md`. Stage 141 candidates: (1)
+> `SecretHandle` real-byte implementation PLANNING update (recommended
+> first — finalize the real-byte design in writing, per
+> `docs/secret_lifecycle_implementation_plan.md`, before touching the
+> type); (2) `SecretHandle` real-byte implementation; (3) HKDF internal
+> implementation.
+> Prior status:
+>
+> **Stage 137 — Rust `randomBytes` implementation.** The
 > Implementation Phase's FIRST real code: `packages/fedos-core-rust/src/lib.rs`
 > gains `FedosRandomBytesLength` (one variant, `ThirtyTwo`),
 > `FedosRandomBytesState` (`Ready` / `EntropySourceUnavailable`),

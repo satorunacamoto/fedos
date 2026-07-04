@@ -103,17 +103,19 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     expect(cargoCode).not.toContain("wasm32");
   });
 
-  it("4. production code calls getrandom ONLY inside fedos_random_bytes_32 (Stage 137) — see test/fedos_core_rust_random_bytes.test.ts for the dedicated checks", () => {
+  it("4. production code calls getrandom ONLY inside fedos_random_bytes_32 (Stage 137) and fedos_aead_nonce_96 (Stage 138) — see their dedicated test files", () => {
     // Through Stage 136 this asserted "never calls getrandom" outright.
     // Stage 137 is the first real implementation behind this crate's
-    // public API, scoped to exactly one function — this narrows the
-    // claim to "calls it only there" rather than dropping it.
-    // Several doc comments legitimately NAME `getrandom::fill` in prose;
-    // count actual CALL sites (the `(` invocation syntax), not bare
-    // "getrandom::" mentions.
+    // public API, scoped to exactly one function; Stage 138 adds a
+    // second, independent call site (the nonce helper) — this narrows the
+    // claim to "calls it only in these two places" rather than dropping
+    // it. Several doc comments legitimately NAME `getrandom::fill` in
+    // prose; count actual CALL sites (the `(` invocation syntax), not
+    // bare "getrandom::" mentions.
     const getrandomCallSites = productionLibRs.match(/getrandom::fill\s*\(/g) ?? [];
-    expect(getrandomCallSites.length).toBe(1);
+    expect(getrandomCallSites.length).toBe(2);
     expect(productionLibRs).toMatch(/\bfn\s+fedos_random_bytes_32\s*\([^)]*\)[\s\S]*?getrandom::fill\s*\(/);
+    expect(productionLibRs).toMatch(/\bfn\s+fedos_aead_nonce_96\s*\([^)]*\)[\s\S]*?getrandom::fill\s*\(/);
     // The crate-private skeletons this stage does NOT touch stay exactly
     // as getrandom-free as they were through Stage 136.
     for (const mod of [aeadCoreModule, kdfCoreModule, secretHandleModule, rngModule]) {
@@ -149,8 +151,9 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
       "fedos_random_bytes_32",
+      "fedos_aead_nonce_96",
     ];
-    expect(pubFnNames.length).toBe(23);
+    expect(pubFnNames.length).toBe(24);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
