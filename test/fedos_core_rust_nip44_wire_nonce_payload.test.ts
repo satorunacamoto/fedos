@@ -33,6 +33,10 @@ import storageTypesSource from "../src/storage/types.ts?raw";
 import noopStorageSource from "../src/storage/noop_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import federationTypesSource from "../src/federation/types.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip44WireNonceGenDocSource from "../docs/nip44_wire_nonce_generation.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip44WirePayloadBuilderDocSource from "../docs/nip44_wire_payload_builder.md?raw";
 
 /**
  * Stage 224–228 — NIP-44 v2 wire-compatible implementation building
@@ -152,6 +156,16 @@ describe("NIP-44 wire nonce generation + payload skeleton + diagnostics (Stage 2
       /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*16\]\s*=\s*\[/,
     );
     expect(diagnosticsSource).not.toMatch(/WireNonce|WirePayload/);
+  });
+
+  it("10. docs/nip44_wire_nonce_generation.md and docs/nip44_wire_payload_builder.md exist, document real code, and state ChaCha20/HMAC are not connected", () => {
+    expect(nip44WireNonceGenDocSource).toMatch(/generate_wire_nonce_internal/);
+    expect(nip44WireNonceGenDocSource).toMatch(/this document records real code/i);
+    expect(nip44WirePayloadBuilderDocSource).toMatch(/build_placeholder/);
+    expect(nip44WirePayloadBuilderDocSource).toMatch(/validate_wire_payload_placeholder/);
+    expect(nip44WirePayloadBuilderDocSource).toMatch(
+      /ChaCha20 stream encryption and HMAC-SHA256\s+are NOT connected/i,
+    );
   });
 
   it("11. not connected to Runtime, Worker, StorageBackend, or FederationProvider in any way", () => {

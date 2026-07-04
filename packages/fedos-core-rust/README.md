@@ -4318,3 +4318,71 @@ serialization, no `ConversationKey`/`crypto::hkdf_bridge` change, no
 `CryptoCapability` addition. No Runtime/Worker/Storage/Federation/Relay/
 WASM/FFI connection. No TypeScript serialization change. No new
 `Cargo.toml` dependency.
+
+## NIP-44 v2 wire-compatible implementation, second slice: wire nonce generation + payload skeleton (Stage 224–228)
+
+Stage 224–228 land the wire format's SUPPORTING pieces — a real 32-byte
+nonce generator and a payload skeleton/validator — still WITHOUT any
+ChaCha20 stream encryption, HMAC computation, or encrypt/decrypt
+connection.
+
+**Stage 224**:
+[`crypto::nip44_wire_nonce`](src/crypto/nip44_wire_nonce.rs) (new) adds
+`generate_wire_nonce_internal() -> Nip44WireNonceDecision` — exactly 32
+bytes from the OS CSPRNG via `getrandom::fill`, `Nip44WireNonceStatus`
+(`Ready`/`InternalFailure`, no fallback). COMPLETELY INDEPENDENT of this
+crate's pre-existing `fedos_aead_nonce_96`/`FedosAeadNonceDecision`
+(Stage 138) — no shared type, no shared helper, per
+`docs/nip44_wire_nonce.md` (Stage 215) and now
+[`docs/nip44_wire_nonce_generation.md`](../../docs/nip44_wire_nonce_generation.md)
+(the implementation record).
+
+**Stage 225–226**:
+[`crypto::nip44_wire_payload`](src/crypto/nip44_wire_payload.rs) (new)
+adds `Nip44WirePayload { version, nonce, ciphertext, mac }` (`version`
+fixed `V2`, `nonce` REAL via Stage 224, `ciphertext`/`mac` ALWAYS `None`
+— placeholder only) and `Nip44WirePayloadBuilder::build_placeholder()` —
+the one constructor, taking no ciphertext/plaintext/key/MAC input.
+`validate_wire_payload_placeholder(version_tag, nonce, ciphertext_present,
+mac_present)` checks STRUCTURE ONLY (version tag, nonce length, field
+presence) — no authentication, no decryption, no base64 — mirroring
+`crypto::ciphertext_envelope::validate_envelope_internal`'s own
+"untrusted candidate, structural checks only" shape. Calling it against
+the builder's own output honestly reports `MissingField` (verified by
+this module's own
+`a_freshly_built_placeholder_payload_is_not_yet_wire_valid` test) — see
+[`docs/nip44_wire_payload_builder.md`](../../docs/nip44_wire_payload_builder.md)
+for the full implementation record.
+
+**Stage 227**:
+[`crypto::nip44_wire_diagnostics`](src/crypto/nip44_wire_diagnostics.rs)
+(new) adds a SEPARATE, fixed, two-row preview — `WireNonce` → `Ready`,
+`WirePayload` → `Placeholder` — mirroring `aead_diagnostics`'s own
+"per-feature detail preview alongside the main table" shape (Stage 155).
+Adds NO `CryptoCapability` variant and changes NO existing capability's
+meaning or readiness — `capability_matrix`/`diagnostics` stay exactly as
+they were (still sixteen variants). `Nip44WireReadiness::Placeholder`
+names a state `CapabilityReadiness`'s four existing labels have no
+accurate match for: real, tested, connected code whose `ciphertext`/`mac`
+fields are still an explicit placeholder.
+
+**Guards**: a new
+[`test/fedos_core_rust_nip44_wire_nonce_payload.test.ts`](../../test/fedos_core_rust_nip44_wire_nonce_payload.test.ts)
+confirms: all three new files stay `pub(crate)`-only,
+`unsafe`/`.unwrap(`/`.expect(`/`panic!(`-free; the nonce generator draws
+32 bytes via `getrandom::fill` with zero connection to
+`fedos_aead_nonce_96`; the payload builder/validator hold the documented
+shape; no ChaCha20/HMAC/base64/encode/decode function exists anywhere in
+the three files; `crypto::conversation_key`/`crypto::message_key`/
+`crypto::hkdf_bridge` are untouched; `capability_matrix`/`diagnostics`
+stay unchanged in shape; the two new docs exist and record the real
+implementation; and the usual Runtime/Worker/Storage/Federation/
+`pub fn`-count/`Cargo.toml`-dependency-count/`package.json`-dependency-count/
+no-`serde`-derive checks all still hold.
+
+Public `pub fn` surface unchanged at twenty-seven. No ChaCha20 stream
+cipher, no HMAC computation, no encrypt/decrypt connection, no base64, no
+wire encode/decode, no `ConversationKey`/`MessageKey`/`crypto::hkdf_bridge`
+change, no `CryptoCapability` addition. No Runtime/Worker/Storage/
+Federation/Relay/WASM/FFI connection. No TypeScript serialization change.
+No new `Cargo.toml` dependency.
