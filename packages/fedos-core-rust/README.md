@@ -4165,3 +4165,85 @@ encrypt/decrypt implementation, no base64, no HMAC-SHA256, no raw ChaCha20
 stream cipher. No Runtime/Worker/Storage/Federation/Relay/WASM/FFI
 connection. No TypeScript serialization change. No new `Cargo.toml`
 dependency.
+
+## NIP-44 v2 exact wire preparation: message key review, nonce/payload planning, and derivation skeleton (Stage 214–218)
+
+Stage 214–218 add zero new encrypt/decrypt/base64/HMAC/ChaCha20-stream
+code. They fix the NIP-44 v2 spec itself — exact message key derivation,
+the 32-byte wire nonce, and the fixed wire payload layout — in writing
+and in a label-only skeleton, so the eventual byte-exact implementation
+(`docs/nip44_wire_implementation_roadmap.md`) has zero ambiguity left to
+resolve.
+
+**Stage 214**:
+[`docs/nip44_message_key_review.md`](../../docs/nip44_message_key_review.md)
+(new) re-derives NIP-44 v2's real per-message key derivation
+byte-for-byte against `test-vectors/nip44/nip44-v2.json`'s
+`valid.get_message_keys` category: `HKDF-Expand(PRK = conversation_key,
+info = nonce, L = 76)`, split into `chacha_key` (bytes 0–32),
+`chacha_nonce` (bytes 32–44), `hmac_key` (bytes 44–76) — NOT a second
+extract. It also corrects `docs/nip44_internal_plan.md` §4's own
+terminology: the per-message `nonce` plays RFC 5869's `info` role (an
+expand-step parameter), not `salt` (an extract-step parameter) — a
+wording-only correction; the substantive claims in §4 were already right.
+A diff table lines this up against what `crypto::hkdf_bridge` (Stage
+200–201) actually implements today (a FIXED-domain, nonce-free,
+single-32-byte-output bridge — nothing like the real per-message,
+76-byte, three-way-split derivation).
+
+**Stage 215**:
+[`docs/nip44_wire_nonce.md`](../../docs/nip44_wire_nonce.md) (new) fixes
+the 32-byte wire nonce's role (the HKDF-expand `info` parameter above,
+ALSO carried in the clear as the wire payload's second field), generation
+responsibility (sender draws it fresh every message, CSPRNG-only, never
+deterministic), the reuse prohibition (repeating a nonce under the same
+`conversation_key` deterministically repeats the ENTIRE `chacha_key`/
+`chacha_nonce`/`hmac_key` triple — a compound keystream-reuse failure,
+worse than a typical AEAD nonce reuse), and how it differs from both this
+crate's own 12-byte `fedos_aead_nonce_96`/`FedosAeadNonceDecision` and the
+Stage 204–206 bridge's own (unrelated, 12-byte, stand-in) nonce parameter.
+
+**Stage 216**:
+[`docs/nip44_wire_payload_layout.md`](../../docs/nip44_wire_payload_layout.md)
+(new) fixes the complete wire payload: `version_byte (1 byte, 0x02) ‖
+nonce (32 bytes) ‖ ciphertext (variable, per `calc_padded_len`) ‖ hmac_tag
+(32 bytes)`, then standard-base64-encoded (NOT the base64url this crate's
+OWN, separate `ciphertext_serialization`, Stage 186, already uses) as a
+single string embedded in a Nostr event's `content` field. Documents
+exactly where padding sits (entirely inside the `ciphertext` field,
+invisible at the wire level once encrypted — never its own field) and
+why the field order is fixed the way it is. No encode/decode function is
+implemented.
+
+**Stage 217**:
+[`crypto::nip44_message_keys`](src/crypto/nip44_message_keys.rs) (new,
+`pub(crate)`-only) adds `Nip44DerivedKeyKind` (`ChachaKey`/`ChachaNonce`/
+`HmacKey`), `Nip44MessageKeyStatus` (`Placeholder` — its only variant),
+`Nip44MessageKeyDecision` (holds only the above two labels), and
+`derive_message_keys_exact_placeholder()` — takes NO `ConversationKey`,
+NO nonce, and no other input, always returns all three kinds as
+`Placeholder`. No HKDF call, no nonce generation, no HMAC, no ChaCha20
+stream cipher — a label-only skeleton mirroring `crypto::nip44_wire`'s
+own shape (Stage 209–213), fixing the vocabulary the real derivation
+(`docs/nip44_wire_implementation_roadmap.md` step 1) would eventually
+return through.
+
+**Guards**: a new
+[`test/fedos_core_rust_nip44_message_key_review.test.ts`](../../test/fedos_core_rust_nip44_message_key_review.test.ts)
+confirms: the three new docs exist and name their required content;
+`nip44_message_keys` is `pub(crate)`-only with no HKDF/HMAC/ChaCha20/
+nonce-generation import in its code (comments may legitimately NAME them
+in "this module does NOT use X" prose); `derive_message_keys_exact_placeholder`
+takes no parameter and its status enum has no variant beyond
+`Placeholder`; `crypto::conversation_key`/`crypto::message_key`/
+`crypto::hkdf_bridge` and `crypto::nip44_wire` are untouched; capability/
+diagnostics stay unchanged in shape; and the usual Runtime/Worker/
+Storage/Federation/`pub fn`-count/`Cargo.toml`-dependency-count/
+`package.json`-dependency-count/no-`serde`-derive checks all still hold.
+
+Public `pub fn` surface unchanged at twenty-seven. No NIP-44 v2 wire
+encrypt/decrypt implementation, no base64, no HMAC-SHA256, no raw ChaCha20
+stream cipher, no nonce generation, no `ConversationKey`/`MessageKey`/
+`HkdfDomain` change. No Runtime/Worker/Storage/Federation/Relay/WASM/FFI
+connection. No TypeScript serialization change. No new `Cargo.toml`
+dependency.
