@@ -229,7 +229,7 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
       (m) => m[1],
     );
     expect(pubFnNames).toContain("fedos_random_bytes_32");
-    expect(pubFnNames.length).toBe(24);
+    expect(pubFnNames.length).toBe(26);
     // The #[cfg(test)]-only wiring module's own test functions are not
     // `pub` — this stage's tests live behind cfg(test) like every other
     // vector/wiring module in this crate.

@@ -103,3 +103,17 @@ part of that future stage's own review, not automated here.
   exactly matching this crate's actual implementation state as of Stage
   151. Not a public API addition, not a new dependency, never touches a
   secret byte.
+
+## 8. Stage 164 update — a tenth row, `Envelope` (`Ready`)
+
+`crypto_diagnostics_preview()` now returns `[CapabilityReport; 10]`,
+adding an `Envelope` row (right after `Aead`) reporting `Ready` — the
+Stage 157–163 ciphertext-envelope + AEAD↔envelope bridge work
+(`crypto::ciphertext_envelope`/`crypto::aead_envelope_bridge`) is real and
+`cargo test`-verified, per `docs/crypto_capability_matrix.md` §8. (Note:
+by Stage 164, `Aead`'s own row already reports `Ready` too, not
+`NotConnected` — it was promoted in Stage 155, per
+`docs/aead_internal_implementation.md`; §2's table above is a
+point-in-time snapshot from Stage 151 and is not re-updated here except
+for this section's own `Envelope` addition.) Every other row/behavior
+from §2–§6 is otherwise unchanged.

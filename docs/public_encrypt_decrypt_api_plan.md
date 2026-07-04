@@ -167,3 +167,33 @@ earlier binding docs win.
 - **NIP-44 remains its own, separate, future stage** — not designed here.
 - No code, test, or `Cargo.toml` change is authorized or made by this
   document.
+
+## 9. Stage 166–167 update — the API is now IMPLEMENTED
+
+`pub fn fedos_encrypt`/`pub fn fedos_decrypt` (`src/lib.rs`) now exist,
+satisfying every constraint this plan fixed — see `docs/public_crypto_api.md`
+for the full implementation record and test/fedos_core_rust_public_crypto_api.test.ts
+for the dedicated checks. In summary:
+
+- **§3/§4 satisfied exactly**: the key input is `&SecretHandle` only; the
+  nonce is always drawn internally by `fedos_encrypt` (via
+  `fedos_aead_nonce_96`) or extracted from the envelope by `fedos_decrypt`,
+  never a parameter; the ciphertext is `fedos_encrypt`'s returned envelope
+  type / `fedos_decrypt`'s accepted envelope-reference parameter, never a
+  bare byte buffer; the AAD is a fixed `AeadAadDomain` selection.
+- **§7's open question is answered**: `encrypt`/`decrypt` became ONE
+  function EACH, algorithm-SELECTABLE via an `AeadCipher` parameter on
+  `fedos_encrypt` (`fedos_decrypt` needs no such parameter — the envelope
+  already carries which algorithm sealed it) — not two functions per
+  algorithm.
+- **One deliberate, reviewed scope limitation beyond this plan's own
+  text**: `SecretHandle` and `AeadCiphertextEnvelope` themselves remain
+  `pub(crate)`, not promoted to `pub`. This plan's §3 already required the
+  key type to be "`SecretHandle` (or a future public-facing wrapper)" and
+  left that choice open — Stage 166–167 chose literal minimal scope: the
+  two functions are `pub` in NAME, but not yet practically callable from
+  outside this crate until a future stage also exposes those types (or
+  narrowly-scoped opaque wrappers around them). See
+  `docs/public_crypto_api.md` §3 for the full reasoning.
+- **§5 (Runtime/Storage) and §6 (NIP-44) remain exactly as deferred as
+  this plan left them** — nothing in Stage 166–170 wires either.

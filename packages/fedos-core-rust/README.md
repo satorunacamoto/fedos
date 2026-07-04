@@ -3394,3 +3394,98 @@ See
 Nostr/NIP-44/WASM connection, no `Cargo.toml` change, no serialization of
 any kind, the twenty-four-function `pub fn` surface unchanged, and no
 `unwrap`/`expect`/`panic!`/`unsafe`.
+
+## Internal crypto completion: AEAD/envelope bridge + public encrypt/decrypt API (Stage 161–170)
+
+Stage 161–163 implement `docs/ciphertext_envelope_plan.md` section 9's
+planned bridge: a new
+[`src/crypto/aead_envelope_bridge.rs`](src/crypto/aead_envelope_bridge.rs)
+adds `envelope_from_seal_decision_internal` (AEAD seal result → real
+envelope) and `open_decision_from_envelope_internal` (envelope → AEAD
+open), both `pub(crate)`-only. `AeadCiphertextEnvelope`'s ciphertext field
+changes from a fixed `ciphertext_placeholder: [u8; 4]` to a real,
+variable-length `ciphertext: Vec<u8>` (the struct drops its `Copy` derive
+accordingly); the original placeholder-producing constructor is unchanged
+in signature, and a new `new_with_ciphertext_for_internal_use` constructor
+is the only way to populate the field with real bytes. A Stage 157–158
+skeleton (placeholder) envelope passed to the open bridge is rejected via
+ORDINARY AEAD authentication failure — no special-case branch exists.
+
+Stage 164 adds a tenth `CryptoCapability` variant, `Envelope` (right
+after `Aead`), reporting `Ready` in `crypto_diagnostics_preview()`.
+
+Stage 165 updates this crate's own crate-level doc comment
+(`src/lib.rs`) and the docs above (`docs/ciphertext_envelope_plan.md`
+section 11, `docs/aead_internal_implementation.md` section 12,
+`docs/crypto_capability_matrix.md` section 8,
+`docs/crypto_diagnostics.md` section 8) to record all of the above as
+implemented.
+
+Stage 166–167 add this crate's FIRST public crypto-operation functions:
+**`pub fn fedos_encrypt(algorithm, key: &SecretHandle, aad_domain,
+plaintext: &[u8]) -> FedosEncryptDecision`** and **`pub fn
+fedos_decrypt(key: &SecretHandle, envelope: &AeadCiphertextEnvelope) ->
+FedosDecryptDecision`**. `fedos_encrypt` draws its own fresh nonce
+internally (never a parameter) and returns a real envelope; `fedos_decrypt`
+extracts everything it needs from the envelope, never a separate nonce/
+algorithm parameter. **The crate's public `pub fn` surface grows from
+twenty-four to twenty-six.**
+
+**One deliberate, reviewed scope limitation**: `SecretHandle` and
+`AeadCiphertextEnvelope` remain `pub(crate)` — not promoted to `pub` this
+stage. `fedos_encrypt`/`fedos_decrypt` are `pub` in NAME, but not yet
+practically callable from outside this crate until a future stage also
+exposes those types (or narrowly-scoped opaque wrappers around them). See
+`docs/public_crypto_api.md` for the full record of this choice, confirmed
+explicitly during this stage's review. Both functions carry an
+`#[allow(private_interfaces)]` with a doc comment explaining why, rather
+than silently suppressing the compiler's own warning about it.
+
+Stage 168 (public crypto diagnostics) is interpreted conservatively: no
+new public function is added beyond `fedos_encrypt`/`fedos_decrypt`
+themselves, consistent with this crate's standing precedent that the
+Stage 103 "frozen" public-boundary status functions
+(`fedos_crypto_boundary_status` and friends) stay untouched by every
+real-implementation stage. Stage 169 adds `docs/public_crypto_api.md`
+(this section's own companion document). Stage 170 is this final
+integration verification itself.
+
+**What is explicitly NOT implemented or connected:**
+
+- No Runtime/Worker/Storage/Nostr/NIP-44/WASM connection anywhere in the
+  bridge or the public API.
+- No serialization of any kind.
+- No public raw key byte, no public raw nonce byte, no public HKDF
+  exposure, no public AEAD-implementation-type exposure.
+- No `Cargo.toml` change — still 9 production dependencies.
+
+**Rust-side `cargo test` coverage**: 10 new tests in
+`aead_envelope_bridge.rs` (round trip for both ciphers, envelope carries
+the algorithm/nonce/AAD-domain used to seal, wrong key, cleared key,
+wrong nonce, wrong AAD domain, tampered ciphertext, a Stage 157–158
+placeholder envelope rejected, and a non-`Ready` seal decision never
+bridging); `ciphertext_envelope.rs`'s own suite updated (13 tests, net +1:
+a new real-ciphertext constructor test and a real-variable-length
+validation test added, the exact-marker tamper test replaced by a
+non-emptiness check); 8 new tests in `src/lib.rs`'s
+`fedos_encrypt_decrypt_wiring` module (encrypt→decrypt round trip for
+both ciphers, wrong key, cleared key, wrong nonce, wrong AAD domain,
+tampered ciphertext, a Stage 157–158 placeholder envelope, and a direct
+pub-fn-surface sanity check).
+
+**Verified against a real Rust toolchain**: `cargo check`, `cargo test`
+(193 crate unit tests, up from 174 at Stage 157–158), and
+`cargo check --tests` all GREEN.
+
+See
+[`test/fedos_core_rust_aead_envelope_bridge.test.ts`](../../test/fedos_core_rust_aead_envelope_bridge.test.ts)
+(16 tests) and
+[`test/fedos_core_rust_public_crypto_api.test.ts`](../../test/fedos_core_rust_public_crypto_api.test.ts)
+(15 tests) for the dedicated Stage 161–170 guard suites, plus updated
+checks in `test/fedos_core_rust_ciphertext_envelope.test.ts`,
+`test/fedos_core_rust_crypto_capability.test.ts`,
+`test/fedos_core_rust_secret_handle_real_bytes.test.ts`, and every other
+test file that asserts an exact `pub fn` count or name list (now 24 → 26
+throughout): no Runtime/Worker/Storage/Nostr/NIP-44 connection, no
+`panic!`/`unwrap`/`expect`, and the twenty-six-function `pub fn` surface
+verified by name.

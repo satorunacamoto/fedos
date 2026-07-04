@@ -26,6 +26,19 @@ import workerSource from "../src/worker.ts?raw";
  * serialization (JSON/base64/CBOR), no Runtime/Worker/Storage/Nostr/
  * NIP-44/WASM connection, no `Cargo.toml` change — every one of those is
  * verified absent below.
+ *
+ * Updated Stage 161: `AeadCiphertextEnvelope`'s ciphertext field changes
+ * from a fixed `ciphertext_placeholder: [u8; 4]` to a real, variable-length
+ * `ciphertext: Vec<u8>` (still defaulting to the fixed placeholder marker
+ * via the ORIGINAL `new_for_internal_use` constructor — a NEW
+ * `new_with_ciphertext_for_internal_use` constructor is the only way to
+ * populate it with real bytes) — this module itself still performs no AEAD
+ * authentication and calls no seal/open function directly; the actual
+ * bridge lives in the new, separately-tested `aead_envelope_bridge.rs` (see
+ * test/fedos_core_rust_aead_envelope_bridge.test.ts). The `InvalidCiphertextPlaceholder`
+ * status is renamed `InvalidCiphertext` and now checks non-emptiness
+ * rather than an exact marker match, since real ciphertext is
+ * variable-length and arbitrary.
  */
 describe("FedOS Rust crate — internal ciphertext envelope skeleton (Stage 157–158)", () => {
   const cargoCode: string = cargoTomlSource
@@ -52,15 +65,16 @@ describe("FedOS Rust crate — internal ciphertext envelope skeleton (Stage 157�
     }
   });
 
-  it("2. AeadCiphertextEnvelope holds version/algorithm/nonce [u8;12]/ciphertext placeholder [u8;4]/aad_domain", () => {
+  it("2. AeadCiphertextEnvelope holds version/algorithm/nonce [u8;12]/ciphertext Vec<u8>/aad_domain (Stage 161: real, variable-length ciphertext)", () => {
     expect(ciphertextEnvelopeSource).toMatch(/version:\s*AeadEnvelopeVersion/);
     expect(ciphertextEnvelopeSource).toMatch(/algorithm:\s*AeadEnvelopeAlgorithm/);
     expect(ciphertextEnvelopeSource).toMatch(/nonce:\s*\[\s*u8\s*;\s*12\s*\]/);
-    expect(ciphertextEnvelopeSource).toMatch(/ciphertext_placeholder:\s*\[\s*u8\s*;\s*4\s*\]/);
+    expect(ciphertextEnvelopeSource).toMatch(/ciphertext:\s*Vec<u8>/);
     expect(ciphertextEnvelopeSource).toMatch(/aad_domain:\s*AeadEnvelopeAadDomain/);
-    // No Vec<u8> ciphertext field — this is a fixed placeholder, not real
-    // variable-length ciphertext.
-    expect(ciphertextEnvelopeSource).not.toMatch(/ciphertext[a-z_]*:\s*Vec<u8>/i);
+    // The struct no longer derives Copy — Vec<u8> is not Copy.
+    expect(ciphertextEnvelopeSource).toMatch(
+      /#\[derive\(Debug,\s*Clone,\s*PartialEq,\s*Eq\)\]\s*\r?\n\s*pub\(crate\)\s+struct\s+AeadCiphertextEnvelope/,
+    );
   });
 
   it("3. AeadEnvelopeVersion has exactly one variant (V1); AeadEnvelopeAlgorithm has exactly two (ChaCha20Poly1305/Aes256Gcm)", () => {
@@ -86,7 +100,7 @@ describe("FedOS Rust crate — internal ciphertext envelope skeleton (Stage 157�
     expect(ciphertextEnvelopeSource).not.toMatch(/\bsuper::aead_internal::AeadAadDomain\b/);
   });
 
-  it("6. validate_envelope_internal is pub(crate)-only and checks version/algorithm/domain/nonce-length/ciphertext-placeholder", () => {
+  it("6. validate_envelope_internal is pub(crate)-only and checks version/algorithm/domain/nonce-length/ciphertext-non-emptiness", () => {
     expect(ciphertextEnvelopeSource).toMatch(
       /\bpub\(crate\)\s+fn\s+validate_envelope_internal\s*\(/,
     );
@@ -97,12 +111,15 @@ describe("FedOS Rust crate — internal ciphertext envelope skeleton (Stage 157�
       "InvalidAlgorithm",
       "InvalidAadDomain",
       "InvalidNonceLength",
-      "InvalidCiphertextPlaceholder",
+      "InvalidCiphertext",
     ]) {
       expect(ciphertextEnvelopeSource, `expected AeadEnvelopeStatus variant: ${status}`).toContain(
         status,
       );
     }
+    // Stage 161: the ciphertext check is non-emptiness, not an exact
+    // marker match — real ciphertext is variable-length and arbitrary.
+    expect(ciphertextEnvelopeSource).toMatch(/ciphertext\.is_empty\s*\(\s*\)/);
   });
 
   it("7. no AEAD authentication/decryption and no seal/open call anywhere in this module", () => {
@@ -149,7 +166,7 @@ describe("FedOS Rust crate — internal ciphertext envelope skeleton (Stage 157�
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(24);
+    expect(pubFnNames.length).toBe(26);
     expect(pubFnNames).not.toContain("validate_envelope_internal");
   });
 

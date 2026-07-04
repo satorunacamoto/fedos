@@ -88,3 +88,15 @@ record, not a new design decision.
 - **Nine fixed, `pub(crate)`-only capability labels**, one per crypto
   concern this crate's design tracks — a naming convenience, not a status
   report, not a public API addition, not a new dependency.
+
+## 8. Stage 164 update — a tenth capability, `Envelope`
+
+`CryptoCapability` gains a tenth variant, **`Envelope`**, inserted right
+after `Aead` in `CryptoCapability::ALL`'s fixed order — naming the Stage
+157–163 ciphertext-envelope + AEAD↔envelope bridge work
+(`crypto::ciphertext_envelope`/`crypto::aead_envelope_bridge`; see
+`docs/ciphertext_envelope_plan.md`). Its `as_static_label()` is
+`"envelope"`. `docs/crypto_diagnostics.md` §8 records the matching
+diagnostics-preview update (`Envelope` reports `Ready`). `CryptoCapability::ALL`
+is now `[CryptoCapability; 10]`; every other variant/label from §2 is
+unchanged.

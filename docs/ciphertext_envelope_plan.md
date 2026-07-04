@@ -197,3 +197,46 @@ This section fixes, in writing, the shape a FUTURE stage connecting
   seal/open bridge (§9) is Stage 161 candidate work, not built here.
 - **No public API, no serialization, no NIP-44** — all three remain
   exactly as unfixed/unbuilt as this document originally left them.
+
+## 11. Stage 161–163 update — the bridge is now IMPLEMENTED
+
+§9's planned bridge is now real code, in a new file,
+`packages/fedos-core-rust/src/crypto/aead_envelope_bridge.rs` — see
+test/fedos_core_rust_aead_envelope_bridge.test.ts for its dedicated checks.
+
+- **`AeadCiphertextEnvelope`'s ciphertext field changes shape**, as §9
+  anticipated: `ciphertext_placeholder: [u8; 4]` becomes
+  `ciphertext: Vec<u8>`. The struct drops its `Copy` derive (`Vec<u8>` is
+  not `Copy`) but keeps `Debug`/`Clone`/`PartialEq`/`Eq`. The ORIGINAL
+  `new_for_internal_use` constructor is unchanged in signature and still
+  produces a placeholder envelope (now storing the marker as a `Vec<u8>`);
+  a NEW constructor, `new_with_ciphertext_for_internal_use`, is the only
+  way to populate the field with real bytes.
+- **`envelope_from_seal_decision_internal(decision: AeadSealDecision,
+  nonce: [u8; 12], aad_domain: AeadAadDomain) -> Option<AeadCiphertextEnvelope>`**
+  — takes an `AeadSealDecision` BY VALUE (not by reference, as §9's draft
+  signature had it — avoids an unnecessary ciphertext clone) plus the same
+  nonce/AAD domain used to produce it. Returns `None` if the decision's
+  status was not `Ready` (there is no ciphertext to carry). This is the
+  ONE place `AeadCipher`/`AeadAadDomain` (`aead_internal`) are mapped onto
+  `AeadEnvelopeAlgorithm`/`AeadEnvelopeAadDomain` (`ciphertext_envelope`).
+- **`open_decision_from_envelope_internal(envelope: &AeadCiphertextEnvelope,
+  key: &SecretHandle) -> AeadOpenDecision`** — the reverse direction,
+  exactly as §9 anticipated: extracts the algorithm/nonce/AAD-domain/
+  ciphertext already carried by the envelope and calls
+  `aead_internal::open_internal`. The caller never separately supplies a
+  nonce or algorithm.
+- **A Stage 157–158 SKELETON (placeholder) envelope is rejected by the
+  open bridge via ORDINARY AEAD authentication failure** — there is no
+  special-case "is this a placeholder" branch; the placeholder marker
+  simply cannot authenticate against any real key, so it fails exactly
+  like any other wrong/tampered ciphertext would
+  (`AeadStatus::AuthenticationFailed`). This is verified directly by this
+  module's own `placeholder_envelope_is_rejected_by_open_bridge` test.
+- **Both bridge functions stay `pub(crate)`-only**, per this plan's §4 —
+  no public API is authorized by this bridge existing. The public
+  `fedos_encrypt`/`fedos_decrypt` functions that call into it are their
+  own, separate, later stage — see `docs/public_crypto_api.md`.
+- **Still no serialization.** The bridge converts between in-memory Rust
+  types only; no wire format, JSON, base64, or CBOR encoding exists
+  anywhere in this module.

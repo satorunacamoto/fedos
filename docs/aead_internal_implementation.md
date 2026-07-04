@@ -254,3 +254,17 @@ pub(crate) fn open_internal(
 - **The ciphertext envelope format remains unfixed** — its own, separate,
   docs-only planning stage (`docs/ciphertext_envelope_plan.md`), which
   this batch also includes.
+
+## 12. Stage 161–163 update — bridged to a real ciphertext envelope
+
+`seal_internal`/`open_internal` are now connected to
+`crypto::ciphertext_envelope::AeadCiphertextEnvelope` via a new,
+dedicated, `pub(crate)`-only bridge module,
+`crypto::aead_envelope_bridge` — see `docs/ciphertext_envelope_plan.md`
+§11 for the full record. This section's own scope (real AEAD seal/open)
+is otherwise unchanged by that bridge: `seal_internal`/`open_internal`
+themselves are not modified, still accept exactly the same five
+parameters, and still return the same `AeadSealDecision`/
+`AeadOpenDecision` shapes. Stage 166–167 (`docs/public_crypto_api.md`)
+builds this crate's first public crypto-operation functions,
+`fedos_encrypt`/`fedos_decrypt`, on top of that bridge.

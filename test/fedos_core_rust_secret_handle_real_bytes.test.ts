@@ -116,9 +116,19 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     expect(secretHandleModule).not.toMatch(/impl\s+AsRef\s*<\s*\[\s*u8\s*\]\s*>/);
   });
 
-  it("7. no public raw-byte accessor: SecretHandle stays pub(crate)-only and no pub fn returns/accepts it", () => {
+  it("7. no public raw-byte accessor: SecretHandle stays pub(crate)-only; no pub fn returns it; the only pub fns accepting it are Stage 166–167's explicit fedos_encrypt/fedos_decrypt", () => {
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+\w+\([^)]*\)\s*->\s*[^{;]*\bSecretHandle\b/);
-    expect(libRsSource).not.toMatch(/\bpub\s+fn\s+\w+\([^)]*\bSecretHandle\b[^)]*\)/);
+    // Updated Stage 166–167: `fedos_encrypt`/`fedos_decrypt` are this
+    // crate's first (and, as of this stage, ONLY) public functions taking
+    // a `SecretHandle` parameter — a deliberate, reviewed exception (see
+    // test/fedos_core_rust_public_crypto_api.test.ts), not an accidental
+    // raw-byte leak: `SecretHandle` itself never exposes its bytes
+    // publicly (test 8 below), and these two functions accept only the
+    // opaque handle, never a raw byte.
+    const pubFnsTakingSecretHandle = [
+      ...libRsSource.matchAll(/\bpub\s+fn\s+(\w+)\([^)]*\bSecretHandle\b[^)]*\)/g),
+    ].map((m) => m[1]);
+    expect([...pubFnsTakingSecretHandle].sort()).toEqual(["fedos_decrypt", "fedos_encrypt"]);
     expect(secretHandleModule).not.toMatch(/\bpub\s+fn\b/);
   });
 
@@ -147,7 +157,7 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(24);
+    expect(pubFnNames.length).toBe(26);
     expect(pubFnNames).not.toContain("new_from_32_bytes_for_internal_use");
   });
 

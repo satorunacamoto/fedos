@@ -124,11 +124,11 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     }
   });
 
-  it("4. no encrypt/decrypt/derive IMPLEMENTATION function is added — only status/label functions and the two explicit Stage 137/138 exceptions exist", () => {
+  it("4. no BARE encrypt/decrypt/derive_key function is added — only status/label functions and the explicit Stage 137/138/166-167 exceptions exist", () => {
     // Every public function name must end in one of these safe suffixes,
-    // OR be one of the two explicit, individually-reviewed exceptions
-    // below; none may be a bare `encrypt`/`decrypt`/`derive_key` (without
-    // the `_placeholder` suffix) or any `*_impl`/`*_real` name.
+    // OR be one of the explicit, individually-reviewed exceptions below;
+    // none may be a bare `encrypt`/`decrypt`/`derive_key` (without a
+    // `fedos_`-prefixed, reviewed name) or any `*_impl`/`*_real` name.
     // Updated Stage 103: `_descriptors`/`_version`/`_features`/`_decision`
     // added as safe suffixes for the new boundary-consolidation functions.
     // Updated Stage 106: `_requirements` added for
@@ -144,12 +144,22 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     // test/fedos_core_rust_aead_nonce.test.ts) joins the same closed
     // exception set for the same reason — a real nonce-drawing function,
     // not a placeholder.
+    // Updated Stage 166–167: `fedos_encrypt`/`fedos_decrypt` (see
+    // test/fedos_core_rust_public_crypto_api.test.ts) join the same
+    // closed exception set — this crate's first public crypto-operation
+    // functions. Both are `fedos_`-prefixed, reviewed, individually-named
+    // exceptions, exactly like the two Stage 137/138 entries — this test's
+    // OWN premise (no bare `encrypt`/`decrypt` function) still holds: the
+    // ban below is specifically on an UNPREFIXED `encrypt`/`decrypt`/
+    // `derive_key` name, which neither of these is.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
     const explicitImplementationExceptions = new Set([
       "fedos_random_bytes_32",
       "fedos_aead_nonce_96",
+      "fedos_encrypt",
+      "fedos_decrypt",
     ]);
     for (const name of pubFnNames) {
       const hasSafeSuffix =
