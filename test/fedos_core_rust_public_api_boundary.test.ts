@@ -124,7 +124,7 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     }
   });
 
-  it("4. no BARE encrypt/decrypt/derive_key function is added — only status/label functions and the explicit Stage 137/138/166-167 exceptions exist", () => {
+  it("4. no BARE encrypt/decrypt/derive_key function is added — only status/label functions and the explicit Stage 137/138/166-176 exceptions exist", () => {
     // Every public function name must end in one of these safe suffixes,
     // OR be one of the explicit, individually-reviewed exceptions below;
     // none may be a bare `encrypt`/`decrypt`/`derive_key` (without a
@@ -152,6 +152,11 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     // OWN premise (no bare `encrypt`/`decrypt` function) still holds: the
     // ban below is specifically on an UNPREFIXED `encrypt`/`decrypt`/
     // `derive_key` name, which neither of these is.
+    // Updated Stage 171–176: `fedos_generate_aead_key_32` (see
+    // test/fedos_core_rust_public_opaque_crypto_api.test.ts) joins the
+    // same closed exception set — this crate's first public
+    // key-GENERATION function, `fedos_`-prefixed and individually
+    // reviewed like every other entry here.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
@@ -160,6 +165,7 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
       "fedos_aead_nonce_96",
       "fedos_encrypt",
       "fedos_decrypt",
+      "fedos_generate_aead_key_32",
     ]);
     for (const name of pubFnNames) {
       const hasSafeSuffix =

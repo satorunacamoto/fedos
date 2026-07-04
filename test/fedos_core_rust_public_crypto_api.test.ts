@@ -14,27 +14,25 @@ import workerSource from "../src/worker.ts?raw";
 /**
  * Stage 166–170 — the public `fedos_encrypt`/`fedos_decrypt` API + docs.
  *
- * `packages/fedos-core-rust/src/lib.rs` gains this crate's FIRST public
- * crypto-operation functions: `pub fn fedos_encrypt` and
- * `pub fn fedos_decrypt`. Per the explicit Stage 166–170 scope, these are
- * the ONLY new public items besides their own `FedosEncryptStatus`/
- * `FedosEncryptDecision`/`FedosDecryptStatus`/`FedosDecryptDecision` result
- * types — `fedos_encrypt` accepts only a `SecretHandle` (never a raw key
- * byte) and returns only its own `FedosEncryptDecision`; `fedos_decrypt`
- * accepts only a `SecretHandle` and an internal ciphertext-envelope
- * reference and returns only its own `FedosDecryptDecision`.
+ * Updated Stage 171–176: `fedos_encrypt`/`fedos_decrypt`'s signatures are
+ * rewired to accept/return ONLY the new opaque `FedosAeadKeyHandle`/
+ * `FedosCiphertextEnvelope` wrapper types plus two new public label enums
+ * (`FedosAeadAlgorithm`/`FedosAeadAadDomain`) — resolving the Stage
+ * 166–170 "practically internal-only" limitation this file originally
+ * documented. See test/fedos_core_rust_public_opaque_crypto_api.test.ts
+ * for the dedicated Stage 171–176 opaque-handle checks (no `Clone`/
+ * `Debug`/`Display`/`Serialize`/`AsRef<[u8]>`, key generation, the
+ * integration test proving external callability, etc.) — this file keeps
+ * the original Stage 166–170 checks updated to match the new signatures.
  *
- * Deliberate, reviewed, documented scope limit (see
- * `docs/public_crypto_api.md`): `SecretHandle` and the ciphertext envelope
- * type stay `pub(crate)` — these two functions are `pub` in NAME this
- * stage, not yet practically callable from outside this crate until a
- * future stage also exposes public-facing wrappers for those types. No
- * Runtime/Worker/Storage/Nostr/NIP-44/WASM connection, no serialization,
- * no public raw key/nonce/HKDF/AEAD-implementation-type exposure, no new
- * crate dependency, no `Cargo.toml` change — every one of those is
- * verified absent below.
+ * `SecretHandle`/`AeadCiphertextEnvelope`/`AeadCipher`/`AeadAadDomain`
+ * (this crate's internal AEAD implementation types) stay `pub(crate)` —
+ * unchanged and unpromoted. No Runtime/Worker/Storage/Nostr/NIP-44/WASM
+ * connection, no serialization, no public raw key/nonce/HKDF/AEAD-
+ * implementation-type exposure, no new crate dependency, no `Cargo.toml`
+ * change — every one of those is verified absent below.
  */
-describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166–170)", () => {
+describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166–176)", () => {
   const cargoCode: string = cargoTomlSource
     .split("\n")
     .map((line: string) => line.replace(/#.*$/, ""))
@@ -46,15 +44,15 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
     expect(libRsSource).toMatch(/\bpub\s+fn\s+fedos_decrypt\s*\(/);
   });
 
-  it("2. fedos_encrypt accepts exactly (AeadCipher, &SecretHandle, AeadAadDomain, &[u8]) and returns FedosEncryptDecision", () => {
+  it("2. fedos_encrypt accepts exactly (FedosAeadAlgorithm, &FedosAeadKeyHandle, FedosAeadAadDomain, &[u8]) and returns FedosEncryptDecision", () => {
     expect(libRsSource).toMatch(
-      /pub\s+fn\s+fedos_encrypt\s*\(\s*algorithm:\s*crate::crypto::aead_internal::AeadCipher,\s*key:\s*&secret_handle::SecretHandle,\s*aad_domain:\s*crate::crypto::aead_internal::AeadAadDomain,\s*plaintext:\s*&\[\s*u8\s*\],?\s*\)\s*->\s*FedosEncryptDecision/,
+      /pub\s+fn\s+fedos_encrypt\s*\(\s*algorithm:\s*FedosAeadAlgorithm,\s*key:\s*&FedosAeadKeyHandle,\s*aad_domain:\s*FedosAeadAadDomain,\s*plaintext:\s*&\[\s*u8\s*\],?\s*\)\s*->\s*FedosEncryptDecision/,
     );
   });
 
-  it("3. fedos_decrypt accepts exactly (&SecretHandle, &AeadCiphertextEnvelope) and returns FedosDecryptDecision", () => {
+  it("3. fedos_decrypt accepts exactly (&FedosAeadKeyHandle, &FedosCiphertextEnvelope) and returns FedosDecryptDecision", () => {
     expect(libRsSource).toMatch(
-      /pub\s+fn\s+fedos_decrypt\s*\(\s*key:\s*&secret_handle::SecretHandle,\s*envelope:\s*&crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope,?\s*\)\s*->\s*FedosDecryptDecision/,
+      /pub\s+fn\s+fedos_decrypt\s*\(\s*key:\s*&FedosAeadKeyHandle,\s*envelope:\s*&FedosCiphertextEnvelope,?\s*\)\s*->\s*FedosDecryptDecision/,
     );
   });
 
@@ -66,9 +64,12 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
     expect(fnBody).toMatch(/fedos_aead_nonce_96\s*\(\s*\)/);
   });
 
-  it("5. FedosEncryptDecision's envelope field and FedosDecryptDecision's plaintext field are typed as documented", () => {
+  it("5. FedosEncryptDecision's envelope field and FedosDecryptDecision's plaintext field are genuinely public (Stage 171–176: envelope is no longer pub(crate))", () => {
     expect(libRsSource).toMatch(
-      /pub\(crate\)\s+envelope:\s*Option<\s*crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope\s*>/,
+      /pub\s+envelope:\s*Option<\s*FedosCiphertextEnvelope\s*>/,
+    );
+    expect(libRsSource).not.toMatch(
+      /pub\(crate\)\s+envelope:\s*Option</,
     );
     expect(libRsSource).toMatch(/pub\s+plaintext:\s*Option<Vec<u8>>/);
   });
@@ -99,20 +100,21 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
     expect(publicApiSection).not.toMatch(/\bHkdf::/);
   });
 
-  it("9. SecretHandle and AeadCiphertextEnvelope stay pub(crate)-only — the documented minimal-scope limitation", () => {
+  it("9. SecretHandle and AeadCiphertextEnvelope stay pub(crate)-only — the documented, permanent scope limitation", () => {
     expect(libRsSource).toMatch(/\bpub\(crate\)\s+struct\s+SecretHandle\b/);
     expect(libRsSource).not.toMatch(/\bpub\s+struct\s+SecretHandle\b/);
     expect(ciphertextEnvelopeSource).toMatch(/\bpub\(crate\)\s+struct\s+AeadCiphertextEnvelope\b/);
     expect(ciphertextEnvelopeSource).not.toMatch(/\bpub\s+struct\s+AeadCiphertextEnvelope\b/);
   });
 
-  it("10. the crate's public pub fn surface grows from twenty-four to exactly twenty-six", () => {
+  it("10. the crate's public pub fn surface grows from twenty-six to exactly twenty-seven (Stage 171–176 adds fedos_generate_aead_key_32)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(26);
+    expect(pubFnNames.length).toBe(27);
     expect(pubFnNames).toContain("fedos_encrypt");
     expect(pubFnNames).toContain("fedos_decrypt");
+    expect(pubFnNames).toContain("fedos_generate_aead_key_32");
   });
 
   it("11. Cargo.toml is unchanged — no new dependency, still 9 production dependencies", () => {
@@ -131,6 +133,7 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
     for (const src of [runtime, worker]) {
       expect(src).not.toContain("fedos_encrypt");
       expect(src).not.toContain("fedos_decrypt");
+      expect(src).not.toContain("fedos_generate_aead_key_32");
       expect(src).not.toContain("cargo");
       expect(src).not.toContain("lib.rs");
       expect(src).not.toContain("wasm_loader");
@@ -162,5 +165,20 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
 
   it("15. no `unsafe` anywhere in lib.rs; crate-level forbid stays intact", () => {
     expect(libRsSource).toContain("#![forbid(unsafe_code)]");
+  });
+
+  it("16. fedos_encrypt/fedos_decrypt no longer carry #[allow(private_interfaces)] — every parameter/return type is genuinely pub", () => {
+    const encryptDocStart = libRsSource.lastIndexOf(
+      "/// Seal `plaintext` under `key`",
+      libRsSource.indexOf("pub fn fedos_encrypt("),
+    );
+    const decryptDocStart = libRsSource.lastIndexOf(
+      "/// Open (verify-then-decrypt) `envelope`",
+      libRsSource.indexOf("pub fn fedos_decrypt("),
+    );
+    const encryptBlock = libRsSource.slice(encryptDocStart, libRsSource.indexOf("pub fn fedos_encrypt("));
+    const decryptBlock = libRsSource.slice(decryptDocStart, libRsSource.indexOf("pub fn fedos_decrypt("));
+    expect(encryptBlock).not.toContain("#[allow(private_interfaces)]");
+    expect(decryptBlock).not.toContain("#[allow(private_interfaces)]");
   });
 });

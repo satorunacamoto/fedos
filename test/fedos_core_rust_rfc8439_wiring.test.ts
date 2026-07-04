@@ -223,6 +223,11 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       "fedos_aead_nonce_96",
       "fedos_encrypt",
       "fedos_decrypt",
+      // Stage 171–176's key-generation entry point — see
+      // test/fedos_core_rust_public_opaque_crypto_api.test.ts for the
+      // dedicated checks that it returns only an opaque handle, never a
+      // raw byte.
+      "fedos_generate_aead_key_32",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

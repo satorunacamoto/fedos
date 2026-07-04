@@ -116,19 +116,19 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     expect(secretHandleModule).not.toMatch(/impl\s+AsRef\s*<\s*\[\s*u8\s*\]\s*>/);
   });
 
-  it("7. no public raw-byte accessor: SecretHandle stays pub(crate)-only; no pub fn returns it; the only pub fns accepting it are Stage 166–167's explicit fedos_encrypt/fedos_decrypt", () => {
+  it("7. no public raw-byte accessor: SecretHandle stays pub(crate)-only; no pub fn returns it or accepts it directly", () => {
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+\w+\([^)]*\)\s*->\s*[^{;]*\bSecretHandle\b/);
-    // Updated Stage 166–167: `fedos_encrypt`/`fedos_decrypt` are this
-    // crate's first (and, as of this stage, ONLY) public functions taking
-    // a `SecretHandle` parameter — a deliberate, reviewed exception (see
-    // test/fedos_core_rust_public_crypto_api.test.ts), not an accidental
-    // raw-byte leak: `SecretHandle` itself never exposes its bytes
-    // publicly (test 8 below), and these two functions accept only the
-    // opaque handle, never a raw byte.
+    // Updated Stage 171–176: `fedos_encrypt`/`fedos_decrypt` no longer
+    // accept `SecretHandle` directly — they were rewired to accept the
+    // new opaque `FedosAeadKeyHandle` wrapper instead (see
+    // test/fedos_core_rust_public_opaque_crypto_api.test.ts), so NO pub
+    // fn anywhere in this crate takes a `SecretHandle` parameter any
+    // more. `SecretHandle` itself never exposes its bytes publicly
+    // (test 8 below).
     const pubFnsTakingSecretHandle = [
       ...libRsSource.matchAll(/\bpub\s+fn\s+(\w+)\([^)]*\bSecretHandle\b[^)]*\)/g),
     ].map((m) => m[1]);
-    expect([...pubFnsTakingSecretHandle].sort()).toEqual(["fedos_decrypt", "fedos_encrypt"]);
+    expect(pubFnsTakingSecretHandle).toEqual([]);
     expect(secretHandleModule).not.toMatch(/\bpub\s+fn\b/);
   });
 
@@ -153,11 +153,11 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     );
   });
 
-  it("9. lib.rs's public `pub fn` surface is unchanged (still 24 functions) — SecretHandle adds no pub fn", () => {
+  it("9. lib.rs's public `pub fn` surface is unaffected by SecretHandle itself — SecretHandle adds no pub fn", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(26);
+    expect(pubFnNames.length).toBe(27);
     expect(pubFnNames).not.toContain("new_from_32_bytes_for_internal_use");
   });
 

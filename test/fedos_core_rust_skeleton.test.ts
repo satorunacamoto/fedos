@@ -220,20 +220,22 @@ describe("FedOS Rust crate skeleton", () => {
     expect(productionLibRs).toMatch(/\buse\s+secrecy\b/);
   });
 
-  it("7. lib.rs's only real getrandom CALLS are fedos_random_bytes_32 (Stage 137) and fedos_aead_nonce_96 (Stage 138) — every other mention is prose naming them, never a fallback PRNG", () => {
+  it("7. lib.rs's only real getrandom CALLS are fedos_random_bytes_32 (Stage 137), fedos_aead_nonce_96 (Stage 138), and fedos_generate_aead_key_32 (Stage 171–176) — every other mention is prose naming them, never a fallback PRNG", () => {
     // Through Stage 136 this asserted "no getrandom/rand CALL usage"
     // outright. Stage 137 is the first real implementation behind this
     // crate's public API (see test/fedos_core_rust_random_bytes.test.ts
-    // for the dedicated checks), and Stage 138 adds a second, independent
-    // call site (see test/fedos_core_rust_aead_nonce.test.ts) — narrowed
-    // here to "exactly these two call sites, and nothing else calls
+    // for the dedicated checks), Stage 138 adds a second, independent
+    // call site (see test/fedos_core_rust_aead_nonce.test.ts), and Stage
+    // 171–176 adds a THIRD, independent call site for key generation (see
+    // test/fedos_core_rust_public_opaque_crypto_api.test.ts) — narrowed
+    // here to "exactly these three call sites, and nothing else calls
     // getrandom/rand/thread_rng." Several doc comments legitimately NAME
     // `getrandom`/`thread_rng` in prose (to describe the stage or say a
     // fallback is never used) — a bare word match would false-positive on
     // that prose, so this checks actual CALL/import syntax instead.
     expect(libRsSource).not.toMatch(/\buse\s+getrandom\b/);
     const getrandomCallSites = libRsSource.match(/getrandom::fill\s*\(/g) ?? [];
-    expect(getrandomCallSites.length).toBe(2);
+    expect(getrandomCallSites.length).toBe(3);
     expect(libRsSource).not.toMatch(/\buse\s+rand\b/);
     expect(libRsSource).not.toMatch(/\brand::/);
     expect(libRsSource).not.toMatch(/\bthread_rng\s*\(/);

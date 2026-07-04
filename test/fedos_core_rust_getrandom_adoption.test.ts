@@ -154,8 +154,9 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
       "fedos_aead_nonce_96",
       "fedos_encrypt",
       "fedos_decrypt",
+      "fedos_generate_aead_key_32",
     ];
-    expect(pubFnNames.length).toBe(26);
+    expect(pubFnNames.length).toBe(27);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
