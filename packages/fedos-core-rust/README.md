@@ -3746,3 +3746,83 @@ sensitive/commerce/chat metadata with no payload/plaintext/raw-key field,
 no Storage/Federation/Runtime/Worker wiring exists, `Cargo.toml`/
 `package.json` are unchanged, and the `pub fn` surface is unchanged at
 twenty-seven.
+
+## Rust ciphertext serialization implementation + NIP-44 vector schema guard (Stage 186–188)
+
+Stage 186–188 IMPLEMENT the Stage 182 format decision and complete
+`docs/nip44_vector_readiness.md` §3's first step — still no NIP-44
+cryptography, no Runtime/Worker/Storage/Nostr/WASM connection, and no
+TypeScript serialization.
+
+**Stage 186**: [`src/crypto/ciphertext_serialization.rs`](src/crypto/ciphertext_serialization.rs)
+(new) adds **`encode_envelope_internal`**/**`decode_envelope_internal`**,
+the real implementation of the canonical JSON + base64url format
+(`v`/`alg`/`aad`/`n`/`ct`/`tag`) — hand-written against the STANDARD
+LIBRARY ONLY. `serde`/`serde_json`/`hex` remain `[dev-dependencies]`-only;
+**no dependency was promoted, and `Cargo.toml` is byte-for-byte
+unchanged.** This is safe (not just expedient) because the wire schema is
+fully closed: fixed-label strings, one small integer, and base64url text
+whose alphabet contains no `"`/`\`. Field order is STRICT in both
+directions — a reordered document is rejected, resolving the leniency
+question `docs/ciphertext_serialization_format_decision.md` §3 left open.
+`ct`/`tag` are split wire fields (at the fixed 16-byte AEAD tag length)
+even though the in-memory `AeadCiphertextEnvelope` keeps them combined —
+`encode_envelope_internal` returns `None` (never panics) for a Stage
+157–158 placeholder envelope too short to split. Connects to the REAL
+envelope type (this stage's explicit authorization); not yet wired to
+`fedos_encrypt`/`fedos_decrypt` or any bridge. No public API addition —
+still twenty-seven `pub fn`s.
+
+**Stage 187**: [`src/crypto/nip44_vector_schema.rs`](src/crypto/nip44_vector_schema.rs)
+(new, `#[cfg(test)]`-only) implements `docs/nip44_vector_readiness.md`
+§3's step 1 — and ONLY that step: confirms
+`test-vectors/nip44/nip44-v2.json` parses and its 8 categories match the
+documented schema (name, `shouldPass` polarity, non-empty `data`,
+`get_message_keys`'s distinct object shape) — via `serde`/`serde_json`
+(already `[dev-dependencies]`-only). **No cryptographic verification of
+any kind** — no ECDH, no HKDF, no conversation-key/message-key
+derivation, no padding calculation, no encrypt/decrypt. No secp256k1
+dependency adopted.
+
+**Stage 188**: `docs/ciphertext_serialization_format_decision.md` and
+`docs/nip44_vector_readiness.md` are updated to record both as complete.
+
+**What is explicitly NOT implemented or connected:**
+
+- No NIP-44 cryptographic implementation — no conversation-key/
+  message-key derivation, no padding, no encrypt/decrypt.
+- No secp256k1/ECDH dependency.
+- No TypeScript serialization implementation (no `JSON.stringify`-based
+  encoder/decoder mirroring the Rust codec).
+- No wiring of `ciphertext_serialization` to `fedos_encrypt`/
+  `fedos_decrypt`, `aead_envelope_bridge`, or `ciphertext_transport`.
+- No Runtime/Worker/Storage/Nostr/WASM connection.
+- No public API addition — still twenty-seven `pub fn`s.
+- No `Cargo.toml` or `package.json` change, no new dependency.
+- No raw key getter, no raw nonce public getter, no raw ciphertext
+  public getter beyond what the existing crate-private
+  `AeadCiphertextEnvelope::ciphertext()` already exposed internally.
+
+**Rust-side test coverage added**: 11 new tests in
+`crypto::ciphertext_serialization`'s own test module (round trip for both
+ciphers × every `AeadAadDomain`, canonical field order, reordered-fields
+rejection, unknown/missing field rejection, invalid base64url rejection,
+wrong version/algorithm/AAD-domain rejection, placeholder-envelope
+encode returning `None`, and base64url encode/decode round-trip +
+standard-base64/whitespace rejection); 6 new tests in
+`crypto::nip44_vector_schema` (JSON parses, algorithm description sanity,
+exactly the 8 expected categories present, each category's `shouldPass`
+polarity + non-empty data, valid./invalid. naming consistency, and
+`get_message_keys`'s object shape).
+
+**Verified against a real Rust toolchain**: `cargo check`, `cargo test`
+(219 crate unit tests, up from 202 at Stage 177–185, plus the 3
+integration tests unchanged), and `cargo check --tests` all GREEN.
+
+See
+[`test/fedos_core_rust_ciphertext_serialization.test.ts`](../../test/fedos_core_rust_ciphertext_serialization.test.ts)
+for the dedicated Stage 186–188 guard suite: serialization stays
+Rust-only (no TypeScript JSON/base64 codec added), no NIP-44
+cryptographic implementation exists anywhere, no Runtime/Worker/Storage/
+Nostr wiring, `Cargo.toml`/`package.json` unchanged, and the `pub fn`
+surface is unchanged at twenty-seven.

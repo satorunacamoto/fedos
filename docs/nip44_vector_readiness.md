@@ -1,11 +1,13 @@
-# NIP-44 Vector Readiness Review (Stage 185) — binding, docs only
+# NIP-44 Vector Readiness Review (Stage 185, §3 step 1 completed Stage 186–188) — binding, docs only
 
-**Status: this document adds no code.** It confirms, in writing, that
+**Status: this document adds no code itself. §3's step 1 ("vector schema
+guard") is now COMPLETE — see §6. Steps 2–7 remain future, separate,
+explicitly-reviewed stages.** It confirms, in writing, that
 `test-vectors/nip44/nip44-v2.json` (imported Stage 73) already exists,
 records exactly what it contains, and fixes the ORDER a future NIP-44
-implementation stage must follow — before any NIP-44 code, any
-`cargo test` wiring of this file, or any secp256k1 dependency exists in
-this crate. This is a READINESS review, not an implementation: it
+implementation stage must follow — before any NIP-44 CRYPTOGRAPHIC code,
+or any secp256k1 dependency, exists in this crate. This is a READINESS
+review, not a cryptographic implementation: it
 confirms the inputs a future stage needs are already in place and
 reviewed, the same role `docs/crypto_test_vectors.md` played for the
 RFC 8439/5869/9106 vectors before Stage 74–147 wired each one.
@@ -148,3 +150,37 @@ deferred concern, unaffected by this ordering.
 - **The actual first implementation step (vector schema guard) is Stage
   186+ candidate work**, following the order fixed here, not built in
   this stage.
+
+## 6. Stage 186–188 update — §3 step 1 (vector schema guard) is COMPLETE
+
+`packages/fedos-core-rust/src/crypto/nip44_vector_schema.rs` (new,
+`#[cfg(test)]`-only) implements §3's step 1 exactly as specified:
+
+- `include_str!`s `test-vectors/nip44/nip44-v2.json` at compile time (no
+  filesystem/IO dependency at runtime — same discipline as
+  `rfc8439_vectors`/`rfc5869_vectors`/`rfc9106_vectors`).
+- Confirms the file parses (via `serde`/`serde_json`, already
+  `[dev-dependencies]`-only since Stage 75/77 — no `Cargo.toml` change).
+- Confirms all 8 categories from §2's table are present, with the
+  documented `shouldPass` polarity, and non-empty `data` — as a CLOSED
+  set (no unexpected 9th category, no missing category).
+- Confirms `valid.get_message_keys`'s `data` is specifically an object
+  carrying `conversation_key` + a non-empty `keys` array (the one
+  category whose shape differs from the rest, per §2 row 2).
+- **Performs NO cryptographic verification of any kind** — no ECDH, no
+  HKDF, no conversation-key/message-key derivation, no padding
+  calculation, no encrypt/decrypt, and no comparison against any
+  `sec1`/`pub2`/`conversation_key`/`chacha_key`/`ciphertext` byte value
+  inside `data`. Schema and presence only.
+- **No secp256k1/ECDH dependency was adopted.** `Cargo.toml` is
+  unchanged.
+
+**Steps 2–7 remain exactly as future and separate as this document
+originally left them**: secp256k1 dependency adoption, conversation-key
+test, message-key test, padding test, encrypt/decrypt test, and
+invalid-case test are none of them built by this update — each is its
+own future, explicitly-reviewed stage, in the order §3 fixed.
+
+See `test/fedos_core_rust_ciphertext_serialization.test.ts` for the JS
+guard confirming this schema guard performs no cryptographic
+verification and adds no secp256k1 dependency.

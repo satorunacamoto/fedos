@@ -1,12 +1,13 @@
-# Ciphertext Serialization Format Decision (Stage 182) — binding, docs only
+# Ciphertext Serialization Format Decision (Stage 182, implemented Stage 186) — binding, docs only
 
-**Status: this document adds no code.** It picks the MVP wire encoding
-`docs/ciphertext_envelope_serialization_plan.md` (Stage 179) compared but
-deliberately did not choose, fixes the canonical field order an
-implementing stage must produce, and restates what that future
-implementation is still forbidden from doing. **No encode/decode
-function, no `serde` derive, no base64 crate, and no `Cargo.toml` change
-exists anywhere in this crate as of this stage** — `crypto::ciphertext_transport`
+**Status: this decision is now IMPLEMENTED — see §8.** This document
+picks the MVP wire encoding `docs/ciphertext_envelope_serialization_plan.md`
+(Stage 179) compared but deliberately did not choose, fixes the canonical
+field order an implementing stage must produce, and restates what that
+implementation was (at Stage 182) still forbidden from doing. As of
+Stage 182 itself: **no encode/decode function, no `serde` derive, no
+base64 crate, and no `Cargo.toml` change exists anywhere in this
+crate** — `crypto::ciphertext_transport`
 (Stage 177–178) records this decision as an updated LABEL only (see §6),
 never as running code.
 
@@ -207,3 +208,62 @@ comment (updated this stage) for the exact record.
   `serde_json`/base64url dependency promotion/adoption, and the
   round-trip `cargo test` suite) is Stage 186 candidate work**
   ("Ciphertext serialization implementation in Rust"), not built here.
+
+## 8. Stage 186 update — IMPLEMENTED, with NO dependency promotion
+
+`packages/fedos-core-rust/src/crypto/ciphertext_serialization.rs` (new)
+implements `encode_envelope_internal`/`decode_envelope_internal` against
+this exact decision — and resolves §7's open "`serde_json`/base64url
+dependency promotion/adoption" question the OPPOSITE way from how it
+reads: **no dependency was promoted or adopted.** `serde`/`serde_json`/
+`hex` remain `[dev-dependencies]`-only, exactly as before Stage 186 —
+`Cargo.toml` is byte-for-byte unchanged.
+
+Both the canonical JSON emission and the base64url encoding/decoding are
+hand-written against the standard library only, made tractable by this
+format's CLOSED schema (a handful of fixed-label strings, one small
+integer, and base64url text whose alphabet contains no `"`/`\` — see that
+module's own doc comment for the full reasoning, including why this is
+safe rather than merely convenient). This was a deliberate choice, not an
+oversight: promoting `serde_json` to `[dependencies]` (or adding a
+base64/base64url crate) remained an option this stage could have taken,
+but the closed schema made a correct, narrowly-scoped hand implementation
+straightforward enough that no new production dependency was needed —
+consistent with this crate's standing "no new dependency without its own
+adoption review" discipline (`docs/rust_dependency_adoption.md`), applied
+here by simply not needing one.
+
+**What shipped:**
+
+- `encode_envelope_internal(envelope: &AeadCiphertextEnvelope) -> Option<String>`
+  — emits the canonical `v`/`alg`/`aad`/`n`/`ct`/`tag` JSON object, no
+  whitespace, splitting the in-memory combined `ciphertext‖tag` buffer at
+  its final 16 bytes (both this crate's adopted AEAD ciphers' fixed tag
+  length) into separate wire `ct`/`tag` fields. Returns `None` only for a
+  Stage 157–158 SKELETON placeholder envelope (whose ciphertext is
+  shorter than 16 bytes) — never panics.
+- `decode_envelope_internal(json: &str) -> CiphertextSerializationDecision`
+  — parses a candidate string back, requiring the canonical field order
+  STRICTLY (§3's leniency question is resolved: reordering is rejected,
+  not tolerated), and reconstructing the ONE combined `ciphertext‖tag`
+  buffer the in-memory `AeadCiphertextEnvelope` type still expects (§3's
+  in-memory-vs-wire split is confined entirely to this codec — the
+  existing type is unchanged). Distinguishes `InvalidVersion`/
+  `InvalidAlgorithm`/`InvalidAadDomain`/`InvalidBase64Url`/`MissingField`/
+  `UnknownField`/`MalformedJson` — never panics.
+- Both functions are `pub(crate)`-only and connect to the REAL
+  `AeadCiphertextEnvelope` type (this stage's explicit authorization) —
+  neither is wired to `fedos_encrypt`/`fedos_decrypt`,
+  `aead_envelope_bridge`, or `ciphertext_transport` yet; that connection
+  is its own, future, separate stage. No public API addition — the crate's
+  `pub fn` surface stays at twenty-seven.
+- **Round-trip, canonical-order, and every rejection case (`unknown
+  field`, `missing field`, `invalid base64url`, `wrong version`, `wrong
+  algorithm`, `wrong aad`, `reordered fields`) are all `cargo test`-verified**
+  in that module's own test suite, for both adopted ciphers and every
+  `AeadAadDomain` variant.
+
+See `test/fedos_core_rust_ciphertext_serialization.test.ts` for the
+dedicated JS guard suite proving this stays Rust-only (no TypeScript
+`JSON.stringify`/parser was added to mirror it) and `Cargo.toml`/
+`package.json` are both unchanged.
