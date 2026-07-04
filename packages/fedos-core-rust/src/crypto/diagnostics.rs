@@ -12,6 +12,14 @@
 //! stages — this keeps the preview simple and auditable, and guarantees it
 //! can never accidentally observe (let alone display) a real secret byte,
 //! since it never runs any operation that would produce one.
+//!
+//! Stage 195 adds a FOURTH `CapabilityReadiness` variant,
+//! `ReadyForImplementation`, and reports it for the new `Ecdh` capability
+//! (Stage 194 adopted `k256`, but zero ECDH code exists) — seeing this
+//! distinction requires a state strictly between `NotImplemented` (no
+//! dependency, no code) and `NotConnected` (a skeleton/staging TYPE
+//! exists, not yet wired): `Ecdh` has neither a dependency gap NOR any
+//! Rust type/skeleton yet, only an adopted library to build one against.
 #![allow(dead_code)]
 
 use super::capability_matrix::CryptoCapability;
@@ -28,8 +36,16 @@ pub(crate) enum CapabilityReadiness {
     /// the last one (staged per `docs/hkdf_internal_plan.md`'s AEAD
     /// staging section), now `Ready`.
     NotConnected,
-    /// No implementation or skeleton exists yet at all (e.g. `Nip44`,
-    /// `Schnorr`, `StorageKey`, `ConversationKey`).
+    /// The dependency/library this capability needs is now adopted in
+    /// `Cargo.toml`, but ZERO code — no skeleton, no function, no type —
+    /// has been written for it yet. Stage 195 introduces this variant for
+    /// exactly one capability, `Ecdh` (Stage 194 adopted `k256`). A
+    /// capability moves OUT of this state, into `NotConnected` (a
+    /// skeleton lands) or `Ready` (real, wired code lands), in its own
+    /// later, separate, explicitly-reviewed stage — never silently.
+    ReadyForImplementation,
+    /// No implementation, skeleton, or adopted dependency exists yet at
+    /// all (e.g. `Nip44`, `Schnorr`, `StorageKey`, `ConversationKey`).
     NotImplemented,
 }
 
@@ -45,9 +61,9 @@ pub(crate) struct CapabilityReport {
 /// A fixed, hand-maintained, display-only snapshot of every
 /// [`CryptoCapability`]'s current readiness — see this module's own doc
 /// comment above for why this is a fixed table, not a live probe. Returns
-/// exactly ten rows, in [`CryptoCapability::ALL`]'s order, one per
+/// exactly eleven rows, in [`CryptoCapability::ALL`]'s order, one per
 /// capability, every time it is called — takes no parameter of any kind.
-pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 10] {
+pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 11] {
     [
         CapabilityReport {
             capability: CryptoCapability::Random,
@@ -74,6 +90,10 @@ pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 10] {
             readiness: CapabilityReadiness::Ready,
         },
         CapabilityReport {
+            capability: CryptoCapability::Ecdh,
+            readiness: CapabilityReadiness::ReadyForImplementation,
+        },
+        CapabilityReport {
             capability: CryptoCapability::Nip44,
             readiness: CapabilityReadiness::NotImplemented,
         },
@@ -97,9 +117,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_reports_exactly_ten_rows_matching_capability_all_order() {
+    fn preview_reports_exactly_eleven_rows_matching_capability_all_order() {
         let preview = crypto_diagnostics_preview();
-        assert_eq!(preview.len(), 10);
+        assert_eq!(preview.len(), 11);
         for (row, expected_capability) in preview.iter().zip(CryptoCapability::ALL.iter()) {
             assert_eq!(row.capability, *expected_capability);
         }
@@ -144,6 +164,30 @@ mod tests {
         assert!(preview
             .iter()
             .all(|row| row.readiness != CapabilityReadiness::NotConnected));
+    }
+
+    #[test]
+    fn ecdh_is_ready_for_implementation_as_of_stage_194_195_not_ready_and_not_not_implemented() {
+        let preview = crypto_diagnostics_preview();
+        let row = preview
+            .iter()
+            .find(|row| row.capability == CryptoCapability::Ecdh)
+            .expect("expected an Ecdh row to exist");
+        assert_eq!(row.readiness, CapabilityReadiness::ReadyForImplementation);
+        assert_ne!(row.readiness, CapabilityReadiness::Ready);
+        assert_ne!(row.readiness, CapabilityReadiness::NotImplemented);
+        assert_ne!(row.readiness, CapabilityReadiness::NotConnected);
+    }
+
+    #[test]
+    fn exactly_one_capability_reports_ready_for_implementation() {
+        let preview = crypto_diagnostics_preview();
+        let ready_for_implementation: Vec<CryptoCapability> = preview
+            .iter()
+            .filter(|row| row.readiness == CapabilityReadiness::ReadyForImplementation)
+            .map(|row| row.capability)
+            .collect();
+        assert_eq!(ready_for_implementation, vec![CryptoCapability::Ecdh]);
     }
 
     #[test]

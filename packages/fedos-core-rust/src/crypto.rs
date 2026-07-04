@@ -90,6 +90,16 @@
 //! — see `ciphertext_serialization`'s own module-level doc comment and
 //! `docs/ciphertext_serialization_format_decision.md` for the full design
 //! record.
+//!
+//! Stage 194–196 adopt `k256` (secp256k1 elliptic-curve arithmetic,
+//! `arithmetic` feature only — see `Cargo.toml`'s own comment for the
+//! full record, including the reviewed `rand_core` transitive-dependency
+//! exception) and add `capability_matrix`'s eleventh `CryptoCapability`,
+//! `Ecdh`, reporting `diagnostics`'s new `CapabilityReadiness::ReadyForImplementation`
+//! (the dependency exists; zero ECDH code does). `secp256k1_dependency_guard`
+//! (`#[cfg(test)]`-only) confirms the resolved build stays exactly this
+//! minimal. No ECDH function, no conversation-key derivation, no NIP-44
+//! code, no public API addition.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -102,3 +112,5 @@ pub(crate) mod ciphertext_transport;
 pub(crate) mod diagnostics;
 #[cfg(test)]
 mod nip44_vector_schema;
+#[cfg(test)]
+mod secp256k1_dependency_guard;
