@@ -302,3 +302,43 @@ the earlier binding docs win.
   (`docs/random_bytes_implementation_plan.md`), which precedes
   `SecretHandle` real bytes in the fixed order — this plan prepares the
   step that follows it.
+
+## 14. Stage 141 update — randomBytes and the nonce helper are now implemented; SecretHandle real bytes is next, still not implemented
+
+- **`fedos_random_bytes_32()`** (Stage 137) and **`fedos_aead_nonce_96()`**
+  (Stage 138) are both real, `cargo test`-verified implementations now —
+  the two items `docs/implementation_phase_roadmap.md` §1 placed BEFORE
+  `SecretHandle` real bytes in its fixed order are done. `SecretHandle`
+  real bytes (item 3 of that order) is next, and remains **NOT
+  implemented** — `SecretHandle` still holds only the Stage 79 placeholder
+  marker, exactly as §2 of this document describes.
+- **`SecretHandle` does not, and must not, directly generate random bytes
+  or a nonce.** Now that both generators are real functions a future
+  implementation could be tempted to call directly, this is worth stating
+  explicitly: `SecretHandle`'s real-byte constructor accepts already-drawn
+  bytes as a parameter (see `docs/secret_handle_api_shape.md` §5–§6,
+  `new_from_32_bytes_for_internal_use`) — it never calls
+  `fedos_random_bytes_32` or `fedos_aead_nonce_96` itself. Keeping
+  byte-generation and byte-holding as two separate, independently-testable
+  concerns is the same "two boundaries, not one" reasoning
+  `docs/public_random_boundary.md` §1 already used to keep `randomBytes`
+  and the nonce helper apart from each other.
+- **`SecretHandle` does not, and must not, directly connect to HKDF or
+  AEAD in the same stage that gives it real bytes.** §9 above already
+  fixed this ordering; this update restates it now that the two
+  PRECONDITION stages (randomBytes, nonce) are real: the stage that
+  extends `SecretHandle` with real bytes must ship — and be reviewable —
+  entirely on its own, verified against
+  `docs/secret_memory_test_strategy.md`'s gates (Clone-absence,
+  Debug-no-raw-byte, clear/is_cleared state machine, drop-time zeroize)
+  BEFORE any HKDF or AEAD wiring is even proposed.
+- **HKDF connection remains its own, later, separate stage** — per §9
+  above, unchanged by this update.
+- **AEAD connection remains a further, still-later, separate stage** —
+  also unchanged, and now additionally has a real nonce source
+  (`fedos_aead_nonce_96`, Stage 138) it will eventually consume, per
+  `docs/secret_handle_api_shape.md` §10's sketch of that future
+  connection's shape.
+- See `docs/secret_handle_api_shape.md` (the concrete type/method shape)
+  and `docs/secret_memory_test_strategy.md` (the concrete test gates) for
+  the two documents this update introduces alongside it.

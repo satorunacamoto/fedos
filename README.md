@@ -8,7 +8,66 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 138–140 — Fixed-size AEAD nonce helper + Stage 137
+> **Status: Stage 141–143 — SecretHandle real-byte implementation
+> preparation (docs only).** A three-stage, **docs-only** batch that
+> fixes the concrete type/method shape and test strategy a future stage
+> must satisfy before `SecretHandle` (Stage 79) is extended to hold real
+> secret bytes. **No `src/`, `packages/`, `Cargo.toml`, or `test/` file
+> was touched — no real bytes given to `SecretHandle`, no HKDF/AEAD
+> wiring, and no Runtime/Worker change of any kind.**
+>
+> **Stage 141 — [`docs/secret_lifecycle_implementation_plan.md`](docs/secret_lifecycle_implementation_plan.md)
+> §14 update.** Records that Stage 137's `fedos_random_bytes_32` and
+> Stage 138's `fedos_aead_nonce_96` are now both real, `cargo test`-verified
+> implementations — the two preconditions
+> `docs/implementation_phase_roadmap.md` §1 placed before `SecretHandle`
+> real bytes are done, and `SecretHandle` real bytes is next but still
+> **NOT implemented**. Fixes explicitly that `SecretHandle` must never
+> call `fedos_random_bytes_32`/`fedos_aead_nonce_96` itself (it receives
+> already-drawn bytes as a constructor parameter) and must not connect to
+> HKDF or AEAD in the same stage that gives it real bytes — both
+> connections remain their own, later, separate stages.
+>
+> **Stage 142 — [`docs/secret_handle_api_shape.md`](docs/secret_handle_api_shape.md)
+> (new).** Fixes the concrete type/method shape: five candidate types
+> (`SecretHandleState`, `SecretHandleKind`, `SecretHandle`,
+> `SecretHandleStatus`, `SecretInputLength`) and five candidate methods
+> (`new_from_32_bytes_for_internal_use`, `status`, `kind`, `clear`,
+> `is_cleared`). Input starts at a fixed-size `[u8; 32]` only —
+> `Vec<u8>` and `String`/password input stay forbidden. `Clone`, raw-byte
+> `Debug`, public `AsRef<[u8]>`, `Display`, `Serialize`, and raw-secret
+> `Eq`/`PartialEq` are all explicitly forbidden. Names the future
+> HKDF/AEAD connection shape without building it.
+>
+> **Stage 143 — [`docs/secret_memory_test_strategy.md`](docs/secret_memory_test_strategy.md)
+> (new).** Fixes the concrete test gates: `Clone`-absence proof,
+> `Debug`-no-raw-byte assertion, `clear()`/`is_cleared()` state-machine
+> checks (including double-clear idempotency), a drop-time zeroize
+> verification approach (with its use-after-free-adjacent caveat named
+> explicitly), no-raw-exposure and exact-method-set assertions, and
+> no-`Vec`/`String`/`serde` checks. Panic-time zeroization and WASM-time
+> behavior are named as open, untested limitations, not solved problems;
+> Miri/Valgrind/sanitizer tooling is recorded as valuable future work, not
+> a blocker for the first real-byte stage.
+>
+> **This batch is docs-only, with no Rust/`src`/`test` change of any
+> kind.** `npm run typecheck` and `npm test` stay GREEN (131 files, 1963
+> tests, unchanged); `cargo check`/`cargo test`/`cargo check --tests`
+> were re-confirmed GREEN in the `stable-x86_64-pc-windows-msvc` toolchain
+> this session, unaffected since no `.rs`/`Cargo.toml` file was touched;
+> `git status` is clean aside from this docs batch. **The next step is
+> the `SecretHandle` real-byte implementation itself** — the
+> Implementation Phase has landed `randomBytes` (Stage 137) and the nonce
+> helper (Stage 138) but has not yet touched `SecretHandle`. Stage 144
+> candidates: (1) **`SecretHandle` real-byte implementation** (recommended
+> first — the shape and test gates are now fixed in writing, so the next
+> stage can implement directly against
+> `docs/secret_handle_api_shape.md`/`docs/secret_memory_test_strategy.md`
+> rather than designing under pressure); (2) HKDF internal implementation
+> planning update; (3) AEAD implementation staging docs.
+> Prior status:
+>
+> **Stage 138–140 — Fixed-size AEAD nonce helper + Stage 137
 > cargo-verification gate closed.** `packages/fedos-core-rust/src/lib.rs`
 > gains `fedos_aead_nonce_96()` — the crate's SECOND real implementation,
 > drawing exactly 12 bytes (96 bits) from the OS CSPRNG via
