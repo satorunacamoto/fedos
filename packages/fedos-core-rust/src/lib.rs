@@ -424,6 +424,31 @@
 //! `NotImplemented`) — display-only, non-secret, `pub(crate)`-at-most, not
 //! wired into the Runtime/Worker/WASM, and adding no `pub fn`. See
 //! `docs/crypto_capability_matrix.md` and `docs/crypto_diagnostics.md`.
+//!
+//! Stage 152–154 add `crypto::aead_internal` — this crate's FIRST real
+//! AEAD implementation: `seal_internal`/`open_internal` implement
+//! ChaCha20-Poly1305 (Stage 74) AND AES-256-GCM (Stage 101), consuming
+//! ONLY a `SecretHandle(AeadKeyMaterial)` key and a `Ready`
+//! `FedosAeadNonceDecision` nonce (from `fedos_aead_nonce_96`, Stage 138)
+//! — never a caller-supplied raw key/nonce byte. AAD is a fixed
+//! `AeadAadDomain` label, never caller-supplied text. `SecretHandle` gains
+//! a SECOND narrowly-scoped accessor, `expose_bytes_for_internal_aead`
+//! (method count seven → eight), confined to this one reviewed call site.
+//! A wrong-kinded/cleared key, a non-`Ready` nonce, a mismatched AAD
+//! domain, a mismatched nonce, or a tampered ciphertext are all rejected
+//! with fixed `AeadStatus` labels (`InvalidKey`/`InvalidNonce`/
+//! `AuthenticationFailed`) — never a panic, never distinguishing which
+//! tamper cause failed authentication (per RFC 8439/NIST AEAD guidance).
+//! Nonce-reuse prevention is a documented CALLER obligation, not
+//! runtime-tracked state. Stage 155 adds `crypto::aead_diagnostics`, a
+//! fixed, display-only two-row preview (`ChaCha20Poly1305`/`Aes256Gcm`,
+//! both `Ready`), and flips `crypto::diagnostics`'s own `Aead` row from
+//! `NotConnected` to `Ready`. No public `encrypt`/`decrypt`, no ciphertext
+//! envelope/serialization format (see `docs/ciphertext_envelope_plan.md`
+//! for that future, separate, docs-only stage), no Runtime/Worker/
+//! storage/Nostr/NIP-44/WASM connection, no `Cargo.toml` change, and no
+//! public API addition — still twenty-four `pub fn`s. See
+//! `docs/aead_internal_implementation.md` for the full design record.
 
 #![forbid(unsafe_code)]
 
@@ -1752,6 +1777,26 @@ mod secret_handle {
                 _ => None,
             }
         }
+
+        /// Stage 152–154 — a SECOND narrowly-scoped internal accessor,
+        /// identical in shape to [`SecretHandle::expose_bytes_for_internal_derivation`]
+        /// above but named for its OWN sole reviewed caller:
+        /// `crypto::aead_internal`'s `seal_internal`/`open_internal` (the
+        /// AEAD seal/open call sites). `docs/secret_handle_api_shape.md`
+        /// section 6 anticipated exactly this: each future connection stage
+        /// needing the bytes adds its OWN narrowly-scoped accessor, never a
+        /// generic `expose()`/`as_bytes()` added once for every later
+        /// consumer — this is the AEAD-specific accessor, a sibling of the
+        /// earlier key-derivation one, not a reuse of it. Same rules:
+        /// returns `None` for the Stage 79 placeholder path and after
+        /// `clear()`; returns a COPY, never a reference; the caller
+        /// zeroizes its own copy once done.
+        pub(crate) fn expose_bytes_for_internal_aead(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
     }
 
     #[cfg(test)]
@@ -1926,6 +1971,31 @@ mod secret_handle {
             );
             assert_eq!(
                 real.expose_bytes_for_internal_derivation(),
+                Some(TEST_FIXTURE_BYTES)
+            );
+        }
+
+        #[test]
+        fn expose_bytes_for_internal_aead_returns_none_for_placeholder_and_cleared() {
+            let placeholder = SecretHandle::new_placeholder();
+            assert!(placeholder.expose_bytes_for_internal_aead().is_none());
+
+            let mut real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            real.clear();
+            assert!(real.expose_bytes_for_internal_aead().is_none());
+        }
+
+        #[test]
+        fn expose_bytes_for_internal_aead_returns_the_stored_bytes_for_a_holding_handle() {
+            let real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            assert_eq!(
+                real.expose_bytes_for_internal_aead(),
                 Some(TEST_FIXTURE_BYTES)
             );
         }

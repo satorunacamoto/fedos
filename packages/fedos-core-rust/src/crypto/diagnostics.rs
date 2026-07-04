@@ -24,8 +24,9 @@ pub(crate) enum CapabilityReadiness {
     /// (e.g. `Random`, `Nonce`, `SecretHandle`, `Hkdf`).
     Ready,
     /// A skeleton/staging design exists, but the real operation is not yet
-    /// wired (e.g. `Aead` — staged per `docs/hkdf_internal_plan.md`'s AEAD
-    /// staging section, not yet implemented).
+    /// wired. As of Stage 152–154 no capability reports this — `Aead` was
+    /// the last one (staged per `docs/hkdf_internal_plan.md`'s AEAD
+    /// staging section), now `Ready`.
     NotConnected,
     /// No implementation or skeleton exists yet at all (e.g. `Nip44`,
     /// `Schnorr`, `StorageKey`, `ConversationKey`).
@@ -66,7 +67,7 @@ pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 9] {
         },
         CapabilityReport {
             capability: CryptoCapability::Aead,
-            readiness: CapabilityReadiness::NotConnected,
+            readiness: CapabilityReadiness::Ready,
         },
         CapabilityReport {
             capability: CryptoCapability::Nip44,
@@ -101,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn ready_capabilities_are_exactly_random_nonce_secret_handle_and_hkdf() {
+    fn ready_capabilities_are_exactly_random_nonce_secret_handle_hkdf_and_aead() {
         let preview = crypto_diagnostics_preview();
         let ready: Vec<CryptoCapability> = preview
             .iter()
@@ -115,18 +116,27 @@ mod tests {
                 CryptoCapability::Nonce,
                 CryptoCapability::SecretHandle,
                 CryptoCapability::Hkdf,
+                CryptoCapability::Aead,
             ]
         );
     }
 
     #[test]
-    fn aead_is_not_connected_not_ready_and_not_not_implemented() {
+    fn aead_is_ready_as_of_stage_152_154() {
         let preview = crypto_diagnostics_preview();
         let aead = preview
             .iter()
             .find(|row| row.capability == CryptoCapability::Aead)
             .expect("Aead row must exist");
-        assert_eq!(aead.readiness, CapabilityReadiness::NotConnected);
+        assert_eq!(aead.readiness, CapabilityReadiness::Ready);
+    }
+
+    #[test]
+    fn no_capability_reports_not_connected_as_of_stage_152_154() {
+        let preview = crypto_diagnostics_preview();
+        assert!(preview
+            .iter()
+            .all(|row| row.readiness != CapabilityReadiness::NotConnected));
     }
 
     #[test]

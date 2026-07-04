@@ -26,7 +26,20 @@
 //! Neither child module is wired into the Runtime, the Worker, storage, or
 //! Nostr in any way, and `Cargo.toml` is unchanged by this module (it adds
 //! no dependency).
+//!
+//! Stage 152–154 add `aead_internal` — this crate's first REAL AEAD
+//! implementation (ChaCha20-Poly1305 + AES-256-GCM), consuming a
+//! `SecretHandle(AeadKeyMaterial)` and a `Ready` `FedosAeadNonceDecision`
+//! only; see `aead_internal`'s own module-level doc comment for the full
+//! design. Stage 155 adds `aead_diagnostics`, a fixed, display-only
+//! per-algorithm readiness preview alongside the Stage 151
+//! `diagnostics::crypto_diagnostics_preview`, whose own `Aead` row is
+//! updated this stage from `NotConnected` to `Ready`. No public API
+//! addition, no `Cargo.toml` change, no Runtime/Worker/storage/Nostr/
+//! NIP-44/WASM connection.
 #![allow(dead_code)]
 
+pub(crate) mod aead_diagnostics;
+pub(crate) mod aead_internal;
 pub(crate) mod capability_matrix;
 pub(crate) mod diagnostics;
