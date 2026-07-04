@@ -377,6 +377,23 @@
 //! remain UNCHANGED and unconnected. `Cargo.toml` is untouched; nothing is
 //! wired into the Runtime, the Worker, or a crypto provider; no WASM
 //! binding exists.
+//!
+//! Stage 144–146 extends the Stage 79 `secret_handle` module to hold its
+//! FIRST real secret bytes: `SecretHandle::new_from_32_bytes_for_internal_use`
+//! accepts an already-drawn, fixed-size `[u8; 32]` (never a slice, `Vec<u8>`,
+//! or `String`) plus a non-sensitive `SecretHandleKind` classification label,
+//! wraps it in its own `secrecy::SecretBox`, and transitions the handle to a
+//! new `SecretHandleState::Holding` state. `new_placeholder()` (Stage 79) is
+//! unchanged and still works standalone. `SecretHandle` remains
+//! `pub(crate)`-at-most, gains no `pub` export, and this crate's public
+//! `pub fn` surface is unchanged (still twenty-four functions). It still
+//! does NOT call `fedos_random_bytes_32` or `fedos_aead_nonce_96` itself, and
+//! is still NOT connected to `aead_core` (Stage 80) or `kdf_core` (Stage 82)
+//! — HKDF and AEAD each connect in their own future, separate stage, per
+//! `docs/secret_lifecycle_implementation_plan.md` section 9. See that
+//! document, `docs/secret_handle_api_shape.md`, and
+//! `docs/secret_memory_test_strategy.md` for the full design/test records
+//! this addition builds against.
 
 #![forbid(unsafe_code)]
 
@@ -1421,48 +1438,85 @@ pub fn fedos_aead_nonce_96() -> FedosAeadNonceDecision {
     }
 }
 
-/// Stage 79 — an INTERNAL-ONLY secret-handle skeleton.
+/// Stage 79 — an INTERNAL-ONLY secret-handle skeleton. It originally held
+/// only a fixed, non-secret [`PlaceholderMarker`] wrapped in
+/// `secrecy::SecretBox`. Stage 144–146 extends it to hold its first REAL
+/// secret bytes: [`SecretHandle::new_from_32_bytes_for_internal_use`]
+/// accepts an already-drawn, fixed-size `[u8; 32]` (never a slice,
+/// `Vec<u8>`, or `String`) plus a non-sensitive [`SecretHandleKind`] label,
+/// wraps the bytes in its own `secrecy::SecretBox`-held payload, and
+/// transitions the handle to [`SecretHandleState::Holding`].
+/// `new_placeholder()` (Stage 79) is UNCHANGED — both construction paths
+/// coexist on the same type.
 ///
 /// NOT part of this crate's public API: every item below is `pub(crate)` at
 /// most (never `pub`), nothing is re-exported from the crate root, and none
-/// of the six functions above (`fedos_core_status`, `fedos_core_capabilities`,
-/// `random_bytes_placeholder`, `derive_key_placeholder`, `encrypt_placeholder`,
-/// `decrypt_placeholder`) constructs, holds, or returns a [`SecretHandle`].
+/// of this crate's `pub fn` functions constructs, holds, or returns a
+/// [`SecretHandle`].
 ///
-/// This is the first code in this crate to actually import and use the
-/// `zeroize`/`secrecy` dependencies adopted Stage 78 — but only against a
-/// fixed, non-secret [`PlaceholderMarker`]. It holds NO real key, seed,
-/// plaintext, ciphertext, or passphrase byte: no function below takes a
-/// borrowed-byte-slice, `Vec<u8>`, or `String` secret parameter, and no
-/// field below is typed as one either; no AEAD/HKDF/Argon2/NIP-44 operation
-/// is implemented or called here.
-/// `subtle` (also adopted Stage 78) is intentionally NOT used yet — a future
-/// stage that needs to compare real secret-derived bytes (e.g. an
-/// authentication tag) adopts it then; [`SecretHandleState`]'s derived
-/// `PartialEq` below is plain, non-secret enum equality, not a secret
-/// comparison `subtle` would need to guard.
+/// `SecretHandle` does not, and must not, generate its own bytes: it never
+/// calls `fedos_random_bytes_32` (Stage 137) or `fedos_aead_nonce_96`
+/// (Stage 138) itself — a caller draws bytes first and hands them to the
+/// constructor. No AEAD/HKDF/Argon2/NIP-44 operation is implemented or
+/// called here, and no field or method reaches into `aead_core`/`kdf_core`/
+/// `key_material` — per `docs/secret_lifecycle_implementation_plan.md`
+/// section 9 and `docs/secret_handle_api_shape.md` section 3, HKDF and AEAD
+/// each connect in their own future, later, separate stage.
+/// `subtle` (also adopted Stage 78) is intentionally still NOT used here —
+/// [`SecretHandleState`]/[`SecretHandleKind`]'s derived `PartialEq` below is
+/// plain, non-secret label equality, never a raw-secret comparison.
+///
+/// [`SecretHandleKind`] (NEW) is a non-sensitive classification label —
+/// `Placeholder` (the Stage 79 path) plus five real-secret labels
+/// (`AeadKeyMaterial`, `HkdfInputMaterial`, `HkdfOutputMaterial`,
+/// `NostrKeyMaterial`, `TestOnlySecretMaterial`) fixed at construction and
+/// returned by [`SecretHandle::kind`] — never a byte, never a length that
+/// narrows down which secret is held.
+///
+/// [`SecretInputLength`] (NEW) mirrors `FedosRandomBytesLength`/
+/// `FedosAeadNonceKind`'s "exactly one variant, no open count" shape —
+/// `ThirtyTwo` is the only length this boundary accepts today.
+///
+/// The real-byte payload (`RealSecretBytes`, private to this module) is
+/// never `Clone`/`Copy`/`Debug`-over-raw-bytes/`Display`/`Serialize`, and
+/// this module exposes no accessor that returns its raw bytes — `clear()`
+/// zeroizes it in place, and `secrecy::SecretBox`'s own `Drop` impl
+/// zeroizes it again if a handle is ever dropped without `clear()` being
+/// called first. See `docs/secret_lifecycle_implementation_plan.md` section
+/// 10 for the limitations this does NOT solve (compiler-introduced copies,
+/// OS paging, core dumps, and — once a WASM target exists — WASM's own
+/// memory model).
 ///
 /// Every item in this module is currently exercised ONLY by its own unit
 /// tests below (gated `cfg(test)`) — nothing outside this module calls it —
 /// so `#[allow(dead_code)]` suppresses the resulting warning on a plain,
-/// non-test `cargo check`/`cargo build`. This is expected for a skeleton not
+/// non-test `cargo check`/`cargo build`. This is expected for a type not
 /// yet wired to any consumer; it clears once a future stage (e.g. an
-/// internal AEAD module) actually uses `SecretHandle`.
+/// internal HKDF module) actually uses `SecretHandle`.
 #[allow(dead_code)]
 mod secret_handle {
     use secrecy::SecretBox;
     use zeroize::Zeroize;
 
+    // Used ONLY to prove `zeroize` actually runs on `clear()`/drop (see
+    // `RealSecretBytes` below) — never compiled into a production build.
+    #[cfg(test)]
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     /// Coarse internal lifecycle state of a [`SecretHandle`]. Crate-private
     /// only — never exposed via this crate's public API.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum SecretHandleState {
-        /// No placeholder marker has been allocated yet.
+        /// No placeholder marker or real payload has been allocated yet.
         Empty,
-        /// A placeholder marker is allocated. Still holds no real secret.
+        /// A placeholder marker is allocated (`new_placeholder()`). Still
+        /// holds no real secret.
         Placeholder,
-        /// [`SecretHandle::clear`] was called: the placeholder marker was
-        /// zeroized and this handle must not be treated as holding anything.
+        /// Real secret bytes are allocated
+        /// (`new_from_32_bytes_for_internal_use`).
+        Holding,
+        /// [`SecretHandle::clear`] was called: the payload was zeroized and
+        /// this handle must not be treated as holding anything.
         Cleared,
     }
 
@@ -1470,6 +1524,39 @@ mod secret_handle {
         fn default() -> Self {
             SecretHandleState::Empty
         }
+    }
+
+    /// A non-sensitive classification label for what KIND of secret a
+    /// [`SecretHandle`] holds — a label only, never a byte. Crate-private
+    /// only. `Placeholder` is the Stage 79 non-secret path; the remaining
+    /// variants label real secret material a future `kdf_core`/`aead_core`
+    /// stage may eventually consume (still unconnected today).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum SecretHandleKind {
+        /// `new_placeholder()`'s non-secret path.
+        Placeholder,
+        /// A symmetric AEAD key (future `aead_core` consumer).
+        AeadKeyMaterial,
+        /// Input key material for a future `kdf_core` derivation step.
+        HkdfInputMaterial,
+        /// Output key material derived by a future `kdf_core` step.
+        HkdfOutputMaterial,
+        /// Nostr signing-key material.
+        NostrKeyMaterial,
+        /// A test-fixture-only secret — never real production material.
+        TestOnlySecretMaterial,
+    }
+
+    /// The fixed, label-selected input length
+    /// [`SecretHandle::new_from_32_bytes_for_internal_use`] accepts — never
+    /// an open, caller-supplied byte count (same "exactly one variant, no
+    /// open count" shape this crate's other fixed-size boundaries already
+    /// use). Exactly one variant exists today; a future additional length
+    /// would be its own reviewed addition, never a numeric parameter.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum SecretInputLength {
+        /// Exactly 32 bytes — the only length this boundary supports today.
+        ThirtyTwo,
     }
 
     /// A non-sensitive status snapshot for a [`SecretHandle`]. Crate-private
@@ -1480,9 +1567,10 @@ mod secret_handle {
     }
 
     /// A fixed, non-secret placeholder value. Exists ONLY so [`SecretHandle`]
-    /// has a concrete `Zeroize`-able type to wrap in `secrecy::SecretBox` —
-    /// its value is a constant, never derived from or holding any real
-    /// key/seed/plaintext/ciphertext/passphrase byte.
+    /// has a concrete `Zeroize`-able type to wrap in `secrecy::SecretBox` for
+    /// its `new_placeholder()` path — its value is a constant, never derived
+    /// from or holding any real key/seed/plaintext/ciphertext/passphrase
+    /// byte.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     struct PlaceholderMarker(u8);
 
@@ -1492,27 +1580,97 @@ mod secret_handle {
         }
     }
 
-    /// An INTERNAL-ONLY secret-handle skeleton (crate-private; not part of
-    /// this crate's public API — see the module-level doc comment above).
-    /// Holds NO real key, seed, plaintext, ciphertext, or passphrase byte:
-    /// `marker` is the fixed, non-secret [`PlaceholderMarker`] above,
-    /// wrapped in `secrecy::SecretBox` purely to exercise the
-    /// secret-handling foundation adopted Stage 78 ahead of any real secret
-    /// type. A future, explicitly-reviewed stage may extend this skeleton to
-    /// hold real secret bytes; until then it accepts and stores none.
+    /// The real 32-byte secret payload held once a [`SecretHandle`] is
+    /// constructed via [`SecretHandle::new_from_32_bytes_for_internal_use`].
+    /// Deliberately NOT `Clone`/`Copy`/`Debug`-over-raw-bytes/`Display`/
+    /// `Serialize` — the same prohibitions bind this type as bind
+    /// `SecretHandle` itself
+    /// (`docs/secret_lifecycle_implementation_plan.md` sections 4–5).
+    /// `secrecy::SecretBox<RealSecretBytes>` gets no `Clone` impl either:
+    /// `secrecy`'s own `Clone for SecretBox<S>` requires `S: CloneableSecret`,
+    /// which this type deliberately never implements. The `#[cfg(test)]`-only
+    /// call-count bump inside `zeroize` below exists SOLELY so a test can
+    /// prove `zeroize` actually runs on `clear()`/drop — it never compiles
+    /// into a production build and never exposes a byte of the secret
+    /// itself.
+    struct RealSecretBytes([u8; 32]);
+
+    impl Zeroize for RealSecretBytes {
+        fn zeroize(&mut self) {
+            self.0.zeroize();
+            #[cfg(test)]
+            REAL_SECRET_ZEROIZE_CALLS.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    #[cfg(test)]
+    static REAL_SECRET_ZEROIZE_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Either the Stage 79 non-secret placeholder marker or a real 32-byte
+    /// payload — exactly one of `SecretHandle`'s two construction paths is
+    /// active at a time. Crate-private; never `Clone`/`Debug`-over-raw-bytes.
+    enum SecretPayload {
+        Placeholder(SecretBox<PlaceholderMarker>),
+        Real(SecretBox<RealSecretBytes>),
+    }
+
+    impl SecretPayload {
+        fn zeroize_in_place(&mut self) {
+            match self {
+                SecretPayload::Placeholder(marker) => marker.zeroize(),
+                SecretPayload::Real(bytes) => bytes.zeroize(),
+            }
+        }
+    }
+
+    /// An INTERNAL-ONLY secret-handle (crate-private; not part of this
+    /// crate's public API — see the module-level doc comment above). Holds
+    /// EITHER the Stage 79 non-secret [`PlaceholderMarker`] (via
+    /// `new_placeholder()`) OR, as of Stage 144–146, a real 32-byte secret
+    /// buffer (via `new_from_32_bytes_for_internal_use`) — both wrapped in
+    /// `secrecy::SecretBox`. No `Clone`, no `Debug`, no `Display`, no
+    /// `Serialize`, no `Eq`/`PartialEq` over the payload, and no public raw
+    /// byte accessor anywhere on this type.
     pub(crate) struct SecretHandle {
         state: SecretHandleState,
-        marker: SecretBox<PlaceholderMarker>,
+        kind: SecretHandleKind,
+        payload: Option<SecretPayload>,
     }
 
     impl SecretHandle {
         /// Construct a placeholder handle. Takes NO secret input of any
         /// kind — there is no borrowed-byte-slice, `Vec<u8>`, or `String`
-        /// parameter here or anywhere else in this module.
+        /// parameter here — unchanged from Stage 79.
         pub(crate) fn new_placeholder() -> Self {
             Self {
                 state: SecretHandleState::Placeholder,
-                marker: SecretBox::new(Box::new(PlaceholderMarker(0))),
+                kind: SecretHandleKind::Placeholder,
+                payload: Some(SecretPayload::Placeholder(SecretBox::new(Box::new(
+                    PlaceholderMarker(0),
+                )))),
+            }
+        }
+
+        /// Construct a handle holding REAL secret bytes. Takes ownership of
+        /// a fixed-size `[u8; 32]` (never a slice, never a `Vec<u8>`, never
+        /// a `String`) plus the non-sensitive [`SecretHandleKind`] label the
+        /// caller is asserting for it, and immediately wraps the bytes in
+        /// `secrecy::SecretBox`. Never calls `fedos_random_bytes_32` or
+        /// `fedos_aead_nonce_96` itself — the caller draws bytes first. The
+        /// `_for_internal_use` suffix signals this stays `pub(crate)` —
+        /// never a crate-public provisioning entry point (a future,
+        /// separate, narrowly-scoped decision per
+        /// `docs/secret_lifecycle_implementation_plan.md` section 8).
+        pub(crate) fn new_from_32_bytes_for_internal_use(
+            kind: SecretHandleKind,
+            bytes: [u8; 32],
+        ) -> Self {
+            Self {
+                state: SecretHandleState::Holding,
+                kind,
+                payload: Some(SecretPayload::Real(SecretBox::new(Box::new(
+                    RealSecretBytes(bytes),
+                )))),
             }
         }
 
@@ -1521,10 +1679,20 @@ mod secret_handle {
             SecretHandleStatus { state: self.state }
         }
 
-        /// Zeroizes the (non-secret) placeholder marker and marks this
-        /// handle `Cleared`. Does not return, expose, or copy the marker.
+        /// The non-sensitive classification label fixed at construction.
+        pub(crate) fn kind(&self) -> SecretHandleKind {
+            self.kind
+        }
+
+        /// Zeroizes the held payload (placeholder marker or real bytes) and
+        /// marks this handle `Cleared`. Does not return, expose, or copy the
+        /// payload. Safe to call more than once — a second call is a no-op
+        /// (there is no payload left to zeroize).
         pub(crate) fn clear(&mut self) {
-            self.marker.zeroize();
+            if let Some(payload) = self.payload.as_mut() {
+                payload.zeroize_in_place();
+            }
+            self.payload = None;
             self.state = SecretHandleState::Cleared;
         }
 
@@ -1538,17 +1706,24 @@ mod secret_handle {
     mod tests {
         use super::*;
 
+        // A clearly-labeled, non-production test fixture — a fixed
+        // repeating pattern, never a real key/seed/passphrase
+        // (`docs/crypto_test_vectors.md` section 6's labeling rule
+        // generalized to secret fixtures).
+        const TEST_FIXTURE_BYTES: [u8; 32] = [0xAB; 32];
+
         #[test]
         fn new_placeholder_starts_in_placeholder_state_only() {
             let handle = SecretHandle::new_placeholder();
             assert_eq!(handle.status().state, SecretHandleState::Placeholder);
+            assert_eq!(handle.kind(), SecretHandleKind::Placeholder);
             assert!(!handle.is_cleared());
         }
 
         #[test]
         fn status_reports_placeholder_state_only_no_secret_bytes() {
             // `SecretHandleStatus` carries only the coarse state enum — no
-            // secret byte, no marker, nothing derived from `marker`.
+            // secret byte, no marker, nothing derived from the payload.
             let handle = SecretHandle::new_placeholder();
             let status = handle.status();
             assert_eq!(status.state, SecretHandleState::Placeholder);
@@ -1571,6 +1746,111 @@ mod secret_handle {
         #[test]
         fn empty_state_is_the_default_placeholder_only_state() {
             assert_eq!(SecretHandleState::default(), SecretHandleState::Empty);
+        }
+
+        #[test]
+        fn new_from_32_bytes_for_internal_use_starts_in_holding_state_with_given_kind() {
+            let handle = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            assert_eq!(handle.status().state, SecretHandleState::Holding);
+            assert_eq!(handle.kind(), SecretHandleKind::TestOnlySecretMaterial);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn real_byte_handle_preserves_every_kind_variant() {
+            for kind in [
+                SecretHandleKind::AeadKeyMaterial,
+                SecretHandleKind::HkdfInputMaterial,
+                SecretHandleKind::HkdfOutputMaterial,
+                SecretHandleKind::NostrKeyMaterial,
+                SecretHandleKind::TestOnlySecretMaterial,
+            ] {
+                let handle =
+                    SecretHandle::new_from_32_bytes_for_internal_use(kind, TEST_FIXTURE_BYTES);
+                assert_eq!(handle.kind(), kind);
+                assert_eq!(handle.status().state, SecretHandleState::Holding);
+            }
+        }
+
+        #[test]
+        fn clear_on_real_byte_handle_transitions_to_cleared() {
+            let mut handle = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            handle.clear();
+            assert_eq!(handle.status().state, SecretHandleState::Cleared);
+            assert!(handle.is_cleared());
+        }
+
+        #[test]
+        fn clear_is_idempotent_and_does_not_panic_on_double_clear() {
+            let mut handle = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            handle.clear();
+            handle.clear();
+            assert!(handle.is_cleared());
+            assert_eq!(handle.status().state, SecretHandleState::Cleared);
+        }
+
+        #[test]
+        fn real_byte_zeroize_is_called_on_explicit_clear() {
+            let before = REAL_SECRET_ZEROIZE_CALLS.load(Ordering::SeqCst);
+            let mut handle = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            handle.clear();
+            let after = REAL_SECRET_ZEROIZE_CALLS.load(Ordering::SeqCst);
+            assert!(after > before, "clear() must zeroize the real payload");
+        }
+
+        #[test]
+        fn real_byte_zeroize_is_called_on_drop_without_explicit_clear() {
+            let before = REAL_SECRET_ZEROIZE_CALLS.load(Ordering::SeqCst);
+            {
+                let _handle = SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::TestOnlySecretMaterial,
+                    TEST_FIXTURE_BYTES,
+                );
+                // `_handle` drops at the end of this block without `clear()`
+                // ever being called — `secrecy::SecretBox`'s own `Drop` impl
+                // must zeroize the payload on its own.
+            }
+            let after = REAL_SECRET_ZEROIZE_CALLS.load(Ordering::SeqCst);
+            assert!(after > before, "drop must zeroize the real payload");
+        }
+
+        /// `SecretInputLength` supports exactly one variant today — an
+        /// exhaustive match with no wildcard arm compiles only because no
+        /// zero-length or caller-chosen-length variant exists to add one
+        /// for (mirrors
+        /// `fedos_random_bytes_length_has_no_variant_other_than_thirty_two`,
+        /// Stage 137).
+        #[test]
+        fn secret_input_length_has_no_variant_other_than_thirty_two() {
+            let length = SecretInputLength::ThirtyTwo;
+            match length {
+                SecretInputLength::ThirtyTwo => {}
+            }
+        }
+
+        /// The placeholder path (Stage 79) still works entirely unchanged
+        /// alongside the new real-byte path.
+        #[test]
+        fn placeholder_and_real_byte_paths_stay_independent() {
+            let placeholder = SecretHandle::new_placeholder();
+            let real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            assert_eq!(placeholder.status().state, SecretHandleState::Placeholder);
+            assert_eq!(real.status().state, SecretHandleState::Holding);
         }
     }
 }

@@ -8,26 +8,32 @@ import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 import workerSource from "../src/worker.ts?raw";
 
 /**
- * Stage 79 — internal secret-handle skeleton.
+ * Stage 79 — internal secret-handle skeleton. Stage 144–146 extends it to
+ * hold its first REAL secret bytes (see
+ * `fedos_core_rust_secret_handle_real_bytes.test.ts` for the dedicated
+ * real-byte guard suite) — this file covers the parts of the shape that
+ * changed as a result (state/method-set enumeration) plus everything from
+ * Stage 79 that is still true unchanged.
  *
  * `packages/fedos-core-rust/src/lib.rs` gains a crate-private `secret_handle`
- * module: `SecretHandleState` (`Empty` / `Placeholder` / `Cleared`),
- * `SecretHandleStatus`, and `SecretHandle` itself
- * (`new_placeholder()`/`status()`/`clear()`/`is_cleared()`). This is the
- * first PRODUCTION (not `#[cfg(test)]`-only) code in this crate to actually
- * import and use the `zeroize`/`secrecy` dependencies adopted Stage 78 — but
- * only against a fixed, non-secret `PlaceholderMarker`. `subtle` (also
- * adopted Stage 78) is deliberately NOT used yet.
+ * module: `SecretHandleState` (`Empty` / `Placeholder` / `Holding` /
+ * `Cleared`), `SecretHandleKind`, `SecretInputLength`, `SecretHandleStatus`,
+ * and `SecretHandle` itself
+ * (`new_placeholder()`/`new_from_32_bytes_for_internal_use()`/`status()`/
+ * `kind()`/`clear()`/`is_cleared()`). This is the first PRODUCTION (not
+ * `#[cfg(test)]`-only) code in this crate to actually import and use the
+ * `zeroize`/`secrecy` dependencies adopted Stage 78. `subtle` (also adopted
+ * Stage 78) is deliberately still NOT used.
  *
- * `SecretHandle` is an INTERNAL skeleton, not a public API: every item in
+ * `SecretHandle` is an INTERNAL type, not a public API: every item in
  * `secret_handle` is `pub(crate)` at most (never `pub`), nothing is
  * re-exported from the crate root, and this crate's public `pub fn` surface
- * is still exactly the same six placeholder functions from Stage 69. No real
- * key/seed/plaintext/ciphertext/passphrase byte is accepted, stored, or
- * handled anywhere — `new_placeholder()` takes no secret input of any kind,
- * and the only field `SecretHandle` holds is the fixed placeholder marker.
- * No AEAD/HKDF/Argon2/NIP-44 operation is implemented or called. Nothing is
- * wired into the Runtime, the Worker, or `CryptoProvider`.
+ * is unchanged by this addition. No key/seed/plaintext/ciphertext/passphrase
+ * byte is accepted, stored, or handled through any `pub` function anywhere
+ * — `new_from_32_bytes_for_internal_use()` is `pub(crate)`-only and takes a
+ * fixed-size `[u8; 32]`, never a slice/`Vec<u8>`/`String`. No AEAD/HKDF/
+ * Argon2/NIP-44 operation is implemented or called. Nothing is wired into
+ * the Runtime, the Worker, or `CryptoProvider`.
  *
  * `cargo test` (green as of this stage, including `secret_handle`'s own
  * `#[cfg(test)] mod tests`) and `cargo check` / `cargo check --tests` are
@@ -145,7 +151,7 @@ describe("FedOS Rust crate — internal secret handle skeleton", () => {
     expect(secretHandleModule).not.toMatch(/\b(key|seed|plaintext|ciphertext|passphrase)\s*:\s*\w/i);
   });
 
-  it("7. no Vec<u8> / String secret field anywhere in secret_handle — the only stored field is the fixed placeholder marker", () => {
+  it("7. no Vec<u8> / String secret field anywhere in secret_handle", () => {
     expect(secretHandleModule).not.toMatch(/:\s*Vec<u8>/);
     expect(secretHandleModule).not.toMatch(/:\s*String\b/);
     expect(secretHandleModule).not.toMatch(/&\s*\[\s*u8\s*\]/);
@@ -219,14 +225,21 @@ describe("FedOS Rust crate — internal secret handle skeleton", () => {
     expect(secretHandleModule).not.toMatch(/\.ct_eq\s*\(/);
   });
 
-  it("14. SecretHandleState has exactly the three specified variants", () => {
-    for (const variant of ["Empty", "Placeholder", "Cleared"]) {
+  it("14. SecretHandleState has exactly the four specified variants (Stage 144–146 adds Holding)", () => {
+    for (const variant of ["Empty", "Placeholder", "Holding", "Cleared"]) {
       expect(secretHandleModule).toContain(variant);
     }
   });
 
-  it("15. SecretHandle exposes exactly the four specified methods", () => {
-    for (const method of ["new_placeholder", "status", "clear", "is_cleared"]) {
+  it("15. SecretHandle exposes exactly the six specified methods (Stage 144–146 adds new_from_32_bytes_for_internal_use and kind)", () => {
+    for (const method of [
+      "new_placeholder",
+      "new_from_32_bytes_for_internal_use",
+      "status",
+      "kind",
+      "clear",
+      "is_cleared",
+    ]) {
       expect(secretHandleModule).toMatch(new RegExp(`\\bfn\\s+${method}\\b`));
     }
   });
