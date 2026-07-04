@@ -310,3 +310,29 @@ display which capability labels a sample creator's federation summary would
 show — a pure label lookup, opening no relay/HTTP/OAuth connection. No
 adapter behind `FederationProvider` (Stage 110) was built, wired, or changed
 by this addition; §6's NOT-implemented list is unchanged.
+
+---
+
+## 10. Stage 182–185 note — the encrypted payload descriptor, and why it stays OUT of this file's scope
+
+`src/storage/encrypted_payload.ts` (Stage 183) adds an
+`EncryptedPayloadDescriptor` boundary (`docs/encrypted_payload_storage_boundary.md`
+§9) whose `transportKind` field can name `"nostr_event"` as a future
+destination label. This is named here ONLY to head off a natural
+question: does that descriptor belong in THIS document instead, since it
+mentions Nostr?
+
+**No** — for the same reason §9's `private_message_placeholder`/
+`paid_content_placeholder` STRUCTURAL rejection already established: this
+document plans the PUBLIC relay-event adapter behind `FederationProvider`,
+and an encrypted payload (by definition, content NOT meant to ride a
+permanently public relay event unencrypted) is exactly the case that
+adapter's own capability matrix already marks `rejected` for
+`nostr_placeholder`. `EncryptedPayloadDescriptor`'s `"nostr_event"` label
+does not reopen that — it exists so a FUTURE, SEPARATE, explicitly-opted-in
+write path (`docs/encrypted_payload_storage_boundary.md` §4's "encrypted
+payload, ONLY when explicitly allowed for that specific write" rule) has a
+reviewed shape, once NIP-44 (`docs/nip44_internal_plan.md`) or an
+equivalent scheme is actually implemented and a real adapter exists. No
+such adapter, write path, or NIP-44 code exists yet, and this document's
+own §6 NOT-implemented list remains completely unchanged by Stage 182–185.

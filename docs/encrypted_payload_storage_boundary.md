@@ -1,6 +1,8 @@
-# Encrypted Payload Storage/Send Boundary (Stage 177–180) — binding, docs only
+# Encrypted Payload Storage/Send Boundary (Stage 177–180, updated Stage 182–185) — binding, docs only
 
-**Status: this document adds no code and wires no connection.** It fixes,
+**Status: this document adds no code and wires no connection. Stage
+182–185 add ONE concrete, still-unconnected TypeScript type/pure-function
+file implementing this document's own §3 shape — see §9.** It fixes,
 in writing, what a future stage MAY hand to `StorageBackend`
 (`src/storage/types.ts`, Stage 107) versus what it MAY hand to a
 `FederationProvider` (`src/federation/types.ts`, Stage 110) once this
@@ -198,3 +200,37 @@ or re-derive from the Rust enum.
 - **No code, no wiring, no bridge** is added or authorized by this
   document — it is boundary PREP for a future, separate, explicitly
   reviewed bridging stage.
+
+## 9. Stage 182–185 update — the pre-`StorageBackend` descriptor now EXISTS
+
+`src/storage/encrypted_payload.ts` (new) implements this document's §3
+shape as a concrete TypeScript type + pure review function:
+`EncryptedPayloadDescriptor` (`version`/`algorithm`/`encoding`/
+`transportKind`/`idRef`/`metadata` — no payload byte, ciphertext byte,
+plaintext, or raw key field of any kind) and
+`reviewEncryptedPayloadDescriptor(descriptor)`, a PURE function mirroring
+`../storage/policy.ts`'s `reviewStoragePacket` shape exactly (never
+mutates its input, performs no I/O, never throws), which denies a
+descriptor whose `idRef` looks like a URL/path or whose `metadata`
+contains a sensitive, buyer/payment/entitlement, or chat/DM/private
+key or value.
+
+**This file is still NOT connected to `StorageBackend`,
+`FederationProvider`, Nostr, the Runtime, or the Worker** — it imports
+nothing from `./noop_storage.ts`, `../federation/`, `../runtime/`, or
+`../worker.ts`, and none of those import it either. It exists so a
+FUTURE bridging stage (§7's still-unbuilt Rust↔TypeScript bridge) has a
+reviewed TypeScript-side shape to hand data through, once one exists —
+exactly the same "fix the shape before the wiring" role this document's
+§3/§4 tables already played for `StoragePacket`/`FederationProvider`
+writes in prose; §9 now backs that prose with an actual, independently
+testable type.
+
+`EncryptedPayloadEncoding`'s two labels (`"undecided"` /
+`"canonical_json_base64url_placeholder"`) mirror the Rust-side
+`crypto::ciphertext_transport::CiphertextEncodingPlaceholder`'s two
+variants (Stage 177–178, extended Stage 182) in ROLE — per §6 above,
+this is independent parallel design, not a shared type or a bridge.
+`docs/ciphertext_serialization_format_decision.md`'s canonical JSON +
+base64url MVP decision is what `"canonical_json_base64url_placeholder"`
+names; no encoder/decoder exists in either language for it yet.
