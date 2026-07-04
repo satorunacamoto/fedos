@@ -37,9 +37,21 @@
 //! updated this stage from `NotConnected` to `Ready`. No public API
 //! addition, no `Cargo.toml` change, no Runtime/Worker/storage/Nostr/
 //! NIP-44/WASM connection.
+//!
+//! Stage 157–158 add `ciphertext_envelope` — an INTERNAL-ONLY ciphertext
+//! envelope SKELETON (`AeadCiphertextEnvelope`, holding a version/
+//! algorithm/AAD-domain label, a real 12-byte nonce, and a fixed,
+//! non-secret ciphertext PLACEHOLDER — never real ciphertext) plus
+//! `validate_envelope_internal`, which validates untrusted candidate
+//! field values structurally (no AEAD authentication, no serialization).
+//! Deliberately unconnected from `aead_internal`'s real `AeadCipher`/
+//! `AeadAadDomain` types — see `ciphertext_envelope`'s own module-level
+//! doc comment for the full design and
+//! `docs/ciphertext_envelope_plan.md` for the planning record.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
 pub(crate) mod aead_internal;
 pub(crate) mod capability_matrix;
+pub(crate) mod ciphertext_envelope;
 pub(crate) mod diagnostics;

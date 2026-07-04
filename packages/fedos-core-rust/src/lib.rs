@@ -449,6 +449,29 @@
 //! storage/Nostr/NIP-44/WASM connection, no `Cargo.toml` change, and no
 //! public API addition — still twenty-four `pub fn`s. See
 //! `docs/aead_internal_implementation.md` for the full design record.
+//!
+//! Stage 157–158 add `crypto::ciphertext_envelope`: an INTERNAL-ONLY
+//! ciphertext envelope SKELETON, `AeadCiphertextEnvelope` — holding a
+//! version/algorithm/AAD-domain label, a real 12-byte nonce, and a fixed,
+//! non-secret ciphertext PLACEHOLDER (never real ciphertext, never
+//! derived from `crypto::aead_internal::seal_internal`). Fixes the six
+//! fields `docs/ciphertext_envelope_plan.md` named into a concrete type,
+//! but does NOT connect this envelope to the real AEAD implementation —
+//! that bridge is Stage 161 candidate work, planned in writing only
+//! (`docs/ciphertext_envelope_plan.md` section 8). `validate_envelope_internal`
+//! validates untrusted CANDIDATE field values (raw version/algorithm/
+//! AAD-domain tags, a nonce slice, a ciphertext-placeholder slice) —
+//! structural/label checks only, no AEAD authentication, no
+//! serialization/deserialization of any wire format. `AeadEnvelopeAlgorithm`/
+//! `AeadEnvelopeAadDomain` are deliberately SEPARATE types from
+//! `crypto::aead_internal::AeadCipher`/`AeadAadDomain` — this skeleton
+//! stays unconnected, same discipline as every other unconnected skeleton
+//! in this crate. No public API addition, no `Cargo.toml` change, no
+//! Runtime/Worker/storage/Nostr/NIP-44/WASM connection. See
+//! `docs/ciphertext_envelope_plan.md` and
+//! `docs/public_encrypt_decrypt_api_plan.md` (planning for the future
+//! public `encrypt`/`decrypt` API this envelope and `SecretHandle` would
+//! eventually feed, not built here) for the full design records.
 
 #![forbid(unsafe_code)]
 
