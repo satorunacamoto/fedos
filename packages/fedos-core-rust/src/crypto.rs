@@ -100,6 +100,18 @@
 //! (`#[cfg(test)]`-only) confirms the resolved build stays exactly this
 //! minimal. No ECDH function, no conversation-key derivation, no NIP-44
 //! code, no public API addition.
+//!
+//! Stage 198–199 add `conversation_key` — a `SecretHandle`-backed
+//! `ConversationKey` type with a Stage 198 placeholder path, plus Stage
+//! 199's REAL `derive_conversation_key_via_ecdh_internal`: secp256k1 ECDH
+//! (manual `k256` `arithmetic`-only point multiplication — no `ecdh`
+//! Cargo feature added) followed by HKDF-extract-only (fixed salt
+//! `"nip44-v2"`), vector-verified against
+//! `test-vectors/nip44/nip44-v2.json`'s `valid`/`invalid .get_conversation_key`
+//! categories (43 cases total) by the sibling `#[cfg(test)]`-only
+//! `nip44_conversation_key_vectors` module. No message-key derivation, no
+//! padding, no NIP-44 encrypt/decrypt, no public API addition, no
+//! Runtime/Worker/Storage/Relay connection.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -109,7 +121,10 @@ pub(crate) mod capability_matrix;
 pub(crate) mod ciphertext_envelope;
 pub(crate) mod ciphertext_serialization;
 pub(crate) mod ciphertext_transport;
+pub(crate) mod conversation_key;
 pub(crate) mod diagnostics;
+#[cfg(test)]
+mod nip44_conversation_key_vectors;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]

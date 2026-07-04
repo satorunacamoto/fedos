@@ -1667,11 +1667,16 @@ pub fn fedos_aead_nonce_96() -> FedosAeadNonceDecision {
 /// plain, non-secret label equality, never a raw-secret comparison.
 ///
 /// [`SecretHandleKind`] (NEW) is a non-sensitive classification label —
-/// `Placeholder` (the Stage 79 path) plus five real-secret labels
+/// `Placeholder` (the Stage 79 path) plus seven real-secret labels
 /// (`AeadKeyMaterial`, `HkdfInputMaterial`, `HkdfOutputMaterial`,
-/// `NostrKeyMaterial`, `TestOnlySecretMaterial`) fixed at construction and
-/// returned by [`SecretHandle::kind`] — never a byte, never a length that
-/// narrows down which secret is held.
+/// `NostrKeyMaterial`, `ConversationKeyMaterial` (Stage 198),
+/// `MessageKeyMaterial` (Stage 200), `TestOnlySecretMaterial`) fixed at
+/// construction and returned by [`SecretHandle::kind`] — never a byte,
+/// never a length that narrows down which secret is held. Stage 199 adds a
+/// third narrowly-scoped raw-byte accessor,
+/// [`SecretHandle::expose_bytes_for_internal_ecdh`], for
+/// `crypto::conversation_key`'s sole reviewed ECDH call site — same rules
+/// as the two existing accessors below.
 ///
 /// [`SecretInputLength`] (NEW) mirrors `FedosRandomBytesLength`/
 /// `FedosAeadNonceKind`'s "exactly one variant, no open count" shape —
@@ -1743,6 +1748,17 @@ mod secret_handle {
         HkdfOutputMaterial,
         /// Nostr signing-key material.
         NostrKeyMaterial,
+        /// Stage 198 — a Nostr conversation key (`crypto::conversation_key`),
+        /// derived via `crypto::conversation_key`'s ECDH-plus-extract
+        /// pipeline (Stage 199 — see that module's own doc comment for the
+        /// full derivation record). The more specifically-named variant
+        /// `docs/nip44_internal_plan.md`'s own §8 anticipated in place of
+        /// reusing `NostrKeyMaterial`/`HkdfOutputMaterial` for this purpose.
+        ConversationKeyMaterial,
+        /// Stage 200 — a Nostr per-message key (`crypto::message_key`),
+        /// derived FROM a `ConversationKeyMaterial` handle via
+        /// `crypto::hkdf_bridge` (Stage 201).
+        MessageKeyMaterial,
         /// A test-fixture-only secret — never real production material.
         TestOnlySecretMaterial,
     }
@@ -1940,6 +1956,20 @@ mod secret_handle {
                 _ => None,
             }
         }
+
+        /// Stage 199 — a THIRD narrowly-scoped internal accessor, identical
+        /// in shape to the two above but named for its own sole reviewed
+        /// caller: `crypto::conversation_key`'s ECDH-driven conversation-key
+        /// generation (the `NostrKeyMaterial` secret-key/public-key inputs
+        /// it reads bytes from). Same rules: returns `None` for the Stage 79
+        /// placeholder path and after `clear()`; returns a COPY, never a
+        /// reference; the caller zeroizes its own copy once done.
+        pub(crate) fn expose_bytes_for_internal_ecdh(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
     }
 
     #[cfg(test)]
@@ -2006,6 +2036,8 @@ mod secret_handle {
                 SecretHandleKind::HkdfInputMaterial,
                 SecretHandleKind::HkdfOutputMaterial,
                 SecretHandleKind::NostrKeyMaterial,
+                SecretHandleKind::ConversationKeyMaterial,
+                SecretHandleKind::MessageKeyMaterial,
                 SecretHandleKind::TestOnlySecretMaterial,
             ] {
                 let handle =
@@ -2139,6 +2171,31 @@ mod secret_handle {
             );
             assert_eq!(
                 real.expose_bytes_for_internal_aead(),
+                Some(TEST_FIXTURE_BYTES)
+            );
+        }
+
+        #[test]
+        fn expose_bytes_for_internal_ecdh_returns_none_for_placeholder_and_cleared() {
+            let placeholder = SecretHandle::new_placeholder();
+            assert!(placeholder.expose_bytes_for_internal_ecdh().is_none());
+
+            let mut real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            real.clear();
+            assert!(real.expose_bytes_for_internal_ecdh().is_none());
+        }
+
+        #[test]
+        fn expose_bytes_for_internal_ecdh_returns_the_stored_bytes_for_a_holding_handle() {
+            let real = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            );
+            assert_eq!(
+                real.expose_bytes_for_internal_ecdh(),
                 Some(TEST_FIXTURE_BYTES)
             );
         }
