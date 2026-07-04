@@ -3663,3 +3663,86 @@ for the dedicated Stage 177–181 guard suite: the descriptor is
 exists anywhere in this crate, no Runtime/Worker/Storage/Nostr/NIP-44
 connection, `Cargo.toml` unchanged (still 9 production dependencies), and
 the `pub fn` surface is unchanged at twenty-seven.
+
+## Serialization format decision + TypeScript payload descriptor + NIP-44 vector readiness (Stage 182–185)
+
+Stage 182–185 continue as **planning/skeleton/docs/guards only** — still
+no real serialization implementation, no NIP-44 implementation, and no
+Rust↔TypeScript/WASM/FFI bridge or Storage/Nostr/Runtime/Worker
+connection of any kind.
+
+**Stage 182**: [`docs/ciphertext_serialization_format_decision.md`](../../docs/ciphertext_serialization_format_decision.md)
+picks the MVP wire encoding `docs/ciphertext_envelope_serialization_plan.md`
+(Stage 179) deliberately left open — **canonical JSON + base64url
+fields** — weighed explicitly against that document's seven selection
+criteria, and fixes the canonical field order: `v` / `alg` / `aad` / `n` /
+`ct` / `tag`. No `kid`/key-id field, no secret, no buyer/payment/
+entitlement metadata. `crypto::ciphertext_transport::CiphertextEncodingPlaceholder`
+gains a second, additive variant, `CanonicalJsonBase64UrlPlaceholder`
+(`Undecided` remains valid; a new `new_placeholder_with_encoding`
+constructor lets a caller pick either) — still a label only, no
+encode/decode function, no `serde`/base64 dependency, no `Cargo.toml`
+change.
+
+**Stage 183**: [`src/storage/encrypted_payload.ts`](../../src/storage/encrypted_payload.ts)
+(new, TypeScript side) adds `EncryptedPayloadDescriptor`/
+`EncryptedPayloadEncoding`/`EncryptedPayloadAlgorithm`/
+`EncryptedPayloadTransportKind`/`EncryptedPayloadDecision` and a pure
+`reviewEncryptedPayloadDescriptor(descriptor)` — mirroring this crate's
+`CiphertextTransportDescriptor` in ROLE (not by import; there is still no
+Rust↔TypeScript bridge). No payload byte, ciphertext byte, plaintext, or
+raw key field exists on the descriptor; the review function rejects
+buyer/payment/entitlement and chat/DM/private metadata, never mutates its
+input, and is not wired to `StorageBackend`/`FederationProvider`/Runtime/
+Worker.
+
+**Stage 184**: `docs/encrypted_payload_storage_boundary.md` and
+`docs/nostr_adapter_planning.md` are updated to name the new TypeScript
+descriptor as the pre-`StorageBackend` step (§9 of the former), and to
+explain why an encrypted payload's `"nostr_event"` transport-kind label
+does NOT reopen `nostr_placeholder`'s existing structural rejection of
+`private_message_placeholder`/`paid_content_placeholder` (§10 of the
+latter) — still no adapter, no write path, no NIP-44 code.
+
+**Stage 185**: [`docs/nip44_vector_readiness.md`](../../docs/nip44_vector_readiness.md)
+confirms `test-vectors/nip44/nip44-v2.json`'s 8 existing vector
+categories cover every pipeline stage `docs/nip44_internal_plan.md`
+names, and fixes the 7-step implementation ORDER a future stage must
+follow: vector schema guard → secp256k1 dependency adoption →
+conversation-key test → message-key test → padding test →
+encrypt/decrypt test → invalid-case test. No NIP-44 code, no secp256k1
+dependency, no Chat/DM connection.
+
+**What is explicitly NOT implemented or connected:**
+
+- No JSON/base64/CBOR/binary encode or decode function anywhere in Rust.
+- No TypeScript serialization code for the new descriptor.
+- No NIP-44 implementation, no secp256k1/ECDH dependency.
+- No Rust↔TypeScript/WASM/FFI bridge — this crate remains
+  `crate-type = ["rlib"]` only.
+- No `StorageBackend`/`FederationProvider`/Nostr relay/Runtime/Worker
+  connection.
+- No public API addition — still twenty-seven `pub fn`s.
+- No `Cargo.toml` or `package.json` change, no new dependency.
+- No raw key/nonce/ciphertext getter anywhere; no plaintext or payload
+  bytes field on the TypeScript descriptor.
+- No buyer/payment/entitlement/chat/private metadata anywhere in the new
+  docs or code.
+
+**Rust-side test coverage**: `crypto::ciphertext_transport`'s test module
+grows from 5 to 6 tests (an updated exhaustive-match guard now covering
+both `CiphertextEncodingPlaceholder` variants, plus a new test
+constructing a descriptor still recording `Undecided` via
+`new_placeholder_with_encoding`).
+
+See
+[`test/fedos_core_rust_ciphertext_transport.test.ts`](../../test/fedos_core_rust_ciphertext_transport.test.ts)
+(updated) and
+[`test/encrypted_payload_boundary.test.ts`](../../test/encrypted_payload_boundary.test.ts)
+(new) for the dedicated Stage 182–185 guard suites: the encoding label
+change is verified, no serialization/NIP-44 implementation exists
+anywhere, the TypeScript descriptor accepts safe labels and rejects
+sensitive/commerce/chat metadata with no payload/plaintext/raw-key field,
+no Storage/Federation/Runtime/Worker wiring exists, `Cargo.toml`/
+`package.json` are unchanged, and the `pub fn` surface is unchanged at
+twenty-seven.
