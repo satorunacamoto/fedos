@@ -3098,3 +3098,135 @@ separate, explicitly-reviewed stage): no HKDF connection (`kdf_core` remains
 exactly as unconnected as before), no AEAD connection (`aead_core` likewise),
 no `deriveKey`/`encrypt`/`decrypt` public API change, and no Runtime/Worker/
 WASM wiring of any kind.
+
+## Internal HKDF-SHA256 implementation using SecretHandle (Stage 147)
+
+Stage 147 implements `docs/hkdf_internal_plan.md`: the crate-private
+`kdf_core` module (Stage 82) gains this crate's first REAL implementation.
+`derive_secret_handle_internal(input: &SecretHandle, domain: HkdfDomain) ->
+HkdfDecision` derives a NEW `SecretHandle(HkdfOutputMaterial)` from an
+existing `SecretHandle(HkdfInputMaterial)` via HKDF-SHA256 (RFC 5869, the
+`hkdf` dependency adopted Stage 76), using a fixed, `domain`-selected
+salt/info — never a caller-supplied or randomly-drawn byte. The Stage 82
+`KdfPlaceholderRequest` skeleton is UNCHANGED and coexists alongside this
+new, separate real path.
+
+**New types** (all `pub(crate)`-at-most, inside the existing `kdf_core`
+module):
+
+- **`HkdfDomain`** — `RootKey` / `Identity` / `Storage` / `Conversation` /
+  `TestOnly`. Each variant has its OWN fixed `salt(self) -> &'static [u8]`
+  and `info(self) -> &'static [u8]` — real domain separation, not a
+  placeholder: two different domains derived from the same input produce
+  different output bytes (`cargo test`-verified).
+- **`HkdfStatus`** — `Ready` / `InvalidInput` / `InternalFailure`.
+- **`HkdfDecision`** — `domain: HkdfDomain`, `status: HkdfStatus`,
+  `output: Option<SecretHandle>`. Derives nothing (`Clone`/`Debug` would
+  fail to compile anyway, since `SecretHandle` implements neither).
+
+**`SecretHandle` gains one new, narrowly-scoped accessor**:
+`expose_bytes_for_internal_derivation(&self) -> Option<[u8; 32]>` —
+`pub(crate)`, named for its one reviewed caller (`kdf_core`'s HKDF call
+site), returns `None` for the Stage 79 placeholder path and after
+`clear()`. `SecretHandle`'s method count grows from six to seven as a
+direct, reviewed consequence — still no public raw-byte accessor anywhere.
+
+**`Cargo.toml`'s only change**: `sha2` is PROMOTED from
+`[dev-dependencies]` to `[dependencies]` — `hkdf`'s API is generic over the
+hash algorithm, so a concrete one (`sha2::Sha256`) is mandatory to
+instantiate it in PRODUCTION code (previously only needed under
+`#[cfg(test)]` for the pre-existing `rfc5869_vectors` module, Stage 77,
+which is unchanged and still passes its own RFC 5869 vectors). No other
+dependency changed.
+
+**What is explicitly NOT implemented or connected:**
+
+- No AEAD connection — `kdf_core` never constructs an
+  `AeadPlaceholderRequest`, never imports `chacha20poly1305`/`aes-gcm`. See
+  `docs/hkdf_internal_plan.md` section 10 for the AEAD staging preparation
+  (labels/shape only, no code).
+- No `randomBytes`/nonce connection — `derive_secret_handle_internal`
+  never calls `fedos_random_bytes_32`/`fedos_aead_nonce_96`.
+- No `encrypt`/`decrypt`/NIP-44 implementation, no public `deriveKey` API.
+- No connection to `domain_label` (Stage 88) — `HkdfDomain` is its own,
+  separate label enum; `domain_label` remains an unconnected placeholder.
+- No Runtime/Worker/WASM wiring.
+
+**Rust-side `cargo test` coverage** (`kdf_core`'s own nested
+`#[cfg(test)] mod tests`, now 12 tests for the real path, alongside the
+four pre-existing placeholder tests): input holding (the input handle is
+left unchanged after derivation), output `SecretHandle` kind is
+`HkdfOutputMaterial`, domain preserved for all five variants, invalid
+input rejected (wrong kind, and an already-`clear()`-ed handle),
+determinism (same input+domain → same output), domain separation (two
+domains, same input → different output), and `HkdfDomain`'s exhaustive
+five-variant match. `SecretHandle` gains two new tests for
+`expose_bytes_for_internal_derivation`.
+
+**Verified against a real Rust toolchain**: `cargo check`, `cargo test`
+(146 crate unit tests, up from 127 at Stage 146 — 12 net new `kdf_core`
+tests plus 2 new `secret_handle` tests for the new accessor, plus 5 new
+tests from the Stage 150–151 `crypto` module below), and
+`cargo check --tests` all GREEN.
+
+See
+[`test/fedos_core_rust_hkdf_internal.test.ts`](../../test/fedos_core_rust_hkdf_internal.test.ts)
+(14 tests) for the dedicated Stage 147 guard suite, and the updated
+[`test/fedos_core_rust_kdf_skeleton.test.ts`](../../test/fedos_core_rust_kdf_skeleton.test.ts),
+[`test/fedos_core_rust_dependency.test.ts`](../../test/fedos_core_rust_dependency.test.ts),
+[`test/fedos_core_rust_hkdf_wiring.test.ts`](../../test/fedos_core_rust_hkdf_wiring.test.ts),
+[`test/fedos_core_rust_hkdf_test_helper.test.ts`](../../test/fedos_core_rust_hkdf_test_helper.test.ts),
+[`test/fedos_core_rust_skeleton.test.ts`](../../test/fedos_core_rust_skeleton.test.ts),
+[`test/fedos_core_rust_secret_handle.test.ts`](../../test/fedos_core_rust_secret_handle.test.ts),
+and
+[`test/fedos_core_rust_secret_handle_real_bytes.test.ts`](../../test/fedos_core_rust_secret_handle_real_bytes.test.ts)
+files (each relaxed from "no hkdf/sha2/SecretHandle connection" to
+"connected ONLY in the one reviewed kdf_core call site" — the same style
+of relaxation Stage 79's own guard tests underwent when `secret_handle`
+first used `zeroize`/`secrecy`).
+
+## Crypto capability matrix + diagnostics preview (Stage 150–151)
+
+Stage 150–151 add a crate-private `crypto` module —
+[`src/crypto.rs`](src/crypto.rs) declaring two file-based children,
+[`src/crypto/capability_matrix.rs`](src/crypto/capability_matrix.rs) and
+[`src/crypto/diagnostics.rs`](src/crypto/diagnostics.rs) — the first
+multi-file module in this crate (every prior crate-private module has been
+an inline `mod name { ... }` block inside `src/lib.rs`).
+
+**`capability_matrix.rs` (Stage 150)** fixes `CryptoCapability`: a
+nine-variant, non-sensitive label enum (`Random` / `Nonce` /
+`SecretHandle` / `Hkdf` / `Aead` / `Nip44` / `Schnorr` / `StorageKey` /
+`ConversationKey`), `CryptoCapability::ALL` (a fixed 9-element array in
+that order), and `as_static_label()` (a fixed `&'static str` per variant).
+See `docs/crypto_capability_matrix.md`.
+
+**`diagnostics.rs` (Stage 151)** fixes `CapabilityReadiness` (`Ready` /
+`NotConnected` / `NotImplemented`) and `crypto_diagnostics_preview() ->
+[CapabilityReport; 9]` — a FIXED, hand-maintained, display-only snapshot:
+`Random`/`Nonce`/`SecretHandle`/`Hkdf` report `Ready`, `Aead` reports
+`NotConnected` (a skeleton exists but no real seal/open), and
+`Nip44`/`Schnorr`/`StorageKey`/`ConversationKey` report `NotImplemented`.
+This is NOT a live health-check — it never calls
+`fedos_random_bytes_32`/`fedos_aead_nonce_96`/`SecretHandle`/
+`derive_secret_handle_internal` to compute these values, so it can never
+observe (let alone display) a real secret byte. See
+`docs/crypto_diagnostics.md`.
+
+**Not part of this crate's public API**: every item in both files is
+`pub(crate)`-at-most; `mod crypto;` in `src/lib.rs` is a plain (non-`pub`)
+declaration. This crate's public `pub fn` surface is UNCHANGED (still
+twenty-four functions). `Cargo.toml` is unchanged — no new dependency.
+Neither file is wired into the Runtime, the Worker, storage, or Nostr.
+
+**Rust-side `cargo test` coverage**: 4 tests in `capability_matrix.rs`
+(every variant present in the documented order, `as_static_label` matches
+per variant and is stable, every label unique) and 5 tests in
+`diagnostics.rs` (exactly 9 rows in order, the `Ready` set is exactly
+Random/Nonce/SecretHandle/Hkdf, `Aead` is specifically `NotConnected`, the
+`NotImplemented` set is exactly Nip44/Schnorr/StorageKey/ConversationKey,
+and the preview is stable across repeated calls).
+
+See
+[`test/fedos_core_rust_crypto_capability.test.ts`](../../test/fedos_core_rust_crypto_capability.test.ts)
+(13 tests) for the dedicated Stage 150–151 guard suite.

@@ -217,3 +217,42 @@ following combinations are explicitly forbidden for Stage 134+:
   same test gates (§5) that every Stage 1–130 boundary already passed —
   the Implementation Phase does not relax any existing guardrail, it only
   starts landing real bytes behind them.
+
+## 7. Stage 137–147 update — items 2–4 are now IMPLEMENTED
+
+- **Item 2 (`randomBytes`)** — DONE, Stage 137: `fedos_random_bytes_32`.
+- **Item 3 (`SecretHandle` real bytes)** — DONE, Stage 144–146:
+  `SecretHandle::new_from_32_bytes_for_internal_use`, landing together
+  with its zeroize-on-drop guarantee in one stage, exactly as §1 item 3
+  and `docs/fedos_core_rust_safety.md` §6 required.
+- **Item 4 (HKDF internal implementation)** — DONE, Stage 147:
+  `kdf_core::derive_secret_handle_internal` wires the already-adopted
+  `hkdf` crate (Stage 76) to a real `pub(crate)` key-derivation function,
+  consuming a `SecretHandle(HkdfInputMaterial)` (item 3) as input and a
+  fixed `HkdfDomain`-selected salt/info as context — still no public API,
+  per this item's own scope. Unlike this section's original phrasing,
+  domain separation is provided by a NEW `HkdfDomain` enum specific to
+  `kdf_core` rather than the pre-existing `domain_label` skeleton (Stage
+  88) — `domain_label` remains an unconnected placeholder, per this
+  document's own §3 rule against combining unrelated skeletons into one
+  stage's wiring decision. `sha2` is promoted from `[dev-dependencies]` to
+  `[dependencies]` as this stage's one, necessary `Cargo.toml` change (a
+  concrete hash algorithm is mandatory to instantiate `hkdf`'s generic
+  `Hkdf<H>` in production code) — see `docs/hkdf_internal_plan.md` for the
+  full record, including why this was judged in-scope rather than a
+  separate dependency-adoption stage: it is the direct, minimal
+  consequence of item 4 itself, not an unrelated addition.
+- **Item 5 (AEAD internal implementation) remains NOT implemented.**
+  Stage 149 (`docs/hkdf_internal_plan.md`'s AEAD staging section) fixes,
+  in writing, that AEAD will consume a `SecretHandle(AeadKeyMaterial)` and
+  the nonce helper (`fedos_aead_nonce_96`, Stage 138) — but ciphertext
+  production/verification itself is explicitly deferred to its own,
+  later, separate stage, per this document's own splitting rule (§2–§3).
+- **Item 6 (public `encrypt`/`decrypt`/`deriveKey`) remains NOT
+  implemented** — unchanged, still blocked on item 5.
+- Stage 150–151 add a crate-private `crypto` capability matrix +
+  diagnostics preview (`docs/crypto_capability_matrix.md`,
+  `docs/crypto_diagnostics.md`) — a display-only, non-secret status
+  report over items 1–6's current readiness. This is observability
+  tooling, not a new item in this roadmap's numbered order; it does not
+  advance, skip, or substitute for any of items 4–6 above.

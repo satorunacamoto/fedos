@@ -378,3 +378,48 @@ the earlier binding docs win.
   writeup, and
   [`test/fedos_core_rust_secret_handle_real_bytes.test.ts`](../test/fedos_core_rust_secret_handle_real_bytes.test.ts)
   for the guard suite verifying every constraint above.
+
+## 16. Stage 147 update — HKDF is now CONNECTED to SecretHandle; AEAD remains unconnected
+
+- **§9's ordering is satisfied**: HKDF connects to `SecretHandle` (this
+  update) BEFORE AEAD connects to HKDF's output (still a future, separate
+  stage — see `docs/hkdf_internal_plan.md`'s AEAD staging section).
+  `kdf_core::derive_secret_handle_internal(input: &SecretHandle, domain:
+  HkdfDomain) -> HkdfDecision` is the one, reviewed connection point: it
+  takes a `SecretHandle(HkdfInputMaterial)` by shared reference (never
+  consuming or mutating it) and returns a NEW, independently-owned
+  `SecretHandle(HkdfOutputMaterial)` — exactly the shape §9 anticipated
+  ("never mutating the input in place, never returning raw bytes").
+- **Domain separation is real, not a placeholder**, per §9's mandate: each
+  `HkdfDomain` variant (`RootKey`/`Identity`/`Storage`/`Conversation`/
+  `TestOnly`) carries its own fixed, distinct salt AND info context —
+  `cargo test` proves two different domains derived from the SAME input
+  `SecretHandle` produce different output bytes
+  (`derive_secret_handle_internal_separates_output_by_domain`).
+- **The one raw-byte exposure §8 anticipated now exists, exactly as narrow
+  as promised**: `SecretHandle::expose_bytes_for_internal_derivation(&self)
+  -> Option<[u8; 32]>` is `pub(crate)`, named for its one reviewed caller
+  (`kdf_core`'s HKDF call site), returns `None` for the Stage 79
+  placeholder path and after `clear()`, and is never re-exported or
+  reachable from this crate's public API. No other raw-byte accessor was
+  added.
+- **`SecretHandle` still does not generate its own bytes or a nonce** —
+  `derive_secret_handle_internal` does not call `fedos_random_bytes_32` or
+  `fedos_aead_nonce_96` either; both remain independent, unconnected
+  boundaries.
+- **AEAD remains completely unconnected** — `kdf_core` never constructs an
+  `AeadPlaceholderRequest` and never imports `chacha20poly1305`/`aes-gcm`.
+  `docs/hkdf_internal_plan.md`'s AEAD staging section fixes, in writing,
+  what AEAD's own future connection will look like (a
+  `SecretHandle(AeadKeyMaterial)` input plus `fedos_aead_nonce_96`'s
+  output) without building any of it.
+- **`Cargo.toml` changed by exactly one line**: `sha2` moved from
+  `[dev-dependencies]` to `[dependencies]` — necessary because `hkdf`'s API
+  is generic over the hash algorithm, and a concrete one
+  (`sha2::Sha256`) is mandatory to call it at all, in test OR production
+  code. No other dependency was added.
+- See `docs/hkdf_internal_plan.md` for the full design record and
+  `packages/fedos-core-rust/README.md`'s Stage 147 section for the
+  implementation writeup, and
+  [`test/fedos_core_rust_hkdf_internal.test.ts`](../test/fedos_core_rust_hkdf_internal.test.ts)
+  for the guard suite verifying every constraint above.

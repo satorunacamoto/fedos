@@ -8,7 +8,69 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 144–146 — SecretHandle real-byte implementation.** The
+> **Status: Stage 147–151 — Crypto Core Boundary Completion (HKDF internal
+> implementation + capability matrix + diagnostics preview).** The
+> crate-private `kdf_core` module (Stage 82) gains its FIRST real
+> implementation: `derive_secret_handle_internal(input: &SecretHandle,
+> domain: HkdfDomain) -> HkdfDecision` derives a NEW
+> `SecretHandle(HkdfOutputMaterial)` from an existing
+> `SecretHandle(HkdfInputMaterial)` via HKDF-SHA256 (RFC 5869), using a
+> fixed, `HkdfDomain`-selected salt/info (`RootKey`/`Identity`/`Storage`/
+> `Conversation`/`TestOnly`) — never caller-supplied, never random. Real
+> domain separation is `cargo test`-verified: two domains, same input,
+> produce different output bytes. `SecretHandle` gains one new,
+> narrowly-scoped `pub(crate)` accessor,
+> `expose_bytes_for_internal_derivation` (method count six → seven) — still
+> no public raw-byte accessor anywhere. `Cargo.toml`'s ONLY change: `sha2`
+> promoted from `[dev-dependencies]` to `[dependencies]` (mandatory — `hkdf`
+> needs a concrete hash algorithm to instantiate in production code).
+>
+> Stage 150–151 add a crate-private `crypto` module — this crate's FIRST
+> multi-file module (`src/crypto.rs` + `src/crypto/capability_matrix.rs` +
+> `src/crypto/diagnostics.rs`, vs. every prior module being inline in
+> `src/lib.rs`): a fixed nine-capability label enum (`CryptoCapability` —
+> Random/Nonce/SecretHandle/Hkdf/Aead/Nip44/Schnorr/StorageKey/
+> ConversationKey) and a fixed, hand-maintained, DISPLAY-ONLY
+> `crypto_diagnostics_preview()` reporting Random/Nonce/SecretHandle/Hkdf as
+> `Ready`, Aead as `NotConnected`, and Nip44/Schnorr/StorageKey/
+> ConversationKey as `NotImplemented` — never a live probe, never touching
+> a secret byte.
+>
+> **Still NOT implemented**: AEAD execution, `encrypt`/`decrypt`, NIP-44,
+> public `deriveKey` API, Runtime/Worker/WASM wiring, `domain_label`
+> (Stage 88) connection. AEAD staging preparation (labels/shape only, no
+> code) is fixed in writing in `docs/hkdf_internal_plan.md` section 10:
+> AEAD will accept only `SecretHandle(AeadKeyMaterial)` and use the
+> existing `fedos_aead_nonce_96()` nonce helper; ciphertext production
+> itself remains a future, separate stage.
+>
+> This crate's public `pub fn` surface is UNCHANGED (still twenty-four
+> functions) — every new item across both HKDF and the crypto module is
+> `pub(crate)`-at-most. `cargo check`/`cargo test` (146 crate unit tests, up
+> from 127 — 12 net new `kdf_core` tests, 2 new `secret_handle` tests, 9 new
+> `crypto` module tests)/`cargo check --tests` all GREEN. `npm run
+> typecheck`/`npm test` GREEN (134 files, 2006 tests, up from 132/1979 —
+> two new guard files,
+> [`test/fedos_core_rust_hkdf_internal.test.ts`](test/fedos_core_rust_hkdf_internal.test.ts)
+> (14 tests) and
+> [`test/fedos_core_rust_crypto_capability.test.ts`](test/fedos_core_rust_crypto_capability.test.ts)
+> (13 tests), plus six existing guard files relaxed from "no hkdf/sha2/
+> SecretHandle connection" to "connected ONLY in the one reviewed kdf_core
+> call site," the same relaxation style `secret_handle`'s own guards
+> underwent at Stage 79). `git status` clean aside from this batch's
+> intended files.
+>
+> See `docs/hkdf_internal_plan.md`, `docs/crypto_capability_matrix.md`, and
+> `docs/crypto_diagnostics.md` for the full design records. Stage 152
+> candidates: (1) Internal AEAD implementation (ChaCha20-Poly1305/
+> AES-256-GCM connected to `SecretHandle` + the nonce helper) —
+> recommended first, the last piece of the crypto core (SecretHandle →
+> HKDF → AEAD) before a public `encrypt`/`decrypt` API can be safely
+> designed; (2) Public `encrypt`/`decrypt` planning update; (3) NIP-44
+> internal implementation planning.
+> Prior status:
+>
+> **Stage 144–146 — SecretHandle real-byte implementation.** The
 > crate-private `secret_handle` module (Stage 79) gains its FIRST real-byte
 > construction path,
 > `new_from_32_bytes_for_internal_use(kind: SecretHandleKind, bytes: [u8; 32])`,
@@ -44,12 +106,7 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > **What this stage deliberately does NOT do**: no HKDF connection, no AEAD
 > connection, no `deriveKey`/`encrypt`/`decrypt` public API change, and no
 > Runtime/Worker/WASM wiring — each is its own future, separate,
-> explicitly-reviewed stage. Stage 147 candidates: (1) HKDF internal
-> implementation planning update (recommended first — worth re-confirming
-> domain separation and the derived-output `SecretHandle`'s shape in
-> writing now that `SecretHandle` can hold a real input); (2) HKDF internal
-> implementation using `SecretHandle`; (3) AEAD implementation staging
-> docs.
+> explicitly-reviewed stage.
 > Prior status:
 >
 > **Stage 141–143 — SecretHandle real-byte implementation
