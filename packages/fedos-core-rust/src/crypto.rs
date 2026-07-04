@@ -155,6 +155,22 @@
 //! `expect`/`panic!`-free, and unconnected to Runtime/Worker/Storage/
 //! Relay. No byte-exact NIP-44 wire format, no public API addition, no
 //! Runtime/Worker/Storage/Relay connection.
+//!
+//! Stage 209–213 add `nip44_wire` — a LABEL-ONLY skeleton
+//! (`Nip44WireVersion`/`Nip44WirePayloadKind`/`Nip44WireStatus`/
+//! `Nip44WireDecision`, always reporting `Unimplemented`) fixing the
+//! vocabulary a FUTURE, byte-exact "NIP-44 v2 wire-compatible
+//! implementation" would use — deliberately separate from, and NOT a
+//! replacement for, the Stage 202–206 `nip44_padding`/`nip44_encrypt`/
+//! `nip44_decrypt`/`nip44_bridge` bridge (which stays exactly as it was,
+//! still reporting `Ready`). See `docs/nip44_wire_compatibility_gap.md`
+//! for that existing bridge's own forbidden/required terminology list
+//! and `docs/nip44_wire_implementation_roadmap.md` for the proposed path
+//! to a real wire-compatible pipeline. No NIP-44 v2 wire encrypt/decrypt,
+//! no base64, no HMAC-SHA256, no raw ChaCha20 stream cipher, no
+//! `capability_matrix`/`diagnostics` change, no public API addition, no
+//! Runtime/Worker/Storage/Relay connection, no new `Cargo.toml`
+//! dependency.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -172,6 +188,7 @@ pub(crate) mod nip44_bridge;
 pub(crate) mod nip44_decrypt;
 pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_padding;
+pub(crate) mod nip44_wire;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
 #[cfg(test)]
