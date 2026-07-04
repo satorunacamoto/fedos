@@ -212,6 +212,13 @@
 //! `sec1`/`pub2` pair anywhere in `valid.get_conversation_key`, hence the
 //! byte-level entry point (see `nip44_message_keys`'s own module-level
 //! doc comment for the full record).
+//!
+//! Stage 224 adds `nip44_wire_nonce` — real NIP-44 v2 wire nonce
+//! generation (`generate_wire_nonce_internal`, exactly 32 CSPRNG bytes
+//! via `getrandom::fill`), COMPLETELY INDEPENDENT of this crate's own
+//! pre-existing `fedos_aead_nonce_96`/`FedosAeadNonceDecision` (Stage
+//! 138) — deliberately not shared or generalized, per
+//! `docs/nip44_wire_nonce.md` (Stage 215).
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -231,6 +238,7 @@ pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_message_keys;
 pub(crate) mod nip44_padding;
 pub(crate) mod nip44_wire;
+pub(crate) mod nip44_wire_nonce;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
 #[cfg(test)]
