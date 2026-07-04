@@ -4038,3 +4038,130 @@ Public `pub fn` surface unchanged at twenty-seven. No padding, no NIP-44
 encrypt/decrypt implementation. No Runtime/Worker/Storage/Federation/
 Relay/WASM/FFI connection. No TypeScript serialization change. No new
 `Cargo.toml` dependency.
+
+## NIP-44 padding/encrypt/decrypt/authentication half: the FedOS internal NIP-44-like bridge (Stage 202–208)
+
+**Terminology, fixed by Stage 209–213 and used throughout this section:**
+what Stage 202–208 builds is the **"FedOS internal NIP-44-like bridge"**
+— NIP-44-*shaped* (pad → encrypt-with-authentication → decrypt), but NOT
+NIP-44 v2's byte-exact wire format. It must never be called "NIP-44
+compatible" — see
+[`docs/nip44_wire_compatibility_gap.md`](../../docs/nip44_wire_compatibility_gap.md)
+for the full field-by-field record.
+
+**Stage 202–203**: [`crypto::nip44_padding`](src/crypto/nip44_padding.rs)
+(new) implements NIP-44 v2's real, SPEC-EXACT logarithmic-bucket padding
+scheme (`docs/nip44_internal_plan.md` §5) — `calc_padded_len` (pure
+integer arithmetic, no floating point), `pad_message` (2-byte big-endian
+length prefix + zero-fill), `unpad_message` (the inverse). This is the ONE
+piece of the Stage 202–208 bridge that already matches NIP-44 v2's real
+wire format byte-for-byte, vector-verified by the sibling
+`#[cfg(test)]`-only
+[`nip44_padding_vectors`](src/crypto/nip44_padding_vectors.rs) module
+against all 24 `valid.calc_padded_len` cases and all 4
+`invalid.encrypt_msg_lengths` cases in `test-vectors/nip44/nip44-v2.json`.
+
+**Stage 204–205**: [`crypto::nip44_encrypt`](src/crypto/nip44_encrypt.rs)/
+[`crypto::nip44_decrypt`](src/crypto/nip44_decrypt.rs) (new) implement a
+pad-then-seal / open-then-unpad pipeline keyed by a `MessageKey`, but
+REUSE this crate's PRE-EXISTING ChaCha20-Poly1305 AEAD
+(`crypto::aead_internal`, Stage 152–154) rather than NIP-44 v2's real
+raw-ChaCha20-stream-cipher-plus-separate-HMAC-SHA256 construction —
+zero new `Cargo.toml` dependency, at the cost of not being byte-exact.
+`nip44_decrypt` collapses every reachable failure cause (wrong key, wrong
+nonce, tampered ciphertext, invalid tag, and even a structurally malformed
+padded plaintext discovered AFTER authentication already succeeded) into
+a SINGLE fixed `Nip44DecryptStatus::AuthenticationFailed` label, never
+distinguishing cause — verified by that module's own
+`malformed_padding_after_successful_authentication_still_reports_authentication_failed`
+test.
+
+**Stage 206**: [`crypto::nip44_bridge`](src/crypto/nip44_bridge.rs) (new)
+connects both to this crate's pre-existing, UNCHANGED
+`ciphertext_envelope::AeadCiphertextEnvelope` type
+(`nip44_envelope_from_encrypt_decision_internal`/
+`nip44_decrypt_decision_from_envelope_internal`) — no new envelope field,
+no new variant, no format change.
+
+**Capability/diagnostics (Stage 207–208)**: `CryptoCapability` grows from
+fifteen to sixteen variants — a new `Authentication` variant tracks
+`nip44_decrypt`'s single-fixed-label MAC discipline as its own capability.
+`crypto_diagnostics_preview()` promotes `Padding`/`Encrypt`/`Decrypt` from
+`NotImplemented`/`NotConnected` to `Ready`, and reports the new
+`Authentication` as `Ready` too — zero `NotConnected` rows remain.
+
+**Guards**: a new Rust-side
+[`nip44_encrypt_decrypt_guard`](src/crypto/nip44_encrypt_decrypt_guard.rs)
+(`#[cfg(test)]`-only) confirms all four Stage 202–206 files stay
+`pub(crate)`-only, `unsafe`/`.unwrap(`/`.expect(`/`panic!(`-free, import no
+raw `chacha20`/`hmac` crate, and reference no Runtime/Worker/Storage/
+Relay. A new
+[`test/nip44_padding_encrypt_decrypt_guard.test.ts`](../../test/nip44_padding_encrypt_decrypt_guard.test.ts)
+re-confirms all of the above from outside the crate, plus the capability/
+diagnostics changes land exactly as specified and the `pub fn` surface
+stays unchanged at twenty-seven.
+
+Public `pub fn` surface unchanged at twenty-seven. **No byte-exact NIP-44
+v2 wire format** (no 32-byte per-message nonce, no raw ChaCha20 stream
+cipher, no separate HMAC-SHA256 tag, no base64 payload — see
+`docs/nip44_wire_compatibility_gap.md`). No Runtime/Worker/Storage/
+Federation/Relay/WASM/FFI connection. No TypeScript serialization change.
+No new `Cargo.toml` dependency.
+
+## NIP-44 wire compatibility gap clarification + wire-compatible implementation prep (Stage 209–213)
+
+Stage 209–213 do NOT add any new encrypt/decrypt/base64/HMAC/ChaCha20
+stream-cipher code. They exist to make the Stage 202–208 gap
+impossible to miss going forward, and to fix the label vocabulary a
+FUTURE byte-exact implementation would use.
+
+**Docs**:
+[`docs/nip44_wire_compatibility_gap.md`](../../docs/nip44_wire_compatibility_gap.md)
+(new) states, field by field, exactly what the Stage 202–208 bridge is
+(a generic ChaCha20-Poly1305-AEAD-based pipeline) and is not (NIP-44 v2's
+real `chacha_key`/`chacha_nonce`/`hmac_key`-separated,
+32-byte-nonce, base64-encoded, HMAC-SHA256-tagged wire format), and fixes
+two terms: **"FedOS internal NIP-44-like bridge"** (what exists today) and
+**"NIP-44 v2 wire-compatible implementation"** (the future target) — with
+an explicit forbidden-phrasing list ("NIP-44 compatible", "NIP-44 v2
+compatible", "NIP-44-compliant") that must never describe the former.
+[`docs/nip44_wire_implementation_roadmap.md`](../../docs/nip44_wire_implementation_roadmap.md)
+(new) proposes an eight-step order for actually closing the gap (exact
+message-key derivation → padding re-confirmation → 32-byte nonce handling
+→ raw ChaCha20 stream encryption → HMAC-SHA256 tag → base64 payload
+encoding → invalid vectors → bridge to Nostr DM only once every vector
+category passes), with candidate Stage numbers (214+) that are explicitly
+not commitments. `docs/nip44_internal_plan.md` gains a terminology section
+pointing at both new documents.
+
+**Wire skeleton**: [`crypto::nip44_wire`](src/crypto/nip44_wire.rs) (new)
+adds four LABEL-ONLY types — `Nip44WireVersion` (`V2`, the only wire
+version), `Nip44WirePayloadKind` (`Nonce`/`Ciphertext`/`Mac` — which wire
+section a value classifies), `Nip44WireStatus` (`Unimplemented` — its only
+variant; no real wire encrypt/decrypt exists), and `Nip44WireDecision`
+(holds only the above three labels — never a ciphertext, nonce, or tag
+byte). Deliberately separate from, and does not modify, the existing
+Stage 202–206 bridge (which keeps reporting `Ready` unchanged).
+
+**Guards**: `crypto::nip44_wire`'s own `#[cfg(test)]` unit tests confirm
+`Nip44WireStatus` has no variant beyond `Unimplemented` and
+`Nip44WireVersion` has no variant beyond `V2` (an exhaustive `match` that
+fails to compile if a future stage adds one without reviewing this test).
+A new
+[`test/fedos_core_rust_nip44_wire_compatibility.test.ts`](../../test/fedos_core_rust_nip44_wire_compatibility.test.ts)
+confirms: no Stage 198–208 source (`nip44_padding`/`nip44_encrypt`/
+`nip44_decrypt`/`nip44_bridge`/`capability_matrix`/`diagnostics`/
+`crypto.rs`) ever claims "NIP-44 compatible"/"NIP-44 v2 compatible"/
+"NIP-44-compliant"; the new docs exist and name the required/forbidden
+terminology; `nip44_wire` is `pub(crate)`-only with no base64/HMAC/raw-
+ChaCha20 import and no `fn` named `encrypt`/`decrypt`/`base64`/`hmac`; the
+existing bridge is untouched; capability/diagnostics are unchanged in
+shape; and the usual Runtime/Worker/Storage/Federation/`pub fn`-count/
+`Cargo.toml`-dependency-count/`package.json`-dependency-count/no-`serde`-
+derive checks all still hold.
+
+Public `pub fn` surface unchanged at twenty-seven. No NIP-44 v2 wire
+encrypt/decrypt implementation, no base64, no HMAC-SHA256, no raw ChaCha20
+stream cipher. No Runtime/Worker/Storage/Federation/Relay/WASM/FFI
+connection. No TypeScript serialization change. No new `Cargo.toml`
+dependency.
