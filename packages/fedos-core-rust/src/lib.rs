@@ -492,6 +492,31 @@
 //! serialization, no Runtime/Worker/storage/Nostr connection, no Nostr
 //! encrypted-message scheme, no `Cargo.toml` change. See
 //! `docs/public_crypto_api.md` for the full design record.
+//!
+//! Stage 171–176 resolve that limitation: `FedosAeadKeyHandle` and
+//! `FedosCiphertextEnvelope` are NEW public OPAQUE wrapper types around
+//! `SecretHandle`/`AeadCiphertextEnvelope` (both of which stay `pub(crate)`
+//! forever, unchanged and unpromoted). `fedos_encrypt`/`fedos_decrypt` are
+//! rewired to accept/return ONLY these opaque handles plus two NEW public
+//! label enums, `FedosAeadAlgorithm`/`FedosAeadAadDomain` (deliberately
+//! separate from `crypto::aead_internal`'s own `AeadCipher`/`AeadAadDomain`,
+//! which also stay `pub(crate)`-only, unchanged — the same "separate label
+//! per boundary" discipline this crate has followed since Stage 157–158).
+//! A new function, `fedos_generate_aead_key_32`, draws a fresh 32-byte key
+//! from the OS CSPRNG (via `getrandom::fill`, same discipline as
+//! `fedos_random_bytes_32`/`fedos_aead_nonce_96`) and returns it wrapped in
+//! a `FedosAeadKeyHandle` — never a raw `[u8; 32]`. The public `pub fn`
+//! surface grows from twenty-six to twenty-seven. `FedosAeadKeyHandle` has
+//! no `Clone`/`Debug`/`Display`/`Serialize`/`AsRef<[u8]>` and no public
+//! raw-byte getter; `FedosCiphertextEnvelope` has no public raw
+//! ciphertext/nonce getter and no `Serialize`. A new
+//! `packages/fedos-core-rust/tests/public_crypto_api.rs` integration test
+//! (compiled by Cargo as its own separate crate) proves the whole surface
+//! is genuinely usable from OUTSIDE this crate — not just `pub` in name.
+//! No serialization, no Runtime/Worker/Storage/Nostr/NIP-44/WASM
+//! connection, no `Cargo.toml` change, no new dependency. See
+//! `docs/public_crypto_api.md` (updated) and
+//! `docs/public_crypto_opaque_handles.md` for the full design record.
 
 #![forbid(unsafe_code)]
 
@@ -5492,15 +5517,188 @@ mod tests {
     }
 }
 
+/// Stage 171–176 — a public OPAQUE wrapper around a crate-private
+/// `SecretHandle(AeadKeyMaterial)`. This is the FIRST type that lets code
+/// OUTSIDE this crate hold a usable AEAD key without ever naming, cloning,
+/// printing, or serializing a raw byte: `inner` is a private field, and
+/// `SecretHandle` itself stays `pub(crate)` (see `docs/public_crypto_api.md`
+/// and `docs/public_crypto_opaque_handles.md`), so no external crate could
+/// read or reconstruct it even if this field were `pub`. Deliberately NOT
+/// `Clone` (secret material is never silently duplicated), NOT `Debug`/
+/// `Display` (no structural or raw-byte exposure through formatting), and
+/// NOT `Serialize` (no JSON/CBOR/base64 encoding of key material). No
+/// public raw-byte getter and no `AsRef<[u8]>` exist anywhere on this type
+/// — the only ways to obtain one are [`fedos_generate_aead_key_32`].
+pub struct FedosAeadKeyHandle {
+    inner: secret_handle::SecretHandle,
+}
+
+impl FedosAeadKeyHandle {
+    /// Crate-private only: the one reviewed seam `fedos_encrypt`/
+    /// `fedos_decrypt` use to reach the real `SecretHandle` this handle
+    /// wraps. Never re-exported, never returns anything but a reference.
+    pub(crate) fn inner(&self) -> &secret_handle::SecretHandle {
+        &self.inner
+    }
+
+    /// Crate-private, test-only: mutable access so this crate's own tests
+    /// can `clear()` the wrapped handle directly to build a
+    /// cleared-key fixture. Never compiled into a production build.
+    #[cfg(test)]
+    pub(crate) fn inner_mut(&mut self) -> &mut secret_handle::SecretHandle {
+        &mut self.inner
+    }
+}
+
+/// Coarse observable outcome of a [`fedos_generate_aead_key_32`] call. No
+/// secret byte is exposed through this label itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosKeyGenerationStatus {
+    /// Generation succeeded; `FedosGenerateAeadKeyDecision::key` is `Some`.
+    Ready,
+    /// The OS CSPRNG failed — there is no fallback PRNG, so generation
+    /// cannot proceed.
+    EntropySourceUnavailable,
+}
+
+/// The result of a [`fedos_generate_aead_key_32`] call. `key` is `Some`
+/// only on `FedosKeyGenerationStatus::Ready`.
+pub struct FedosGenerateAeadKeyDecision {
+    pub status: FedosKeyGenerationStatus,
+    pub key: Option<FedosAeadKeyHandle>,
+}
+
+/// Generate a fresh, random 32-byte AEAD key, drawn from the OS CSPRNG via
+/// `getrandom::fill` (never a fallback PRNG, never derived from a seed,
+/// password, or counter — same discipline as [`fedos_random_bytes_32`]/
+/// [`fedos_aead_nonce_96`]), and return it wrapped in an opaque
+/// [`FedosAeadKeyHandle`] — never a raw `[u8; 32]`. This crate's FIRST
+/// public key-GENERATION entry point. The local staging buffer is
+/// zeroized immediately after the `SecretHandle` takes its own copy, so no
+/// extra copy of the key outlives this call. Never panics — the
+/// `Result` `getrandom::fill` returns is matched exhaustively, never
+/// force-unwrapped.
+pub fn fedos_generate_aead_key_32() -> FedosGenerateAeadKeyDecision {
+    use zeroize::Zeroize;
+    let mut buf = [0u8; 32];
+    match getrandom::fill(&mut buf) {
+        Ok(()) => {
+            let handle = FedosAeadKeyHandle {
+                inner: secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+                    secret_handle::SecretHandleKind::AeadKeyMaterial,
+                    buf,
+                ),
+            };
+            buf.zeroize();
+            FedosGenerateAeadKeyDecision {
+                status: FedosKeyGenerationStatus::Ready,
+                key: Some(handle),
+            }
+        }
+        Err(_) => FedosGenerateAeadKeyDecision {
+            status: FedosKeyGenerationStatus::EntropySourceUnavailable,
+            key: None,
+        },
+    }
+}
+
+/// Stage 171–176 — a public OPAQUE wrapper around a crate-private
+/// `AeadCiphertextEnvelope`. Lets code OUTSIDE this crate hold, pass
+/// around, and feed back into [`fedos_decrypt`] a sealed result — without
+/// exposing the raw ciphertext bytes, the raw nonce bytes, or any
+/// serialized/wire form of the envelope. `inner` is a private field, and
+/// `AeadCiphertextEnvelope` itself stays `pub(crate)`. No public raw
+/// ciphertext getter, no public raw nonce getter, no `AsRef<[u8]>`, no
+/// `Serialize`, and no `Debug`/`Display` that would print its bytes exist
+/// anywhere on this type — see `docs/public_crypto_opaque_handles.md`.
+pub struct FedosCiphertextEnvelope {
+    inner: crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope,
+}
+
+impl FedosCiphertextEnvelope {
+    /// Crate-private only: wraps an already-sealed real envelope produced
+    /// by [`fedos_encrypt`]. Never constructs one from untrusted/candidate
+    /// bytes — that remains a future, separate, explicitly-reviewed stage
+    /// (see `docs/ciphertext_envelope_plan.md`).
+    pub(crate) fn from_inner(
+        inner: crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope,
+    ) -> Self {
+        Self { inner }
+    }
+
+    /// Crate-private only: the one reviewed seam [`fedos_decrypt`] uses to
+    /// reach the real envelope this type wraps. Never re-exported.
+    pub(crate) fn inner(&self) -> &crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope {
+        &self.inner
+    }
+}
+
+/// Public label selecting which AEAD algorithm [`fedos_encrypt`] should
+/// use. A NEW public-facing type, deliberately SEPARATE from
+/// `crypto::aead_internal::AeadCipher` (which stays `pub(crate)`-only,
+/// unchanged since Stage 152–154) — the same "separate label per
+/// boundary" discipline this crate has followed at every previous crypto
+/// stage (e.g. `crypto::ciphertext_envelope::AeadEnvelopeAlgorithm`).
+/// Mirrors `AeadCipher`'s two variants today; a future additional cipher
+/// would need its own reviewed addition to both this type and the
+/// conversion below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosAeadAlgorithm {
+    ChaCha20Poly1305,
+    Aes256Gcm,
+}
+
+/// Public label selecting which fixed AAD domain [`fedos_encrypt`]/
+/// [`fedos_decrypt`] bind as Associated Data. A NEW public-facing type,
+/// deliberately SEPARATE from `crypto::aead_internal::AeadAadDomain`
+/// (which stays `pub(crate)`-only, unchanged since Stage 152–154).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosAeadAadDomain {
+    RootKey,
+    Identity,
+    Storage,
+    Conversation,
+    TestOnly,
+}
+
+/// The one reviewed conversion point from the public algorithm label to
+/// this crate's internal `AeadCipher` — mirrors
+/// `crypto::aead_envelope_bridge`'s own conversion-function shape.
+fn fedos_aead_algorithm_to_internal(
+    algorithm: FedosAeadAlgorithm,
+) -> crate::crypto::aead_internal::AeadCipher {
+    match algorithm {
+        FedosAeadAlgorithm::ChaCha20Poly1305 => {
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305
+        }
+        FedosAeadAlgorithm::Aes256Gcm => crate::crypto::aead_internal::AeadCipher::Aes256Gcm,
+    }
+}
+
+/// The one reviewed conversion point from the public AAD-domain label to
+/// this crate's internal `AeadAadDomain`.
+fn fedos_aead_aad_domain_to_internal(
+    aad_domain: FedosAeadAadDomain,
+) -> crate::crypto::aead_internal::AeadAadDomain {
+    match aad_domain {
+        FedosAeadAadDomain::RootKey => crate::crypto::aead_internal::AeadAadDomain::RootKey,
+        FedosAeadAadDomain::Identity => crate::crypto::aead_internal::AeadAadDomain::Identity,
+        FedosAeadAadDomain::Storage => crate::crypto::aead_internal::AeadAadDomain::Storage,
+        FedosAeadAadDomain::Conversation => {
+            crate::crypto::aead_internal::AeadAadDomain::Conversation
+        }
+        FedosAeadAadDomain::TestOnly => crate::crypto::aead_internal::AeadAadDomain::TestOnly,
+    }
+}
+
 /// Coarse observable outcome of a [`fedos_encrypt`] call. No secret byte
 /// is exposed through this label itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FedosEncryptStatus {
-    /// Sealing succeeded; `FedosEncryptDecision`'s internal envelope is
-    /// present.
+    /// Sealing succeeded; `FedosEncryptDecision`'s envelope is present.
     Ready,
-    /// `key` was not `SecretHandleKind::AeadKeyMaterial`-kinded, or held
-    /// no real bytes (a placeholder handle, or one already `clear()`-ed).
+    /// `key` held no real bytes (a placeholder handle, or one already
+    /// `clear()`-ed).
     InvalidKey,
     /// The OS CSPRNG failed while drawing this call's nonce (see
     /// `fedos_aead_nonce_96`) — there is no fallback PRNG, so sealing
@@ -5512,46 +5710,41 @@ pub enum FedosEncryptStatus {
     InternalFailure,
 }
 
-/// The result of a [`fedos_encrypt`] call. `status` is public; the sealed
-/// envelope itself stays `pub(crate)` — `SecretHandle` and
-/// `AeadCiphertextEnvelope` (the types this crate's internal AEAD
-/// pipeline is built on) remain crate-private as of this stage, so this
-/// decision type's envelope field is not yet readable from outside this
-/// crate. See `docs/public_crypto_api.md` for why this is a deliberate,
-/// documented, minimal-scope choice rather than an oversight.
+/// The result of a [`fedos_encrypt`] call. Stage 171–176: `envelope` is
+/// now a genuinely public field — `FedosCiphertextEnvelope` is an opaque
+/// `pub` wrapper, so code outside this crate can hold, pass around, and
+/// feed this value straight into [`fedos_decrypt`], while the real
+/// `AeadCiphertextEnvelope` underneath stays `pub(crate)` forever. See
+/// `docs/public_crypto_opaque_handles.md`.
 pub struct FedosEncryptDecision {
     pub status: FedosEncryptStatus,
-    pub(crate) envelope: Option<crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope>,
+    pub envelope: Option<FedosCiphertextEnvelope>,
 }
 
-/// Seal `plaintext` under `key` (a `SecretHandle(AeadKeyMaterial)`) using
+/// Seal `plaintext` under `key` (an opaque [`FedosAeadKeyHandle`]) using
 /// `algorithm`, binding `aad_domain` as Associated Data — this crate's
-/// FIRST public crypto-operation entry point. Draws its OWN fresh nonce
-/// internally via [`fedos_aead_nonce_96`] (never accepting one as a
-/// parameter — see `docs/nonce_generation_policy.md`) and bridges the
-/// result into a real ciphertext envelope
-/// (`crate::crypto::aead_envelope_bridge::envelope_from_seal_decision_internal`).
-/// Never exposes a raw key byte, a raw nonce byte, or any AEAD
-/// implementation type — the only inputs are `key`/`algorithm`/
-/// `aad_domain`/`plaintext`, and the only output is this function's own
-/// `FedosEncryptDecision`. Never panics — every internal `Result`/`Option`
-/// is matched exhaustively.
-///
-/// `#[allow(private_interfaces)]`: `AeadCipher`/`AeadAadDomain`/
-/// `SecretHandle` stay `pub(crate)` by deliberate, reviewed choice (see
-/// `docs/public_crypto_api.md`) — this function is `pub` in NAME, so a
-/// future stage can build the Runtime/provisioning-facing surface around
-/// it without renaming it, but it is not yet practically callable from
-/// outside this crate until those types (or narrowly-scoped public
-/// wrappers around them) are also exposed. This is an accepted, documented
-/// limitation, not an oversight the lint is catching.
-#[allow(private_interfaces)]
+/// FIRST public crypto-operation entry point, and, as of Stage 171–176,
+/// genuinely callable from OUTSIDE this crate: every parameter and return
+/// type (`FedosAeadKeyHandle`, `FedosAeadAlgorithm`, `FedosAeadAadDomain`,
+/// `&[u8]`, `FedosEncryptDecision`/`FedosCiphertextEnvelope`) is fully
+/// `pub`. Draws its OWN fresh nonce internally via [`fedos_aead_nonce_96`]
+/// (never accepting one as a parameter — see
+/// `docs/nonce_generation_policy.md`) and bridges the result into a real
+/// ciphertext envelope
+/// (`crate::crypto::aead_envelope_bridge::envelope_from_seal_decision_internal`),
+/// wrapped in the opaque [`FedosCiphertextEnvelope`]. Never exposes a raw
+/// key byte, a raw nonce byte, or any internal AEAD implementation type —
+/// the only inputs are `key`/`algorithm`/`aad_domain`/`plaintext`, and the
+/// only output is this function's own `FedosEncryptDecision`. Never
+/// panics — every internal `Result`/`Option` is matched exhaustively.
 pub fn fedos_encrypt(
-    algorithm: crate::crypto::aead_internal::AeadCipher,
-    key: &secret_handle::SecretHandle,
-    aad_domain: crate::crypto::aead_internal::AeadAadDomain,
+    algorithm: FedosAeadAlgorithm,
+    key: &FedosAeadKeyHandle,
+    aad_domain: FedosAeadAadDomain,
     plaintext: &[u8],
 ) -> FedosEncryptDecision {
+    let internal_algorithm = fedos_aead_algorithm_to_internal(algorithm);
+    let internal_aad_domain = fedos_aead_aad_domain_to_internal(aad_domain);
     let nonce_decision = fedos_aead_nonce_96();
     let nonce_bytes = match nonce_decision.nonce {
         Some(bytes) if nonce_decision.state == FedosNonceState::Ready => bytes,
@@ -5563,10 +5756,10 @@ pub fn fedos_encrypt(
         }
     };
     let seal_decision = crate::crypto::aead_internal::seal_internal(
-        algorithm,
-        key,
+        internal_algorithm,
+        key.inner(),
         &nonce_decision,
-        aad_domain,
+        internal_aad_domain,
         plaintext,
     );
     match seal_decision.status {
@@ -5574,11 +5767,11 @@ pub fn fedos_encrypt(
             match crate::crypto::aead_envelope_bridge::envelope_from_seal_decision_internal(
                 seal_decision,
                 nonce_bytes,
-                aad_domain,
+                internal_aad_domain,
             ) {
                 Some(envelope) => FedosEncryptDecision {
                     status: FedosEncryptStatus::Ready,
-                    envelope: Some(envelope),
+                    envelope: Some(FedosCiphertextEnvelope::from_inner(envelope)),
                 },
                 None => FedosEncryptDecision {
                     status: FedosEncryptStatus::InternalFailure,
@@ -5605,8 +5798,7 @@ pub fn fedos_encrypt(
 pub enum FedosDecryptStatus {
     /// Opening succeeded; `FedosDecryptDecision::plaintext` is `Some`.
     Ready,
-    /// `key` was not `SecretHandleKind::AeadKeyMaterial`-kinded, or held
-    /// no real bytes.
+    /// `key` held no real bytes.
     InvalidKey,
     /// Authentication failed — a SINGLE fixed label covering every
     /// decryption failure cause (wrong key, wrong nonce, wrong AAD
@@ -5618,34 +5810,32 @@ pub enum FedosDecryptStatus {
     InternalFailure,
 }
 
-/// The result of a [`fedos_decrypt`] call. Unlike [`FedosEncryptDecision`],
-/// `plaintext` is a public field: it is plain recovered bytes (`Vec<u8>`),
-/// not an internal crate-private type, so there is no type-visibility
-/// reason to hide it — returning the caller's own requested plaintext is
+/// The result of a [`fedos_decrypt`] call. `plaintext` is plain recovered
+/// bytes (`Vec<u8>`) — returning the caller's own requested plaintext is
 /// the entire point of a decrypt call.
 pub struct FedosDecryptDecision {
     pub status: FedosDecryptStatus,
     pub plaintext: Option<Vec<u8>>,
 }
 
-/// Open (verify-then-decrypt) `envelope` under `key` (a
-/// `SecretHandle(AeadKeyMaterial)`) — the counterpart to [`fedos_encrypt`].
-/// Extracts the algorithm/nonce/AAD-domain/ciphertext already carried by
-/// `envelope` (via
+/// Open (verify-then-decrypt) `envelope` (an opaque
+/// [`FedosCiphertextEnvelope`]) under `key` (an opaque
+/// [`FedosAeadKeyHandle`]) — the counterpart to [`fedos_encrypt`], and,
+/// as of Stage 171–176, likewise genuinely callable from OUTSIDE this
+/// crate. Extracts the algorithm/nonce/AAD-domain/ciphertext already
+/// carried by `envelope` (via
 /// `crate::crypto::aead_envelope_bridge::open_decision_from_envelope_internal`)
 /// — the caller never separately supplies a nonce or algorithm. Never
-/// exposes a raw key byte or any AEAD implementation type. Never panics.
-///
-/// `#[allow(private_interfaces)]`: see [`fedos_encrypt`]'s own doc comment
-/// — `SecretHandle`/`AeadCiphertextEnvelope` stay `pub(crate)` by
-/// deliberate, reviewed, documented choice.
-#[allow(private_interfaces)]
+/// exposes a raw key byte, a raw nonce byte, or any internal AEAD
+/// implementation type. Never panics.
 pub fn fedos_decrypt(
-    key: &secret_handle::SecretHandle,
-    envelope: &crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope,
+    key: &FedosAeadKeyHandle,
+    envelope: &FedosCiphertextEnvelope,
 ) -> FedosDecryptDecision {
-    let open_decision =
-        crate::crypto::aead_envelope_bridge::open_decision_from_envelope_internal(envelope, key);
+    let open_decision = crate::crypto::aead_envelope_bridge::open_decision_from_envelope_internal(
+        envelope.inner(),
+        key.inner(),
+    );
     match open_decision.status {
         crate::crypto::aead_internal::AeadStatus::Ready => FedosDecryptDecision {
             status: FedosDecryptStatus::Ready,
@@ -6906,35 +7096,87 @@ mod aead_nonce_wiring {
     }
 }
 
-/// Stage 166–167 — `cargo test` coverage for [`fedos_encrypt`]/
-/// [`fedos_decrypt`], this crate's first public crypto-operation entry
-/// points. Every test lives inside this crate (reading the `pub(crate)`
-/// `FedosEncryptDecision::envelope` field directly) — exactly the
-/// "practically internal-only for now" situation `docs/public_crypto_api.md`
-/// documents: an external crate could call these functions by name, but
-/// could not construct a `SecretHandle` or read an `AeadCiphertextEnvelope`
-/// to do anything useful with them yet.
+/// Stage 166–176 — `cargo test` coverage for [`fedos_encrypt`]/
+/// [`fedos_decrypt`]/[`fedos_generate_aead_key_32`] through their public,
+/// opaque-handle-based signatures. Most tests here still live inside this
+/// crate so they can build specific wrong-kind-key/tampered-envelope
+/// fixtures via `FedosAeadKeyHandle`'s/`FedosCiphertextEnvelope`'s private
+/// `inner` field — visible here only because this module is a descendant
+/// of the crate root where both types are defined (ordinary Rust privacy,
+/// not a special exemption). See
+/// `packages/fedos-core-rust/tests/public_crypto_api.rs` for the
+/// genuinely-external-crate proof, reachable ONLY through
+/// `fedos_generate_aead_key_32`/`fedos_encrypt`/`fedos_decrypt` exactly as
+/// an outside consumer would use them.
 #[cfg(test)]
 mod fedos_encrypt_decrypt_wiring {
     use super::*;
-    use crate::crypto::aead_internal::{AeadAadDomain, AeadCipher};
     use crate::secret_handle::{SecretHandle, SecretHandleKind};
 
     const TEST_KEY_BYTES: [u8; 32] = [0x77; 32];
     const TEST_PLAINTEXT: &[u8] = b"fedos public encrypt/decrypt roundtrip test";
 
-    fn test_key() -> SecretHandle {
-        SecretHandle::new_from_32_bytes_for_internal_use(
-            SecretHandleKind::AeadKeyMaterial,
-            TEST_KEY_BYTES,
-        )
+    fn test_key() -> FedosAeadKeyHandle {
+        FedosAeadKeyHandle {
+            inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::AeadKeyMaterial,
+                TEST_KEY_BYTES,
+            ),
+        }
+    }
+
+    #[test]
+    fn generate_key_returns_an_opaque_handle_ready_to_encrypt() {
+        let generated = fedos_generate_aead_key_32();
+        assert_eq!(generated.status, FedosKeyGenerationStatus::Ready);
+        let key = generated
+            .key
+            .expect("Ready generation decision must carry a key handle");
+
+        let encrypted = fedos_encrypt(
+            FedosAeadAlgorithm::ChaCha20Poly1305,
+            &key,
+            FedosAeadAadDomain::TestOnly,
+            TEST_PLAINTEXT,
+        );
+        assert_eq!(encrypted.status, FedosEncryptStatus::Ready);
+    }
+
+    #[test]
+    fn two_generated_keys_are_independent() {
+        let first = fedos_generate_aead_key_32()
+            .key
+            .expect("Ready generation decision must carry a key handle");
+        let second = fedos_generate_aead_key_32()
+            .key
+            .expect("Ready generation decision must carry a key handle");
+
+        let encrypted = fedos_encrypt(
+            FedosAeadAlgorithm::Aes256Gcm,
+            &first,
+            FedosAeadAadDomain::TestOnly,
+            TEST_PLAINTEXT,
+        );
+        let envelope = encrypted
+            .envelope
+            .expect("Ready encrypt decision must carry an envelope");
+        let decrypted = fedos_decrypt(&second, &envelope);
+        assert_eq!(decrypted.status, FedosDecryptStatus::AuthenticationFailed);
     }
 
     #[test]
     fn fedos_encrypt_then_fedos_decrypt_round_trips_for_both_ciphers() {
-        for algorithm in [AeadCipher::ChaCha20Poly1305, AeadCipher::Aes256Gcm] {
+        for algorithm in [
+            FedosAeadAlgorithm::ChaCha20Poly1305,
+            FedosAeadAlgorithm::Aes256Gcm,
+        ] {
             let key = test_key();
-            let encrypted = fedos_encrypt(algorithm, &key, AeadAadDomain::TestOnly, TEST_PLAINTEXT);
+            let encrypted = fedos_encrypt(
+                algorithm,
+                &key,
+                FedosAeadAadDomain::TestOnly,
+                TEST_PLAINTEXT,
+            );
             assert_eq!(encrypted.status, FedosEncryptStatus::Ready);
             let envelope = encrypted
                 .envelope
@@ -6948,14 +7190,16 @@ mod fedos_encrypt_decrypt_wiring {
 
     #[test]
     fn fedos_encrypt_rejects_a_wrong_kinded_key() {
-        let wrong_kind_key = SecretHandle::new_from_32_bytes_for_internal_use(
-            SecretHandleKind::HkdfInputMaterial,
-            TEST_KEY_BYTES,
-        );
+        let wrong_kind_key = FedosAeadKeyHandle {
+            inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::HkdfInputMaterial,
+                TEST_KEY_BYTES,
+            ),
+        };
         let encrypted = fedos_encrypt(
-            AeadCipher::ChaCha20Poly1305,
+            FedosAeadAlgorithm::ChaCha20Poly1305,
             &wrong_kind_key,
-            AeadAadDomain::TestOnly,
+            FedosAeadAadDomain::TestOnly,
             TEST_PLAINTEXT,
         );
         assert_eq!(encrypted.status, FedosEncryptStatus::InvalidKey);
@@ -6966,15 +7210,15 @@ mod fedos_encrypt_decrypt_wiring {
     fn fedos_decrypt_rejects_a_cleared_key() {
         let mut key = test_key();
         let encrypted = fedos_encrypt(
-            AeadCipher::Aes256Gcm,
+            FedosAeadAlgorithm::Aes256Gcm,
             &key,
-            AeadAadDomain::TestOnly,
+            FedosAeadAadDomain::TestOnly,
             TEST_PLAINTEXT,
         );
         let envelope = encrypted
             .envelope
             .expect("Ready encrypt decision must carry an envelope");
-        key.clear();
+        key.inner_mut().clear();
 
         let decrypted = fedos_decrypt(&key, &envelope);
         assert_eq!(decrypted.status, FedosDecryptStatus::InvalidKey);
@@ -6985,9 +7229,9 @@ mod fedos_encrypt_decrypt_wiring {
     fn fedos_decrypt_rejects_a_wrong_nonce() {
         let key = test_key();
         let encrypted = fedos_encrypt(
-            AeadCipher::ChaCha20Poly1305,
+            FedosAeadAlgorithm::ChaCha20Poly1305,
             &key,
-            AeadAadDomain::TestOnly,
+            FedosAeadAadDomain::TestOnly,
             TEST_PLAINTEXT,
         );
         let envelope = encrypted
@@ -6998,24 +7242,25 @@ mod fedos_encrypt_decrypt_wiring {
         // has a different (freshly drawn) nonce — swapping ciphertexts
         // between the two envelopes simulates a wrong-nonce scenario.
         let second_encrypted = fedos_encrypt(
-            AeadCipher::ChaCha20Poly1305,
+            FedosAeadAlgorithm::ChaCha20Poly1305,
             &key,
-            AeadAadDomain::TestOnly,
+            FedosAeadAadDomain::TestOnly,
             TEST_PLAINTEXT,
         );
         let second_envelope = second_encrypted
             .envelope
             .expect("Ready encrypt decision must carry an envelope");
-        assert_ne!(envelope.nonce(), second_envelope.nonce());
+        assert_ne!(envelope.inner().nonce(), second_envelope.inner().nonce());
 
-        let mismatched_envelope =
+        let mismatched_envelope = FedosCiphertextEnvelope::from_inner(
             crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
-                envelope.version(),
-                envelope.algorithm(),
-                second_envelope.nonce(),
-                envelope.aad_domain(),
-                envelope.ciphertext().to_vec(),
-            );
+                envelope.inner().version(),
+                envelope.inner().algorithm(),
+                second_envelope.inner().nonce(),
+                envelope.inner().aad_domain(),
+                envelope.inner().ciphertext().to_vec(),
+            ),
+        );
         let decrypted = fedos_decrypt(&key, &mismatched_envelope);
         assert_eq!(decrypted.status, FedosDecryptStatus::AuthenticationFailed);
     }
@@ -7024,23 +7269,24 @@ mod fedos_encrypt_decrypt_wiring {
     fn fedos_decrypt_rejects_a_wrong_aad_domain() {
         let key = test_key();
         let encrypted = fedos_encrypt(
-            AeadCipher::Aes256Gcm,
+            FedosAeadAlgorithm::Aes256Gcm,
             &key,
-            AeadAadDomain::Storage,
+            FedosAeadAadDomain::Storage,
             TEST_PLAINTEXT,
         );
         let envelope = encrypted
             .envelope
             .expect("Ready encrypt decision must carry an envelope");
 
-        let mismatched_envelope =
+        let mismatched_envelope = FedosCiphertextEnvelope::from_inner(
             crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
-                envelope.version(),
-                envelope.algorithm(),
-                envelope.nonce(),
+                envelope.inner().version(),
+                envelope.inner().algorithm(),
+                envelope.inner().nonce(),
                 crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::Conversation,
-                envelope.ciphertext().to_vec(),
-            );
+                envelope.inner().ciphertext().to_vec(),
+            ),
+        );
         let decrypted = fedos_decrypt(&key, &mismatched_envelope);
         assert_eq!(decrypted.status, FedosDecryptStatus::AuthenticationFailed);
     }
@@ -7049,25 +7295,26 @@ mod fedos_encrypt_decrypt_wiring {
     fn fedos_decrypt_reports_authentication_failed_for_tampered_ciphertext() {
         let key = test_key();
         let encrypted = fedos_encrypt(
-            AeadCipher::ChaCha20Poly1305,
+            FedosAeadAlgorithm::ChaCha20Poly1305,
             &key,
-            AeadAadDomain::TestOnly,
+            FedosAeadAadDomain::TestOnly,
             TEST_PLAINTEXT,
         );
         let envelope = encrypted
             .envelope
             .expect("Ready encrypt decision must carry an envelope");
 
-        let mut tampered_ciphertext = envelope.ciphertext().to_vec();
+        let mut tampered_ciphertext = envelope.inner().ciphertext().to_vec();
         tampered_ciphertext[0] ^= 0xFF;
-        let tampered_envelope =
+        let tampered_envelope = FedosCiphertextEnvelope::from_inner(
             crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
-                envelope.version(),
-                envelope.algorithm(),
-                envelope.nonce(),
-                envelope.aad_domain(),
+                envelope.inner().version(),
+                envelope.inner().algorithm(),
+                envelope.inner().nonce(),
+                envelope.inner().aad_domain(),
                 tampered_ciphertext,
-            );
+            ),
+        );
         let decrypted = fedos_decrypt(&key, &tampered_envelope);
         assert_eq!(decrypted.status, FedosDecryptStatus::AuthenticationFailed);
         assert!(decrypted.plaintext.is_none());
@@ -7076,30 +7323,58 @@ mod fedos_encrypt_decrypt_wiring {
     #[test]
     fn fedos_decrypt_rejects_a_stage_157_158_placeholder_envelope() {
         let key = test_key();
-        let placeholder_envelope =
+        let placeholder_envelope = FedosCiphertextEnvelope::from_inner(
             crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope::new_for_internal_use(
                 crate::crypto::ciphertext_envelope::AeadEnvelopeVersion::V1,
                 crate::crypto::ciphertext_envelope::AeadEnvelopeAlgorithm::ChaCha20Poly1305,
                 [0x11; 12],
                 crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::TestOnly,
-            );
+            ),
+        );
         let decrypted = fedos_decrypt(&key, &placeholder_envelope);
         assert_eq!(decrypted.status, FedosDecryptStatus::AuthenticationFailed);
         assert!(decrypted.plaintext.is_none());
     }
 
     #[test]
-    fn lib_rs_public_pub_fn_surface_now_includes_fedos_encrypt_and_fedos_decrypt() {
+    fn no_raw_key_or_nonce_or_ciphertext_byte_is_reachable_through_the_opaque_types() {
+        // A structural guard, not a string scan (see the JS guard suite for
+        // that): `FedosAeadKeyHandle`/`FedosCiphertextEnvelope` expose no
+        // method returning `[u8; N]`/`Vec<u8>`/`&[u8]` anywhere in this
+        // crate's own usage of them — every access in this file goes
+        // through `.inner()`, itself `pub(crate)`-only.
+        let key = test_key();
+        let encrypted = fedos_encrypt(
+            FedosAeadAlgorithm::ChaCha20Poly1305,
+            &key,
+            FedosAeadAadDomain::TestOnly,
+            TEST_PLAINTEXT,
+        );
+        let envelope = encrypted
+            .envelope
+            .expect("Ready encrypt decision must carry an envelope");
+        // `envelope.inner()`/`key.inner()` are reachable here ONLY because
+        // this test module is a descendant of the crate root — an actual
+        // external crate has no such path (see the integration test).
+        let _ = envelope.inner().ciphertext();
+        let _ = key.inner();
+    }
+
+    #[test]
+    fn lib_rs_public_pub_fn_surface_now_includes_the_stage_171_176_opaque_crypto_api() {
         // A lightweight in-crate sanity check complementing the dedicated
-        // JS guard test's source-string scan: both new functions are
+        // JS guard test's source-string scan: every new function is
         // directly callable at the crate root.
         let key = test_key();
         let encrypted = fedos_encrypt(
-            AeadCipher::ChaCha20Poly1305,
+            FedosAeadAlgorithm::ChaCha20Poly1305,
             &key,
-            AeadAadDomain::TestOnly,
+            FedosAeadAadDomain::TestOnly,
             TEST_PLAINTEXT,
         );
         assert_eq!(encrypted.status, FedosEncryptStatus::Ready);
+
+        let generated = fedos_generate_aead_key_32();
+        assert_eq!(generated.status, FedosKeyGenerationStatus::Ready);
     }
 }
