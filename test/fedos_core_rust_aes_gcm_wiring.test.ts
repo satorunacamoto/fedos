@@ -186,8 +186,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_algorithm_requirements",
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
+      "fedos_random_bytes_32",
     ];
-    expect(pubFnNames.length).toBe(22);
+    expect(pubFnNames.length).toBe(23);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -293,6 +294,7 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_algorithm_requirements",
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
+      "fedos_random_bytes_32",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

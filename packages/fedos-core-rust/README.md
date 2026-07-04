@@ -4,7 +4,33 @@ The **FedOS crypto core** package boundary — the INTENDED future home of a
 RustCrypto-backed WASM/FFI crypto core, kept as a standalone package so the host
 app depends only on its *contract*, never on its internals.
 
-> **Status: Stage 106 — Public Boundary Freeze v2: public key-USAGE label
+> **Status: Stage 137 — first REAL implementation behind this crate's
+> public API: `fedos_random_bytes_32`.** `FedosRandomBytesLength` (one
+> variant, `ThirtyTwo`), `FedosRandomBytesState` (`Ready` /
+> `EntropySourceUnavailable`), and `FedosRandomBytesDecision`
+> (`length`/`state`/`bytes: Option<[u8; 32]>`) round out the group.
+> `fedos_random_bytes_32()` draws exactly 32 bytes from the OS CSPRNG via
+> `getrandom::fill` — the FIRST time `getrandom` (adopted Stage 104,
+> build-check only until now) is actually imported and called anywhere in
+> this crate, production or test. The public `pub fn` surface grows from
+> twenty-two (Stage 106) to twenty-three. Output length is fixed and
+> label-selected, never an open caller-supplied count (no zero-length
+> request exists); a CSPRNG failure returns `EntropySourceUnavailable`
+> with `bytes: None` — no fallback PRNG, no `rand`/`thread_rng`
+> substitute, and no panic. This is general-purpose randomness ONLY: no
+> nonce generation, no key generation, no key derivation, and no AEAD/KDF/
+> NIP-44 operation is added or connected — `SecretHandle` (Stage 79),
+> `aead_core` (Stage 80), and `kdf_core` (Stage 82) remain untouched.
+> `Cargo.toml` is UNCHANGED (no dependency change — `getrandom` was
+> already adopted Stage 104); no Runtime/Worker/CryptoProvider/WASM
+> wiring. See "Rust randomBytes implementation (Stage 137)" below, and
+> [`docs/random_bytes_implementation_plan.md`](../../docs/random_bytes_implementation_plan.md),
+> [`docs/nonce_generation_policy.md`](../../docs/nonce_generation_policy.md),
+> and
+> [`docs/secret_lifecycle_implementation_plan.md`](../../docs/secret_lifecycle_implementation_plan.md)
+> for the full design records this stage follows. Prior status:
+>
+> **Stage 106 — Public Boundary Freeze v2: public key-USAGE label
 > enumeration (`FedosKeyUsageLabel`, eight labels) + public algorithm
 > policy metadata (`FedosAlgorithmRequirement`/`FedosAlgorithmCapability`/
 > `FedosAlgorithmPolicy`) + a Capability/Feature/Policy/Version/Usage/
@@ -2744,6 +2770,93 @@ no dynamic collection, the policy function's fixed no-branching body, no
 legitimately reuse Stage 102's algorithm labels), no
 Runtime/Worker/`CryptoProvider` connection, `Cargo.toml` unchanged, no
 `getrandom`/`rand` usage, no `unsafe`/`println!`/`log` usage, the `pub
-fn` surface includes all three new functions among twenty-two total, the
-design doc exists and names all three types, no committed build
-artifact).
+fn` surface includes all three new functions among twenty-three total
+(updated from twenty-two once Stage 137 added a twenty-third, unrelated
+function elsewhere), the design doc exists and names all three types, no
+committed build artifact).
+
+## Rust randomBytes implementation (Stage 137)
+
+Stage 137 is this crate's FIRST real implementation — the first stage
+since Stage 69 to replace a placeholder body with one that actually does
+something. It implements exactly one function, deliberately scoped as
+narrowly as `docs/random_bytes_implementation_plan.md` and
+`docs/implementation_phase_roadmap.md` §1 item 2 require: nothing else
+(nonce generation, key generation, key derivation, AEAD, `SecretHandle`
+real bytes, WASM, Runtime wiring) is touched.
+
+**`FedosRandomBytesLength`** (`pub enum`, placed right after Stage 106's
+`fedos_algorithm_policy_decision`, still ahead of Stage 79's
+`secret_handle` module) — exactly ONE variant, `ThirtyTwo`. There is no
+zero-length, custom-length, or caller-selected-length variant; a future
+additional length would be its own reviewed addition to this enum, never
+a numeric parameter on the function itself.
+
+**`FedosRandomBytesState`** (`Ready` / `EntropySourceUnavailable`) and
+**`FedosRandomBytesDecision`** (`length: FedosRandomBytesLength`, `state:
+FedosRandomBytesState`, `bytes: Option<[u8; 32]>`) round out the group.
+`bytes` is a fixed-size `[u8; 32]` wrapped in `Option` — never a `Vec<u8>`
+or a borrowed slice — `Some` only on `Ready`, always `None` on
+`EntropySourceUnavailable`.
+
+**`fedos_random_bytes_32()`** — the one new public function — takes NO
+parameter of any kind (no length, no seed, nothing) and draws exactly 32
+bytes from the OS CSPRNG via `getrandom::fill(&mut buf)`, matched
+exhaustively (`Ok(())` / `Err(_)`, never `.unwrap()`/`.expect()`/`panic!`).
+On success it returns `Ready` with the 32 drawn bytes; on any CSPRNG
+failure it returns `EntropySourceUnavailable` with `bytes: None` — there
+is no fallback PRNG, no `rand`/`thread_rng` substitute, and no
+degraded/partial/zeroed output. This is this crate's first production
+(not `#[cfg(test)]`-only) use of the `getrandom` dependency adopted Stage
+104 — every occurrence of `getrandom::fill(` anywhere in `src/lib.rs`
+outside its own doc comments is this one call site.
+
+**What is explicitly NOT implemented or connected:**
+
+- No nonce generation of any kind — `docs/nonce_generation_policy.md`
+  (Stage 134) remains policy only.
+- No key generation, key derivation, or AEAD/KDF/NIP-44 operation.
+- No connection to `SecretHandle` (`secret_handle`, Stage 79),
+  `AeadPlaceholderRequest` (`aead_core`, Stage 80), or
+  `KdfPlaceholderRequest` (`kdf_core`, Stage 82) — all three remain
+  exactly as placeholder as before this stage.
+- `random_bytes_placeholder` (Stage 69) and
+  `fedos_random_boundary_status`/`FedosRandomBoundary` (Stage 103) are
+  byte-for-byte UNCHANGED — this stage adds a new, independent function
+  rather than editing either.
+- `Cargo.toml` is UNCHANGED — no dependency change of any kind.
+- No WASM target, loader, or artifact; no Runtime/Worker/`CryptoProvider`
+  wiring — `fedos_random_bytes_32` is reachable only by directly calling
+  this crate.
+
+**Rust-side `cargo test` coverage** (`random_bytes_wiring`, a new
+`#[cfg(test)]`-only module at the end of `src/lib.rs`, kept separate from
+Stage 104's `csprng_verification_infrastructure` PLAN module): a
+successful call returns exactly 32 bytes tagged `Ready`; two calls in
+immediate succession are asserted to differ (a non-determinism sanity
+check, not a statistical randomness proof — the plan
+`docs/random_bytes_implementation_plan.md` §12 fixed this distinction in
+advance); the fixed `EntropySourceUnavailable`/`bytes: None` failure
+shape is constructed and asserted directly, since fault-injecting a real
+OS CSPRNG failure isn't practical in a portable `cargo test` (the plan's
+own documented fallback); `FedosRandomBytesLength` is asserted to have no
+variant beyond `ThirtyTwo`; and ten repeated calls are asserted not to
+panic.
+
+See
+[`test/fedos_core_rust_random_bytes.test.ts`](../../test/fedos_core_rust_random_bytes.test.ts)
+(20 tests) for the dedicated Stage 137 guard tests (all three new types
+and the function declared, the length enum has no zero/open-length
+escape hatch, the function takes no parameter, `bytes` is `Option<[u8;
+32]>` never `Vec<u8>`, `getrandom::fill` is called exactly once and
+matched exhaustively with no panic path, no fallback PRNG/`Math.random()`
+equivalent, no nonce/key-generation/key-derivation/AEAD/KDF/NIP-44
+construct — checked structurally rather than by a bare word match, since
+this stage's own doc comments legitimately NAME each of those concepts to
+say none is done — not connected to `SecretHandle`/`aead_core`/`kdf_core`,
+the two unchanged prior functions verified byte-for-byte, the twenty-
+three-function `pub fn` surface, `Cargo.toml` unchanged, no
+Runtime/Worker/`CryptoProvider` connection, no `println!`/`log`/`unsafe`
+usage, the `random_bytes_wiring` test module itself calls no `getrandom`,
+no raw secret exposed on the public API, no committed build artifact, and
+all three design docs exist).

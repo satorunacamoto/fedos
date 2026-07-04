@@ -43,10 +43,14 @@ describe("FedOS Rust crate — public key-usage label boundary (Stage 106)", () 
     return source.slice(start, end);
   }
 
+  // End marker narrowed from "Stage 79 — an INTERNAL-ONLY secret-handle
+  // skeleton" once Stage 137 added new content between Stage 106's group
+  // and the secret_handle module (same narrowing pattern this repo used
+  // for Stage 102's own section when Stage 103 landed).
   const stage106Section = extractSection(
     libRsSource,
     "Stage 106 — public key-usage label enumeration",
-    "Stage 79 — an INTERNAL-ONLY secret-handle skeleton",
+    "Stage 137 — first REAL implementation behind this crate's random-byte",
   );
 
   it("1. FedosKeyUsageLabel exists, with the eight specified variants", () => {
@@ -120,12 +124,12 @@ describe("FedOS Rust crate — public key-usage label boundary (Stage 106)", () 
     );
   });
 
-  it("7. public pub fn surface includes the new key-usage function among twenty-two total", () => {
+  it("7. public pub fn surface includes the new key-usage function among twenty-three total", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
     expect(pubFnNames).toContain("fedos_key_usage_descriptor_placeholder");
-    expect(pubFnNames.length).toBe(22);
+    expect(pubFnNames.length).toBe(23);
   });
 
   it("8. no Runtime / Worker / CryptoProvider connection anywhere related to key usage", () => {

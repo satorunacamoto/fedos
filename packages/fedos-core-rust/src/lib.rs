@@ -321,6 +321,38 @@
 //! eighteen functions from Stage 69/102/103/104/105 are unchanged. See
 //! `docs/public_key_usage.md` and `docs/public_algorithm_policy.md` for
 //! the full design records.
+//!
+//! Stage 137 adds this crate's FIRST real implementation: `fedos_random_bytes_32`
+//! (below, right after Stage 106's group, still ahead of the Stage 79
+//! module) draws exactly 32 bytes from the OS's CSPRNG — the first time
+//! the already-adopted `getrandom` dependency (Stage 104, build-check
+//! only until now) is actually imported and called anywhere in this
+//! crate, production or test. (Its own doc comment, just above its
+//! declaration, names the exact call — kept out of this crate-level doc
+//! so this production-facing summary stays free of the exact code path,
+//! same reasoning the Stage 75/101 notes above already state for their
+//! AEAD dependencies.) `FedosRandomBytesLength` (one variant, `ThirtyTwo`),
+//! `FedosRandomBytesState` (`Ready` / `EntropySourceUnavailable`), and
+//! `FedosRandomBytesDecision` (`length`/`state`/`bytes: Option<[u8; 32]>`)
+//! round out the group — the crate's public `pub fn` surface grows from
+//! twenty-two (Stage 106) to twenty-three. The output length is fixed and
+//! label-selected, never an open caller-supplied count, so there is no
+//! zero-length request; a CSPRNG failure returns `EntropySourceUnavailable`
+//! with `bytes: None` — no fallback PRNG, no degraded output, and no
+//! panic. This is general-purpose randomness ONLY: no nonce generation, no
+//! key generation, no key derivation, and no AEAD/KDF/NIP-44 operation is
+//! added or connected — `random_bytes_placeholder` (Stage 69),
+//! `fedos_random_boundary_status`/`FedosRandomBoundary` (Stage 103),
+//! `SecretHandle` (Stage 79), `aead_core` (Stage 80), and `kdf_core`
+//! (Stage 82) are all UNCHANGED and unconnected to this addition.
+//! `Cargo.toml` is untouched (no dependency change — `getrandom` was
+//! already adopted Stage 104). Nothing is wired into the Runtime, the
+//! Worker, or a crypto provider; no WASM binding exists. See
+//! `docs/random_bytes_implementation_plan.md`,
+//! `docs/nonce_generation_policy.md`, and
+//! `docs/secret_lifecycle_implementation_plan.md` for the full design
+//! records this addition follows (and deliberately does not yet build
+//! against).
 
 #![forbid(unsafe_code)]
 
@@ -1144,6 +1176,110 @@ pub fn fedos_algorithm_policy_decision(algorithm: FedosCryptoAlgorithm) -> Fedos
     FedosAlgorithmPolicy {
         algorithm,
         decision: FedosAlgorithmPolicyDecision::NotYetApprovedPlaceholder,
+    }
+}
+
+/// Stage 137 — first REAL implementation behind this crate's random-byte
+/// boundary.
+///
+/// [`fedos_random_bytes_32`] draws exactly 32 bytes from the OS CSPRNG via
+/// `getrandom::fill` — the FIRST production (not gated `cfg(test)`) code
+/// anywhere in this crate to import and call `getrandom` (adopted Stage
+/// 104, build-check only until now). Scope is deliberately narrow, per
+/// `docs/random_bytes_implementation_plan.md`: exactly 32 bytes, selected
+/// by a fixed label ([`FedosRandomBytesLength::ThirtyTwo`]) rather than an
+/// open, caller-supplied count — there is no zero-length or
+/// variable-length request anywhere on this boundary, and no caller-facing
+/// parameter of any kind. On success the caller gets exactly 32 fresh
+/// CSPRNG bytes; on any OS CSPRNG failure the call returns a fixed
+/// [`FedosRandomBytesState::EntropySourceUnavailable`] with `bytes: None`
+/// — there is no fallback PRNG, no `rand`/`thread_rng`/deterministic
+/// substitute, and this function never panics (`getrandom::fill`'s
+/// `Result` is matched exhaustively, never `.unwrap()`/`.expect()`-ed).
+///
+/// This is general-purpose randomness ONLY. It performs NO nonce
+/// generation (`docs/nonce_generation_policy.md` remains policy only — no
+/// nonce is drawn here or anywhere else in this crate), NO key
+/// generation, NO key derivation, and NO AEAD/KDF/NIP-44 operation; it is
+/// not connected to [`SecretHandle`] (`secret_handle`, Stage 79),
+/// `AeadPlaceholderRequest` (`aead_core`, Stage 80), or
+/// `KdfPlaceholderRequest` (`kdf_core`, Stage 82) — those crate-private
+/// skeletons remain exactly as placeholder as before this stage.
+/// `random_bytes_placeholder` (Stage 69) and
+/// `fedos_random_boundary_status`/[`FedosRandomBoundary`] (Stage 103) are
+/// also UNCHANGED — this stage adds a new, independent function rather
+/// than editing either. Not wired into the Runtime, the Worker, or any
+/// `CryptoProvider`; no WASM binding exists. See
+/// `docs/random_bytes_implementation_plan.md` for the full design record,
+/// and `docs/secret_lifecycle_implementation_plan.md` section 8 for why
+/// `bytes` below is a plain returned value, not a `SecretHandle`-wrapped
+/// secret.
+
+/// The fixed, label-selected output length this boundary supports —
+/// never an open, caller-supplied byte count
+/// (`docs/random_bytes_implementation_plan.md` section 4). Exactly one
+/// variant exists today; a future additional length would be its own
+/// reviewed addition, never a numeric parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosRandomBytesLength {
+    /// Exactly 32 bytes — the only length this boundary supports today.
+    ThirtyTwo,
+}
+
+/// Coarse observable outcome of a [`fedos_random_bytes_32`] call. No
+/// generated byte is exposed through this label itself — only through
+/// [`FedosRandomBytesDecision::bytes`] on the `Ready` state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FedosRandomBytesState {
+    /// The OS CSPRNG produced the requested bytes.
+    Ready,
+    /// The OS CSPRNG reported a failure. There is no fallback PRNG and no
+    /// degraded output — see `docs/random_bytes_implementation_plan.md`
+    /// section 6.
+    EntropySourceUnavailable,
+}
+
+/// The result of a [`fedos_random_bytes_32`] call. On
+/// [`FedosRandomBytesState::Ready`], `bytes` holds exactly 32 freshly
+/// drawn CSPRNG bytes; on
+/// [`FedosRandomBytesState::EntropySourceUnavailable`], `bytes` is
+/// `None` — never a zeroed, truncated, or otherwise degraded substitute.
+///
+/// `bytes` is a fixed-size `[u8; 32]`, never a `Vec<u8>` or a borrowed
+/// slice — there is no length for a caller to separately validate. This
+/// is NOT a secret-handling type: the output is general-purpose random
+/// bytes handed back to the caller in full, not a key or seed held by
+/// this crate (`docs/secret_lifecycle_implementation_plan.md` section 8
+/// governs a raw secret's own eventual provisioning path, which this
+/// function does not implement).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FedosRandomBytesDecision {
+    pub length: FedosRandomBytesLength,
+    pub state: FedosRandomBytesState,
+    pub bytes: Option<[u8; 32]>,
+}
+
+/// Draw exactly 32 bytes from the OS CSPRNG via `getrandom::fill`. Never
+/// accepts a caller-supplied length, a seed, or any other parameter.
+/// Returns [`FedosRandomBytesState::Ready`] with the drawn bytes on
+/// success; on any CSPRNG failure, returns
+/// [`FedosRandomBytesState::EntropySourceUnavailable`] with
+/// `bytes: None` — there is no fallback PRNG, no `rand`/`thread_rng`
+/// substitute, and no panic (the `Result` `getrandom::fill` returns is
+/// matched exhaustively, never `.unwrap()`/`.expect()`-ed).
+pub fn fedos_random_bytes_32() -> FedosRandomBytesDecision {
+    let mut buf = [0u8; 32];
+    match getrandom::fill(&mut buf) {
+        Ok(()) => FedosRandomBytesDecision {
+            length: FedosRandomBytesLength::ThirtyTwo,
+            state: FedosRandomBytesState::Ready,
+            bytes: Some(buf),
+        },
+        Err(_) => FedosRandomBytesDecision {
+            length: FedosRandomBytesLength::ThirtyTwo,
+            state: FedosRandomBytesState::EntropySourceUnavailable,
+            bytes: None,
+        },
     }
 }
 
@@ -5509,6 +5645,94 @@ mod csprng_verification_infrastructure {
         let mut seen = std::collections::HashSet::new();
         for category in RNG_VERIFICATION_PLAN {
             assert!(seen.insert(*category), "duplicate category: {category:?}");
+        }
+    }
+}
+
+/// Stage 137 — `cargo test` coverage for [`fedos_random_bytes_32`], the
+/// real `getrandom`-backed implementation added this stage.
+///
+/// Kept separate from `csprng_verification_infrastructure` (Stage 104)
+/// above: that module is a label-only PLAN with no real entropy source to
+/// exercise; this module tests the REAL implementation. A genuine OS
+/// CSPRNG failure cannot be triggered deterministically from a portable
+/// `cargo test` without fault-injection machinery this crate does not
+/// have, so — per `docs/random_bytes_implementation_plan.md`'s own
+/// fallback allowance — the failure PATH is exercised structurally (the
+/// fixed `EntropySourceUnavailable` state is constructed directly and its
+/// shape asserted) rather than by forcing a real `getrandom` error.
+#[cfg(test)]
+mod random_bytes_wiring {
+    use super::*;
+
+    /// A successful call always returns exactly 32 bytes, tagged
+    /// `ThirtyTwo`/`Ready`.
+    #[test]
+    fn fedos_random_bytes_32_returns_ready_with_exactly_32_bytes() {
+        let decision = fedos_random_bytes_32();
+        assert_eq!(decision.length, FedosRandomBytesLength::ThirtyTwo);
+        assert_eq!(decision.state, FedosRandomBytesState::Ready);
+        let bytes = decision.bytes.expect("Ready state must carry bytes");
+        assert_eq!(bytes.len(), 32);
+    }
+
+    /// Two calls in immediate succession are not obviously identical — a
+    /// basic non-determinism sanity check, NOT a statistical proof of
+    /// randomness quality (see `docs/random_bytes_implementation_plan.md`
+    /// section 12, category 4). Two genuine 32-byte CSPRNG draws
+    /// colliding has probability 1 in 2^256 — this is not treated as a
+    /// flaky assertion.
+    #[test]
+    fn fedos_random_bytes_32_two_calls_are_not_obviously_identical() {
+        let first = fedos_random_bytes_32()
+            .bytes
+            .expect("first call should succeed");
+        let second = fedos_random_bytes_32()
+            .bytes
+            .expect("second call should succeed");
+        assert_ne!(first, second);
+    }
+
+    /// The fixed failure state exists and carries no bytes — standing in
+    /// for a real CSPRNG-failure test, which would require fault-injecting
+    /// the OS entropy source (not available here). See
+    /// `docs/random_bytes_implementation_plan.md` section 6: a failure
+    /// must map to this exact state, with `bytes: None`, never a
+    /// degraded/partial/fallback value.
+    #[test]
+    fn entropy_source_unavailable_state_carries_no_bytes() {
+        let failure = FedosRandomBytesDecision {
+            length: FedosRandomBytesLength::ThirtyTwo,
+            state: FedosRandomBytesState::EntropySourceUnavailable,
+            bytes: None,
+        };
+        assert_eq!(
+            failure.state,
+            FedosRandomBytesState::EntropySourceUnavailable
+        );
+        assert!(failure.bytes.is_none());
+    }
+
+    /// `FedosRandomBytesLength` supports exactly one variant today — an
+    /// exhaustive match with no wildcard arm compiles only because no
+    /// zero-length or caller-chosen-length variant exists to add one for.
+    #[test]
+    fn fedos_random_bytes_length_has_no_variant_other_than_thirty_two() {
+        let length = FedosRandomBytesLength::ThirtyTwo;
+        match length {
+            FedosRandomBytesLength::ThirtyTwo => {}
+        }
+    }
+
+    /// Repeated calls do not panic — ten calls in a row all succeed with
+    /// the fixed shape (guards against a non-total implementation, not a
+    /// performance benchmark).
+    #[test]
+    fn fedos_random_bytes_32_does_not_panic_across_repeated_calls() {
+        for _ in 0..10 {
+            let decision = fedos_random_bytes_32();
+            assert_eq!(decision.length, FedosRandomBytesLength::ThirtyTwo);
+            assert_eq!(decision.state, FedosRandomBytesState::Ready);
         }
     }
 }

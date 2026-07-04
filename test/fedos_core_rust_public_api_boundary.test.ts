@@ -124,29 +124,48 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     }
   });
 
-  it("4. no encrypt/decrypt/derive/random IMPLEMENTATION function is added — only status/label functions exist", () => {
-    // Every public function name must end in one of these safe suffixes;
-    // none may be a bare `encrypt`/`decrypt`/`derive_key`/`random_bytes`
-    // (without the `_placeholder` suffix) or any `*_impl`/`*_real` name.
+  it("4. no encrypt/decrypt/derive IMPLEMENTATION function is added — only status/label functions and Stage 137's one explicit exception exist", () => {
+    // Every public function name must end in one of these safe suffixes,
+    // OR be the one explicit, individually-reviewed exception below; none
+    // may be a bare `encrypt`/`decrypt`/`derive_key` (without the
+    // `_placeholder` suffix) or any `*_impl`/`*_real` name.
     // Updated Stage 103: `_descriptors`/`_version`/`_features`/`_decision`
     // added as safe suffixes for the new boundary-consolidation functions.
     // Updated Stage 106: `_requirements` added for
     // `fedos_algorithm_requirements`.
+    // Updated Stage 137: `fedos_random_bytes_32` is this crate's FIRST
+    // real implementation function (see
+    // test/fedos_core_rust_random_bytes.test.ts for its dedicated
+    // checks) — deliberately NOT given a `_placeholder`-style suffix,
+    // since it is not a placeholder. Rather than widen the suffix regex
+    // (which would silently allow any future `..._32`/`..._bytes` name),
+    // it is named as a single, explicit, closed exception.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
+    const explicitImplementationExceptions = new Set(["fedos_random_bytes_32"]);
     for (const name of pubFnNames) {
-      expect(
+      const hasSafeSuffix =
         /_placeholder$|_status$|_capabilities$|_descriptors$|_version$|_features$|_decision$|_requirements$/.test(
           name,
-        ),
+        );
+      expect(
+        hasSafeSuffix || explicitImplementationExceptions.has(name),
         `unexpected public function name: ${name}`,
       ).toBe(true);
     }
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+encrypt\s*\(/);
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+decrypt\s*\(/);
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+derive_key\s*\(/);
+    // Still no BARE "random_bytes" name (without the `_32` suffix) —
+    // Stage 137's exception is `fedos_random_bytes_32` specifically.
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+random_bytes\s*\(/);
+    // The one exception is scoped to exactly this single name — no
+    // sibling `fedos_random_bytes_16`/`_64`/generic-length function
+    // exists alongside it.
+    expect(pubFnNames.filter((name) => name.startsWith("fedos_random_bytes")).sort()).toEqual([
+      "fedos_random_bytes_32",
+    ]);
   });
 
   it("5. no raw byte parameter/field anywhere in the new boundary — no borrowed slice, no growable byte vector", () => {

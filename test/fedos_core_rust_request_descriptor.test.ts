@@ -126,8 +126,9 @@ describe("FedOS Rust crate — internal request descriptor skeleton", () => {
       "fedos_algorithm_requirements",
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
+      "fedos_random_bytes_32",
     ];
-    expect(pubFnNames.length).toBe(22);
+    expect(pubFnNames.length).toBe(23);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

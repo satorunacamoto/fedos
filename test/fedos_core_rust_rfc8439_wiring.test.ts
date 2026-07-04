@@ -218,6 +218,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       "fedos_algorithm_requirements",
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
+      "fedos_random_bytes_32",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

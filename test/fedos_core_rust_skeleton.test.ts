@@ -210,19 +210,22 @@ describe("FedOS Rust crate skeleton", () => {
     expect(productionLibRs).toMatch(/\buse\s+secrecy\b/);
   });
 
-  it("7. lib.rs has no random / getrandom CALL usage — the crate-level doc comment legitimately NAMES getrandom (Stage 104's adoption note)", () => {
-    // Specific crate-usage patterns only — NOT a bare substring match:
-    // Stage 104's crate-level doc comment (top of file) legitimately
-    // names `getrandom` in prose describing its own adoption, without
-    // importing or calling it (see
-    // test/fedos_core_rust_dependency.test.ts test 21 for the dedicated
-    // "not imported/called anywhere" check).
+  it("7. lib.rs's only real getrandom CALL is fedos_random_bytes_32 (Stage 137) — every other mention is prose naming it, never a fallback PRNG", () => {
+    // Through Stage 136 this asserted "no getrandom/rand CALL usage"
+    // outright. Stage 137 is the first real implementation behind this
+    // crate's public API (see test/fedos_core_rust_random_bytes.test.ts
+    // for the dedicated checks) — narrowed here to "the one call site is
+    // getrandom::fill, and nothing else calls getrandom/rand/thread_rng."
+    // Several doc comments legitimately NAME `getrandom`/`thread_rng` in
+    // prose (to describe the stage or say a fallback is never used) — a
+    // bare word match would false-positive on that prose, so this checks
+    // actual CALL/import syntax instead.
     expect(libRsSource).not.toMatch(/\buse\s+getrandom\b/);
-    expect(libRsSource).not.toMatch(/\bgetrandom::/);
-    expect(libRsSource).not.toMatch(/\bgetrandom\s*\(/);
+    const getrandomCallSites = libRsSource.match(/getrandom::fill\s*\(/g) ?? [];
+    expect(getrandomCallSites.length).toBe(1);
     expect(libRsSource).not.toMatch(/\buse\s+rand\b/);
     expect(libRsSource).not.toMatch(/\brand::/);
-    expect(libRsSource).not.toMatch(/\bthread_rng\b/);
+    expect(libRsSource).not.toMatch(/\bthread_rng\s*\(/);
   });
 
   it("8. lib.rs's production code has no encryption implementation beyond placeholder names", () => {

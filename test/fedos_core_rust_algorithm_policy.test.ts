@@ -45,11 +45,14 @@ describe("FedOS Rust crate — public algorithm policy metadata (Stage 106)", ()
   const stage106Section = extractSection(
     libRsSource,
     "Stage 106 — public key-usage label enumeration",
-    "Stage 79 — an INTERNAL-ONLY secret-handle skeleton",
+    "Stage 137 — first REAL implementation behind this crate's random-byte",
   );
   // The algorithm-policy group is the tail of stage106Section, starting
   // at its first declaration — sliced directly, since stage106Section
-  // itself already ends right where "Stage 79" begins.
+  // itself already ends right where Stage 137's marker begins (narrowed
+  // from "Stage 79" once Stage 137 added new content between Stage 106's
+  // group and the secret_handle module — same narrowing pattern this
+  // repo used for Stage 102's own section when Stage 103 landed).
   const algorithmPolicyStart = stage106Section.indexOf("pub enum FedosAlgorithmRequirementLabel");
   expect(algorithmPolicyStart, "expected to find FedosAlgorithmRequirementLabel").toBeGreaterThan(
     -1,
@@ -201,7 +204,7 @@ describe("FedOS Rust crate — public algorithm policy metadata (Stage 106)", ()
     expect(algorithmPolicySection).not.toMatch(/\blog::/);
   });
 
-  it("12. public pub fn surface includes all three new algorithm-policy functions among twenty-two total", () => {
+  it("12. public pub fn surface includes all three new algorithm-policy functions among twenty-three total", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
@@ -212,7 +215,7 @@ describe("FedOS Rust crate — public algorithm policy metadata (Stage 106)", ()
     ]) {
       expect(pubFnNames).toContain(fn);
     }
-    expect(pubFnNames.length).toBe(22);
+    expect(pubFnNames.length).toBe(23);
   });
 
   it("13. the design doc exists and names all three types", () => {

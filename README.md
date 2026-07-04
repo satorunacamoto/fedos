@@ -8,7 +8,83 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 134–136 — Nonce / Random / Secret lifecycle
+> **Status: Stage 137 — Rust `randomBytes` implementation.** The
+> Implementation Phase's FIRST real code: `packages/fedos-core-rust/src/lib.rs`
+> gains `FedosRandomBytesLength` (one variant, `ThirtyTwo`),
+> `FedosRandomBytesState` (`Ready` / `EntropySourceUnavailable`),
+> `FedosRandomBytesDecision` (`length`/`state`/`bytes: Option<[u8; 32]>`),
+> and one new function, `fedos_random_bytes_32()`, which draws exactly 32
+> bytes from the OS CSPRNG via `getrandom::fill` — the FIRST time
+> `getrandom` (adopted Stage 104, build-check only until now) is actually
+> imported and called anywhere in this crate, production or test. The
+> public `pub fn` surface grows from twenty-two (Stage 106) to
+> twenty-three.
+>
+> **Scope, exactly as planned Stage 134–136:** output length is fixed at
+> 32 bytes, selected by a label, never an open caller-supplied count — no
+> zero-length request exists. A CSPRNG failure returns
+> `EntropySourceUnavailable` with `bytes: None` — no fallback PRNG, no
+> `rand`/`thread_rng`/`Math.random()`-equivalent substitute, and no panic
+> (`getrandom::fill`'s `Result` is matched exhaustively, never
+> `.unwrap()`/`.expect()`-ed). **No nonce generation, no key generation,
+> no key derivation, and no AEAD/KDF/NIP-44 operation is added or
+> connected** — `SecretHandle` (Stage 79), `aead_core` (Stage 80), and
+> `kdf_core` (Stage 82) remain exactly as placeholder as before this
+> stage; `random_bytes_placeholder` (Stage 69) and
+> `fedos_random_boundary_status`/`FedosRandomBoundary` (Stage 103) are
+> byte-for-byte unchanged. `Cargo.toml` is UNCHANGED (no dependency
+> change). **No WASM target/loader and no Runtime/Worker/`CryptoProvider`
+> wiring** — `fedos_random_bytes_32` is reachable only by directly calling
+> the crate.
+>
+> New [`test/fedos_core_rust_random_bytes.test.ts`](test/fedos_core_rust_random_bytes.test.ts)
+> (20 tests) covers the new declarations, the fixed-length/no-caller-
+> parameter shape, the single `getrandom::fill` call site matched
+> exhaustively, the no-fallback-PRNG guarantee, and (checked structurally,
+> not by a bare word match, since this stage's own doc comments legitimately
+> NAME "nonce"/"NIP-44"/"SecretHandle"/"Runtime"/"Worker" to say none is
+> done) that none of those is actually implemented or connected. A new
+> `#[cfg(test)]`-only `random_bytes_wiring` module in `src/lib.rs` (kept
+> separate from Stage 104's label-only `csprng_verification_infrastructure`
+> plan) covers: a successful call returns exactly 32 bytes tagged `Ready`;
+> two calls in immediate succession differ (a non-determinism sanity
+> check, not a statistical randomness proof —
+> [`docs/random_bytes_implementation_plan.md`](docs/random_bytes_implementation_plan.md)
+> §12 fixed this distinction in advance); the fixed
+> `EntropySourceUnavailable` failure shape is constructed and asserted
+> directly, since fault-injecting a real OS CSPRNG failure isn't practical
+> in a portable `cargo test`; and ten repeated calls do not panic. Twenty-
+> six existing `fedos_core_rust_*.test.ts` guard files were updated for
+> the new twenty-three-function `pub fn` total (mechanical `22 → 23`
+> bumps plus the new function name added to each expected list/whitelist);
+> two Stage-106 tests
+> ([`test/fedos_core_rust_algorithm_policy.test.ts`](test/fedos_core_rust_algorithm_policy.test.ts),
+> [`test/fedos_core_rust_key_usage_label.test.ts`](test/fedos_core_rust_key_usage_label.test.ts))
+> had their section-extraction end marker narrowed from "Stage 79" to
+> Stage 137's own marker so their scope stays exactly what Stage 106
+> added — the same narrowing pattern this repo used when Stage 103 first
+> landed after Stage 102; and
+> [`test/fedos_core_rust_getrandom_adoption.test.ts`](test/fedos_core_rust_getrandom_adoption.test.ts)'s
+> Stage 104 "never calls getrandom" assertion was narrowed to "calls it
+> only inside `fedos_random_bytes_32`." `npm run typecheck` and `npm test`
+> stay GREEN (129 → 130 test files, 1923 → 1943 tests); `cargo` remains
+> unavailable in this environment (confirmed again this stage), so `cargo
+> check`/`cargo test`/`cargo check --tests` could not be re-run here — the
+> new Rust code and its `#[cfg(test)]` coverage should be verified in an
+> environment with `cargo` on `PATH` before Stage 138 builds on top of it.
+> Where this stage stopped, on purpose: no nonce/encrypt/decrypt/deriveKey
+> implementation, no `SecretHandle` real bytes, no WASM, and no Runtime/
+> Worker wiring of any kind — see
+> [`docs/implementation_phase_roadmap.md`](docs/implementation_phase_roadmap.md)
+> for why each is its own later, separate stage. Stage 138 candidates: (1)
+> a nonce helper implementation (recommended — narrow, AEAD-internal-only,
+> building directly on this stage's `getrandom` wiring per
+> [`docs/nonce_generation_policy.md`](docs/nonce_generation_policy.md));
+> (2) `SecretHandle` real-byte implementation planning update; (3)
+> randomBytes WASM behavior docs.
+> Prior status:
+>
+> **Stage 134–136 — Nonce / Random / Secret lifecycle
 > implementation-prep docs (docs only).** A three-stage, **docs-only**
 > batch that fixes the last safety-design questions before the
 > Implementation Phase begins. **No `src/`, `packages/`, `Cargo.toml`, or

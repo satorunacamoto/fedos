@@ -103,10 +103,22 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     expect(cargoCode).not.toContain("wasm32");
   });
 
-  it("4. production code (before the first #[cfg(test)]) never imports or calls getrandom", () => {
-    expect(productionLibRs).not.toMatch(/\buse\s+getrandom\b/);
-    expect(productionLibRs).not.toMatch(/\bgetrandom::/);
-    expect(productionLibRs).not.toMatch(/\bgetrandom\s*\(/);
+  it("4. production code calls getrandom ONLY inside fedos_random_bytes_32 (Stage 137) — see test/fedos_core_rust_random_bytes.test.ts for the dedicated checks", () => {
+    // Through Stage 136 this asserted "never calls getrandom" outright.
+    // Stage 137 is the first real implementation behind this crate's
+    // public API, scoped to exactly one function — this narrows the
+    // claim to "calls it only there" rather than dropping it.
+    // Several doc comments legitimately NAME `getrandom::fill` in prose;
+    // count actual CALL sites (the `(` invocation syntax), not bare
+    // "getrandom::" mentions.
+    const getrandomCallSites = productionLibRs.match(/getrandom::fill\s*\(/g) ?? [];
+    expect(getrandomCallSites.length).toBe(1);
+    expect(productionLibRs).toMatch(/\bfn\s+fedos_random_bytes_32\s*\([^)]*\)[\s\S]*?getrandom::fill\s*\(/);
+    // The crate-private skeletons this stage does NOT touch stay exactly
+    // as getrandom-free as they were through Stage 136.
+    for (const mod of [aeadCoreModule, kdfCoreModule, secretHandleModule, rngModule]) {
+      expect(mod).not.toMatch(/\bgetrandom::/);
+    }
   });
 
   it("5. lib.rs's public pub fn surface reflects the current total (getrandom adoption itself added no function)", () => {
@@ -136,8 +148,9 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
       "fedos_algorithm_requirements",
       "fedos_algorithm_capabilities",
       "fedos_algorithm_policy_decision",
+      "fedos_random_bytes_32",
     ];
-    expect(pubFnNames.length).toBe(22);
+    expect(pubFnNames.length).toBe(23);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
