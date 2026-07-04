@@ -32,6 +32,15 @@
  *     both REJECTED by `reviewEncryptedPayloadDescriptor` — restating
  *     `docs/encrypted_payload_storage_boundary.md` §5's identical rule at
  *     this boundary's own review function, not just in prose.
+ *
+ * Stage 189–191 extend this file with a PREVIEW/DIAGNOSTICS boundary:
+ * `PayloadPreviewDescriptor`, `PayloadDiagnosticsDescriptor`, and a pure
+ * `reviewPayloadPreview` — feeding `src/render/encrypted_payload_preview.ts`
+ * (Stage 189) and `src/render/payload_diagnostics.ts` (Stage 190). Same
+ * guardrails as above, plus: NO `bytes`/`Uint8Array`/`ArrayBuffer` field of
+ * any kind, and NO `metadata` dictionary at all on either new descriptor
+ * type (there is nothing for a future field to leak buyer/payment/chat/
+ * entitlement content through).
  */
 
 /** Which AEAD algorithm sealed the ciphertext this descriptor classifies — a label only. */
@@ -177,5 +186,86 @@ export function reviewEncryptedPayloadDescriptor(
     allowed: true,
     state: "accepted_placeholder",
     reason: "descriptor carries only non-sensitive, opaque encrypted-payload metadata",
+  };
+}
+
+/**
+ * Stage 189–191 — the encrypted payload PREVIEW/DIAGNOSTICS boundary.
+ *
+ * Which fixed AAD domain a previewed ciphertext names — a label only,
+ * mirroring the Rust-side `crypto::ciphertext_envelope::AeadEnvelopeAadDomain`/
+ * `crypto::ciphertext_serialization`'s wire labels in ROLE (not by import —
+ * there is still no Rust↔TypeScript bridge; see this file's own module
+ * doc comment above). Never the actual AAD bytes.
+ */
+export type PayloadAadDomain =
+  | "root_key"
+  | "identity"
+  | "storage"
+  | "conversation"
+  | "test_only";
+
+/**
+ * Coarse, DISPLAY-ONLY validity label for a payload preview — never a
+ * live decode result, never derived from an actual `decode_envelope_internal`
+ * call (there is no bridge to one). `"unavailable"` is the default/no-data
+ * case; `"valid_placeholder"`/`"invalid_placeholder"` are fixed labels a
+ * caller supplies to describe what a (not-yet-real) decode WOULD report —
+ * this module never computes either value itself.
+ */
+export type PayloadPreviewStatus = "unavailable" | "valid_placeholder" | "invalid_placeholder";
+
+/**
+ * A non-sensitive, DISPLAY-ONLY description of an encrypted payload for
+ * preview/diagnostics purposes — carries NO ciphertext, nonce, tag,
+ * plaintext, or raw key byte, and (deliberately, structurally) NO
+ * `metadata` dictionary at all, unlike `EncryptedPayloadDescriptor` above
+ * — a preview has nothing to leak through a metadata bag because it
+ * carries no such field to populate. `payloadId`, like `idRef` above, is
+ * an OPAQUE label only, never a path or URL.
+ */
+export interface PayloadPreviewDescriptor {
+  readonly version: "v1";
+  readonly algorithm: EncryptedPayloadAlgorithm;
+  readonly aadDomain: PayloadAadDomain;
+  readonly encoding: EncryptedPayloadEncoding;
+  readonly transportKind: EncryptedPayloadTransportKind;
+  readonly status: PayloadPreviewStatus;
+  readonly payloadId?: string;
+}
+
+/**
+ * A minimal, DISPLAY-ONLY diagnostics projection of a
+ * [`PayloadPreviewDescriptor`] — `src/render/payload_diagnostics.ts`'s pure
+ * `buildPayloadDiagnostics` derives one FROM a preview descriptor. Carries
+ * only label fields, no `payloadId` (a diagnostics summary names
+ * capabilities/labels, not a specific item's reference) and no metadata.
+ */
+export interface PayloadDiagnosticsDescriptor {
+  readonly version: "v1";
+  readonly algorithm: EncryptedPayloadAlgorithm;
+  readonly encoding: EncryptedPayloadEncoding;
+  readonly transportKind: EncryptedPayloadTransportKind;
+  readonly validationStatus: PayloadPreviewStatus;
+}
+
+/**
+ * Decide whether a [`PayloadPreviewDescriptor`] is safe to preview — PURE:
+ * never mutates `descriptor`, performs no I/O, connects to no backend or
+ * adapter, and never throws. Denies only when `payloadId` looks like a
+ * URL/file path — every other field is already a closed label union
+ * TypeScript enforces at compile time, and this descriptor carries no
+ * metadata dictionary to scan (see the type's own doc comment above for
+ * why). A clean descriptor is `accepted_placeholder`; nothing is stored,
+ * sent, decrypted, or persisted by this review.
+ */
+export function reviewPayloadPreview(descriptor: PayloadPreviewDescriptor): EncryptedPayloadDecision {
+  if (descriptor.payloadId !== undefined && looksLikeUrlOrPath(descriptor.payloadId)) {
+    return deny("payloadId must be an opaque label, not a URL or file path");
+  }
+  return {
+    allowed: true,
+    state: "accepted_placeholder",
+    reason: "preview descriptor carries only non-sensitive, opaque preview labels",
   };
 }
