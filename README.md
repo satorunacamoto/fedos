@@ -8,7 +8,82 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 131–133 — Boundary Phase index + Implementation
+> **Status: Stage 134–136 — Nonce / Random / Secret lifecycle
+> implementation-prep docs (docs only).** A three-stage, **docs-only**
+> batch that fixes the last safety-design questions before the
+> Implementation Phase begins. **No `src/`, `packages/`, `Cargo.toml`, or
+> `test/` file was touched — no `randomBytes` implementation, no nonce
+> generation implementation, no `SecretHandle` implementation change, no
+> HKDF/AEAD wiring, and no Runtime/Worker change of any kind.**
+>
+> **Stage 134 — [`docs/nonce_generation_policy.md`](docs/nonce_generation_policy.md).**
+> Fixes the nonce policy `docs/public_random_boundary.md` (Stage 103) and
+> `docs/public_random_design.md` (Stage 104) deliberately deferred:
+> unconditional (key, nonce) reuse prohibition for every AEAD candidate
+> (ChaCha20-Poly1305 and AES-GCM, both 96-bit nonces; XChaCha20-Poly1305's
+> 192-bit nonce named as a future option); a random-vs-counter comparison
+> concluding the MVP draws a CSPRNG random nonce (this codebase has no
+> durable, crash-safe counter-persistence mechanism today, and building one
+> is a strictly larger, separate undertaking); deterministic and
+> seed/password/user-id-derived nonces forbidden outright, with no
+> fallback on CSPRNG failure — the whole `encrypt` operation aborts
+> instead; a nonce is not a secret but must never be exposed as a
+> standalone public function or reused; storage/transmission travels with
+> the ciphertext in the clear; a test policy banning any "reuse works"
+> test; and NIP-44's own upstream-defined nonce construction taking
+> precedence for NIP-44 traffic specifically, while §2's reuse ban and §7's
+> determinism ban still apply unconditionally to it.
+>
+> **Stage 135 — [`docs/random_bytes_implementation_plan.md`](docs/random_bytes_implementation_plan.md).**
+> Fixes the preconditions for a real `randomBytes`: `getrandom` (Stage 104)
+> is adopted but called by zero lines of code anywhere, prod or test;
+> output length is always a fixed, small, label-selected size, never an
+> open caller-supplied count, so a zero-length request is not even
+> representable; an OS CSPRNG failure surfaces as one fixed error label
+> and must never fall back to a secondary/software PRNG, `Math.random()`,
+> or any degraded output; a deterministic/seeded RNG may exist only under
+> `#[cfg(test)]`, never in a production path; WASM loading stays an
+> explicitly separate, later stage; and a four-category test strategy
+> (linkage, exact length, `Result::Err`-not-panic on failure,
+> non-determinism between calls) that deliberately does not attempt a
+> known-answer vector, since none exists for randomness by design.
+>
+> **Stage 136 — [`docs/secret_lifecycle_implementation_plan.md`](docs/secret_lifecycle_implementation_plan.md).**
+> Fixes the policy for giving `SecretHandle` (Stage 79) real bytes instead
+> of its current placeholder marker: `secrecy`/`zeroize` wrap and
+> zeroize-on-drop every real secret; `Clone` is forbidden on any
+> real-secret type; `Debug`/`Display`/logging of the raw value is
+> forbidden, with only a non-sensitive placeholder representation
+> permitted; zeroize-on-drop is the guarantee made, while panic-safety and
+> core-dump exposure are explicitly named as an unsolved, deferred concern
+> per the existing safety docs, never oversold as solved; no public
+> function may ever return or accept raw secret bytes, only opaque
+> handles; HKDF connects to `SecretHandle` before AEAD connects to HKDF's
+> output, each its own reviewed stage; memory-safety limitations
+> (compiler-introduced copies, OS paging, core dumps, WASM's own model) are
+> stated plainly rather than wished away; and a test strategy covering the
+> `Clone` ban, the `Debug` ban, zeroize-on-drop, and the no-raw-bytes-on-
+> the-public-API guarantee.
+>
+> **This batch is docs-only, with no Rust/`src`/`test` change of any
+> kind.** `npm run typecheck` and `npm test` (129 files, 1923 tests) stay
+> GREEN; `git status` is clean aside from this docs batch (the
+> pre-existing untracked `.claude/` directory is unrelated); `cargo` is not
+> on `PATH` in this environment, so `cargo check`/`cargo test` were not
+> re-run this batch either — unchanged from Stage 131–133, and moot anyway
+> since no `.rs`/`Cargo.toml` file was touched. **The next step is the Rust
+> `randomBytes` implementation** (`docs/implementation_phase_roadmap.md`
+> §1 item 2, now that item 1's nonce policy is fixed) — the Implementation
+> Phase has still not started as of Stage 136. Stage 137 candidates: (1)
+> **Rust `randomBytes` implementation** (recommended first — the nonce/
+> random/secret-lifecycle policies this batch fixed are now all in place,
+> so the minimal real implementation, wiring the already-adopted
+> `getrandom` behind the already-designed boundary, is the safest next
+> step); (2) `SecretHandle` real-byte implementation; (3) a nonce helper
+> skeleton.
+> Prior status:
+>
+> **Stage 131–133 — Boundary Phase index + Implementation
 > readiness checklist + Phase transition roadmap (docs only).** A
 > three-stage, **docs-only** batch that closes out FedOS's Boundary Phase
 > (Stage 1–130) and fixes the map for the next one. **No `src/`,
