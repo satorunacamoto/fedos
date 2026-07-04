@@ -123,6 +123,17 @@
 //! `MessageKey` as `Ready`, `Encrypt`/`Decrypt` as `NotConnected`, and
 //! `Padding` as `NotImplemented`. No padding, no NIP-44 encrypt/decrypt,
 //! no public API addition, no Runtime/Worker/Storage/Relay connection.
+//!
+//! Stage 202–203 add `nip44_padding` — NIP-44 v2's logarithmic-bucket
+//! plaintext padding scheme (`docs/nip44_internal_plan.md` §5):
+//! `calc_padded_len` (pure integer arithmetic, no floating point),
+//! `pad_message` (a 2-byte big-endian length prefix plus zero-fill),
+//! `unpad_message` (the inverse). Vector-verified against
+//! `test-vectors/nip44/nip44-v2.json`'s `valid.calc_padded_len` (24 cases)
+//! and `invalid.encrypt_msg_lengths` (4 cases) by the sibling
+//! `#[cfg(test)]`-only `nip44_padding_vectors` module. No NIP-44
+//! encrypt/decrypt function yet, no public API addition, no
+//! Runtime/Worker/Storage/Relay connection.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -136,10 +147,13 @@ pub(crate) mod conversation_key;
 pub(crate) mod diagnostics;
 pub(crate) mod hkdf_bridge;
 pub(crate) mod message_key;
+pub(crate) mod nip44_padding;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
 #[cfg(test)]
 mod nip44_key_derivation_guard;
+#[cfg(test)]
+mod nip44_padding_vectors;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]
