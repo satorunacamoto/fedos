@@ -93,11 +93,11 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
     expect(cargoTomlSource).not.toMatch(/^\s*rand_core\s*=/m);
   });
 
-  it("6. CryptoCapability includes the Ecdh label right after Envelope (Stage 195) — now one of fifteen variants total since Stage 198-201; see test/nip44_key_derivation_stage_guard.test.ts for the current full-count check", () => {
+  it("6. CryptoCapability includes the Ecdh label right after Envelope (Stage 195) — now one of sixteen variants total since Stage 202-208; see test/nip44_padding_encrypt_decrypt_guard.test.ts for the current full-count check", () => {
     const variantOrderMatch = capabilityMatrixSource.match(
-      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*15\]\s*=\s*\[([\s\S]*?)\];/,
+      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*16\]\s*=\s*\[([\s\S]*?)\];/,
     );
-    expect(variantOrderMatch, "expected to find CryptoCapability::ALL with 15 entries").not.toBeNull();
+    expect(variantOrderMatch, "expected to find CryptoCapability::ALL with 16 entries").not.toBeNull();
     const variants = [...variantOrderMatch![1].matchAll(/CryptoCapability::(\w+)/g)].map((m) => m[1]);
     expect(variants.indexOf("Ecdh")).toBe(variants.indexOf("Envelope") + 1);
     expect(variants).toContain("Ecdh");

@@ -143,9 +143,18 @@
 //! collapses every reachable failure cause (wrong key, wrong nonce,
 //! tampered ciphertext, invalid tag, malformed post-auth padding) into the
 //! single fixed `Nip44DecryptStatus::AuthenticationFailed` label, never
-//! distinguishing cause. No byte-exact NIP-44 wire format, no public API
-//! addition, no Runtime/Worker/Storage/Relay connection, no
-//! `capability_matrix`/`diagnostics` change yet (Stage 207–208).
+//! distinguishing cause.
+//!
+//! Stage 207–208 add `capability_matrix`'s sixteenth variant,
+//! `Authentication`, tracking `nip44_decrypt`'s single-fixed-label MAC
+//! discipline as its own capability; `diagnostics` promotes
+//! `Padding`/`Encrypt`/`Decrypt` to `Ready` and reports `Authentication`
+//! as `Ready` too — zero `NotConnected` rows remain. The dedicated
+//! `#[cfg(test)]`-only `nip44_encrypt_decrypt_guard` module confirms all
+//! four Stage 202–206 files stay `pub(crate)`-only, `unsafe`/`unwrap`/
+//! `expect`/`panic!`-free, and unconnected to Runtime/Worker/Storage/
+//! Relay. No byte-exact NIP-44 wire format, no public API addition, no
+//! Runtime/Worker/Storage/Relay connection.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -165,6 +174,8 @@ pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_padding;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
+#[cfg(test)]
+mod nip44_encrypt_decrypt_guard;
 #[cfg(test)]
 mod nip44_key_derivation_guard;
 #[cfg(test)]

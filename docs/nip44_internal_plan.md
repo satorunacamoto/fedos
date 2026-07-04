@@ -18,16 +18,37 @@ vector-verified against `test-vectors/nip44/nip44-v2.json`'s
 and `crypto::hkdf_bridge` add a `MessageKey` type and a generic
 `ConversationKey` → `MessageKey` bridge (reusing the pre-existing
 `HkdfDomain::Conversation`) — see §4's note below for why this is
-NOT yet §4's real per-message derivation. §5 (padding), §6 (payload
-encoding), and §7 (MAC/encrypt/decrypt) remain entirely unimplemented, per
-this stage's own explicit scope limits.
+NOT yet §4's real per-message derivation.
 
-**No NIP-44 padding function, no NIP-44 encrypt/decrypt function** exists
-anywhere in this crate as of Stage 201. `test-vectors/nip44/nip44-v2.json`
-(imported Stage 73, per that file's own provenance record) already exists
-in this repository and is referenced throughout this plan; its
-`get_conversation_key` categories are now wired to `cargo test` (Stage
-199); the remaining six categories are not yet wired.
+**Update — Stage 202-208 implement §5 (padding) for real, and a GENERIC
+(not byte-exact) version of §6/§7 (pad-then-encrypt / open-then-unpad,
+with authentication).** `crypto::nip44_padding` implements
+`calc_padded_len`/`pad_message`/`unpad_message` exactly as §5 specifies,
+vector-verified against `valid.calc_padded_len` (24 cases) and
+`invalid.encrypt_msg_lengths` (4 cases). `crypto::nip44_encrypt`/
+`crypto::nip44_decrypt` implement a pad-then-seal / open-then-unpad
+pipeline keyed by a `MessageKey`, but reuse this crate's PRE-EXISTING
+ChaCha20-Poly1305 AEAD (`crypto::aead_internal`, Stage 152–154) rather
+than §6/§7's byte-exact raw-ChaCha20-plus-HMAC-SHA256 construction — see
+the updated §6/§7 notes below for exactly what this does and does not
+achieve. `crypto::nip44_bridge` connects both to the pre-existing,
+UNCHANGED `ciphertext_envelope::AeadCiphertextEnvelope` type. §4's real
+per-message `chacha_key`/`chacha_nonce`/`hmac_key` derivation remains
+unimplemented — Stage 202-208 deliberately did not need it, since the
+generic `MessageKey` (Stage 200-201) is used as a single AEAD key
+directly instead.
+
+**No byte-exact NIP-44 encrypt/decrypt function** (matching
+`test-vectors/nip44/nip44-v2.json`'s `valid.encrypt_decrypt`/
+`invalid.decrypt` categories) exists anywhere in this crate as of Stage
+208 — see §6/§7 below. `test-vectors/nip44/nip44-v2.json` (imported Stage
+73, per that file's own provenance record) already exists in this
+repository and is referenced throughout this plan; its
+`get_conversation_key` (Stage 199) and `calc_padded_len`/
+`encrypt_msg_lengths` (Stage 203) categories are now wired to `cargo
+test`; `get_message_keys`, `encrypt_decrypt`, `encrypt_decrypt_long_msg`,
+and `decrypt` remain unwired, since they require the byte-exact §4/§6/§7
+pipeline this crate does not implement.
 
 This complements, and does not renegotiate, `docs/hkdf_internal_plan.md`
 (the HKDF-SHA256 implementation NIP-44's own key derivation would need to
@@ -146,6 +167,11 @@ Per the imported vectors' `valid.get_message_keys` category:
 
 ## 5. Padding scheme
 
+**IMPLEMENTED Stage 202-203** — `crypto::nip44_padding::calc_padded_len`/
+`pad_message`/`unpad_message`, exactly as this section specifies below,
+verified against all 24 `valid.calc_padded_len` cases and all 4
+`invalid.encrypt_msg_lengths` cases.
+
 Per the imported vectors' `valid.calc_padded_len` and
 `invalid.encrypt_msg_lengths` categories:
 
@@ -174,6 +200,28 @@ Per the imported vectors' `valid.calc_padded_len` and
 
 ## 6. Payload structure and encoding
 
+**Update — Stage 204-206 implement a GENERIC pad-then-seal pipeline, NOT
+this section's byte-exact wire payload.** `crypto::nip44_encrypt`/
+`crypto::nip44_decrypt` pad plaintext exactly per §5, then seal/open it
+via this crate's own pre-existing ChaCha20-Poly1305 AEAD
+(`crypto::aead_internal`) — which combines encryption and authentication
+into ONE primitive, unlike this section's `ChaCha20 stream cipher +
+separate HMAC-SHA256 tag` construction. Concretely, this means: no
+`version_byte (0x02) ‖ nonce (32 bytes) ‖ ...` wire layout (the nonce this
+crate's pipeline uses is the pre-existing 12-byte `FedosAeadNonceDecision`,
+not a 32-byte HKDF-expand salt), no base64 encoding (ciphertext stays a
+plain `Vec<u8>`, bridged into the crate's OWN pre-existing
+`ciphertext_envelope::AeadCiphertextEnvelope` by `crypto::nip44_bridge`,
+Stage 206 — itself UNCHANGED by this work), and the authentication tag is
+Poly1305's (16 bytes, appended by the AEAD crate), not a 32-byte
+HMAC-SHA256 tag. This is a deliberate, documented, zero-new-dependency
+choice (`crypto::nip44_encrypt`'s own module-level doc comment) — the
+same "generic bridge, not the real per-message wire format" choice
+`crypto::hkdf_bridge` (Stage 201) already made for key derivation. Byte-
+exact compatibility with this section's spec wire format remains a
+future, separate, explicitly-reviewed stage that would need to adopt a
+raw `chacha20` stream-cipher crate and a separate `hmac` crate.
+
 Per the spec and the imported vectors' `valid.encrypt_decrypt` /
 `valid.encrypt_decrypt_long_msg` categories:
 
@@ -196,6 +244,25 @@ Per the spec and the imported vectors' `valid.encrypt_decrypt` /
   is explicitly not decided here.
 
 ## 7. MAC/authentication and failure labels
+
+**Update — Stage 205-208 implement this section's FAILURE-LABEL
+discipline for real, using ChaCha20-Poly1305's own Poly1305 tag rather
+than a separate HMAC-SHA256 tag** (see the updated §6 note above for why).
+`crypto::nip44_decrypt::Nip44DecryptStatus::AuthenticationFailed` is the
+one fixed label covering every reachable cause post-key/nonce validation
+— a wrong key, a wrong nonce, a tampered ciphertext, an invalid Poly1305
+tag, AND a structurally malformed padded plaintext discovered by
+`crypto::nip44_padding::unpad_message` AFTER authentication already
+succeeded — verified by that module's own test suite
+(`malformed_padding_after_successful_authentication_still_reports_authentication_failed`).
+A separate `Nip44DecryptStatus::InvalidKey`/`InvalidNonce` pair covers
+the structural preconditions this section's own last paragraph
+anticipated needing a distinct label from the MAC/decrypt failure.
+Constant-time comparison is inherited from the underlying
+`chacha20poly1305` crate's own Poly1305 tag verification (already
+`subtle`-based internally) — this crate's own `subtle` dependency is
+still not directly imported by this pipeline, since it never implements
+its own MAC comparison.
 
 Per the imported vectors' `invalid.decrypt` category:
 
@@ -267,17 +334,22 @@ accessor on either, mirroring `SecretHandle` itself.
   explicitly-reviewed public boundary — not an overload or variant of the
   existing `fedos_encrypt`/`fedos_decrypt` functions.
 
-## 9. What this plan does NOT fix (Stage 177 original; see Stage 198-201 updates in §3/§4/§8 above)
+## 9. What this plan does NOT fix (Stage 177 original; see Stage 198-208 updates in §3/§4/§5/§6/§7/§8 above)
 
-- **As of Stage 201: no padding function, no NIP-44 encrypt/decrypt
-  function.** §3's conversation-key derivation and a GENERIC (not
-  spec-accurate) §4-adjacent bridge ARE now implemented — see §3/§4/§8.
+- **As of Stage 208: padding IS implemented (§5, spec-exact); encrypt/
+  decrypt/authentication ARE implemented, but as a GENERIC bridge onto
+  this crate's pre-existing ChaCha20-Poly1305 AEAD, not §6/§7's
+  byte-exact raw-ChaCha20-plus-HMAC-SHA256 wire format.** §3's
+  conversation-key derivation and §4-adjacent generic bridge remain as
+  they were at Stage 201 — see §3/§4/§8.
 - **secp256k1/ECDH dependency IS now adopted** (`k256`, Stage 194) and
   used (Stage 199) — superseding this line's original Stage 177 framing.
-- **`test-vectors/nip44/nip44-v2.json`'s `get_conversation_key` categories
-  ARE now wired to `cargo test`** (Stage 199, 43 cases) — the remaining
-  six categories (message keys, padding, encrypt/decrypt) are not yet
-  wired.
+- **`test-vectors/nip44/nip44-v2.json`'s `get_conversation_key` (Stage
+  199, 43 cases) and `calc_padded_len`/`encrypt_msg_lengths` (Stage 203,
+  28 cases) categories ARE now wired to `cargo test`** — the remaining
+  three categories (`get_message_keys`, `encrypt_decrypt`/
+  `encrypt_decrypt_long_msg`, `decrypt`) require the byte-exact §4/§6/§7
+  pipeline this crate does not implement, and are not wired.
 - **No public API.** Whether a future NIP-44 primitive is ever exposed
   publicly, and in what opaque-handle shape (mirroring
   `docs/public_crypto_opaque_handles.md`'s discipline), is not decided
@@ -302,7 +374,12 @@ accessor on either, mirroring `SecretHandle` itself.
   choice between the two.
 - **Explicitly separate from this crate's own AEAD/ciphertext-envelope
   work** (§2, §6) and from any Chat/DM feature (§8, §9) — no conflation.
-- **No code, no dependency, no public API, no `Cargo.toml` change** is
-  authorized or made by this document.
-- **The actual implementation is Stage 182 candidate work** ("NIP-44
-  vector wiring review/update" as a first step toward it), not made here.
+- **§3 (conversation key), §5 (padding) ARE implemented spec-exactly
+  (Stage 199, 202-203); §4 (real per-message chacha_key/nonce/hmac_key),
+  §6 (byte-exact wire payload), and full byte-exact §7 remain
+  unimplemented — Stage 204-208 instead implement a GENERIC pad-then-seal/
+  open-then-unpad pipeline reusing this crate's pre-existing
+  ChaCha20-Poly1305 AEAD, with §7's single-fixed-failure-label discipline
+  implemented for real against that generic pipeline.** Zero new
+  `Cargo.toml` dependency, no public API, no `Cargo.toml` change beyond
+  what Stage 194 already adopted.

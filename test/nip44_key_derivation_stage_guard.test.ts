@@ -39,8 +39,19 @@ import packageJsonSource from "../package.json?raw";
  * NIP-44 encrypt/decrypt, no public API addition, no Runtime/Worker/
  * Storage/Federation/Relay connection** — every one of those is verified
  * absent below.
+ *
+ * **Superseded IN PART by Stage 202–208** — `CryptoCapability` grows a
+ * sixteenth variant, `Authentication`, and `Padding`/`Encrypt`/`Decrypt`
+ * are promoted from `NotImplemented`/`NotConnected` to `Ready` (real code
+ * now exists in `crypto::nip44_padding`/`nip44_encrypt`/`nip44_decrypt`).
+ * Tests 1 and 3 below are updated accordingly to the current, real shape
+ * — see test/nip44_padding_encrypt_decrypt_guard.test.ts for the
+ * dedicated Stage 202–208 checks on padding/encrypt/decrypt/bridge's own
+ * encapsulation. What remains true unchanged: `ConversationKey`/
+ * `MessageKey`/the `HkdfDomain::Conversation` bridge (tests 5–13) and the
+ * public `pub fn` surface (test 14, still unchanged at twenty-seven).
  */
-describe("NIP-44 conversation/message key derivation (Stage 198-201)", () => {
+describe("NIP-44 conversation/message key derivation (Stage 198-201, updated Stage 202-208)", () => {
   function productionOnlyOf(source: string): string {
     const idx = source.indexOf("#[cfg(test)]");
     return idx === -1 ? source : source.slice(0, idx);
@@ -49,11 +60,11 @@ describe("NIP-44 conversation/message key derivation (Stage 198-201)", () => {
   const messageKeyProductionOnly = productionOnlyOf(messageKeySource);
   const hkdfBridgeProductionOnly = productionOnlyOf(hkdfBridgeSource);
 
-  it("1. CryptoCapability has exactly fifteen variants, with MessageKey/Padding/Encrypt/Decrypt appended after ConversationKey", () => {
+  it("1. CryptoCapability has exactly sixteen variants, with MessageKey/Padding/Encrypt/Decrypt/Authentication appended after ConversationKey (Authentication added Stage 202-208)", () => {
     const allMatch = capabilityMatrixSource.match(
-      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*15\]\s*=\s*\[([\s\S]*?)\];/,
+      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*16\]\s*=\s*\[([\s\S]*?)\];/,
     );
-    expect(allMatch, "expected to find CryptoCapability::ALL with 15 entries").not.toBeNull();
+    expect(allMatch, "expected to find CryptoCapability::ALL with 16 entries").not.toBeNull();
     const variants = [...allMatch![1].matchAll(/CryptoCapability::(\w+)/g)].map((m) => m[1]);
     expect(variants).toEqual([
       "Random",
@@ -71,6 +82,7 @@ describe("NIP-44 conversation/message key derivation (Stage 198-201)", () => {
       "Padding",
       "Encrypt",
       "Decrypt",
+      "Authentication",
     ]);
   });
 
@@ -86,11 +98,12 @@ describe("NIP-44 conversation/message key derivation (Stage 198-201)", () => {
     }
   });
 
-  it("3. Encrypt and Decrypt report NotConnected; Padding reports NotImplemented", () => {
+  it("3. Padding, Encrypt, Decrypt, and Authentication all report Ready (Stage 202-208; superseding the Stage 198-201 NotConnected/NotImplemented snapshot)", () => {
     for (const [capability, expected] of [
-      ["Encrypt", "NotConnected"],
-      ["Decrypt", "NotConnected"],
-      ["Padding", "NotImplemented"],
+      ["Padding", "Ready"],
+      ["Encrypt", "Ready"],
+      ["Decrypt", "Ready"],
+      ["Authentication", "Ready"],
     ] as const) {
       const rowMatch = diagnosticsSource.match(
         new RegExp(
@@ -102,9 +115,9 @@ describe("NIP-44 conversation/message key derivation (Stage 198-201)", () => {
     }
   });
 
-  it("4. crypto_diagnostics_preview's return type is now [CapabilityReport; 15]", () => {
+  it("4. crypto_diagnostics_preview's return type is now [CapabilityReport; 16] (Stage 202-208 adds the Authentication row)", () => {
     expect(diagnosticsSource).toMatch(
-      /pub\(crate\)\s+fn\s+crypto_diagnostics_preview\(\)\s*->\s*\[CapabilityReport;\s*15\]/,
+      /pub\(crate\)\s+fn\s+crypto_diagnostics_preview\(\)\s*->\s*\[CapabilityReport;\s*16\]/,
     );
   });
 

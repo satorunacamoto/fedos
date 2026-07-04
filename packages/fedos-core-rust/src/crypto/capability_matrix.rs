@@ -11,8 +11,12 @@
 //! MessageKey → Padding → Encrypt → Decrypt → NIP-44) as fully-tracked
 //! capability labels, even though `Padding`/`Encrypt`/`Decrypt` remain
 //! unimplemented this stage — see `diagnostics` for each one's current
-//! readiness. Crate-private only — see `src/crypto.rs`'s module-level doc
-//! comment for the full scope of this module and its `diagnostics`
+//! readiness. Stage 202–208 implement all three (`nip44_padding`,
+//! `nip44_encrypt`, `nip44_decrypt`) and add a SIXTEENTH variant,
+//! `Authentication`, tracking `nip44_decrypt`'s single-fixed-label MAC
+//! discipline as its own capability — all four now report `Ready` (see
+//! `diagnostics`). Crate-private only — see `src/crypto.rs`'s module-level
+//! doc comment for the full scope of this module and its `diagnostics`
 //! sibling.
 #![allow(dead_code)]
 
@@ -77,13 +81,23 @@ pub(crate) enum CryptoCapability {
     /// NIP-44-specific HMAC-verify → decrypt → unpad pipeline — same
     /// dependency note as `Encrypt` above.
     Decrypt,
+    /// Stage 208 — the MAC/tag-verification discipline
+    /// `crypto::nip44_decrypt` implements: a SINGLE fixed
+    /// `AuthenticationFailed` label covering every decrypt failure cause
+    /// (wrong key, wrong nonce, tampered ciphertext, invalid MAC, invalid
+    /// padding), verified constant-time and cause-indistinguishable by
+    /// that module's own test suite. Distinct from `Encrypt`/`Decrypt`
+    /// themselves (the cipher operations) — this label tracks the
+    /// authentication PROPERTY specifically, per
+    /// `docs/nip44_internal_plan.md` §7.
+    Authentication,
 }
 
 impl CryptoCapability {
     /// Every `CryptoCapability` variant, in a fixed, stable order — the same
     /// order `diagnostics::crypto_diagnostics_preview` reports them in.
     /// Crate-private only.
-    pub(crate) const ALL: [CryptoCapability; 15] = [
+    pub(crate) const ALL: [CryptoCapability; 16] = [
         CryptoCapability::Random,
         CryptoCapability::Nonce,
         CryptoCapability::SecretHandle,
@@ -99,6 +113,7 @@ impl CryptoCapability {
         CryptoCapability::Padding,
         CryptoCapability::Encrypt,
         CryptoCapability::Decrypt,
+        CryptoCapability::Authentication,
     ];
 
     /// The fixed `&'static str` label for this capability — never built,
@@ -121,6 +136,7 @@ impl CryptoCapability {
             CryptoCapability::Padding => "padding",
             CryptoCapability::Encrypt => "encrypt",
             CryptoCapability::Decrypt => "decrypt",
+            CryptoCapability::Authentication => "authentication",
         }
     }
 }
@@ -149,6 +165,7 @@ mod tests {
                 CryptoCapability::Padding,
                 CryptoCapability::Encrypt,
                 CryptoCapability::Decrypt,
+                CryptoCapability::Authentication,
             ]
         );
     }
@@ -171,6 +188,7 @@ mod tests {
             (CryptoCapability::Padding, "padding"),
             (CryptoCapability::Encrypt, "encrypt"),
             (CryptoCapability::Decrypt, "decrypt"),
+            (CryptoCapability::Authentication, "authentication"),
         ];
         for (capability, label) in expected {
             assert_eq!(capability.as_static_label(), label);

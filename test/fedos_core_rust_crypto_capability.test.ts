@@ -44,6 +44,16 @@ import workerSource from "../src/worker.ts?raw";
  * exists) — see test/nip44_pre_adoption_guard.test.ts and
  * test/secp256k1_dependency_guard.test.ts for the dedicated Stage 194–196
  * checks.
+ *
+ * Updated Stage 198-201: four more variants (`MessageKey`/`Padding`/
+ * `Encrypt`/`Decrypt`) — see test/nip44_key_derivation_stage_guard.test.ts.
+ *
+ * Updated Stage 202-208: `Padding`/`Encrypt`/`Decrypt` are promoted from
+ * `NotImplemented`/`NotConnected` to `Ready` (real code now exists in
+ * `crypto::nip44_padding`/`nip44_encrypt`/`nip44_decrypt`), and a
+ * sixteenth variant, `Authentication`, is added, also reporting `Ready` —
+ * see test/nip44_padding_encrypt_decrypt_guard.test.ts for the dedicated
+ * Stage 202-208 checks.
  */
 describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (Stage 150–151)", () => {
   it("1. lib.rs declares a plain (non-pub) mod crypto", () => {
@@ -51,11 +61,11 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     expect(libRsSource).not.toMatch(/\bpub\s+mod\s+crypto\b/);
   });
 
-  it("2. CryptoCapability is pub(crate)-only, with exactly the fifteen specified variants in the documented order (Stage 164 adds Envelope; Stage 195 adds Ecdh; Stage 198-201 add MessageKey/Padding/Encrypt/Decrypt)", () => {
+  it("2. CryptoCapability is pub(crate)-only, with exactly the sixteen specified variants in the documented order (Stage 164 adds Envelope; Stage 195 adds Ecdh; Stage 198-201 add MessageKey/Padding/Encrypt/Decrypt; Stage 202-208 adds Authentication)", () => {
     expect(capabilityMatrixSource).toMatch(/\bpub\(crate\)\s+enum\s+CryptoCapability\b/);
     expect(capabilityMatrixSource).not.toMatch(/\bpub\s+enum\s+CryptoCapability\b/);
     const variantOrderMatch = capabilityMatrixSource.match(
-      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*15\]\s*=\s*\[([\s\S]*?)\];/,
+      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*16\]\s*=\s*\[([\s\S]*?)\];/,
     );
     expect(variantOrderMatch, "expected to find CryptoCapability::ALL").not.toBeNull();
     const variants = [...variantOrderMatch![1].matchAll(/CryptoCapability::(\w+)/g)].map(
@@ -77,6 +87,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
       "Padding",
       "Encrypt",
       "Decrypt",
+      "Authentication",
     ]);
   });
 
@@ -90,9 +101,9 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     }
   });
 
-  it("4. crypto_diagnostics_preview is pub(crate)-only, takes no parameter, and returns a fixed [CapabilityReport; 15] (Stage 164, Stage 195, Stage 198-201)", () => {
+  it("4. crypto_diagnostics_preview is pub(crate)-only, takes no parameter, and returns a fixed [CapabilityReport; 16] (Stage 164, Stage 195, Stage 198-201, Stage 202-208)", () => {
     expect(diagnosticsSource).toMatch(
-      /\bpub\(crate\)\s+fn\s+crypto_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*CapabilityReport\s*;\s*15\s*\]/,
+      /\bpub\(crate\)\s+fn\s+crypto_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*CapabilityReport\s*;\s*16\s*\]/,
     );
     expect(diagnosticsSource).not.toMatch(/\bpub\s+fn\s+crypto_diagnostics_preview\b/);
   });

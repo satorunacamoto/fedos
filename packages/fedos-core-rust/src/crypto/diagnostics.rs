@@ -33,6 +33,14 @@
 //! `NotConnected` state before Stage 152–154. A fourth new capability,
 //! `Padding`, reports `NotImplemented` — no padding code or dependency
 //! exists at all.
+//!
+//! Stage 202–208 land real code for `Padding`/`Encrypt`/`Decrypt`
+//! (`crypto::nip44_padding`, `crypto::nip44_encrypt`,
+//! `crypto::nip44_decrypt`) — all three move to `Ready`. A sixth new
+//! capability, `Authentication` (`capability_matrix`'s new sixteenth
+//! variant), also reports `Ready` — `crypto::nip44_decrypt`'s single
+//! fixed `AuthenticationFailed` label, verified never to distinguish its
+//! failure cause. `NotConnected` now reports zero capabilities.
 #![allow(dead_code)]
 
 use super::capability_matrix::CryptoCapability;
@@ -74,9 +82,9 @@ pub(crate) struct CapabilityReport {
 /// A fixed, hand-maintained, display-only snapshot of every
 /// [`CryptoCapability`]'s current readiness — see this module's own doc
 /// comment above for why this is a fixed table, not a live probe. Returns
-/// exactly fifteen rows, in [`CryptoCapability::ALL`]'s order, one per
+/// exactly sixteen rows, in [`CryptoCapability::ALL`]'s order, one per
 /// capability, every time it is called — takes no parameter of any kind.
-pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 15] {
+pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 16] {
     [
         CapabilityReport {
             capability: CryptoCapability::Random,
@@ -128,15 +136,19 @@ pub(crate) fn crypto_diagnostics_preview() -> [CapabilityReport; 15] {
         },
         CapabilityReport {
             capability: CryptoCapability::Padding,
-            readiness: CapabilityReadiness::NotImplemented,
+            readiness: CapabilityReadiness::Ready,
         },
         CapabilityReport {
             capability: CryptoCapability::Encrypt,
-            readiness: CapabilityReadiness::NotConnected,
+            readiness: CapabilityReadiness::Ready,
         },
         CapabilityReport {
             capability: CryptoCapability::Decrypt,
-            readiness: CapabilityReadiness::NotConnected,
+            readiness: CapabilityReadiness::Ready,
+        },
+        CapabilityReport {
+            capability: CryptoCapability::Authentication,
+            readiness: CapabilityReadiness::Ready,
         },
     ]
 }
@@ -146,16 +158,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_reports_exactly_fifteen_rows_matching_capability_all_order() {
+    fn preview_reports_exactly_sixteen_rows_matching_capability_all_order() {
         let preview = crypto_diagnostics_preview();
-        assert_eq!(preview.len(), 15);
+        assert_eq!(preview.len(), 16);
         for (row, expected_capability) in preview.iter().zip(CryptoCapability::ALL.iter()) {
             assert_eq!(row.capability, *expected_capability);
         }
     }
 
     #[test]
-    fn ready_capabilities_are_exactly_the_documented_nine_as_of_stage_198_201() {
+    fn ready_capabilities_are_exactly_the_documented_thirteen_as_of_stage_202_208() {
         let preview = crypto_diagnostics_preview();
         let ready: Vec<CryptoCapability> = preview
             .iter()
@@ -174,6 +186,10 @@ mod tests {
                 CryptoCapability::Ecdh,
                 CryptoCapability::ConversationKey,
                 CryptoCapability::MessageKey,
+                CryptoCapability::Padding,
+                CryptoCapability::Encrypt,
+                CryptoCapability::Decrypt,
+                CryptoCapability::Authentication,
             ]
         );
     }
@@ -207,28 +223,33 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_and_decrypt_report_not_connected_as_of_stage_201() {
+    fn padding_encrypt_decrypt_and_authentication_report_ready_as_of_stage_202_208() {
         let preview = crypto_diagnostics_preview();
-        for capability in [CryptoCapability::Encrypt, CryptoCapability::Decrypt] {
+        for capability in [
+            CryptoCapability::Padding,
+            CryptoCapability::Encrypt,
+            CryptoCapability::Decrypt,
+            CryptoCapability::Authentication,
+        ] {
             let row = preview
                 .iter()
                 .find(|row| row.capability == capability)
                 .expect("expected capability row to exist");
-            assert_eq!(row.readiness, CapabilityReadiness::NotConnected);
+            assert_eq!(row.readiness, CapabilityReadiness::Ready);
         }
     }
 
     #[test]
-    fn not_connected_capabilities_are_exactly_encrypt_and_decrypt() {
+    fn no_capability_reports_not_connected_as_of_stage_202_208() {
         let preview = crypto_diagnostics_preview();
         let not_connected: Vec<CryptoCapability> = preview
             .iter()
             .filter(|row| row.readiness == CapabilityReadiness::NotConnected)
             .map(|row| row.capability)
             .collect();
-        assert_eq!(
-            not_connected,
-            vec![CryptoCapability::Encrypt, CryptoCapability::Decrypt]
+        assert!(
+            not_connected.is_empty(),
+            "expected zero NotConnected rows, got {not_connected:?}"
         );
     }
 
@@ -247,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn not_implemented_capabilities_are_exactly_nip44_schnorr_storage_key_and_padding() {
+    fn not_implemented_capabilities_are_exactly_nip44_schnorr_and_storage_key() {
         let preview = crypto_diagnostics_preview();
         let not_implemented: Vec<CryptoCapability> = preview
             .iter()
@@ -260,7 +281,6 @@ mod tests {
                 CryptoCapability::Nip44,
                 CryptoCapability::Schnorr,
                 CryptoCapability::StorageKey,
-                CryptoCapability::Padding,
             ]
         );
     }
