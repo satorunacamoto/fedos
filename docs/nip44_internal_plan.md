@@ -1,4 +1,4 @@
-# NIP-44 Internal Implementation Plan (Stage 177, §3 IMPLEMENTED Stage 198-201) — binding, docs only
+# NIP-44 Internal Implementation Plan (Stage 177; §3 IMPLEMENTED Stage 198-201; §5-§7 generic bridge IMPLEMENTED Stage 202-208; terminology clarified Stage 209-213) — binding, docs only
 
 **Status (as of Stage 177): this document adds no code.** It fixes, in
 writing, the shape a FUTURE NIP-44 v2 implementation stage must satisfy —
@@ -60,6 +60,21 @@ and `docs/ciphertext_envelope_plan.md`/`docs/ciphertext_envelope_serialization_p
 (this crate's OWN, separate ciphertext envelope — NOT the same format as
 NIP-44's payload, per §6 of both documents). Where this document and any
 of those disagree, the earlier binding docs win.
+
+**Terminology (Stage 209–213) — see `docs/nip44_wire_compatibility_gap.md`
+for the full record.** Everything Stage 198–208 implemented
+(`crypto::conversation_key`/`crypto::message_key`/`crypto::hkdf_bridge`/
+`crypto::nip44_padding`/`crypto::nip44_encrypt`/`crypto::nip44_decrypt`/
+`crypto::nip44_bridge`) is the **"FedOS internal NIP-44-like bridge"** —
+NIP-44-*shaped*, but reusing this crate's pre-existing ChaCha20-Poly1305
+AEAD rather than NIP-44 v2's real raw-ChaCha20-plus-HMAC-SHA256 wire
+construction. It must never be called "NIP-44 compatible" or "NIP-44 v2
+compatible" in any doc, code comment, or commit message. The eventual
+byte-exact pipeline (matching every `test-vectors/nip44/nip44-v2.json`
+category) is the **"NIP-44 v2 wire-compatible implementation"** — not yet
+built; see `docs/nip44_wire_implementation_roadmap.md` for the proposed
+stage order, and `crypto::nip44_wire` (Stage 209–213) for a label-only
+skeleton of its eventual status/version/payload-kind vocabulary.
 
 ---
 

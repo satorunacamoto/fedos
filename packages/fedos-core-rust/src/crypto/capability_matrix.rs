@@ -20,7 +20,7 @@
 //! sibling.
 #![allow(dead_code)]
 
-/// One of this crate's fifteen tracked crypto capabilities — a label
+/// One of this crate's sixteen tracked crypto capabilities — a label
 /// ONLY, never a byte, never an operation. Crate-private only; never
 /// exposed via this crate's public API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,17 +69,29 @@ pub(crate) enum CryptoCapability {
     /// module-level doc comment.
     MessageKey,
     /// NIP-44 v2's logarithmic-bucket plaintext padding scheme
-    /// (`docs/nip44_internal_plan.md` §5) — not yet implemented.
+    /// (`docs/nip44_internal_plan.md` §5) — `crypto::nip44_padding`
+    /// (Stage 202–203) implements this SPEC-EXACTLY, vector-verified
+    /// against `test-vectors/nip44/nip44-v2.json`'s `valid.calc_padded_len`/
+    /// `invalid.encrypt_msg_lengths` categories. This is the one piece of
+    /// the Stage 202–208 bridge that already matches the real NIP-44 v2
+    /// wire format byte-for-byte — see
+    /// `docs/nip44_wire_compatibility_gap.md`.
     Padding,
-    /// NIP-44-specific pad → stream-cipher → MAC encrypt pipeline. The
-    /// underlying primitive families this would need are already present
-    /// transitively in this crate's resolved dependency graph (via its
-    /// existing AEAD/HKDF dependencies), but no NIP-44-specific function is
-    /// wired yet — mirrors how `Aead` itself reported `NotConnected` before Stage
-    /// 152–154's real wiring landed.
+    /// `crypto::nip44_encrypt` (Stage 204): a pad-then-seal pipeline keyed
+    /// by a `MessageKey`, reusing this crate's PRE-EXISTING
+    /// ChaCha20-Poly1305 AEAD (`crypto::aead_internal`) rather than NIP-44
+    /// v2's byte-exact raw-ChaCha20-plus-separate-HMAC-SHA256 wire
+    /// construction. This is the "FedOS internal NIP-44-like bridge", NOT
+    /// a NIP-44 v2 wire-compatible encrypt — see
+    /// `docs/nip44_wire_compatibility_gap.md` for the full field-by-field
+    /// gap and `docs/nip44_wire_implementation_roadmap.md` for the path to
+    /// closing it.
     Encrypt,
-    /// NIP-44-specific HMAC-verify → decrypt → unpad pipeline — same
-    /// dependency note as `Encrypt` above.
+    /// `crypto::nip44_decrypt` (Stage 205): the inverse of `Encrypt` —
+    /// open-then-unpad, collapsing every failure cause into a single fixed
+    /// `AuthenticationFailed` label (see `Authentication` below). Same
+    /// "internal bridge, not NIP-44 v2 wire-compatible" scope note as
+    /// `Encrypt` above.
     Decrypt,
     /// Stage 208 — the MAC/tag-verification discipline
     /// `crypto::nip44_decrypt` implements: a SINGLE fixed
