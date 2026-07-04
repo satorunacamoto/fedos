@@ -8,61 +8,78 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 152–156 — AEAD Internal Foundation.** A new
+> **Status: Stage 157–160 — Ciphertext envelope skeleton + public API
+> planning.** A new `src/crypto/ciphertext_envelope.rs` turns
+> `docs/ciphertext_envelope_plan.md`'s six planned fields into a concrete,
+> `pub(crate)`-only skeleton: `AeadCiphertextEnvelope` holds `version:
+> AeadEnvelopeVersion`, `algorithm: AeadEnvelopeAlgorithm`, `nonce: [u8;
+> 12]`, a fixed `ciphertext_placeholder: [u8; 4]` marker (NOT real
+> ciphertext‖tag), and `aad_domain: AeadEnvelopeAadDomain`.
+> `AeadEnvelopeAlgorithm`/`AeadEnvelopeAadDomain` are deliberately NEW,
+> SEPARATE types from `crypto::aead_internal`'s own `AeadCipher`/
+> `AeadAadDomain` — this skeleton stays unconnected from the real AEAD
+> implementation, same discipline as every other unconnected skeleton in
+> this crate.
+>
+> `validate_envelope_internal` validates UNTRUSTED CANDIDATE field values
+> (raw version/algorithm/AAD-domain discriminant bytes, a nonce byte
+> slice, a ciphertext-placeholder byte slice) in order — version first,
+> then algorithm, then AAD domain, then nonce length, then the ciphertext
+> placeholder's exact bytes — returning a fixed `AeadEnvelopeStatus`. No
+> AEAD authentication/decryption is performed (no real ciphertext exists
+> yet), and no serialization/deserialization of any wire format exists —
+> this is validation of already-split candidate values, not a codec.
+>
+> `docs/ciphertext_envelope_plan.md` section 9 fixes, in writing only, the
+> shape a FUTURE Stage 161 bridge would take to connect
+> `crypto::aead_internal`'s real seal/open results to a real (non-
+> placeholder) envelope — not built this stage.
+> `docs/public_encrypt_decrypt_api_plan.md` (new) fixes the shape a future
+> PUBLIC `encrypt`/`decrypt` API would take: key input as `SecretHandle`
+> only (never a raw byte/password/seed), nonce always internal or
+> envelope-extracted (never caller-supplied), ciphertext as an envelope
+> type, AAD as a fixed domain-label selection. Runtime/storage
+> connections and NIP-44 are all explicitly named as their own, later,
+> separate stages.
+>
+> **Still NOT implemented**: public `encrypt`/`decrypt`/`deriveKey`, any
+> serialization (JSON/base64/CBOR/`serde`), the envelope↔AEAD seal/open
+> bridge (ciphertext stays a fixed placeholder), NIP-44,
+> Runtime/Worker/storage/WASM wiring.
+>
+> This crate's public `pub fn` surface is UNCHANGED (still twenty-four
+> functions) — every new item is `pub(crate)`-at-most. `cargo check`/
+> `cargo test` (174 crate unit tests, up from 162 — 12 net new
+> `ciphertext_envelope` tests)/`cargo check --tests` all GREEN. `npm run
+> typecheck`/`npm test` GREEN (137 files, 2046 tests, up from 136/2031 —
+> one new guard file,
+> [`test/fedos_core_rust_ciphertext_envelope.test.ts`](test/fedos_core_rust_ciphertext_envelope.test.ts)
+> (15 tests)). `git status` clean aside from this batch's intended files.
+>
+> See `docs/ciphertext_envelope_plan.md` and
+> `docs/public_encrypt_decrypt_api_plan.md` for the full design records.
+> Stage 161 candidates: (1) Internal AEAD envelope seal/open bridge
+> (recommended first — connect the envelope to real ciphertext before the
+> public boundary); (2) Public `encrypt`/`decrypt` API skeleton; (3) NIP-44
+> internal implementation planning.
+> Prior status:
+>
+> **Stage 152–156 — AEAD Internal Foundation.** A new
 > `src/crypto/aead_internal.rs` gives this crate its FIRST real AEAD
 > implementation: `seal_internal`/`open_internal` implement BOTH
 > ChaCha20-Poly1305 (Stage 74) and AES-256-GCM (Stage 101), consuming
 > ONLY a `SecretHandle(AeadKeyMaterial)` key and a `Ready`
 > `FedosAeadNonceDecision` nonce (from `fedos_aead_nonce_96`, Stage 138) —
-> never a caller-supplied raw key/nonce byte. AAD is a fixed
-> `AeadAadDomain` label (`RootKey`/`Identity`/`Storage`/`Conversation`/
-> `TestOnly`), mirroring `kdf_core::HkdfDomain`'s shape (Stage 147) as its
-> own, separate enum. `SecretHandle` gains a SECOND narrowly-scoped
-> accessor, `expose_bytes_for_internal_aead` (method count seven → eight)
-> — a sibling of Stage 147's HKDF accessor, not a reuse of it.
+> never a caller-supplied raw key/nonce byte. `SecretHandle` gains a
+> SECOND narrowly-scoped accessor, `expose_bytes_for_internal_aead`
+> (method count seven → eight). Misuse guards run BEFORE any cipher is
+> touched (`InvalidKey`/`InvalidNonce`); decryption failure is a SINGLE
+> fixed `AuthenticationFailed` label. `Cargo.toml` UNCHANGED. Stage 155
+> adds `aead_diagnostics` (both ciphers `Ready`).
 >
-> Misuse guards run BEFORE any cipher is touched: a wrong-kinded/cleared
-> key returns `InvalidKey`; a non-`Ready` nonce decision returns
-> `InvalidNonce`. Decryption failure is a SINGLE fixed
-> `AuthenticationFailed` label, never distinguishing the tamper cause (per
-> RFC 8439/NIST AEAD guidance — distinguishing why is itself a side
-> channel). Nonce-reuse prevention is a documented CALLER obligation, not
-> runtime-tracked state (this crate has no persistent, cross-call nonce
-> registry). `Cargo.toml` is COMPLETELY UNCHANGED — both cipher crates
-> were already production dependencies since Stage 74/101.
->
-> Stage 155 adds `src/crypto/aead_diagnostics.rs`: a fixed, display-only
-> `aead_diagnostics_preview()` reporting both `ChaCha20Poly1305` and
-> `Aes256Gcm` as `Ready`; `crypto::diagnostics`'s own `Aead` row flips from
-> `NotConnected` to `Ready` — no capability reports `NotConnected` anymore.
->
-> **Still NOT implemented**: public `encrypt`/`decrypt`, a ciphertext
-> envelope/serialization format (`docs/ciphertext_envelope_plan.md` fixes
-> six future fields — version/algorithm/nonce/ciphertext/tag/AAD-domain —
-> in writing only, no code), NIP-44, Runtime/Worker/storage/WASM wiring,
-> and the pre-existing `aead_core` (Stage 80) skeleton stays unconnected
-> (left untouched, same discipline Stage 147 used for `domain_label`).
->
-> This crate's public `pub fn` surface is UNCHANGED (still twenty-four
-> functions) — every new item is `pub(crate)`-at-most. `cargo check`/
-> `cargo test` (162 crate unit tests, up from 146 — 10 net new
-> `aead_internal` tests, 3 new `aead_diagnostics` tests, 2 new
-> `secret_handle` tests)/`cargo check --tests` all GREEN, zero new
-> warnings. `npm run typecheck`/`npm test` GREEN (136 files, 2031 tests, up
-> from 134/2006 — two new guard files,
-> [`test/fedos_core_rust_aead_internal.test.ts`](test/fedos_core_rust_aead_internal.test.ts)
-> (16 tests) and
-> [`test/fedos_core_rust_aead_diagnostics.test.ts`](test/fedos_core_rust_aead_diagnostics.test.ts)
-> (9 tests), plus two existing `secret_handle` guard files updated for the
-> eight-method set). `git status` clean aside from this batch's intended
-> files.
->
-> See `docs/aead_internal_implementation.md` and
-> `docs/ciphertext_envelope_plan.md` for the full design records. Stage 157
-> candidates: (1) Ciphertext envelope skeleton (recommended first — fixing
-> the wire format before a public `encrypt`/`decrypt` API means less
-> rework later); (2) NIP-44 internal implementation planning; (3) Public
-> `encrypt`/`decrypt` API planning.
+> **Still NOT implemented** (as of that stage): public `encrypt`/
+> `decrypt`, a ciphertext envelope/serialization format, NIP-44,
+> Runtime/Worker/storage/WASM wiring.
 > Prior status:
 >
 > **Stage 147–151 — Crypto Core Boundary Completion (HKDF internal

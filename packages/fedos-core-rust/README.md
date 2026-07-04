@@ -3319,3 +3319,78 @@ Nostr/NIP-44/WASM connection, no `Cargo.toml` change (still 9 production
 dependencies), no `Vec<u8>` exposed publicly, no `unwrap`/`expect`/
 `panic!`/`unsafe`, the twenty-four-function `pub fn` surface unchanged,
 and diagnostics carrying no secret byte.
+
+## Internal ciphertext envelope skeleton + public API planning (Stage 157–160)
+
+Stage 157–158 implement `docs/ciphertext_envelope_plan.md`'s six planned
+fields as a concrete, `pub(crate)`-only skeleton: a new
+[`src/crypto/ciphertext_envelope.rs`](src/crypto/ciphertext_envelope.rs)
+defines `AeadCiphertextEnvelope` — `version: AeadEnvelopeVersion`,
+`algorithm: AeadEnvelopeAlgorithm`, `nonce: [u8; 12]`, a fixed
+`ciphertext_placeholder: [u8; 4]` marker (NOT real ciphertext‖tag), and
+`aad_domain: AeadEnvelopeAadDomain`. `AeadEnvelopeAlgorithm`/
+`AeadEnvelopeAadDomain` are deliberately NEW, SEPARATE types from
+`crypto::aead_internal`'s own `AeadCipher`/`AeadAadDomain` — this
+skeleton stays unconnected from the real AEAD implementation, same
+discipline as every other unconnected skeleton in this crate.
+
+**`validate_envelope_internal`** validates UNTRUSTED CANDIDATE field
+values (raw version/algorithm/AAD-domain discriminant bytes, a nonce byte
+slice, and a ciphertext-placeholder byte slice) — the same shape a future
+deserializer would need, though no deserializer exists yet. Checks run in
+order — version first, then algorithm, then AAD domain, then nonce
+length, then the ciphertext placeholder's exact bytes — each returning
+its own fixed `AeadEnvelopeStatus` (`Valid` / `InvalidVersion` /
+`InvalidAlgorithm` / `InvalidAadDomain` / `InvalidNonceLength` /
+`InvalidCiphertextPlaceholder`). No AEAD authentication/decryption is
+performed (there is no real ciphertext yet to authenticate), and no
+serialization/deserialization of any wire format exists — this is
+validation of already-split candidate values, not a codec.
+
+**Stage 159** fixes, in writing only (`docs/ciphertext_envelope_plan.md`
+section 9), the shape a FUTURE Stage 161 bridge would take to connect
+`crypto::aead_internal`'s real `AeadSealDecision`/`AeadOpenDecision`
+results to a real (non-placeholder) `AeadCiphertextEnvelope` — a
+`pub(crate)`-only bridge function, not built this stage.
+
+**Stage 160** adds `docs/public_encrypt_decrypt_api_plan.md`: the shape a
+future PUBLIC `encrypt`/`decrypt` API would take — key input as
+`SecretHandle` only (never a raw byte/password/seed), nonce always
+internal or envelope-extracted (never caller-supplied), ciphertext as an
+envelope type (never a bare byte buffer with separately-tracked
+metadata), AAD as a fixed domain-label selection. Runtime and storage
+connections, and NIP-44, are all explicitly named as their own, later,
+separate stages — not designed or authorized here.
+
+**What is explicitly NOT implemented or connected:**
+
+- No public `encrypt`/`decrypt`/`deriveKey` — `encrypt_placeholder`/
+  `decrypt_placeholder`/`derive_key_placeholder` (Stage 69) unchanged.
+- No serialization of any kind — no JSON, base64, CBOR, or `serde`
+  derive on any envelope type.
+- No connection from the envelope to `crypto::aead_internal`'s real
+  seal/open functions — the ciphertext field stays a fixed placeholder.
+- No NIP-44, no Nostr connection, no storage connection.
+- No Runtime/Worker/WASM wiring.
+- No `Cargo.toml` change — still 9 production dependencies, no new
+  dependency.
+
+**Rust-side `cargo test` coverage**: 12 new tests in
+`ciphertext_envelope.rs` (envelope construction holding every field,
+version/algorithm/domain preserved across every combination, nonce held
+as a fixed 12-byte array, validation succeeds for a well-formed
+candidate, wrong version/algorithm/AAD-domain tags rejected, wrong nonce
+length rejected, empty and tampered ciphertext placeholders rejected, and
+both label enums' exhaustive-variant matches).
+
+**Verified against a real Rust toolchain**: `cargo check`, `cargo test`
+(174 crate unit tests, up from 162 at Stage 156), and
+`cargo check --tests` all GREEN.
+
+See
+[`test/fedos_core_rust_ciphertext_envelope.test.ts`](../../test/fedos_core_rust_ciphertext_envelope.test.ts)
+(15 tests) for the dedicated Stage 157–158 guard suite: no public
+`encrypt`/`decrypt`, no public raw key getter, no Runtime/Worker/Storage/
+Nostr/NIP-44/WASM connection, no `Cargo.toml` change, no serialization of
+any kind, the twenty-four-function `pub fn` surface unchanged, and no
+`unwrap`/`expect`/`panic!`/`unsafe`.

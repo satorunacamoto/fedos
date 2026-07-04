@@ -102,7 +102,7 @@ A future envelope is expected to carry, at minimum:
   vocabulary, or may need its own — that decision is deferred to that
   stage's own review, not decided here.
 
-## 7. Conclusion
+## 7. Conclusion (Stage 152–156 status)
 
 - **Six fields named** (`version`, `algorithm`, `nonce`, `ciphertext`,
   `tag`, `aad` domain label) as the minimum a future ciphertext envelope
@@ -112,3 +112,88 @@ A future envelope is expected to carry, at minimum:
 - **NIP-44 remains its own, separate, later stage** — not designed here.
 - No code, test, or `Cargo.toml` change is authorized or made by this
   document.
+
+## 8. Stage 157–158 update — the skeleton is now IMPLEMENTED
+
+- **`packages/fedos-core-rust/src/crypto/ciphertext_envelope.rs` (new)
+  turns §3's six fields into a concrete, `pub(crate)`-only skeleton**:
+  `AeadCiphertextEnvelope` holds `version: AeadEnvelopeVersion`,
+  `algorithm: AeadEnvelopeAlgorithm`, `nonce: [u8; 12]`, a fixed
+  `ciphertext_placeholder: [u8; 4]` marker (NOT real ciphertext‖tag — see
+  below), and `aad_domain: AeadEnvelopeAadDomain`.
+- **§5's open questions are now answered for THIS skeleton, though not
+  necessarily forever**: `ciphertext`/`tag` are kept as ONE combined
+  field (matching RustCrypto's own `ciphertext‖tag` convention) rather
+  than split; the envelope stays `pub(crate)`-only, not crossing any
+  public boundary (there is none yet); `version` is a label enum
+  (`AeadEnvelopeVersion`, exactly one variant, `V1`, mirroring this
+  crate's "fixed label, no open choice" shape for what it currently
+  produces), paired with a raw `u8` tag for the SEPARATE concern of
+  validating an untrusted candidate version number (see below) — a future
+  stage MAY revisit any of these, but they are no longer unfixed.
+- **The ciphertext/tag field is STILL a placeholder, not real output.**
+  `AeadCiphertextEnvelope::new_for_internal_use` always sets it to a
+  fixed, non-secret 4-byte marker constant — it is NOT populated from
+  `crypto::aead_internal`'s real seal function. Connecting the two is
+  explicitly deferred to Stage 161 (§9 below fixes that future bridge's
+  shape in writing, still not building it).
+- **`validate_envelope_internal` fixes a validation layer, not a codec.**
+  It takes untrusted CANDIDATE values — raw version/algorithm/AAD-domain
+  discriminant bytes, a nonce byte slice, and a ciphertext-placeholder
+  byte slice — and checks each structurally (version first, per §3's
+  "MUST be checked before any other field" rule), returning a fixed
+  `AeadEnvelopeStatus` (`Valid` / `InvalidVersion` / `InvalidAlgorithm` /
+  `InvalidAadDomain` / `InvalidNonceLength` / `InvalidCiphertextPlaceholder`)
+  and, on `Valid`, a constructed `AeadCiphertextEnvelope`. It performs NO
+  authenticated-decryption verification (there is no real ciphertext to
+  authenticate yet) and NO byte-level parsing of a single combined
+  buffer — §4's "serialization format is NOT decided" still holds in
+  full; this is deliberately validation-of-already-split-fields, not a
+  wire-format decoder.
+- **The algorithm/AAD-domain labels are deliberately NEW, SEPARATE types**
+  (`AeadEnvelopeAlgorithm`/`AeadEnvelopeAadDomain`) from
+  `crypto::aead_internal`'s own `AeadCipher`/`AeadAadDomain` — this
+  skeleton stays unconnected from the real AEAD implementation, the same
+  "leave unrelated skeletons unconnected" discipline this crate has used
+  since Stage 79.
+
+## 9. Stage 161 candidate — the future seal/open bridge (planning only, not built)
+
+This section fixes, in writing, the shape a FUTURE stage connecting
+`crypto::aead_internal`'s real seal/open results to
+`AeadCiphertextEnvelope` would take — naming it, not building it.
+
+- **A `pub(crate)` bridge function, not a public one.** E.g.
+  `envelope_from_seal_decision_internal(decision: &AeadSealDecision,
+  nonce: [u8; 12], algorithm: AeadEnvelopeAlgorithm, aad_domain:
+  AeadEnvelopeAadDomain) -> Option<AeadCiphertextEnvelope>` — takes an
+  `AeadSealDecision` (Stage 152–154) plus the same nonce/algorithm/AAD
+  domain used to produce it, and constructs a REAL envelope whose
+  ciphertext field is no longer the Stage 157–158 placeholder. This
+  function stays `pub(crate)`-at-most, per this plan's §4 ("no public API
+  is authorized").
+- **The `ciphertext_placeholder: [u8; 4]` field's type itself would need
+  to change** (to something that can hold the real, variable-length
+  `ciphertext‖tag` `Vec<u8>` `AeadSealDecision::ciphertext` already
+  produces) — that type change is this future stage's own decision to
+  make and review, not pre-authorized here.
+- **The reverse direction** (extracting an `AeadOpenDecision`-compatible
+  input FROM an `AeadCiphertextEnvelope`, to call the real open function)
+  is the same shape, mirrored: a `pub(crate)` bridge, not a public one.
+- **Still no public `encrypt`/`decrypt`.** A working internal bridge does
+  not, by itself, authorize crossing the public API boundary — that is
+  `docs/public_encrypt_decrypt_api_plan.md`'s own, later, separate
+  concern.
+- **Still no serialization.** A real envelope (post-bridge) still does
+  not need to be serialized to be useful internally — turning it into
+  wire bytes remains its own, further, later stage.
+
+## 10. Conclusion (Stage 157–158 update)
+
+- **The envelope skeleton is now real code**, not just a field list —
+  `AeadCiphertextEnvelope` + `validate_envelope_internal`, both
+  `pub(crate)`-only, `cargo test`-verified.
+- **The ciphertext field remains a fixed placeholder** — the real
+  seal/open bridge (§9) is Stage 161 candidate work, not built here.
+- **No public API, no serialization, no NIP-44** — all three remain
+  exactly as unfixed/unbuilt as this document originally left them.
