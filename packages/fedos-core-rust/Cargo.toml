@@ -7,11 +7,13 @@
 # `cargo test` (Stage 101) + `getrandom` CSPRNG dependency adopted, build
 # check ONLY (Stage 104) + `SecretHandle` real-byte storage (Stage 144–146,
 # no `Cargo.toml` change) + `sha2` PROMOTED from `[dev-dependencies]` to
-# `[dependencies]` (Stage 147) — the ONLY `Cargo.toml` change this batch
-# makes, required because `kdf_core`'s new internal HKDF-SHA256
-# implementation instantiates `Hkdf::<Sha256>` in PRODUCTION code for the
-# first time (previously only the `#[cfg(test)]`-only `rfc5869_vectors`
-# module, Stage 77, needed a concrete hash algorithm).
+# `[dependencies]` (Stage 147) + `k256` secp256k1 dependency ADOPTED
+# (Stage 194, minimal `arithmetic`-only feature — no ECDH function, no
+# conversation-key derivation, no NIP-44 code; see
+# `docs/nip44_dependency_adoption.md` for the full adoption record and
+# `docs/nip44_internal_plan.md` for the future ECDH/conversation-key/
+# message-key/padding/encrypt/decrypt/NIP-44 stages this dependency
+# prepares for, in that fixed order, none of them built yet).
 #
 # Placeholder crate. There is still NO WASM here — the PUBLIC API in
 # `src/lib.rs` is unchanged (placeholder functions only; see
@@ -163,6 +165,49 @@ getrandom = "0.3"
 # features are used as-is (`std`, no `asm` acceleration). Still not connected
 # to any AEAD/NIP-44/Runtime/Worker/WASM path.
 sha2 = "0.11.0"
+
+# `k256` (RustCrypto, Apache-2.0 OR MIT) — the secp256k1 elliptic-curve
+# implementation Stage 194 adopts per `docs/nip44_dependency_adoption.md`'s
+# comparison (that document named `rust-secp256k1` and `k256` as the two
+# candidates, picking neither; this Cargo.toml change is Stage 194's own,
+# separate, explicitly-reviewed decision, resolving that document's §5
+# open question in favor of `k256` — same RustCrypto organization, same
+# Apache-2.0 OR MIT license, same pure-Rust/no-FFI/`no_std`-friendly shape
+# as every dependency already listed above). `default-features = false` +
+# `features = ["arithmetic"]` enables ONLY field/group arithmetic — the
+# minimum needed for a FUTURE ECDH stage to build on — and explicitly
+# excludes `ecdsa` (signing/verification, not needed for NIP-44's ECDH-only
+# usage), `schnorr` (BIP-340, a separate future Nostr-signing candidate,
+# not this one), `serde` (this crate has never enabled `serde` in a
+# PRODUCTION dependency — `docs/ciphertext_serialization_format_decision.md`),
+# and `pem`/`pkcs8` (key-file-format encoding, not needed for an in-memory
+# ECDH shared-secret computation).
+#
+# REVIEWED EXCEPTION to `docs/rust_dependency_adoption.md` §12's "no
+# `rand`/`rand_core` anywhere in the resolved graph" rule: `rand_core`
+# (verified via `cargo tree -i rand_core`) appears as a REQUIRED,
+# non-optional transitive dependency of `elliptic-curve`/`ff`/`group`/
+# `crypto-bigint` — the trait crates `k256`'s `arithmetic` feature itself
+# is built on — regardless of which `k256` feature flags are selected;
+# this is an ecosystem-wide RustCrypto elliptic-curve trait requirement
+# (e.g. `ff::Field`'s `random(rng)` trait method signature), not a `k256`-
+# specific choice, and no version/feature combination of `k256` avoids it.
+# `rand_core` itself is a TRAIT-ONLY crate (`RngCore`/`CryptoRng` trait
+# definitions) with no actual entropy-source implementation of its own —
+# unlike the full `rand` crate (still absent), it provides no
+# `thread_rng()`/`OsRng` this crate could accidentally call instead of
+# `getrandom::fill`. This exception is confirmed by the user and recorded
+# here, in `docs/nip44_dependency_adoption.md`, and verified by a
+# dedicated `cargo test` (`crypto::secp256k1_dependency_guard`, Stage 196)
+# asserting `rand_core` is present ONLY as this specific transitive
+# dependency, never as a direct dependency of this crate, and that the
+# full `rand` crate remains entirely absent. NOT imported/used ANYWHERE in
+# `src/lib.rs` or `src/crypto/` — production or `#[cfg(test)]` — this
+# stage: dependency + build check only, exactly like every prior
+# first-adoption stage. No ECDH function, no conversation-key derivation,
+# no NIP-44 code of any kind exists yet — see
+# `docs/nip44_dependency_adoption.md` (updated) for the full record.
+k256 = { version = "0.13", default-features = false, features = ["arithmetic"] }
 
 [dev-dependencies]
 # Test-only plumbing (Stage 75) to read and assert against the RFC 8439
