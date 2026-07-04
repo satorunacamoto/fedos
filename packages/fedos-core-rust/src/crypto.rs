@@ -238,6 +238,17 @@
 //! a `CryptoCapability` variant and does NOT change any existing
 //! capability's meaning or readiness — `capability_matrix`/`diagnostics`
 //! stay exactly as they were (still sixteen variants).
+//!
+//! Stage 229 adds `nip44_stream_cipher` — the real, byte-exact NIP-44 v2
+//! raw ChaCha20 stream cipher (RFC 8439 §2.3–2.4, hand-implemented, no
+//! `chacha20` crate adopted), `encrypt_stream_internal`/
+//! `decrypt_stream_internal`, keyed by `chacha_key`/`chacha_nonce` only,
+//! counter fixed at `0`. NOT an AEAD — never calls, and is never called
+//! by, `crypto::aead_internal`'s ChaCha20-Poly1305. Vector-verified by
+//! the sibling `#[cfg(test)]`-only `nip44_stream_cipher_vectors` module
+//! (Stage 230) against `test-vectors/nip44/nip44-v2.json`'s
+//! `valid.encrypt_decrypt` category's ciphertext bytes.
+//!
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -256,6 +267,7 @@ pub(crate) mod nip44_decrypt;
 pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_message_keys;
 pub(crate) mod nip44_padding;
+pub(crate) mod nip44_stream_cipher;
 pub(crate) mod nip44_wire;
 pub(crate) mod nip44_wire_diagnostics;
 pub(crate) mod nip44_wire_nonce;
@@ -270,6 +282,8 @@ mod nip44_key_derivation_guard;
 mod nip44_message_key_vectors;
 #[cfg(test)]
 mod nip44_padding_vectors;
+#[cfg(test)]
+mod nip44_stream_cipher_vectors;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]
