@@ -1,14 +1,40 @@
-# NIP-44 v2 exact message key derivation review (Stage 214) — docs only, no code
+# NIP-44 v2 exact message key derivation review (Stage 214; IMPLEMENTED Stage 219-220) — docs only at Stage 214, now backed by real code
 
-**Status: this document adds no code.** It reviews, against the NIP-44 v2
-spec and `test-vectors/nip44/nip44-v2.json`'s `valid.get_message_keys`
-category (byte-for-byte re-derived below, not just read from the spec
-prose), EXACTLY how `chacha_key`/`chacha_nonce`/`hmac_key` are produced
-from a `conversation_key`, and lists every difference from what this
-crate currently implements (Stage 198–201's `crypto::hkdf_bridge`). No
-code changes here — see `docs/nip44_wire_implementation_roadmap.md`
-step 1 (candidate Stage 219) for where the real derivation eventually
-lands.
+**Status at Stage 214: this document added no code.** It reviewed, against
+the NIP-44 v2 spec and `test-vectors/nip44/nip44-v2.json`'s
+`valid.get_message_keys` category (byte-for-byte re-derived below, not
+just read from the spec prose), EXACTLY how `chacha_key`/`chacha_nonce`/
+`hmac_key` are produced from a `conversation_key`, and listed every
+difference from what this crate implemented at the time (Stage 198–201's
+`crypto::hkdf_bridge`).
+
+**Update — Stage 219–220: this review's own derivation IS now
+implemented and vector-verified.**
+[`crypto::nip44_message_keys::derive_message_keys_exact_internal`](../packages/fedos-core-rust/src/crypto/nip44_message_keys.rs)
+(`&ConversationKey`-facing) and
+[`derive_message_keys_exact_from_bytes_internal`](../packages/fedos-core-rust/src/crypto/nip44_message_keys.rs)
+(a lower-level pure-bytes engine) implement §1's exact schedule below
+byte-for-byte: `Hkdf::<Sha256>::from_prk(conversation_key)` (NEVER
+`Hkdf::extract` — `conversation_key` is treated as the PRK directly, per
+§1) then `.expand(nonce, &mut okm[76])`, split into `chacha_key`
+(`okm[0..32]`), `chacha_nonce` (`okm[32..44]`), `hmac_key`
+(`okm[44..76]`). ALL 32 `valid.get_message_keys` cases match exactly (the
+sibling `#[cfg(test)]`-only `nip44_message_key_vectors` module, Stage
+220). §2's terminology correction (`nonce` is HKDF's `info`, not `salt`)
+is now embodied directly in the code: the parameter is named `nonce` and
+passed as `expand`'s `info` argument, never anywhere near a `salt`
+parameter. §3's diff table is now HISTORICAL — it describes the Stage
+200–201 `hkdf_bridge` gap as it stood before this update; `hkdf_bridge`
+itself remains completely UNCHANGED (this stage deliberately did not
+touch it — see this module's own doc comment), and the exact derivation
+instead lives in the separate `nip44_message_keys` module. Still true,
+unchanged: no wire encrypt/decrypt, no ChaCha20 stream-cipher call, no
+HMAC-SHA256 computation, no base64, no wire serialization, no public API,
+no Runtime/Worker/Storage/Relay connection — see
+`docs/nip44_wire_implementation_roadmap.md` for what remains (steps
+2–8: wire nonce generation, ChaCha20 stream encryption, the HMAC tag
+itself, base64 payload encoding, invalid vectors, and only then a Nostr
+DM bridge).
 
 ## 1. The exact derivation order (RFC 5869 roles, verified against the vectors)
 
@@ -84,19 +110,27 @@ broader "FedOS internal NIP-44-like bridge, not NIP-44 v2 wire-compatible"
 distinction — this document adds the byte-level confirmation and the
 precise RFC 5869 role correction, nothing more.
 
-## 4. What this review does NOT do
+## 4. What this review did NOT do at Stage 214 (superseded in part by Stage 219–220)
 
-- **No code change.** `crypto::hkdf_bridge`/`crypto::message_key`/
-  `crypto::conversation_key` are untouched. `crypto::nip44_message_keys`
-  (Stage 217, a separate new file) adds LABEL-ONLY types — no HKDF call,
-  no real derivation — see that module's own doc comment.
-- **No vector wiring.** `valid.get_message_keys` is not connected to
-  `cargo test` by this document; that remains
-  `docs/nip44_wire_implementation_roadmap.md` step 1's own future work.
-- **No `SecretHandle`/`ConversationKey`/`MessageKey` type change.**
-- **No decision here about WHERE the real per-message derivation
-  eventually lives** (a new function in `crypto::hkdf_bridge`, or an
-  entirely new module) — that is the implementing stage's own call.
+- **As of Stage 214: no code change.** `crypto::hkdf_bridge`/
+  `crypto::message_key`/`crypto::conversation_key` were untouched.
+  `crypto::nip44_message_keys` (Stage 217, a separate new file) added
+  LABEL-ONLY types — no HKDF call, no real derivation.
+- **As of Stage 219–220: the real derivation and its vector wiring EXIST**
+  — `crypto::nip44_message_keys::derive_message_keys_exact_internal`/
+  `derive_message_keys_exact_from_bytes_internal`, and the sibling
+  `#[cfg(test)]`-only `nip44_message_key_vectors` module wires all 32
+  `valid.get_message_keys` cases to `cargo test` — see this document's
+  own update note above. `crypto::hkdf_bridge`/`crypto::message_key`/
+  `crypto::conversation_key` remain UNCHANGED even now — the real
+  derivation lives entirely in the new, separate `nip44_message_keys`
+  module, per this stage's own explicit scope limit.
+- **No `SecretHandle`/`ConversationKey`/`MessageKey` type change** — still
+  true at Stage 219–220.
+- **No Encrypt/Decrypt, no ChaCha20 stream cipher, no HMAC-SHA256
+  computation, no base64, no wire payload/serialization, no Runtime/
+  Worker/Storage/Relay connection** — see
+  `docs/nip44_wire_implementation_roadmap.md` steps 2–8 for what remains.
 
 ## See also
 

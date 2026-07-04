@@ -92,7 +92,11 @@ describe("NIP-44 exact message key derivation review + skeleton (Stage 214-218, 
         keyword,
       );
     }
-    expect(messageKeyReviewDocSource).toMatch(/this document adds no code/i);
+    // Stage 219-220 implemented this review's own derivation for real, so
+    // the doc's intro now speaks of Stage 214 in the past tense ("added",
+    // not "adds") — both phrasings are accepted here.
+    expect(messageKeyReviewDocSource).toMatch(/this document (adds|added) no code/i);
+    expect(messageKeyReviewDocSource).toMatch(/IMPLEMENTED Stage 219-220/);
   });
 
   it("2. docs/nip44_wire_nonce.md exists and documents size, generation responsibility, reuse prohibition, and the internal-nonce difference", () => {

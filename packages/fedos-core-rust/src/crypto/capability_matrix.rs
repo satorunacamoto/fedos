@@ -15,9 +15,19 @@
 //! `nip44_encrypt`, `nip44_decrypt`) and add a SIXTEENTH variant,
 //! `Authentication`, tracking `nip44_decrypt`'s single-fixed-label MAC
 //! discipline as its own capability — all four now report `Ready` (see
-//! `diagnostics`). Crate-private only — see `src/crypto.rs`'s module-level
-//! doc comment for the full scope of this module and its `diagnostics`
-//! sibling.
+//! `diagnostics`). Stage 219–223 land a REAL, vector-verified, exact
+//! per-message key derivation (`crypto::nip44_message_keys::derive_message_keys_exact_internal`,
+//! HKDF-Expand keyed by `conversation_key`, split into
+//! `chacha_key`/`chacha_nonce`/`hmac_key`) — this adds NO seventeenth
+//! variant (`Capability` additions are explicitly out of scope for that
+//! stage): `MessageKey` still names `crypto::message_key`/
+//! `crypto::hkdf_bridge`'s own, UNCHANGED, generic bridge specifically
+//! (see that variant's own doc comment below), and continues to report
+//! `Ready` exactly as it did at Stage 200–201 — the new exact derivation
+//! is a SEPARATE, additional capability of this crate's NIP-44 work, not
+//! a replacement for what `MessageKey` already tracked. Crate-private
+//! only — see `src/crypto.rs`'s module-level doc comment for the full
+//! scope of this module and its `diagnostics` sibling.
 #![allow(dead_code)]
 
 /// One of this crate's sixteen tracked crypto capabilities — a label

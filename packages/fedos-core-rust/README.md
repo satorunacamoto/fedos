@@ -4247,3 +4247,74 @@ stream cipher, no nonce generation, no `ConversationKey`/`MessageKey`/
 `HkdfDomain` change. No Runtime/Worker/Storage/Federation/Relay/WASM/FFI
 connection. No TypeScript serialization change. No new `Cargo.toml`
 dependency.
+
+## NIP-44 v2 wire-compatible implementation, first slice: exact HKDF-expand message key derivation (Stage 219–223)
+
+Stage 219–223 land the FIRST real slice of a byte-exact "NIP-44 v2
+wire-compatible implementation" (`docs/nip44_wire_implementation_roadmap.md`
+step 1): per-message key derivation, vector-verified against every
+`valid.get_message_keys` case. **Derivation only** — no Encrypt/Decrypt,
+no ChaCha20 stream cipher, no HMAC computation, no wire encoding, no
+base64, no Nostr/Runtime/Worker/Storage connection.
+
+**Stage 219**:
+[`crypto::nip44_message_keys`](src/crypto/nip44_message_keys.rs) replaces
+its Stage 217 `derive_message_keys_exact_placeholder()` label-only
+skeleton with the REAL derivation
+`docs/nip44_message_key_review.md` (Stage 214) reviewed:
+`derive_message_keys_exact_internal(conversation_key: &ConversationKey,
+nonce: &[u8; 32])` exposes `conversation_key`'s raw bytes via its own
+pre-existing, UNCHANGED `expose_bytes_for_internal_message_key_derivation`
+accessor, then calls `derive_message_keys_exact_from_bytes_internal` — a
+lower-level pure-bytes engine (`Hkdf::<Sha256>::from_prk(conversation_key_bytes)`,
+NEVER `Hkdf::extract`, then `.expand(nonce, &mut okm[76])`, split into
+`chacha_key`/`chacha_nonce`/`hmac_key`) kept `pub(crate)` specifically so
+vector tests can feed it a raw `conversation_key` value with no
+corresponding `sec1`/`pub2` pair to re-derive it through. `Nip44MessageKeyStatus`
+drops its Stage 217 `Placeholder` variant for `Ready`/
+`InvalidConversationKey`/`InternalFailure`.
+
+**Stage 220**: a new sibling `#[cfg(test)]`-only
+[`nip44_message_key_vectors`](src/crypto/nip44_message_key_vectors.rs)
+module wires ALL 32 `test-vectors/nip44/nip44-v2.json`
+`valid.get_message_keys` cases against
+`derive_message_keys_exact_from_bytes_internal` — every `chacha_key`/
+`chacha_nonce`/`hmac_key` matches byte-for-byte. NIP-44 v2's reference
+vector set defines no `invalid.get_message_keys` category, so this stage
+wires `valid` only (invalid-input handling for this function — a
+placeholder or cleared `ConversationKey` — is instead covered by
+`nip44_message_keys`'s own unit tests).
+
+**Stage 221**: a new
+[`test/fedos_core_rust_nip44_message_key_vectors.test.ts`](../../test/fedos_core_rust_nip44_message_key_vectors.test.ts)
+confirms: the Stage 217 placeholder function/variant is gone; real
+`Hkdf::from_prk`/`.expand` is used, never `Hkdf::extract`/`Hkdf::new`;
+`derive_message_keys_exact_internal`'s signature takes `&ConversationKey`
+plus a 32-byte nonce; the vector module is wired and `#[cfg(test)]`-only;
+`crypto::conversation_key`/`crypto::message_key`/`crypto::hkdf_bridge`
+remain untouched; and the usual public API/`Cargo.toml`/`package.json`/
+Runtime/Worker/Storage/Federation checks all still hold. The pre-existing
+[`test/fedos_core_rust_nip44_message_key_review.test.ts`](../../test/fedos_core_rust_nip44_message_key_review.test.ts)
+(Stage 218) is updated in place: its placeholder-shape assertions (tests
+6–9) now check the real shape instead.
+
+**Stage 222**: `capability_matrix`/`diagnostics` gain a documentation-only
+update — NO seventeenth `CryptoCapability` variant is added.
+`nip44_message_keys` is additional machinery behind NIP-44 v2's exact
+wire path, not a newly-tracked capability of its own; `MessageKey`'s row
+keeps reporting `Ready` for exactly the reason it already did at Stage
+200–201 (`crypto::message_key`/`crypto::hkdf_bridge`'s own, still
+UNCHANGED, generic bridge).
+
+**Stage 223**: `docs/nip44_message_key_review.md` gains an "IMPLEMENTED
+Stage 219-220" update note confirming its own reviewed derivation is now
+real and vector-verified, embodying its own §2 terminology correction
+directly in code (the parameter is named `nonce` and passed as
+`expand`'s `info` argument, never near a `salt` parameter).
+
+Public `pub fn` surface unchanged at twenty-seven. No Encrypt/Decrypt, no
+ChaCha20 stream cipher, no HMAC computation, no base64, no wire
+serialization, no `ConversationKey`/`crypto::hkdf_bridge` change, no
+`CryptoCapability` addition. No Runtime/Worker/Storage/Federation/Relay/
+WASM/FFI connection. No TypeScript serialization change. No new
+`Cargo.toml` dependency.

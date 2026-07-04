@@ -41,6 +41,19 @@
 //! variant), also reports `Ready` — `crypto::nip44_decrypt`'s single
 //! fixed `AuthenticationFailed` label, verified never to distinguish its
 //! failure cause. `NotConnected` now reports zero capabilities.
+//!
+//! Stage 219–223 land the REAL, exact, vector-verified per-message key
+//! derivation (`crypto::nip44_message_keys`, replacing its own Stage 217
+//! label-only `Placeholder` skeleton with `Ready`-reporting HKDF-Expand
+//! code) — this table's OWN sixteen rows are UNCHANGED by that work: no
+//! seventeenth `CryptoCapability` variant is added (`nip44_message_keys`
+//! is additional machinery behind NIP-44 v2's exact wire path, not a
+//! newly-tracked capability of its own), and `MessageKey`'s row keeps
+//! reporting `Ready` for exactly the reason it already did at Stage
+//! 200–201 (`crypto::message_key`/`crypto::hkdf_bridge`'s own generic
+//! bridge, itself still unchanged) — this preview remains a fixed,
+//! hand-maintained snapshot of the SAME sixteen capabilities, not a live
+//! reflection of every module this crate's NIP-44 work adds.
 #![allow(dead_code)]
 
 use super::capability_matrix::CryptoCapability;
