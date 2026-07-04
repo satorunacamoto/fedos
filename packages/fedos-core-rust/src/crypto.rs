@@ -193,17 +193,25 @@
 //! `derive_message_keys_exact_internal` (the `ConversationKey`-facing
 //! entry point) and `derive_message_keys_exact_from_bytes_internal` (a
 //! lower-level pure-bytes engine, kept `pub(crate)` for the sibling
-//! vector-verification module a following stage adds — see
-//! `nip44_message_keys`'s own module-level doc comment for why).
-//! `Nip44MessageKeyStatus` drops its Stage 217 `Placeholder` variant for
-//! `Ready`/`InvalidConversationKey`/`InternalFailure`. Still no ChaCha20
-//! stream-cipher call, no HMAC-SHA256 call, no base64, no wire payload/
-//! serialization, no change to `crypto::conversation_key`/
-//! `crypto::message_key`/`crypto::hkdf_bridge` (all three remain
-//! UNCHANGED), no `capability_matrix`/`diagnostics` capability-count
-//! change (still sixteen variants), no public API addition, no
-//! Runtime/Worker/Storage/Relay connection, no new `Cargo.toml`
-//! dependency.
+//! vector-verification module below). `Nip44MessageKeyStatus` drops its
+//! Stage 217 `Placeholder` variant for `Ready`/`InvalidConversationKey`/
+//! `InternalFailure`. Still no ChaCha20 stream-cipher call, no
+//! HMAC-SHA256 call, no base64, no wire payload/serialization, no change
+//! to `crypto::conversation_key`/`crypto::message_key`/
+//! `crypto::hkdf_bridge` (all three remain UNCHANGED), no
+//! `capability_matrix`/`diagnostics` capability-count change (still
+//! sixteen variants), no public API addition, no Runtime/Worker/Storage/
+//! Relay connection, no new `Cargo.toml` dependency.
+//!
+//! Stage 220 adds the sibling `#[cfg(test)]`-only `nip44_message_key_vectors`
+//! module, wiring ALL 32 `test-vectors/nip44/nip44-v2.json`
+//! `valid.get_message_keys` cases against
+//! `derive_message_keys_exact_from_bytes_internal` — every `chacha_key`/
+//! `chacha_nonce`/`hmac_key` matches byte-for-byte. This category's
+//! fixture supplies a raw `conversation_key` with no corresponding
+//! `sec1`/`pub2` pair anywhere in `valid.get_conversation_key`, hence the
+//! byte-level entry point (see `nip44_message_keys`'s own module-level
+//! doc comment for the full record).
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -229,6 +237,8 @@ mod nip44_conversation_key_vectors;
 mod nip44_encrypt_decrypt_guard;
 #[cfg(test)]
 mod nip44_key_derivation_guard;
+#[cfg(test)]
+mod nip44_message_key_vectors;
 #[cfg(test)]
 mod nip44_padding_vectors;
 #[cfg(test)]
