@@ -219,6 +219,25 @@
 //! pre-existing `fedos_aead_nonce_96`/`FedosAeadNonceDecision` (Stage
 //! 138) — deliberately not shared or generalized, per
 //! `docs/nip44_wire_nonce.md` (Stage 215).
+//!
+//! Stage 225–226 add `nip44_wire_payload` — a wire payload SKELETON
+//! builder (`Nip44WirePayloadBuilder::build_placeholder`: real `version`/
+//! `nonce`, placeholder-only `ciphertext`/`mac`) and its
+//! structural-only validator (`validate_wire_payload_placeholder`:
+//! version tag, nonce length, ciphertext/mac presence — no
+//! authentication, no decryption, no base64). Calling the validator
+//! against the builder's own output correctly reports `MissingField`
+//! (ciphertext/mac are still absent) — this module names what
+//! "wire-valid" will mean once a later stage wires real ChaCha20/HMAC
+//! code, it does not pretend today's skeleton already satisfies it.
+//!
+//! Stage 227 adds `nip44_wire_diagnostics` — a SEPARATE, fixed,
+//! display-only two-row preview (`WireNonce` → `Ready`, `WirePayload` →
+//! `Placeholder`), mirroring `aead_diagnostics`'s own "per-feature detail
+//! preview alongside the main table" shape (Stage 155). It does NOT add
+//! a `CryptoCapability` variant and does NOT change any existing
+//! capability's meaning or readiness — `capability_matrix`/`diagnostics`
+//! stay exactly as they were (still sixteen variants).
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -238,7 +257,9 @@ pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_message_keys;
 pub(crate) mod nip44_padding;
 pub(crate) mod nip44_wire;
+pub(crate) mod nip44_wire_diagnostics;
 pub(crate) mod nip44_wire_nonce;
+pub(crate) mod nip44_wire_payload;
 #[cfg(test)]
 mod nip44_conversation_key_vectors;
 #[cfg(test)]
