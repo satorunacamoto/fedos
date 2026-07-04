@@ -14,6 +14,19 @@
 //! layer (`docs/encrypted_payload_storage_boundary.md`) would need to
 //! route an envelope without inspecting its contents.
 //!
+//! Stage 182 update — `CiphertextEncodingPlaceholder` gains a SECOND
+//! variant, `CanonicalJsonBase64UrlPlaceholder`, recording
+//! `docs/ciphertext_serialization_format_decision.md`'s MVP encoding
+//! decision (canonical JSON + base64url fields, field order `v`/`alg`/
+//! `aad`/`n`/`ct`/`tag`) — still a LABEL only, not a codec. No encode/
+//! decode function, no `serde`/base64 dependency, and no `Cargo.toml`
+//! change come with this label; see that document's §6 and §7 for the
+//! exact scope of what this stage adds versus what remains Stage 186
+//! candidate work ("Ciphertext serialization implementation in Rust").
+//! `new_placeholder` now defaults to the NEW variant (the decision has
+//! been made); `Undecided` remains a valid, constructible variant for a
+//! descriptor that deliberately does not yet commit to it.
+//!
 //! Every type here is deliberately SEPARATE from its lookalikes elsewhere
 //! in this crate — `CiphertextTransportAlgorithm` is NOT
 //! `crypto::aead_internal::AeadCipher` and NOT
@@ -55,15 +68,28 @@ pub(crate) enum CiphertextTransportAlgorithm {
     Aes256Gcm,
 }
 
-/// Whether a wire encoding has been chosen for this ciphertext yet —
-/// exactly one variant today, `Undecided`, because
-/// `docs/ciphertext_envelope_serialization_plan.md` deliberately does NOT
-/// pick an MVP encoding (JSON/base64/CBOR/binary all remain candidates).
-/// A future stage that picks one adds new variants here as its own
-/// explicit, reviewed change — never silently. Crate-private only.
+/// Whether a wire encoding has been chosen for this ciphertext yet, and
+/// which one — a LABEL only, never a codec. `Undecided` was this enum's
+/// sole variant through Stage 177–181
+/// (`docs/ciphertext_envelope_serialization_plan.md` deliberately did NOT
+/// pick an MVP encoding then). Stage 182 adds
+/// `CanonicalJsonBase64UrlPlaceholder`, recording
+/// `docs/ciphertext_serialization_format_decision.md`'s MVP decision
+/// (canonical JSON + base64url fields) — still no encode/decode function
+/// exists anywhere in this crate; this variant only lets a descriptor
+/// NAME the decision. `Undecided` remains valid — a future stage that
+/// implements a DIFFERENT or ADDITIONAL encoding adds its own new variant
+/// here as its own explicit, reviewed change — never silently, and never
+/// by repurposing an existing variant's meaning. Crate-private only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CiphertextEncodingPlaceholder {
     Undecided,
+    /// Records `docs/ciphertext_serialization_format_decision.md`'s Stage
+    /// 182 MVP choice — canonical JSON, with `n`/`ct`/`tag` base64url
+    /// encoded, in the fixed field order `v`/`alg`/`aad`/`n`/`ct`/`tag`.
+    /// A label only: no serialization function exists anywhere in this
+    /// crate that produces or consumes this shape.
+    CanonicalJsonBase64UrlPlaceholder,
 }
 
 /// Which future destination a ciphertext is headed for — a label only, no
@@ -105,19 +131,40 @@ pub(crate) struct CiphertextTransportDescriptor {
 impl CiphertextTransportDescriptor {
     /// Construct a descriptor naming `algorithm` and `transport_kind`.
     /// `version` is always `V1` (the only version this crate produces
-    /// today); `encoding` is always `Undecided` (no encoding is chosen by
-    /// this skeleton); `status` is always `Unavailable` (no real transport
-    /// wiring exists yet). Takes no ciphertext, nonce, tag, or key
-    /// parameter of any kind — there is nothing here for this constructor
-    /// to accept.
+    /// today); `encoding` defaults to
+    /// `CiphertextEncodingPlaceholder::CanonicalJsonBase64UrlPlaceholder`
+    /// as of Stage 182 (recording
+    /// `docs/ciphertext_serialization_format_decision.md`'s MVP choice —
+    /// still a label, no codec exists); `status` is always `Unavailable`
+    /// (no real transport wiring exists yet). Takes no ciphertext, nonce,
+    /// tag, or key parameter of any kind — there is nothing here for this
+    /// constructor to accept. Use
+    /// [`CiphertextTransportDescriptor::new_placeholder_with_encoding`] to
+    /// construct one still recording `Undecided` instead.
     pub(crate) fn new_placeholder(
         algorithm: CiphertextTransportAlgorithm,
         transport_kind: CiphertextTransportKind,
     ) -> Self {
+        Self::new_placeholder_with_encoding(
+            algorithm,
+            transport_kind,
+            CiphertextEncodingPlaceholder::CanonicalJsonBase64UrlPlaceholder,
+        )
+    }
+
+    /// Same as [`CiphertextTransportDescriptor::new_placeholder`], but
+    /// lets the caller pick `encoding` explicitly — e.g. `Undecided`, for
+    /// a descriptor that deliberately does not yet commit to the Stage
+    /// 182 decision.
+    pub(crate) fn new_placeholder_with_encoding(
+        algorithm: CiphertextTransportAlgorithm,
+        transport_kind: CiphertextTransportKind,
+        encoding: CiphertextEncodingPlaceholder,
+    ) -> Self {
         Self {
             version: CiphertextTransportVersion::V1,
             algorithm,
-            encoding: CiphertextEncodingPlaceholder::Undecided,
+            encoding,
             transport_kind,
             status: CiphertextTransportStatus::Unavailable,
         }
@@ -149,7 +196,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_placeholder_always_reports_v1_undecided_encoding_and_unavailable_status() {
+    fn new_placeholder_always_reports_v1_canonical_json_encoding_and_unavailable_status() {
         for algorithm in [
             CiphertextTransportAlgorithm::ChaCha20Poly1305,
             CiphertextTransportAlgorithm::Aes256Gcm,
@@ -161,11 +208,24 @@ mod tests {
                 let descriptor = CiphertextTransportDescriptor::new_placeholder(algorithm, transport_kind);
                 assert_eq!(descriptor.version(), CiphertextTransportVersion::V1);
                 assert_eq!(descriptor.algorithm(), algorithm);
-                assert_eq!(descriptor.encoding(), CiphertextEncodingPlaceholder::Undecided);
+                assert_eq!(
+                    descriptor.encoding(),
+                    CiphertextEncodingPlaceholder::CanonicalJsonBase64UrlPlaceholder
+                );
                 assert_eq!(descriptor.transport_kind(), transport_kind);
                 assert_eq!(descriptor.status(), CiphertextTransportStatus::Unavailable);
             }
         }
+    }
+
+    #[test]
+    fn new_placeholder_with_encoding_can_still_construct_an_undecided_descriptor() {
+        let descriptor = CiphertextTransportDescriptor::new_placeholder_with_encoding(
+            CiphertextTransportAlgorithm::ChaCha20Poly1305,
+            CiphertextTransportKind::Storage,
+            CiphertextEncodingPlaceholder::Undecided,
+        );
+        assert_eq!(descriptor.encoding(), CiphertextEncodingPlaceholder::Undecided);
     }
 
     #[test]
@@ -197,10 +257,21 @@ mod tests {
     }
 
     #[test]
-    fn ciphertext_encoding_placeholder_has_no_variant_other_than_undecided() {
-        let encoding = CiphertextEncodingPlaceholder::Undecided;
-        match encoding {
-            CiphertextEncodingPlaceholder::Undecided => {}
+    fn ciphertext_encoding_placeholder_has_no_variant_other_than_undecided_and_canonical_json() {
+        // A structural guard, updated Stage 182: exhaustively matching
+        // both variants compiles only if these two are still the sole
+        // variants — if a future stage adds a third, this match becomes
+        // non-exhaustive and fails to compile, forcing that stage to
+        // review this test deliberately (the same discipline that forced
+        // THIS update when `CanonicalJsonBase64UrlPlaceholder` was added).
+        for encoding in [
+            CiphertextEncodingPlaceholder::Undecided,
+            CiphertextEncodingPlaceholder::CanonicalJsonBase64UrlPlaceholder,
+        ] {
+            match encoding {
+                CiphertextEncodingPlaceholder::Undecided => {}
+                CiphertextEncodingPlaceholder::CanonicalJsonBase64UrlPlaceholder => {}
+            }
         }
     }
 

@@ -96,13 +96,21 @@ describe("FedOS Rust crate — ciphertext transport descriptor + NIP-44/storage 
     expect(body).not.toMatch(/\[\s*u8\s*;/);
   });
 
-  it("4. CiphertextEncodingPlaceholder has exactly one variant, Undecided — no encoding is chosen by this skeleton", () => {
+  it("4. CiphertextEncodingPlaceholder has exactly two variants, Undecided and CanonicalJsonBase64UrlPlaceholder (Stage 182) — still a label, no codec", () => {
     const enumMatch = transportSource.match(
-      /pub\(crate\)\s+enum\s+CiphertextEncodingPlaceholder\s*\{([\s\S]*?)\}/,
+      /pub\(crate\)\s+enum\s+CiphertextEncodingPlaceholder\s*\{([\s\S]*?)\n\}/,
     );
     expect(enumMatch).not.toBeNull();
-    const variants = [...(enumMatch![1] ?? "").matchAll(/([A-Za-z0-9_]+)\s*,/g)].map((m) => m[1]);
-    expect(variants).toEqual(["Undecided"]);
+    const body = (enumMatch![1] ?? "").replace(/\/\/\/.*$/gm, ""); // strip doc-comment lines before scanning for variants
+    const variants = [...body.matchAll(/^\s*([A-Za-z0-9_]+)\s*,/gm)].map((m) => m[1]);
+    expect([...variants].sort()).toEqual(
+      ["Undecided", "CanonicalJsonBase64UrlPlaceholder"].sort(),
+    );
+  });
+
+  it("4b. the new CanonicalJsonBase64UrlPlaceholder variant records the Stage 182 decision as a label only — no encode/decode function anywhere", () => {
+    expect(transportSource).toContain("CanonicalJsonBase64UrlPlaceholder");
+    expect(transportSource).not.toMatch(/\bfn\s+\w*(encode|decode|serialize|deserialize)\w*\s*\(/i);
   });
 
   it("5. CiphertextTransportKind has exactly Storage and NostrEvent — labels only, no connection", () => {

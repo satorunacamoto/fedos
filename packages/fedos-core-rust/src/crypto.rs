@@ -68,6 +68,16 @@
 //! module-level doc comment, `docs/ciphertext_envelope_serialization_plan.md`,
 //! and `docs/encrypted_payload_storage_boundary.md` for the full design
 //! and planning records.
+//!
+//! Stage 182 updates `ciphertext_transport`'s `CiphertextEncodingPlaceholder`
+//! with a second variant, `CanonicalJsonBase64UrlPlaceholder`, recording
+//! `docs/ciphertext_serialization_format_decision.md`'s MVP encoding
+//! decision (canonical JSON + base64url fields) — still a label only, no
+//! encode/decode function, no `serde`/base64 dependency, no `Cargo.toml`
+//! change. `Undecided` remains valid; `new_placeholder` now defaults to
+//! the new variant, and a new
+//! `new_placeholder_with_encoding` constructor lets a caller pick either
+//! explicitly.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;

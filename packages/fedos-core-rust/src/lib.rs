@@ -543,6 +543,31 @@
 //! still twenty-seven `pub fn`s. No Runtime/Worker/Storage/Nostr/NIP-44/
 //! WASM connection, no serialization implementation, no `Cargo.toml`
 //! change, no new dependency.
+//!
+//! Stage 182 picks the MVP wire encoding Stage 179 deliberately left
+//! open: `docs/ciphertext_serialization_format_decision.md` chooses
+//! canonical JSON + base64url fields, fixes the canonical field order
+//! (`v`/`alg`/`aad`/`n`/`ct`/`tag`), and updates
+//! `crypto::ciphertext_transport::CiphertextEncodingPlaceholder` with a
+//! second variant, `CanonicalJsonBase64UrlPlaceholder` (`Undecided`
+//! remains valid) — still a label, no encode/decode function, no
+//! `serde`/base64 dependency, no `Cargo.toml` change. Stage 183 adds
+//! `src/storage/encrypted_payload.ts` (TypeScript side): an
+//! `EncryptedPayloadDescriptor` boundary mirroring this crate's
+//! label-only discipline — no payload bytes, no plaintext, no raw key,
+//! rejecting buyer/payment/entitlement/chat metadata, not wired to
+//! `StorageBackend`/`FederationProvider`/Runtime/Worker. Stage 184 updates
+//! `docs/encrypted_payload_storage_boundary.md`/`docs/nostr_adapter_planning.md`
+//! naming the new TypeScript descriptor as the pre-`StorageBackend` step,
+//! still not connected. Stage 185 adds `docs/nip44_vector_readiness.md`,
+//! confirming `test-vectors/nip44/nip44-v2.json`'s existing categories and
+//! fixing the implementation ORDER a future NIP-44 stage must follow
+//! (vector schema guard → secp256k1 dependency adoption → conversation-key
+//! test → message-key test → padding test → encrypt/decrypt test →
+//! invalid-case test) — no NIP-44 code, no secp256k1 dependency. No public
+//! API addition across Stage 182–185 — still twenty-seven `pub fn`s. No
+//! Runtime/Worker/Storage/Nostr/NIP-44/WASM connection, no `Cargo.toml`
+//! change, no new dependency.
 
 #![forbid(unsafe_code)]
 

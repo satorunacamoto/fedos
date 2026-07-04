@@ -1,9 +1,13 @@
-# Ciphertext Envelope Serialization Plan (Stage 177) — binding, docs only
+# Ciphertext Envelope Serialization Plan (Stage 177, updated Stage 182) — binding, docs only
 
-**Status: this document adds no code.** It fixes, in writing, the field
-list a future ciphertext WIRE format would need, compares candidate
-encodings, and fixes the SELECTION CRITERIA a future stage must satisfy —
-without picking an MVP encoding. This is the same "fix the shape before
+**Status: this document adds no code. The MVP encoding this document
+originally left open is now DECIDED — see §9 and
+`docs/ciphertext_serialization_format_decision.md` (Stage 182).** This
+document still fixes, in writing, the field list a future ciphertext WIRE
+format would need, compares candidate encodings, and fixes the SELECTION
+CRITERIA a future stage must satisfy — §9 below records which candidate
+was picked and why, without adding any implementation itself. This is the
+same "fix the shape before
 the implementation" discipline `docs/ciphertext_envelope_plan.md` used for
 `AeadCiphertextEnvelope`'s field list before Stage 157–158 implemented it,
 and `docs/secret_handle_api_shape.md` used for `SecretHandle` before Stage
@@ -224,3 +228,26 @@ that future stage's own decision, not assumed by this document.
   no public API, no `Cargo.toml` change.
 - **The actual encoding decision is Stage 182 candidate work**
   ("Ciphertext envelope serialization format decision"), not made here.
+
+## 9. Stage 182 update — the MVP encoding is now DECIDED
+
+`docs/ciphertext_serialization_format_decision.md` (Stage 182) picks
+**canonical JSON + base64url fields** as the MVP encoding, weighed
+explicitly against this document's own §4 selection criteria, and fixes
+the canonical field order (`v`/`alg`/`aad`/`n`/`ct`/`tag`) an implementing
+stage must produce. This is a DECISION, still not an implementation — no
+encode/decode function, no `serde_json` promotion to `[dependencies]`, no
+base64url-encoding dependency, and no `Cargo.toml` change exist anywhere
+in this crate as of Stage 182. See that document for the full reasoning
+and the exclusions (still no key ID, no secret, no buyer/payment/
+entitlement metadata) it restates unchanged from this document's own §2.2.
+
+`crypto::ciphertext_transport::CiphertextEncodingPlaceholder` gains one
+additive label, `CanonicalJsonBase64UrlPlaceholder`, alongside its
+original `Undecided` variant — recording the decision, not implementing
+it. See that module's own doc comment for the exact record.
+
+The actual Rust implementation (encode/decode functions, the dependency
+adoption this decision explicitly does not authorize, and a round-trip
+`cargo test` suite) remains Stage 186 candidate work ("Ciphertext
+serialization implementation in Rust"), not built here either.
