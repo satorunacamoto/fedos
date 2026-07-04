@@ -3826,3 +3826,40 @@ Rust-only (no TypeScript JSON/base64 codec added), no NIP-44
 cryptographic implementation exists anywhere, no Runtime/Worker/Storage/
 Nostr wiring, `Cargo.toml`/`package.json` unchanged, and the `pub fn`
 surface is unchanged at twenty-seven.
+
+## Encrypted payload preview + diagnostics + NIP-44 dependency adoption planning (Stage 189–193)
+
+Stage 189–193 add NO new cryptography anywhere. Stage 189–191 are
+TypeScript-side display/boundary work (`src/render/`, `src/storage/`);
+Stage 192 is a Rust-crate dependency PLANNING document (no `Cargo.toml`
+change); Stage 193 is a pre-adoption JS guard.
+
+**Stage 192**: [`docs/nip44_dependency_adoption.md`](../../docs/nip44_dependency_adoption.md)
+(new) compares the two realistic secp256k1/ECDH candidates for
+`docs/nip44_internal_plan.md`'s conversation-key derivation —
+`rust-secp256k1` (C-FFI bindings to `libsecp256k1`, the same library
+Bitcoin Core runs in production; the first C-FFI/`unsafe`-internally
+candidate this crate has ever considered) and `k256` (pure Rust,
+RustCrypto family — the same organization behind `hkdf`/`aes-gcm`/`sha2`/
+`subtle`, already in this crate's dependency tree) — against nine fixed
+adoption criteria (feature minimalism, no `rand`/`serde` feature, a
+citable audit posture rather than an assumed one, `no_std`/WASM posture,
+MSRV, one-crate-per-stage scope discipline). **Picks neither.**
+`Cargo.toml` is unchanged — still 9 production dependencies, still zero
+secp256k1/ECDH crates.
+
+**Stage 193**: a pre-adoption JS guard suite (see
+[`test/nip44_pre_adoption_guard.test.ts`](../../test/nip44_pre_adoption_guard.test.ts))
+confirms, from OUTSIDE the crate, that none of this planning slipped into
+code: `Cargo.toml` byte-for-byte unchanged, no `secp256k1`/`k256`
+dependency, no NIP-44 cryptographic function (ECDH, conversation-key,
+message-key, padding, MAC, encrypt, decrypt) exists anywhere in this
+crate's production code, and the public `pub fn` surface is unchanged at
+twenty-seven.
+
+Stage 189–191's TypeScript-side work — `src/render/encrypted_payload_preview.ts`,
+`src/render/payload_diagnostics.ts`, and the `PayloadPreviewDescriptor`/
+`PayloadDiagnosticsDescriptor` extension to `src/storage/encrypted_payload.ts` —
+lives entirely outside this Rust crate (there is still no Rust↔TypeScript
+bridge); see the repository root `README.md`'s Stage 189–193 entry for
+the full record of that work.
