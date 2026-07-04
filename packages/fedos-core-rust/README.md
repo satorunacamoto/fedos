@@ -3591,3 +3591,75 @@ file that asserts an exact `pub fn` count or name list (now 26 → 27
 throughout): no Runtime/Worker/Storage/Nostr/NIP-44 connection, no
 `panic!`/`unwrap`/`expect`, and the twenty-seven-function `pub fn`
 surface verified by name.
+
+## Ciphertext serialization + NIP-44 + storage/send boundary planning (Stage 177–181)
+
+Stage 177–181 are **planning, skeleton, docs, and guards only** — no real
+serialization, no NIP-44 implementation, and no Runtime/Worker/Storage/
+Nostr connection of any kind.
+
+**Stage 177–178**: a new crate-private module,
+[`src/crypto/ciphertext_transport.rs`](src/crypto/ciphertext_transport.rs),
+adds `CiphertextTransportDescriptor` — a LABEL-ONLY descriptor naming
+`version` (`V1` only), `algorithm` (`ChaCha20Poly1305`/`Aes256Gcm`, its own
+type, separate from `aead_internal`'s and `ciphertext_envelope`'s own
+algorithm labels), `encoding` (`CiphertextEncodingPlaceholder::Undecided`
+— its one variant, since no wire encoding is chosen yet), `transport_kind`
+(`Storage`/`NostrEvent` — naming a future destination, connecting to
+neither), and `status` (`Unavailable`). Holds no ciphertext, nonce, tag,
+or key. Deliberately unconnected to `crypto::ciphertext_envelope`'s real
+envelope type and to any real transport.
+
+**Stage 179**: [`docs/ciphertext_envelope_serialization_plan.md`](../../docs/ciphertext_envelope_serialization_plan.md)
+fixes the wire-format field list (extending
+`docs/ciphertext_envelope_plan.md`'s in-memory fields with framing
+concerns), compares four candidate encodings (JSON, base64, CBOR, raw
+binary) against seven fixed selection criteria, and picks NO MVP encoding.
+Raw secret, a key-identifier field, and buyer/payment/entitlement metadata
+are all explicitly excluded from the future format.
+
+**Stage 180**: [`docs/nip44_internal_plan.md`](../../docs/nip44_internal_plan.md)
+fixes NIP-44 v2's full pipeline in writing — secp256k1 ECDH →
+HKDF-extract (conversation key) → HKDF-expand (per-message chacha_key/
+nonce/hmac_key) → pad-then-ChaCha20-encrypt → version‖nonce‖ciphertext‖
+hmac_tag (base64) → HMAC-then-decrypt with fixed failure labels — against
+this repository's already-imported `test-vectors/nip44/nip44-v2.json`, and
+names a `SecretHandle` connection strategy for the conversation key. No
+NIP-44 code, no secp256k1 dependency, no Chat/DM connection.
+
+**Stage 181**: [`docs/encrypted_payload_storage_boundary.md`](../../docs/encrypted_payload_storage_boundary.md)
+fixes what a future encrypted payload MAY hand to `StorageBackend`
+(`src/storage/types.ts`) — an encrypted payload descriptor, an opaque
+`idRef`, an algorithm label; never a raw key, plaintext, or bare extracted
+nonce — and to a `FederationProvider` (`src/federation/types.ts`) — a
+public event candidate by default, or an encrypted payload only when a
+specific write explicitly opts in. No `StorageBackend`/`FederationProvider`
+implementation change; this crate remains `crate-type = ["rlib"]` only,
+with no WASM/FFI bridge to TypeScript.
+
+**What is explicitly NOT implemented or connected:**
+
+- No JSON/base64/CBOR/binary serialization implementation anywhere.
+- No NIP-44 implementation, no NIP-17, no secp256k1/ECDH dependency.
+- No Chat feature connection.
+- No `StorageBackend`/Nostr/Federation/Runtime/Worker connection.
+- No public API addition — still twenty-seven `pub fn`s.
+- No `Cargo.toml` change, no new dependency.
+- No raw key export, no raw nonce public getter, no raw ciphertext public
+  getter.
+- No buyer/payment/entitlement metadata anywhere in the new docs or code.
+
+**Rust-side test coverage added**: 5 new tests in
+`crypto::ciphertext_transport`'s own `#[cfg(test)] mod tests` (placeholder
+construction reports `V1`/`Undecided`/`Unavailable` for every algorithm ×
+transport-kind combination, algorithm/transport-kind are preserved
+independently, and each single-variant enum has no other variant — an
+exhaustive-match compile-time guard).
+
+See
+[`test/fedos_core_rust_ciphertext_transport.test.ts`](../../test/fedos_core_rust_ciphertext_transport.test.ts)
+for the dedicated Stage 177–181 guard suite: the descriptor is
+`pub(crate)`-only (never `pub`), no serialization/NIP-44 implementation
+exists anywhere in this crate, no Runtime/Worker/Storage/Nostr/NIP-44
+connection, `Cargo.toml` unchanged (still 9 production dependencies), and
+the `pub fn` surface is unchanged at twenty-seven.
