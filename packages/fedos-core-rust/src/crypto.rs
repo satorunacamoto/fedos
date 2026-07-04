@@ -78,6 +78,18 @@
 //! the new variant, and a new
 //! `new_placeholder_with_encoding` constructor lets a caller pick either
 //! explicitly.
+//!
+//! Stage 186 adds `ciphertext_serialization` — the REAL implementation of
+//! that Stage 182 decision: `encode_envelope_internal`/
+//! `decode_envelope_internal` turn a real `ciphertext_envelope::AeadCiphertextEnvelope`
+//! into (and back from) the canonical JSON + base64url wire string, hand-
+//! written against the standard library only (`serde`/`serde_json`/`hex`
+//! remain `[dev-dependencies]`-only — no `Cargo.toml` change). Both
+//! functions stay `pub(crate)`-only; neither is wired to `fedos_encrypt`/
+//! `fedos_decrypt`, `aead_envelope_bridge`, or `ciphertext_transport` yet
+//! — see `ciphertext_serialization`'s own module-level doc comment and
+//! `docs/ciphertext_serialization_format_decision.md` for the full design
+//! record.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -85,5 +97,8 @@ pub(crate) mod aead_envelope_bridge;
 pub(crate) mod aead_internal;
 pub(crate) mod capability_matrix;
 pub(crate) mod ciphertext_envelope;
+pub(crate) mod ciphertext_serialization;
 pub(crate) mod ciphertext_transport;
 pub(crate) mod diagnostics;
+#[cfg(test)]
+mod nip44_vector_schema;

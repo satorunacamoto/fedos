@@ -568,6 +568,30 @@
 //! API addition across Stage 182–185 — still twenty-seven `pub fn`s. No
 //! Runtime/Worker/Storage/Nostr/NIP-44/WASM connection, no `Cargo.toml`
 //! change, no new dependency.
+//!
+//! Stage 186 IMPLEMENTS the Stage 182 decision:
+//! `crypto::ciphertext_serialization` (new) adds
+//! `encode_envelope_internal`/`decode_envelope_internal`, hand-written
+//! against the standard library only (`serde`/`serde_json`/`hex` remain
+//! `[dev-dependencies]`-only — no dependency promotion, no `Cargo.toml`
+//! change) — safe because the wire schema is fully closed (fixed labels,
+//! one small integer, base64url text). Field order is STRICT both
+//! directions (a reordered document is rejected); `ct`/`tag` are split
+//! wire fields even though the in-memory `AeadCiphertextEnvelope` keeps
+//! them combined. Connects to the REAL envelope type but is not yet wired
+//! to `fedos_encrypt`/`fedos_decrypt` or any bridge — both functions stay
+//! `pub(crate)`-only. Stage 187 adds `crypto::nip44_vector_schema`
+//! (compiled only under `cargo test`, never in a plain build): confirms
+//! `test-vectors/nip44/nip44-v2.json`'s 8
+//! categories parse and match `docs/nip44_vector_readiness.md`'s schema —
+//! `docs/nip44_vector_readiness.md` §3's step 1 ("vector schema guard"),
+//! and ONLY that step. No cryptographic verification, no secp256k1
+//! dependency. Stage 188 updates
+//! `docs/ciphertext_serialization_format_decision.md`/
+//! `docs/nip44_vector_readiness.md` recording both as complete. No public
+//! API addition — still twenty-seven `pub fn`s. No Runtime/Worker/
+//! Storage/Nostr/NIP-44-cryptography/WASM connection, no `Cargo.toml`
+//! change, no new dependency.
 
 #![forbid(unsafe_code)]
 
