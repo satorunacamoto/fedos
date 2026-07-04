@@ -39,21 +39,34 @@ import federationTypesSource from "../src/federation/types.ts?raw";
 import packageJsonSource from "../package.json?raw";
 
 /**
- * Stage 214–218 — "NIP-44 v2 exact wire preparation". Three new docs
+ * Stage 214–218 — "NIP-44 v2 exact wire preparation". Three docs
  * (`docs/nip44_message_key_review.md`, `docs/nip44_wire_nonce.md`,
  * `docs/nip44_wire_payload_layout.md`) fix the exact per-message key
  * derivation, the 32-byte wire nonce, and the fixed wire payload field
- * order in writing, and `crypto::nip44_message_keys` (new) adds a
- * LABEL-ONLY skeleton naming the three derived values
- * (`chacha_key`/`chacha_nonce`/`hmac_key`) with a single
- * `derive_message_keys_exact_placeholder` function that takes no input
- * and returns only `Placeholder` status. **No HKDF call, no nonce
- * generation, no HMAC, no ChaCha20 stream cipher, no
- * `ConversationKey`/`MessageKey`/`hkdf_bridge` change, no public API
- * addition, no Runtime/Worker/Storage/Relay connection, no new Cargo
- * dependency** — every one of those is verified absent below.
+ * order in writing.
+ *
+ * **Superseded IN PART by Stage 219–223** — `crypto::nip44_message_keys`
+ * replaces its Stage 217 `derive_message_keys_exact_placeholder`
+ * label-only skeleton with the REAL HKDF-Expand derivation
+ * `docs/nip44_message_key_review.md` reviewed: `derive_message_keys_exact_internal`
+ * (`&ConversationKey`-facing) and `derive_message_keys_exact_from_bytes_internal`
+ * (a lower-level pure-bytes engine, `pub(crate)` so
+ * `nip44_message_key_vectors`, Stage 220, can feed it vector bytes
+ * directly). `Nip44MessageKeyStatus` drops `Placeholder` for
+ * `Ready`/`InvalidConversationKey`/`InternalFailure`. Tests 6–9 below are
+ * updated accordingly to the current, real shape — see
+ * `test/fedos_core_rust_nip44_message_key_vectors.test.ts` for the
+ * dedicated Stage 219–223 checks. What remains true unchanged: the three
+ * docs (tests 1–3), `crypto::conversation_key`/`crypto::message_key`/
+ * `crypto::hkdf_bridge` stay untouched (test 11), `crypto::nip44_wire`
+ * stays untouched (test 12), and the public `pub fn` surface stays
+ * unchanged at twenty-seven (test 15). **No HMAC, no ChaCha20 stream
+ * cipher, no base64, no `ConversationKey`/`MessageKey`/`hkdf_bridge`
+ * change, no public API addition, no Runtime/Worker/Storage/Relay
+ * connection, no new Cargo dependency** — every one of those is verified
+ * absent below.
  */
-describe("NIP-44 exact message key derivation review + skeleton (Stage 214-218)", () => {
+describe("NIP-44 exact message key derivation review + skeleton (Stage 214-218, updated Stage 219-223)", () => {
   function productionOnlyOf(source: string): string {
     const idx = source.indexOf("#[cfg(test)]");
     return idx === -1 ? source : source.slice(0, idx);
@@ -120,47 +133,57 @@ describe("NIP-44 exact message key derivation review + skeleton (Stage 214-218)"
     expect(nip44MessageKeysSource).not.toMatch(/^\s*pub\s+mod\s+/m);
   });
 
-  it("6. nip44_message_keys declares exactly the documented types and function", () => {
+  it("6. nip44_message_keys declares exactly the documented types and functions (Stage 219 real implementation)", () => {
     for (const item of [
       "pub(crate) enum Nip44DerivedKeyKind",
       "pub(crate) enum Nip44MessageKeyStatus",
       "pub(crate) struct Nip44MessageKeyDecision",
-      "pub(crate) fn derive_message_keys_exact_placeholder",
+      "pub(crate) fn derive_message_keys_exact_internal",
+      "pub(crate) fn derive_message_keys_exact_from_bytes_internal",
     ]) {
       expect(nip44MessageKeysSource).toContain(item);
     }
+    // The module's own doc comment legitimately NAMES the retired Stage 217
+    // function for historical continuity — only the CODE must no longer
+    // declare it.
+    expect(codeOnlyOf(nip44MessageKeysSource)).not.toMatch(
+      /fn\s+derive_message_keys_exact_placeholder/,
+    );
   });
 
-  it("7. Nip44MessageKeyStatus has no variant other than Placeholder — derive_message_keys_exact_placeholder is placeholder-only", () => {
+  it("7. Nip44MessageKeyStatus has no variant other than Ready/InvalidConversationKey/InternalFailure — Placeholder is removed", () => {
     const enumMatch = nip44MessageKeysSource.match(
       /pub\(crate\)\s+enum\s+Nip44MessageKeyStatus\s*\{([\s\S]*?)\n\}/,
     );
     expect(enumMatch, "expected to find the Nip44MessageKeyStatus enum body").not.toBeNull();
     const variants = [...enumMatch![1].matchAll(/^\s*(\w+),?\s*$/gm)].map((m) => m[1]);
-    expect(variants).toEqual(["Placeholder"]);
+    expect(variants).toEqual(["Ready", "InvalidConversationKey", "InternalFailure"]);
+    expect(variants).not.toContain("Placeholder");
   });
 
-  it("8. derive_message_keys_exact_placeholder takes no parameter", () => {
+  it("8. derive_message_keys_exact_internal takes a ConversationKey and a 32-byte nonce (no longer parameterless)", () => {
     const fnMatch = nip44MessageKeysSource.match(
-      /pub\(crate\)\s+fn\s+derive_message_keys_exact_placeholder\s*\(([^)]*)\)/,
+      /pub\(crate\)\s+fn\s+derive_message_keys_exact_internal\s*\(([^)]*)\)/,
     );
-    expect(fnMatch, "expected to find derive_message_keys_exact_placeholder's signature").not.toBeNull();
-    expect(fnMatch![1].trim()).toBe("");
+    expect(fnMatch, "expected to find derive_message_keys_exact_internal's signature").not.toBeNull();
+    expect(fnMatch![1]).toMatch(/conversation_key\s*:\s*&ConversationKey/);
+    expect(fnMatch![1]).toMatch(/nonce\s*:\s*&\[u8;\s*32\]/);
   });
 
-  it("9. no HKDF/nonce-generation/HMAC/ChaCha20 connection in nip44_message_keys — no real derivation exists yet", () => {
-    // Doc comments legitimately NAME `use hkdf::`/`Hkdf::`/`ConversationKey`/
-    // `HkdfDomain`/etc. in "this module does NOT use X" reassurance prose
-    // (mirroring `nip44_encrypt_decrypt_guard`'s own `strip_comment_lines`
-    // rationale) — only the CODE (not comments) must never reference them.
+  it("9. real HKDF-expand (from_prk, never extract) is used; still no HMAC/ChaCha20-stream/nonce-generation connection", () => {
+    // Doc comments legitimately NAME `use hmac::`/`use chacha20::`/etc. in
+    // "this module does NOT use X" reassurance prose (mirroring
+    // `nip44_encrypt_decrypt_guard`'s own `strip_comment_lines` rationale)
+    // — only the CODE (not comments) must never reference them.
     const codeOnly = codeOnlyOf(nip44MessageKeysSource);
-    expect(codeOnly).not.toMatch(/use\s+hkdf\s*::/);
-    expect(codeOnly).not.toMatch(/Hkdf::/);
+    expect(codeOnly).toMatch(/use\s+hkdf\s*::/);
+    expect(codeOnly).toMatch(/Hkdf::<Sha256>::from_prk/);
+    expect(codeOnly).not.toMatch(/Hkdf::extract/);
+    expect(codeOnly).not.toMatch(/Hkdf::new\s*\(/);
     expect(codeOnly).not.toMatch(/use\s+hmac\s*::/);
     expect(codeOnly).not.toMatch(/use\s+chacha20\s*::/);
     expect(codeOnly).not.toMatch(/fedos_random_bytes_32/);
     expect(codeOnly).not.toMatch(/fedos_aead_nonce_96/);
-    expect(codeOnly).not.toMatch(/ConversationKey/);
     expect(codeOnly).not.toMatch(/HkdfDomain/);
   });
 

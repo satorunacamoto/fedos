@@ -186,11 +186,24 @@
 //! three-way 76-byte split). `docs/nip44_wire_nonce.md` and
 //! `docs/nip44_wire_payload_layout.md` review the 32-byte per-message
 //! nonce and the fixed wire field order/lengths respectively — docs only,
-//! no serialize/deserialize code. No HKDF call, no nonce generation, no
-//! HMAC-SHA256, no ChaCha20 stream cipher, no `ConversationKey`/
-//! `HkdfDomain` change, no `capability_matrix`/`diagnostics` change, no
-//! public API addition, no Runtime/Worker/Storage/Relay connection, no
-//! new `Cargo.toml` dependency.
+//! no serialize/deserialize code.
+//!
+//! Stage 219 replaces `nip44_message_keys`'s label-only skeleton with the
+//! REAL derivation `docs/nip44_message_key_review.md` reviewed:
+//! `derive_message_keys_exact_internal` (the `ConversationKey`-facing
+//! entry point) and `derive_message_keys_exact_from_bytes_internal` (a
+//! lower-level pure-bytes engine, kept `pub(crate)` for the sibling
+//! vector-verification module a following stage adds — see
+//! `nip44_message_keys`'s own module-level doc comment for why).
+//! `Nip44MessageKeyStatus` drops its Stage 217 `Placeholder` variant for
+//! `Ready`/`InvalidConversationKey`/`InternalFailure`. Still no ChaCha20
+//! stream-cipher call, no HMAC-SHA256 call, no base64, no wire payload/
+//! serialization, no change to `crypto::conversation_key`/
+//! `crypto::message_key`/`crypto::hkdf_bridge` (all three remain
+//! UNCHANGED), no `capability_matrix`/`diagnostics` capability-count
+//! change (still sixteen variants), no public API addition, no
+//! Runtime/Worker/Storage/Relay connection, no new `Cargo.toml`
+//! dependency.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
