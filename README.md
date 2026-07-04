@@ -8,7 +8,83 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 119–130 — Boundary Completion Batch (Protocol Adapter /
+> **Status: Stage 131–133 — Boundary Phase index + Implementation
+> readiness checklist + Phase transition roadmap (docs only).** A
+> three-stage, **docs-only** batch that closes out FedOS's Boundary Phase
+> (Stage 1–130) and fixes the map for the next one. **No `src/`,
+> `packages/`, `Cargo.toml`, or `test/` file was touched — no new
+> boundary, no new preview, no new implementation, and no Runtime/Worker/
+> Rust change of any kind.**
+>
+> **Stage 131 — [`docs/boundary_phase_index.md`](docs/boundary_phase_index.md).**
+> A single cross-cutting index over every boundary shipped Stage 1–130,
+> organized into ten categories (Crypto/Identity/Storage/Federation/
+> Social/Creator/Governance/Device/Preview/Docs) instead of chronology —
+> each entry names its stage number, file(s), role, implemented scope, and
+> explicit NOT-implemented scope. Its conclusion (§12) restates, in one
+> place, that real cryptography, real network transport, real payment/
+> settlement, and real persistent storage do not exist anywhere in this
+> codebase — every provider shipped is `Noop*`/`Placeholder*`/in-memory/
+> mock, with the narrow exceptions already on record (NIP-07 delegation,
+> Noble Schnorr verification, D1/KV/R2/MeshKV behind opt-in gates, and the
+> RFC/NIST-vector-verified `cfg(test)`-only AEAD/KDF crates).
+>
+> **Stage 132 — [`docs/implementation_readiness_checklist.md`](docs/implementation_readiness_checklist.md).**
+> A `[ ]`/`[x]` checklist across six areas — Crypto (`randomBytes`, nonce
+> policy, `SecretHandle` real bytes, HKDF/AEAD internal implementation,
+> public `encrypt`/`decrypt`/`deriveKey`), Storage (local-only-first
+> sequencing, encrypted packet format, no Google Drive direct dependency),
+> Federation (Nostr signing, relay connection, publish-queue retry
+> policy), Creator (listing/entitlement models, payment deferred),
+> Security (threat model, secret lifecycle, logging ban, no shadow-vault/
+> anti-analysis implementation), and Testing (RFC vectors green, no
+> secrets in logs, no Runtime auto-call without an explicit flag) — each
+> item cites the exact stage/doc that satisfies it, or names it as an open
+> blocker for Stage 134+. An `[x]` marks a **precondition** satisfied
+> (a policy or safety-rule doc exists), never that the real primitive is
+> implemented; §7 records this session's verified baseline (`npm run
+> typecheck` green; `npm test` **129 files, 1923 tests**, green; `cargo`
+> not on `PATH` in this environment, so `cargo check`/`cargo test` were
+> not re-run — no Rust file has changed since Stage 106's last recorded
+> green run).
+>
+> **Stage 133 — [`docs/implementation_phase_roadmap.md`](docs/implementation_phase_roadmap.md).**
+> Fixes the recommended Stage 134+ order — ten items from a nonce-policy
+> doc through Nostr signing/publish, each its own reviewed stage — plus
+> why each is split rather than merged, three cross-domain combinations
+> that are explicitly forbidden (crypto+storage+federation in one stage,
+> payment+entitlement in one stage, NIP-44+chat in one stage), a rollback
+> strategy (every stage independently revertible, every opt-in flag
+> defaults off, no vector/guard-test weakening to force a revert to pass),
+> and the test gates every future stage must clear. It deliberately
+> reorders `docs/fedos_core_architecture_freeze_v1.md` §11's plain
+> adoption list: nonce generation policy now comes **before** the
+> `randomBytes` implementation, since `getrandom` is already adopted
+> (Stage 104) and fixing nonce discipline in writing first prevents the
+> exact (key, nonce) reuse accident that discipline exists to prevent once
+> a real AEAD implementation lands.
+>
+> **Boundary Phase: complete.** Stage 1–130 shipped the full boundary/
+> preview surface across every domain this product needs; Stage 131–133
+> closes that phase with an index, a readiness checklist, and a roadmap
+> instead of one more boundary. **The Implementation Phase has not
+> started.** No `randomBytes`, nonce policy, `SecretHandle` real bytes,
+> HKDF/AEAD internal implementation, public `encrypt`/`decrypt`/
+> `deriveKey`, WASM build, Runtime crypto opt-in, local encrypted storage,
+> or Nostr signing/publish exists yet — Stage 134 is the first stage that
+> may begin it. `npm run typecheck` and `npm test` (129 files, 1923 tests)
+> stay GREEN; `git status` is clean aside from this docs batch (the
+> pre-existing untracked `.claude/` directory is unrelated). Stage 134
+> candidates, in the roadmap's recommended order: (1) **nonce generation
+> policy docs** (short, docs-only — fixes the scheme/source/reuse-
+> prevention question before any byte-producing code); (2) **Rust
+> `randomBytes` implementation** (wires the already-adopted `getrandom`
+> dependency, following the nonce policy item); (3) `SecretHandle`
+> real-byte implementation planning (paired with its zeroize guarantee,
+> per `docs/fedos_core_rust_safety.md` §6).
+> Prior status:
+>
+> **Stage 119–130 — Boundary Completion Batch (Protocol Adapter /
 > Creator Governance / Identity & Device suites).** A twelve-stage batch
 > completing FedOS's design-boundary phase — still **no relay/WebSocket/
 > fetch/OAuth connection, no signing, no publish/subscribe, no real crypto,
