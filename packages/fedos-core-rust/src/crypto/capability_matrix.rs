@@ -5,14 +5,20 @@
 //! elliptic-curve arithmetic) — see `diagnostics`'s own module-level doc
 //! comment for why this capability reports `ReadyForImplementation`
 //! rather than `Ready`: the dependency exists, but zero ECDH code has
-//! been written. Crate-private only — see `src/crypto.rs`'s module-level
-//! doc comment for the full scope of this module and its `diagnostics`
+//! been written. Stage 198–201 add four more variants — `MessageKey`,
+//! `Padding`, `Encrypt`, `Decrypt` — completing the fixed future order
+//! `docs/nip44_dependency_adoption.md` §8 names (ECDH → ConversationKey →
+//! MessageKey → Padding → Encrypt → Decrypt → NIP-44) as fully-tracked
+//! capability labels, even though `Padding`/`Encrypt`/`Decrypt` remain
+//! unimplemented this stage — see `diagnostics` for each one's current
+//! readiness. Crate-private only — see `src/crypto.rs`'s module-level doc
+//! comment for the full scope of this module and its `diagnostics`
 //! sibling.
 #![allow(dead_code)]
 
-/// One of this crate's eleven tracked crypto capabilities — a label ONLY,
-/// never a byte, never an operation. Crate-private only; never exposed via
-/// this crate's public API.
+/// One of this crate's fifteen tracked crypto capabilities — a label
+/// ONLY, never a byte, never an operation. Crate-private only; never
+/// exposed via this crate's public API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CryptoCapability {
     /// `fedos_random_bytes_32` (Stage 137).
@@ -45,19 +51,39 @@ pub(crate) enum CryptoCapability {
     /// consumer) — domain label exists (Stage 147); no consumer wired yet.
     StorageKey,
     /// A conversation/messaging-key derivation (an
-    /// `HkdfDomain::Conversation` consumer) — domain label exists (Stage
-    /// 147); no consumer wired yet. Depends on `Ecdh` (above) landing
-    /// FIRST, per `docs/nip44_dependency_adoption.md`'s fixed future
-    /// order — still `NotImplemented`, not promoted alongside `Ecdh` this
-    /// stage.
+    /// `HkdfDomain::Conversation` consumer) — Stage 199 makes this real:
+    /// `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`
+    /// (ECDH + HKDF-extract), vector-verified against
+    /// `test-vectors/nip44/nip44-v2.json`'s `valid`/`invalid
+    /// .get_conversation_key` categories.
     ConversationKey,
+    /// A NIP-44 per-message key (`crypto::message_key`/`crypto::hkdf_bridge`,
+    /// Stage 200–201) — derived FROM `ConversationKey` via the
+    /// pre-existing `HkdfDomain::Conversation`. This is a generic
+    /// architectural bridge, not NIP-44 v2's real per-message
+    /// nonce-salted derivation — see `crypto::hkdf_bridge`'s own
+    /// module-level doc comment.
+    MessageKey,
+    /// NIP-44 v2's logarithmic-bucket plaintext padding scheme
+    /// (`docs/nip44_internal_plan.md` §5) — not yet implemented.
+    Padding,
+    /// NIP-44-specific pad → stream-cipher → MAC encrypt pipeline. The
+    /// underlying primitive families this would need are already present
+    /// transitively in this crate's resolved dependency graph (via its
+    /// existing AEAD/HKDF dependencies), but no NIP-44-specific function is
+    /// wired yet — mirrors how `Aead` itself reported `NotConnected` before Stage
+    /// 152–154's real wiring landed.
+    Encrypt,
+    /// NIP-44-specific HMAC-verify → decrypt → unpad pipeline — same
+    /// dependency note as `Encrypt` above.
+    Decrypt,
 }
 
 impl CryptoCapability {
     /// Every `CryptoCapability` variant, in a fixed, stable order — the same
     /// order `diagnostics::crypto_diagnostics_preview` reports them in.
     /// Crate-private only.
-    pub(crate) const ALL: [CryptoCapability; 11] = [
+    pub(crate) const ALL: [CryptoCapability; 15] = [
         CryptoCapability::Random,
         CryptoCapability::Nonce,
         CryptoCapability::SecretHandle,
@@ -69,6 +95,10 @@ impl CryptoCapability {
         CryptoCapability::Schnorr,
         CryptoCapability::StorageKey,
         CryptoCapability::ConversationKey,
+        CryptoCapability::MessageKey,
+        CryptoCapability::Padding,
+        CryptoCapability::Encrypt,
+        CryptoCapability::Decrypt,
     ];
 
     /// The fixed `&'static str` label for this capability — never built,
@@ -87,6 +117,10 @@ impl CryptoCapability {
             CryptoCapability::Schnorr => "schnorr",
             CryptoCapability::StorageKey => "storage_key",
             CryptoCapability::ConversationKey => "conversation_key",
+            CryptoCapability::MessageKey => "message_key",
+            CryptoCapability::Padding => "padding",
+            CryptoCapability::Encrypt => "encrypt",
+            CryptoCapability::Decrypt => "decrypt",
         }
     }
 }
@@ -111,6 +145,10 @@ mod tests {
                 CryptoCapability::Schnorr,
                 CryptoCapability::StorageKey,
                 CryptoCapability::ConversationKey,
+                CryptoCapability::MessageKey,
+                CryptoCapability::Padding,
+                CryptoCapability::Encrypt,
+                CryptoCapability::Decrypt,
             ]
         );
     }
@@ -129,6 +167,10 @@ mod tests {
             (CryptoCapability::Schnorr, "schnorr"),
             (CryptoCapability::StorageKey, "storage_key"),
             (CryptoCapability::ConversationKey, "conversation_key"),
+            (CryptoCapability::MessageKey, "message_key"),
+            (CryptoCapability::Padding, "padding"),
+            (CryptoCapability::Encrypt, "encrypt"),
+            (CryptoCapability::Decrypt, "decrypt"),
         ];
         for (capability, label) in expected {
             assert_eq!(capability.as_static_label(), label);

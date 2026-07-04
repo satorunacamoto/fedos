@@ -3937,3 +3937,104 @@ Public `pub fn` surface unchanged at twenty-seven. No ECDH,
 conversation-key, message-key, padding, encrypt, decrypt, or NIP-44
 implementation. No Runtime/Worker/Storage/Federation/Relay/WASM/FFI
 connection. No TypeScript serialization change.
+
+## NIP-44 key-derivation half: ConversationKey + ECDH + MessageKey + HKDF bridge (Stage 198–201)
+
+Stage 198–201 implement `docs/nip44_internal_plan.md` §3 for real, and
+lay a generic (not yet spec-accurate) bridge toward §4. **No padding, no
+NIP-44 encrypt/decrypt, no public API addition, no Runtime/Worker/
+Storage/Relay connection, no new `Cargo.toml` dependency.**
+
+**Stage 198**: [`crypto::conversation_key`](src/crypto/conversation_key.rs)
+(new) adds `ConversationKeyState`/`ConversationKeyKind`/`ConversationKey`/
+`ConversationKeyDecision`/`ConversationKeyStatus`/`ConversationKeyGeneration`.
+`ConversationKey` wraps a `SecretHandle` internally (a NEW
+`SecretHandleKind::ConversationKeyMaterial` variant) — `pub(crate)`-only,
+no `Clone`, no `Debug`, no public raw-byte accessor, zeroize-on-drop via
+`SecretHandle`'s own `Drop`, and a `new_placeholder()` path mirroring
+`SecretHandle`'s own skeleton-first shape.
+
+**Stage 199**: the same module adds the REAL
+`derive_conversation_key_via_ecdh_internal(secret_key: &SecretHandle,
+public_key: &SecretHandle) -> ConversationKeyDecision` — this crate's
+first production elliptic-curve point arithmetic. Both inputs MUST be
+`SecretHandleKind::NostrKeyMaterial`-kinded and `Holding` real bytes;
+wrong kind, the Stage 79 placeholder path, or an already-`clear()`-ed
+handle are all rejected with `ConversationKeyStatus::InvalidKey` before
+any `k256` call. The ECDH shared point is computed via MANUAL
+`ProjectivePoint`/`AffinePoint` scalar multiplication — `k256`'s
+`arithmetic` feature alone, no `ecdh` Cargo feature added — lifting the
+32-byte x-only Nostr public key to a full curve point with a `0x02` SEC1
+even-Y tag byte (the same convention NIP-44's reference implementation
+uses). The shared X-coordinate then feeds `hkdf::Hkdf::extract` with the
+fixed `"nip44-v2"` salt (EXTRACT ONLY, never expand) to produce the
+32-byte conversation key. A new sibling `#[cfg(test)]`-only module,
+[`nip44_conversation_key_vectors`](src/crypto/nip44_conversation_key_vectors.rs),
+verifies this byte-for-byte against ALL 43 `valid`/
+`invalid .get_conversation_key` cases in
+`test-vectors/nip44/nip44-v2.json` — 35 valid cases produce the exact
+documented `conversation_key`; all 8 invalid cases (out-of-range/zero
+scalar, points with no valid on-curve lift, twist points) are rejected by
+`k256`'s own constant-time validation, never a panic. `SecretHandle`
+itself gains a THIRD narrowly-scoped raw-byte accessor,
+`expose_bytes_for_internal_ecdh`, for this module's sole reviewed call
+site — mirroring the two accessors Stage 147/152–154 already added for
+`kdf_core`/`aead_internal`.
+
+**Stage 200**: [`crypto::message_key`](src/crypto/message_key.rs) (new)
+adds `MessageKey`/`MessageKeyKind`/`MessageKeyStatus`/`MessageKeyDecision`
+— the same `SecretHandle`-backed (a NEW
+`SecretHandleKind::MessageKeyMaterial` variant), placeholder-first,
+`pub(crate)`-only, no-`Clone`/no-`Debug` shape as `ConversationKey`, with
+zero derivation logic of its own.
+
+**Stage 201**: [`crypto::hkdf_bridge`](src/crypto/hkdf_bridge.rs) (new)
+adds the ONE function connecting them:
+`derive_message_key_from_conversation_key_internal(&ConversationKey) ->
+MessageKeyDecision`. It reuses `kdf_core::derive_secret_handle_internal`
+(Stage 147, already real) under the pre-existing, FIXED
+`HkdfDomain::Conversation` — there is no salt/info/domain parameter of
+any kind on this function, so a caller cannot select a different domain.
+A `ConversationKey` that is still the Stage 198 placeholder path, or
+already `clear()`-ed, is rejected with `MessageKeyStatus::InvalidKey`
+before any HKDF call. **This is a generic architectural bridge, NOT
+NIP-44 v2's real per-message key derivation** — the real spec derives
+`chacha_key`/`chacha_nonce`/`hmac_key` via HKDF-expand with a FRESH
+RANDOM per-message nonce as salt (`docs/nip44_internal_plan.md` §4), which
+this fixed-domain bridge deliberately does not accept; that real
+derivation remains a future, separate, explicitly-reviewed stage.
+
+**Capability/diagnostics**: `CryptoCapability` grows from eleven to
+fifteen variants — `MessageKey`, `Padding`, `Encrypt`, `Decrypt` appended
+after `ConversationKey`. `crypto_diagnostics_preview()` promotes `Ecdh`
+(was `ReadyForImplementation`) and `ConversationKey` (was
+`NotImplemented`) to `Ready`, reports the new `MessageKey` as `Ready`,
+`Encrypt`/`Decrypt` as `NotConnected` (the underlying ChaCha20/HMAC-SHA256
+primitive FAMILIES already exist transitively in this crate's dependency
+graph, but no NIP-44-specific function is wired — mirroring how `Aead`
+itself was `NotConnected` before Stage 152–154), and the new `Padding` as
+`NotImplemented` (no padding code or dependency exists at all).
+
+**Guards**: a new Rust-side
+[`nip44_key_derivation_guard`](src/crypto/nip44_key_derivation_guard.rs)
+(`#[cfg(test)]`-only) confirms `ConversationKey`/`MessageKey` derive
+neither `Clone` nor `Debug`, that none of the three new files declare a
+single `pub` item, and that none of them reference Runtime/Worker/
+Storage/Relay. A new
+[`test/nip44_key_derivation_stage_guard.test.ts`](../../test/nip44_key_derivation_stage_guard.test.ts)
+re-confirms all of the above from OUTSIDE the crate, plus the
+capability/diagnostics changes land exactly as specified and the `pub fn`
+surface is unchanged at twenty-seven. The pre-existing
+[`test/nip44_pre_adoption_guard.test.ts`](../../test/nip44_pre_adoption_guard.test.ts)
+(Stage 193) and
+[`test/secp256k1_dependency_guard.test.ts`](../../test/secp256k1_dependency_guard.test.ts)
+(Stage 196) are both updated in place: several of their checks now
+acknowledge that ECDH/`ConversationKey`/`MessageKey` ARE implemented for
+real (in their own dedicated files, never in `lib.rs`/`crypto.rs`
+directly), while confirming padding/NIP-44 encrypt/decrypt still exist
+nowhere in the crate.
+
+Public `pub fn` surface unchanged at twenty-seven. No padding, no NIP-44
+encrypt/decrypt implementation. No Runtime/Worker/Storage/Federation/
+Relay/WASM/FFI connection. No TypeScript serialization change. No new
+`Cargo.toml` dependency.

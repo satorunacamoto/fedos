@@ -93,11 +93,11 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
     expect(cargoTomlSource).not.toMatch(/^\s*rand_core\s*=/m);
   });
 
-  it("6. CryptoCapability has exactly eleven variants, ending with the new Ecdh label right after Envelope", () => {
+  it("6. CryptoCapability includes the Ecdh label right after Envelope (Stage 195) — now one of fifteen variants total since Stage 198-201; see test/nip44_key_derivation_stage_guard.test.ts for the current full-count check", () => {
     const variantOrderMatch = capabilityMatrixSource.match(
-      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*11\]\s*=\s*\[([\s\S]*?)\];/,
+      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*15\]\s*=\s*\[([\s\S]*?)\];/,
     );
-    expect(variantOrderMatch, "expected to find CryptoCapability::ALL with 11 entries").not.toBeNull();
+    expect(variantOrderMatch, "expected to find CryptoCapability::ALL with 15 entries").not.toBeNull();
     const variants = [...variantOrderMatch![1].matchAll(/CryptoCapability::(\w+)/g)].map((m) => m[1]);
     expect(variants.indexOf("Ecdh")).toBe(variants.indexOf("Envelope") + 1);
     expect(variants).toContain("Ecdh");
@@ -116,12 +116,12 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
     );
   });
 
-  it("8. Ecdh reports ReadyForImplementation in crypto_diagnostics_preview — not Ready, not NotImplemented", () => {
+  it("8. Ecdh reports Ready in crypto_diagnostics_preview as of Stage 199 (was ReadyForImplementation Stage 195-198 — see test/nip44_key_derivation_stage_guard.test.ts for the dedicated Stage 199 check)", () => {
     const rowMatch = diagnosticsSource.match(
       /CapabilityReport\s*\{\s*capability:\s*CryptoCapability::Ecdh,\s*readiness:\s*CapabilityReadiness::(\w+),?\s*\}/,
     );
     expect(rowMatch, "expected to find the Ecdh CapabilityReport row").not.toBeNull();
-    expect(rowMatch![1]).toBe("ReadyForImplementation");
+    expect(rowMatch![1]).toBe("Ready");
   });
 
   it("9. no ECDH implementation exists: no fn performing point arithmetic, no conversation-key/message-key/padding/encrypt/decrypt function", () => {

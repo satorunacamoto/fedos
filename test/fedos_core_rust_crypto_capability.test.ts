@@ -51,11 +51,11 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     expect(libRsSource).not.toMatch(/\bpub\s+mod\s+crypto\b/);
   });
 
-  it("2. CryptoCapability is pub(crate)-only, with exactly the eleven specified variants in the documented order (Stage 164 adds Envelope; Stage 195 adds Ecdh)", () => {
+  it("2. CryptoCapability is pub(crate)-only, with exactly the fifteen specified variants in the documented order (Stage 164 adds Envelope; Stage 195 adds Ecdh; Stage 198-201 add MessageKey/Padding/Encrypt/Decrypt)", () => {
     expect(capabilityMatrixSource).toMatch(/\bpub\(crate\)\s+enum\s+CryptoCapability\b/);
     expect(capabilityMatrixSource).not.toMatch(/\bpub\s+enum\s+CryptoCapability\b/);
     const variantOrderMatch = capabilityMatrixSource.match(
-      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*11\]\s*=\s*\[([\s\S]*?)\];/,
+      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*15\]\s*=\s*\[([\s\S]*?)\];/,
     );
     expect(variantOrderMatch, "expected to find CryptoCapability::ALL").not.toBeNull();
     const variants = [...variantOrderMatch![1].matchAll(/CryptoCapability::(\w+)/g)].map(
@@ -73,6 +73,10 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
       "Schnorr",
       "StorageKey",
       "ConversationKey",
+      "MessageKey",
+      "Padding",
+      "Encrypt",
+      "Decrypt",
     ]);
   });
 
@@ -86,9 +90,9 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     }
   });
 
-  it("4. crypto_diagnostics_preview is pub(crate)-only, takes no parameter, and returns a fixed [CapabilityReport; 11] (Stage 164, Stage 195)", () => {
+  it("4. crypto_diagnostics_preview is pub(crate)-only, takes no parameter, and returns a fixed [CapabilityReport; 15] (Stage 164, Stage 195, Stage 198-201)", () => {
     expect(diagnosticsSource).toMatch(
-      /\bpub\(crate\)\s+fn\s+crypto_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*CapabilityReport\s*;\s*11\s*\]/,
+      /\bpub\(crate\)\s+fn\s+crypto_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*CapabilityReport\s*;\s*15\s*\]/,
     );
     expect(diagnosticsSource).not.toMatch(/\bpub\s+fn\s+crypto_diagnostics_preview\b/);
   });

@@ -184,3 +184,27 @@ own future, explicitly-reviewed stage, in the order §3 fixed.
 See `test/fedos_core_rust_ciphertext_serialization.test.ts` for the JS
 guard confirming this schema guard performs no cryptographic
 verification and adds no secp256k1 dependency.
+
+## 7. Stage 194-201 update — §3 steps 2 and 3 are COMPLETE; step 4 is PARTIALLY addressed
+
+- **Step 2 (secp256k1 dependency adoption) — COMPLETE, Stage 194.** `k256`
+  adopted (`arithmetic` feature only) — see
+  `docs/nip44_dependency_adoption.md`.
+- **Step 3 (conversation-key test) — COMPLETE, Stage 199.**
+  `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`
+  implements ECDH + HKDF-extract exactly per `docs/nip44_internal_plan.md`
+  §3, verified against BOTH `valid.get_conversation_key` (35 cases) AND
+  `invalid.get_conversation_key` (8 cases) — the sibling
+  `#[cfg(test)]`-only `nip44_conversation_key_vectors` module.
+- **Step 4 (message-key test) — PARTIALLY addressed, Stage 200-201, NOT
+  the real per-message HKDF-expand step this section specifies.**
+  `crypto::message_key`/`crypto::hkdf_bridge` add a `MessageKey` type and a
+  bridge from `ConversationKey`, but that bridge reuses the crate's
+  pre-existing, FIXED `HkdfDomain::Conversation` — it does not accept a
+  per-message random nonce as HKDF-expand salt, is not verified against
+  `valid.get_message_keys`, and does not produce
+  `chacha_key`/`chacha_nonce`/`hmac_key`. The REAL step 4 (verified
+  against `valid.get_message_keys`) remains a future, separate stage.
+- **Steps 5–7 (padding, encrypt/decrypt, invalid-case tests) remain
+  entirely future and separate**, exactly as this document originally
+  fixed — Stage 198-201 do not touch them.

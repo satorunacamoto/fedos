@@ -1,22 +1,33 @@
-# NIP-44 Internal Implementation Plan (Stage 177) — binding, docs only
+# NIP-44 Internal Implementation Plan (Stage 177, §3 IMPLEMENTED Stage 198-201) — binding, docs only
 
-**Status: this document adds no code.** It fixes, in writing, the shape a
-FUTURE NIP-44 v2 implementation stage must satisfy — naming the
-conversation-key derivation, nonce, payload layout, padding scheme,
-MAC/authentication step, failure labels, and `SecretHandle` connection
-strategy — before any NIP-44 code exists in this crate. This is the same
-"fix the shape before the implementation" discipline
+**Status (as of Stage 177): this document adds no code.** It fixes, in
+writing, the shape a FUTURE NIP-44 v2 implementation stage must satisfy —
+naming the conversation-key derivation, nonce, payload layout, padding
+scheme, MAC/authentication step, failure labels, and `SecretHandle`
+connection strategy — before any NIP-44 code exists in this crate. This is
+the same "fix the shape before the implementation" discipline
 `docs/ciphertext_envelope_plan.md`, `docs/secret_handle_api_shape.md`, and
 `docs/hkdf_internal_plan.md` each used for their own eventual
 implementations.
 
-**No NIP-44 code is implemented by this document.** No `conversation_key`
-derivation function, no NIP-44 padding function, no NIP-44 encrypt/decrypt
-function, and no connection to `SecretHandle`/`aead_internal`/`kdf_core`
-exists anywhere in this crate as of this stage. `test-vectors/nip44/nip44-v2.json`
+**Update — Stage 198-201 implement §3 for real.** `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`
+implements exactly §3's pipeline (secp256k1 ECDH via `k256`'s `arithmetic`
+feature, then HKDF-SHA256 extract-only with the fixed `"nip44-v2"` salt),
+vector-verified against `test-vectors/nip44/nip44-v2.json`'s
+`valid`/`invalid .get_conversation_key` categories (43 cases). `crypto::message_key`
+and `crypto::hkdf_bridge` add a `MessageKey` type and a generic
+`ConversationKey` → `MessageKey` bridge (reusing the pre-existing
+`HkdfDomain::Conversation`) — see §4's note below for why this is
+NOT yet §4's real per-message derivation. §5 (padding), §6 (payload
+encoding), and §7 (MAC/encrypt/decrypt) remain entirely unimplemented, per
+this stage's own explicit scope limits.
+
+**No NIP-44 padding function, no NIP-44 encrypt/decrypt function** exists
+anywhere in this crate as of Stage 201. `test-vectors/nip44/nip44-v2.json`
 (imported Stage 73, per that file's own provenance record) already exists
-in this repository and is referenced throughout this plan, but is not yet
-wired to any `cargo test`.
+in this repository and is referenced throughout this plan; its
+`get_conversation_key` categories are now wired to `cargo test` (Stage
+199); the remaining six categories are not yet wired.
 
 This complements, and does not renegotiate, `docs/hkdf_internal_plan.md`
 (the HKDF-SHA256 implementation NIP-44's own key derivation would need to
@@ -61,6 +72,12 @@ must respect, not an oversight to "fix" by reusing `aead_internal`.
 
 ## 3. Conversation key derivation
 
+**IMPLEMENTED Stage 199** — `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`,
+exactly as this section specifies below (manual `k256` `arithmetic`-only
+point multiplication for ECDH, then `hkdf::Hkdf::extract` with the fixed
+`"nip44-v2"` salt), verified against all 43
+`valid`/`invalid .get_conversation_key` vector cases.
+
 Per the imported vectors' `valid.get_conversation_key` category
 (`sec1`/`pub2` → `conversation_key`, ECDH + HKDF-extract):
 
@@ -92,6 +109,18 @@ Per the imported vectors' `valid.get_conversation_key` category
   TypeScript-side and outside this crate's scope.)
 
 ## 4. Message keys, nonce, and payload derivation
+
+**NOT YET this section's real derivation.** Stage 200-201 add a
+`crypto::message_key::MessageKey` type and a generic
+`crypto::hkdf_bridge::derive_message_key_from_conversation_key_internal`
+bridge, but that bridge reuses the crate's pre-existing, FIXED
+`HkdfDomain::Conversation` (a compile-time salt/info pair) — it does NOT
+accept a per-message, caller-supplied random nonce as HKDF-expand salt,
+and does NOT produce the `chacha_key`/`chacha_nonce`/`hmac_key` triple
+this section specifies below. That real, spec-accurate, nonce-salted
+per-message derivation remains a future, separate, explicitly-reviewed
+stage (naturally paired with the padding/encrypt work below, since
+`chacha_nonce`/`hmac_key` have no use until then).
 
 Per the imported vectors' `valid.get_message_keys` category:
 
@@ -201,6 +230,14 @@ Per the imported vectors' `invalid.decrypt` category:
 
 ## 8. `SecretHandle` connection strategy
 
+**IMPLEMENTED Stage 198-201** — exactly the dedicated-variant choice this
+section anticipated: `SecretHandleKind::ConversationKeyMaterial` and
+`SecretHandleKind::MessageKeyMaterial` (not a reuse of `NostrKeyMaterial`/
+`HkdfOutputMaterial`), each wrapped in its own opaque
+`ConversationKey`/`MessageKey` type (`crypto::conversation_key`,
+`crypto::message_key`) — no `Clone`, no `Debug`, no public raw-byte
+accessor on either, mirroring `SecretHandle` itself.
+
 - **A NIP-44 conversation key SHOULD be held as a `SecretHandle`**, using
   a NEW `SecretHandleKind` variant (this crate already reserves
   `SecretHandleKind::NostrKeyMaterial` — see `src/lib.rs`'s
@@ -230,17 +267,17 @@ Per the imported vectors' `invalid.decrypt` category:
   explicitly-reviewed public boundary — not an overload or variant of the
   existing `fedos_encrypt`/`fedos_decrypt` functions.
 
-## 9. What this plan does NOT fix
+## 9. What this plan does NOT fix (Stage 177 original; see Stage 198-201 updates in §3/§4/§8 above)
 
-- **No conversation-key derivation function, no message-key derivation
-  function, no padding function, no NIP-44 encrypt/decrypt function.** No
-  code of any kind.
-- **No secp256k1/ECDH dependency adoption.** This crate has none today;
-  adopting one is its own future, separate, reviewed decision.
-- **No `cargo test` wiring of `test-vectors/nip44/nip44-v2.json`.** The
-  file exists (imported Stage 73) but no test reads it yet — that is
-  named as Stage 182 candidate work ("NIP-44 vector wiring
-  review/update"), not done here.
+- **As of Stage 201: no padding function, no NIP-44 encrypt/decrypt
+  function.** §3's conversation-key derivation and a GENERIC (not
+  spec-accurate) §4-adjacent bridge ARE now implemented — see §3/§4/§8.
+- **secp256k1/ECDH dependency IS now adopted** (`k256`, Stage 194) and
+  used (Stage 199) — superseding this line's original Stage 177 framing.
+- **`test-vectors/nip44/nip44-v2.json`'s `get_conversation_key` categories
+  ARE now wired to `cargo test`** (Stage 199, 43 cases) — the remaining
+  six categories (message keys, padding, encrypt/decrypt) are not yet
+  wired.
 - **No public API.** Whether a future NIP-44 primitive is ever exposed
   publicly, and in what opaque-handle shape (mirroring
   `docs/public_crypto_opaque_handles.md`'s discipline), is not decided
