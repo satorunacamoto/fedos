@@ -56,6 +56,18 @@
 //! `aead_envelope_bridge`'s own module-level doc comment for the full
 //! design and `docs/ciphertext_envelope_plan.md` section 9 for the
 //! planning record this implements.
+//!
+//! Stage 177–178 add `ciphertext_transport` — an INTERNAL-ONLY,
+//! LABEL-ONLY transport descriptor (`CiphertextTransportDescriptor`)
+//! naming which algorithm sealed a ciphertext, which future destination
+//! (`Storage`/`NostrEvent`) it is headed for, and whether a wire encoding
+//! has been chosen (always `Undecided` — no encoding is picked by this
+//! skeleton). Deliberately unconnected to `ciphertext_envelope`'s real
+//! envelope type, to `aead_internal`'s real cipher labels, and to any
+//! `StorageBackend`/Nostr send path — see `ciphertext_transport`'s own
+//! module-level doc comment, `docs/ciphertext_envelope_serialization_plan.md`,
+//! and `docs/encrypted_payload_storage_boundary.md` for the full design
+//! and planning records.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -63,4 +75,5 @@ pub(crate) mod aead_envelope_bridge;
 pub(crate) mod aead_internal;
 pub(crate) mod capability_matrix;
 pub(crate) mod ciphertext_envelope;
+pub(crate) mod ciphertext_transport;
 pub(crate) mod diagnostics;

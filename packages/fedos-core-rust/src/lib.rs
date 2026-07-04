@@ -517,6 +517,32 @@
 //! connection, no `Cargo.toml` change, no new dependency. See
 //! `docs/public_crypto_api.md` (updated) and
 //! `docs/public_crypto_opaque_handles.md` for the full design record.
+//!
+//! Stage 177–178 add `crypto::ciphertext_transport`: an INTERNAL-ONLY,
+//! LABEL-ONLY `CiphertextTransportDescriptor` naming which algorithm
+//! sealed a ciphertext, which future destination (`Storage`/`NostrEvent`)
+//! it is headed for, and that a wire encoding has NOT yet been chosen
+//! (`CiphertextEncodingPlaceholder::Undecided`, its one variant). Holds no
+//! ciphertext, nonce, tag, or key of any kind; deliberately unconnected
+//! from `crypto::ciphertext_envelope`'s real envelope type and from
+//! `crypto::aead_internal`'s real cipher labels — the same "separate label
+//! per boundary" discipline this crate has followed throughout. Stage
+//! 179–181 add three planning documents, no code:
+//! `docs/ciphertext_envelope_serialization_plan.md` (wire-format field
+//! list, four candidate encodings compared, seven selection criteria
+//! fixed — no MVP encoding chosen; raw secret, key ID, and buyer/payment/
+//! entitlement metadata all explicitly excluded from the future format),
+//! `docs/nip44_internal_plan.md` (NIP-44 v2's conversation-key/message-key
+//! derivation, padding, MAC, and failure-label shape fixed against this
+//! repository's already-imported `test-vectors/nip44/nip44-v2.json` — no
+//! NIP-44 code, no secp256k1 dependency), and
+//! `docs/encrypted_payload_storage_boundary.md` (what a future encrypted
+//! payload MAY hand to `StorageBackend`/`FederationProvider` — no
+//! implementation, no bridge; this crate remains `crate-type = ["rlib"]`
+//! only, with no WASM/FFI path to TypeScript). No public API addition —
+//! still twenty-seven `pub fn`s. No Runtime/Worker/Storage/Nostr/NIP-44/
+//! WASM connection, no serialization implementation, no `Cargo.toml`
+//! change, no new dependency.
 
 #![forbid(unsafe_code)]
 
