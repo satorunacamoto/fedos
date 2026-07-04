@@ -3489,3 +3489,105 @@ test file that asserts an exact `pub fn` count or name list (now 24 → 26
 throughout): no Runtime/Worker/Storage/Nostr/NIP-44 connection, no
 `panic!`/`unwrap`/`expect`, and the twenty-six-function `pub fn` surface
 verified by name.
+
+## Public opaque crypto API completion (Stage 171–176)
+
+Stage 171–176 resolve Stage 166–170's one deliberate scope limitation:
+`fedos_encrypt`/`fedos_decrypt` are now genuinely callable from OUTSIDE
+this crate, not just `pub` in name. See
+[`docs/public_crypto_opaque_handles.md`](../../docs/public_crypto_opaque_handles.md)
+for the full design record; `docs/public_crypto_api.md` section 6 records
+the resolution against the original Stage 166–170 record.
+
+**Two new public OPAQUE wrapper types** replace direct use of this
+crate's secret/payload-carrying types in the public signature:
+`FedosAeadKeyHandle` (wraps a `SecretHandle(AeadKeyMaterial)`) and
+`FedosCiphertextEnvelope` (wraps an `AeadCiphertextEnvelope`). Both have a
+private `inner` field and no `Clone`/`Debug`/`Display`/`Serialize`/
+`AsRef<[u8]>` — **`SecretHandle` and `AeadCiphertextEnvelope` themselves
+are NEVER promoted to `pub`**; opaque wrapping, not promotion, is the
+permanent design.
+
+**A new key-generation entry point**, **`pub fn
+fedos_generate_aead_key_32() -> FedosGenerateAeadKeyDecision`**, draws a
+fresh 32-byte key from the OS CSPRNG (`getrandom::fill`, no fallback PRNG,
+same discipline as `fedos_random_bytes_32`/`fedos_aead_nonce_96`) and
+returns it wrapped in a `FedosAeadKeyHandle` — never a raw `[u8; 32]`.
+This is the only way to obtain one from outside the crate.
+
+**Two new public label enums**, `FedosAeadAlgorithm`/`FedosAeadAadDomain`,
+replace `crate::crypto::aead_internal::AeadCipher`/`AeadAadDomain` in the
+public signature — deliberately SEPARATE types (the same "separate label
+per boundary" discipline this crate has followed since Stage 157–158),
+bridged internally by one small, reviewed conversion function each.
+`AeadCipher`/`AeadAadDomain` themselves remain `pub(crate)`-only,
+unchanged since Stage 152–154.
+
+**`fedos_encrypt`/`fedos_decrypt`'s new signatures**:
+
+```rust
+pub fn fedos_encrypt(
+    algorithm: FedosAeadAlgorithm,
+    key: &FedosAeadKeyHandle,
+    aad_domain: FedosAeadAadDomain,
+    plaintext: &[u8],
+) -> FedosEncryptDecision; // envelope: Option<FedosCiphertextEnvelope> — now pub
+
+pub fn fedos_decrypt(
+    key: &FedosAeadKeyHandle,
+    envelope: &FedosCiphertextEnvelope,
+) -> FedosDecryptDecision;
+```
+
+Neither function carries `#[allow(private_interfaces)]` any more —
+every parameter/return type is genuinely `pub`, and
+`FedosEncryptDecision::envelope` changes from `pub(crate)` to `pub`. **The
+crate's public `pub fn` surface grows from twenty-six to twenty-seven.**
+
+**Proof, not just assertion**: a new
+[`tests/public_crypto_api.rs`](tests/public_crypto_api.rs) Cargo
+integration test (auto-discovered — no `Cargo.toml` change needed) is
+compiled as its OWN separate crate and reaches `fedos_core_rust` ONLY
+through `fedos_generate_aead_key_32`/`fedos_encrypt`/`fedos_decrypt` and
+the two opaque types — it cannot even name `SecretHandle`/
+`AeadCiphertextEnvelope`/`AeadCipher`/`AeadAadDomain`.
+
+**What is explicitly NOT implemented or connected:**
+
+- No promotion of `SecretHandle`, `AeadCiphertextEnvelope`, `AeadCipher`,
+  or `AeadAadDomain` to `pub` — all four remain `pub(crate)` forever.
+- No `Clone`/`Debug`/`Display`/`Serialize`/`AsRef<[u8]>` on either opaque
+  wrapper type, and no public raw-byte getter of any kind.
+- No ciphertext envelope serialization (JSON/CBOR/base64/wire format) —
+  still its own future, separate stage (Stage 177+ candidate).
+- No Runtime/Worker/Storage/Nostr/NIP-44/WASM connection anywhere.
+- No new `Cargo.toml` dependency or manifest change — still 9 production
+  dependencies.
+
+**Rust-side test coverage added**: 3 new tests in `src/lib.rs`'s
+`fedos_encrypt_decrypt_wiring` module (`generate_key_returns_an_opaque_
+handle_ready_to_encrypt`, `two_generated_keys_are_independent`, and a
+structural no-raw-byte-reachability guard), on top of the 8 existing
+tests updated to the new opaque-handle signatures; 3 new tests in the new
+`tests/public_crypto_api.rs` integration crate (generate→encrypt→decrypt
+round trip for both ciphers, wrong key fails, two generated keys never
+collide).
+
+**Verification status**: `cargo check` and `cargo check --tests` both
+compiled clean (zero warnings) against this stage's final code. Live
+execution of `cargo test` was intermittently blocked in this development
+environment by a local Windows Application Control Policy (unrelated to
+this crate's code — see `docs/public_crypto_api.md`'s companion session
+notes); this is tracked as an environment issue, not a code defect, and
+should be re-run in a clean environment before release.
+
+See
+[`test/fedos_core_rust_public_opaque_crypto_api.test.ts`](../../test/fedos_core_rust_public_opaque_crypto_api.test.ts)
+(19 tests) for the dedicated Stage 171–176 guard suite, plus updated
+checks in `test/fedos_core_rust_public_crypto_api.test.ts`,
+`test/fedos_core_rust_secret_handle_real_bytes.test.ts`,
+`test/fedos_core_rust_public_api_boundary.test.ts`, and every other test
+file that asserts an exact `pub fn` count or name list (now 26 → 27
+throughout): no Runtime/Worker/Storage/Nostr/NIP-44 connection, no
+`panic!`/`unwrap`/`expect`, and the twenty-seven-function `pub fn`
+surface verified by name.
