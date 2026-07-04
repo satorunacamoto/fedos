@@ -124,7 +124,7 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("12. not connected to Runtime/Worker/Storage/Nostr/NIP-44/WASM in any way", () => {

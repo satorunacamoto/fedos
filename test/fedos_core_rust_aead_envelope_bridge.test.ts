@@ -143,7 +143,7 @@ describe("FedOS Rust crate — internal AEAD/envelope bridge (Stage 161–163)",
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("15. misuse-guard coverage: wrong key, wrong nonce, wrong AAD domain, and tampered ciphertext are each named in this module's own test suite", () => {

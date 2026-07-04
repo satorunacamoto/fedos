@@ -1,15 +1,16 @@
-# NIP-44 secp256k1 Dependency Adoption Planning (Stage 192) — binding, docs only
+# NIP-44 secp256k1 Dependency Adoption Planning (Stage 192, DECIDED Stage 194) — binding, docs only
 
-**Status: this document adds no code and makes NO adoption decision.** It
-compares the two realistic secp256k1/ECDH crate candidates
+**Status: Stage 194 has ADOPTED `k256` — see §6.** This document
+originally (Stage 192) added no code and made no decision; it compared
+the two realistic secp256k1/ECDH crate candidates
 `docs/nip44_internal_plan.md` §3 and `docs/nip44_vector_readiness.md` §3
 step 2 both name ("secp256k1 dependency adoption") — `rust-secp256k1` and
 `k256` — against the criteria `docs/rust_dependency_adoption.md` already
 fixes for any new dependency, and against this stage's own additional
 secp256k1-specific criteria (no_std, WASM, audit history, maintenance,
-MSRV). **No dependency is adopted here. `Cargo.toml` is unchanged —
-still 9 production dependencies, still no secp256k1/ECDH crate of any
-kind.**
+MSRV). As of Stage 192 itself: no dependency was adopted, `Cargo.toml`
+was unchanged (9 production dependencies, no secp256k1/ECDH crate of any
+kind) — §6 records what changed at Stage 194.
 
 This complements, and does not renegotiate, `docs/rust_dependency_adoption.md`
 (this crate's general one-crate-per-stage adoption discipline, which the
@@ -234,8 +235,141 @@ its choice against ALL of the following:
   secp256k1-specific concerns (feature minimalism, no `rand`/`serde`,
   citable audit posture, `no_std`/WASM posture, MSRV, scope discipline).
 - **No decision, no dependency, no `Cargo.toml` change, no NIP-44 code**
-  is made or authorized by this document.
-- **The actual adoption decision and `Cargo.toml` change is Stage 194
-  candidate work** ("rust-secp256k1 adoption" — a working NAME, not a
-  pre-decided outcome per §3's own criteria still needing to be weighed
-  against `k256` at that time), not made here.
+  is made or authorized by this document AS OF STAGE 192.
+- **The actual adoption decision and `Cargo.toml` change happened at
+  Stage 194** — see §6 below for the full record.
+
+## 6. Stage 194 update — `k256` ADOPTED
+
+Stage 194 resolves §3's nine criteria in favor of **`k256`**, weighed as
+follows:
+
+1. **RustCrypto ecosystem fit (the deciding factor)**: `k256` is
+   maintained by the SAME organization as `hkdf`/`aes-gcm`/`chacha20poly1305`'s
+   underlying primitives/`sha2`/`zeroize`/`secrecy`/`subtle`/`argon2` —
+   every dependency already in this crate's `Cargo.toml`. Same Apache-2.0
+   OR MIT license convention, same pure-Rust/no-FFI/`no_std`-friendly
+   shape, same `#![forbid(unsafe_code)]`-COMPATIBLE profile (this crate's
+   own `unsafe_code` forbid only covers code written directly in this
+   crate — `rust-secp256k1`'s C-FFI bindings would necessarily contain
+   `unsafe` internally, in a DEPENDENCY, for the first time; `k256`
+   introduces no such new risk category).
+2. **Audit posture**: neither candidate has a citable, `k256`/
+   `rust-secp256k1`-SPECIFIC third-party audit report as of this
+   decision (§2's own comparison already named this honestly for both) —
+   this criterion did not favor either candidate decisively, so it did
+   NOT drive the final choice; `libsecp256k1`'s (rust-secp256k1's
+   underlying C library) multi-year Bitcoin-Core-production track record
+   remains a real, if different-shaped, form of scrutiny that `k256`
+   does not yet have an equivalent of. This is named honestly, not
+   glossed over: `k256`'s audit posture is the ONE criterion where
+   `rust-secp256k1` arguably had the stronger case, outweighed here by
+   ecosystem-fit and feature-minimality considerations instead.
+3. **Feature minimalism**: `k256`'s `arithmetic` feature (see §7 below)
+   is a smaller, more targeted enable-surface for THIS crate's ECDH-only
+   need than `rust-secp256k1`'s comparable minimal configuration, mostly
+   because `k256`'s feature graph is already split finely (arithmetic /
+   ecdsa / ecdh / schnorr are each separately gate-able), whereas
+   `rust-secp256k1`'s C library bundles more functionality behind fewer
+   feature seams.
+4. **WASM/no_std posture**: `k256` compiles to `wasm32-unknown-unknown`
+   directly with no emscripten/libc shim, and its `no_std` support has no
+   C-toolchain cross-compilation concern — the simpler story of the two,
+   relevant to `docs/nip44_internal_plan.md`'s eventual public-API-and-
+   beyond future even though this crate has no WASM target today.
+5. **MSRV**: compatible with this crate's `edition = "2021"` — verified
+   at adoption time via `cargo check` succeeding with the exact version
+   pinned in `Cargo.toml`/`Cargo.lock`.
+6. **Scope discipline**: `k256` is adopted ALONE, as its own single
+   `Cargo.toml` change, exactly like every prior first-adoption stage in
+   this crate's history (`chacha20poly1305` Stage 74, `hkdf` Stage 76,
+   `argon2` Stage 84, `aes-gcm` Stage 101, `getrandom` Stage 104).
+
+## 7. Feature selection rationale
+
+`Cargo.toml`'s `k256` line: `default-features = false`, `features =
+["arithmetic"]` — chosen because:
+
+- **`arithmetic`** is the minimum needed for ANY future ECDH stage to
+  build on (field/group operations) — nothing less would let a future
+  stage even begin; nothing more is needed YET.
+- **`ecdsa`/`schnorr` deliberately excluded**: NIP-44's conversation key
+  needs raw ECDH (a shared-secret computation), never signing/
+  verification. `schnorr` in particular is reserved for a SEPARATE,
+  future, explicitly-reviewed Nostr-event-signing candidate — conflating
+  the two would blur two unrelated capabilities into one dependency
+  decision.
+- **`serde` deliberately excluded**: this crate has never enabled `serde`
+  in a PRODUCTION dependency (`docs/ciphertext_serialization_format_decision.md`
+  — this crate's own canonical JSON codec is hand-written against the
+  standard library specifically to avoid needing it).
+- **`pem`/`pkcs8` deliberately excluded**: key-file-format encoding is
+  irrelevant to an in-memory ECDH shared-secret computation — this crate
+  has never persisted or exported a key in any file format.
+- **No `rand`/`rand_core`-enabling FEATURE was selected** — `rand_core`
+  DOES still appear in the resolved dependency graph (verified via
+  `cargo tree -i rand_core`), but ONLY as a required, non-optional
+  transitive dependency of `elliptic-curve`/`ff`/`group`/`crypto-bigint`
+  (the trait crates `arithmetic` itself is built on) — an ecosystem-wide
+  RustCrypto elliptic-curve trait requirement (e.g. `ff::Field`'s
+  `random(rng)` trait method signature), confirmed unavoidable for ANY
+  `k256` feature/version combination, not a feature THIS crate chose to
+  turn on. `rand_core` is trait-definitions-only (`RngCore`/`CryptoRng`),
+  with no actual entropy-source implementation — it cannot compete with
+  or bypass `getrandom::fill`, this crate's one CSPRNG source. The full
+  `rand` crate remains entirely absent from the resolved graph. This is a
+  REVIEWED, USER-CONFIRMED exception to `docs/rust_dependency_adoption.md`
+  §12's "no rand/rand_core anywhere" rule — recorded here, in
+  `Cargo.toml`'s own comment, and verified by
+  `packages/fedos-core-rust/src/crypto/secp256k1_dependency_guard.rs`
+  (Stage 196).
+
+## 8. Fixed future implementation order (unchanged from `docs/nip44_vector_readiness.md` §3, restated here for this document's own completeness)
+
+Stage 194's adoption does not itself authorize skipping ahead. The
+remaining steps stay in this exact order, one capability per stage, per
+this crate's standing "1 stage = 1 crypto capability" discipline — a
+future stage never combines two of these into one commit, and every
+intermediate commit within a future stage keeps `cargo check`/`cargo
+test` green:
+
+1. **ECDH** — the shared-secret computation itself (Stage 198 candidate:
+   skeleton; Stage 199 candidate: real implementation, per
+   `docs/nip44_vector_readiness.md` §3 steps 2–3, combined or split at
+   that future stage's own discretion).
+2. **ConversationKey** — HKDF-extract from the ECDH shared secret
+   (depends on step 1 landing first).
+3. **MessageKey** — HKDF-expand from the conversation key (depends on
+   step 2).
+4. **Padding** — the length-obscuring schedule (independent of steps
+   1–3, but ordered after them here to match `docs/nip44_vector_readiness.md`'s
+   fixed sequence).
+5. **Encrypt** — pad → ChaCha20 → HMAC → payload assembly (depends on
+   steps 2–4).
+6. **Decrypt** — HMAC-verify → decrypt → unpad (depends on step 5's
+   encrypt path existing to test against).
+7. **NIP-44** (the full public-facing primitive, if/when a public API is
+   authorized) — depends on all of the above.
+
+No step in this order is built by Stage 194–197 — this section only
+fixes the SEQUENCE a future stage must follow, restating (not
+re-deciding) `docs/nip44_vector_readiness.md` §3.
+
+## 9. Conclusion (Stage 194)
+
+- **`k256` adopted**, `default-features = false`, `features =
+  ["arithmetic"]` only — no `ecdsa`/`schnorr`/`serde`/`pem`/`pkcs8`/`rand`
+  feature enabled.
+- **`rand_core` appears in the resolved graph as a reviewed, unavoidable,
+  trait-only transitive dependency** — the full `rand` crate remains
+  absent.
+- **`CryptoCapability` gains an eleventh variant, `Ecdh`**, reporting a
+  new `CapabilityReadiness::ReadyForImplementation` (Stage 195) — neither
+  `Ready` (no code exists) nor `NotImplemented` (the dependency now
+  does).
+- **No ECDH implementation, no conversation-key/message-key/padding/
+  encrypt/decrypt code, no NIP-44 code, no public API addition** — this
+  remains dependency adoption plus label/diagnostics updates ONLY.
+- **The fixed future order is ECDH → ConversationKey → MessageKey →
+  Padding → Encrypt → Decrypt → NIP-44** (§8), one capability per future
+  stage.

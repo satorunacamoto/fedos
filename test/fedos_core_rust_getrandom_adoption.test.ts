@@ -87,7 +87,7 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("2. getrandom has no direct rand/rand_core sibling dependency, and wasm-bindgen is still absent", () => {

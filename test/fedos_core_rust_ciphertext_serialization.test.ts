@@ -137,7 +137,7 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
     expect(nip44SchemaSource).not.toContain("unsafe");
   });
 
-  it("8. Cargo.toml is unchanged: still 9 production dependencies, serde/serde_json/hex remain dev-dependencies-only, no base64/CBOR/secp256k1 crate", () => {
+  it("8. Cargo.toml is unchanged since this stage: still 10 production dependencies (Stage 194 separately added k256; see test/nip44_pre_adoption_guard.test.ts), serde/serde_json/hex remain dev-dependencies-only, no base64/CBOR/rust-secp256k1 crate", () => {
     const depsIdx = cargoCode.indexOf("[dependencies]");
     const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
     const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
@@ -145,8 +145,8 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
     const productionDepLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(productionDepLines.length).toBe(9);
-    for (const forbidden of ["serde", "serde_json", "hex", "base64", "cbor", "secp256k1", "k256"]) {
+    expect(productionDepLines.length).toBe(10);
+    for (const forbidden of ["serde", "serde_json", "hex", "base64", "cbor", "secp256k1"]) {
       expect(
         productionDepLines.some((line: string) => line.trim().startsWith(`${forbidden} `) || line.trim().startsWith(`${forbidden}=`)),
         `expected ${forbidden} to be absent from [dependencies]`,

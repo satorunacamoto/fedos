@@ -3863,3 +3863,77 @@ Stage 189–191's TypeScript-side work — `src/render/encrypted_payload_preview
 lives entirely outside this Rust crate (there is still no Rust↔TypeScript
 bridge); see the repository root `README.md`'s Stage 189–193 entry for
 the full record of that work.
+
+## secp256k1 dependency adoption + capability/diagnostics + guards + docs (Stage 194–197)
+
+Stage 194–197 resolve Stage 192's open comparison: **`k256` is adopted.**
+No ECDH, conversation-key, message-key, padding, encrypt, decrypt, or
+NIP-44 code is written — this is dependency adoption plus capability-
+label/diagnostics bookkeeping and guards only.
+
+**Stage 194**: `Cargo.toml` gains `k256 = { version = "0.13",
+default-features = false, features = ["arithmetic"] }` — production
+dependency count 9 → 10. No `ecdsa`/`schnorr`/`serde`/`pem`/`pkcs8`/`rand`
+feature is enabled; `arithmetic` alone is the minimum a future ECDH stage
+needs to build on. A `cargo tree -i rand_core` check (run before
+adoption, not after) found `rand_core` appearing as a REQUIRED,
+non-optional transitive dependency of `elliptic-curve`/`ff`/`group`/
+`crypto-bigint` — the RustCrypto elliptic-curve trait crates
+`arithmetic` itself is built on — regardless of which `k256` feature
+flags are selected. This is an ecosystem-wide trait requirement (e.g.
+`ff::Field`'s `random(rng)` signature), not a feature this crate chose to
+turn on; `rand_core` is trait-definitions-only, with no entropy-source
+implementation of its own, and the full `rand` crate remains absent from
+the resolved graph. Escalated to and confirmed by the user as a REVIEWED
+EXCEPTION to this crate's standing "no `rand`/`rand_core`" dependency
+policy — recorded in `Cargo.toml`'s own comment and in
+`docs/nip44_dependency_adoption.md` §7.
+
+**Stage 195**: `crypto::capability_matrix`'s `CryptoCapability` gains an
+eleventh variant, `Ecdh` (right after `Envelope`). `crypto::diagnostics`'s
+`CapabilityReadiness` gains a fourth variant, `ReadyForImplementation` —
+distinct from `Ready` (real, wired code), `NotConnected` (a skeleton
+type exists), and `NotImplemented` (no dependency, no code): the
+dependency now exists, but zero ECDH code — no skeleton, no function, no
+type — has been written. `crypto_diagnostics_preview()` reports exactly
+one capability, `Ecdh`, in this new state.
+
+**Stage 196**: two new guard suites confirm the adoption's shape stays
+exactly this minimal. Rust-side:
+[`crypto::secp256k1_dependency_guard`](src/crypto/secp256k1_dependency_guard.rs)
+(`#[cfg(test)]`-only, mirroring `nip44_vector_schema`'s pattern) reads
+the ACTUAL resolved `Cargo.toml`/`Cargo.lock` via `include_str!` and
+confirms: exactly ten production dependencies, `k256` declared with
+`default-features = false` and only the `arithmetic` feature, no
+`rust-secp256k1` (C-FFI) dependency was also added, and `Cargo.lock`
+resolves `k256` with `rand_core` present only as the documented
+transitive exception (no full `rand` crate). TypeScript-side:
+[`test/secp256k1_dependency_guard.test.ts`](../../test/secp256k1_dependency_guard.test.ts)
+re-confirms all of the above from OUTSIDE the crate, plus: the
+`CryptoCapability`/`CapabilityReadiness` enum changes land exactly as
+specified, no ECDH/conversation-key/message-key/padding/encrypt/decrypt
+function exists anywhere in production code, `secp256k1_dependency_guard`
+is declared `#[cfg(test)]`-only (never `pub`/`pub(crate)`), the `pub fn`
+surface is unchanged at twenty-seven, and there is no Runtime/Worker/
+Storage/Federation connection. The pre-existing
+[`test/nip44_pre_adoption_guard.test.ts`](../../test/nip44_pre_adoption_guard.test.ts)
+(Stage 193) is updated in place — its premise ("nothing adopted yet")
+is now false, so its checks are inverted/refocused where Stage 194–195
+change what is legitimately present (e.g. `k256` in `Cargo.toml`, the
+`Ecdh` capability label) while still confirming no actual ECDH
+COMPUTATION exists.
+
+**Stage 197**: [`docs/nip44_dependency_adoption.md`](../../docs/nip44_dependency_adoption.md)
+gains a new §6–§9 recording the `k256` decision (weighed against the
+nine §3 criteria — RustCrypto ecosystem fit was decisive; audit posture
+was the one criterion favoring `rust-secp256k1`, outweighed here), the
+exact feature-selection rationale, the `rand_core` exception
+cross-reference, and the FIXED future implementation order: **ECDH →
+ConversationKey → MessageKey → Padding → Encrypt → Decrypt → NIP-44** —
+one capability per future stage, every intermediate commit within a
+future stage keeping `cargo check`/`cargo test` green.
+
+Public `pub fn` surface unchanged at twenty-seven. No ECDH,
+conversation-key, message-key, padding, encrypt, decrypt, or NIP-44
+implementation. No Runtime/Worker/Storage/Federation/Relay/WASM/FFI
+connection. No TypeScript serialization change.

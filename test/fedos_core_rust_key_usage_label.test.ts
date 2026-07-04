@@ -156,7 +156,7 @@ describe("FedOS Rust crate — public key-usage label boundary (Stage 106)", () 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("10. no getrandom/rand call anywhere in the key-usage group", () => {

@@ -203,7 +203,7 @@ describe("FedOS Rust crate — public opaque crypto API (Stage 171–176)", () =
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
     expect(cargoCode).not.toMatch(/\[\[test\]\]/);
   });
 

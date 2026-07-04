@@ -177,7 +177,7 @@ describe("FedOS Rust crate â€” internal ciphertext envelope skeleton (Stage 157â
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("13. not connected to Runtime/Worker/Storage/Nostr/NIP-44/WASM in any way", () => {

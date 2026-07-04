@@ -21,34 +21,37 @@ import federationTypesSource from "../src/federation/types.ts?raw";
 import packageJsonSource from "../package.json?raw";
 
 /**
- * Stage 193 — NIP-44 PRE-ADOPTION GUARD.
+ * Stage 193 — NIP-44 PRE-ADOPTION GUARD (superseded IN PART by Stage 194).
  *
- * `docs/nip44_dependency_adoption.md` (Stage 192) compares
- * `rust-secp256k1` and `k256` without adopting either. This guard confirms
- * — from OUTSIDE the crate, independent of that planning document's own
- * prose — that none of Stage 189–192's work slipped any actual NIP-44
- * cryptography, secp256k1/k256 dependency, or new connection into code:
- * `Cargo.toml` is byte-for-byte unchanged, no secp256k1/k256 dependency
- * exists, no ECDH/conversation-key/message-key/padding/encrypt/decrypt
- * function exists anywhere in this crate's production code, no Runtime/
- * Worker/Storage/Federation connection exists, and the public `pub fn`
- * surface is unchanged at twenty-seven.
+ * `docs/nip44_dependency_adoption.md` (Stage 192) originally compared
+ * `rust-secp256k1` and `k256` without adopting either — Stage 193 guarded
+ * that state. **Stage 194 has since adopted `k256`** (minimal
+ * `arithmetic`-only feature) and Stage 195 added an `Ecdh`
+ * `CryptoCapability` LABEL reporting `ReadyForImplementation` — see
+ * `test/secp256k1_dependency_guard.test.ts` for the dedicated Stage
+ * 194–196 checks on that adoption's exact shape. This file's remaining
+ * checks confirm what is STILL true after that adoption: no actual ECDH
+ * cryptographic COMPUTATION, no conversation-key/message-key derivation,
+ * no padding, no NIP-44-specific encrypt/decrypt function exists anywhere
+ * in this crate's production code, no Runtime/Worker/Storage/Federation
+ * connection exists, and the public `pub fn` surface is unchanged at
+ * twenty-seven.
  */
-describe("NIP-44 pre-adoption guard (Stage 193)", () => {
+describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-196)", () => {
   const cargoCode: string = cargoTomlSource
     .split("\n")
     .map((line: string) => line.replace(/#.*$/, ""))
     .join("\n")
     .toLowerCase();
 
-  it("1. Cargo.toml is unchanged: still 9 production dependencies, no secp256k1/k256/ECC crate", () => {
+  it("1. Cargo.toml has exactly 10 production dependencies: the original 9, plus k256 (Stage 194) — no rust-secp256k1/other ECC crate", () => {
     const depsIdx = cargoCode.indexOf("[dependencies]");
     const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
     const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
     const productionDepLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(productionDepLines.length).toBe(9);
+    expect(productionDepLines.length).toBe(10);
     const productionDepNames = productionDepLines.map((line: string) => line.trim().split(/\s*=/)[0]);
     expect(productionDepNames.sort()).toEqual(
       [
@@ -61,16 +64,17 @@ describe("NIP-44 pre-adoption guard (Stage 193)", () => {
         "aes-gcm",
         "getrandom",
         "sha2",
+        "k256",
       ].sort(),
     );
   });
 
-  it("2. no secp256k1 dependency anywhere in Cargo.toml", () => {
-    expect(cargoCode).not.toMatch(/\bsecp256k1\b/);
+  it("2. no rust-secp256k1 (C-FFI) dependency line anywhere in Cargo.toml — docs/nip44_dependency_adoption.md picked k256", () => {
+    expect(cargoCode).not.toMatch(/^\s*secp256k1\s*=/m);
   });
 
-  it("3. no k256 dependency anywhere in Cargo.toml", () => {
-    expect(cargoCode).not.toMatch(/\bk256\b/);
+  it("3. k256 IS now a declared dependency (Stage 194) — its exact feature shape has its own dedicated test file", () => {
+    expect(cargoCode).toMatch(/^\s*k256\s*=/m);
   });
 
   it("4. no NIP-44 cryptographic implementation exists anywhere in lib.rs's production code — checked structurally (fn/struct/enum/mod definitions), not as a bare word (this crate's own doc comments legitimately name 'NIP-44' in prose, e.g. 'no Runtime/Worker/Storage/Nostr/NIP-44/WASM connection')", () => {
@@ -87,12 +91,22 @@ describe("NIP-44 pre-adoption guard (Stage 193)", () => {
     }
   });
 
-  it("5. no ECDH implementation or reference exists in production code", () => {
-    expect(cargoCode).not.toMatch(/\becdh\b/);
+  it("5. the Ecdh CAPABILITY LABEL is legitimate (Stage 195), but no actual ECDH cryptographic COMPUTATION (a real shared-secret function/call) exists anywhere in production code", () => {
+    // Updated Stage 195: `CryptoCapability::Ecdh` is now a real, intentional
+    // enum variant (capability_matrix.rs) and is legitimately NAMED in
+    // crypto.rs's own doc comment — a bare `/\becdh\b/` check across the
+    // whole module would now false-positive on that intentional label, so
+    // this checks for an actual COMPUTATION shape instead: a function that
+    // performs Diffie-Hellman (e.g. calls into k256's point-multiplication
+    // API), not merely a label naming the future capability.
     const firstCfgTestIdx = libRsSource.indexOf("#[cfg(test)]");
     const productionOnly = libRsSource.slice(0, firstCfgTestIdx);
-    expect(productionOnly).not.toMatch(/\becdh\b/i);
-    expect(cryptoModSource).not.toMatch(/\becdh\b/i);
+    for (const forbidden of [/\bfn\s+\w*ecdh\w*\s*\(/i, /\bAffinePoint::/, /\bProjectivePoint::/, /\.to_affine\s*\(/]) {
+      expect(productionOnly, `expected lib.rs productionOnly to not match ${forbidden}`).not.toMatch(
+        forbidden,
+      );
+      expect(cryptoModSource, `expected crypto.rs to not match ${forbidden}`).not.toMatch(forbidden);
+    }
   });
 
   it("6. no ConversationKey/conversation_key derivation FUNCTION exists in production code", () => {
@@ -153,11 +167,11 @@ describe("NIP-44 pre-adoption guard (Stage 193)", () => {
     expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
   });
 
-  it("13. docs/nip44_dependency_adoption.md names both candidates and makes no decision", () => {
+  it("13. docs/nip44_dependency_adoption.md names both candidates, and now records the Stage 194 k256 decision (Stage 192's original 'no decision' framing is superseded)", () => {
     expect(dependencyAdoptionDoc).toMatch(/rust-secp256k1/);
     expect(dependencyAdoptionDoc).toMatch(/\bk256\b/);
-    expect(dependencyAdoptionDoc).toMatch(/no code/i);
-    expect(dependencyAdoptionDoc).toMatch(/picks neither|no dependency is adopted|makes NO adoption decision/i);
+    expect(dependencyAdoptionDoc).toMatch(/ADOPTED/);
+    expect(dependencyAdoptionDoc).toMatch(/Stage 194/);
     expect(dependencyAdoptionDoc).not.toMatch(/```rust/);
   });
 });

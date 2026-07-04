@@ -187,7 +187,7 @@ describe("FedOS Rust crate — public algorithm policy metadata (Stage 106)", ()
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
     // Updated Stage 147: sha2 promoted to [dependencies] makes this nine.
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("10. no getrandom/rand call anywhere in the algorithm-policy group", () => {

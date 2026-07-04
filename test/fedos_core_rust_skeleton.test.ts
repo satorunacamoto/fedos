@@ -115,7 +115,7 @@ describe("FedOS Rust crate skeleton", () => {
     .join("\n")
     .toLowerCase();
 
-  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 + aes-gcm + getrandom + sha2 only — no other crypto dependency", () => {
+  it("3. Cargo.toml's [dependencies] (production) table depends on chacha20poly1305 + hkdf + zeroize/secrecy/subtle + argon2 + aes-gcm + getrandom + sha2 + k256 only — no other crypto dependency", () => {
     for (const dep of [
       // sha2 is NOT in this list: since Stage 77 it is a legitimate
       // [dev-dependencies] entry (used only by the #[cfg(test)]-only
@@ -135,7 +135,17 @@ describe("FedOS Rust crate skeleton", () => {
       // NOT in this list: since Stage 104 it is a legitimate PRODUCTION
       // dependency, this crate's own CSPRNG entropy source, adopted
       // build-check ONLY — see test/fedos_core_rust_dependency.test.ts
-      // test 21 and docs/public_random_design.md.
+      // test 21 and docs/public_random_design.md. k256 is likewise NOT in
+      // this list: since Stage 194 it is a legitimate PRODUCTION
+      // dependency (arithmetic-only feature) — see
+      // test/secp256k1_dependency_guard.test.ts for its dedicated checks.
+      // rand_core is likewise excluded from this forbidden list's own
+      // wording concern: it still names no PRODUCTION dependency LINE
+      // (k256's `arithmetic` feature pulls it in only as a transitive,
+      // trait-only dependency — see Cargo.toml's own REVIEWED EXCEPTION
+      // comment) — this test's `cargoCode` strips `#`-comments, so this
+      // forbidden-word check still only matches an actual dependency
+      // declaration, never prose.
       "rand_core",
       "bip39",
       "secp256k1",
@@ -160,7 +170,7 @@ describe("FedOS Rust crate skeleton", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
     expect(depLines.some((line: string) => line.includes("getrandom"))).toBe(true);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);

@@ -186,16 +186,15 @@ describe("FedOS Rust crate — ciphertext transport descriptor + NIP-44/storage 
     }
   });
 
-  it("12. Cargo.toml is unchanged — no new dependency, still 9 production dependencies, no secp256k1/CBOR crate", () => {
+  it("12. Cargo.toml is unchanged — no new dependency since this stage, still 10 production dependencies (Stage 194 separately added k256; see test/nip44_pre_adoption_guard.test.ts for that stage's own dedicated checks), no CBOR crate, no rust-secp256k1 C-FFI crate", () => {
     const depsIdx = cargoCode.indexOf("[dependencies]");
     const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
     const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
-    expect(cargoCode).not.toMatch(/\bsecp256k1\b/);
-    expect(cargoCode).not.toMatch(/\bk256\b/);
+    expect(depLines.length).toBe(10);
+    expect(depLines.some((line: string) => /^\s*secp256k1\s*=/.test(line))).toBe(false);
     expect(cargoCode).not.toMatch(/\bcbor\b/);
   });
 

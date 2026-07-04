@@ -260,7 +260,7 @@ describe("FedOS Rust crate — AEAD nonce helper (Stage 138)", () => {
     // [dependencies] (see test/fedos_core_rust_dependency.test.ts test 7 and
     // test/fedos_core_rust_hkdf_internal.test.ts for the dedicated checks),
     // making this nine, not eight — unrelated to this stage's own topic.
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
     expect(productionDepsSection).toMatch(/^getrandom\s*=/m);
   });
 

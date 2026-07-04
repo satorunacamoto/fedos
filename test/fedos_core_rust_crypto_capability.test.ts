@@ -36,6 +36,14 @@ import workerSource from "../src/worker.ts?raw";
  * ↔ ciphertext-envelope bridge is real — see
  * test/fedos_core_rust_aead_envelope_bridge.test.ts for the bridge's own
  * dedicated checks.
+ *
+ * Updated Stage 195: `CryptoCapability` gains an eleventh variant, `Ecdh`
+ * (reporting the new `CapabilityReadiness::ReadyForImplementation` — a
+ * fourth readiness label, distinct from `Ready`/`NotConnected`/
+ * `NotImplemented` — now that Stage 194 adopted `k256` but zero ECDH code
+ * exists) — see test/nip44_pre_adoption_guard.test.ts and
+ * test/secp256k1_dependency_guard.test.ts for the dedicated Stage 194–196
+ * checks.
  */
 describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (Stage 150–151)", () => {
   it("1. lib.rs declares a plain (non-pub) mod crypto", () => {
@@ -43,11 +51,11 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     expect(libRsSource).not.toMatch(/\bpub\s+mod\s+crypto\b/);
   });
 
-  it("2. CryptoCapability is pub(crate)-only, with exactly the ten specified variants in the documented order (Stage 164 adds Envelope)", () => {
+  it("2. CryptoCapability is pub(crate)-only, with exactly the eleven specified variants in the documented order (Stage 164 adds Envelope; Stage 195 adds Ecdh)", () => {
     expect(capabilityMatrixSource).toMatch(/\bpub\(crate\)\s+enum\s+CryptoCapability\b/);
     expect(capabilityMatrixSource).not.toMatch(/\bpub\s+enum\s+CryptoCapability\b/);
     const variantOrderMatch = capabilityMatrixSource.match(
-      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*10\]\s*=\s*\[([\s\S]*?)\];/,
+      /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*11\]\s*=\s*\[([\s\S]*?)\];/,
     );
     expect(variantOrderMatch, "expected to find CryptoCapability::ALL").not.toBeNull();
     const variants = [...variantOrderMatch![1].matchAll(/CryptoCapability::(\w+)/g)].map(
@@ -60,6 +68,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
       "Hkdf",
       "Aead",
       "Envelope",
+      "Ecdh",
       "Nip44",
       "Schnorr",
       "StorageKey",
@@ -67,19 +76,19 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     ]);
   });
 
-  it("3. CapabilityReadiness is pub(crate)-only with exactly the three specified variants", () => {
+  it("3. CapabilityReadiness is pub(crate)-only with exactly the four specified variants (Stage 195 adds ReadyForImplementation)", () => {
     expect(diagnosticsSource).toMatch(/\bpub\(crate\)\s+enum\s+CapabilityReadiness\b/);
     expect(diagnosticsSource).not.toMatch(/\bpub\s+enum\s+CapabilityReadiness\b/);
-    for (const variant of ["Ready", "NotConnected", "NotImplemented"]) {
+    for (const variant of ["Ready", "NotConnected", "ReadyForImplementation", "NotImplemented"]) {
       expect(diagnosticsSource, `expected CapabilityReadiness variant: ${variant}`).toContain(
         variant,
       );
     }
   });
 
-  it("4. crypto_diagnostics_preview is pub(crate)-only, takes no parameter, and returns a fixed [CapabilityReport; 10] (Stage 164)", () => {
+  it("4. crypto_diagnostics_preview is pub(crate)-only, takes no parameter, and returns a fixed [CapabilityReport; 11] (Stage 164, Stage 195)", () => {
     expect(diagnosticsSource).toMatch(
-      /\bpub\(crate\)\s+fn\s+crypto_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*CapabilityReport\s*;\s*10\s*\]/,
+      /\bpub\(crate\)\s+fn\s+crypto_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*CapabilityReport\s*;\s*11\s*\]/,
     );
     expect(diagnosticsSource).not.toMatch(/\bpub\s+fn\s+crypto_diagnostics_preview\b/);
   });
@@ -93,7 +102,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     // Every row of the fixed table is a plain `CapabilityReport { ... }`
     // struct literal, not a computed value.
     const rows = [...diagnosticsSource.matchAll(/CapabilityReport\s*\{/g)];
-    expect(rows.length).toBeGreaterThanOrEqual(10);
+    expect(rows.length).toBeGreaterThanOrEqual(11);
   });
 
   it("6. no secret byte, key, seed, plaintext, ciphertext, or passphrase field anywhere in capability_matrix.rs / diagnostics.rs", () => {
@@ -154,7 +163,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     }
   });
 
-  it("11. Cargo.toml is unchanged by the crypto module — no new dependency", () => {
+  it("11. Cargo.toml has 10 production dependencies (9 pre-Stage-194, plus k256 adopted Stage 194 for the new Ecdh capability — see test/nip44_pre_adoption_guard.test.ts/test/secp256k1_dependency_guard.test.ts for that stage's own dedicated checks)", () => {
     const cargoCode = cargoTomlSource
       .split("\n")
       .map((line: string) => line.replace(/#.*$/, ""))
@@ -166,7 +175,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(9);
+    expect(depLines.length).toBe(10);
   });
 
   it("12. no unwrap/expect/panic/unsafe anywhere in the crypto module's production code", () => {
