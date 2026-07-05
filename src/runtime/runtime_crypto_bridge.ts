@@ -3,23 +3,27 @@
  *
  * The ONE function that resolves a `RuntimeCryptoProvider` for `AppRuntime`
  * (`src/runtime/create_runtime.ts`, Stage 260) to use. Reads
- * `src/runtime/runtime_crypto_config.ts`'s (Stage 258) fixed,
- * `runtimeCryptoEnabled: false` config and, per that flag, resolves ONLY the
- * registry's `"placeholder"` entry (`src/runtime/runtime_crypto_registry.ts`,
- * Stage 257) — never a real FedOS core, in either branch below.
+ * `src/runtime/runtime_crypto_config.ts`'s (Stage 258/267) fixed config and
+ * resolves a name via the Registry (`src/runtime/runtime_crypto_registry.ts`,
+ * Stage 257/266) — never a real FedOS core call, in any branch below.
+ *
+ * Stage 268 makes the selection a TWO-FLAG gate:
+ * `runtimeCryptoEnabled && runtimeCryptoProvider === "fedos"`. BOTH must be
+ * true before `"fedos"` is even asked for — either flag alone still
+ * resolves `"placeholder"`. Since `runtimeCryptoEnabled` is permanently
+ * `false` (Stage 258), this gate can never actually pass in this stage,
+ * regardless of `runtimeCryptoProvider`'s value (itself fixed
+ * `"placeholder"`, Stage 267).
  *
  * HARD GUARDRAILS:
  *   - NO `packages/fedos-core-rust` reference (Rust crate or TS package
  *     boundary) anywhere in this file.
- *   - Both branches of `if (!runtimeCryptoEnabled)` resolve to the SAME safe
- *     placeholder — there is no code path in this stage that could ever
- *     construct or call a non-placeholder provider, even if
- *     `runtimeCryptoEnabled` were (hypothetically, and never in this stage)
- *     `true`.
+ *   - The two-flag gate is evaluated with `&&`, never `||` — a single
+ *     truthy flag is never enough.
  *   - A `RuntimeCryptoProvider` is NEVER constructed with `new` in this
  *     file — every provider comes from `RuntimeCryptoProviderRegistry.create()`
- *     (Stage 257), so a future stage that registers a real provider changes
- *     NOTHING here beyond which name is asked for.
+ *     (Stage 257/266), so a future stage that registers another real
+ *     provider changes NOTHING here beyond which name is asked for.
  *   - Never throws; never mutates its `registry` argument.
  */
 
@@ -27,48 +31,51 @@ import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
 import {
   createDefaultRuntimeCryptoProviderRegistry,
+  FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME,
   PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME,
   RuntimeCryptoProviderRegistry,
 } from "./runtime_crypto_registry.js";
 
 /**
- * Resolve the `"placeholder"` entry from `registry`, falling back to a
- * fresh default registry's own entry if `registry` somehow lacks one (e.g. a
- * caller supplied a bespoke registry without registering it) — still
- * resolved via a `RuntimeCryptoProviderRegistry`, never `new`'d directly.
+ * Resolve `name` from `registry`, falling back to a fresh default
+ * registry's own entry if `registry` somehow lacks one (e.g. a caller
+ * supplied a bespoke registry without registering it) — still resolved via
+ * a `RuntimeCryptoProviderRegistry`, never `new`'d directly.
  */
-function resolvePlaceholderProvider(
+function resolveFromRegistry(
   registry: RuntimeCryptoProviderRegistry,
+  name: string,
 ): RuntimeCryptoProvider {
-  const fromRegistry = registry.create(PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME);
+  const fromRegistry = registry.create(name);
   if (fromRegistry) return fromRegistry;
-  // `registry` lacked a "placeholder" entry (e.g. a caller supplied a
-  // bespoke, not-yet-populated registry) — resolve from a fresh default
-  // registry instead. `createDefaultRuntimeCryptoProviderRegistry()` always
-  // registers this name (see runtime_crypto_registry.ts), so this second
-  // lookup is guaranteed to succeed.
+  // `registry` lacked this name (e.g. a caller supplied a bespoke,
+  // not-yet-populated registry) — resolve from a fresh default registry
+  // instead. `createDefaultRuntimeCryptoProviderRegistry()` always
+  // registers both known names (see runtime_crypto_registry.ts), so this
+  // second lookup for the SAFE placeholder name is guaranteed to succeed.
   return createDefaultRuntimeCryptoProviderRegistry().create(
     PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME,
   ) as RuntimeCryptoProvider;
 }
 
 /**
- * Resolve the `RuntimeCryptoProvider` Runtime should use. Always resolves
- * (from `registry`, or a fresh default registry) the `"placeholder"` entry —
- * `runtimeCryptoEnabled` being permanently `false` (Stage 258) means the
- * `if` branch below is the only one ever taken, and even the (currently
- * unreachable) `else` branch resolves nothing but the same placeholder name.
- * No FedOS Core call exists in this function.
+ * Resolve the `RuntimeCryptoProvider` Runtime should use. Only resolves
+ * `"fedos"` when BOTH `runtimeCryptoEnabled` is `true` AND
+ * `runtimeCryptoProvider === "fedos"` — otherwise (always, in this stage)
+ * resolves `"placeholder"`. No FedOS Core call exists in this function
+ * regardless of which name is resolved — `FedosRuntimeCryptoProvider`
+ * itself performs no real cryptography either (Stage 265).
  */
 export function buildRuntimeCryptoProvider(
   registry: RuntimeCryptoProviderRegistry = createDefaultRuntimeCryptoProviderRegistry(),
 ): RuntimeCryptoProvider {
-  const { runtimeCryptoEnabled } = getRuntimeCryptoConfig();
-  if (!runtimeCryptoEnabled) {
-    return resolvePlaceholderProvider(registry);
+  const { runtimeCryptoEnabled, runtimeCryptoProvider } = getRuntimeCryptoConfig();
+  if (runtimeCryptoEnabled && runtimeCryptoProvider === FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME) {
+    // Unreachable in this stage: runtimeCryptoEnabled is permanently false
+    // (Stage 258), so this branch never actually runs. Even here, only the
+    // registry's own "fedos" entry (FedosRuntimeCryptoProvider, itself
+    // encrypt/decrypt-Unsupported) is ever resolved — never a real core.
+    return resolveFromRegistry(registry, FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME);
   }
-  // Unreachable in this stage: `runtimeCryptoEnabled` is permanently `false`
-  // (Stage 258). Even here, only the registry's own "placeholder" entry is
-  // ever resolved — never a FedOS core.
-  return resolvePlaceholderProvider(registry);
+  return resolveFromRegistry(registry, PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME);
 }

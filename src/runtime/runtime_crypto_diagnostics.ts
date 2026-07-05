@@ -22,6 +22,15 @@
  * `RuntimeCryptoDiagnosticsReport` above. `enabled` is `false` because
  * `runtimeCryptoEnabled` is permanently `false` — not because this function
  * re-derives it independently.
+ *
+ * Stage 269 extends `runtimeCryptoActivationStatus`'s `provider` field to
+ * report the EFFECTIVE provider name — mirroring
+ * `src/runtime/runtime_crypto_bridge.ts`'s (Stage 268) own two-flag gate
+ * (`runtimeCryptoEnabled && runtimeCryptoProvider === "fedos"`) — rather
+ * than blindly echoing the config's `runtimeCryptoProvider` field. Since
+ * `runtimeCryptoEnabled` is permanently `false`, this function's `provider`
+ * is permanently `"placeholder"` too, regardless of `runtimeCryptoProvider`'s
+ * own (also fixed `"placeholder"`) value.
  */
 
 import type {
@@ -29,7 +38,9 @@ import type {
   RuntimeCryptoProvider,
   RuntimeCryptoState,
 } from "./crypto_provider.js";
+import type { RuntimeCryptoProviderName } from "./runtime_crypto_config.js";
 import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
+import { FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME } from "./runtime_crypto_registry.js";
 
 /**
  * A non-sensitive, display-only readiness label for a `RuntimeCryptoProvider`
@@ -93,24 +104,31 @@ export function runtimeCryptoDiagnosticsPreview(
   };
 }
 
-/** A minimal, non-sensitive activation summary — see this module's Stage 261 doc comment above. */
+/** A minimal, non-sensitive activation summary — see this module's Stage 261/269 doc comment above. */
 export interface RuntimeCryptoActivationStatus {
   readonly enabled: boolean;
-  readonly provider: "placeholder";
+  readonly provider: RuntimeCryptoProviderName;
 }
 
 /**
- * Read-only activation summary: `enabled` mirrors
- * `runtimeCryptoEnabled` (`src/runtime/runtime_crypto_config.ts`) exactly —
- * permanently `false` in this stage — and `provider` is fixed at
- * `"placeholder"`, the only provider name this stage's registry/bridge ever
- * resolves. Takes no parameter, reads no environment variable, and never
- * calls a `RuntimeCryptoProvider` method.
+ * Read-only activation summary: `enabled` mirrors `runtimeCryptoEnabled`
+ * (`src/runtime/runtime_crypto_config.ts`) exactly — permanently `false` in
+ * this stage — and `provider` reports the EFFECTIVE provider name,
+ * mirroring `src/runtime/runtime_crypto_bridge.ts`'s own two-flag gate:
+ * `"fedos"` only when BOTH `runtimeCryptoEnabled` is `true` AND
+ * `runtimeCryptoProvider === "fedos"`; `"placeholder"` otherwise. Since
+ * `runtimeCryptoEnabled` is permanently `false`, `provider` is permanently
+ * `"placeholder"` here too. Takes no parameter, reads no environment
+ * variable, and never calls a `RuntimeCryptoProvider` method.
  */
 export function runtimeCryptoActivationStatus(): RuntimeCryptoActivationStatus {
-  const { runtimeCryptoEnabled } = getRuntimeCryptoConfig();
+  const { runtimeCryptoEnabled, runtimeCryptoProvider } = getRuntimeCryptoConfig();
+  const effectiveProvider: RuntimeCryptoProviderName =
+    runtimeCryptoEnabled && runtimeCryptoProvider === FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME
+      ? FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME
+      : "placeholder";
   return {
     enabled: runtimeCryptoEnabled,
-    provider: "placeholder",
+    provider: effectiveProvider,
   };
 }
