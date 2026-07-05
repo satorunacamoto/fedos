@@ -5989,6 +5989,31 @@ pub fn fedos_decrypt(
     }
 }
 
+/// Stage 369 — the first minimal, crate-internal Rust invocation target: a
+/// trivial "ping" with NO cryptographic behavior of any kind. Takes no
+/// parameters, performs no allocation, holds no state, and always returns
+/// `true`. This exists ONLY so a future, separate, explicitly-reviewed
+/// stage can wire the FIRST real cross-language call (TypeScript ->
+/// Rust) through a harmless, constant-returning function BEFORE any
+/// cryptographic functionality is ever exposed across that boundary.
+///
+/// `pub(crate)`, NOT `pub` — this is deliberately NOT part of this
+/// crate's public API surface (see `fedos_encrypt`/`fedos_decrypt` above
+/// for what IS). Nothing outside this crate can call it in this stage;
+/// TypeScript's own `FedosRustInvocationAdapter.planPing()`
+/// (`src/runtime/fedos_rust_invocation_adapter.ts`, Stage 370) never
+/// calls into Rust at all yet.
+///
+/// Exercised ONLY by its own unit tests below (`fedos_runtime_ping_wiring`,
+/// gated `cfg(test)`) — nothing in production code calls it yet — so
+/// `#[allow(dead_code)]` suppresses the resulting warning on a plain,
+/// non-test `cargo check`/`cargo build`, mirroring this crate's existing
+/// convention (e.g. `secret_handle`, `aead_core`, `kdf_core`).
+#[allow(dead_code)]
+pub(crate) fn fedos_runtime_ping_internal() -> bool {
+    true
+}
+
 /// Stage 75 — RFC 8439 known-answer verification, `#[cfg(test)]` ONLY.
 ///
 /// This module is not part of the crate's public API: it is compiled only
@@ -7508,5 +7533,27 @@ mod fedos_encrypt_decrypt_wiring {
 
         let generated = fedos_generate_aead_key_32();
         assert_eq!(generated.status, FedosKeyGenerationStatus::Ready);
+    }
+}
+
+#[cfg(test)]
+mod fedos_runtime_ping_wiring {
+    //! Stage 369 — verifies `fedos_runtime_ping_internal` in isolation: it
+    //! takes no parameters, performs no cryptographic operation, and always
+    //! returns `true`. This module is a descendant of the crate root, so it
+    //! can reach the `pub(crate)` function directly — an actual external
+    //! crate has no such path.
+    use super::fedos_runtime_ping_internal;
+
+    #[test]
+    fn ping_always_returns_true() {
+        assert!(fedos_runtime_ping_internal());
+    }
+
+    #[test]
+    fn ping_is_deterministic_across_repeated_calls() {
+        for _ in 0..8 {
+            assert_eq!(fedos_runtime_ping_internal(), true);
+        }
     }
 }
