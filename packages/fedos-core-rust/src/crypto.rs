@@ -278,6 +278,17 @@
 //! `CryptoCapability` variant added, still no existing capability's
 //! meaning changed — `capability_matrix`/`diagnostics` remain exactly as
 //! they were (still sixteen variants).
+//!
+//! Stage 234 adds `nip44_wire_encoding` — the real NIP-44 v2 wire payload
+//! encoding, `base64(version_byte ‖ nonce ‖ ciphertext ‖ mac)`, STANDARD
+//! base64 (hand-implemented, no `base64` crate adopted) — deliberately
+//! SEPARATE from `crypto::ciphertext_serialization`'s own base64url
+//! codec (Stage 186, UNCHANGED), never shared or generalized.
+//! `decode_wire_payload_internal` validates structurally only (base64
+//! well-formedness, minimum length, version byte), reusing
+//! `crypto::nip44_wire_payload::Nip44WirePayload` (UNCHANGED) as its
+//! output shape.
+//!
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -301,6 +312,7 @@ pub(crate) mod nip44_stream_cipher;
 pub(crate) mod nip44_wire;
 pub(crate) mod nip44_wire_decrypt;
 pub(crate) mod nip44_wire_diagnostics;
+pub(crate) mod nip44_wire_encoding;
 pub(crate) mod nip44_wire_nonce;
 pub(crate) mod nip44_wire_payload;
 #[cfg(test)]
@@ -317,6 +329,8 @@ mod nip44_padding_vectors;
 mod nip44_stream_cipher_vectors;
 #[cfg(test)]
 mod nip44_wire_decrypt_vectors;
+#[cfg(test)]
+mod nip44_wire_encoding_vectors;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]
