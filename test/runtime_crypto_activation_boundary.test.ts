@@ -269,4 +269,39 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     }
     expect(codeOnlyOf(runtimeDiagnosticsSource)).not.toMatch(/Storage|Relay|nip.?17|nip-17|wasm/i);
   });
+
+  it("20. Stage 281-285: FEDOS_CRYPTO_PROVIDER=fedos is recorded as configuredProvider but effectiveProvider stays placeholder", () => {
+    const config = getRuntimeCryptoConfig({ FEDOS_CRYPTO_PROVIDER: "fedos" });
+    expect(config.runtimeCryptoEnabled).toBe(false);
+    expect(config.runtimeCryptoProvider).toBe("fedos");
+
+    const status = runtimeCryptoActivationStatus({ FEDOS_CRYPTO_PROVIDER: "fedos" });
+    expect(status.enabled).toBe(false);
+    expect(status.configuredProvider).toBe("fedos");
+    expect(status.effectiveProvider).toBe("placeholder");
+
+    const provider = buildRuntimeCryptoProvider(undefined, { FEDOS_CRYPTO_PROVIDER: "fedos" });
+    expect(provider).toBeInstanceOf(PlaceholderRuntimeCryptoProvider);
+  });
+
+  it("21. unset/unknown/truthy-flag-spelled env values all resolve to placeholder", () => {
+    for (const raw of [undefined, "", "unknown", "true", "1", "on", "enabled", "fedos-dev-only"]) {
+      const env = raw === undefined ? undefined : { FEDOS_CRYPTO_PROVIDER: raw };
+      expect(getRuntimeCryptoConfig(env).runtimeCryptoProvider).toBe("placeholder");
+      expect(runtimeCryptoActivationStatus(env).configuredProvider).toBe("placeholder");
+      expect(runtimeCryptoActivationStatus(env).effectiveProvider).toBe("placeholder");
+    }
+  });
+
+  it("22. no raw env string value ever leaks into the diagnostics report", () => {
+    const marker = "totally-unrecognized-marker-string";
+    const status = runtimeCryptoActivationStatus({ FEDOS_CRYPTO_PROVIDER: marker });
+    expect(JSON.stringify(status)).not.toContain(marker);
+  });
+
+  it("23. runtime_crypto_config.ts / runtime_crypto_bridge.ts / runtime_crypto_diagnostics.ts read no process.env", () => {
+    for (const src of [configSource, bridgeSource, runtimeDiagnosticsSource]) {
+      expect(codeOnlyOf(src)).not.toMatch(/process\.env/);
+    }
+  });
 });

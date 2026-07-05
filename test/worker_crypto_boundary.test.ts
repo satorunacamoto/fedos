@@ -208,4 +208,40 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
     expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
   });
+
+  it("17. Stage 281-284: FEDOS_CRYPTO_PROVIDER=fedos is recorded as configuredProvider but effectiveProvider/buildWorkerCryptoProvider stay placeholder", () => {
+    const config = getWorkerCryptoConfig({ FEDOS_CRYPTO_PROVIDER: "fedos" });
+    expect(config.workerCryptoEnabled).toBe(false);
+    expect(config.workerCryptoProvider).toBe("fedos");
+
+    const status = workerCryptoActivationStatus({ FEDOS_CRYPTO_PROVIDER: "fedos" });
+    expect(status.enabled).toBe(false);
+    expect(status.configuredProvider).toBe("fedos");
+    expect(status.effectiveProvider).toBe("placeholder");
+    expect(status.reachable).toBe(false);
+
+    const provider = buildWorkerCryptoProvider(undefined, { FEDOS_CRYPTO_PROVIDER: "fedos" });
+    expect(provider).toBeInstanceOf(PlaceholderRuntimeCryptoProvider);
+    expect(provider).not.toBeInstanceOf(FedosRuntimeCryptoProvider);
+  });
+
+  it("18. unset/unknown/truthy-flag-spelled env values all resolve to placeholder on the Worker side too", () => {
+    for (const raw of [undefined, "", "unknown", "true", "1", "on", "enabled", "fedos-dev-only"]) {
+      const env = raw === undefined ? undefined : { FEDOS_CRYPTO_PROVIDER: raw };
+      expect(getWorkerCryptoConfig(env).workerCryptoProvider).toBe("placeholder");
+      expect(workerCryptoActivationStatus(env).effectiveProvider).toBe("placeholder");
+    }
+  });
+
+  it("19. no raw env string value ever leaks into the Worker diagnostics report", () => {
+    const marker = "totally-unrecognized-worker-marker";
+    const status = workerCryptoActivationStatus({ FEDOS_CRYPTO_PROVIDER: marker });
+    expect(JSON.stringify(status)).not.toContain(marker);
+  });
+
+  it("20. worker_crypto_config.ts / worker_crypto_bridge.ts / worker_crypto_diagnostics.ts read no process.env", () => {
+    for (const [name, src] of WORKER_PRODUCTION_FILES) {
+      expect(codeOnlyOf(src), name).not.toMatch(/process\.env/);
+    }
+  });
 });

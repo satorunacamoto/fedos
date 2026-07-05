@@ -34,14 +34,23 @@ reviewer/activation stage would work through, not a runtime call chain).
 
 1. **Placeholder → FedOS Provider**: already possible today at the type
    level (`FedosRuntimeCryptoProvider` exists, `"fedos"` is registered) —
-   but `src/runtime/runtime_crypto_bridge.ts`'s two-flag gate
-   (`runtimeCryptoEnabled && runtimeCryptoProvider === "fedos"`) never
-   passes, because both `runtimeCryptoEnabled` and `runtimeCryptoProvider`
-   are fixed constants in `src/runtime/runtime_crypto_config.ts`. A future
-   stage would need to turn AT LEAST ONE of these into a real selection
-   (e.g. an env-driven flag, mirroring `RuntimeEnv.CRYPTO_PROVIDER`/
-   `ENABLE_CRYPTO_PLACEHOLDER`'s existing pattern) — explicitly reviewed,
-   not done here.
+   and, as of Stage 281–282, `runtimeCryptoProvider` IS now a real,
+   env-driven selection: setting `FEDOS_CRYPTO_PROVIDER=fedos` (parsed by
+   `src/runtime/crypto_provider_env.ts`'s `parseFedosCryptoProviderEnv` —
+   allowed values `"placeholder"`/`"fedos"` ONLY; truthy-flag spellings
+   like `"true"`/`"1"`/`"on"`/`"enabled"` are NOT recognized and fall back
+   to `"placeholder"`) makes `getRuntimeCryptoConfig()` report
+   `runtimeCryptoProvider: "fedos"`. **This still does not activate
+   anything**: `runtimeCryptoEnabled` stays fixed `false`
+   (`src/runtime/runtime_crypto_config.ts`, Stage 258, unchanged), so
+   `src/runtime/runtime_crypto_bridge.ts`'s two-flag gate
+   (`runtimeCryptoEnabled && runtimeCryptoProvider === "fedos"`) still
+   never passes — `FEDOS_CRYPTO_PROVIDER=fedos` is recorded as the
+   `configuredProvider` (`runtimeCryptoActivationStatus()`, Stage 285) but
+   the `effectiveProvider` stays `"placeholder"`. A future stage would
+   still need to turn `runtimeCryptoEnabled` itself into a real,
+   explicitly-reviewed selection (mirroring `RuntimeEnv.CRYPTO_PROVIDER`/
+   `ENABLE_CRYPTO_PLACEHOLDER`'s existing pattern) — not done here.
 2. **FedOS Provider → Worker**: `FedosRuntimeCryptoProvider.encrypt()`/
    `decrypt()` still always resolve to `"Unsupported"` (Stage 265) — before
    the Worker could usefully depend on this provider, a future,
@@ -63,8 +72,11 @@ reviewer/activation stage would work through, not a runtime call chain).
 
 ## 3. Explicit non-goals of this planning document
 
-- **No flag flip.** `runtimeCryptoEnabled`/`runtimeCryptoProvider`
-  (`src/runtime/runtime_crypto_config.ts`) stay fixed.
+- **No `runtimeCryptoEnabled` flip.** It stays fixed `false`
+  (`src/runtime/runtime_crypto_config.ts`) regardless of
+  `FEDOS_CRYPTO_PROVIDER`. (`runtimeCryptoProvider` itself IS now
+  env-selectable as of Stage 281–282 — see §2 step 1 above — but that
+  alone changes no executable behavior.)
 - **No Worker implementation or env exposure.** `src/worker.ts` is not
   modified.
 - **No real FedOS core call.** `FedosRuntimeCryptoProvider.encrypt()`/
@@ -84,6 +96,9 @@ reviewer/activation stage would work through, not a runtime call chain).
   step connects into.
 - `src/runtime/fedos_runtime_crypto_provider.ts` (Stage 265) — the
   still-non-operational provider this document names as step two.
-- `src/runtime/runtime_crypto_config.ts` (Stage 258/267) — the two fixed
-  flags this document's step one would need to turn into a real
+- `src/runtime/runtime_crypto_config.ts` (Stage 258/267/282) —
+  `runtimeCryptoProvider` is now env-driven; `runtimeCryptoEnabled` is the
+  one flag this document's step one still needs turned into a real
   selection.
+- `src/runtime/crypto_provider_env.ts` (Stage 281) — the shared
+  `FEDOS_CRYPTO_PROVIDER` parser both Runtime and Worker configs use.

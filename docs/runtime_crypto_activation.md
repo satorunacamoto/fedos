@@ -55,13 +55,47 @@ A future, separate, explicitly-reviewed stage would need to, in order:
 
 **None of the three steps above happens in this document or Stage 262.**
 
-## 3. Explicit non-goals of this planning document
+## 3. Update — Stage 281–285: step 1 partially landed, step 2 still does NOT
+
+Steps 1 and (half of) 2 from §2 above are now real code, but activation
+STILL has not happened:
+
+- **`"fedos"` IS now registered** (Stage 266) —
+  `createDefaultRuntimeCryptoProviderRegistry()` registers both
+  `"placeholder"` and `"fedos"` (`FedosRuntimeCryptoProvider`, Stage 265,
+  itself still encrypt/decrypt-`Unsupported`).
+- **`runtimeCryptoProvider` IS now selectable** (Stage 282) — via the
+  `FEDOS_CRYPTO_PROVIDER` environment variable, parsed by
+  `src/runtime/crypto_provider_env.ts`'s (Stage 281) shared
+  `parseFedosCryptoProviderEnv`. Allowed values: **`"placeholder"`**
+  (default) and **`"fedos"`** — nothing else, and specifically NOT any
+  truthy-flag spelling (`"true"`/`"1"`/`"on"`/`"enabled"`) and NOT any
+  dev-only variant name (`"fedos-dev-only"`, etc.); all of those resolve to
+  `"placeholder"` exactly like an unset/empty value does.
+- **`runtimeCryptoEnabled` is STILL fixed `false`** (Stage 258, unchanged)
+  — step 2's OWN "flip the enable gate" half has NOT happened. Setting
+  `FEDOS_CRYPTO_PROVIDER=fedos` records `runtimeCryptoProvider: "fedos"` in
+  the config (visible as `configuredProvider` in
+  `runtimeCryptoActivationStatus()`, Stage 285) but changes NOTHING about
+  which provider `buildRuntimeCryptoProvider()` actually resolves — its
+  `effectiveProvider` stays `"placeholder"`, because `runtimeCryptoEnabled
+  && runtimeCryptoProvider === "fedos"` still requires the first,
+  still-`false` flag.
+- **Step 3 (bridge resolving the new name when enabled) already existed**
+  since Stage 268 and needed no change for this update (Stage 284
+  confirmed it still behaves correctly with an env-sourced
+  `runtimeCryptoProvider`).
+
+**`encrypt`/`decrypt` are still never executed anywhere** — setting the
+env var only changes a recorded configuration value, never causes a real
+cryptographic operation.
+
+## 4. Explicit non-goals of this planning document
 
 - **No activation.** `runtimeCryptoEnabled` stays `false`
   (`src/runtime/runtime_crypto_config.ts`, Stage 258) — this document does
-  not modify it.
-- **No new registry entry.** Nothing registers a `"fedos"`/`"rust"`
-  provider anywhere in this repository.
+  not modify it, and no `FEDOS_CRYPTO_PROVIDER` value can change it either
+  (§3).
 - **No Worker implementation.** `src/worker.ts` is not modified — see
   `docs/runtime_worker_crypto_bridge.md` §3 for the Worker's own,
   still-unbuilt role.

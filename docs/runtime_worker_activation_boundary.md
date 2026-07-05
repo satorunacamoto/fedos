@@ -59,24 +59,42 @@ type was needed for the Worker side (unlike, say, `RuntimeCryptoCapability`
 needing its own type distinct from `CryptoCapability`, where the underlying
 CONCEPT genuinely differed).
 
-## 3. What a future connection stage would still need to decide
+## 3. Update — Stage 281–285: `workerCryptoProvider` IS now env-selectable
+
+`workerCryptoProvider` (`src/runtime/worker_crypto_config.ts`) now reads
+the SAME `FEDOS_CRYPTO_PROVIDER` env var Runtime reads
+(`src/runtime/crypto_provider_env.ts`'s shared `parseFedosCryptoProviderEnv`,
+Stage 281), via an OPTIONAL `env` parameter on `getWorkerCryptoConfig`
+(Stage 283) — but `src/worker.ts` still passes nothing to it, since it
+still does not import `worker_crypto_config.ts`/`worker_crypto_bridge.ts`
+at all (§1). `workerCryptoEnabled` is STILL fixed `false`, so even a
+future stage that wired a real Worker env through would still see
+`buildWorkerCryptoProvider()`'s `effectiveProvider` stay `"placeholder"`
+(`workerCryptoActivationStatus()`, Stage 285, reports both
+`configuredProvider` and `effectiveProvider` separately for exactly this
+reason).
+
+## 4. What a future connection stage would still need to decide
 
 - **Whether the Worker even needs its own opt-in at all**, versus simply
   reading `AppRuntime.crypto` (already assembled by `createRuntime()`,
   Stage 260) — not decided here.
-- **How `workerCryptoEnabled`/`workerCryptoProvider` would ever become
-  selectable** — an env-driven flag (mirroring `RuntimeEnv.CRYPTO_PROVIDER`),
-  a build-time flag, or something else — not decided here.
+- **How `workerCryptoEnabled` would ever become selectable** — an
+  env-driven flag (mirroring `RuntimeEnv.CRYPTO_PROVIDER`), a build-time
+  flag, or something else — not decided here. (`workerCryptoProvider`
+  itself already reads `FEDOS_CRYPTO_PROVIDER` as of Stage 283 — see §3 —
+  but that alone activates nothing.)
 - **Whether `FedosRuntimeCryptoProvider` ever gets a real, non-`"Unsupported"`
   implementation**, and through which layer (the still-unbuilt public
   opaque API, `docs/public_nip44_wire_api.md`) — a separate, later stage.
 
-## 4. Explicit non-goals of this planning document
+## 5. Explicit non-goals of this planning document
 
 - **No Worker implementation or import.** `src/worker.ts` is not modified
-  and does not reference any of Stage 273–275's three new files.
-- **No flag flip.** `workerCryptoEnabled`/`workerCryptoProvider`
-  (`src/runtime/worker_crypto_config.ts`) stay fixed.
+  and does not reference any of Stage 273–275/281–285's new files.
+- **No `workerCryptoEnabled` flip.** It stays fixed `false`
+  (`src/runtime/worker_crypto_config.ts`) regardless of
+  `FEDOS_CRYPTO_PROVIDER`.
 - **No Relay/Storage connection.**
 - **No real FedOS core call.**
 - **No WASM/FFI, no NIP-17.**

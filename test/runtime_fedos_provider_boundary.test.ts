@@ -194,4 +194,23 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
     expect(activationDocSource).toMatch(/Runtime/);
     expect(activationDocSource).toMatch(/Nostr/);
   });
+
+  it("16. Stage 281-284: FEDOS_CRYPTO_PROVIDER=fedos still never yields a FedosRuntimeCryptoProvider from buildRuntimeCryptoProvider (runtimeCryptoEnabled stays false)", () => {
+    const provider = buildRuntimeCryptoProvider(
+      createDefaultRuntimeCryptoProviderRegistry(),
+      { FEDOS_CRYPTO_PROVIDER: "fedos" },
+    );
+    expect(provider).toBeInstanceOf(PlaceholderRuntimeCryptoProvider);
+    expect(provider).not.toBeInstanceOf(FedosRuntimeCryptoProvider);
+  });
+
+  it("17. FedosRuntimeCryptoProvider still always resolves encrypt/decrypt to Unsupported, unaffected by the env var", async () => {
+    const provider = new FedosRuntimeCryptoProvider();
+    expect((await provider.encrypt({})).state).toBe("Unsupported");
+    expect((await provider.decrypt({})).state).toBe("Unsupported");
+  });
+
+  it("18. RUNTIME_CRYPTO_PROVIDER_NAMES still lists exactly placeholder/fedos", () => {
+    expect(RUNTIME_CRYPTO_PROVIDER_NAMES).toEqual(["placeholder", "fedos"]);
+  });
 });
