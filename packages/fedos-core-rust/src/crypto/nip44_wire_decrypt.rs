@@ -37,14 +37,28 @@
 //! required, mirroring `crypto::nip44_message_keys`'s own
 //! `derive_message_keys_exact_from_bytes_internal` precedent exactly.
 //!
-//! **What this module is NOT**: no encrypt pipeline (out of this stage's
-//! explicit scope — only "wire decrypt" was requested), no wire payload
-//! decode (the caller already has `nonce`/`ciphertext`/`mac` as separate
-//! values — no base64, no version-byte parsing here), no change to
+//! Stage 235 adds [`decrypt_wire_payload_internal`]/
+//! [`decrypt_wire_payload_from_bytes_internal`] — the wire-STRING-facing
+//! entry points: decode (`crypto::nip44_wire_encoding::decode_wire_payload_internal`,
+//! Stage 234) then delegate to the pipeline above. A fourth
+//! `Nip44WireDecryptStatus` variant, `InvalidPayload`, covers encoding-
+//! level failures (malformed base64, wrong version, too-short payload)
+//! — checked BEFORE any key derivation/HMAC/ChaCha20 call, distinct from
+//! both `InvalidConversationKey` (a different structural precondition)
+//! and `AuthenticationFailed` (a cryptographic failure reachable only
+//! AFTER a payload decodes successfully). Vector-verified against ALL 12
+//! `invalid.decrypt` cases by the sibling `#[cfg(test)]`-only
+//! `nip44_wire_decrypt_invalid_vectors` module (Stage 235) — every one
+//! collapses to `InvalidPayload` or `AuthenticationFailed`, never a more
+//! detailed reason.
+//!
+//! **What this module is NOT**: no encrypt pipeline (see
+//! `crypto::nip44_wire_encrypt`, Stage 236), no change to
 //! `crypto::conversation_key`/`crypto::message_key`/`crypto::hkdf_bridge`/
-//! `crypto::nip44_padding`/`crypto::nip44_wire_payload` (all UNCHANGED),
-//! no public API, no Runtime/Worker/Storage/Relay/Nostr connection, no
-//! new `Cargo.toml` dependency.
+//! `crypto::nip44_padding`/`crypto::nip44_wire_payload`/
+//! `crypto::nip44_wire_encoding` (all UNCHANGED), no public API, no
+//! Runtime/Worker/Storage/Relay/Nostr connection, no new `Cargo.toml`
+//! dependency.
 #![allow(dead_code)]
 
 use super::conversation_key::ConversationKey;
@@ -55,9 +69,11 @@ use super::nip44_message_keys::{
 };
 use super::nip44_padding::{unpad_message, PadStatus};
 use super::nip44_stream_cipher::decrypt_stream_internal;
+use super::nip44_wire_encoding::{decode_wire_payload_internal, Nip44WireEncodingStatus};
 
 /// Coarse observable outcome of a [`decrypt_wire_internal`]/
-/// [`decrypt_wire_from_bytes_internal`] call. Crate-private only.
+/// [`decrypt_wire_from_bytes_internal`]/[`decrypt_wire_payload_internal`]/
+/// [`decrypt_wire_payload_from_bytes_internal`] call. Crate-private only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Nip44WireDecryptStatus {
     /// Every step succeeded; `Nip44WireDecryptDecision::plaintext` is
@@ -69,6 +85,15 @@ pub(crate) enum Nip44WireDecryptStatus {
     /// `Nip44MessageKeyStatus::InvalidConversationKey`. A structural
     /// precondition failure, distinct from an authentication failure.
     InvalidConversationKey,
+    /// The candidate wire payload STRING failed to decode structurally
+    /// (malformed base64, wrong version, too short) — checked BEFORE any
+    /// key derivation/HMAC/ChaCha20 call. Only reachable via
+    /// [`decrypt_wire_payload_internal`]/[`decrypt_wire_payload_from_bytes_internal`]
+    /// (the byte-level `decrypt_wire_internal`/`decrypt_wire_from_bytes_internal`
+    /// entry points never return this — they take already-decoded
+    /// fields). A SINGLE fixed label, never distinguishing which
+    /// structural check failed.
+    InvalidPayload,
     /// HMAC verification failed, OR (only reachable after HMAC
     /// verification already succeeded) the decrypted, authenticated
     /// bytes were not validly padded — a SINGLE fixed label covering
@@ -109,6 +134,13 @@ fn invalid_conversation_key_decision() -> Nip44WireDecryptDecision {
 fn authentication_failed_decision() -> Nip44WireDecryptDecision {
     Nip44WireDecryptDecision {
         status: Nip44WireDecryptStatus::AuthenticationFailed,
+        plaintext: None,
+    }
+}
+
+fn invalid_payload_decision() -> Nip44WireDecryptDecision {
+    Nip44WireDecryptDecision {
+        status: Nip44WireDecryptStatus::InvalidPayload,
         plaintext: None,
     }
 }
@@ -200,6 +232,61 @@ pub(crate) fn decrypt_wire_from_bytes_internal(
 ) -> Nip44WireDecryptDecision {
     let key_decisions = derive_message_keys_exact_from_bytes_internal(conversation_key_bytes, nonce);
     decrypt_wire_from_key_decisions(&key_decisions, nonce, ciphertext, mac)
+}
+
+/// The `ConversationKey`-facing, wire-STRING-facing entry point: decodes
+/// `payload` via `crypto::nip44_wire_encoding::decode_wire_payload_internal`
+/// (Stage 234) — rejecting a structurally malformed candidate with
+/// [`Nip44WireDecryptStatus::InvalidPayload`] BEFORE any key derivation/
+/// HMAC/ChaCha20 call — then delegates to [`decrypt_wire_internal`].
+pub(crate) fn decrypt_wire_payload_internal(
+    conversation_key: &ConversationKey,
+    payload: &str,
+) -> Nip44WireDecryptDecision {
+    let decoded = decode_wire_payload_internal(payload);
+    if decoded.status != Nip44WireEncodingStatus::Ready {
+        return invalid_payload_decision();
+    }
+    let fields = match decoded.payload {
+        Some(fields) => fields,
+        None => return invalid_payload_decision(),
+    };
+    let ciphertext = match fields.ciphertext {
+        Some(bytes) => bytes,
+        None => return invalid_payload_decision(),
+    };
+    let mac = match fields.mac {
+        Some(bytes) => bytes,
+        None => return invalid_payload_decision(),
+    };
+    decrypt_wire_internal(conversation_key, &fields.nonce, &ciphertext, &mac)
+}
+
+/// The byte-level, wire-STRING-facing entry point: identical to
+/// [`decrypt_wire_payload_internal`], but takes the conversation key's
+/// raw bytes directly — kept `pub(crate)` specifically for this module's
+/// own vector tests (see this module's own doc comment above for why).
+pub(crate) fn decrypt_wire_payload_from_bytes_internal(
+    conversation_key_bytes: &[u8; 32],
+    payload: &str,
+) -> Nip44WireDecryptDecision {
+    let decoded = decode_wire_payload_internal(payload);
+    if decoded.status != Nip44WireEncodingStatus::Ready {
+        return invalid_payload_decision();
+    }
+    let fields = match decoded.payload {
+        Some(fields) => fields,
+        None => return invalid_payload_decision(),
+    };
+    let ciphertext = match fields.ciphertext {
+        Some(bytes) => bytes,
+        None => return invalid_payload_decision(),
+    };
+    let mac = match fields.mac {
+        Some(bytes) => bytes,
+        None => return invalid_payload_decision(),
+    };
+    decrypt_wire_from_bytes_internal(conversation_key_bytes, &fields.nonce, &ciphertext, &mac)
 }
 
 #[cfg(test)]
@@ -354,17 +441,69 @@ mod tests {
     }
 
     #[test]
-    fn nip44_wire_decrypt_status_has_no_variant_other_than_the_three_specified() {
+    fn nip44_wire_decrypt_status_has_no_variant_other_than_the_four_specified() {
         for status in [
             Nip44WireDecryptStatus::Ready,
             Nip44WireDecryptStatus::InvalidConversationKey,
+            Nip44WireDecryptStatus::InvalidPayload,
             Nip44WireDecryptStatus::AuthenticationFailed,
         ] {
             match status {
                 Nip44WireDecryptStatus::Ready => {}
                 Nip44WireDecryptStatus::InvalidConversationKey => {}
+                Nip44WireDecryptStatus::InvalidPayload => {}
                 Nip44WireDecryptStatus::AuthenticationFailed => {}
             }
         }
+    }
+
+    #[test]
+    fn decrypt_wire_payload_from_bytes_internal_round_trips_a_well_formed_wire_string() {
+        let (ciphertext, mac) = encrypt_fixture(&TEST_CONVERSATION_KEY_BYTES, &TEST_NONCE);
+        let payload = crate::crypto::nip44_wire_encoding::encode_wire_payload_internal(
+            &TEST_NONCE,
+            &ciphertext,
+            &mac,
+        );
+        let decision =
+            decrypt_wire_payload_from_bytes_internal(&TEST_CONVERSATION_KEY_BYTES, &payload);
+        assert_eq!(decision.status, Nip44WireDecryptStatus::Ready);
+        assert_eq!(decision.plaintext.as_deref(), Some(TEST_PLAINTEXT));
+    }
+
+    #[test]
+    fn decrypt_wire_payload_internal_round_trips_using_a_real_conversation_key() {
+        let key = real_conversation_key();
+        let key_bytes = key
+            .expose_bytes_for_internal_message_key_derivation()
+            .expect("expected real conversation key bytes");
+        let (ciphertext, mac) = encrypt_fixture(&key_bytes, &TEST_NONCE);
+        let payload = crate::crypto::nip44_wire_encoding::encode_wire_payload_internal(
+            &TEST_NONCE,
+            &ciphertext,
+            &mac,
+        );
+        let decision = decrypt_wire_payload_internal(&key, &payload);
+        assert_eq!(decision.status, Nip44WireDecryptStatus::Ready);
+        assert_eq!(decision.plaintext.as_deref(), Some(TEST_PLAINTEXT));
+    }
+
+    #[test]
+    fn decrypt_wire_payload_from_bytes_internal_rejects_a_malformed_wire_string() {
+        let decision =
+            decrypt_wire_payload_from_bytes_internal(&TEST_CONVERSATION_KEY_BYTES, "not valid base64!!");
+        assert_eq!(decision.status, Nip44WireDecryptStatus::InvalidPayload);
+        assert!(decision.plaintext.is_none());
+    }
+
+    #[test]
+    fn decrypt_wire_payload_internal_rejects_placeholder_conversation_key_even_for_a_malformed_payload()
+    {
+        // InvalidPayload is checked BEFORE any key-related check - a
+        // malformed payload with a placeholder key still reports
+        // InvalidPayload, never InvalidConversationKey.
+        let placeholder = ConversationKey::new_placeholder();
+        let decision = decrypt_wire_payload_internal(&placeholder, "not valid base64!!");
+        assert_eq!(decision.status, Nip44WireDecryptStatus::InvalidPayload);
     }
 }

@@ -289,6 +289,15 @@
 //! `crypto::nip44_wire_payload::Nip44WirePayload` (UNCHANGED) as its
 //! output shape.
 //!
+//! Stage 235 extends `nip44_wire_decrypt` with `decrypt_wire_payload_internal`/
+//! `decrypt_wire_payload_from_bytes_internal` — decode (Stage 234) then
+//! the existing Stage 232 pipeline — and a fourth
+//! `Nip44WireDecryptStatus` variant, `InvalidPayload`, for encoding-level
+//! failures (checked before any key derivation/HMAC call). Vector-
+//! verified by the sibling `#[cfg(test)]`-only
+//! `nip44_wire_decrypt_invalid_vectors` module against ALL 12
+//! `invalid.decrypt` cases — every one collapses to `InvalidPayload` or
+//! `AuthenticationFailed`, never a more detailed reason.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -327,6 +336,8 @@ mod nip44_message_key_vectors;
 mod nip44_padding_vectors;
 #[cfg(test)]
 mod nip44_stream_cipher_vectors;
+#[cfg(test)]
+mod nip44_wire_decrypt_invalid_vectors;
 #[cfg(test)]
 mod nip44_wire_decrypt_vectors;
 #[cfg(test)]
