@@ -1,11 +1,11 @@
-# Runtime/Worker crypto activation policy (Stage 289–304) — implementation record
+# Runtime/Worker crypto activation policy (Stage 289–312) — implementation record
 
 **Status: this document records real code.** It fixes, in writing, the
 full set of conditions that must ALL hold before FedOS crypto could ever
 actually run — and confirms that, today, none of them fully hold.
-`src/runtime/runtime_crypto_activation_policy.ts` (Stage 289/297) and
-`src/runtime/worker_crypto_activation_policy.ts` (Stage 290/297) are the
-real, `cargo test`-adjacent (well, `npm test`-verified) code this
+`src/runtime/runtime_crypto_activation_policy.ts` (Stage 289/297/308) and
+`src/runtime/worker_crypto_activation_policy.ts` (Stage 290/297/308) are
+the real, `cargo test`-adjacent (well, `npm test`-verified) code this
 document describes.
 
 ## 1. The five conditions
@@ -24,7 +24,13 @@ performing `encrypt`/`decrypt` instead of resolving `"Unsupported"` — REQUIRES
 3. **A real FedOS Provider implementation** — `FedosRuntimeCryptoProvider`
    (`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 265) must
    actually call through to real cryptography instead of unconditionally
-   resolving `"Unsupported"`. Not implemented.
+   resolving `"Unsupported"`. Not implemented — `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`
+   (Stage 305) is fixed `false`, with no env path or override, and BOTH
+   activation policies now read it directly (Stage 308) as their single
+   source of truth for this condition. See
+   `docs/runtime_fedos_provider_implementation.md` for the SHAPE this
+   stage adds around it (`internalCapabilitySurface()`, `decisionReason()`)
+   without changing this fact.
 4. **Runtime connected** — `AppRuntime.crypto`
    (`src/runtime/create_runtime.ts`, Stage 260) exists and is ASSEMBLED,
    but nothing in Runtime's own request-handling path ever calls its
@@ -54,9 +60,11 @@ priority order:
 2. provider !== "fedos"                -> "ProviderNotSelected"
 3. otherwise (both locks open,
    provider == "fedos")                -> "ProviderUnavailable"
-                                           (FEDOS_PROVIDER_IMPLEMENTED is a
-                                            fixed, private, permanently-false
-                                            constant — no parameter can flip it)
+                                           (FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
+                                            src/runtime/fedos_runtime_crypto_provider.ts,
+                                            Stage 305, is a fixed, permanently-false
+                                            constant read directly by BOTH policies,
+                                            Stage 308 — no parameter can flip it)
 ```
 
 `envLockEnabled` is `parseFedosCryptoEnabledEnv(env?.FEDOS_CRYPTO_ENABLED)
@@ -75,7 +83,7 @@ that could ever make it `true` in this repository as it exists today —
 this holds EVEN WHEN `provider === "fedos"` AND
 `FEDOS_CRYPTO_ENABLED === "explicit-dev-only"` simultaneously.
 
-## 3. Diagnostics (Stage 291/297)
+## 3. Diagnostics (Stage 291/297/309)
 
 `runtimeCryptoActivationStatus()`/`workerCryptoActivationStatus()`
 (`src/runtime/runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts`)
@@ -85,7 +93,11 @@ already read for `configuredProvider`/`effectiveProvider`, plus (Stage
 297) a `configuredEnabled` field — the PARSED `FEDOS_CRYPTO_ENABLED`
 label (`"explicit-dev-only"` or `"disabled"`), and `env` is now also
 passed through to the activation policy so `activationReason` reflects
-the dual-lock combination.
+the dual-lock combination. Stage 309 adds `providerImplemented` — a
+direct read of `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`, the SAME constant
+`activationReason`'s own computation now consults (Stage 308). Fixed
+`false`; setting BOTH locks still leaves `activationReason:
+"ProviderUnavailable"`.
 
 `effectiveProvider` is DELIBERATELY UNCHANGED by Stage 297 — it still
 mirrors ONLY `runtime_crypto_bridge.ts`/`worker_crypto_bridge.ts`'s own
@@ -133,6 +145,9 @@ locks still does not activate FedOS today).
 
 ## See also
 
+- `docs/runtime_fedos_provider_implementation.md` (Stage 305–312) — what
+  the provider implementation flag/capability surface/decision reason
+  additions do and do NOT mean.
 - `docs/runtime_crypto_threat_model.md` (Stage 293/297) — the fail-closed
   security posture this policy enforces, and the dual-lock rationale.
 - `docs/runtime_fedos_provider_activation.md` (Stage 270) /

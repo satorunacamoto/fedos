@@ -61,6 +61,14 @@
  * `activationReason: "ProviderUnavailable"` while `effectiveProvider`
  * still reports `"placeholder"`) — see
  * `docs/runtime_crypto_activation_policy.md` §2.
+ *
+ * Stage 309 adds `providerImplemented` — a direct read of
+ * `fedos_runtime_crypto_provider.ts`'s (Stage 305)
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`, the SAME constant
+ * `evaluateRuntimeCryptoActivation` itself now consults (Stage 308).
+ * Fixed `false`; setting BOTH `FEDOS_CRYPTO_PROVIDER=fedos` AND
+ * `FEDOS_CRYPTO_ENABLED=explicit-dev-only` still leaves
+ * `activationReason: "ProviderUnavailable"` (unchanged from Stage 297).
  */
 
 import type {
@@ -70,6 +78,7 @@ import type {
 } from "./crypto_provider.js";
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
+import { FEDOS_RUNTIME_PROVIDER_IMPLEMENTED } from "./fedos_runtime_crypto_provider.js";
 import type { ActivationReason } from "./runtime_crypto_activation_policy.js";
 import { evaluateRuntimeCryptoActivation } from "./runtime_crypto_activation_policy.js";
 import type { RuntimeCryptoProviderName } from "./runtime_crypto_config.js";
@@ -172,6 +181,13 @@ export interface RuntimeCryptoActivationStatus {
    * `"Allowed"` in this stage.
    */
   readonly activationReason: ActivationReason;
+  /**
+   * Whether `FedosRuntimeCryptoProvider` has a real internal
+   * `encrypt`/`decrypt` implementation — a direct read of
+   * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` (`src/runtime/fedos_runtime_crypto_provider.ts`,
+   * Stage 305). Fixed `false` in this stage.
+   */
+  readonly providerImplemented: boolean;
 }
 
 /**
@@ -204,5 +220,6 @@ export function runtimeCryptoActivationStatus(
     configuredEnabled: parseFedosCryptoEnabledEnv(env?.FEDOS_CRYPTO_ENABLED),
     effectiveProvider,
     activationReason: evaluateRuntimeCryptoActivation(config, env).reason,
+    providerImplemented: FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   };
 }

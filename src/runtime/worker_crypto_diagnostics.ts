@@ -49,10 +49,17 @@
  * combination. `effectiveProvider` is DELIBERATELY UNCHANGED — still
  * mirrors ONLY `worker_crypto_bridge.ts`'s own two-flag gate, which was
  * NOT touched this stage.
+ *
+ * Stage 309 adds `providerImplemented` — a direct read of
+ * `fedos_runtime_crypto_provider.ts`'s (Stage 305)
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`, the SAME constant
+ * `evaluateWorkerCryptoActivation` itself now consults (Stage 308).
+ * Fixed `false`.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
+import { FEDOS_RUNTIME_PROVIDER_IMPLEMENTED } from "./fedos_runtime_crypto_provider.js";
 import type { ActivationReason } from "./worker_crypto_activation_policy.js";
 import { evaluateWorkerCryptoActivation } from "./worker_crypto_activation_policy.js";
 import type { WorkerCryptoProviderName } from "./worker_crypto_config.js";
@@ -93,6 +100,12 @@ export interface WorkerCryptoActivationStatus {
    * `"Allowed"` in this stage.
    */
   readonly activationReason: ActivationReason;
+  /**
+   * Whether `FedosRuntimeCryptoProvider` has a real internal
+   * `encrypt`/`decrypt` implementation — a direct read of
+   * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`. Fixed `false` in this stage.
+   */
+  readonly providerImplemented: boolean;
 }
 
 /**
@@ -124,5 +137,6 @@ export function workerCryptoActivationStatus(
     effectiveProvider,
     reachable: false,
     activationReason: evaluateWorkerCryptoActivation(config, env).reason,
+    providerImplemented: FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   };
 }

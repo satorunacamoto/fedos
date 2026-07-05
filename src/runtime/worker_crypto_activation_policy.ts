@@ -24,13 +24,22 @@
  * itself is NOT touched, so a real `FedosRuntimeCryptoProvider` still
  * never gets resolved regardless of this policy's own answer.
  *
+ * Stage 308 makes this policy's "is a real implementation present"
+ * check READ `fedos_runtime_crypto_provider.ts`'s (Stage 305)
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` directly — the SAME single
+ * source of truth the Runtime policy now reads too (both describe the
+ * ONE shared `FedosRuntimeCryptoProvider` class, already registered
+ * under `"fedos"` in BOTH registries since Stage 265/274). This is NOT
+ * "sharing the activation policy" — `ActivationReason`/
+ * `ActivationDecision`/`ActivationPolicy`/`evaluateWorkerCryptoActivation`
+ * remain independently defined here, exactly as before.
+ *
  * HARD GUARDRAILS:
  *   - `evaluateWorkerCryptoActivation` NEVER returns `{ allowed: true,
- *     reason: "Allowed" }` in this stage — `FEDOS_PROVIDER_IMPLEMENTED`
- *     below is a fixed, PRIVATE constant, permanently `false`, with NO
- *     parameter or override letting any caller flip it.
- *     `"Allowed"`/`"FutureFeature"` are RESERVED labels only. This holds
- *     REGARDLESS of `FEDOS_CRYPTO_ENABLED`/`FEDOS_CRYPTO_PROVIDER`.
+ *     reason: "Allowed" }` in this stage — `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`
+ *     is fixed `false`, with NO parameter or override letting any caller
+ *     flip it. `"Allowed"`/`"FutureFeature"` are RESERVED labels only.
+ *     This holds REGARDLESS of `FEDOS_CRYPTO_ENABLED`/`FEDOS_CRYPTO_PROVIDER`.
  *   - Reads NO `process.env`/`RuntimeEnv` — takes an already-resolved
  *     `WorkerCryptoConfig` plus an OPTIONAL, already-resolved
  *     `FedosCryptoProviderEnvLike` as its only inputs.
@@ -41,11 +50,12 @@
  *     1. `!(workerCryptoEnabled || envLockEnabled)` → `"DisabledByConfig"`.
  *     2. `workerCryptoProvider !== "fedos"` → `"ProviderNotSelected"`.
  *     3. Otherwise → `"ProviderUnavailable"`, because
- *        `FEDOS_PROVIDER_IMPLEMENTED` is fixed `false`.
+ *        `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` is fixed `false`.
  */
 
 import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
+import { FEDOS_RUNTIME_PROVIDER_IMPLEMENTED } from "./fedos_runtime_crypto_provider.js";
 import type { WorkerCryptoConfig } from "./worker_crypto_config.js";
 
 /**
@@ -79,13 +89,6 @@ export type ActivationPolicy = (
 ) => ActivationDecision;
 
 /**
- * Fixed, PRIVATE, permanently-`false` constant: whether a real
- * `FedosRuntimeCryptoProvider` implementation exists. No parameter or
- * override anywhere in this module can flip it.
- */
-const FEDOS_PROVIDER_IMPLEMENTED = false;
-
-/**
  * Evaluate whether Worker may activate a real FedOS-backed
  * `RuntimeCryptoProvider` right now, and why (not). See this module's own
  * doc comment above for the exact priority order, including the Stage
@@ -104,10 +107,10 @@ export const evaluateWorkerCryptoActivation: ActivationPolicy = (
   if (config.workerCryptoProvider !== "fedos") {
     return { allowed: false, reason: "ProviderNotSelected" };
   }
-  if (!FEDOS_PROVIDER_IMPLEMENTED) {
+  if (!FEDOS_RUNTIME_PROVIDER_IMPLEMENTED) {
     return { allowed: false, reason: "ProviderUnavailable" };
   }
-  // Unreachable in this stage: FEDOS_PROVIDER_IMPLEMENTED is permanently
-  // false above, regardless of both locks being open.
+  // Unreachable in this stage: FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is
+  // permanently false above, regardless of both locks being open.
   return { allowed: true, reason: "Allowed" };
 };

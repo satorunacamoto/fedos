@@ -140,6 +140,7 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       configuredEnabled: "disabled",
       effectiveProvider: "placeholder",
       activationReason: "DisabledByConfig",
+      providerImplemented: false,
     });
   });
 

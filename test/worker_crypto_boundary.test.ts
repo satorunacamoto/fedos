@@ -175,6 +175,7 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       effectiveProvider: "placeholder",
       reachable: false,
       activationReason: "DisabledByConfig",
+      providerImplemented: false,
     });
   });
 

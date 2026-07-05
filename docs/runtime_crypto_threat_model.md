@@ -1,8 +1,8 @@
-# Runtime/Worker crypto activation — threat model (Stage 293/297)
+# Runtime/Worker crypto activation — threat model (Stage 293/297/305–312)
 
 **Status: this document records real code's safety property.** It states,
 explicitly, the ONE property `src/runtime/runtime_crypto_activation_policy.ts`/
-`worker_crypto_activation_policy.ts` (Stage 289–290/297) exist to
+`worker_crypto_activation_policy.ts` (Stage 289–290/297/308) exist to
 guarantee: a misconfiguration of ONE knob — or even BOTH knobs of the
 Stage 297 dual-lock model — can never, by itself, turn on real
 cryptography. This is a **fail-closed** design.
@@ -47,15 +47,31 @@ FEDOS_CRYPTO_ENABLED=explicit-dev-only
 nothing happens.** `evaluateRuntimeCryptoActivation`/
 `evaluateWorkerCryptoActivation` now get PAST `"DisabledByConfig"` and
 `"ProviderNotSelected"` — but land on `"ProviderUnavailable"`, because
-`FEDOS_PROVIDER_IMPLEMENTED` is a fixed, private, permanently-`false`
-constant with no env path, no parameter, no override anywhere in either
-policy file. `"Allowed"` is NEVER returned, no matter what env values are
-supplied. And even if it somehow were: `runtime_crypto_bridge.ts`/
+`FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`
+(`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 305) is a fixed,
+permanently-`false` constant with no env path, no parameter, no
+override anywhere — and, as of Stage 308, BOTH policy files read this
+SAME constant directly, rather than each keeping an independent literal
+that could drift. `"Allowed"` is NEVER returned, no matter what env
+values are supplied. And even if it somehow were: `runtime_crypto_bridge.ts`/
 `worker_crypto_bridge.ts` (untouched this stage) never read
 `FEDOS_CRYPTO_ENABLED` at all, so `buildRuntimeCryptoProvider()`/
 `buildWorkerCryptoProvider()` STILL only ever resolve
 `PlaceholderRuntimeCryptoProvider`. Two separate reasons, independently
 sufficient, both currently true.
+
+## 1b. The Stage 305–312 scenario: the provider gains a "shape" but not a "self"
+
+Stage 305–312 gives `FedosRuntimeCryptoProvider` an implementation FLAG
+(`FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`), a richer capability SURFACE
+(`internalCapabilitySurface()`), and a decision-reason VOCABULARY
+(`decisionReason()`) — none of which back any real cryptography. This
+is deliberately NOT a step toward real crypto; it is bookkeeping ABOUT
+the absence of real crypto, made precise enough that a future stage can
+name exactly what it would need to change (the flag; nothing else)
+without that future stage's diff needing to invent new vocabulary at
+the same time. `encrypt()`/`decrypt()` are untouched, byte for byte,
+across Stage 305–312.
 
 ## 2. Why "fail closed" and not "fail permissive"
 
@@ -67,7 +83,7 @@ ADDITIONAL knob narrows (never widens) what is possible:
 | `FEDOS_CRYPTO_PROVIDER` | `"placeholder"` | No provider NAME even points at FedOS. |
 | `FEDOS_CRYPTO_ENABLED` | `"disabled"` (Stage 297; ONE exact phrase opens it) | Even a `"fedos"`-named config is ignored by the activation policy. |
 | `runtimeCryptoEnabled`/`workerCryptoEnabled` | `false` (fixed, no env path) | The bridge's own gate is untouched by either env var above. |
-| `FedosRuntimeCryptoProvider`'s real implementation | absent (`encrypt`/`decrypt` → `"Unsupported"`) | Even if ALL knobs above were somehow flipped, no cryptography would run. |
+| `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` (`FedosRuntimeCryptoProvider`'s real implementation) | `false` (fixed, Stage 305, no env path) | Even if ALL knobs above were somehow flipped, `encrypt`/`decrypt` still resolve `"Unsupported"` and no cryptography would run. |
 | Runtime's automatic `encrypt`/`decrypt` call | absent | `AppRuntime.crypto` exists but nothing calls it automatically. |
 | Worker's import of the Worker crypto boundary | absent | `src/worker.ts` cannot reach any of this even in principle. |
 
@@ -123,9 +139,12 @@ default, safest state).
 
 ## See also
 
-- `docs/runtime_crypto_activation_policy.md` (Stage 289–297) — the five
+- `docs/runtime_crypto_activation_policy.md` (Stage 289–312) — the five
   conditions, the dual-lock model, and the two evaluate functions this
   document's guarantee rests on.
+- `docs/runtime_fedos_provider_implementation.md` (Stage 305–312) — what
+  the provider's new implementation flag/capability surface/decision
+  vocabulary do and do NOT mean.
 - `docs/runtime_fedos_provider_activation.md` (Stage 270) — the
   Placeholder→FedOS Provider→Worker→Runtime→Nostr order that must ALL be
   completed, in sequence, before this threat model's scenario could ever
