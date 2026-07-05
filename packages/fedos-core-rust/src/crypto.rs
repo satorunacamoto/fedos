@@ -319,6 +319,14 @@
 //! eight: `WireEncoding`/`WireEncrypt`/`WireDecrypt`/`WireInvalidVectors`
 //! all report `Ready`. Still no `CryptoCapability` variant added, still
 //! no existing capability's meaning changed.
+//!
+//! Stage 242 adds `nip44_public_api` — an INTERNAL-ONLY, LABEL-ONLY
+//! skeleton naming the shape a FUTURE public NIP-44 wire opaque API
+//! would use (`Nip44OpaqueConversation`/`Nip44OpaquePayload`/
+//! `Nip44OpaqueStatus`/`Nip44OpaqueDecision`, all placeholders, all
+//! `pub(crate)`) — see `docs/public_nip44_wire_api.md` (Stage 241) for
+//! the full planning document this vocabulary follows. Adds NO public
+//! API.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -338,6 +346,7 @@ pub(crate) mod nip44_encrypt;
 pub(crate) mod nip44_hmac;
 pub(crate) mod nip44_message_keys;
 pub(crate) mod nip44_padding;
+pub(crate) mod nip44_public_api;
 pub(crate) mod nip44_stream_cipher;
 pub(crate) mod nip44_wire;
 pub(crate) mod nip44_wire_decrypt;
