@@ -119,6 +119,15 @@
  * into the Execution Review's own chain as of Stage 354, even though
  * it is only ever planned, never executed). No payload, plaintext,
  * ciphertext, or key material is exposed by either field.
+ *
+ * Stage 365 adds `rustInvocationAdapterState` (`fedos_rust_invocation_adapter.ts`'s
+ * `fedosRustInvocationAdapterState()`, Stage 361 — fixed `"NotConnected"`),
+ * `rustInvocationAdapterReachable` (`fedosRustInvocationAdapterReachable()`,
+ * fixed `true` — the Rust Invocation Adapter IS structurally wired
+ * into the Internal Rust Call's own chain as of Stage 362), and
+ * `rustInvocationAdapterExecuted` (`fedosRustInvocationAdapterExecuted()`,
+ * fixed `false`). `providerImplementationStage` now reflects the
+ * extended seven-step milestone, fixed at `"RustInvocationAdapterReady"`.
  */
 
 import type {
@@ -147,6 +156,12 @@ import {
   fedosRustExecutionReviewReason,
   fedosRustExecutionReviewState,
 } from "./fedos_rust_execution_review.js";
+import type { FedosRustInvocationAdapterState } from "./fedos_rust_invocation_adapter.js";
+import {
+  fedosRustInvocationAdapterExecuted,
+  fedosRustInvocationAdapterReachable,
+  fedosRustInvocationAdapterState,
+} from "./fedos_rust_invocation_adapter.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -287,8 +302,8 @@ export interface RuntimeCryptoActivationStatus {
   /**
    * The internal architecture's own coarse milestone —
    * `fedosProviderImplementationStage()`'s own answer
-   * (`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 324/332/340).
-   * Fixed `"RustApiReady"` in this stage.
+   * (`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 324/332/340/364).
+   * Fixed `"RustInvocationAdapterReady"` in this stage.
    */
   readonly providerImplementationStage: FedosProviderImplementationStage;
   /**
@@ -362,6 +377,26 @@ export interface RuntimeCryptoActivationStatus {
    * this stage, NOT a claim that any call has ever executed.
    */
   readonly internalRustCallReachable: boolean;
+  /**
+   * The Rust Invocation Adapter's own status —
+   * `fedosRustInvocationAdapterState()`'s own answer
+   * (`src/runtime/fedos_rust_invocation_adapter.ts`, Stage 361/365).
+   * Fixed `"NotConnected"` in this stage.
+   */
+  readonly rustInvocationAdapterState: FedosRustInvocationAdapterState;
+  /**
+   * Whether the Rust Invocation Adapter is structurally reachable from
+   * the Internal Rust Call's own internal chain —
+   * `fedosRustInvocationAdapterReachable()`'s own answer. Fixed `true`
+   * in this stage, NOT a claim that real Rust crypto executes.
+   */
+  readonly rustInvocationAdapterReachable: boolean;
+  /**
+   * Whether the Rust Invocation Adapter has ever actually executed
+   * real Rust crypto — `fedosRustInvocationAdapterExecuted()`'s own
+   * answer. Fixed `false` in this stage.
+   */
+  readonly rustInvocationAdapterExecuted: boolean;
 }
 
 /**
@@ -410,5 +445,8 @@ export function runtimeCryptoActivationStatus(
     rustExecutionApproved: fedosRustExecutionApproved(),
     internalRustCallState: fedosInternalRustCallState(),
     internalRustCallReachable: fedosInternalRustCallReachable(),
+    rustInvocationAdapterState: fedosRustInvocationAdapterState(),
+    rustInvocationAdapterReachable: fedosRustInvocationAdapterReachable(),
+    rustInvocationAdapterExecuted: fedosRustInvocationAdapterExecuted(),
   };
 }
