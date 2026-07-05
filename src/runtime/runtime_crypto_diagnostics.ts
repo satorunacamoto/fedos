@@ -41,6 +41,14 @@
  * `getRuntimeCryptoConfig` — never reads `process.env` directly, and never
  * echoes `env`'s raw string value anywhere in its return value (only the
  * parsed `"placeholder"`/`"fedos"` enum values ever appear).
+ *
+ * Stage 291 adds `activationReason`
+ * (`src/runtime/runtime_crypto_activation_policy.ts`'s
+ * `evaluateRuntimeCryptoActivation`, Stage 289) to the activation summary
+ * — WHY activation is not (yet) allowed, one of `"DisabledByConfig"`/
+ * `"ProviderNotSelected"`/`"ProviderUnavailable"`/`"FutureFeature"`.
+ * `"Allowed"` is never displayed here — the policy function itself never
+ * produces it in this stage.
  */
 
 import type {
@@ -49,6 +57,8 @@ import type {
   RuntimeCryptoState,
 } from "./crypto_provider.js";
 import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
+import type { ActivationReason } from "./runtime_crypto_activation_policy.js";
+import { evaluateRuntimeCryptoActivation } from "./runtime_crypto_activation_policy.js";
 import type { RuntimeCryptoProviderName } from "./runtime_crypto_config.js";
 import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
 import { FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME } from "./runtime_crypto_registry.js";
@@ -134,21 +144,31 @@ export interface RuntimeCryptoActivationStatus {
    * `"placeholder"` regardless of `configuredProvider`.
    */
   readonly effectiveProvider: RuntimeCryptoProviderName;
+  /**
+   * WHY activation is not (yet) allowed —
+   * `evaluateRuntimeCryptoActivation`'s own reason
+   * (`src/runtime/runtime_crypto_activation_policy.ts`, Stage 289). Never
+   * `"Allowed"` in this stage.
+   */
+  readonly activationReason: ActivationReason;
 }
 
 /**
  * Read-only activation summary: `enabled` mirrors `runtimeCryptoEnabled`
  * (`src/runtime/runtime_crypto_config.ts`) exactly — permanently `false` in
  * this stage — `configuredProvider` reports the raw PARSED config value
- * (reflecting `FEDOS_CRYPTO_PROVIDER` via `env`), and `effectiveProvider`
- * reports the two-flag-gated result. Accepts an OPTIONAL `env`, passed
- * straight through to `getRuntimeCryptoConfig` — reads no `process.env`
- * directly, and never calls a `RuntimeCryptoProvider` method.
+ * (reflecting `FEDOS_CRYPTO_PROVIDER` via `env`), `effectiveProvider`
+ * reports the two-flag-gated result, and `activationReason` reports WHY
+ * activation is not (yet) allowed (`evaluateRuntimeCryptoActivation`,
+ * Stage 289). Accepts an OPTIONAL `env`, passed straight through to
+ * `getRuntimeCryptoConfig` — reads no `process.env` directly, and never
+ * calls a `RuntimeCryptoProvider` method.
  */
 export function runtimeCryptoActivationStatus(
   env?: FedosCryptoProviderEnvLike,
 ): RuntimeCryptoActivationStatus {
-  const { runtimeCryptoEnabled, runtimeCryptoProvider } = getRuntimeCryptoConfig(env);
+  const config = getRuntimeCryptoConfig(env);
+  const { runtimeCryptoEnabled, runtimeCryptoProvider } = config;
   const effectiveProvider: RuntimeCryptoProviderName =
     runtimeCryptoEnabled && runtimeCryptoProvider === FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME
       ? FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME
@@ -157,5 +177,6 @@ export function runtimeCryptoActivationStatus(
     enabled: runtimeCryptoEnabled,
     configuredProvider: runtimeCryptoProvider,
     effectiveProvider,
+    activationReason: evaluateRuntimeCryptoActivation(config).reason,
   };
 }

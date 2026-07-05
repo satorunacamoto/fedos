@@ -201,6 +201,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       enabled: false,
       configuredProvider: "placeholder",
       effectiveProvider: "placeholder",
+      activationReason: "DisabledByConfig",
     });
   });
 

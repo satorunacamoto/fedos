@@ -36,9 +36,17 @@
  *     `process.env`.
  *   - Never echoes `env`'s raw string value anywhere in its return value —
  *     only the parsed `"placeholder"`/`"fedos"` enum values ever appear.
+ *
+ * Stage 291 adds `activationReason`
+ * (`src/runtime/worker_crypto_activation_policy.ts`'s
+ * `evaluateWorkerCryptoActivation`, Stage 290 — an INDEPENDENT
+ * implementation, not shared with the Runtime policy) — WHY activation is
+ * not (yet) allowed. `"Allowed"` is never displayed here.
  */
 
 import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
+import type { ActivationReason } from "./worker_crypto_activation_policy.js";
+import { evaluateWorkerCryptoActivation } from "./worker_crypto_activation_policy.js";
 import type { WorkerCryptoProviderName } from "./worker_crypto_config.js";
 import { getWorkerCryptoConfig } from "./worker_crypto_config.js";
 import { WORKER_FEDOS_PROVIDER_NAME } from "./worker_crypto_registry.js";
@@ -64,6 +72,13 @@ export interface WorkerCryptoActivationStatus {
    * `false` in this stage — see this module's own doc comment above.
    */
   readonly reachable: boolean;
+  /**
+   * WHY activation is not (yet) allowed —
+   * `evaluateWorkerCryptoActivation`'s own reason
+   * (`src/runtime/worker_crypto_activation_policy.ts`, Stage 290). Never
+   * `"Allowed"` in this stage.
+   */
+  readonly activationReason: ActivationReason;
 }
 
 /**
@@ -71,16 +86,19 @@ export interface WorkerCryptoActivationStatus {
  * `workerCryptoEnabled` (`src/runtime/worker_crypto_config.ts`) exactly —
  * permanently `false` — `configuredProvider` reports the raw PARSED
  * config value (reflecting `FEDOS_CRYPTO_PROVIDER` via `env`),
- * `effectiveProvider` reports the two-flag-gated result, and `reachable`
- * is fixed `false` (this stage's Worker never imports the Worker crypto
- * boundary at all). Accepts an OPTIONAL `env`, passed straight through to
- * `getWorkerCryptoConfig` — reads no `process.env` directly, and never
- * calls a `RuntimeCryptoProvider` method.
+ * `effectiveProvider` reports the two-flag-gated result, `reachable` is
+ * fixed `false` (this stage's Worker never imports the Worker crypto
+ * boundary at all), and `activationReason` reports WHY activation is not
+ * (yet) allowed (`evaluateWorkerCryptoActivation`, Stage 290). Accepts an
+ * OPTIONAL `env`, passed straight through to `getWorkerCryptoConfig` —
+ * reads no `process.env` directly, and never calls a
+ * `RuntimeCryptoProvider` method.
  */
 export function workerCryptoActivationStatus(
   env?: FedosCryptoProviderEnvLike,
 ): WorkerCryptoActivationStatus {
-  const { workerCryptoEnabled, workerCryptoProvider } = getWorkerCryptoConfig(env);
+  const config = getWorkerCryptoConfig(env);
+  const { workerCryptoEnabled, workerCryptoProvider } = config;
   const effectiveProvider: WorkerCryptoProviderName =
     workerCryptoEnabled && workerCryptoProvider === WORKER_FEDOS_PROVIDER_NAME
       ? WORKER_FEDOS_PROVIDER_NAME
@@ -90,5 +108,6 @@ export function workerCryptoActivationStatus(
     configuredProvider: workerCryptoProvider,
     effectiveProvider,
     reachable: false,
+    activationReason: evaluateWorkerCryptoActivation(config).reason,
   };
 }
