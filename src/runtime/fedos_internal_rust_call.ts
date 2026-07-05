@@ -41,7 +41,17 @@
  *     Nostr/NIP-17 reference. No Runtime/Worker activation of any kind.
  *   - Pure; every function here is synchronous, never throws, never
  *     mutates its argument.
+ *
+ * Stage 362 extends `evaluateFedosInternalRustCall` with a NINTH link:
+ * it now builds a `FedosRustInvocationAdapter`
+ * (`fedos_rust_invocation_adapter.ts`, Stage 361) and routes `call` to
+ * it via `planFedosRustInvocationAdapterExecution` — then IMMEDIATELY
+ * DISCARDS the result and returns the EXISTING `"Planned"` status
+ * UNCHANGED. The Rust Invocation Adapter itself never invokes
+ * `packages/fedos-core-rust`/WASM/FFI.
  */
+
+import { createFedosRustInvocationAdapter, planFedosRustInvocationAdapterExecution } from "./fedos_rust_invocation_adapter.js";
 
 /** Which Rust operation a `FedosInternalRustCall` represents. */
 export type FedosInternalRustCallKind = "Encrypt" | "Decrypt";
@@ -91,6 +101,8 @@ export function planFedosInternalRustCall(
 export function evaluateFedosInternalRustCall(
   call: FedosInternalRustCall,
 ): FedosInternalRustCallDecision {
+  const adapter = createFedosRustInvocationAdapter();
+  planFedosRustInvocationAdapterExecution(adapter, call); // discarded — never changes this decision
   return {
     call,
     status: "Planned",

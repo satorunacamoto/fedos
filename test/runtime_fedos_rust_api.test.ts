@@ -177,15 +177,16 @@ describe("FedOS private Rust API connection, blocked before Rust crypto (Stage 3
     );
   });
 
-  it("18. the implementation stage is fixed at RustApiReady, and RustReady remains unreachable", () => {
+  it("18. the implementation stage is fixed at RustInvocationAdapterReady, and RustReady remains unreachable", () => {
     expect(FEDOS_RUNTIME_PROVIDER_IMPLEMENTED).toBe(false);
-    expect(fedosProviderImplementationStage()).toBe("RustApiReady");
+    expect(fedosProviderImplementationStage()).toBe("RustInvocationAdapterReady");
     expect(FEDOS_PROVIDER_IMPLEMENTATION_STAGES).toEqual([
       "Unavailable",
       "ProviderReady",
       "OpaqueApiReady",
       "RustBoundaryReady",
       "RustApiReady",
+      "RustInvocationAdapterReady",
       "RustReady",
     ]);
   });
