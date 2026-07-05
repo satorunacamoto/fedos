@@ -42,8 +42,18 @@
  *     Nostr/NIP-17 reference. No Runtime/Worker activation of any kind.
  *   - Pure; every method here is synchronous, never throws, never
  *     mutates its argument.
+ *
+ * Stage 354 extends `FedosRustExecutionReviewPlaceholder.reviewEncrypt()`/
+ * `reviewDecrypt()` with an EIGHTH link: each now builds a
+ * `FedosInternalRustCall` (`fedos_internal_rust_call.ts`, Stage 353),
+ * evaluates it (always `"Planned"`) — then IMMEDIATELY DISCARDS it and
+ * returns the EXISTING review result UNCHANGED
+ * (`{ approved: false, reason: "BlockedBeforeCrypto" }`). Planning a
+ * call is NOT calling it — no `packages/fedos-core-rust`/WASM/FFI
+ * invocation results from this, ever.
  */
 
+import { evaluateFedosInternalRustCall, planFedosInternalRustCall } from "./fedos_internal_rust_call.js";
 import type { FedosOpaqueRequest, OpaqueDecryptRequest, OpaqueEncryptRequest } from "./fedos_runtime_opaque_request.js";
 
 /**
@@ -121,11 +131,23 @@ export class FedosRustExecutionReviewPlaceholder implements FedosRustExecutionRe
   }
 
   reviewEncrypt(_request: OpaqueEncryptRequest): FedosRustExecutionReviewDecision {
+    this.#planInternalRustCall("Encrypt"); // constructed and discarded — never executed
     return this.#blocked("encrypt");
   }
 
   reviewDecrypt(_request: OpaqueDecryptRequest): FedosRustExecutionReviewDecision {
+    this.#planInternalRustCall("Decrypt"); // constructed and discarded — never executed
     return this.#blocked("decrypt");
+  }
+
+  /**
+   * PRIVATE — plans (but never executes) a `FedosInternalRustCall` for
+   * `kind`. The evaluated decision is discarded; it never changes this
+   * review's own, unchanged `"BlockedBeforeCrypto"` answer.
+   */
+  #planInternalRustCall(kind: "Encrypt" | "Decrypt"): void {
+    const call = planFedosInternalRustCall(kind);
+    evaluateFedosInternalRustCall(call); // always "Planned"; result not otherwise used
   }
 
   #blocked(operation: "encrypt" | "decrypt"): FedosRustExecutionReviewDecision {
