@@ -197,6 +197,28 @@ export function fedosRustInvocationAdapterExecuted(): boolean {
 }
 
 /**
+ * Pure, standalone: whether `planPing()` is structurally reachable
+ * from the Rust Invocation Adapter's own placeholder implementation
+ * (Stage 370 wires it) — NOT whether Rust's `fedos_runtime_ping_internal()`
+ * has ever actually been called from TypeScript. Fixed `true` in this
+ * stage: `planPing()` exists and can be called, but it never calls
+ * Rust yet — it always resolves `"BlockedByImplementation"`.
+ */
+export function fedosRustPingReachable(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: whether Rust's `fedos_runtime_ping_internal()` has
+ * ever actually been called from TypeScript. Fixed `false` in this
+ * stage — no parameter or override anywhere can flip it; `planPing()`
+ * never calls Rust in this stage.
+ */
+export function fedosRustPingExecuted(): boolean {
+  return false;
+}
+
+/**
  * Route a `FedosInternalRustCall` to the matching
  * `planEncrypt`/`planDecrypt` method. Pure; never throws; never
  * mutates `call`.

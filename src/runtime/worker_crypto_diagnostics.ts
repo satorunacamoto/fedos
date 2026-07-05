@@ -88,6 +88,9 @@
  * own Stage 365 doc comment. `providerImplementationStage` now reflects
  * the extended seven-step milestone, fixed at
  * `"RustInvocationAdapterReady"`.
+ *
+ * Stage 372 adds `rustPingReachable`/`rustPingExecuted` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 372 doc comment.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -116,6 +119,8 @@ import {
   fedosRustInvocationAdapterExecuted,
   fedosRustInvocationAdapterReachable,
   fedosRustInvocationAdapterState,
+  fedosRustPingExecuted,
+  fedosRustPingReachable,
 } from "./fedos_rust_invocation_adapter.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
@@ -279,6 +284,18 @@ export interface WorkerCryptoActivationStatus {
    * answer. Fixed `false` in this stage.
    */
   readonly rustInvocationAdapterExecuted: boolean;
+  /**
+   * Whether `FedosRustInvocationAdapter.planPing()` is structurally
+   * reachable — `fedosRustPingReachable()`'s own answer. Fixed `true`
+   * in this stage.
+   */
+  readonly rustPingReachable: boolean;
+  /**
+   * Whether Rust's `fedos_runtime_ping_internal()` has ever actually
+   * been called from TypeScript — `fedosRustPingExecuted()`'s own
+   * answer. Fixed `false` in this stage.
+   */
+  readonly rustPingExecuted: boolean;
 }
 
 /**
@@ -329,5 +346,7 @@ export function workerCryptoActivationStatus(
     rustInvocationAdapterState: fedosRustInvocationAdapterState(),
     rustInvocationAdapterReachable: fedosRustInvocationAdapterReachable(),
     rustInvocationAdapterExecuted: fedosRustInvocationAdapterExecuted(),
+    rustPingReachable: fedosRustPingReachable(),
+    rustPingExecuted: fedosRustPingExecuted(),
   };
 }

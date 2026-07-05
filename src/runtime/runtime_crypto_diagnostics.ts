@@ -128,6 +128,13 @@
  * `rustInvocationAdapterExecuted` (`fedosRustInvocationAdapterExecuted()`,
  * fixed `false`). `providerImplementationStage` now reflects the
  * extended seven-step milestone, fixed at `"RustInvocationAdapterReady"`.
+ *
+ * Stage 372 adds `rustPingReachable` (`fedos_rust_invocation_adapter.ts`'s
+ * `fedosRustPingReachable()`, Stage 370 — fixed `true`, since
+ * `planPing()` exists and can be called) and `rustPingExecuted`
+ * (`fedosRustPingExecuted()`, fixed `false` — `planPing()` never calls
+ * Rust's `fedos_runtime_ping_internal()` in this stage). Neither field
+ * exposes any implementation detail beyond these two booleans.
  */
 
 import type {
@@ -161,6 +168,8 @@ import {
   fedosRustInvocationAdapterExecuted,
   fedosRustInvocationAdapterReachable,
   fedosRustInvocationAdapterState,
+  fedosRustPingExecuted,
+  fedosRustPingReachable,
 } from "./fedos_rust_invocation_adapter.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
@@ -397,6 +406,19 @@ export interface RuntimeCryptoActivationStatus {
    * answer. Fixed `false` in this stage.
    */
   readonly rustInvocationAdapterExecuted: boolean;
+  /**
+   * Whether `FedosRustInvocationAdapter.planPing()` is structurally
+   * reachable — `fedosRustPingReachable()`'s own answer
+   * (`src/runtime/fedos_rust_invocation_adapter.ts`, Stage 370/372).
+   * Fixed `true` in this stage.
+   */
+  readonly rustPingReachable: boolean;
+  /**
+   * Whether Rust's `fedos_runtime_ping_internal()` has ever actually
+   * been called from TypeScript — `fedosRustPingExecuted()`'s own
+   * answer. Fixed `false` in this stage.
+   */
+  readonly rustPingExecuted: boolean;
 }
 
 /**
@@ -448,5 +470,7 @@ export function runtimeCryptoActivationStatus(
     rustInvocationAdapterState: fedosRustInvocationAdapterState(),
     rustInvocationAdapterReachable: fedosRustInvocationAdapterReachable(),
     rustInvocationAdapterExecuted: fedosRustInvocationAdapterExecuted(),
+    rustPingReachable: fedosRustPingReachable(),
+    rustPingExecuted: fedosRustPingExecuted(),
   };
 }
