@@ -314,6 +314,11 @@
 //! decoding+decrypting each reproduces the documented plaintext exactly
 //! — full round-trip, connecting Stage 234–236's new code to the
 //! existing Stage 219–232 pipeline with zero changes to any of it.
+//!
+//! Stage 238 extends `nip44_wire_diagnostics`'s preview from four rows to
+//! eight: `WireEncoding`/`WireEncrypt`/`WireDecrypt`/`WireInvalidVectors`
+//! all report `Ready`. Still no `CryptoCapability` variant added, still
+//! no existing capability's meaning changed.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;

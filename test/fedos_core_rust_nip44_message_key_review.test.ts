@@ -122,7 +122,10 @@ describe("NIP-44 exact message key derivation review + skeleton (Stage 214-218, 
         `expected payload layout doc to mention ${keyword}`,
       ).toContain(keyword.toLowerCase());
     }
-    expect(wirePayloadLayoutDocSource).toMatch(/this document adds no code/i);
+    // Stage 234 implemented this layout for real, so the doc's intro now
+    // speaks of Stage 216 in the past tense ("added", not "adds") — both
+    // phrasings are accepted here.
+    expect(wirePayloadLayoutDocSource).toMatch(/this document (adds|added) no code/i);
   });
 
   it("4. crypto.rs declares nip44_message_keys as pub(crate) mod, never bare pub mod", () => {

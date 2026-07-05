@@ -4474,3 +4474,102 @@ encrypt pipeline, no wire payload encode/decode, no production base64, no
 change, no `CryptoCapability` addition. No Runtime/Worker/Storage/
 Federation/Relay/WASM/FFI connection. No TypeScript serialization change.
 No new `Cargo.toml` dependency.
+
+## NIP-44 v2 wire-compatible implementation COMPLETE (crate-internal): base64 encoding + invalid vectors + encrypt pipeline (Stage 234–240)
+
+Stage 234–240 complete the NIP-44 v2 wire-compatible implementation at
+the crate-internal level: real base64 wire payload encoding,
+`invalid.decrypt` vector wiring, the complete ENCRYPT pipeline, and full
+round-trip vector verification against ALL 10 `valid.encrypt_decrypt` and
+ALL 12 `invalid.decrypt` cases. **Still NOT connected to Runtime/Worker/
+Storage/Nostr/Relay, still no public API, `fedos_encrypt`/`fedos_decrypt`
+completely untouched.**
+
+**Stage 234**: [`crypto::nip44_wire_encoding`](src/crypto/nip44_wire_encoding.rs)
+(new) hand-implements STANDARD base64 (RFC 4648 §4) — NO `base64` crate
+adopted, and DELIBERATELY SEPARATE from `crypto::ciphertext_serialization`'s
+own base64url codec (Stage 186, UNCHANGED) — never shared or
+generalized. `encode_wire_payload_internal`/`decode_wire_payload_internal`
+build/parse `base64(version_byte (0x02) ‖ nonce ‖ ciphertext ‖ mac)`;
+decode validates STRUCTURALLY only (malformed base64, too-short, wrong
+version → `InvalidPayload`), reusing `crypto::nip44_wire_payload::Nip44WirePayload`
+(Stage 225–226, UNCHANGED) as its output shape. Vector-verified
+(`nip44_wire_encoding_vectors`) against all 10 `valid.encrypt_decrypt`
+cases: decode extracts the right nonce, and re-encoding reproduces each
+vector's exact payload string.
+
+**Stage 235**: `crypto::nip44_wire_decrypt` gains wire-STRING-facing
+`decrypt_wire_payload_internal`/`decrypt_wire_payload_from_bytes_internal`
+and a fourth `Nip44WireDecryptStatus` variant, `InvalidPayload` (encoding-
+level failures, checked before any key/HMAC/ChaCha20 call). A new sibling
+`#[cfg(test)]`-only [`nip44_wire_decrypt_invalid_vectors`](src/crypto/nip44_wire_decrypt_invalid_vectors.rs)
+wires ALL 12 `invalid.decrypt` cases (unknown version ×2, invalid base64,
+invalid MAC ×2, invalid padding ×3, invalid payload length ×4) — every
+one collapses to `InvalidPayload` or `AuthenticationFailed`, never
+`Ready`.
+
+**Stage 236**: [`crypto::nip44_wire_encrypt`](src/crypto/nip44_wire_encrypt.rs)
+(new) composes the complete ENCRYPT pipeline: derive exact message keys
+(Stage 219) → pad (Stage 202–203) → ChaCha20 stream encrypt (Stage 229) →
+HMAC-SHA256 (Stage 231) → encode (Stage 234). `encrypt_wire_internal` is
+the ONE production entry point, drawing its nonce EXCLUSIVELY via
+`crypto::nip44_wire_nonce::generate_wire_nonce_internal` (Stage 224) — a
+nonce-accepting variant exists ONLY behind `#[cfg(test)]`, unreachable
+from any production build.
+
+**Stage 237**: a new sibling `#[cfg(test)]`-only
+[`nip44_wire_encrypt_vectors`](src/crypto/nip44_wire_encrypt_vectors.rs)
+confirms, for ALL 10 `valid.encrypt_decrypt` cases: the encrypt
+pipeline's output matches the vector's own `payload` EXACTLY; decrypting
+that freshly-encrypted payload recovers the documented `plaintext`
+EXACTLY; and decrypting the VECTOR'S OWN `payload` string also recovers
+it EXACTLY — the full loop, closed against the upstream reference
+vectors, connecting Stage 234–236's new code to the already-verified
+Stage 219–232 pipeline with zero changes to any of it.
+
+**Stage 238**: `crypto::nip44_wire_diagnostics`'s preview grows from four
+rows to eight — `WireEncoding`/`WireEncrypt`/`WireDecrypt`/
+`WireInvalidVectors` all report `Ready`. `WireDecrypt` is distinct from
+`WireAuthentication` (Stage 233) — the former tracks the wire-STRING-
+facing pipeline, the latter the byte-level HMAC/decrypt pipeline. Still
+no `CryptoCapability` variant added.
+
+**Stage 239 (guards)**: a new
+[`test/fedos_core_rust_nip44_wire_completion.test.ts`](../../test/fedos_core_rust_nip44_wire_completion.test.ts)
+confirms: the two new production files stay `pub(crate)`-only and
+panic/unsafe-free; the base64 helpers are private (never `pub(crate)`)
+and use the standard (not base64url) alphabet; `ciphertext_serialization`
+is untouched and never cross-referenced; `encrypt_wire_internal` takes no
+nonce parameter and the nonce-accepting variant is `#[cfg(test)]`-gated
+with nothing else declared between the attribute and the function;
+`invalid.decrypt` is wired (12 cases); `Nip44WireDecryptStatus` has
+exactly four variants; the diagnostics preview has exactly eight rows;
+`capability_matrix`/`diagnostics`/`conversation_key`/`message_key`/
+`hkdf_bridge`/`nip44_padding`/`nip44_wire_nonce`/`nip44_wire_payload`/
+`aead_internal` are all untouched; no `fedos_encrypt`/`fedos_decrypt`
+call exists anywhere in the new files; and the usual Runtime/Worker/
+Storage/Federation/`pub fn`-count/`Cargo.toml`-dependency-count/
+`package.json`-dependency-count/no-`serde`-derive checks all still hold.
+Pre-existing
+[`test/fedos_core_rust_nip44_wire_crypto.test.ts`](../../test/fedos_core_rust_nip44_wire_crypto.test.ts)
+and
+[`test/fedos_core_rust_nip44_wire_nonce_payload.test.ts`](../../test/fedos_core_rust_nip44_wire_nonce_payload.test.ts)
+are updated in place for the new four-variant status/eight-row preview.
+
+**Stage 240 (docs)**: `docs/nip44_wire_crypto_completion.md`,
+`docs/nip44_wire_implementation_roadmap.md` (steps 6/7 now marked
+IMPLEMENTED — step 8, the Nostr DM bridge, is the ONLY step left), and
+`docs/nip44_wire_payload_layout.md` (marked IMPLEMENTED) are all updated
+in place, explicitly stating: the NIP-44 v2 wire encrypt/decrypt
+INTERNAL implementation is complete; Runtime/Nostr/Storage remain
+unconnected; there is no public API; `fedos_encrypt`/`fedos_decrypt`
+remain this crate's existing, unrelated, opaque-handle AEAD API, not a
+NIP-44 wire API; the NIP-44 wire payload uses standard base64;
+`ciphertext_serialization` (canonical JSON + base64url) remains a
+completely separate, unrelated format.
+
+Public `pub fn` surface unchanged at twenty-seven. No Runtime/Worker/
+Storage/Relay/Nostr/NIP-17 connection, no public API addition, no
+`fedos_encrypt`/`fedos_decrypt` change, no `Cargo.toml`/`package.json`
+change, no new dependency, no WASM/FFI, no JSON serialization change, no
+`ciphertext_serialization` change, no AEAD bridge change.

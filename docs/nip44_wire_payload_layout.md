@@ -1,12 +1,22 @@
-# NIP-44 v2 wire payload layout planning (Stage 216) — docs only, no code
+# NIP-44 v2 wire payload layout planning (Stage 216; IMPLEMENTED Stage 234) — docs only at Stage 216, now backed by real code
 
-**Status: this document adds no code.** It fixes, in writing, EVERY field
-of NIP-44 v2's real wire payload — order, length, encoding, and exactly
-where padding sits relative to encryption — before any serialize/
-deserialize function is written. This is the same "fix the shape before
-the implementation" discipline `docs/ciphertext_envelope_plan.md` and
+**Status at Stage 216: this document added no code.** It fixed, in
+writing, EVERY field of NIP-44 v2's real wire payload — order, length,
+encoding, and exactly where padding sits relative to encryption — before
+any serialize/deserialize function was written. This was the same "fix
+the shape before the implementation" discipline
+`docs/ciphertext_envelope_plan.md` and
 `docs/ciphertext_serialization_format_decision.md` already used for this
 crate's OWN, separate envelope format.
+
+**Update — Stage 234: this layout IS now implemented exactly as
+specified below.**
+[`crypto::nip44_wire_encoding::encode_wire_payload_internal`/`decode_wire_payload_internal`](../packages/fedos-core-rust/src/crypto/nip44_wire_encoding.rs)
+build/parse EXACTLY the `version_byte ‖ nonce ‖ ciphertext ‖ hmac_tag`
+layout this document fixed, base64-encoded with standard base64 (never
+base64url) as planned. See `docs/nip44_wire_crypto_completion.md` for
+the full implementation record, and `docs/nip44_wire_implementation_roadmap.md`
+step 6 (now marked IMPLEMENTED).
 
 ## The fixed field layout
 
@@ -96,20 +106,25 @@ own.
   above IS the only "schema" — there is no JSON object, no key names, no
   reordering possible.
 
-## Explicit non-goals of this planning document
+## Explicit non-goals of this planning document (as of Stage 216 — superseded in part by Stage 234)
 
-- **No `encode`/`decode` function is implemented here** — `crypto::nip44_wire`
-  (Stage 209–213) stays a label-only skeleton; this document only fixes
-  what such a future function's INPUT/OUTPUT byte layout would be.
-- **No base64 dependency is adopted** — `Cargo.toml` is unchanged; a
-  future implementing stage would need to either hand-write standard
-  base64 (mirroring `crypto::ciphertext_serialization`'s own hand-written
-  base64url, Stage 186, which added no dependency either) or explicitly
-  review adopting a `base64` crate.
+- **As of Stage 216: no `encode`/`decode` function was implemented
+  here** — `crypto::nip44_wire` (Stage 209–213) stayed a label-only
+  skeleton; this document only fixed what such a future function's
+  INPUT/OUTPUT byte layout would be. **As of Stage 234:
+  `crypto::nip44_wire_encoding::encode_wire_payload_internal`/
+  `decode_wire_payload_internal` implement exactly this layout** — see
+  `docs/nip44_wire_crypto_completion.md`.
+- **No base64 dependency was adopted, and still isn't** — `Cargo.toml`
+  is unchanged; Stage 234 hand-wrote standard base64 (mirroring
+  `crypto::ciphertext_serialization`'s own hand-written base64url,
+  Stage 186, which also added no dependency), exactly as this
+  document's own non-goal anticipated as one of the two options.
 - **Not the same format as `AeadCiphertextEnvelope`.** No field of this
   layout is renamed, reused, or merged into that type — see
   `docs/nip44_internal_plan.md` §6's own cross-reference on this exact
-  point.
+  point. Still true as of Stage 234: `crypto::ciphertext_serialization`
+  remains completely UNCHANGED.
 
 ## See also
 
@@ -119,6 +134,8 @@ own.
   layout places second.
 - `docs/nip44_internal_plan.md` §5 (padding, spec-exact and implemented),
   §6 (payload structure — this document's source material), §7 (MAC).
-- `docs/nip44_wire_implementation_roadmap.md` steps 4–6 — where the real
-  ChaCha20 stream cipher, HMAC-SHA256 tag, and base64 encoding steps this
-  layout depends on are proposed to land.
+- `docs/nip44_wire_crypto_completion.md` — the full implementation record
+  for Stage 234's real encode/decode, and Stage 229/231's real ChaCha20/
+  HMAC-SHA256 this layout's `ciphertext`/`hmac_tag` fields carry.
+- `docs/nip44_wire_implementation_roadmap.md` steps 4–6 — all now marked
+  IMPLEMENTED.

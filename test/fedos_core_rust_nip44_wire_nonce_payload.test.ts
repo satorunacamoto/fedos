@@ -148,13 +148,14 @@ describe("NIP-44 wire nonce generation + payload skeleton + diagnostics (Stage 2
     }
   });
 
-  it("9. nip44_wire_diagnostics is a separate preview (now four rows as of Stage 233) — no CryptoCapability variant added, capability_matrix/diagnostics unchanged in shape", () => {
-    // Stage 233 extends this preview from two rows to four (WireCrypto,
-    // WireAuthentication join WireNonce/WirePayload) — see
-    // test/fedos_core_rust_nip44_wire_crypto.test.ts for the dedicated
-    // Stage 229-233 checks on the two new rows.
+  it("9. nip44_wire_diagnostics is a separate preview (now eight rows as of Stage 238) — no CryptoCapability variant added, capability_matrix/diagnostics unchanged in shape", () => {
+    // Stage 233 extended this preview from two rows to four (WireCrypto,
+    // WireAuthentication join WireNonce/WirePayload); Stage 238 extends it
+    // again to eight (WireEncoding/WireEncrypt/WireDecrypt/WireInvalidVectors)
+    // — see test/fedos_core_rust_nip44_wire_completion.test.ts for the
+    // dedicated Stage 234-238 checks.
     expect(nip44WireDiagnosticsSource).toMatch(
-      /pub\(crate\)\s+fn\s+nip44_wire_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*Nip44WireFeatureReport\s*;\s*4\s*\]/,
+      /pub\(crate\)\s+fn\s+nip44_wire_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*Nip44WireFeatureReport\s*;\s*8\s*\]/,
     );
     expect(capabilityMatrixSource).toMatch(
       /pub\(crate\)\s+const\s+ALL:\s*\[CryptoCapability;\s*16\]\s*=\s*\[/,

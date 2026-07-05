@@ -44,6 +44,20 @@
 //! stays an explicit placeholder: `WireCrypto`'s ChaCha20 stream and
 //! `WireAuthentication`'s HMAC tag are both fully real, `cargo
 //! test`-verified operations.
+//!
+//! Stage 238 adds four more rows, all `Ready`: `WireEncoding`
+//! (`crypto::nip44_wire_encoding`, Stage 234 — real base64 wire payload
+//! encode/decode), `WireEncrypt` (`crypto::nip44_wire_encrypt`, Stage
+//! 236 — the complete wire-compatible ENCRYPT pipeline), `WireDecrypt`
+//! (`crypto::nip44_wire_decrypt`'s wire-STRING-facing
+//! `decrypt_wire_payload_internal`/`decrypt_wire_payload_from_bytes_internal`,
+//! Stage 235 — distinct from `WireAuthentication` above, which tracks
+//! the byte-level HMAC/decrypt pipeline specifically), and
+//! `WireInvalidVectors` (confirming `test-vectors/nip44/nip44-v2.json`'s
+//! full `invalid.decrypt` category, Stage 235, collapses to
+//! `InvalidPayload`/`AuthenticationFailed` for every one of its 12
+//! cases). Still no `CryptoCapability` variant added, still no existing
+//! capability's meaning changed.
 #![allow(dead_code)]
 
 /// A non-sensitive readiness label for one [`Nip44WireFeature`] —
@@ -74,6 +88,10 @@ pub(crate) enum Nip44WireFeature {
     WirePayload,
     WireCrypto,
     WireAuthentication,
+    WireEncoding,
+    WireEncrypt,
+    WireDecrypt,
+    WireInvalidVectors,
 }
 
 /// One row of the [`nip44_wire_diagnostics_preview`] table. Crate-private
@@ -85,12 +103,13 @@ pub(crate) struct Nip44WireFeatureReport {
     pub(crate) readiness: Nip44WireReadiness,
 }
 
-/// A fixed, hand-maintained, display-only snapshot of all four NIP-44
-/// wire features' current readiness. Returns exactly four rows
-/// (`WireNonce`, `WirePayload`, `WireCrypto`, `WireAuthentication`, in
+/// A fixed, hand-maintained, display-only snapshot of all eight NIP-44
+/// wire features' current readiness. Returns exactly eight rows
+/// (`WireNonce`, `WirePayload`, `WireCrypto`, `WireAuthentication`,
+/// `WireEncoding`, `WireEncrypt`, `WireDecrypt`, `WireInvalidVectors`, in
 /// that order) every time it is called — takes no parameter of any
 /// kind.
-pub(crate) fn nip44_wire_diagnostics_preview() -> [Nip44WireFeatureReport; 4] {
+pub(crate) fn nip44_wire_diagnostics_preview() -> [Nip44WireFeatureReport; 8] {
     [
         Nip44WireFeatureReport {
             feature: Nip44WireFeature::WireNonce,
@@ -108,6 +127,22 @@ pub(crate) fn nip44_wire_diagnostics_preview() -> [Nip44WireFeatureReport; 4] {
             feature: Nip44WireFeature::WireAuthentication,
             readiness: Nip44WireReadiness::Ready,
         },
+        Nip44WireFeatureReport {
+            feature: Nip44WireFeature::WireEncoding,
+            readiness: Nip44WireReadiness::Ready,
+        },
+        Nip44WireFeatureReport {
+            feature: Nip44WireFeature::WireEncrypt,
+            readiness: Nip44WireReadiness::Ready,
+        },
+        Nip44WireFeatureReport {
+            feature: Nip44WireFeature::WireDecrypt,
+            readiness: Nip44WireReadiness::Ready,
+        },
+        Nip44WireFeatureReport {
+            feature: Nip44WireFeature::WireInvalidVectors,
+            readiness: Nip44WireReadiness::Ready,
+        },
     ]
 }
 
@@ -116,9 +151,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_reports_exactly_four_rows_in_the_documented_order_and_readiness() {
+    fn preview_reports_exactly_eight_rows_in_the_documented_order_and_readiness() {
         let preview = nip44_wire_diagnostics_preview();
-        assert_eq!(preview.len(), 4);
+        assert_eq!(preview.len(), 8);
         assert_eq!(preview[0].feature, Nip44WireFeature::WireNonce);
         assert_eq!(preview[0].readiness, Nip44WireReadiness::Ready);
         assert_eq!(preview[1].feature, Nip44WireFeature::WirePayload);
@@ -127,6 +162,14 @@ mod tests {
         assert_eq!(preview[2].readiness, Nip44WireReadiness::Ready);
         assert_eq!(preview[3].feature, Nip44WireFeature::WireAuthentication);
         assert_eq!(preview[3].readiness, Nip44WireReadiness::Ready);
+        assert_eq!(preview[4].feature, Nip44WireFeature::WireEncoding);
+        assert_eq!(preview[4].readiness, Nip44WireReadiness::Ready);
+        assert_eq!(preview[5].feature, Nip44WireFeature::WireEncrypt);
+        assert_eq!(preview[5].readiness, Nip44WireReadiness::Ready);
+        assert_eq!(preview[6].feature, Nip44WireFeature::WireDecrypt);
+        assert_eq!(preview[6].readiness, Nip44WireReadiness::Ready);
+        assert_eq!(preview[7].feature, Nip44WireFeature::WireInvalidVectors);
+        assert_eq!(preview[7].readiness, Nip44WireReadiness::Ready);
     }
 
     #[test]
@@ -145,18 +188,26 @@ mod tests {
     }
 
     #[test]
-    fn nip44_wire_feature_has_no_variant_other_than_the_four_specified() {
+    fn nip44_wire_feature_has_no_variant_other_than_the_eight_specified() {
         for feature in [
             Nip44WireFeature::WireNonce,
             Nip44WireFeature::WirePayload,
             Nip44WireFeature::WireCrypto,
             Nip44WireFeature::WireAuthentication,
+            Nip44WireFeature::WireEncoding,
+            Nip44WireFeature::WireEncrypt,
+            Nip44WireFeature::WireDecrypt,
+            Nip44WireFeature::WireInvalidVectors,
         ] {
             match feature {
                 Nip44WireFeature::WireNonce => {}
                 Nip44WireFeature::WirePayload => {}
                 Nip44WireFeature::WireCrypto => {}
                 Nip44WireFeature::WireAuthentication => {}
+                Nip44WireFeature::WireEncoding => {}
+                Nip44WireFeature::WireEncrypt => {}
+                Nip44WireFeature::WireDecrypt => {}
+                Nip44WireFeature::WireInvalidVectors => {}
             }
         }
     }

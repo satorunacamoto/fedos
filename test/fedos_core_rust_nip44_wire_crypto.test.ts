@@ -151,13 +151,22 @@ describe("NIP-44 wire crypto completion: ChaCha20 + HMAC-SHA256 + decrypt pipeli
     expect(variants).toEqual(["Verified", "AuthenticationFailed"]);
   });
 
-  it("7. nip44_wire_decrypt runs verify-HMAC before decrypt-stream, and collapses failures into AuthenticationFailed (plus a separate InvalidConversationKey precondition)", () => {
+  it("7. nip44_wire_decrypt runs verify-HMAC before decrypt-stream, and collapses failures into AuthenticationFailed (plus separate InvalidConversationKey/InvalidPayload preconditions as of Stage 235)", () => {
+    // Stage 235 adds a fourth variant, InvalidPayload, for encoding-level
+    // failures (see test/fedos_core_rust_nip44_wire_completion.test.ts for
+    // the dedicated Stage 234-238 checks) — this test's own core claim
+    // (verify-HMAC strictly before decrypt-stream) still holds unchanged.
     const enumMatch = nip44WireDecryptSource.match(
       /pub\(crate\)\s+enum\s+Nip44WireDecryptStatus\s*\{([\s\S]*?)\n\}/,
     );
     expect(enumMatch, "expected to find the Nip44WireDecryptStatus enum body").not.toBeNull();
     const variants = [...enumMatch![1].matchAll(/^\s*(\w+),?\s*$/gm)].map((m) => m[1]);
-    expect(variants).toEqual(["Ready", "InvalidConversationKey", "AuthenticationFailed"]);
+    expect(variants).toEqual([
+      "Ready",
+      "InvalidConversationKey",
+      "InvalidPayload",
+      "AuthenticationFailed",
+    ]);
 
     const verifyIdx = nip44WireDecryptSource.indexOf("verify_hmac_internal(");
     const decryptIdx = nip44WireDecryptSource.indexOf("decrypt_stream_internal(");
@@ -185,9 +194,13 @@ describe("NIP-44 wire crypto completion: ChaCha20 + HMAC-SHA256 + decrypt pipeli
     expect(nip44WirePayloadSource).not.toMatch(/Nip44WireDecrypt|Nip44HmacVerify|chacha20_block/);
   });
 
-  it("10. nip44_wire_diagnostics reports exactly four rows: WireNonce/Ready, WirePayload/Placeholder, WireCrypto/Ready, WireAuthentication/Ready", () => {
+  it("10. nip44_wire_diagnostics reports WireCrypto/Ready and WireAuthentication/Ready among its rows (now eight total as of Stage 238)", () => {
+    // Stage 238 extends this preview from four rows to eight (WireEncoding/
+    // WireEncrypt/WireDecrypt/WireInvalidVectors join) — see
+    // test/fedos_core_rust_nip44_wire_completion.test.ts for the dedicated
+    // Stage 234-238 checks on the four new rows.
     expect(nip44WireDiagnosticsSource).toMatch(
-      /pub\(crate\)\s+fn\s+nip44_wire_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*Nip44WireFeatureReport\s*;\s*4\s*\]/,
+      /pub\(crate\)\s+fn\s+nip44_wire_diagnostics_preview\s*\(\s*\)\s*->\s*\[\s*Nip44WireFeatureReport\s*;\s*8\s*\]/,
     );
     expect(nip44WireDiagnosticsSource).toMatch(/WireCrypto/);
     expect(nip44WireDiagnosticsSource).toMatch(/WireAuthentication/);

@@ -1,17 +1,27 @@
-# NIP-44 v2 wire crypto completion: ChaCha20 + HMAC-SHA256 + decrypt pipeline (Stage 229–233) — implementation record
+# NIP-44 v2 wire crypto completion: ChaCha20 + HMAC-SHA256 + decrypt pipeline (Stage 229–233); base64 encoding + invalid vectors + encrypt pipeline (Stage 234–240) — implementation record
 
 **Status: this document records real code.** It describes the ACTUAL raw
-ChaCha20 stream cipher, HMAC-SHA256 authentication, and complete
-verify-HMAC → decrypt-stream → unpad DECRYPT pipeline Stage 229–233
-landed — the crypto CORE of a byte-exact "NIP-44 v2 wire-compatible
-implementation" (`docs/nip44_wire_implementation_roadmap.md`).
+ChaCha20 stream cipher, HMAC-SHA256 authentication, complete verify-HMAC
+→ decrypt-stream → unpad DECRYPT pipeline (Stage 229–233), real base64
+wire payload encoding, `invalid.decrypt` vector wiring, and the complete
+ENCRYPT pipeline (Stage 234–240) this crate landed — together, the full
+crypto CORE of a byte-exact "NIP-44 v2 wire-compatible implementation"
+(`docs/nip44_wire_implementation_roadmap.md`).
 
-**This is decrypt-direction crypto, not a full wire implementation.** No
-base64 encode/decode, no wire payload build/parse, and no
-`invalid.decrypt` failure-mode wiring exist yet — see "What remains" at
-the end of this document, and `docs/nip44_wire_compatibility_gap.md` for
-why none of this crate's NIP-44 code, before or after this stage, may
-ever be described as "NIP-44 compatible".
+**As of Stage 240, the internal NIP-44 v2 wire encrypt/decrypt
+implementation is COMPLETE at the crate-internal level** — every
+`test-vectors/nip44/nip44-v2.json` category this crate's own roadmap
+targeted (`get_conversation_key`, `get_message_keys`,
+`calc_padded_len`/`encrypt_msg_lengths`, `valid.encrypt_decrypt`,
+`invalid.decrypt`) is wired to `cargo test` and passes. **This is still
+NOT connected to Runtime/Worker/Storage/Nostr/Relay, still has no public
+API of its own, and `fedos_encrypt`/`fedos_decrypt` (this crate's
+existing, unrelated, opaque-handle AEAD API) are completely untouched**
+— see "What remains" at the end of this document, and
+`docs/nip44_wire_compatibility_gap.md` for why none of this crate's
+NIP-44 code, before or after this stage, may ever be described as
+"NIP-44 compatible" without that further, separate, explicitly-reviewed
+connection work.
 
 ## Stream cipher (Stage 229–230)
 
@@ -94,11 +104,12 @@ Ready, with the recovered plaintext
   `conversation_key` value with no `sec1`/`pub2` pair required (mirroring
   `crypto::nip44_message_keys`'s own established precedent for the same
   reason).
-- **`Nip44WireDecryptStatus` has exactly three variants**: `Ready`,
-  `InvalidConversationKey` (a structural precondition), and
+- **`Nip44WireDecryptStatus` had exactly three variants at Stage 232**:
+  `Ready`, `InvalidConversationKey` (a structural precondition), and
   `AuthenticationFailed` (a SINGLE fixed label collapsing every HMAC
   failure and every post-authentication unpad failure — never
-  distinguishing which).
+  distinguishing which). **Stage 235 adds a fourth, `InvalidPayload`** —
+  see that section below.
 - **Vector-verified end-to-end**: the sibling `#[cfg(test)]`-only
   [`nip44_wire_decrypt_vectors`](../packages/fedos-core-rust/src/crypto/nip44_wire_decrypt_vectors.rs)
   module decodes all 10 `valid.encrypt_decrypt` payloads (via the SAME
@@ -132,30 +143,146 @@ join the unchanged `WireNonce` → `Ready` and `WirePayload` →
 existing capability's meaning changes — `capability_matrix`/
 `diagnostics` remain exactly as they were (still sixteen variants).
 
+## Wire payload encoding (Stage 234)
+
+[`crypto::nip44_wire_encoding`](../packages/fedos-core-rust/src/crypto/nip44_wire_encoding.rs)
+hand-implements STANDARD base64 (RFC 4648 §4, `+`/`/`, `=` padding) — no
+`base64` crate is adopted, and this is DELIBERATELY SEPARATE from
+`crypto::ciphertext_serialization`'s own base64url codec (Stage 186,
+UNCHANGED) — the two are never shared or generalized.
+
+- `encode_wire_payload_internal(nonce: &[u8; 32], ciphertext: &[u8], mac:
+  &[u8; 32]) -> String` builds `base64(version_byte (0x02) ‖ nonce ‖
+  ciphertext ‖ mac)`. Cannot fail for any input.
+- `decode_wire_payload_internal(payload: &str) -> Nip44WireDecodeDecision`
+  validates a candidate STRUCTURALLY ONLY: malformed base64 (invalid
+  character, wrong length, misplaced padding), too-short decoded length
+  (< 65 bytes — not enough for `version ‖ nonce ‖ mac`), or a
+  `version_byte` other than `0x02` all collapse into a SINGLE
+  `Nip44WireEncodingStatus::InvalidPayload` label. Performs NO
+  authentication and NO decryption. Reuses
+  `crypto::nip44_wire_payload::Nip44WirePayload` (UNCHANGED, Stage
+  225–226) as its own output shape — the second way that type gets
+  built, alongside `Nip44WirePayloadBuilder::build_placeholder`'s
+  placeholder path.
+- **Vector-verified**: the sibling `#[cfg(test)]`-only
+  [`nip44_wire_encoding_vectors`](../packages/fedos-core-rust/src/crypto/nip44_wire_encoding_vectors.rs)
+  module confirms `decode_wire_payload_internal` extracts the documented
+  `nonce` for all 10 `valid.encrypt_decrypt` cases, and that
+  re-encoding the decoded fields reproduces each vector's own `payload`
+  string EXACTLY.
+
+## `invalid.decrypt` vector wiring (Stage 235)
+
+`crypto::nip44_wire_decrypt` (Stage 232) gains two wire-STRING-facing
+entry points, `decrypt_wire_payload_internal`/
+`decrypt_wire_payload_from_bytes_internal`, and a fourth
+`Nip44WireDecryptStatus` variant, `InvalidPayload` (encoding-level
+failures, checked BEFORE any key derivation/HMAC/ChaCha20 call — distinct
+from both `InvalidConversationKey` and `AuthenticationFailed`). The
+sibling `#[cfg(test)]`-only
+[`nip44_wire_decrypt_invalid_vectors`](../packages/fedos-core-rust/src/crypto/nip44_wire_decrypt_invalid_vectors.rs)
+module wires ALL 12 `invalid.decrypt` cases (unknown version ×2, invalid
+base64, invalid MAC ×2, invalid padding ×3, invalid payload length ×4)
+against `decrypt_wire_payload_from_bytes_internal` — every single one
+collapses to `InvalidPayload` or `AuthenticationFailed`, never `Ready`,
+never a more detailed reason.
+
+## Encrypt pipeline (Stage 236)
+
+[`crypto::nip44_wire_encrypt`](../packages/fedos-core-rust/src/crypto/nip44_wire_encrypt.rs)
+composes the complete ENCRYPT direction: derive exact message keys
+(Stage 219, UNCHANGED) → pad (Stage 202–203, UNCHANGED) → ChaCha20 stream
+encrypt (Stage 229) → HMAC-SHA256 (Stage 231) → encode (Stage 234).
+
+- `encrypt_wire_internal(conversation_key: &ConversationKey, plaintext:
+  &[u8]) -> Nip44WireEncryptDecision` is the ONE production entry point
+  — it draws its nonce EXCLUSIVELY via
+  `crypto::nip44_wire_nonce::generate_wire_nonce_internal` (Stage 224).
+  There is NO way to supply a caller-chosen nonce in production.
+- `Nip44WireEncryptStatus` has four variants: `Ready`,
+  `InvalidConversationKey`, `InvalidPlaintextLength` (mirrors
+  `crypto::nip44_padding::pad_message`'s own 1–65535-byte bound), and
+  `InternalFailure` (the nonce draw failed).
+- A `#[cfg(test)]`-ONLY nonce-accepting variant,
+  `encrypt_wire_from_bytes_with_nonce_for_test_internal`, exists SOLELY
+  for deterministic vector testing — this item does not exist at all in
+  non-test builds.
+
+## Full round-trip vector verification (Stage 237)
+
+The sibling `#[cfg(test)]`-only
+[`nip44_wire_encrypt_vectors`](../packages/fedos-core-rust/src/crypto/nip44_wire_encrypt_vectors.rs)
+module confirms, for ALL 10 `valid.encrypt_decrypt` cases:
+
+1. `encrypt_wire_from_bytes_with_nonce_for_test_internal`'s output
+   matches the vector's own `payload` field EXACTLY.
+2. Decoding and decrypting that freshly-encrypted payload recovers the
+   documented `plaintext` EXACTLY.
+3. Decoding and decrypting the VECTOR'S OWN `payload` string (not just
+   our freshly-encrypted one) also recovers the documented `plaintext`
+   EXACTLY — closing the full loop against the upstream reference
+   vectors, not just against this crate's own output.
+
+This connects Stage 234–236's new code to the already-verified Stage
+219–232 pipeline with ZERO changes to any of it.
+
+## Diagnostics (Stage 238)
+
+`crypto::nip44_wire_diagnostics`'s preview grows from four rows to
+eight: `WireEncoding`, `WireEncrypt`, `WireDecrypt`, and
+`WireInvalidVectors` all report `Ready`. `WireDecrypt` is distinct from
+`WireAuthentication` (Stage 233) — the former tracks the wire-STRING-
+facing decrypt pipeline (Stage 235) specifically, the latter the
+byte-level HMAC/decrypt pipeline (Stage 231–232). Still no
+`CryptoCapability` variant added, still no existing capability's
+meaning changed.
+
+## The test-only base64 decoders (Stage 230/232) vs. the real one (Stage 234)
+
+`nip44_stream_cipher_vectors`/`nip44_wire_decrypt_vectors` (Stage
+230/232) each still carry their OWN small, `#[cfg(test)]`-only standard
+base64 DECODE function — left UNCHANGED by Stage 234–240, since they
+predate the real production decoder and already pass. Newer vector
+modules (`nip44_wire_encoding_vectors`, `nip44_wire_decrypt_invalid_vectors`,
+`nip44_wire_encrypt_vectors`, Stage 234–237) use the REAL
+`crypto::nip44_wire_encoding::decode_wire_payload_internal`/
+`encode_wire_payload_internal` directly instead, needing no test-only
+helper of their own. Neither the old test-only helpers nor the new real
+codec are reachable from production code beyond `crypto::nip44_wire_encrypt`/
+`crypto::nip44_wire_decrypt` themselves, and neither adds a
+`Cargo.toml` dependency.
+
 ## What remains (per `docs/nip44_wire_implementation_roadmap.md`)
 
-- **Step 6 — base64 payload encoding**: no production base64 encoder/
-  decoder exists; no function anywhere in this crate turns a
-  `crypto::nip44_wire_payload::Nip44WirePayload` into (or out of) wire
-  bytes.
-- **Step 7 — invalid vectors**: `test-vectors/nip44/nip44-v2.json`'s
-  `invalid.decrypt` category (unknown version, invalid base64, invalid
-  MAC/tamper, invalid padding, invalid payload length) is not yet wired
-  — this stage only wires `valid.encrypt_decrypt`.
-- **An encrypt pipeline** (pad → ChaCha20 encrypt → compute HMAC → build
-  a real, non-placeholder `Nip44WirePayload`) — explicitly out of this
-  stage's scope (only "wire decrypt" was requested); `crypto::nip44_wire_payload::Nip44WirePayloadBuilder::build_placeholder`
-  remains UNCHANGED and still produces `ciphertext: None`/`mac: None`.
-- **Step 8 — bridge to Nostr DM** — only after every remaining vector
-  category passes; no Runtime/Worker/Storage/Relay/Nostr connection
-  exists anywhere in this stage's code.
+- **Step 8 — bridge to Nostr DM.** This is the ONLY roadmap step left.
+  No Runtime/Worker/Storage/Relay/Nostr connection exists anywhere in
+  this crate's NIP-44 wire code — `encrypt_wire_internal`/
+  `decrypt_wire_internal`/`decrypt_wire_payload_internal` are
+  `pub(crate)`-only, called by nothing outside this crate's own test
+  suite.
+- **No public API.** Whether and how a future public, opaque-handle API
+  (mirroring `docs/public_crypto_opaque_handles.md`'s discipline) ever
+  exposes this pipeline is not decided here — see
+  `docs/nip44_wire_implementation_roadmap.md`'s own "what this roadmap
+  does NOT do" section.
+- **No connection to `fedos_encrypt`/`fedos_decrypt`.** Those remain
+  this crate's existing, unrelated, opaque-handle AEAD API (Stage
+  166–176) — untouched, and not extended or overloaded with a NIP-44
+  variant by any of this work.
+- **`encrypt_decrypt_long_msg`** (SHA-256-checksum-only fixtures, per
+  that category's own upstream convention) is not wired — this crate's
+  vector wiring covers `valid.encrypt_decrypt`/`invalid.decrypt` (the
+  categories with inline plaintext/payload values) only.
 
 ## See also
 
-- `docs/nip44_wire_implementation_roadmap.md` — steps 4/5 this stage
-  implements; steps 6–8 still remaining.
+- `docs/nip44_wire_implementation_roadmap.md` — steps 4/5/6/7 this work
+  implements; step 8 the only one remaining.
 - `docs/nip44_wire_compatibility_gap.md` — the terminology this stage's
   code still respects (no file claims "NIP-44 compatible").
+- `docs/nip44_wire_payload_layout.md` — the planning document Stage 234
+  implements the real encode/decode of.
 - `docs/nip44_message_key_review.md` / `docs/nip44_wire_nonce_generation.md`
   / `docs/nip44_wire_payload_builder.md` — the earlier building blocks
-  this stage's pipeline reuses UNCHANGED.
+  this pipeline reuses UNCHANGED.

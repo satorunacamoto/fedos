@@ -97,16 +97,25 @@ a single fixed `AuthenticationFailed` label — this was not its own
 roadmap step originally, but naturally follows once steps 1/3/4/5 all
 exist.
 
-### 6. Base64 payload encoding
+### 6. Base64 payload encoding — IMPLEMENTED Stage 234
 
 Implement the real wire payload: `version_byte (0x02) ‖ nonce (32B) ‖
 ciphertext ‖ hmac_tag (32B)`, base64-encoded (standard base64, not the
 base64url this crate's OWN `ciphertext_serialization`, Stage 186, already
 uses for its unrelated envelope format — see
 `docs/nip44_wire_compatibility_gap.md`'s field-by-field table for why
-these must not be conflated). Candidate: **Stage 219**.
+these must not be conflated). Candidate was Stage 219; ACTUALLY landed
+at **Stage 234** as
+`crypto::nip44_wire_encoding::encode_wire_payload_internal`/
+`decode_wire_payload_internal` — hand-implemented (no `base64` crate
+adopted). `decode_wire_payload_internal` reuses
+`crypto::nip44_wire_payload::Nip44WirePayload` (Stage 225–226, UNCHANGED)
+as its output shape. Vector-verified against all 10
+`valid.encrypt_decrypt` cases (`nip44_wire_encoding_vectors`, decode
+extracts the right nonce and re-encoding reproduces the exact payload
+string) at **Stage 234**.
 
-### 7. Invalid vectors
+### 7. Invalid vectors — IMPLEMENTED Stage 235
 
 Wire `invalid.decrypt`'s full category (tampered version byte, invalid
 HMAC, truncated payload, invalid padding, etc.) to `cargo test`, matching
@@ -114,9 +123,17 @@ NIP-44 v2's spec-defined failure modes while still collapsing them into
 this crate's own single fixed decrypt-failure label at the PUBLIC
 boundary (mirroring `crypto::nip44_decrypt::Nip44DecryptStatus::AuthenticationFailed`'s
 existing "one label, never distinguishing why" discipline — see
-`docs/nip44_internal_plan.md` §7). Candidate: **Stage 220**.
+`docs/nip44_internal_plan.md` §7). Candidate was Stage 220; ACTUALLY
+landed at **Stage 235**: `crypto::nip44_wire_decrypt` gains
+`decrypt_wire_payload_internal`/`decrypt_wire_payload_from_bytes_internal`
+and a fourth `Nip44WireDecryptStatus` variant, `InvalidPayload`
+(encoding-level structural failures — distinct from
+`AuthenticationFailed`, exactly as this step anticipated needing "at
+least two distinct categories"). All 12 `invalid.decrypt` cases collapse
+to `InvalidPayload` or `AuthenticationFailed`, never a more detailed
+reason, vector-verified by `nip44_wire_decrypt_invalid_vectors`.
 
-### 8. Bridge to Nostr DM — only after every vector category passes
+### 8. Bridge to Nostr DM — only after every vector category passes — the ONLY step still remaining
 
 Only once steps 1–7 collectively pass EVERY category in
 `test-vectors/nip44/nip44-v2.json` (`get_conversation_key`,
@@ -124,19 +141,32 @@ Only once steps 1–7 collectively pass EVERY category in
 `encrypt_decrypt`, `encrypt_decrypt_long_msg`, `decrypt`, and any padding
 category not already covered) does a future, separate, explicitly-reviewed
 stage connect this pipeline to a real Nostr encrypted-direct-message flow
-— NOT before. This step is intentionally the ONLY one in this roadmap
-that touches Runtime/Worker/Storage/Nostr/Relay; every step above it stays
+— NOT before. **Steps 1–7 are now ALL implemented** (Stage 219–237; see
+each step's own "IMPLEMENTED" note above and
+`docs/nip44_wire_crypto_completion.md` for the full record) — the only
+categories not yet wired are `encrypt_decrypt_long_msg` (SHA-256-checksum-
+only fixtures, per that category's own upstream convention; this crate's
+Stage 230/232/234–237 wiring covers `encrypt_decrypt`/`decrypt` with
+inline plaintext/payload values) and any deliberately-excluded padding
+sub-case. This step is intentionally the ONLY one in this roadmap that
+touches Runtime/Worker/Storage/Nostr/Relay; every step above it stays
 exactly as internal/`pub(crate)`-only as Stage 198–208's own bridge is
-today. Candidate: **Stage 221+** (exact number depends on how many stages
-1–7 actually take).
+today, and remains so as of Stage 240 — no Runtime/Worker/Storage/Nostr/
+Relay connection exists anywhere in this crate's NIP-44 wire code, and no
+public API wraps it. Also note: an ENCRYPT pipeline
+(`crypto::nip44_wire_encrypt::encrypt_wire_internal`) was not originally
+its own numbered step here, but naturally followed once steps 1/3/4/5/6
+all existed — implemented at **Stage 236**, full round-trip vector-
+verified at **Stage 237**. Candidate for step 8 itself: **Stage 241+**.
 
 ## What this roadmap does NOT do
 
 - **As of Stage 209–213: no code.** Every step above was a plan entry,
-  not an implementation. **As of Stage 219–233: steps 1, 3, 4, and 5 ARE
-  real code** — see each step's own "IMPLEMENTED" note above and
-  `docs/nip44_wire_crypto_completion.md` for the full record. Steps 6–8
-  remain plan entries only.
+  not an implementation. **As of Stage 219–237: steps 1, 3, 4, 5, 6, and
+  7 ARE real code**, plus an encrypt pipeline this roadmap didn't
+  originally number — see each step's own "IMPLEMENTED" note above and
+  `docs/nip44_wire_crypto_completion.md` for the full record. **Step 8
+  (the Nostr DM bridge) is the ONLY step remaining.**
 - **No commitment to the exact Stage numbers above.** They are sequential
   placeholders assuming no step splits into two; a future step that turns
   out to need its own sub-stages renumbers everything after it, exactly
