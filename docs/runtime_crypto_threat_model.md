@@ -1,9 +1,10 @@
-# Runtime/Worker crypto activation — threat model (Stage 293)
+# Runtime/Worker crypto activation — threat model (Stage 293/297)
 
 **Status: this document records real code's safety property.** It states,
 explicitly, the ONE property `src/runtime/runtime_crypto_activation_policy.ts`/
-`worker_crypto_activation_policy.ts` (Stage 289–290) exist to guarantee: a
-misconfiguration of ONE knob can never, by itself, turn on real
+`worker_crypto_activation_policy.ts` (Stage 289–290/297) exist to
+guarantee: a misconfiguration of ONE knob — or even BOTH knobs of the
+Stage 297 dual-lock model — can never, by itself, turn on real
 cryptography. This is a **fail-closed** design.
 
 ## 1. The scenario this document rules out
@@ -33,6 +34,29 @@ inspected. A single misconfigured env var cannot silently degrade into
 "provider selected, so let's assume the rest is fine" — the enable gate
 is checked first and independently.
 
+## 1a. The Stage 297 scenario: BOTH locks set
+
+Now suppose a caller sets BOTH:
+
+```
+FEDOS_CRYPTO_PROVIDER=fedos
+FEDOS_CRYPTO_ENABLED=explicit-dev-only
+```
+
+...deliberately, on purpose, having read this very document. **Still
+nothing happens.** `evaluateRuntimeCryptoActivation`/
+`evaluateWorkerCryptoActivation` now get PAST `"DisabledByConfig"` and
+`"ProviderNotSelected"` — but land on `"ProviderUnavailable"`, because
+`FEDOS_PROVIDER_IMPLEMENTED` is a fixed, private, permanently-`false`
+constant with no env path, no parameter, no override anywhere in either
+policy file. `"Allowed"` is NEVER returned, no matter what env values are
+supplied. And even if it somehow were: `runtime_crypto_bridge.ts`/
+`worker_crypto_bridge.ts` (untouched this stage) never read
+`FEDOS_CRYPTO_ENABLED` at all, so `buildRuntimeCryptoProvider()`/
+`buildWorkerCryptoProvider()` STILL only ever resolve
+`PlaceholderRuntimeCryptoProvider`. Two separate reasons, independently
+sufficient, both currently true.
+
 ## 2. Why "fail closed" and not "fail permissive"
 
 Every knob in this pipeline defaults to the SAFEST state, and every
@@ -41,18 +65,47 @@ ADDITIONAL knob narrows (never widens) what is possible:
 | Knob | Default | Effect of leaving it at default |
 |---|---|---|
 | `FEDOS_CRYPTO_PROVIDER` | `"placeholder"` | No provider NAME even points at FedOS. |
-| `runtimeCryptoEnabled`/`workerCryptoEnabled` | `false` (fixed, no env path) | Even a `"fedos"`-named config is ignored. |
-| `FedosRuntimeCryptoProvider`'s real implementation | absent (`encrypt`/`decrypt` → `"Unsupported"`) | Even if BOTH knobs above were somehow flipped, no cryptography would run. |
+| `FEDOS_CRYPTO_ENABLED` | `"disabled"` (Stage 297; ONE exact phrase opens it) | Even a `"fedos"`-named config is ignored by the activation policy. |
+| `runtimeCryptoEnabled`/`workerCryptoEnabled` | `false` (fixed, no env path) | The bridge's own gate is untouched by either env var above. |
+| `FedosRuntimeCryptoProvider`'s real implementation | absent (`encrypt`/`decrypt` → `"Unsupported"`) | Even if ALL knobs above were somehow flipped, no cryptography would run. |
 | Runtime's automatic `encrypt`/`decrypt` call | absent | `AppRuntime.crypto` exists but nothing calls it automatically. |
 | Worker's import of the Worker crypto boundary | absent | `src/worker.ts` cannot reach any of this even in principle. |
 
-**Three independent layers, not one.** An attacker or a mistake would
-need to simultaneously (a) set the env var, (b) find and flip a
-non-existent `enabled` toggle, AND (c) have a maintainer have already
-merged a real `FedosRuntimeCryptoProvider` implementation AND wired it
-into Runtime/Worker's actual call paths — all across multiple, separately
-reviewed, future stages. No single commit, config change, or env var can
-collapse all three.
+**Multiple independent layers, not one.** An attacker or a mistake would
+need to simultaneously (a) set BOTH env vars to their exact open values,
+(b) find and flip a non-existent `enabled` toggle the bridge itself
+reads, (c) have a maintainer have already merged a real
+`FedosRuntimeCryptoProvider` implementation, AND (d) have that
+implementation wired into Runtime/Worker's actual call paths — all
+across multiple, separately reviewed, future stages. No single commit,
+config change, or env var (or PAIR of env vars) can collapse all of
+that.
+
+## 2a. Why `explicit-dev-only` and not a boolean flag
+
+`FEDOS_CRYPTO_ENABLED` deliberately does NOT accept `"true"`/`"1"`/`"yes"`/
+`"on"`/`"enabled"` — the spellings this repository's OTHER env flags
+accept (`isEnvFlagTruthy`, `src/runtime/create_runtime.ts`) — for one
+reason: those spellings are COMMON. A stray `FEDOS_CRYPTO_ENABLED=true`
+left over from copy-pasting an unrelated `.env.example`, a CI variable
+inherited from a different service, or a typo'd `1` meant for a totally
+different flag, would all silently satisfy a conventional boolean gate.
+Requiring the exact, unusual, unmistakably-deliberate phrase
+`"explicit-dev-only"` makes an ACCIDENTAL match — as opposed to a
+human deliberately typing this exact string, presumably having read
+this document first — effectively impossible. The name itself also
+communicates the intent: this is an EXPLICIT, DEV-ONLY escape hatch, not
+a production switch, not a generic "on" state.
+
+Every rejected spelling is deliberate, not an oversight: `true`/`1`/`yes`/
+`on`/`enabled` (common truthy flags elsewhere in this codebase);
+`false`/`0`/`no`/`off`/`disabled` (common negatives, rejected the same as
+everything else — there is no "explicitly disabled" state distinct from
+"unset", by design); `dev`/`development`/`debug`/`prod`/`production`
+(environment-name-shaped words someone might guess); `allow`/
+`allow-fedos`/`fedos`/`real`/`real-fedos`/`experimental`/`beta`
+(FedOS-adjacent words that sound plausible); and empty/unset (the
+default, safest state).
 
 ## 3. What this document does NOT claim
 
@@ -70,9 +123,9 @@ collapse all three.
 
 ## See also
 
-- `docs/runtime_crypto_activation_policy.md` (Stage 289–291) — the five
-  conditions and the two evaluate functions this document's guarantee
-  rests on.
+- `docs/runtime_crypto_activation_policy.md` (Stage 289–297) — the five
+  conditions, the dual-lock model, and the two evaluate functions this
+  document's guarantee rests on.
 - `docs/runtime_fedos_provider_activation.md` (Stage 270) — the
   Placeholder→FedOS Provider→Worker→Runtime→Nostr order that must ALL be
   completed, in sequence, before this threat model's scenario could ever

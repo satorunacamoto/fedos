@@ -1,12 +1,12 @@
-# Runtime/Worker crypto activation policy (Stage 289–296) — implementation record
+# Runtime/Worker crypto activation policy (Stage 289–304) — implementation record
 
 **Status: this document records real code.** It fixes, in writing, the
 full set of conditions that must ALL hold before FedOS crypto could ever
 actually run — and confirms that, today, none of them fully hold.
-`src/runtime/runtime_crypto_activation_policy.ts` (Stage 289) and
-`src/runtime/worker_crypto_activation_policy.ts` (Stage 290) are the real,
-`cargo test`-adjacent (well, `npm test`-verified) code this document
-describes.
+`src/runtime/runtime_crypto_activation_policy.ts` (Stage 289/297) and
+`src/runtime/worker_crypto_activation_policy.ts` (Stage 290/297) are the
+real, `cargo test`-adjacent (well, `npm test`-verified) code this
+document describes.
 
 ## 1. The five conditions
 
@@ -17,9 +17,10 @@ performing `encrypt`/`decrypt` instead of resolving `"Unsupported"` — REQUIRES
    name `"fedos"`, not `"placeholder"` (the default) and not any
    unrecognized/truthy-flag spelling.
 2. **`runtimeCryptoEnabled`/`workerCryptoEnabled` = `true`** — the SEPARATE
-   enable gate (Stage 258/273) — still fixed `false` in this repository,
-   permanently, until a future, separate, explicitly-reviewed stage
-   changes that.
+   enable gate (Stage 258/273), still fixed `false` in this repository —
+   OR, as of Stage 297, `FEDOS_CRYPTO_ENABLED=explicit-dev-only` (see §5
+   below). Either path can, at best, only satisfy THIS ONE condition —
+   conditions #3–#5 are untouched by either.
 3. **A real FedOS Provider implementation** — `FedosRuntimeCryptoProvider`
    (`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 265) must
    actually call through to real cryptography instead of unconditionally
@@ -35,7 +36,9 @@ performing `encrypt`/`decrypt` instead of resolving `"Unsupported"` — REQUIRES
 
 **If even ONE of the five is missing, FedOS does not start.** Today, ALL
 FIVE are missing simultaneously except #1 (which CAN be set via env, but
-achieves nothing alone).
+achieves nothing alone), and #2 (which, as of Stage 297, CAN also be
+"satisfied" via `FEDOS_CRYPTO_ENABLED=explicit-dev-only` — but that
+STILL leaves #3/#4/#5 completely missing, so nothing activates).
 
 ## 2. `evaluateRuntimeCryptoActivation`/`evaluateWorkerCryptoActivation`
 
@@ -43,16 +46,24 @@ Two INDEPENDENT (never shared, per `docs/runtime_worker_activation_boundary.md`'
 own "separate knob per boundary" discipline) pure functions, each
 evaluating conditions #1–#3 above (conditions #4/#5 are structural facts
 about the surrounding code, not something a per-call function evaluates)
-against a resolved config, in this fixed priority order:
+against a resolved config plus an optional env value, in this fixed
+priority order:
 
 ```
-1. !enabled                        -> "DisabledByConfig"
-2. provider !== "fedos"            -> "ProviderNotSelected"
-3. otherwise (enabled && "fedos")  -> "ProviderUnavailable"
-                                       (FEDOS_PROVIDER_IMPLEMENTED is a
-                                        fixed, private, permanently-false
-                                        constant — no parameter can flip it)
+1. !(configEnabled || envLockEnabled) -> "DisabledByConfig"
+2. provider !== "fedos"                -> "ProviderNotSelected"
+3. otherwise (both locks open,
+   provider == "fedos")                -> "ProviderUnavailable"
+                                           (FEDOS_PROVIDER_IMPLEMENTED is a
+                                            fixed, private, permanently-false
+                                            constant — no parameter can flip it)
 ```
+
+`envLockEnabled` is `parseFedosCryptoEnabledEnv(env?.FEDOS_CRYPTO_ENABLED)
+=== "explicit-dev-only"` (Stage 297, §5 below). `configEnabled` is the
+existing `runtimeCryptoEnabled`/`workerCryptoEnabled` field, still fixed
+`false`. Either one being `true` satisfies condition #1 ALONE — condition
+#3 (`FEDOS_PROVIDER_IMPLEMENTED`) still blocks everything regardless.
 
 `ActivationReason` also names two RESERVED labels, `"FutureFeature"` and
 `"Allowed"` — mirroring `RuntimeCryptoDiagnosticsState`'s own `"Enabled"`
@@ -60,36 +71,70 @@ precedent (`src/runtime/runtime_crypto_diagnostics.ts`) — but NEITHER
 function ever produces them in this stage. `"Allowed"` specifically can
 NEVER be produced: the internal "is a real implementation present" check
 is a hardcoded `false` constant with no parameter, override, or code path
-that could ever make it `true` in this repository as it exists today.
+that could ever make it `true` in this repository as it exists today —
+this holds EVEN WHEN `provider === "fedos"` AND
+`FEDOS_CRYPTO_ENABLED === "explicit-dev-only"` simultaneously.
 
-## 3. Diagnostics (Stage 291)
+## 3. Diagnostics (Stage 291/297)
 
 `runtimeCryptoActivationStatus()`/`workerCryptoActivationStatus()`
 (`src/runtime/runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts`)
-each gained an `activationReason` field, computed by calling the
-matching `evaluate*Activation` function against the SAME config already
-read for `configuredProvider`/`effectiveProvider`. Since `enabled` is
-permanently `false` on both sides, `activationReason` is permanently
-`"DisabledByConfig"` today, regardless of `FEDOS_CRYPTO_PROVIDER`'s value
-— this is DELIBERATE: condition #1 (env selection) is checked SECOND in
-priority, after condition #2 (the enable gate), so an unset `enabled`
-flag masks whatever the provider name says.
+each gained an `activationReason` field (Stage 291), computed by calling
+the matching `evaluate*Activation` function against the SAME config
+already read for `configuredProvider`/`effectiveProvider`, plus (Stage
+297) a `configuredEnabled` field — the PARSED `FEDOS_CRYPTO_ENABLED`
+label (`"explicit-dev-only"` or `"disabled"`), and `env` is now also
+passed through to the activation policy so `activationReason` reflects
+the dual-lock combination.
+
+`effectiveProvider` is DELIBERATELY UNCHANGED by Stage 297 — it still
+mirrors ONLY `runtime_crypto_bridge.ts`/`worker_crypto_bridge.ts`'s own
+two-flag gate, neither of which reads `FEDOS_CRYPTO_ENABLED` (they were
+not touched this stage). This means `activationReason` and
+`effectiveProvider` can now legitimately DIVERGE: setting
+`FEDOS_CRYPTO_PROVIDER=fedos` and `FEDOS_CRYPTO_ENABLED=explicit-dev-only`
+together makes `activationReason` report `"ProviderUnavailable"` (both
+locks are open, so the policy layer gets past #1/#2), while
+`effectiveProvider` STILL reports `"placeholder"` (the bridge's own gate
+never even looks at `FEDOS_CRYPTO_ENABLED`). Neither field ever implies
+real cryptography ran.
 
 ## 4. What this stage does NOT do
 
 - **No `enabled` flip.** `runtimeCryptoEnabled`/`workerCryptoEnabled`
-  stay fixed `false`.
-- **No `Allowed` return, ever**, from either evaluate function.
+  (the ORIGINAL config fields) stay fixed `false`, unconditionally.
+- **No `Allowed` return, ever**, from either evaluate function, under any
+  combination of env inputs.
 - **No real FedOS core call**, no `encrypt`/`decrypt` execution anywhere.
 - **No Runtime→FedOS or Worker→FedOS connection.**
+- **No bridge change.** `runtime_crypto_bridge.ts`/`worker_crypto_bridge.ts`
+  are untouched — they still never read `FEDOS_CRYPTO_ENABLED`.
 - **No shared implementation between the Runtime and Worker policies** —
-  each is independently written, independently typed.
+  each is independently written, independently typed. (The env PARSER
+  itself, `crypto_provider_env.ts`, IS shared — same precedent as
+  `FEDOS_CRYPTO_PROVIDER`'s Stage 281 parser.)
 - **No `RuntimeEnv` change, no Rust change, no new dependency.**
+
+## 5. The dual-lock model (Stage 297)
+
+Two, textually unrelated env vars must BOTH resolve to their single
+"open" value before FedOS is even a candidate:
+
+| Lock | Env var | Open value | Everything else |
+|---|---|---|---|
+| #1 | `FEDOS_CRYPTO_PROVIDER` | `"fedos"` | `"placeholder"` (default) |
+| #2 | `FEDOS_CRYPTO_ENABLED` | `"explicit-dev-only"` | `"disabled"` — including EVERY common truthy spelling |
+
+Lock #2's allowed value list is intentionally a SINGLE unusual phrase,
+not a conventional boolean flag. See `docs/runtime_crypto_threat_model.md`
+§2 for the full rationale (why `"true"`/`"1"`/`"on"`/`"enabled"` are
+rejected, why `"explicit-dev-only"` was chosen, and why passing BOTH
+locks still does not activate FedOS today).
 
 ## See also
 
-- `docs/runtime_crypto_threat_model.md` (Stage 293) — the fail-closed
-  security posture this policy enforces.
+- `docs/runtime_crypto_threat_model.md` (Stage 293/297) — the fail-closed
+  security posture this policy enforces, and the dual-lock rationale.
 - `docs/runtime_fedos_provider_activation.md` (Stage 270) /
   `docs/runtime_crypto_activation.md` (Stage 262) — the earlier
   layer/order documents this policy sits on top of.
