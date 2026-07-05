@@ -3,7 +3,7 @@
  *
  * The ONE function that resolves a `RuntimeCryptoProvider` for `AppRuntime`
  * (`src/runtime/create_runtime.ts`, Stage 260) to use. Reads
- * `src/runtime/runtime_crypto_config.ts`'s (Stage 258/267) fixed config and
+ * `src/runtime/runtime_crypto_config.ts`'s (Stage 258/267/282) config and
  * resolves a name via the Registry (`src/runtime/runtime_crypto_registry.ts`,
  * Stage 257/266) — never a real FedOS core call, in any branch below.
  *
@@ -12,22 +12,34 @@
  * true before `"fedos"` is even asked for — either flag alone still
  * resolves `"placeholder"`. Since `runtimeCryptoEnabled` is permanently
  * `false` (Stage 258), this gate can never actually pass in this stage,
- * regardless of `runtimeCryptoProvider`'s value (itself fixed
- * `"placeholder"`, Stage 267).
+ * regardless of `runtimeCryptoProvider`'s value.
+ *
+ * Stage 284 confirms this gate still holds exactly as before now that
+ * `runtimeCryptoProvider` can be `"fedos"` via the `FEDOS_CRYPTO_PROVIDER`
+ * env var (Stage 282): setting `FEDOS_CRYPTO_PROVIDER=fedos` alone records
+ * `runtimeCryptoProvider: "fedos"` in the config, but `runtimeCryptoEnabled`
+ * being permanently `false` means `buildRuntimeCryptoProvider` STILL always
+ * resolves `"placeholder"` — the env value is recorded, never executed.
+ * `buildRuntimeCryptoProvider` now accepts an OPTIONAL `env` parameter
+ * (added AFTER `registry` so every existing call site keeps working
+ * unchanged), passed straight through to `getRuntimeCryptoConfig`.
  *
  * HARD GUARDRAILS:
  *   - NO `packages/fedos-core-rust` reference (Rust crate or TS package
  *     boundary) anywhere in this file.
+ *   - NO `process.env` reference — `env`, if supplied, is used only to read
+ *     `FEDOS_CRYPTO_PROVIDER` via `getRuntimeCryptoConfig`.
  *   - The two-flag gate is evaluated with `&&`, never `||` — a single
  *     truthy flag is never enough.
  *   - A `RuntimeCryptoProvider` is NEVER constructed with `new` in this
  *     file — every provider comes from `RuntimeCryptoProviderRegistry.create()`
  *     (Stage 257/266), so a future stage that registers another real
  *     provider changes NOTHING here beyond which name is asked for.
- *   - Never throws; never mutates its `registry` argument.
+ *   - Never throws; never mutates its `registry`/`env` argument.
  */
 
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
+import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
 import {
   createDefaultRuntimeCryptoProviderRegistry,
@@ -61,20 +73,25 @@ function resolveFromRegistry(
 /**
  * Resolve the `RuntimeCryptoProvider` Runtime should use. Only resolves
  * `"fedos"` when BOTH `runtimeCryptoEnabled` is `true` AND
- * `runtimeCryptoProvider === "fedos"` — otherwise (always, in this stage)
- * resolves `"placeholder"`. No FedOS Core call exists in this function
- * regardless of which name is resolved — `FedosRuntimeCryptoProvider`
- * itself performs no real cryptography either (Stage 265).
+ * `runtimeCryptoProvider === "fedos"` — otherwise (always, in this stage,
+ * regardless of `env`) resolves `"placeholder"`. No FedOS Core call exists
+ * in this function regardless of which name is resolved —
+ * `FedosRuntimeCryptoProvider` itself performs no real cryptography either
+ * (Stage 265). `env` (optional, added after `registry` for backward
+ * compatibility) is passed straight through to `getRuntimeCryptoConfig` —
+ * never read from `process.env` here.
  */
 export function buildRuntimeCryptoProvider(
   registry: RuntimeCryptoProviderRegistry = createDefaultRuntimeCryptoProviderRegistry(),
+  env?: FedosCryptoProviderEnvLike,
 ): RuntimeCryptoProvider {
-  const { runtimeCryptoEnabled, runtimeCryptoProvider } = getRuntimeCryptoConfig();
+  const { runtimeCryptoEnabled, runtimeCryptoProvider } = getRuntimeCryptoConfig(env);
   if (runtimeCryptoEnabled && runtimeCryptoProvider === FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME) {
     // Unreachable in this stage: runtimeCryptoEnabled is permanently false
-    // (Stage 258), so this branch never actually runs. Even here, only the
-    // registry's own "fedos" entry (FedosRuntimeCryptoProvider, itself
-    // encrypt/decrypt-Unsupported) is ever resolved — never a real core.
+    // (Stage 258), so this branch never actually runs regardless of `env`.
+    // Even here, only the registry's own "fedos" entry
+    // (FedosRuntimeCryptoProvider, itself encrypt/decrypt-Unsupported) is
+    // ever resolved — never a real core.
     return resolveFromRegistry(registry, FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME);
   }
   return resolveFromRegistry(registry, PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME);

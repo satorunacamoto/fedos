@@ -18,9 +18,20 @@
  * this module — see `docs/runtime_worker_activation_boundary.md` (Stage
  * 276) for the ordering this bridge sits inside, still unconnected.
  *
+ * Stage 284 confirms this gate still holds exactly as before now that
+ * `workerCryptoProvider` can be `"fedos"` via the `FEDOS_CRYPTO_PROVIDER`
+ * env var (Stage 283): setting it alone records
+ * `workerCryptoProvider: "fedos"` in the config, but `workerCryptoEnabled`
+ * being permanently `false` means `buildWorkerCryptoProvider` STILL always
+ * resolves `"placeholder"`. `buildWorkerCryptoProvider` now accepts an
+ * OPTIONAL `env` parameter (added AFTER `registry` for backward
+ * compatibility), passed straight through to `getWorkerCryptoConfig`.
+ *
  * HARD GUARDRAILS:
  *   - NO `packages/fedos-core-rust` reference (Rust crate or TS package
  *     boundary) anywhere in this file.
+ *   - NO `process.env` reference — `env`, if supplied, is used only to read
+ *     `FEDOS_CRYPTO_PROVIDER` via `getWorkerCryptoConfig`.
  *   - The two-flag gate is evaluated with `&&`, never `||`.
  *   - A `RuntimeCryptoProvider` is NEVER constructed with `new` in this
  *     file — every provider comes from the Worker Registry's own `create()`.
@@ -29,10 +40,11 @@
  *     `src/runtime/runtime_crypto_bridge.ts`'s `buildRuntimeCryptoProvider`
  *     — Worker resolves its own provider through its OWN registry, never
  *     Runtime's.
- *   - Never throws; never mutates its `registry` argument.
+ *   - Never throws; never mutates its `registry`/`env` argument.
  */
 
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
+import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { getWorkerCryptoConfig } from "./worker_crypto_config.js";
 import {
   createDefaultWorkerCryptoProviderRegistry,
@@ -72,8 +84,9 @@ function resolveFromWorkerRegistry(
  */
 export function buildWorkerCryptoProvider(
   registry: RuntimeCryptoProviderRegistry = createDefaultWorkerCryptoProviderRegistry(),
+  env?: FedosCryptoProviderEnvLike,
 ): RuntimeCryptoProvider {
-  const { workerCryptoEnabled, workerCryptoProvider } = getWorkerCryptoConfig();
+  const { workerCryptoEnabled, workerCryptoProvider } = getWorkerCryptoConfig(env);
   if (workerCryptoEnabled && workerCryptoProvider === WORKER_FEDOS_PROVIDER_NAME) {
     // Unreachable in this stage: workerCryptoEnabled is permanently false
     // (Stage 273), so this branch never actually runs. Even here, only the

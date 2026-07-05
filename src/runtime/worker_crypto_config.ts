@@ -5,27 +5,35 @@
  * (Stage 275) may ever resolve anything other than the safe placeholder
  * provider — the Worker-side counterpart of
  * `src/runtime/runtime_crypto_config.ts` (Stage 258/267). `workerCryptoEnabled`
- * is `false` and `workerCryptoProvider` is `"placeholder"` — both HARD-CODED
- * constants, not a selection.
+ * is `false` — a HARD-CODED constant, not a selection.
  *
  * This is a DELIBERATELY SEPARATE config from `RuntimeCryptoConfig` — Worker's
  * own opt-in decision is its own knob, never sharing state with (or being
  * flipped by) Runtime's. Neither config reads the other.
  *
+ * Stage 283 makes `workerCryptoProvider` READ the SAME `FEDOS_CRYPTO_PROVIDER`
+ * env var Runtime reads (`src/runtime/runtime_crypto_config.ts`, Stage 282)
+ * — via `src/runtime/crypto_provider_env.ts`'s (Stage 281) shared
+ * `parseFedosCryptoProviderEnv`, so both sides interpret it identically.
+ * `getWorkerCryptoConfig` now accepts an OPTIONAL `FedosCryptoProviderEnvLike`.
+ *
  * HARD GUARDRAILS:
- *   - This file reads NO `RuntimeEnv` field, NO `process.env`, and no other
- *     external input of any kind — `getWorkerCryptoConfig()` takes no
- *     parameter and its return value never varies.
- *   - `workerCryptoEnabled` is `false` in this stage, permanently. Flipping
- *     it is a future, separate, explicitly-reviewed stage's own decision —
- *     not a runtime toggle, not an env var, not a build flag.
- *   - `workerCryptoProvider` is fixed at `"placeholder"` in this stage,
- *     permanently — this file contains no logic that could ever set it to
- *     `"fedos"`.
+ *   - This file reads NO `process.env` anywhere — only the OPTIONAL,
+ *     explicitly-passed `env` parameter's own `FEDOS_CRYPTO_PROVIDER`
+ *     field, via `parseFedosCryptoProviderEnv`.
+ *   - Omitting `env` (or passing one without `FEDOS_CRYPTO_PROVIDER` set)
+ *     resolves `workerCryptoProvider` to `"placeholder"`.
+ *   - `workerCryptoEnabled` is `false` in this stage, permanently —
+ *     UNAFFECTED by `env` of any kind. Flipping it is a future, separate,
+ *     explicitly-reviewed stage's own decision — not a runtime toggle, not
+ *     an env var, not a build flag.
  */
 
+import type { FedosCryptoProviderEnvLike, FedosCryptoProviderName } from "./crypto_provider_env.js";
+import { parseFedosCryptoProviderEnv } from "./crypto_provider_env.js";
+
 /** The only provider names `WorkerCryptoConfig.workerCryptoProvider` may hold. */
-export type WorkerCryptoProviderName = "placeholder" | "fedos";
+export type WorkerCryptoProviderName = FedosCryptoProviderName;
 
 /** Every valid `WorkerCryptoProviderName`, for validation/documentation helpers. */
 export const WORKER_CRYPTO_PROVIDER_NAMES: readonly WorkerCryptoProviderName[] = [
@@ -33,7 +41,7 @@ export const WORKER_CRYPTO_PROVIDER_NAMES: readonly WorkerCryptoProviderName[] =
   "fedos",
 ];
 
-/** The Worker crypto boundary's fixed configuration shape. */
+/** The Worker crypto boundary's configuration shape. */
 export interface WorkerCryptoConfig {
   /**
    * Whether Worker may ever resolve a non-placeholder `RuntimeCryptoProvider`.
@@ -42,15 +50,17 @@ export interface WorkerCryptoConfig {
   readonly workerCryptoEnabled: boolean;
   /**
    * Which provider NAME would be used if `workerCryptoEnabled` were ever
-   * `true`. Fixed `"placeholder"` in this stage, permanently — see this
-   * module's own doc comment above.
+   * `true` — read from `FEDOS_CRYPTO_PROVIDER` (Stage 283). Defaults to
+   * `"placeholder"` when unset/unrecognized.
    */
   readonly workerCryptoProvider: WorkerCryptoProviderName;
 }
 
 /**
- * The ONLY worker crypto config this stage produces. Frozen so accidental
- * mutation by a caller cannot flip either field at runtime.
+ * The fixed, no-env-supplied Worker crypto config — `workerCryptoProvider`
+ * here is `"placeholder"` only because no `env` was ever passed to compute
+ * it. Kept for callers that want a constant rather than calling
+ * `getWorkerCryptoConfig()` with no argument (the two are equivalent).
  */
 export const WORKER_CRYPTO_CONFIG: WorkerCryptoConfig = Object.freeze({
   workerCryptoEnabled: false,
@@ -58,9 +68,17 @@ export const WORKER_CRYPTO_CONFIG: WorkerCryptoConfig = Object.freeze({
 });
 
 /**
- * Read the fixed Worker crypto config. Takes no parameter, reads no
- * environment variable, and always returns the same frozen object.
+ * Read the Worker crypto config. `workerCryptoEnabled` is always `false`,
+ * regardless of `env`. `workerCryptoProvider` is
+ * `parseFedosCryptoProviderEnv(env?.FEDOS_CRYPTO_PROVIDER)` — `"placeholder"`
+ * when `env` is omitted or lacks a recognized value. Reads NO
+ * `process.env` — only the explicitly-passed `env` parameter, if any.
  */
-export function getWorkerCryptoConfig(): WorkerCryptoConfig {
-  return WORKER_CRYPTO_CONFIG;
+export function getWorkerCryptoConfig(
+  env?: FedosCryptoProviderEnvLike,
+): WorkerCryptoConfig {
+  return Object.freeze({
+    workerCryptoEnabled: false,
+    workerCryptoProvider: parseFedosCryptoProviderEnv(env?.FEDOS_CRYPTO_PROVIDER),
+  });
 }

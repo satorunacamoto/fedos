@@ -105,8 +105,12 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
   it("3. RUNTIME_CRYPTO_CONFIG / getRuntimeCryptoConfig always report runtimeCryptoEnabled: false", () => {
     expect(RUNTIME_CRYPTO_CONFIG.runtimeCryptoEnabled).toBe(false);
     expect(getRuntimeCryptoConfig().runtimeCryptoEnabled).toBe(false);
-    expect(getRuntimeCryptoConfig()).toBe(getRuntimeCryptoConfig()); // same frozen object
+    // Stage 282: each call now builds a fresh frozen object (to reflect a
+    // possibly-different `env` argument), so no-arg calls are no longer
+    // the SAME reference -- but are still deeply equal.
+    expect(getRuntimeCryptoConfig()).toEqual(getRuntimeCryptoConfig());
     expect(Object.isFrozen(RUNTIME_CRYPTO_CONFIG)).toBe(true);
+    expect(Object.isFrozen(getRuntimeCryptoConfig())).toBe(true);
   });
 
   it("4. runtime_crypto_config.ts reads no RuntimeEnv/process.env field", () => {
