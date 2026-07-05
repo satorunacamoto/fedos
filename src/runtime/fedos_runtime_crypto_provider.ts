@@ -100,12 +100,17 @@
  * before it.
  *
  * Stage 324 adds `FedosProviderImplementationStage`/
- * `fedosProviderImplementationStage()` — a coarser, four-step
- * milestone label (`"Unavailable"` → `"ProviderReady"` →
- * `"OpaqueApiReady"` → `"RustReady"`) tracking how far the INTERNAL
- * ARCHITECTURE (not any single operation) has progressed. Fixed at
- * `"OpaqueApiReady"` in this stage — the Opaque API abstraction now
- * exists and is wired, but no Rust connection exists yet.
+ * `fedosProviderImplementationStage()` — a coarser milestone label
+ * tracking how far the INTERNAL ARCHITECTURE (not any single
+ * operation) has progressed.
+ *
+ * Stage 332 EXTENDS that milestone from four steps to five:
+ * `"Unavailable"` → `"ProviderReady"` → `"OpaqueApiReady"` →
+ * `"RustBoundaryReady"` → `"RustReady"`. Fixed at
+ * `"RustBoundaryReady"` in this stage — the Rust Boundary abstraction
+ * (`fedos_rust_boundary.ts`, Stage 329) now exists and is wired into
+ * the Opaque API (Stage 330), but no REAL Rust connection exists yet.
+ * `"RustReady"` remains RESERVED and unreachable.
  */
 
 import type {
@@ -263,7 +268,7 @@ export function fedosProviderOperationState(): FedosRuntimeOperationStatus {
 }
 
 /**
- * A coarse, four-step milestone tracking how far the INTERNAL
+ * A coarse, five-step milestone tracking how far the INTERNAL
  * ARCHITECTURE around `FedosRuntimeCryptoProvider` has progressed —
  * distinct from `FedosRuntimeExecutionState`/`FedosRuntimeOperationStatus`
  * (which describe a single PLANNED operation's fate, not the
@@ -272,15 +277,20 @@ export function fedosProviderOperationState(): FedosRuntimeOperationStatus {
  *   - `"ProviderReady"` — the Provider/Operation/Opaque-Request models
  *     exist (Stage 313–320).
  *   - `"OpaqueApiReady"` — the Opaque API abstraction exists and is
- *     wired (Stage 321–328) — THIS STAGE'S ACTUAL VALUE.
+ *     wired (Stage 321–328).
+ *   - `"RustBoundaryReady"` — the Rust Boundary abstraction exists and
+ *     is wired into the Opaque API (Stage 329–336) — THIS STAGE'S
+ *     ACTUAL VALUE.
  *   - `"RustReady"` — RESERVED for a future, separate,
- *     explicitly-reviewed stage that connects the Opaque API to
- *     `packages/fedos-core-rust`. Unreachable in this stage.
+ *     explicitly-reviewed stage that connects the Rust Boundary to
+ *     REAL `packages/fedos-core-rust` execution. Unreachable in this
+ *     stage.
  */
 export type FedosProviderImplementationStage =
   | "Unavailable"
   | "ProviderReady"
   | "OpaqueApiReady"
+  | "RustBoundaryReady"
   | "RustReady"; // RESERVED — never produced in this stage
 
 /** Every `FedosProviderImplementationStage`, in order, for validation/documentation helpers. */
@@ -288,16 +298,17 @@ export const FEDOS_PROVIDER_IMPLEMENTATION_STAGES: readonly FedosProviderImpleme
   "Unavailable",
   "ProviderReady",
   "OpaqueApiReady",
+  "RustBoundaryReady",
   "RustReady",
 ];
 
 /**
  * Pure, standalone: the current `FedosProviderImplementationStage`.
  * Fixed, hand-maintained — never computed from a live probe. Currently
- * `"OpaqueApiReady"`.
+ * `"RustBoundaryReady"`.
  */
 export function fedosProviderImplementationStage(): FedosProviderImplementationStage {
-  return "OpaqueApiReady";
+  return "RustBoundaryReady";
 }
 
 /**

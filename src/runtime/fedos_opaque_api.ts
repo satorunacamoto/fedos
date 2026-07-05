@@ -41,8 +41,18 @@
  *     Nostr/NIP-17 reference.
  *   - Pure; every method here is synchronous, never throws, never
  *     mutates its argument.
+ *
+ * Stage 330 extends `FedosOpaqueApiPlaceholder.planEncrypt()`/
+ * `planDecrypt()` with a FIFTH link: each now builds a
+ * `FedosRustBoundary` (`fedos_rust_boundary.ts`, Stage 329) and routes
+ * the request to it via `planFedosRustBoundaryExecution` — then
+ * DISCARDS the boundary's own decision and returns its OWN, unchanged
+ * `"BlockedByImplementation"` answer. The Rust Boundary itself never
+ * invokes `packages/fedos-core-rust`/WASM/FFI; the request terminates
+ * immediately upon reaching it.
  */
 
+import { createFedosRustBoundary, planFedosRustBoundaryExecution } from "./fedos_rust_boundary.js";
 import type { FedosOpaqueRequest, OpaqueDecryptRequest, OpaqueEncryptRequest } from "./fedos_runtime_opaque_request.js";
 
 /**
@@ -102,12 +112,25 @@ export class FedosOpaqueApiPlaceholder implements FedosOpaqueApi {
     };
   }
 
-  planEncrypt(_request: OpaqueEncryptRequest): FedosOpaqueApiDecision {
+  planEncrypt(request: OpaqueEncryptRequest): FedosOpaqueApiDecision {
+    this.#reachRustBoundary(request); // result discarded — request terminates at the Rust Boundary
     return this.#blocked("encrypt");
   }
 
-  planDecrypt(_request: OpaqueDecryptRequest): FedosOpaqueApiDecision {
+  planDecrypt(request: OpaqueDecryptRequest): FedosOpaqueApiDecision {
+    this.#reachRustBoundary(request); // result discarded — request terminates at the Rust Boundary
     return this.#blocked("decrypt");
+  }
+
+  /**
+   * PRIVATE — builds a `FedosRustBoundary` and routes `request` to it.
+   * The boundary's own decision is discarded; it is never passed to
+   * `packages/fedos-core-rust`/WASM/FFI, never passed to Runtime or
+   * Worker. The Rust Boundary itself never invokes any of those either.
+   */
+  #reachRustBoundary(request: OpaqueEncryptRequest | OpaqueDecryptRequest): void {
+    const boundary = createFedosRustBoundary();
+    planFedosRustBoundaryExecution(boundary, request);
   }
 
   #blocked(operation: "encrypt" | "decrypt"): FedosOpaqueApiDecision {

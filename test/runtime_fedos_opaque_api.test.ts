@@ -111,12 +111,12 @@ describe("FedOS opaque API internal wiring, blocked before Rust (Stage 321-328)"
 
   it("11. diagnostics are updated -- providerImplementationStage/opaqueApiState/runtimeExecutionState are present and fixed", () => {
     const status = runtimeCryptoActivationStatus();
-    expect(status.providerImplementationStage).toBe("OpaqueApiReady");
+    expect(status.providerImplementationStage).toBe("RustBoundaryReady");
     expect(status.opaqueApiState).toBe("NotConnected");
     expect(status.runtimeExecutionState).toBe("BlockedByImplementation");
 
     const workerStatus = workerCryptoActivationStatus();
-    expect(workerStatus.providerImplementationStage).toBe("OpaqueApiReady");
+    expect(workerStatus.providerImplementationStage).toBe("RustBoundaryReady");
     expect(workerStatus.opaqueApiState).toBe("NotConnected");
     expect(workerStatus.runtimeExecutionState).toBe("BlockedByImplementation");
   });
@@ -139,11 +139,12 @@ describe("FedOS opaque API internal wiring, blocked before Rust (Stage 321-328)"
 
   it("13. the implementation flag is unchanged -- still fixed false", () => {
     expect(FEDOS_RUNTIME_PROVIDER_IMPLEMENTED).toBe(false);
-    expect(fedosProviderImplementationStage()).toBe("OpaqueApiReady");
+    expect(fedosProviderImplementationStage()).toBe("RustBoundaryReady");
     expect(FEDOS_PROVIDER_IMPLEMENTATION_STAGES).toEqual([
       "Unavailable",
       "ProviderReady",
       "OpaqueApiReady",
+      "RustBoundaryReady",
       "RustReady",
     ]);
   });
