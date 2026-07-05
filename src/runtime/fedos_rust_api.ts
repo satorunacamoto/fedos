@@ -44,8 +44,18 @@
  *     Nostr/NIP-17 reference.
  *   - Pure; every method here is synchronous, never throws, never
  *     mutates its argument.
+ *
+ * Stage 346 extends `FedosRustApiPlaceholder.planRustApiEncrypt()`/
+ * `planRustApiDecrypt()` with a SEVENTH link: each now builds a
+ * `FedosRustExecutionReview` (`fedos_rust_execution_review.ts`, Stage
+ * 345) and routes the request to it via `reviewFedosRustExecution` —
+ * then DISCARDS the review's own decision and returns its OWN,
+ * unchanged `"BlockedByImplementation"` answer. The Execution Review
+ * itself never invokes `packages/fedos-core-rust`/WASM/FFI; it is the
+ * LAST stop before any real Rust crypto invocation.
  */
 
+import { createFedosRustExecutionReview, reviewFedosRustExecution } from "./fedos_rust_execution_review.js";
 import type { FedosOpaqueRequest, OpaqueDecryptRequest, OpaqueEncryptRequest } from "./fedos_runtime_opaque_request.js";
 
 /**
@@ -105,12 +115,26 @@ export class FedosRustApiPlaceholder implements FedosRustApi {
     };
   }
 
-  planRustApiEncrypt(_request: OpaqueEncryptRequest): FedosRustApiDecision {
+  planRustApiEncrypt(request: OpaqueEncryptRequest): FedosRustApiDecision {
+    this.#reachExecutionReview(request); // result discarded — request terminates at the Execution Review
     return this.#blocked("encrypt");
   }
 
-  planRustApiDecrypt(_request: OpaqueDecryptRequest): FedosRustApiDecision {
+  planRustApiDecrypt(request: OpaqueDecryptRequest): FedosRustApiDecision {
+    this.#reachExecutionReview(request); // result discarded — request terminates at the Execution Review
     return this.#blocked("decrypt");
+  }
+
+  /**
+   * PRIVATE — builds a `FedosRustExecutionReview` and routes `request`
+   * to it. The review's own decision is discarded; it is never passed
+   * to `packages/fedos-core-rust`/WASM/FFI, never passed to Runtime or
+   * Worker. The Execution Review itself never invokes any of those
+   * either.
+   */
+  #reachExecutionReview(request: OpaqueEncryptRequest | OpaqueDecryptRequest): void {
+    const review = createFedosRustExecutionReview();
+    reviewFedosRustExecution(review, request);
   }
 
   #blocked(operation: "encrypt" | "decrypt"): FedosRustApiDecision {
