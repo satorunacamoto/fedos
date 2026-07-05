@@ -23,12 +23,27 @@
 //! `nip44_wire_diagnostics_preview()` is DISPLAY-ONLY, same discipline as
 //! `super::diagnostics::crypto_diagnostics_preview`/
 //! `super::aead_diagnostics::aead_diagnostics_preview`: it does not call
-//! `crypto::nip44_wire_nonce::generate_wire_nonce_internal` or
-//! `crypto::nip44_wire_payload::Nip44WirePayloadBuilder::build_placeholder`
-//! — a fixed, hand-maintained table, reviewed BY HAND each stage, never a
-//! live probe. No nonce byte, ciphertext byte, or MAC byte is ever held
-//! or displayed here — only the two fixed feature labels and their fixed
+//! `crypto::nip44_wire_nonce::generate_wire_nonce_internal`,
+//! `crypto::nip44_wire_payload::Nip44WirePayloadBuilder::build_placeholder`,
+//! `crypto::nip44_stream_cipher::encrypt_stream_internal`, or
+//! `crypto::nip44_hmac::compute_hmac_internal` — a fixed, hand-maintained
+//! table, reviewed BY HAND each stage, never a live probe. No nonce
+//! byte, ciphertext byte, key byte, or MAC byte is ever held or
+//! displayed here — only the four fixed feature labels and their fixed
 //! readiness labels.
+//!
+//! Stage 229–232 add two more rows: `WireCrypto` → `Ready`
+//! (`crypto::nip44_stream_cipher`, Stage 229 — the real, byte-exact
+//! ChaCha20 stream cipher, vector-verified against
+//! `valid.encrypt_decrypt`) and `WireAuthentication` → `Ready`
+//! (`crypto::nip44_hmac`, Stage 231 — the real HMAC-SHA256
+//! authentication step, and `crypto::nip44_wire_decrypt`, Stage 232 —
+//! the complete verify-HMAC → decrypt-stream → unpad pipeline, also
+//! vector-verified end-to-end). Both report `Ready` (not
+//! `Placeholder`) — unlike `WirePayload`, neither has any field that
+//! stays an explicit placeholder: `WireCrypto`'s ChaCha20 stream and
+//! `WireAuthentication`'s HMAC tag are both fully real, `cargo
+//! test`-verified operations.
 #![allow(dead_code)]
 
 /// A non-sensitive readiness label for one [`Nip44WireFeature`] —
@@ -39,7 +54,9 @@
 pub(crate) enum Nip44WireReadiness {
     /// Real, `cargo test`-verified code exists and is fully connected —
     /// e.g. `WireNonce` (`crypto::nip44_wire_nonce::generate_wire_nonce_internal`,
-    /// Stage 224: every field it produces is real).
+    /// Stage 224: every field it produces is real), `WireCrypto`
+    /// (`crypto::nip44_stream_cipher`, Stage 229), `WireAuthentication`
+    /// (`crypto::nip44_hmac`/`crypto::nip44_wire_decrypt`, Stage 231–232).
     Ready,
     /// Real, `cargo test`-verified code exists and is connected, but AT
     /// LEAST ONE field it produces is an explicit, documented
@@ -55,10 +72,12 @@ pub(crate) enum Nip44WireReadiness {
 pub(crate) enum Nip44WireFeature {
     WireNonce,
     WirePayload,
+    WireCrypto,
+    WireAuthentication,
 }
 
 /// One row of the [`nip44_wire_diagnostics_preview`] table. Crate-private
-/// only. Never contains a nonce/ciphertext/MAC byte — only the two
+/// only. Never contains a nonce/ciphertext/key/MAC byte — only the two
 /// fixed, non-sensitive labels below.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Nip44WireFeatureReport {
@@ -66,11 +85,12 @@ pub(crate) struct Nip44WireFeatureReport {
     pub(crate) readiness: Nip44WireReadiness,
 }
 
-/// A fixed, hand-maintained, display-only snapshot of both NIP-44 wire
-/// features' current readiness. Returns exactly two rows (`WireNonce`,
-/// `WirePayload`, in that order) every time it is called — takes no
-/// parameter of any kind.
-pub(crate) fn nip44_wire_diagnostics_preview() -> [Nip44WireFeatureReport; 2] {
+/// A fixed, hand-maintained, display-only snapshot of all four NIP-44
+/// wire features' current readiness. Returns exactly four rows
+/// (`WireNonce`, `WirePayload`, `WireCrypto`, `WireAuthentication`, in
+/// that order) every time it is called — takes no parameter of any
+/// kind.
+pub(crate) fn nip44_wire_diagnostics_preview() -> [Nip44WireFeatureReport; 4] {
     [
         Nip44WireFeatureReport {
             feature: Nip44WireFeature::WireNonce,
@@ -80,6 +100,14 @@ pub(crate) fn nip44_wire_diagnostics_preview() -> [Nip44WireFeatureReport; 2] {
             feature: Nip44WireFeature::WirePayload,
             readiness: Nip44WireReadiness::Placeholder,
         },
+        Nip44WireFeatureReport {
+            feature: Nip44WireFeature::WireCrypto,
+            readiness: Nip44WireReadiness::Ready,
+        },
+        Nip44WireFeatureReport {
+            feature: Nip44WireFeature::WireAuthentication,
+            readiness: Nip44WireReadiness::Ready,
+        },
     ]
 }
 
@@ -88,13 +116,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_reports_exactly_two_rows_wire_nonce_ready_wire_payload_placeholder() {
+    fn preview_reports_exactly_four_rows_in_the_documented_order_and_readiness() {
         let preview = nip44_wire_diagnostics_preview();
-        assert_eq!(preview.len(), 2);
+        assert_eq!(preview.len(), 4);
         assert_eq!(preview[0].feature, Nip44WireFeature::WireNonce);
         assert_eq!(preview[0].readiness, Nip44WireReadiness::Ready);
         assert_eq!(preview[1].feature, Nip44WireFeature::WirePayload);
         assert_eq!(preview[1].readiness, Nip44WireReadiness::Placeholder);
+        assert_eq!(preview[2].feature, Nip44WireFeature::WireCrypto);
+        assert_eq!(preview[2].readiness, Nip44WireReadiness::Ready);
+        assert_eq!(preview[3].feature, Nip44WireFeature::WireAuthentication);
+        assert_eq!(preview[3].readiness, Nip44WireReadiness::Ready);
     }
 
     #[test]
@@ -113,11 +145,18 @@ mod tests {
     }
 
     #[test]
-    fn nip44_wire_feature_has_no_variant_other_than_the_two_specified() {
-        for feature in [Nip44WireFeature::WireNonce, Nip44WireFeature::WirePayload] {
+    fn nip44_wire_feature_has_no_variant_other_than_the_four_specified() {
+        for feature in [
+            Nip44WireFeature::WireNonce,
+            Nip44WireFeature::WirePayload,
+            Nip44WireFeature::WireCrypto,
+            Nip44WireFeature::WireAuthentication,
+        ] {
             match feature {
                 Nip44WireFeature::WireNonce => {}
                 Nip44WireFeature::WirePayload => {}
+                Nip44WireFeature::WireCrypto => {}
+                Nip44WireFeature::WireAuthentication => {}
             }
         }
     }

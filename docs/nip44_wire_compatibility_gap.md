@@ -20,13 +20,23 @@ any future user-facing string:
   (`crypto::aead_internal`, Stage 152–154). It is NIP-44-*shaped*
   (conversation key → message key → pad → encrypt-with-authentication),
   but it does not produce or consume NIP-44 v2's actual wire bytes.
-- **"NIP-44 v2 wire-compatible implementation"** — a FUTURE, not-yet-built
-  pipeline that produces and consumes byte-for-byte the same ciphertext a
-  real NIP-44 v2 client (or `test-vectors/nip44/nip44-v2.json`'s
+- **"NIP-44 v2 wire-compatible implementation"** — a pipeline that
+  produces and consumes byte-for-byte the same ciphertext a real NIP-44
+  v2 client (or `test-vectors/nip44/nip44-v2.json`'s
   `valid.encrypt_decrypt`/`valid.encrypt_decrypt_long_msg`/`invalid.decrypt`
   vectors) would accept — see
   `docs/nip44_wire_implementation_roadmap.md` for the stage-by-stage path
-  there.
+  there. **Update — Stage 219–233: the CRYPTO CORE of this is now real**
+  (exact message key derivation, wire nonce generation, a byte-exact raw
+  ChaCha20 stream cipher, real HMAC-SHA256, and a complete verify-HMAC →
+  decrypt-stream → unpad pipeline — vector-verified against every
+  `valid.encrypt_decrypt` case; see
+  `docs/nip44_wire_crypto_completion.md`). **This is still NOT the full
+  wire-compatible implementation**: no base64 payload encode/decode, no
+  `invalid.decrypt` failure-mode wiring, and no encrypt pipeline exist
+  yet (`docs/nip44_wire_implementation_roadmap.md` steps 6–7, and an
+  encrypt-direction pipeline, all remain). The forbidden-phrasing list
+  below still applies in full until those are also done.
 
 **Forbidden phrasing, anywhere in this crate's docs, code comments, commit
 messages, or diagnostics labels, for the Stage 198–208 bridge:**

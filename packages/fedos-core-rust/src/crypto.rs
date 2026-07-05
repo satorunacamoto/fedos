@@ -269,6 +269,15 @@
 //! end-to-end by the sibling `#[cfg(test)]`-only `nip44_wire_decrypt_vectors`
 //! module against ALL 10 `valid.encrypt_decrypt` cases — every recovered
 //! plaintext matches exactly.
+//!
+//! Stage 233 extends `nip44_wire_diagnostics`'s preview from two rows to
+//! four: `WireCrypto` → `Ready` (`crypto::nip44_stream_cipher`) and
+//! `WireAuthentication` → `Ready` (`crypto::nip44_hmac`/
+//! `crypto::nip44_wire_decrypt`), alongside the unchanged `WireNonce` →
+//! `Ready` and `WirePayload` → `Placeholder` rows. Still no
+//! `CryptoCapability` variant added, still no existing capability's
+//! meaning changed — `capability_matrix`/`diagnostics` remain exactly as
+//! they were (still sixteen variants).
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;

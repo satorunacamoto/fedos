@@ -4386,3 +4386,91 @@ wire encode/decode, no `ConversationKey`/`MessageKey`/`crypto::hkdf_bridge`
 change, no `CryptoCapability` addition. No Runtime/Worker/Storage/
 Federation/Relay/WASM/FFI connection. No TypeScript serialization change.
 No new `Cargo.toml` dependency.
+
+## NIP-44 v2 wire crypto completion: ChaCha20 + HMAC-SHA256 + decrypt pipeline (Stage 229–233)
+
+Stage 229–233 land the CRYPTO CORE of the NIP-44 v2 wire-compatible
+implementation: a real, byte-exact ChaCha20 stream cipher, real
+HMAC-SHA256 authentication, and the complete verify-HMAC →
+decrypt-stream → unpad DECRYPT pipeline — vector-verified end-to-end
+against `test-vectors/nip44/nip44-v2.json`'s `valid.encrypt_decrypt`
+category (all 10 cases). **Still not a full wire implementation**: no
+base64 encode/decode, no `invalid.decrypt` wiring, and no encrypt
+pipeline exist yet.
+
+**Stage 229–230**:
+[`crypto::nip44_stream_cipher`](src/crypto/nip44_stream_cipher.rs) (new)
+hand-implements RFC 8439 §2.3–2.4's ChaCha20 block function and
+keystream-XOR construction — NO `chacha20` crate adopted (pure `u32`
+wrapping-arithmetic needs none). `encrypt_stream_internal`/
+`decrypt_stream_internal` take `chacha_key`(32B)/`chacha_nonce`(12B)
+only, keystream counter FIXED at `0`. NOT an AEAD — never calls, and is
+never called by, `crypto::aead_internal`'s ChaCha20-Poly1305. A new
+sibling `#[cfg(test)]`-only
+[`nip44_stream_cipher_vectors`](src/crypto/nip44_stream_cipher_vectors.rs)
+wires all 10 `valid.encrypt_decrypt` cases — every ChaCha20 ciphertext
+byte matches exactly (decoding each vector's base64 `payload` via a
+test-fixture-only decoder that adds no `Cargo.toml` dependency and is
+never reachable from production code).
+
+**Stage 231**: [`crypto::nip44_hmac`](src/crypto/nip44_hmac.rs) (new)
+hand-implements RFC 2104's HMAC construction against this crate's
+already-adopted `sha2::Sha256` — NO `hmac` crate adopted.
+`compute_hmac_internal`/`verify_hmac_internal` compute/verify
+`HMAC-SHA256(hmac_key, nonce ‖ ciphertext)`, using
+`subtle::ConstantTimeEq` for the tag comparison — this crate's own
+`subtle` dependency (adopted Stage 76 "for a future secret-derived byte
+comparison", per `Cargo.toml`'s own comment), finally connected to
+exactly that purpose. `verify_hmac_internal` returns only
+`Verified`/`AuthenticationFailed` — no more detailed reason.
+
+**Stage 232**:
+[`crypto::nip44_wire_decrypt`](src/crypto/nip44_wire_decrypt.rs) (new)
+composes the complete pipeline: verify HMAC → decrypt ChaCha20 stream →
+unpad (`crypto::nip44_padding`, UNCHANGED), collapsing every reachable
+failure into a single fixed `Nip44WireDecryptStatus::AuthenticationFailed`
+label (a separate `InvalidConversationKey` covers the structural
+precondition of a placeholder/cleared conversation key, checked first).
+`decrypt_wire_internal` is the `ConversationKey`-facing entry point;
+`decrypt_wire_from_bytes_internal` is the byte-level entry point vector
+tests use. A new sibling `#[cfg(test)]`-only
+[`nip44_wire_decrypt_vectors`](src/crypto/nip44_wire_decrypt_vectors.rs)
+confirms all 10 `valid.encrypt_decrypt` cases decrypt to their exact
+documented plaintext, and that a single tampered MAC byte fails every
+one of them with `AuthenticationFailed`.
+
+**Stage 233**: `crypto::nip44_wire_diagnostics`'s preview grows from two
+rows to four — `WireCrypto` → `Ready` and `WireAuthentication` → `Ready`
+join the unchanged `WireNonce` → `Ready`/`WirePayload` → `Placeholder`
+rows. No `CryptoCapability` variant added, no existing capability's
+meaning changed. New
+[`docs/nip44_wire_crypto_completion.md`](../../docs/nip44_wire_crypto_completion.md)
+records the full implementation; `docs/nip44_wire_implementation_roadmap.md`
+and `docs/nip44_wire_compatibility_gap.md` are updated in place marking
+steps 1/3/4/5 IMPLEMENTED while reaffirming the forbidden-phrasing list
+still applies until base64/invalid-vectors/an encrypt pipeline also
+exist.
+
+**Guards**: a new
+[`test/fedos_core_rust_nip44_wire_crypto.test.ts`](../../test/fedos_core_rust_nip44_wire_crypto.test.ts)
+confirms: the three new production files stay `pub(crate)`-only and
+panic/unsafe-free; ChaCha20 has zero AEAD/`chacha20`-crate connection;
+HMAC uses `sha2`/`subtle` only, never a `hmac` crate; the decrypt
+pipeline verifies HMAC strictly before decrypting; `capability_matrix`/
+`diagnostics`/`conversation_key`/`message_key`/`hkdf_bridge`/
+`nip44_padding`/`nip44_wire_nonce`/`nip44_wire_payload` are all
+untouched; the two vector files' base64 decoders are `#[cfg(test)]`-only
+and never `pub(crate)`; and the usual Runtime/Worker/Storage/Federation/
+`pub fn`-count/`Cargo.toml`-dependency-count/`package.json`-dependency-count/
+no-`serde`-derive checks all still hold. The pre-existing
+[`test/fedos_core_rust_nip44_wire_compatibility.test.ts`](../../test/fedos_core_rust_nip44_wire_compatibility.test.ts)
+(Stage 209–213) is updated in place: its forbidden-phrase check now also
+scans the four new production files, and its roadmap-content check
+accepts the doc's new past-tense wording and "IMPLEMENTED" annotations.
+
+Public `pub fn` surface unchanged at twenty-seven. No AEAD connection, no
+encrypt pipeline, no wire payload encode/decode, no production base64, no
+`ConversationKey`/`MessageKey`/`crypto::hkdf_bridge`/`crypto::nip44_padding`
+change, no `CryptoCapability` addition. No Runtime/Worker/Storage/
+Federation/Relay/WASM/FFI connection. No TypeScript serialization change.
+No new `Cargo.toml` dependency.

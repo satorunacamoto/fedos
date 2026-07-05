@@ -18,6 +18,14 @@ import nip44BridgeSource from "../packages/fedos-core-rust/src/crypto/nip44_brid
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44WireSource from "../packages/fedos-core-rust/src/crypto/nip44_wire.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip44StreamCipherSource from "../packages/fedos-core-rust/src/crypto/nip44_stream_cipher.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip44HmacSource from "../packages/fedos-core-rust/src/crypto/nip44_hmac.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip44WireDecryptSource from "../packages/fedos-core-rust/src/crypto/nip44_wire_decrypt.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip44WirePayloadSource from "../packages/fedos-core-rust/src/crypto/nip44_wire_payload.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44InternalPlanSource from "../docs/nip44_internal_plan.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44WireCompatibilityGapSource from "../docs/nip44_wire_compatibility_gap.md?raw";
@@ -73,9 +81,16 @@ describe("NIP-44 wire compatibility gap clarification + wire skeleton (Stage 209
     ["capability_matrix.rs", capabilityMatrixSource],
     ["diagnostics.rs", diagnosticsSource],
     ["crypto.rs", cryptoModSource],
+    // Stage 229-233 — real wire ChaCha20/HMAC/decrypt-pipeline code now
+    // exists, but base64/wire-encode/invalid-vector handling/Nostr bridge
+    // still do not, so none of these may claim full compatibility either.
+    ["nip44_stream_cipher.rs", nip44StreamCipherSource],
+    ["nip44_hmac.rs", nip44HmacSource],
+    ["nip44_wire_decrypt.rs", nip44WireDecryptSource],
+    ["nip44_wire_payload.rs", nip44WirePayloadSource],
   ];
 
-  it("1. no Rust source in the Stage 198-208 bridge (or crypto.rs/capability_matrix.rs/diagnostics.rs) ever claims NIP-44/NIP-44 v2 'compatible' or 'compliant'", () => {
+  it("1. no Rust source in the Stage 198-233 bridge/wire-crypto code (or crypto.rs/capability_matrix.rs/diagnostics.rs) ever claims NIP-44/NIP-44 v2 'compatible' or 'compliant'", () => {
     for (const [name, src] of BRIDGE_SOURCES) {
       for (const forbidden of FORBIDDEN_COMPATIBILITY_CLAIMS) {
         expect(src, `${name} must not claim ${forbidden}`).not.toMatch(forbidden);
@@ -95,7 +110,7 @@ describe("NIP-44 wire compatibility gap clarification + wire skeleton (Stage 209
     );
   });
 
-  it("3. docs/nip44_wire_implementation_roadmap.md exists and names all eight roadmap steps without implementing any of them", () => {
+  it("3. docs/nip44_wire_implementation_roadmap.md exists and names all eight roadmap steps (steps 1/3/4/5 now marked IMPLEMENTED, 2/6/7/8 still plan-only)", () => {
     for (const keyword of [
       "message key",
       "padding",
@@ -111,7 +126,11 @@ describe("NIP-44 wire compatibility gap clarification + wire skeleton (Stage 209
         `expected roadmap to mention ${keyword}`,
       ).toContain(keyword.toLowerCase());
     }
-    expect(nip44WireRoadmapSource).toMatch(/this document adds no code/i);
+    // Stage 219-233 implemented steps 1/3/4/5 for real, so the doc's
+    // intro now speaks in the past tense ("added", not "adds") — both
+    // phrasings are accepted here.
+    expect(nip44WireRoadmapSource).toMatch(/this document (adds|added) no code/i);
+    expect(nip44WireRoadmapSource).toMatch(/IMPLEMENTED Stage 219/);
   });
 
   it("4. docs/nip44_internal_plan.md points to the new terminology/gap/roadmap docs", () => {
