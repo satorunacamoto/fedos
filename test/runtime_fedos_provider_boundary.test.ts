@@ -155,6 +155,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       rustBoundaryReachable: true,
       rustApiState: "NotConnected",
       rustApiReachable: true,
+      rustExecutionReviewState: "Blocked",
+      rustExecutionReviewReason: "BlockedBeforeCrypto",
+      rustExecutionApproved: false,
     });
   });
 

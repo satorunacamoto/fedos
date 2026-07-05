@@ -102,6 +102,15 @@
  * Rust API IS structurally wired into the Rust Boundary's own chain as
  * of Stage 338). `providerImplementationStage` now reflects the
  * extended six-step milestone, fixed at `"RustApiReady"`.
+ *
+ * Stage 349 adds `rustExecutionReviewState` (`fedos_rust_execution_review.ts`'s
+ * `fedosRustExecutionReviewState()`, Stage 345 — fixed `"Blocked"`),
+ * `rustExecutionReviewReason` (`fedosRustExecutionReviewReason()`, fixed
+ * `"BlockedBeforeCrypto"`), and `rustExecutionApproved`
+ * (`fedosRustExecutionApproved()`, fixed `false`). `providerImplementationStage`
+ * is DELIBERATELY UNCHANGED by this stage — the Execution Review is a
+ * permission/approval layer, not an architecture milestone (see
+ * `docs/runtime_fedos_execution_approval_checklist.md`).
  */
 
 import type {
@@ -122,6 +131,12 @@ import type { FedosRustApiState } from "./fedos_rust_api.js";
 import { fedosRustApiReachable, fedosRustApiState } from "./fedos_rust_api.js";
 import type { FedosRustBoundaryState } from "./fedos_rust_boundary.js";
 import { fedosRustBoundaryReachable, fedosRustBoundaryState } from "./fedos_rust_boundary.js";
+import type { FedosRustExecutionReviewReason, FedosRustExecutionReviewState } from "./fedos_rust_execution_review.js";
+import {
+  fedosRustExecutionApproved,
+  fedosRustExecutionReviewReason,
+  fedosRustExecutionReviewState,
+} from "./fedos_rust_execution_review.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -305,6 +320,24 @@ export interface RuntimeCryptoActivationStatus {
    * crypto executes.
    */
   readonly rustApiReachable: boolean;
+  /**
+   * The Execution Review's own status — `fedosRustExecutionReviewState()`'s
+   * own answer (`src/runtime/fedos_rust_execution_review.ts`, Stage
+   * 345/349). Fixed `"Blocked"` in this stage.
+   */
+  readonly rustExecutionReviewState: FedosRustExecutionReviewState;
+  /**
+   * WHY execution has not (yet) been approved —
+   * `fedosRustExecutionReviewReason()`'s own answer. Fixed
+   * `"BlockedBeforeCrypto"` in this stage.
+   */
+  readonly rustExecutionReviewReason: FedosRustExecutionReviewReason;
+  /**
+   * Whether real Rust execution has been approved —
+   * `fedosRustExecutionApproved()`'s own answer. Fixed `false` in this
+   * stage, with no env path, parameter, or override anywhere.
+   */
+  readonly rustExecutionApproved: boolean;
 }
 
 /**
@@ -348,5 +381,8 @@ export function runtimeCryptoActivationStatus(
     rustBoundaryReachable: fedosRustBoundaryReachable(),
     rustApiState: fedosRustApiState(),
     rustApiReachable: fedosRustApiReachable(),
+    rustExecutionReviewState: fedosRustExecutionReviewState(),
+    rustExecutionReviewReason: fedosRustExecutionReviewReason(),
+    rustExecutionApproved: fedosRustExecutionApproved(),
   };
 }

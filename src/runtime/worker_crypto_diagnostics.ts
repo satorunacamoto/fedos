@@ -73,6 +73,12 @@
  * `runtime_crypto_diagnostics.ts`'s own Stage 341 doc comment.
  * `providerImplementationStage` now reflects the extended six-step
  * milestone, fixed at `"RustApiReady"`.
+ *
+ * Stage 349 adds `rustExecutionReviewState`/`rustExecutionReviewReason`/
+ * `rustExecutionApproved` — see `runtime_crypto_diagnostics.ts`'s own
+ * Stage 349 doc comment. `providerImplementationStage` is unaffected —
+ * the Execution Review is a permission layer, not an architecture
+ * milestone.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -88,6 +94,12 @@ import type { FedosRustApiState } from "./fedos_rust_api.js";
 import { fedosRustApiReachable, fedosRustApiState } from "./fedos_rust_api.js";
 import type { FedosRustBoundaryState } from "./fedos_rust_boundary.js";
 import { fedosRustBoundaryReachable, fedosRustBoundaryState } from "./fedos_rust_boundary.js";
+import type { FedosRustExecutionReviewReason, FedosRustExecutionReviewState } from "./fedos_rust_execution_review.js";
+import {
+  fedosRustExecutionApproved,
+  fedosRustExecutionReviewReason,
+  fedosRustExecutionReviewState,
+} from "./fedos_rust_execution_review.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -201,6 +213,23 @@ export interface WorkerCryptoActivationStatus {
    * crypto executes.
    */
   readonly rustApiReachable: boolean;
+  /**
+   * The Execution Review's own status — `fedosRustExecutionReviewState()`'s
+   * own answer. Fixed `"Blocked"` in this stage.
+   */
+  readonly rustExecutionReviewState: FedosRustExecutionReviewState;
+  /**
+   * WHY execution has not (yet) been approved —
+   * `fedosRustExecutionReviewReason()`'s own answer. Fixed
+   * `"BlockedBeforeCrypto"` in this stage.
+   */
+  readonly rustExecutionReviewReason: FedosRustExecutionReviewReason;
+  /**
+   * Whether real Rust execution has been approved —
+   * `fedosRustExecutionApproved()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly rustExecutionApproved: boolean;
 }
 
 /**
@@ -243,5 +272,8 @@ export function workerCryptoActivationStatus(
     rustBoundaryReachable: fedosRustBoundaryReachable(),
     rustApiState: fedosRustApiState(),
     rustApiReachable: fedosRustApiReachable(),
+    rustExecutionReviewState: fedosRustExecutionReviewState(),
+    rustExecutionReviewReason: fedosRustExecutionReviewReason(),
+    rustExecutionApproved: fedosRustExecutionApproved(),
   };
 }
