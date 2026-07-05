@@ -78,9 +78,12 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     ["runtime_crypto_bridge.ts", bridgeSource],
   ];
 
-  it("1. RuntimeCryptoProviderRegistry registers ONLY placeholder by default", () => {
+  it("1. RuntimeCryptoProviderRegistry registers only placeholder and fedos by default (Stage 266 adds fedos alongside the unchanged placeholder)", () => {
     const registry = createDefaultRuntimeCryptoProviderRegistry();
-    expect(registry.names()).toEqual([PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME]);
+    expect(registry.names()).toEqual([
+      PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME,
+      "fedos",
+    ]);
     const provider = registry.create(PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME);
     expect(provider).toBeInstanceOf(PlaceholderRuntimeCryptoProvider);
   });
