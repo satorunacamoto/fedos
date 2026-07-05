@@ -171,6 +171,7 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
     expect(workerCryptoActivationStatus()).toEqual({
       enabled: false,
       configuredProvider: "placeholder",
+      configuredEnabled: "disabled",
       effectiveProvider: "placeholder",
       reachable: false,
       activationReason: "DisabledByConfig",

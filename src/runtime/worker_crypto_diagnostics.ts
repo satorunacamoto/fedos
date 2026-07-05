@@ -42,9 +42,17 @@
  * `evaluateWorkerCryptoActivation`, Stage 290 — an INDEPENDENT
  * implementation, not shared with the Runtime policy) — WHY activation is
  * not (yet) allowed. `"Allowed"` is never displayed here.
+ *
+ * Stage 297 adds `configuredEnabled` — the PARSED `FEDOS_CRYPTO_ENABLED`
+ * label — and passes `env` through to `evaluateWorkerCryptoActivation`
+ * too, so `activationReason` now reflects the Stage 297 dual-lock
+ * combination. `effectiveProvider` is DELIBERATELY UNCHANGED — still
+ * mirrors ONLY `worker_crypto_bridge.ts`'s own two-flag gate, which was
+ * NOT touched this stage.
  */
 
-import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
+import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
+import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
 import type { ActivationReason } from "./worker_crypto_activation_policy.js";
 import { evaluateWorkerCryptoActivation } from "./worker_crypto_activation_policy.js";
 import type { WorkerCryptoProviderName } from "./worker_crypto_config.js";
@@ -60,6 +68,12 @@ export interface WorkerCryptoActivationStatus {
    * `enabled` stays `false`. NEVER the raw env string.
    */
   readonly configuredProvider: WorkerCryptoProviderName;
+  /**
+   * The PARSED `FEDOS_CRYPTO_ENABLED` label ("Lock #2", Stage 297) —
+   * `"explicit-dev-only"` only for that exact (trimmed) env string;
+   * `"disabled"` for everything else. NEVER the raw env string.
+   */
+  readonly configuredEnabled: FedosCryptoEnabledLabel;
   /**
    * The EFFECTIVE provider name — mirrors
    * `src/runtime/worker_crypto_bridge.ts`'s own two-flag gate exactly.
@@ -106,8 +120,9 @@ export function workerCryptoActivationStatus(
   return {
     enabled: workerCryptoEnabled,
     configuredProvider: workerCryptoProvider,
+    configuredEnabled: parseFedosCryptoEnabledEnv(env?.FEDOS_CRYPTO_ENABLED),
     effectiveProvider,
     reachable: false,
-    activationReason: evaluateWorkerCryptoActivation(config).reason,
+    activationReason: evaluateWorkerCryptoActivation(config, env).reason,
   };
 }

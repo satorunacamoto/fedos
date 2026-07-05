@@ -10,6 +10,19 @@
  * the reason from, rather than re-deriving it from the config/bridge
  * source ad hoc.
  *
+ * Stage 297 adds the DUAL-LOCK model's second lock: `env?.FEDOS_CRYPTO_ENABLED`
+ * (`src/runtime/crypto_provider_env.ts`'s `parseFedosCryptoEnabledEnv`,
+ * Stage 297) is now ALSO consulted — the gate is considered "enabled" if
+ * EITHER `config.runtimeCryptoEnabled` (still permanently `false`, Stage
+ * 258, unchanged) OR the env lock parses to `"explicit-dev-only"`. This
+ * is the ONLY thing Stage 297 changes here: `runtime_crypto_bridge.ts`
+ * itself is NOT touched, so a real `FedosRuntimeCryptoProvider` still
+ * never gets resolved by anything in this repository regardless of this
+ * policy's own answer — see `docs/runtime_crypto_activation_policy.md`
+ * §2 for why `effectiveProvider` (the diagnostics field mirroring the
+ * BRIDGE's gate) and `activationReason` (this policy's own gate) can
+ * legitimately diverge.
+ *
  * HARD GUARDRAILS:
  *   - `evaluateRuntimeCryptoActivation` NEVER returns `{ allowed: true,
  *     reason: "Allowed" }` in this stage — `FEDOS_PROVIDER_IMPLEMENTED`
@@ -19,18 +32,23 @@
  *     `ActivationReason` only as RESERVED labels for a future,
  *     separate, explicitly-reviewed stage — mirroring
  *     `RuntimeCryptoDiagnosticsState`'s own `"Enabled"` precedent
- *     (`src/runtime/runtime_crypto_diagnostics.ts`).
+ *     (`src/runtime/runtime_crypto_diagnostics.ts`). This holds
+ *     REGARDLESS of `FEDOS_CRYPTO_ENABLED`/`FEDOS_CRYPTO_PROVIDER` —
+ *     even `provider === "fedos"` AND `enabled === "explicit-dev-only"`
+ *     simultaneously still resolves to `"ProviderUnavailable"`, never
+ *     `"Allowed"`.
  *   - Reads NO `process.env`/`RuntimeEnv` — takes an already-resolved
- *     `RuntimeCryptoConfig`-shaped value as its only input.
+ *     `RuntimeCryptoConfig`-shaped value plus an OPTIONAL, already-resolved
+ *     `FedosCryptoProviderEnvLike` as its only inputs.
  *   - Never calls a `RuntimeCryptoProvider` method, never constructs one,
  *     never references `packages/fedos-core-rust`.
  *   - Priority order (first match wins), exactly:
- *     1. `!runtimeCryptoEnabled` → `"DisabledByConfig"` (checked BEFORE
- *        the provider name at all — an unselected provider under a
- *        disabled gate is still reported as "disabled", not "not
- *        selected").
+ *     1. `!(runtimeCryptoEnabled || envLockEnabled)` → `"DisabledByConfig"`
+ *        (checked BEFORE the provider name at all — an unselected
+ *        provider under a disabled gate is still reported as "disabled",
+ *        not "not selected").
  *     2. `runtimeCryptoProvider !== "fedos"` → `"ProviderNotSelected"`.
- *     3. Otherwise (`runtimeCryptoEnabled` true AND provider `"fedos"`) →
+ *     3. Otherwise (both locks open AND provider `"fedos"`) →
  *        `"ProviderUnavailable"`, because `FEDOS_PROVIDER_IMPLEMENTED` is
  *        fixed `false` — no real `FedosRuntimeCryptoProvider`
  *        implementation exists yet (`src/runtime/fedos_runtime_crypto_provider.ts`
@@ -38,6 +56,8 @@
  *        unconditionally).
  */
 
+import type { FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
+import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
 import type { RuntimeCryptoConfig } from "./runtime_crypto_config.js";
 
 /**
@@ -60,11 +80,15 @@ export interface ActivationDecision {
 
 /**
  * The shape of a Runtime crypto activation policy: a pure function from a
- * resolved `RuntimeCryptoConfig` to an `ActivationDecision`.
- * `evaluateRuntimeCryptoActivation` is the one implementation this stage
- * provides.
+ * resolved `RuntimeCryptoConfig` (plus an OPTIONAL, already-resolved
+ * `FedosCryptoProviderEnvLike` for the Lock #2 env var) to an
+ * `ActivationDecision`. `evaluateRuntimeCryptoActivation` is the one
+ * implementation this stage provides.
  */
-export type ActivationPolicy = (config: RuntimeCryptoConfig) => ActivationDecision;
+export type ActivationPolicy = (
+  config: RuntimeCryptoConfig,
+  env?: FedosCryptoProviderEnvLike,
+) => ActivationDecision;
 
 /**
  * Fixed, PRIVATE, permanently-`false` constant: whether a real
@@ -79,13 +103,18 @@ const FEDOS_PROVIDER_IMPLEMENTED = false;
 /**
  * Evaluate whether Runtime may activate a real FedOS-backed
  * `RuntimeCryptoProvider` right now, and why (not). See this module's own
- * doc comment above for the exact priority order. Pure; never throws;
- * never mutates `config`.
+ * doc comment above for the exact priority order, including the Stage
+ * 297 dual-lock combination (`config.runtimeCryptoEnabled` OR
+ * `env?.FEDOS_CRYPTO_ENABLED === "explicit-dev-only"`). Pure; never
+ * throws; never mutates `config`/`env`.
  */
 export const evaluateRuntimeCryptoActivation: ActivationPolicy = (
   config: RuntimeCryptoConfig,
+  env?: FedosCryptoProviderEnvLike,
 ): ActivationDecision => {
-  if (!config.runtimeCryptoEnabled) {
+  const envLockEnabled = parseFedosCryptoEnabledEnv(env?.FEDOS_CRYPTO_ENABLED) === "explicit-dev-only";
+  const enabled = config.runtimeCryptoEnabled || envLockEnabled;
+  if (!enabled) {
     return { allowed: false, reason: "DisabledByConfig" };
   }
   if (config.runtimeCryptoProvider !== "fedos") {
@@ -95,7 +124,7 @@ export const evaluateRuntimeCryptoActivation: ActivationPolicy = (
     return { allowed: false, reason: "ProviderUnavailable" };
   }
   // Unreachable in this stage: FEDOS_PROVIDER_IMPLEMENTED is permanently
-  // false above. Kept for documentation of the eventual shape a future
-  // stage would complete.
+  // false above, regardless of both locks being open. Kept for
+  // documentation of the eventual shape a future stage would complete.
   return { allowed: true, reason: "Allowed" };
 };

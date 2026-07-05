@@ -200,6 +200,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     expect(status).toEqual({
       enabled: false,
       configuredProvider: "placeholder",
+      configuredEnabled: "disabled",
       effectiveProvider: "placeholder",
       activationReason: "DisabledByConfig",
     });

@@ -137,6 +137,7 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
     expect(runtimeCryptoActivationStatus()).toEqual({
       enabled: false,
       configuredProvider: "placeholder",
+      configuredEnabled: "disabled",
       effectiveProvider: "placeholder",
       activationReason: "DisabledByConfig",
     });
