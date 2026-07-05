@@ -20,6 +20,16 @@
  *   - NO import of `packages/fedos-core-rust` (Rust crate or TS package
  *     boundary), NO import of `src/crypto/fedos_core_adapter.ts`.
  *   - Never throws; never mutates its request argument.
+ *
+ * Stage 305 adds `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` — a fixed, PRIVATE
+ * (well, exported for `runtime_crypto_activation_policy.ts`/
+ * `worker_crypto_activation_policy.ts`, Stage 308, to reference as their
+ * single source of truth) constant, permanently `false`, with NO env
+ * path and NO parameter anywhere that could flip it. It answers ONE
+ * question — "does a real encrypt/decrypt implementation exist inside
+ * this class" — and is surfaced, read-only, on `status()`'s return value
+ * as `implemented`. `encrypt()`/`decrypt()` still ALWAYS resolve
+ * `"Unsupported"`, completely unchanged.
  */
 
 import type {
@@ -33,6 +43,28 @@ import type {
 import { RUNTIME_CRYPTO_CAPABILITIES } from "./crypto_provider.js";
 
 /**
+ * Fixed, permanently-`false` constant: whether `FedosRuntimeCryptoProvider`
+ * has a real internal `encrypt`/`decrypt` implementation. Reads NO
+ * `process.env`, accepts NO parameter or override anywhere in this
+ * module or any importer — flipping it is a future, separate,
+ * explicitly-reviewed stage's own decision, made only by editing this
+ * literal.
+ */
+export const FEDOS_RUNTIME_PROVIDER_IMPLEMENTED = false;
+
+/**
+ * `FedosRuntimeCryptoProvider.status()`'s own return shape — a strict
+ * superset of `RuntimeCryptoStatus` (assignable to it, so the class still
+ * satisfies `RuntimeCryptoProvider.status(): RuntimeCryptoStatus`
+ * exactly) that additionally surfaces `implemented`, mirroring
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` exactly. No secret, key, or
+ * ciphertext material — a single boolean.
+ */
+export interface FedosRuntimeCryptoProviderStatus extends RuntimeCryptoStatus {
+  readonly implemented: boolean;
+}
+
+/**
  * The FedOS-named `RuntimeCryptoProvider`. Advertises the same fixed
  * placeholder capability labels as `PlaceholderRuntimeCryptoProvider`
  * (labels of intent only), but `encrypt()`/`decrypt()` ALWAYS deny with
@@ -44,10 +76,11 @@ export class FedosRuntimeCryptoProvider implements RuntimeCryptoProvider {
     // Does nothing: no core loaded, no handle resolved, no byte touched.
   }
 
-  status(): RuntimeCryptoStatus {
+  status(): FedosRuntimeCryptoProviderStatus {
     return {
       state: "NotConnected",
       reason: "FedOS runtime crypto provider is not connected to any real core",
+      implemented: FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
     };
   }
 
