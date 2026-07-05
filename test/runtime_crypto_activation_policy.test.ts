@@ -17,6 +17,7 @@ import type { RuntimeCryptoConfig } from "../src/runtime/runtime_crypto_config.j
 import type { WorkerCryptoConfig } from "../src/runtime/worker_crypto_config.js";
 import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
 import { workerCryptoActivationStatus } from "../src/runtime/worker_crypto_diagnostics.js";
+import { FEDOS_RUNTIME_PROVIDER_IMPLEMENTED } from "../src/runtime/fedos_runtime_crypto_provider.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimePolicySource from "../src/runtime/runtime_crypto_activation_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -251,5 +252,39 @@ describe("Runtime/Worker crypto activation policy, fail-closed (Stage 289-296)",
     for (const decision of workerDecisions) {
       expect(workerReasons).toContain(decision.reason);
     }
+  });
+
+  it("17. both policy files read FEDOS_RUNTIME_PROVIDER_IMPLEMENTED from fedos_runtime_crypto_provider.ts as a single source of truth, and it is false", () => {
+    expect(runtimePolicySource).toMatch(
+      /import\s*\{\s*FEDOS_RUNTIME_PROVIDER_IMPLEMENTED\s*\}\s*from\s*"\.\/fedos_runtime_crypto_provider\.js"/,
+    );
+    expect(workerPolicySource).toMatch(
+      /import\s*\{\s*FEDOS_RUNTIME_PROVIDER_IMPLEMENTED\s*\}\s*from\s*"\.\/fedos_runtime_crypto_provider\.js"/,
+    );
+    expect(FEDOS_RUNTIME_PROVIDER_IMPLEMENTED).toBe(false);
+    // Neither file keeps its own second, redundant literal named FEDOS_PROVIDER_IMPLEMENTED.
+    expect(runtimePolicySource).not.toMatch(/const\s+FEDOS_PROVIDER_IMPLEMENTED\s*=/);
+    expect(workerPolicySource).not.toMatch(/const\s+FEDOS_PROVIDER_IMPLEMENTED\s*=/);
+  });
+
+  it("18. Allowed remains unreachable even with both locks open, now that the implementation flag is imported rather than a local literal", () => {
+    const runtimeDecision = evaluateRuntimeCryptoActivation(
+      runtimeConfig({ runtimeCryptoEnabled: true, runtimeCryptoProvider: "fedos" }),
+      { FEDOS_CRYPTO_PROVIDER: "fedos", FEDOS_CRYPTO_ENABLED: "explicit-dev-only" },
+    );
+    expect(runtimeDecision.reason).toBe("ProviderUnavailable");
+    expect(runtimeDecision.allowed).toBe(false);
+
+    const workerDecision = evaluateWorkerCryptoActivation(
+      workerConfig({ workerCryptoEnabled: true, workerCryptoProvider: "fedos" }),
+      { FEDOS_CRYPTO_PROVIDER: "fedos", FEDOS_CRYPTO_ENABLED: "explicit-dev-only" },
+    );
+    expect(workerDecision.reason).toBe("ProviderUnavailable");
+    expect(workerDecision.allowed).toBe(false);
+  });
+
+  it("19. runtimeCryptoActivationStatus/workerCryptoActivationStatus expose providerImplemented: false", () => {
+    expect(runtimeCryptoActivationStatus().providerImplemented).toBe(false);
+    expect(workerCryptoActivationStatus().providerImplemented).toBe(false);
   });
 });

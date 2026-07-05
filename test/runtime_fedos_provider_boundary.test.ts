@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { PlaceholderRuntimeCryptoProvider } from "../src/runtime/crypto_provider.js";
-import { FedosRuntimeCryptoProvider } from "../src/runtime/fedos_runtime_crypto_provider.js";
+import { PlaceholderRuntimeCryptoProvider, RUNTIME_CRYPTO_CAPABILITIES } from "../src/runtime/crypto_provider.js";
+import {
+  FedosRuntimeCryptoProvider,
+  FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
+  FEDOS_PROVIDER_DECISION_REASONS,
+} from "../src/runtime/fedos_runtime_crypto_provider.js";
 import {
   FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME,
   PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME,
@@ -215,5 +219,58 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
 
   it("18. RUNTIME_CRYPTO_PROVIDER_NAMES still lists exactly placeholder/fedos", () => {
     expect(RUNTIME_CRYPTO_PROVIDER_NAMES).toEqual(["placeholder", "fedos"]);
+  });
+
+  it("19. FedosRuntimeCryptoProvider.status() reports implemented: false, mirroring FEDOS_RUNTIME_PROVIDER_IMPLEMENTED", () => {
+    const provider = new FedosRuntimeCryptoProvider();
+    const status = provider.status();
+    expect(status.implemented).toBe(false);
+    expect(FEDOS_RUNTIME_PROVIDER_IMPLEMENTED).toBe(false);
+  });
+
+  it("20. internalCapabilitySurface() names runtime_nip44_wire_placeholder as internal-only and the rest not-implemented, with no secret material", () => {
+    const provider = new FedosRuntimeCryptoProvider();
+    const surface = provider.internalCapabilitySurface();
+    expect(surface).toEqual([
+      { capability: "runtime_encrypt_placeholder", availability: "not-implemented" },
+      { capability: "runtime_decrypt_placeholder", availability: "not-implemented" },
+      { capability: "runtime_nip44_wire_placeholder", availability: "internal-only" },
+      { capability: "runtime_rust_core_placeholder", availability: "not-implemented" },
+    ]);
+    for (const entry of surface) {
+      expect(JSON.stringify(entry)).not.toMatch(/key|secret|plaintext|ciphertext/i);
+    }
+  });
+
+  it("21. capabilities() itself is unaffected by internalCapabilitySurface() -- still the same fixed label list", () => {
+    const provider = new FedosRuntimeCryptoProvider();
+    expect(provider.capabilities()).toEqual(RUNTIME_CRYPTO_CAPABILITIES);
+  });
+
+  it("22. decisionReason() always reports NotImplemented in this stage", () => {
+    const provider = new FedosRuntimeCryptoProvider();
+    expect(provider.decisionReason()).toBe("NotImplemented");
+    expect(FEDOS_PROVIDER_DECISION_REASONS).toEqual([
+      "NotImplemented",
+      "DisabledByActivationPolicy",
+      "RuntimeConnectionMissing",
+      "Unsupported",
+    ]);
+  });
+
+  it("23. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED cannot be changed via any env-like object -- the class constructor and every method take no env parameter", () => {
+    expect(codeOnlyOf(fedosProviderSource)).not.toMatch(/process\.env/);
+    expect(codeOnlyOf(fedosProviderSource)).not.toMatch(/RuntimeEnv/);
+    // The constructor and every public method are zero/no-env-arg.
+    expect(fedosProviderSource).toMatch(/constructor\(\)\s*\{/);
+  });
+
+  it("24. even with FEDOS_CRYPTO_PROVIDER=fedos and FEDOS_CRYPTO_ENABLED=explicit-dev-only, runtimeCryptoActivationStatus still reports providerImplemented: false and activationReason: ProviderUnavailable", () => {
+    const status = runtimeCryptoActivationStatus({
+      FEDOS_CRYPTO_PROVIDER: "fedos",
+      FEDOS_CRYPTO_ENABLED: "explicit-dev-only",
+    });
+    expect(status.providerImplemented).toBe(false);
+    expect(status.activationReason).toBe("ProviderUnavailable");
   });
 });
