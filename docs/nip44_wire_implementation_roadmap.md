@@ -178,35 +178,57 @@ not the connection itself. `crypto::nip44_public_api`'s
 (Stage 246) — meaning "planned and skeleton-named", never "a real
 public API exists" (`Nip44OpaqueStatus::Unimplemented` is unchanged).
 
-### Stage 249+ candidates (the actual step 8 connection, and beyond)
+### Stage 249–256 — Runtime Crypto Boundary Foundation (RENUMBERED — still planning/definitions, not the connection itself)
 
-With the public boundary now planned and skeleton-named, the roadmap's
-next candidates are:
+Per this document's own "no commitment to the exact Stage numbers"
+non-goal, Stage 249–252's original candidate slots were actually spent
+on a DEEPER foundation before any real connection: `src/runtime/crypto_provider.ts`
+(Stage 249, a NEW `RuntimeCryptoProvider` interface — `encrypt`/`decrypt`/
+`capabilities`/`status`, every implementation resolving ONLY to
+`Placeholder`/`NotConnected`/`Unsupported`, never real cryptography),
+`src/runtime/runtime_crypto_capability.ts` (Stage 250, a pure
+`RuntimeCryptoCapability → CryptoCapability` mapping table), `src/runtime/runtime_crypto_diagnostics.ts`
+(Stage 251, a read-only diagnostics preview reporting
+`Enabled`/`Disabled`/`Placeholder`/`NotConnected` — `Enabled` never
+produced), `docs/runtime_worker_crypto_bridge.md` (Stage 252, naming a
+FOURTH layer — `Runtime → Opaque API → FedOS → Internal Crypto`, where
+"FedOS" is the already-existing, inert `packages/fedos-core-rust` TS
+package boundary from Stage 59), `docs/fedos_wasm_boundary.md` (Stage
+253, the opaque-handle-only rule restated specifically for a future WASM
+boundary), guards (Stage 254), a README architecture update (Stage 255),
+and verification (Stage 256). **Still no Runtime/Worker/Storage/Relay
+connection** — `RuntimeCryptoProvider` is not wired into `AppRuntime`/
+`createRuntime`/the Worker, and nothing calls FedOS.
 
-- **Stage 249 — Runtime opt-in crypto bridge**: connect
-  `src/crypto/types.ts`'s `CryptoProvider` seam
-  (`docs/runtime_crypto_bridge.md`) to the future public opaque API,
-  behind an explicit opt-in flag — the actual code Stage 243 only
-  planned.
-- **Stage 250 — Nostr DM publish/receive bridge**: connect
+### Stage 257+ candidates (the actual step 8 connection, and beyond)
+
+With BOTH the public Rust boundary (Stage 241–248) AND the Runtime-facing
+TypeScript boundary (Stage 249–256) now planned/skeleton-named, the
+roadmap's next candidates are:
+
+- **Stage 257 — Runtime opt-in crypto bridge**: wire a real
+  `RuntimeCryptoProvider` implementation into `AppRuntime`/`createRuntime`,
+  behind an explicit opt-in flag, connecting through the future public
+  opaque API — the actual code Stage 243/249–251 only planned/defined.
+- **Stage 258 — Nostr DM publish/receive bridge**: connect
   `src/federation/types.ts`'s `FederationProvider` seam
   (`docs/nostr_dm_bridge.md`) to the future public opaque API — the
   actual code Stage 244 only planned, and this roadmap's own original
   step 8.
-- **Stage 251 — NIP-17 planning**: evaluate what NIP-17 (gift-wrapped
+- **Stage 259 — NIP-17 planning**: evaluate what NIP-17 (gift-wrapped
   DMs) needs beyond NIP-44 v2 itself — a planning-only stage, not yet
   connected, explicitly deferred by `docs/nostr_dm_bridge.md` §4.
-- **Stage 252 — WASM**: evaluate bringing this crate's NIP-44 wire
+- **Stage 260 — WASM**: evaluate bringing this crate's NIP-44 wire
   pipeline into the browser via the existing
   `packages/fedos-core-rust/src/wasm_loader.ts` seam
-  (`docs/fedos_core_wasm_safety.md`) — not started, not decided.
+  (`docs/fedos_core_wasm_safety.md` / `docs/fedos_wasm_boundary.md`) —
+  not started, not decided.
 
-Recommended order: **249 → 250 → 251**, because the internal crypto is
-already complete, so fixing the safe public boundary first and then
-connecting Runtime and Nostr in turn keeps responsibilities separated
-while completing the MVP. **252 (WASM)** is independent of that
-ordering and may land whenever the browser-delivery question is
-actually prioritized.
+Recommended order: **257 → 258 → 259**, because the internal crypto and
+both boundary layers are already complete, so connecting Runtime and
+Nostr in turn keeps responsibilities separated while completing the
+MVP. **260 (WASM)** is independent of that ordering and may land
+whenever the browser-delivery question is actually prioritized.
 
 ## What this roadmap does NOT do
 
