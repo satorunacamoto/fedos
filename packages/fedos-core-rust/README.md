@@ -4573,3 +4573,77 @@ Storage/Relay/Nostr/NIP-17 connection, no public API addition, no
 `fedos_encrypt`/`fedos_decrypt` change, no `Cargo.toml`/`package.json`
 change, no new dependency, no WASM/FFI, no JSON serialization change, no
 `ciphertext_serialization` change, no AEAD bridge change.
+
+## NIP-44 public wire boundary: planning + skeleton (Stage 241–248)
+
+With the NIP-44 v2 wire-compatible internal implementation complete
+(Stage 234–240), Stage 241–248 fix the FINAL PUBLIC BOUNDARY that a
+future stage would connect Runtime/Nostr to — still no
+Runtime/Worker/Storage/Relay connection.
+
+**Stage 241**: new `docs/public_nip44_wire_api.md` — plans the boundary
+in front of the complete internal pipeline
+(`ConversationKey → MessageKey → Wire Encrypt → Wire Payload → Wire
+Decode → Decrypt`). States explicitly: `ConversationKey`/`MessageKey`/
+`SecretHandle`/`Nip44WirePayload` are NEVER exposed publicly; a future
+public API may only ever expose an OPAQUE HANDLE, mirroring
+`docs/public_crypto_opaque_handles.md`'s existing AEAD-handle design.
+No `pub` item added.
+
+**Stage 242**: new `crypto::nip44_public_api` — an INTERNAL-ONLY,
+LABEL-ONLY skeleton naming the shape a future opaque API would use:
+`Nip44OpaqueConversation`/`Nip44OpaquePayload` (both zero-sized
+placeholders, wrapping nothing real), `Nip44OpaqueStatus` (always
+`Unimplemented`, mirroring `crypto::nip44_wire`'s own Stage 209–213
+precedent), and `Nip44OpaqueDecision` (a label-only decision pairing a
+status with nothing else). All four are `pub(crate)`-only — no public
+API addition.
+
+**Stage 243**: new `docs/runtime_crypto_bridge.md` — plans the
+connection policy only: `Runtime → Opaque API → Internal Crypto`, one
+direction, Runtime never reaching past the opaque-API layer to touch
+`ConversationKey`/`MessageKey`/`SecretHandle` directly. References the
+existing, UNCHANGED `CryptoProvider` seam
+(`src/crypto/types.ts`, Stage 34) and its already-inert
+`PlaceholderFedosCoreCrypto`. No Runtime code, no `.ts` file touched.
+
+**Stage 244**: new `docs/nostr_dm_bridge.md` — plans the DM
+publish flow (`encrypt → wire payload → relay publish`) and receive
+flow (`wire decode → decrypt → message`), referencing the existing,
+UNCHANGED `FederationProvider`/`ChatProvider` seams
+(`src/federation/types.ts`, Stage 110–113). Explicitly states NIP-17,
+Relay, and Network remain unconnected and undecided.
+
+**Stage 245 (guards)**: new
+[`test/fedos_core_rust_nip44_public_boundary.test.ts`](../../test/fedos_core_rust_nip44_public_boundary.test.ts)
+confirms: `pub fn` surface unchanged at twenty-seven;
+`SecretHandle`/`ConversationKey`/`MessageKey`/`Nip44WirePayload` all
+stay `pub(crate)`-only; `crypto::nip44_public_api` declares no `pub`
+item and is panic/unsafe-free; no Runtime/Worker/Storage/Relay/NIP-17
+reference anywhere in the new Rust file or existing Runtime/Worker/
+Storage/Federation `.ts` files; `Cargo.toml`/`package.json` dependency
+counts unchanged; `capability_matrix`/`diagnostics` unchanged in shape;
+all three planning docs exist and state the opaque-handle-only rule;
+the roadmap names the Stage 249–252 candidates.
+
+**Stage 246 (diagnostics)**: `crypto::nip44_public_api` gains
+`Nip44PublicBoundaryReadiness`/`nip44_public_boundary_readiness()` — a
+fixed label moving from `NipInternal` to `PublicBoundaryReady`,
+reflecting that the boundary is now planned and skeleton-named (still
+NOT a real public API — `Nip44OpaqueStatus::Unimplemented` is
+unchanged). No `CryptoCapability` variant added.
+
+**Stage 247 (roadmap)**: `docs/nip44_wire_implementation_roadmap.md`
+records this work as step 8's PLANNING half (not yet the Nostr
+connection itself) and names the Stage 249–252 candidates: Runtime
+opt-in crypto bridge, Nostr DM publish/receive bridge, NIP-17 planning,
+and WASM — recommended order 249 → 250 → 251, with 252 independent.
+
+**Stage 248 (final review)**: confirms `Cargo.toml`/`package.json`
+unchanged, `pub fn` count unchanged, and no
+Runtime/Storage/Worker/Relay/NIP-17 connection or new Cargo dependency
+anywhere in Stage 241–248's work.
+
+Public `pub fn` surface unchanged at twenty-seven. No Runtime/Worker/
+Storage/Relay/NIP-17 connection, no public API addition, no
+`Cargo.toml`/`package.json` change, no new dependency, no WASM/FFI.

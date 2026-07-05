@@ -159,6 +159,55 @@ its own numbered step here, but naturally followed once steps 1/3/4/5/6
 all existed — implemented at **Stage 236**, full round-trip vector-
 verified at **Stage 237**. Candidate for step 8 itself: **Stage 241+**.
 
+### Step 8, part one: the public boundary (Stage 241–248) — PLANNING + SKELETON, not yet the Nostr connection itself
+
+Before step 8's actual Nostr connection, Stage 241–248 first fix and
+name the PUBLIC boundary that connection would go through —
+`docs/public_nip44_wire_api.md` (Stage 241, the opaque-handle-only
+planning document), `crypto::nip44_public_api` (Stage 242, a
+label-only `pub(crate)` skeleton — `Nip44OpaqueConversation`/
+`Nip44OpaquePayload`/`Nip44OpaqueStatus`/`Nip44OpaqueDecision`, no
+public API added), `docs/runtime_crypto_bridge.md` (Stage 243, the
+Runtime↔crypto-core connection POLICY only), and
+`docs/nostr_dm_bridge.md` (Stage 244, the DM publish/receive flow
+planning only) — plus guards, diagnostics, and docs (Stage 245–248).
+**No Runtime/Worker/Storage/Relay/NIP-17 connection exists anywhere in
+this work** — it fixes the SHAPE of step 8's eventual connection point,
+not the connection itself. `crypto::nip44_public_api`'s
+`nip44_public_boundary_readiness()` now reports `PublicBoundaryReady`
+(Stage 246) — meaning "planned and skeleton-named", never "a real
+public API exists" (`Nip44OpaqueStatus::Unimplemented` is unchanged).
+
+### Stage 249+ candidates (the actual step 8 connection, and beyond)
+
+With the public boundary now planned and skeleton-named, the roadmap's
+next candidates are:
+
+- **Stage 249 — Runtime opt-in crypto bridge**: connect
+  `src/crypto/types.ts`'s `CryptoProvider` seam
+  (`docs/runtime_crypto_bridge.md`) to the future public opaque API,
+  behind an explicit opt-in flag — the actual code Stage 243 only
+  planned.
+- **Stage 250 — Nostr DM publish/receive bridge**: connect
+  `src/federation/types.ts`'s `FederationProvider` seam
+  (`docs/nostr_dm_bridge.md`) to the future public opaque API — the
+  actual code Stage 244 only planned, and this roadmap's own original
+  step 8.
+- **Stage 251 — NIP-17 planning**: evaluate what NIP-17 (gift-wrapped
+  DMs) needs beyond NIP-44 v2 itself — a planning-only stage, not yet
+  connected, explicitly deferred by `docs/nostr_dm_bridge.md` §4.
+- **Stage 252 — WASM**: evaluate bringing this crate's NIP-44 wire
+  pipeline into the browser via the existing
+  `packages/fedos-core-rust/src/wasm_loader.ts` seam
+  (`docs/fedos_core_wasm_safety.md`) — not started, not decided.
+
+Recommended order: **249 → 250 → 251**, because the internal crypto is
+already complete, so fixing the safe public boundary first and then
+connecting Runtime and Nostr in turn keeps responsibilities separated
+while completing the MVP. **252 (WASM)** is independent of that
+ordering and may land whenever the browser-delivery question is
+actually prioritized.
+
 ## What this roadmap does NOT do
 
 - **As of Stage 209–213: no code.** Every step above was a plan entry,

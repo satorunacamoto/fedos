@@ -327,6 +327,13 @@
 //! `pub(crate)`) — see `docs/public_nip44_wire_api.md` (Stage 241) for
 //! the full planning document this vocabulary follows. Adds NO public
 //! API.
+//!
+//! Stage 246 extends `nip44_public_api` with
+//! `Nip44PublicBoundaryReadiness`/`nip44_public_boundary_readiness` — a
+//! fixed diagnostics label moving from `NipInternal` to
+//! `PublicBoundaryReady`, reflecting that the public boundary is now
+//! PLANNED and SKELETON-NAMED (still no real public API, still no
+//! `CryptoCapability` variant added).
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;

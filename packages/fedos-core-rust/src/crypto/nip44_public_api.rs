@@ -29,6 +29,19 @@
 //! `crypto::nip44_wire_payload::Nip44WirePayload` (all UNCHANGED and
 //! untouched by this module), no public API, no Runtime/Worker/Storage/
 //! Relay/Nostr connection, no new `Cargo.toml` dependency, no WASM/FFI.
+//!
+//! Stage 246 adds [`Nip44PublicBoundaryReadiness`]/
+//! [`nip44_public_boundary_readiness`] — a fixed, hand-maintained
+//! diagnostics label, mirroring `crypto::nip44_wire_diagnostics`'s own
+//! "small, per-feature detail preview, reviewed by hand, never a live
+//! probe" discipline. `NipInternal` names the state before Stage
+//! 241–242 (the internal wire pipeline was complete, but no public-facing
+//! plan or skeleton existed). `PublicBoundaryReady` names the state as
+//! of Stage 246: the public boundary is PLANNED
+//! (`docs/public_nip44_wire_api.md`) and its shape is SKELETON-NAMED
+//! (the four placeholders above) — this does **not** mean a real public
+//! API exists; see `Nip44OpaqueStatus::Unimplemented` above, which is
+//! unchanged.
 #![allow(dead_code)]
 
 /// A LABEL-ONLY placeholder naming what a future public opaque
@@ -84,6 +97,29 @@ impl Nip44OpaqueDecision {
     }
 }
 
+/// The crate's current NIP-44 PUBLIC BOUNDARY readiness — see this
+/// module's own Stage 246 doc comment above. Crate-private only; never
+/// exposed via this crate's public API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Nip44PublicBoundaryReadiness {
+    /// The internal wire pipeline is complete, but no public-facing
+    /// plan or skeleton exists yet (the state before Stage 241–242).
+    NipInternal,
+    /// The public boundary is PLANNED (`docs/public_nip44_wire_api.md`)
+    /// and SKELETON-NAMED (`Nip44OpaqueConversation`/`Nip44OpaquePayload`/
+    /// `Nip44OpaqueStatus`/`Nip44OpaqueDecision`) — NOT that a real
+    /// public API exists.
+    PublicBoundaryReady,
+}
+
+/// A fixed, hand-maintained, display-only snapshot of the public
+/// boundary's current readiness. Always reports `PublicBoundaryReady`
+/// as of Stage 246 — takes no parameter of any kind, calls no other
+/// function, and is not a live probe.
+pub(crate) fn nip44_public_boundary_readiness() -> Nip44PublicBoundaryReadiness {
+    Nip44PublicBoundaryReadiness::PublicBoundaryReady
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +160,34 @@ mod tests {
         let a = Nip44OpaquePayload;
         let b = Nip44OpaquePayload;
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn nip44_public_boundary_readiness_reports_public_boundary_ready() {
+        assert_eq!(
+            nip44_public_boundary_readiness(),
+            Nip44PublicBoundaryReadiness::PublicBoundaryReady
+        );
+    }
+
+    #[test]
+    fn nip44_public_boundary_readiness_is_stable_across_repeated_calls() {
+        assert_eq!(
+            nip44_public_boundary_readiness(),
+            nip44_public_boundary_readiness()
+        );
+    }
+
+    #[test]
+    fn nip44_public_boundary_readiness_has_no_variant_other_than_the_two_specified() {
+        for readiness in [
+            Nip44PublicBoundaryReadiness::NipInternal,
+            Nip44PublicBoundaryReadiness::PublicBoundaryReady,
+        ] {
+            match readiness {
+                Nip44PublicBoundaryReadiness::NipInternal => {}
+                Nip44PublicBoundaryReadiness::PublicBoundaryReady => {}
+            }
+        }
     }
 }
