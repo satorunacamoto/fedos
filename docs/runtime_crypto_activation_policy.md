@@ -143,6 +143,19 @@ not a conventional boolean flag. See `docs/runtime_crypto_threat_model.md`
 rejected, why `"explicit-dev-only"` was chosen, and why passing BOTH
 locks still does not activate FedOS today).
 
+## 6. The Execution Review (Stage 345–352)
+
+Even past this policy's own gate, the internal chain now has a SEVENTH
+and FINAL abstraction link — `FedosRustExecutionReview`
+(`src/runtime/fedos_rust_execution_review.ts`, `docs/runtime_fedos_rust_execution_review.md`).
+**The Execution Review exists, but real Rust crypto execution is
+still blocked** — `reviewEncrypt()`/`reviewDecrypt()` always resolve
+`{ approved: false, reason: "BlockedBeforeCrypto" }`, with no code path
+that could ever produce anything else. See
+`docs/runtime_fedos_execution_approval_checklist.md` for the full
+eight-item list of what remains before real execution could ever be
+considered.
+
 ## See also
 
 - `docs/runtime_fedos_provider_implementation.md` (Stage 305–312) — what

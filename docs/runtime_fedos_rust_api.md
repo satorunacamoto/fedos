@@ -119,8 +119,20 @@ these expose a request, a handle, or any byte of secret material.
 - No Relay, Storage, Nostr, or NIP-17 connection of any kind.
 - No `Cargo.toml`/`package.json` change, no new Rust `pub fn`.
 
+## 7. Update (Stage 345–352): the Execution Review
+
+`FedosRustApi` now reaches ONE further link — `FedosRustExecutionReview`
+(`src/runtime/fedos_rust_execution_review.ts`, Stage 345/346). **The
+Execution Review exists, but real Rust crypto execution is still
+blocked** — see `docs/runtime_fedos_rust_execution_review.md` for the
+full chain. `FedosRustApi`'s own `"BlockedByImplementation"` answer is
+unchanged.
+
 ## See also
 
+- `docs/runtime_fedos_rust_execution_review.md` (Stage 345–352) — the
+  Execution Review link now sitting between this Rust API and real
+  Rust crypto.
 - `docs/runtime_fedos_rust_boundary.md` (Stage 329–336) — the Rust
   Boundary abstraction this stage's Rust API sits behind.
 - `docs/runtime_fedos_opaque_api.md` (Stage 321–328) — the Opaque API

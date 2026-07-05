@@ -137,6 +137,19 @@ default, safest state).
   only that connecting them is a deliberate, separate, future, reviewed
   act, not an accidental side effect of one env var.
 
+## 4. The Execution Review (Stage 345–352)
+
+The internal chain's SEVENTH and FINAL abstraction link —
+`FedosRustExecutionReview` (`src/runtime/fedos_rust_execution_review.ts`)
+— is now in place. **The Execution Review exists, but real Rust crypto
+execution is still blocked**: `reviewEncrypt()`/`reviewDecrypt()`
+always resolve `{ approved: false, reason: "BlockedBeforeCrypto" }`,
+with no code path that could ever produce anything else. This is the
+LAST stop before any real Rust crypto invocation — see
+`docs/runtime_fedos_rust_execution_review.md` for the full chain and
+`docs/runtime_fedos_execution_approval_checklist.md` for what remains
+before real execution could ever be considered.
+
 ## See also
 
 - `docs/runtime_crypto_activation_policy.md` (Stage 289–312) — the five
