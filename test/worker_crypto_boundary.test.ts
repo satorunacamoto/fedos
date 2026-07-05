@@ -167,10 +167,11 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
     );
   });
 
-  it("13. workerCryptoActivationStatus reports { enabled: false, provider: 'placeholder', reachable: false }", () => {
+  it("13. workerCryptoActivationStatus reports { enabled: false, configuredProvider: 'placeholder', effectiveProvider: 'placeholder', reachable: false }", () => {
     expect(workerCryptoActivationStatus()).toEqual({
       enabled: false,
-      provider: "placeholder",
+      configuredProvider: "placeholder",
+      effectiveProvider: "placeholder",
       reachable: false,
     });
   });

@@ -195,9 +195,13 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     expect(decryptCalls).toBe(0);
   });
 
-  it("12. runtimeCryptoActivationStatus reports { enabled: false, provider: 'placeholder' }, reading no live provider", () => {
+  it("12. runtimeCryptoActivationStatus reports { enabled: false, configuredProvider: 'placeholder', effectiveProvider: 'placeholder' }, reading no live provider", () => {
     const status = runtimeCryptoActivationStatus();
-    expect(status).toEqual({ enabled: false, provider: "placeholder" });
+    expect(status).toEqual({
+      enabled: false,
+      configuredProvider: "placeholder",
+      effectiveProvider: "placeholder",
+    });
   });
 
   it("13. Worker does not reference any of the four new Runtime files or AppRuntime.crypto", () => {

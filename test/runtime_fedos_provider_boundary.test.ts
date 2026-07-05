@@ -133,10 +133,11 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
     }
   });
 
-  it("9. runtimeCryptoActivationStatus reports { enabled: false, provider: 'placeholder' }, mirroring the bridge's gate", () => {
+  it("9. runtimeCryptoActivationStatus reports { enabled: false, configuredProvider: 'placeholder', effectiveProvider: 'placeholder' }, mirroring the bridge's gate", () => {
     expect(runtimeCryptoActivationStatus()).toEqual({
       enabled: false,
-      provider: "placeholder",
+      configuredProvider: "placeholder",
+      effectiveProvider: "placeholder",
     });
   });
 
