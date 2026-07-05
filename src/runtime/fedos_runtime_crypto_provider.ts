@@ -61,6 +61,34 @@
  * (still absent) becomes the actual blocker instead. Existing callers of
  * `encrypt()`/`decrypt()` see NO change: their return type and values
  * are identical to before this stage.
+ *
+ * Stage 315 adds `#planInternalExecution` — a PRIVATE method modeling
+ * the internal execution chain's first three links: it calls
+ * `planFedosRuntimeOperation`/`evaluateFedosRuntimeOperation`
+ * (`fedos_runtime_operation.ts`, Stage 313), then
+ * `buildOpaqueRequestFromOperation` (`fedos_runtime_opaque_request.ts`,
+ * Stage 314) to build the (empty) opaque request shape — and then
+ * TERMINATES. The built request is never passed to anything: no
+ * `packages/fedos-core-rust` call, no WASM, no FFI, no Runtime/Worker
+ * call. Exposed publicly (Stage 316) as `planExecution()`, returning a
+ * `FedosRuntimeExecutionDecision`.
+ *
+ * Stage 316 adds `FedosRuntimeExecutionState`/`FedosRuntimeExecutionDecision`/
+ * `planExecution()`. `"BlockedByImplementation"` is the ONLY value this
+ * stage ever produces (mirroring `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`
+ * being `false`) — `"BlockedByActivation"` (RESERVED — the Provider
+ * itself does not read `RuntimeCryptoConfig`/`WorkerCryptoConfig`; that
+ * remains the activation policy's own, separate concern) and
+ * `"ReadyForOpaqueExecution"` (RESERVED) are unreachable in this stage.
+ *
+ * Stage 317 adds three standalone, pure "state" functions —
+ * `fedosProviderImplementationState()`, `fedosProviderExecutionState()`,
+ * `fedosProviderOperationState()` — usable by diagnostics WITHOUT
+ * constructing a `FedosRuntimeCryptoProvider` instance, since every
+ * value they return is already fully determined by
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` alone. `decisionReason()`/
+ * `planExecution()` now call the first two of these internally, so
+ * there is exactly ONE computation for each state, not two.
  */
 
 import type {
@@ -72,6 +100,14 @@ import type {
   RuntimeEncryptRequest,
 } from "./crypto_provider.js";
 import { RUNTIME_CRYPTO_CAPABILITIES } from "./crypto_provider.js";
+import type { FedosOpaqueRequest } from "./fedos_runtime_opaque_request.js";
+import { buildOpaqueRequestFromOperation } from "./fedos_runtime_opaque_request.js";
+import type {
+  FedosRuntimeOperation,
+  FedosRuntimeOperationKind,
+  FedosRuntimeOperationStatus,
+} from "./fedos_runtime_operation.js";
+import { evaluateFedosRuntimeOperation, planFedosRuntimeOperation } from "./fedos_runtime_operation.js";
 
 /**
  * Fixed, permanently-`false` constant: whether `FedosRuntimeCryptoProvider`
@@ -150,6 +186,65 @@ export const FEDOS_PROVIDER_DECISION_REASONS: readonly FedosProviderDecisionReas
 ];
 
 /**
+ * The outcome of `FedosRuntimeCryptoProvider.planExecution()`.
+ * `"BlockedByImplementation"` is the ONLY value this stage's
+ * implementation ever produces (mirroring `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`
+ * being `false`). `"BlockedByActivation"` and `"ReadyForOpaqueExecution"`
+ * are RESERVED — the Provider itself never reads
+ * `RuntimeCryptoConfig`/`WorkerCryptoConfig` (that stays the activation
+ * policy's own, separate concern), and no real implementation exists to
+ * ever reach `"ReadyForOpaqueExecution"`.
+ */
+export type FedosRuntimeExecutionState =
+  | "BlockedByActivation" // RESERVED — never produced in this stage
+  | "BlockedByImplementation" // the only state this stage's implementation ever produces
+  | "ReadyForOpaqueExecution"; // RESERVED — never produced in this stage
+
+/** Every `FedosRuntimeExecutionState`, for validation/documentation helpers. */
+export const FEDOS_RUNTIME_EXECUTION_STATES: readonly FedosRuntimeExecutionState[] = [
+  "BlockedByActivation",
+  "BlockedByImplementation",
+  "ReadyForOpaqueExecution",
+];
+
+/** The result of `FedosRuntimeCryptoProvider.planExecution()`. `reason` is non-sensitive and human-readable. */
+export interface FedosRuntimeExecutionDecision {
+  readonly operation: FedosRuntimeOperationKind;
+  readonly state: FedosRuntimeExecutionState;
+  readonly reason: string;
+}
+
+/**
+ * Pure, standalone: WHY `encrypt()`/`decrypt()` currently deny every
+ * request — usable WITHOUT constructing a `FedosRuntimeCryptoProvider`
+ * instance, since the answer depends only on
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`. `decisionReason()` calls this
+ * directly.
+ */
+export function fedosProviderImplementationState(): FedosProviderDecisionReason {
+  return FEDOS_RUNTIME_PROVIDER_IMPLEMENTED ? "Unsupported" : "NotImplemented";
+}
+
+/**
+ * Pure, standalone: what `planExecution()` would resolve to, for any
+ * operation kind — usable WITHOUT constructing an instance. Always
+ * `"BlockedByImplementation"` in this stage.
+ */
+export function fedosProviderExecutionState(): FedosRuntimeExecutionState {
+  return FEDOS_RUNTIME_PROVIDER_IMPLEMENTED ? "ReadyForOpaqueExecution" : "BlockedByImplementation";
+}
+
+/**
+ * Pure, standalone: the `FedosRuntimeOperationStatus`
+ * (`fedos_runtime_operation.ts`, Stage 313) a planned operation would
+ * resolve to — usable WITHOUT constructing an instance or a real
+ * `FedosRuntimeOperation`. Always `"Blocked"` in this stage.
+ */
+export function fedosProviderOperationState(): FedosRuntimeOperationStatus {
+  return FEDOS_RUNTIME_PROVIDER_IMPLEMENTED ? "Completed" : "Blocked";
+}
+
+/**
  * The FedOS-named `RuntimeCryptoProvider`. Advertises the same fixed
  * placeholder capability labels as `PlaceholderRuntimeCryptoProvider`
  * (labels of intent only), but `encrypt()`/`decrypt()` ALWAYS deny with
@@ -190,7 +285,41 @@ export class FedosRuntimeCryptoProvider implements RuntimeCryptoProvider {
    * which is unaffected.
    */
   decisionReason(): FedosProviderDecisionReason {
-    return FEDOS_RUNTIME_PROVIDER_IMPLEMENTED ? "Unsupported" : "NotImplemented";
+    return fedosProviderImplementationState();
+  }
+
+  /**
+   * Plan (but never execute) the internal chain for `kind`: Operation
+   * (Stage 313) → Opaque Request (Stage 314) → terminate (Stage 315).
+   * ALWAYS resolves `"BlockedByImplementation"` in this stage — see this
+   * module's own Stage 316 doc comment above. Never calls
+   * `encrypt()`/`decrypt()`, never calls any
+   * `packages/fedos-core-rust`/WASM/FFI/Runtime/Worker function.
+   */
+  planExecution(kind: FedosRuntimeOperationKind): FedosRuntimeExecutionDecision {
+    const { state } = this.#planInternalExecution(kind);
+    return {
+      operation: kind,
+      state,
+      reason: `FedOS runtime ${kind} execution is blocked before reaching FedOS: no internal implementation exists yet`,
+    };
+  }
+
+  /**
+   * PRIVATE — the actual internal chain. Builds a `FedosRuntimeOperation`
+   * (Stage 313), evaluates it (always `"Blocked"`), builds the
+   * corresponding opaque request shape (Stage 314) — and then
+   * TERMINATES. The built opaque request is discarded; it is never
+   * passed to `encrypt()`/`decrypt()`, never passed to any
+   * `packages/fedos-core-rust`/WASM/FFI call, never passed to Runtime or
+   * Worker.
+   */
+  #planInternalExecution(kind: FedosRuntimeOperationKind): { state: FedosRuntimeExecutionState } {
+    const operation: FedosRuntimeOperation = planFedosRuntimeOperation(kind);
+    evaluateFedosRuntimeOperation(operation); // always "Blocked"; result not otherwise used
+    const opaqueRequest: FedosOpaqueRequest = buildOpaqueRequestFromOperation(operation);
+    void opaqueRequest; // built to model the shape only — execution terminates HERE
+    return { state: fedosProviderExecutionState() };
   }
 
   async encrypt(_request: RuntimeEncryptRequest): Promise<RuntimeCryptoDecision> {
