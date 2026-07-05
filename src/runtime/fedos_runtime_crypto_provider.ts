@@ -89,6 +89,23 @@
  * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` alone. `decisionReason()`/
  * `planExecution()` now call the first two of these internally, so
  * there is exactly ONE computation for each state, not two.
+ *
+ * Stage 322 extends `#planInternalExecution` with a FOURTH link:
+ * `createFedosOpaqueApi()` (`fedos_opaque_api.ts`, Stage 321)
+ * builds a `FedosOpaqueApi`, and `planFedosOpaqueApiExecution` routes
+ * the built opaque request to its `planEncrypt`/`planDecrypt` (Stage
+ * 323) — which ALWAYS resolves `"BlockedByImplementation"` and is
+ * itself discarded here. The Opaque API never invokes
+ * `packages/fedos-core-rust`/WASM/FFI; execution still terminates
+ * before it.
+ *
+ * Stage 324 adds `FedosProviderImplementationStage`/
+ * `fedosProviderImplementationStage()` — a coarser, four-step
+ * milestone label (`"Unavailable"` → `"ProviderReady"` →
+ * `"OpaqueApiReady"` → `"RustReady"`) tracking how far the INTERNAL
+ * ARCHITECTURE (not any single operation) has progressed. Fixed at
+ * `"OpaqueApiReady"` in this stage — the Opaque API abstraction now
+ * exists and is wired, but no Rust connection exists yet.
  */
 
 import type {
@@ -100,6 +117,7 @@ import type {
   RuntimeEncryptRequest,
 } from "./crypto_provider.js";
 import { RUNTIME_CRYPTO_CAPABILITIES } from "./crypto_provider.js";
+import { createFedosOpaqueApi, planFedosOpaqueApiExecution } from "./fedos_opaque_api.js";
 import type { FedosOpaqueRequest } from "./fedos_runtime_opaque_request.js";
 import { buildOpaqueRequestFromOperation } from "./fedos_runtime_opaque_request.js";
 import type {
@@ -245,6 +263,44 @@ export function fedosProviderOperationState(): FedosRuntimeOperationStatus {
 }
 
 /**
+ * A coarse, four-step milestone tracking how far the INTERNAL
+ * ARCHITECTURE around `FedosRuntimeCryptoProvider` has progressed —
+ * distinct from `FedosRuntimeExecutionState`/`FedosRuntimeOperationStatus`
+ * (which describe a single PLANNED operation's fate, not the
+ * architecture's own build-out):
+ *   - `"Unavailable"` — no operation/opaque-request model exists.
+ *   - `"ProviderReady"` — the Provider/Operation/Opaque-Request models
+ *     exist (Stage 313–320).
+ *   - `"OpaqueApiReady"` — the Opaque API abstraction exists and is
+ *     wired (Stage 321–328) — THIS STAGE'S ACTUAL VALUE.
+ *   - `"RustReady"` — RESERVED for a future, separate,
+ *     explicitly-reviewed stage that connects the Opaque API to
+ *     `packages/fedos-core-rust`. Unreachable in this stage.
+ */
+export type FedosProviderImplementationStage =
+  | "Unavailable"
+  | "ProviderReady"
+  | "OpaqueApiReady"
+  | "RustReady"; // RESERVED — never produced in this stage
+
+/** Every `FedosProviderImplementationStage`, in order, for validation/documentation helpers. */
+export const FEDOS_PROVIDER_IMPLEMENTATION_STAGES: readonly FedosProviderImplementationStage[] = [
+  "Unavailable",
+  "ProviderReady",
+  "OpaqueApiReady",
+  "RustReady",
+];
+
+/**
+ * Pure, standalone: the current `FedosProviderImplementationStage`.
+ * Fixed, hand-maintained — never computed from a live probe. Currently
+ * `"OpaqueApiReady"`.
+ */
+export function fedosProviderImplementationStage(): FedosProviderImplementationStage {
+  return "OpaqueApiReady";
+}
+
+/**
  * The FedOS-named `RuntimeCryptoProvider`. Advertises the same fixed
  * placeholder capability labels as `PlaceholderRuntimeCryptoProvider`
  * (labels of intent only), but `encrypt()`/`decrypt()` ALWAYS deny with
@@ -308,17 +364,20 @@ export class FedosRuntimeCryptoProvider implements RuntimeCryptoProvider {
   /**
    * PRIVATE — the actual internal chain. Builds a `FedosRuntimeOperation`
    * (Stage 313), evaluates it (always `"Blocked"`), builds the
-   * corresponding opaque request shape (Stage 314) — and then
-   * TERMINATES. The built opaque request is discarded; it is never
-   * passed to `encrypt()`/`decrypt()`, never passed to any
+   * corresponding opaque request shape (Stage 314), routes it to a
+   * `FedosOpaqueApi`'s `planEncrypt`/`planDecrypt` (Stage 321–323) — and
+   * then TERMINATES. The Opaque API's own decision is discarded; it is
+   * never passed to `encrypt()`/`decrypt()`, never passed to any
    * `packages/fedos-core-rust`/WASM/FFI call, never passed to Runtime or
-   * Worker.
+   * Worker. The Opaque API itself never invokes Rust either — it simply
+   * receives the request.
    */
   #planInternalExecution(kind: FedosRuntimeOperationKind): { state: FedosRuntimeExecutionState } {
     const operation: FedosRuntimeOperation = planFedosRuntimeOperation(kind);
     evaluateFedosRuntimeOperation(operation); // always "Blocked"; result not otherwise used
     const opaqueRequest: FedosOpaqueRequest = buildOpaqueRequestFromOperation(operation);
-    void opaqueRequest; // built to model the shape only — execution terminates HERE
+    const opaqueApi = createFedosOpaqueApi();
+    planFedosOpaqueApiExecution(opaqueApi, opaqueRequest); // always "BlockedByImplementation"; result not otherwise used — execution terminates HERE
     return { state: fedosProviderExecutionState() };
   }
 
