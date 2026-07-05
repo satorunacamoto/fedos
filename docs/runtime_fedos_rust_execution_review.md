@@ -111,8 +111,19 @@ could ever produce them.
 - No Relay, Storage, Nostr, or NIP-17 connection of any kind.
 - No `Cargo.toml`/`package.json` change, no new Rust `pub fn`.
 
+## 6. Update (Stage 353–360): Internal Rust Call planning completed
+
+`reviewEncrypt()`/`reviewDecrypt()` now ALSO build and evaluate a
+`FedosInternalRustCall` (`src/runtime/fedos_internal_rust_call.ts`,
+Stage 353) internally — then discard it and return this review's own,
+unchanged answer. **Internal Rust Call planning is completed. Execution
+still blocked.** See `docs/runtime_internal_rust_call.md` for the full
+specification.
+
 ## See also
 
+- `docs/runtime_internal_rust_call.md` (Stage 353–360) — the Internal
+  Rust Call planning layer now sitting behind this Execution Review.
 - `docs/runtime_fedos_execution_approval_checklist.md` (Stage 348) —
   the eight-item checklist tracking exactly what remains before real
   execution could ever be considered.

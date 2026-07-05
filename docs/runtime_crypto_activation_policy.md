@@ -156,6 +156,18 @@ that could ever produce anything else. See
 eight-item list of what remains before real execution could ever be
 considered.
 
+## 7. Internal Rust Call planning (Stage 353–360)
+
+The chain now has an EIGHTH abstraction link — `FedosInternalRustCall`
+(`src/runtime/fedos_internal_rust_call.ts`) — which the Execution
+Review builds and evaluates internally before discarding it. **Internal
+Rust Call planning is completed. Execution still blocked** — planning
+a call is not calling it; `fedosInternalRustCallExecuted()` is fixed
+`false`, with no code path that could ever produce anything else. See
+`docs/runtime_internal_rust_call.md` for the full specification and
+`docs/runtime_internal_execution_contract.md` for the eight-link
+contract.
+
 ## See also
 
 - `docs/runtime_fedos_provider_implementation.md` (Stage 305–312) — what
