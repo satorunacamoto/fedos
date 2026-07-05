@@ -164,7 +164,7 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       rustInvocationAdapterReachable: true,
       rustInvocationAdapterExecuted: false,
       rustPingReachable: true,
-      rustPingExecuted: false,
+      rustPingExecuted: true,
     });
   });
 

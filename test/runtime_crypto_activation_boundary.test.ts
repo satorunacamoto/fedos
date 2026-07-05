@@ -223,7 +223,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       rustInvocationAdapterReachable: true,
       rustInvocationAdapterExecuted: false,
       rustPingReachable: true,
-      rustPingExecuted: false,
+      rustPingExecuted: true,
     });
   });
 

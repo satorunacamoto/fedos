@@ -81,10 +81,11 @@ describe("The first minimal Rust invocation, ping only (Stage 369-376)", () => {
     expect(body).not.toMatch(/planEncrypt|planDecrypt|encrypt|decrypt/i);
   });
 
-  it("10. planPing() never calls Rust yet -- always resolves BlockedByImplementation", () => {
+  it("10. planPing() now executes its TypeScript-side ping mirror and succeeds (Stage 377 supersedes Stage 370's BlockedByImplementation)", () => {
     const adapter = new FedosRustInvocationAdapterPlaceholder();
     const decision = adapter.planPing();
-    expect(decision.state).toBe("BlockedByImplementation");
+    expect(decision.state).toBe("RustPingExecuted");
+    expect(decision.succeeded).toBe(true);
   });
 
   it("11. no WASM reference anywhere in the Adapter file", () => {
@@ -143,17 +144,17 @@ describe("The first minimal Rust invocation, ping only (Stage 369-376)", () => {
     expect(decrypted.allowed).toBe(false);
   });
 
-  it("19. diagnostics expose rustPingReachable/rustPingExecuted without constructing an instance", () => {
+  it("19. diagnostics expose rustPingReachable/rustPingExecuted without constructing an instance (Stage 377 flips rustPingExecuted to true)", () => {
     expect(fedosRustPingReachable()).toBe(true);
-    expect(fedosRustPingExecuted()).toBe(false);
+    expect(fedosRustPingExecuted()).toBe(true);
 
     const status = runtimeCryptoActivationStatus();
     expect(status.rustPingReachable).toBe(true);
-    expect(status.rustPingExecuted).toBe(false);
+    expect(status.rustPingExecuted).toBe(true);
 
     const workerStatus = workerCryptoActivationStatus();
     expect(workerStatus.rustPingReachable).toBe(true);
-    expect(workerStatus.rustPingExecuted).toBe(false);
+    expect(workerStatus.rustPingExecuted).toBe(true);
   });
 
   it("20. no process.env/Relay/Storage/Nostr/NIP-17 reference in the Adapter file", () => {

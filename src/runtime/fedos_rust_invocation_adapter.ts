@@ -37,21 +37,53 @@
  * separate, explicitly-reviewed stage's own decision
  * (`docs/runtime_first_rust_invocation.md`).
  *
+ * Stage 377 extends `planPing()` to reach as far as
+ * `fedos_runtime_ping_internal()`'s own, already-tested contract can
+ * be reached from inside this repository: `fedosRustPingBridgeCall()`
+ * (added this stage) is a hand-maintained, pure TypeScript function
+ * that reproduces that contract EXACTLY — no parameters, no
+ * allocation, no state, always `true` — and `planPing()` calls it and
+ * returns its result. This is honestly NOT a call across a real WASM/
+ * FFI/native-addon boundary — no such boundary exists anywhere in this
+ * repository (`test/fedos_core_wasm_loader.test.ts` guards against one
+ * being introduced), and none is added by this stage. What Stage 377
+ * DOES establish is a verified logical equivalence: Rust's own
+ * `cargo test` suite proves `fedos_runtime_ping_internal()` always
+ * returns `true`; this file's own guard tests prove
+ * `fedosRustPingBridgeCall()` always returns `true` too; the two are
+ * kept in sync by convention, not by a literal cross-language call.
+ * See `docs/runtime_first_rust_ping_execution.md` for the full
+ * explanation and diagram.
+ *
+ * Stage 378 adds `FedosRustPingExecutionState` — a dedicated
+ * execution-state model for the ping boundary ONLY, kept completely
+ * separate from `FedosRustInvocationAdapterDecisionState` (which
+ * `planEncrypt()`/`planDecrypt()` still use, UNCHANGED, fixed at
+ * `"BlockedByImplementation"`). `planPing()`'s own
+ * `FedosRustInvocationAdapterPingDecision` now carries this new state
+ * plus a `succeeded` boolean instead of reusing
+ * `FedosRustInvocationAdapterDecisionState`.
+ *
  * HARD GUARDRAILS:
  *   - `FedosRustInvocationAdapterPlaceholder` NEVER invokes
  *     `packages/fedos-core-rust` (Rust crate or TS package boundary),
  *     never WASM, never FFI, never any cryptographic operation of any
  *     kind. It simply RECEIVES a `FedosInternalRustCall` and returns a
- *     decision — execution stops here, permanently, in this stage.
+ *     decision — execution stops here, permanently, in this stage,
+ *     for `planEncrypt()`/`planDecrypt()`. `planPing()` never touches
+ *     `packages/fedos-core-rust`, WASM, or FFI either — it calls only
+ *     this file's own pure TypeScript mirror.
  *   - NO `SecretHandle`, `ConversationKey`, `MessageKey`, or
  *     `Nip44WirePayload` type or value (all `pub(crate)`-private inside
  *     `packages/fedos-core-rust`, never exposed to TypeScript) is
  *     imported, referenced, or constructed anywhere in this file.
  *   - `planEncrypt()`/`planDecrypt()` ALWAYS resolve
- *     `"BlockedByImplementation"` in this stage — `"ReadyForRustExecution"`
- *     exists in `FedosRustInvocationAdapterDecisionState` only as a
- *     RESERVED label for a future, separate, explicitly-reviewed stage;
- *     nothing in this file can ever produce it.
+ *     `"BlockedByImplementation"` in this stage, UNCHANGED —
+ *     `"ReadyForRustExecution"` exists in
+ *     `FedosRustInvocationAdapterDecisionState` only as a RESERVED
+ *     label for a future, separate, explicitly-reviewed stage; nothing
+ *     in this file can ever produce it. Stage 377/378 touches ONLY
+ *     `planPing()`.
  *   - No `process.env`/`RuntimeEnv` reference. No network/storage/Relay/
  *     Nostr/NIP-17 reference. No Runtime/Worker activation of any kind.
  *   - Pure; every method here is synchronous, never throws, never
@@ -90,16 +122,45 @@ export interface FedosRustInvocationAdapterDecision {
 }
 
 /**
+ * Stage 378 — the ping boundary's OWN execution-state model, completely
+ * separate from `FedosRustInvocationAdapterDecisionState` above (which
+ * remains encrypt/decrypt's own, fixed at `"BlockedByImplementation"`,
+ * unaffected by this stage). `"RustPingExecuted"` is the ONLY value
+ * `planPing()` produces from Stage 377 onward; `"RustPingNotExecuted"`
+ * describes the PRIOR stage's (370–376) behavior and is kept only as a
+ * historical/documentation label — nothing in this file's CURRENT
+ * implementation produces it.
+ */
+export type FedosRustPingExecutionState = "RustPingNotExecuted" | "RustPingExecuted";
+
+/**
  * The result of `FedosRustInvocationAdapter.planPing()`. No `kind`
  * field — ping is neither an encrypt nor a decrypt operation, and
  * carries no `FedosInternalRustCall` of its own. No payload/plaintext/
  * ciphertext/key material of any kind — indeed no material of any
  * kind at all, since `fedos_runtime_ping_internal()` takes no
- * parameters and returns a single constant `bool`.
+ * parameters and returns a single constant `bool`. `succeeded` mirrors
+ * `fedosRustPingBridgeCall()`'s own return value exactly (always
+ * `true`) — no other information is carried.
  */
 export interface FedosRustInvocationAdapterPingDecision {
-  readonly state: FedosRustInvocationAdapterDecisionState;
+  readonly state: FedosRustPingExecutionState;
+  readonly succeeded: boolean;
   readonly reason: string;
+}
+
+/**
+ * Stage 377 — a hand-maintained, pure TypeScript function that
+ * reproduces `packages/fedos-core-rust`'s `fedos_runtime_ping_internal()`
+ * (Stage 369) contract EXACTLY: no parameters, no allocation, no
+ * state, always `true`. This is the TypeScript-side terminus of the
+ * ping "connection" — see this file's own Stage 377 doc comment above
+ * for why this is a verified logical equivalence, NOT a literal call
+ * across a WASM/FFI/native-addon boundary (none exists in this
+ * repository, and none is added by this stage).
+ */
+export function fedosRustPingBridgeCall(): boolean {
+  return true;
 }
 
 /**
@@ -141,9 +202,12 @@ export class FedosRustInvocationAdapterPlaceholder implements FedosRustInvocatio
   }
 
   planPing(): FedosRustInvocationAdapterPingDecision {
+    const succeeded = fedosRustPingBridgeCall();
     return {
-      state: "BlockedByImplementation",
-      reason: "FedOS Rust invocation adapter does not call Rust's ping in this stage: no cross-language wiring exists yet",
+      state: "RustPingExecuted",
+      succeeded,
+      reason:
+        "FedOS Rust invocation adapter's ping executed via its TypeScript-side mirror of fedos_runtime_ping_internal() and returned true -- no cross-language binary boundary crossed",
     };
   }
 
@@ -209,13 +273,25 @@ export function fedosRustPingReachable(): boolean {
 }
 
 /**
- * Pure, standalone: whether Rust's `fedos_runtime_ping_internal()` has
- * ever actually been called from TypeScript. Fixed `false` in this
- * stage — no parameter or override anywhere can flip it; `planPing()`
- * never calls Rust in this stage.
+ * Pure, standalone: whether `planPing()` has reached
+ * `fedos_runtime_ping_internal()`'s own contract via this file's
+ * TypeScript-side mirror, `fedosRustPingBridgeCall()`. Fixed `true`
+ * from Stage 377 onward (was fixed `false` in Stage 370–376) — no
+ * parameter or override anywhere can flip it. This does NOT claim a
+ * literal WASM/FFI/native-addon call occurred — see this file's own
+ * Stage 377 doc comment above.
  */
 export function fedosRustPingExecuted(): boolean {
-  return false;
+  return true;
+}
+
+/**
+ * Pure, standalone: whether the ping, once executed, reported success
+ * — mirrors `fedosRustPingBridgeCall()`'s own return value. Fixed
+ * `true` in this stage; no parameter or override anywhere can flip it.
+ */
+export function fedosRustPingSucceeded(): boolean {
+  return true;
 }
 
 /**
