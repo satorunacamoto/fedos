@@ -6,14 +6,22 @@
  * name from. This exists so a future, separate, explicitly-reviewed stage can
  * register a REAL provider without changing `src/runtime/runtime_crypto_bridge.js`'s
  * (Stage 259) own resolution logic — the bridge only ever asks the registry
- * for `"placeholder"`.
+ * for the name `src/runtime/runtime_crypto_config.ts` (Stage 258/267) names.
+ *
+ * Stage 266 registers a SECOND entry, `"fedos"` →
+ * `FedosRuntimeCryptoProvider` (Stage 265) — still encrypt/decrypt-`Unsupported`,
+ * still calling no Rust — alongside the unchanged `"placeholder"` entry.
+ * `createDefaultRuntimeCryptoProviderRegistry()`'s DEFAULT provider NAME
+ * (which the bridge resolves) stays `"placeholder"` — registering `"fedos"`
+ * here does not change what gets used by default; see
+ * `src/runtime/runtime_crypto_bridge.ts` (Stage 268) for the actual
+ * selection logic.
  *
  * HARD GUARDRAILS:
  *   - The default registry (`createDefaultRuntimeCryptoProviderRegistry`)
- *     registers ONLY `"placeholder"` → `PlaceholderRuntimeCryptoProvider`. NO
- *     FedOS/Rust/WASM provider is registered anywhere in this file, and
- *     nothing in this stage's code ever calls `register()` with anything
- *     else.
+ *     registers ONLY `"placeholder"` → `PlaceholderRuntimeCryptoProvider` and
+ *     `"fedos"` → `FedosRuntimeCryptoProvider` — no OTHER provider is ever
+ *     registered, and neither factory calls `packages/fedos-core-rust`.
  *   - `register`/`create` never construct or call `packages/fedos-core-rust`
  *     (Rust crate or TS package boundary) — they only store/invoke
  *     zero-argument factory functions the caller supplies.
@@ -25,12 +33,16 @@
 
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import { PlaceholderRuntimeCryptoProvider } from "./crypto_provider.js";
+import { FedosRuntimeCryptoProvider } from "./fedos_runtime_crypto_provider.js";
 
 /** A zero-argument constructor for a `RuntimeCryptoProvider`. */
 export type RuntimeCryptoProviderFactory = () => RuntimeCryptoProvider;
 
-/** The fixed name the default (and, in this stage, ONLY) provider registers under. */
+/** The fixed name the safe default provider registers under. */
 export const PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME = "placeholder";
+
+/** The fixed name the FedOS-named (still non-operational) provider registers under. */
+export const FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME = "fedos";
 
 /**
  * A name → factory registry for `RuntimeCryptoProvider` implementations.
@@ -58,14 +70,23 @@ export class RuntimeCryptoProviderRegistry {
 }
 
 /**
- * Build a registry with ONLY `"placeholder"` registered — the safe default.
- * No FedOS/Rust/WASM provider is ever registered by this function.
+ * Build a registry with `"placeholder"` and `"fedos"` registered — the safe
+ * default set. Registering `"fedos"` here does NOT change which provider
+ * Runtime actually uses by default — see
+ * `src/runtime/runtime_crypto_bridge.ts` for the selection logic, and
+ * `src/runtime/runtime_crypto_config.ts` for the fixed
+ * `runtimeCryptoProvider: "placeholder"` default this registry does not
+ * override. Neither factory here calls `packages/fedos-core-rust`.
  */
 export function createDefaultRuntimeCryptoProviderRegistry(): RuntimeCryptoProviderRegistry {
   const registry = new RuntimeCryptoProviderRegistry();
   registry.register(
     PLACEHOLDER_RUNTIME_CRYPTO_PROVIDER_NAME,
     () => new PlaceholderRuntimeCryptoProvider(),
+  );
+  registry.register(
+    FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME,
+    () => new FedosRuntimeCryptoProvider(),
   );
   return registry;
 }
