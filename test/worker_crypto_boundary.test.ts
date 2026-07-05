@@ -196,6 +196,7 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       rustInvocationAdapterExecuted: false,
       rustPingReachable: true,
       rustPingExecuted: true,
+      rustPingSucceeded: true,
     });
   });
 

@@ -91,6 +91,10 @@
  *
  * Stage 372 adds `rustPingReachable`/`rustPingExecuted` — see
  * `runtime_crypto_diagnostics.ts`'s own Stage 372 doc comment.
+ *
+ * Stage 377/379 flips `rustPingExecuted` to fixed `true` and adds
+ * `rustPingSucceeded` — see `runtime_crypto_diagnostics.ts`'s own
+ * Stage 377/379 doc comment.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -121,6 +125,7 @@ import {
   fedosRustInvocationAdapterState,
   fedosRustPingExecuted,
   fedosRustPingReachable,
+  fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
@@ -291,11 +296,19 @@ export interface WorkerCryptoActivationStatus {
    */
   readonly rustPingReachable: boolean;
   /**
-   * Whether Rust's `fedos_runtime_ping_internal()` has ever actually
-   * been called from TypeScript — `fedosRustPingExecuted()`'s own
-   * answer. Fixed `false` in this stage.
+   * Whether `planPing()` has reached `fedos_runtime_ping_internal()`'s
+   * own contract via its TypeScript-side mirror —
+   * `fedosRustPingExecuted()`'s own answer. Fixed `true` in this
+   * stage. This does NOT claim a literal WASM/FFI/native-addon call
+   * occurred — see `docs/runtime_first_rust_ping_execution.md`.
    */
   readonly rustPingExecuted: boolean;
+  /**
+   * Whether the ping, once executed, reported success —
+   * `fedosRustPingSucceeded()`'s own answer. Fixed `true` in this
+   * stage.
+   */
+  readonly rustPingSucceeded: boolean;
 }
 
 /**
@@ -348,5 +361,6 @@ export function workerCryptoActivationStatus(
     rustInvocationAdapterExecuted: fedosRustInvocationAdapterExecuted(),
     rustPingReachable: fedosRustPingReachable(),
     rustPingExecuted: fedosRustPingExecuted(),
+    rustPingSucceeded: fedosRustPingSucceeded(),
   };
 }
