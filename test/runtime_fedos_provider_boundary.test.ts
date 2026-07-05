@@ -148,6 +148,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       providerImplementationState: "NotImplemented",
       providerExecutionState: "BlockedByImplementation",
       providerOperationState: "Blocked",
+      providerImplementationStage: "OpaqueApiReady",
+      opaqueApiState: "NotConnected",
+      runtimeExecutionState: "BlockedByImplementation",
     });
   });
 

@@ -129,6 +129,16 @@ export function createFedosOpaqueApi(): FedosOpaqueApi {
 }
 
 /**
+ * Pure, standalone: the Opaque API's own `FedosOpaqueApiState` — usable
+ * by diagnostics WITHOUT constructing a `FedosOpaqueApi` instance (Stage
+ * 325). Fixed `"NotConnected"` in this stage, mirroring
+ * `FedosOpaqueApiPlaceholder.status()` exactly.
+ */
+export function fedosOpaqueApiState(): FedosOpaqueApiState {
+  return "NotConnected";
+}
+
+/**
  * Route a `FedosOpaqueRequest` to the matching `planEncrypt`/`planDecrypt`
  * method. Pure; never throws; never mutates `request`.
  */

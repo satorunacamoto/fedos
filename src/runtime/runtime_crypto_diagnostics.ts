@@ -79,6 +79,16 @@
  * material. All three are fully determined by
  * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` alone, so all three stay fixed in
  * this stage.
+ *
+ * Stage 325 adds `providerImplementationStage` (`fedos_runtime_crypto_provider.ts`'s
+ * `fedosProviderImplementationStage()`, Stage 324 — the internal
+ * architecture's own coarse milestone, fixed `"OpaqueApiReady"`),
+ * `opaqueApiState` (`fedos_opaque_api.ts`'s `FedosOpaqueApiPlaceholder().status()`,
+ * fixed `"NotConnected"`), and `runtimeExecutionState` (the SAME
+ * computation as `providerExecutionState`, exposed under a second name
+ * for a "would Runtime's own execution attempt succeed right now"
+ * framing). None of these construct/expose a request or secret
+ * material.
  */
 
 import type {
@@ -88,10 +98,17 @@ import type {
 } from "./crypto_provider.js";
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
-import type { FedosProviderDecisionReason, FedosRuntimeExecutionState } from "./fedos_runtime_crypto_provider.js";
+import type { FedosOpaqueApiState } from "./fedos_opaque_api.js";
+import { fedosOpaqueApiState } from "./fedos_opaque_api.js";
+import type {
+  FedosProviderDecisionReason,
+  FedosProviderImplementationStage,
+  FedosRuntimeExecutionState,
+} from "./fedos_runtime_crypto_provider.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
+  fedosProviderImplementationStage,
   fedosProviderImplementationState,
   fedosProviderOperationState,
 } from "./fedos_runtime_crypto_provider.js";
@@ -225,6 +242,26 @@ export interface RuntimeCryptoActivationStatus {
    * `"Blocked"` in this stage.
    */
   readonly providerOperationState: FedosRuntimeOperationStatus;
+  /**
+   * The internal architecture's own coarse milestone —
+   * `fedosProviderImplementationStage()`'s own answer
+   * (`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 324). Fixed
+   * `"OpaqueApiReady"` in this stage.
+   */
+  readonly providerImplementationStage: FedosProviderImplementationStage;
+  /**
+   * The Opaque API's own status — `fedosOpaqueApiState()`'s own answer
+   * (`src/runtime/fedos_opaque_api.ts`, Stage 321/325). Fixed
+   * `"NotConnected"` in this stage.
+   */
+  readonly opaqueApiState: FedosOpaqueApiState;
+  /**
+   * Whether Runtime's own execution attempt would succeed right now —
+   * the SAME computation as `providerExecutionState`, exposed under a
+   * second name for diagnostics display. Fixed
+   * `"BlockedByImplementation"` in this stage.
+   */
+  readonly runtimeExecutionState: FedosRuntimeExecutionState;
 }
 
 /**
@@ -261,5 +298,8 @@ export function runtimeCryptoActivationStatus(
     providerImplementationState: fedosProviderImplementationState(),
     providerExecutionState: fedosProviderExecutionState(),
     providerOperationState: fedosProviderOperationState(),
+    providerImplementationStage: fedosProviderImplementationStage(),
+    opaqueApiState: fedosOpaqueApiState(),
+    runtimeExecutionState: fedosProviderExecutionState(),
   };
 }

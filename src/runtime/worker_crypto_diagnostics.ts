@@ -61,14 +61,25 @@
  * three standalone, pure "state" functions — no instance construction,
  * no request or secret material exposed. All three stay fixed in this
  * stage.
+ *
+ * Stage 325 adds `providerImplementationStage`/`opaqueApiState`/
+ * `runtimeExecutionState` — see `runtime_crypto_diagnostics.ts`'s own
+ * Stage 325 doc comment for the exact meaning of each.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
-import type { FedosProviderDecisionReason, FedosRuntimeExecutionState } from "./fedos_runtime_crypto_provider.js";
+import type { FedosOpaqueApiState } from "./fedos_opaque_api.js";
+import { fedosOpaqueApiState } from "./fedos_opaque_api.js";
+import type {
+  FedosProviderDecisionReason,
+  FedosProviderImplementationStage,
+  FedosRuntimeExecutionState,
+} from "./fedos_runtime_crypto_provider.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
+  fedosProviderImplementationStage,
   fedosProviderImplementationState,
   fedosProviderOperationState,
 } from "./fedos_runtime_crypto_provider.js";
@@ -137,6 +148,23 @@ export interface WorkerCryptoActivationStatus {
    * in this stage.
    */
   readonly providerOperationState: FedosRuntimeOperationStatus;
+  /**
+   * The internal architecture's own coarse milestone —
+   * `fedosProviderImplementationStage()`'s own answer. Fixed
+   * `"OpaqueApiReady"` in this stage.
+   */
+  readonly providerImplementationStage: FedosProviderImplementationStage;
+  /**
+   * The Opaque API's own status — `fedosOpaqueApiState()`'s own answer.
+   * Fixed `"NotConnected"` in this stage.
+   */
+  readonly opaqueApiState: FedosOpaqueApiState;
+  /**
+   * Whether Worker's own execution attempt would succeed right now —
+   * the SAME computation as `providerExecutionState`, exposed under a
+   * second name. Fixed `"BlockedByImplementation"` in this stage.
+   */
+  readonly runtimeExecutionState: FedosRuntimeExecutionState;
 }
 
 /**
@@ -172,5 +200,8 @@ export function workerCryptoActivationStatus(
     providerImplementationState: fedosProviderImplementationState(),
     providerExecutionState: fedosProviderExecutionState(),
     providerOperationState: fedosProviderOperationState(),
+    providerImplementationStage: fedosProviderImplementationStage(),
+    opaqueApiState: fedosOpaqueApiState(),
+    runtimeExecutionState: fedosProviderExecutionState(),
   };
 }
