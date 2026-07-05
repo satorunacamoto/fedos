@@ -217,6 +217,8 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       rustExecutionReviewState: "Blocked",
       rustExecutionReviewReason: "BlockedBeforeCrypto",
       rustExecutionApproved: false,
+      internalRustCallState: "Planned",
+      internalRustCallReachable: true,
     });
   });
 

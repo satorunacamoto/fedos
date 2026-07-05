@@ -189,6 +189,8 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       rustExecutionReviewState: "Blocked",
       rustExecutionReviewReason: "BlockedBeforeCrypto",
       rustExecutionApproved: false,
+      internalRustCallState: "Planned",
+      internalRustCallReachable: true,
     });
   });
 

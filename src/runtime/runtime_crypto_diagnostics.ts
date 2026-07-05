@@ -111,6 +111,14 @@
  * is DELIBERATELY UNCHANGED by this stage — the Execution Review is a
  * permission/approval layer, not an architecture milestone (see
  * `docs/runtime_fedos_execution_approval_checklist.md`).
+ *
+ * Stage 357 adds `internalRustCallState` (`fedos_internal_rust_call.ts`'s
+ * `fedosInternalRustCallState()`, Stage 353 — fixed `"Planned"`) and
+ * `internalRustCallReachable` (`fedosInternalRustCallReachable()`,
+ * fixed `true` — the Internal Rust Call plan IS structurally wired
+ * into the Execution Review's own chain as of Stage 354, even though
+ * it is only ever planned, never executed). No payload, plaintext,
+ * ciphertext, or key material is exposed by either field.
  */
 
 import type {
@@ -120,6 +128,8 @@ import type {
 } from "./crypto_provider.js";
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
+import type { FedosInternalRustCallStatus } from "./fedos_internal_rust_call.js";
+import { fedosInternalRustCallReachable, fedosInternalRustCallState } from "./fedos_internal_rust_call.js";
 import type { FedosOpaqueApiState } from "./fedos_opaque_api.js";
 import { fedosOpaqueApiState } from "./fedos_opaque_api.js";
 import type {
@@ -338,6 +348,20 @@ export interface RuntimeCryptoActivationStatus {
    * stage, with no env path, parameter, or override anywhere.
    */
   readonly rustExecutionApproved: boolean;
+  /**
+   * The Internal Rust Call plan's own status —
+   * `fedosInternalRustCallState()`'s own answer
+   * (`src/runtime/fedos_internal_rust_call.ts`, Stage 353/357). Fixed
+   * `"Planned"` in this stage.
+   */
+  readonly internalRustCallState: FedosInternalRustCallStatus;
+  /**
+   * Whether the Internal Rust Call plan is structurally reachable from
+   * the Execution Review's own internal chain —
+   * `fedosInternalRustCallReachable()`'s own answer. Fixed `true` in
+   * this stage, NOT a claim that any call has ever executed.
+   */
+  readonly internalRustCallReachable: boolean;
 }
 
 /**
@@ -384,5 +408,7 @@ export function runtimeCryptoActivationStatus(
     rustExecutionReviewState: fedosRustExecutionReviewState(),
     rustExecutionReviewReason: fedosRustExecutionReviewReason(),
     rustExecutionApproved: fedosRustExecutionApproved(),
+    internalRustCallState: fedosInternalRustCallState(),
+    internalRustCallReachable: fedosInternalRustCallReachable(),
   };
 }

@@ -79,10 +79,15 @@
  * Stage 349 doc comment. `providerImplementationStage` is unaffected —
  * the Execution Review is a permission layer, not an architecture
  * milestone.
+ *
+ * Stage 357 adds `internalRustCallState`/`internalRustCallReachable` —
+ * see `runtime_crypto_diagnostics.ts`'s own Stage 357 doc comment.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
+import type { FedosInternalRustCallStatus } from "./fedos_internal_rust_call.js";
+import { fedosInternalRustCallReachable, fedosInternalRustCallState } from "./fedos_internal_rust_call.js";
 import type { FedosOpaqueApiState } from "./fedos_opaque_api.js";
 import { fedosOpaqueApiState } from "./fedos_opaque_api.js";
 import type {
@@ -230,6 +235,19 @@ export interface WorkerCryptoActivationStatus {
    * stage.
    */
   readonly rustExecutionApproved: boolean;
+  /**
+   * The Internal Rust Call plan's own status —
+   * `fedosInternalRustCallState()`'s own answer. Fixed `"Planned"` in
+   * this stage.
+   */
+  readonly internalRustCallState: FedosInternalRustCallStatus;
+  /**
+   * Whether the Internal Rust Call plan is structurally reachable from
+   * the Execution Review's own internal chain —
+   * `fedosInternalRustCallReachable()`'s own answer. Fixed `true` in
+   * this stage, NOT a claim that any call has ever executed.
+   */
+  readonly internalRustCallReachable: boolean;
 }
 
 /**
@@ -275,5 +293,7 @@ export function workerCryptoActivationStatus(
     rustExecutionReviewState: fedosRustExecutionReviewState(),
     rustExecutionReviewReason: fedosRustExecutionReviewReason(),
     rustExecutionApproved: fedosRustExecutionApproved(),
+    internalRustCallState: fedosInternalRustCallState(),
+    internalRustCallReachable: fedosInternalRustCallReachable(),
   };
 }

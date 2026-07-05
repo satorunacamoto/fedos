@@ -158,6 +158,8 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       rustExecutionReviewState: "Blocked",
       rustExecutionReviewReason: "BlockedBeforeCrypto",
       rustExecutionApproved: false,
+      internalRustCallState: "Planned",
+      internalRustCallReachable: true,
     });
   });
 
