@@ -95,6 +95,10 @@
  * Stage 377/379 flips `rustPingExecuted` to fixed `true` and adds
  * `rustPingSucceeded` — see `runtime_crypto_diagnostics.ts`'s own
  * Stage 377/379 doc comment.
+ *
+ * Stage 388 adds `wasmBoundaryState`/`wasmBoundaryReachable`/
+ * `wasmLoaded` — see `runtime_crypto_diagnostics.ts`'s own Stage 388
+ * doc comment.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -127,6 +131,8 @@ import {
   fedosRustPingReachable,
   fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
+import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
+import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -309,6 +315,23 @@ export interface WorkerCryptoActivationStatus {
    * stage.
    */
   readonly rustPingSucceeded: boolean;
+  /**
+   * The WASM Boundary's own status — `fedosWasmBoundaryState()`'s own
+   * answer. Fixed `"NotLoaded"` in this stage.
+   */
+  readonly wasmBoundaryState: FedosWasmBoundaryState;
+  /**
+   * Whether the WASM Boundary is structurally reachable from the Rust
+   * Invocation Adapter's own internal chain —
+   * `fedosWasmBoundaryReachable()`'s own answer. Fixed `true` in this
+   * stage.
+   */
+  readonly wasmBoundaryReachable: boolean;
+  /**
+   * Whether a real WASM module has ever actually been loaded —
+   * `fedosWasmLoaded()`'s own answer. Fixed `false` in this stage.
+   */
+  readonly wasmLoaded: boolean;
 }
 
 /**
@@ -362,5 +385,8 @@ export function workerCryptoActivationStatus(
     rustPingReachable: fedosRustPingReachable(),
     rustPingExecuted: fedosRustPingExecuted(),
     rustPingSucceeded: fedosRustPingSucceeded(),
+    wasmBoundaryState: fedosWasmBoundaryState(),
+    wasmBoundaryReachable: fedosWasmBoundaryReachable(),
+    wasmLoaded: fedosWasmLoaded(),
   };
 }

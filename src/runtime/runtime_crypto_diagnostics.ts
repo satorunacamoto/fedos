@@ -146,6 +146,16 @@
  * whether that ping, once executed, reported success. Neither field
  * exposes any implementation detail beyond these booleans; no
  * payload, plaintext, ciphertext, or key material is ever involved.
+ *
+ * Stage 388 adds `wasmBoundaryState` (`fedos_wasm_boundary.ts`'s
+ * `fedosWasmBoundaryState()`, Stage 386 — fixed `"NotLoaded"`),
+ * `wasmBoundaryReachable` (`fedosWasmBoundaryReachable()`, fixed
+ * `true` — the WASM Boundary IS structurally wired into the Rust
+ * Invocation Adapter's own chain as of Stage 387), and `wasmLoaded`
+ * (`fedosWasmLoaded()`, fixed `false` — no real WASM module is ever
+ * loaded). None of these expose any implementation detail beyond
+ * these values; no payload, plaintext, ciphertext, or key material is
+ * ever involved.
  */
 
 import type {
@@ -183,6 +193,8 @@ import {
   fedosRustPingReachable,
   fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
+import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
+import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -441,6 +453,24 @@ export interface RuntimeCryptoActivationStatus {
    * in this stage. No implementation detail beyond this boolean.
    */
   readonly rustPingSucceeded: boolean;
+  /**
+   * The WASM Boundary's own status — `fedosWasmBoundaryState()`'s own
+   * answer (`src/runtime/fedos_wasm_boundary.ts`, Stage 386/388).
+   * Fixed `"NotLoaded"` in this stage.
+   */
+  readonly wasmBoundaryState: FedosWasmBoundaryState;
+  /**
+   * Whether the WASM Boundary is structurally reachable from the Rust
+   * Invocation Adapter's own internal chain —
+   * `fedosWasmBoundaryReachable()`'s own answer. Fixed `true` in this
+   * stage, NOT a claim that any WASM module is ever loaded.
+   */
+  readonly wasmBoundaryReachable: boolean;
+  /**
+   * Whether a real WASM module has ever actually been loaded —
+   * `fedosWasmLoaded()`'s own answer. Fixed `false` in this stage.
+   */
+  readonly wasmLoaded: boolean;
 }
 
 /**
@@ -495,5 +525,8 @@ export function runtimeCryptoActivationStatus(
     rustPingReachable: fedosRustPingReachable(),
     rustPingExecuted: fedosRustPingExecuted(),
     rustPingSucceeded: fedosRustPingSucceeded(),
+    wasmBoundaryState: fedosWasmBoundaryState(),
+    wasmBoundaryReachable: fedosWasmBoundaryReachable(),
+    wasmLoaded: fedosWasmLoaded(),
   };
 }

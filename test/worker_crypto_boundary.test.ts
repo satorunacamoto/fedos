@@ -154,10 +154,17 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
     }
   });
 
-  it("11. no direct Rust/WASM/Relay/Storage reference in the four Worker production files", () => {
+  it("11. no direct Rust/Relay/Storage reference in the four Worker production files; no real WASM execution primitive either (Stage 388 legitimately references the WASM Boundary abstraction by name in worker_crypto_diagnostics.ts)", () => {
     for (const [name, src] of WORKER_PRODUCTION_FILES) {
       const codeOnly = codeOnlyOf(src);
-      expect(codeOnly, name).not.toMatch(/fedos-core-rust|wasm|Relay|Storage|nip.?17|nip-17/i);
+      expect(codeOnly, name).not.toMatch(/fedos-core-rust|Relay|Storage|nip.?17|nip-17/i);
+      if (name !== "worker_crypto_diagnostics.ts") {
+        expect(codeOnly, name).not.toMatch(/wasm/i);
+      } else {
+        expect(codeOnly, name).not.toMatch(/WebAssembly\s*\.\s*(instantiate|compile)/);
+        expect(codeOnly, name).not.toMatch(/wasm-bindgen/i);
+        expect(codeOnly, name).not.toMatch(/\.wasm['"`]/);
+      }
     }
   });
 
@@ -197,6 +204,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       rustPingReachable: true,
       rustPingExecuted: true,
       rustPingSucceeded: true,
+      wasmBoundaryState: "NotLoaded",
+      wasmBoundaryReachable: true,
+      wasmLoaded: false,
     });
   });
 

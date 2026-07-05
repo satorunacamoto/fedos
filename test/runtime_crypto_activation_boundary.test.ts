@@ -225,6 +225,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       rustPingReachable: true,
       rustPingExecuted: true,
       rustPingSucceeded: true,
+      wasmBoundaryState: "NotLoaded",
+      wasmBoundaryReachable: true,
+      wasmLoaded: false,
     });
   });
 
@@ -287,11 +290,15 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     expect(activationDocSource).not.toMatch(/```[\s\S]*?register\(\s*["']fedos["']/);
   });
 
-  it("19. no Storage/Relay/NIP-17/WASM reference anywhere in the four new production Runtime files", () => {
+  it("19. no Storage/Relay/NIP-17 reference anywhere in the four new production Runtime files; no real WASM execution primitive either (Stage 388 legitimately references the WASM Boundary abstraction by name)", () => {
     for (const [name, src] of PRODUCTION_FILES) {
       expect(codeOnlyOf(src), name).not.toMatch(/Storage|Relay|nip.?17|nip-17|wasm/i);
     }
-    expect(codeOnlyOf(runtimeDiagnosticsSource)).not.toMatch(/Storage|Relay|nip.?17|nip-17|wasm/i);
+    const diagnosticsCode = codeOnlyOf(runtimeDiagnosticsSource);
+    expect(diagnosticsCode).not.toMatch(/Storage|Relay|nip.?17|nip-17/i);
+    expect(diagnosticsCode).not.toMatch(/WebAssembly\s*\.\s*(instantiate|compile)/);
+    expect(diagnosticsCode).not.toMatch(/wasm-bindgen/i);
+    expect(diagnosticsCode).not.toMatch(/\.wasm['"`]/);
   });
 
   it("20. Stage 281-285: FEDOS_CRYPTO_PROVIDER=fedos is recorded as configuredProvider but effectiveProvider stays placeholder", () => {

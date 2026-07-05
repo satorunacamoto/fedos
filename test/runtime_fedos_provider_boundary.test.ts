@@ -166,6 +166,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       rustPingReachable: true,
       rustPingExecuted: true,
       rustPingSucceeded: true,
+      wasmBoundaryState: "NotLoaded",
+      wasmBoundaryReachable: true,
+      wasmLoaded: false,
     });
   });
 
@@ -175,12 +178,16 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
     expect(createRuntimeSource).not.toMatch(/\.\s*(encrypt|decrypt)\s*\(/);
   });
 
-  it("11. no Worker/WASM/Relay/Storage/NIP-17 reference in the four new/updated production files", () => {
+  it("11. no Worker/Relay/Storage/NIP-17 reference in the four new/updated production files; no real WASM execution primitive either (Stage 388 legitimately references the WASM Boundary abstraction by name)", () => {
     for (const [name, src] of PRODUCTION_FILES) {
       const codeOnly = codeOnlyOf(src);
       expect(codeOnly, name).not.toMatch(/worker\.js|wasm|Relay|Storage|nip.?17|nip-17/i);
     }
-    expect(codeOnlyOf(diagnosticsSource)).not.toMatch(/worker\.js|wasm|Relay|Storage|nip.?17|nip-17/i);
+    const diagnosticsCode = codeOnlyOf(diagnosticsSource);
+    expect(diagnosticsCode).not.toMatch(/worker\.js|Relay|Storage|nip.?17|nip-17/i);
+    expect(diagnosticsCode).not.toMatch(/WebAssembly\s*\.\s*(instantiate|compile)/);
+    expect(diagnosticsCode).not.toMatch(/wasm-bindgen/i);
+    expect(diagnosticsCode).not.toMatch(/\.wasm['"`]/);
   });
 
   it("12. the Worker does not reference any Runtime crypto file or AppRuntime.crypto", () => {
