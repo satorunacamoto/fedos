@@ -55,11 +55,24 @@
  * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`, the SAME constant
  * `evaluateWorkerCryptoActivation` itself now consults (Stage 308).
  * Fixed `false`.
+ *
+ * Stage 317 adds `providerImplementationState`/`providerExecutionState`/
+ * `providerOperationState`, reading `fedos_runtime_crypto_provider.ts`'s
+ * three standalone, pure "state" functions — no instance construction,
+ * no request or secret material exposed. All three stay fixed in this
+ * stage.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
-import { FEDOS_RUNTIME_PROVIDER_IMPLEMENTED } from "./fedos_runtime_crypto_provider.js";
+import type { FedosProviderDecisionReason, FedosRuntimeExecutionState } from "./fedos_runtime_crypto_provider.js";
+import {
+  FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
+  fedosProviderExecutionState,
+  fedosProviderImplementationState,
+  fedosProviderOperationState,
+} from "./fedos_runtime_crypto_provider.js";
+import type { FedosRuntimeOperationStatus } from "./fedos_runtime_operation.js";
 import type { ActivationReason } from "./worker_crypto_activation_policy.js";
 import { evaluateWorkerCryptoActivation } from "./worker_crypto_activation_policy.js";
 import type { WorkerCryptoProviderName } from "./worker_crypto_config.js";
@@ -106,6 +119,24 @@ export interface WorkerCryptoActivationStatus {
    * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED`. Fixed `false` in this stage.
    */
   readonly providerImplemented: boolean;
+  /**
+   * WHY `FedosRuntimeCryptoProvider.encrypt()`/`decrypt()` currently deny
+   * every request — `fedosProviderImplementationState()`'s own answer.
+   * Fixed `"NotImplemented"` in this stage.
+   */
+  readonly providerImplementationState: FedosProviderDecisionReason;
+  /**
+   * What `FedosRuntimeCryptoProvider.planExecution()` would resolve to
+   * — `fedosProviderExecutionState()`'s own answer. Fixed
+   * `"BlockedByImplementation"` in this stage.
+   */
+  readonly providerExecutionState: FedosRuntimeExecutionState;
+  /**
+   * The `FedosRuntimeOperationStatus` a planned operation would resolve
+   * to — `fedosProviderOperationState()`'s own answer. Fixed `"Blocked"`
+   * in this stage.
+   */
+  readonly providerOperationState: FedosRuntimeOperationStatus;
 }
 
 /**
@@ -138,5 +169,8 @@ export function workerCryptoActivationStatus(
     reachable: false,
     activationReason: evaluateWorkerCryptoActivation(config, env).reason,
     providerImplemented: FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
+    providerImplementationState: fedosProviderImplementationState(),
+    providerExecutionState: fedosProviderExecutionState(),
+    providerOperationState: fedosProviderOperationState(),
   };
 }

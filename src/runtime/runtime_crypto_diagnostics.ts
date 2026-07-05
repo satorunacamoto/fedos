@@ -69,6 +69,16 @@
  * Fixed `false`; setting BOTH `FEDOS_CRYPTO_PROVIDER=fedos` AND
  * `FEDOS_CRYPTO_ENABLED=explicit-dev-only` still leaves
  * `activationReason: "ProviderUnavailable"` (unchanged from Stage 297).
+ *
+ * Stage 317 adds `providerImplementationState`/`providerExecutionState`/
+ * `providerOperationState`, reading `fedos_runtime_crypto_provider.ts`'s
+ * (Stage 317) three standalone, pure "state" functions —
+ * `fedosProviderImplementationState()`/`fedosProviderExecutionState()`/
+ * `fedosProviderOperationState()` — which need no
+ * `FedosRuntimeCryptoProvider` instance and expose no request or secret
+ * material. All three are fully determined by
+ * `FEDOS_RUNTIME_PROVIDER_IMPLEMENTED` alone, so all three stay fixed in
+ * this stage.
  */
 
 import type {
@@ -78,7 +88,14 @@ import type {
 } from "./crypto_provider.js";
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
 import { parseFedosCryptoEnabledEnv } from "./crypto_provider_env.js";
-import { FEDOS_RUNTIME_PROVIDER_IMPLEMENTED } from "./fedos_runtime_crypto_provider.js";
+import type { FedosProviderDecisionReason, FedosRuntimeExecutionState } from "./fedos_runtime_crypto_provider.js";
+import {
+  FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
+  fedosProviderExecutionState,
+  fedosProviderImplementationState,
+  fedosProviderOperationState,
+} from "./fedos_runtime_crypto_provider.js";
+import type { FedosRuntimeOperationStatus } from "./fedos_runtime_operation.js";
 import type { ActivationReason } from "./runtime_crypto_activation_policy.js";
 import { evaluateRuntimeCryptoActivation } from "./runtime_crypto_activation_policy.js";
 import type { RuntimeCryptoProviderName } from "./runtime_crypto_config.js";
@@ -188,6 +205,26 @@ export interface RuntimeCryptoActivationStatus {
    * Stage 305). Fixed `false` in this stage.
    */
   readonly providerImplemented: boolean;
+  /**
+   * WHY `FedosRuntimeCryptoProvider.encrypt()`/`decrypt()` currently deny
+   * every request — `fedosProviderImplementationState()`'s own answer
+   * (`src/runtime/fedos_runtime_crypto_provider.ts`, Stage 307/317).
+   * Fixed `"NotImplemented"` in this stage.
+   */
+  readonly providerImplementationState: FedosProviderDecisionReason;
+  /**
+   * What `FedosRuntimeCryptoProvider.planExecution()` would resolve to
+   * — `fedosProviderExecutionState()`'s own answer (Stage 316/317).
+   * Fixed `"BlockedByImplementation"` in this stage.
+   */
+  readonly providerExecutionState: FedosRuntimeExecutionState;
+  /**
+   * The `FedosRuntimeOperationStatus` a planned operation would resolve
+   * to — `fedosProviderOperationState()`'s own answer
+   * (`src/runtime/fedos_runtime_operation.ts`, Stage 313/317). Fixed
+   * `"Blocked"` in this stage.
+   */
+  readonly providerOperationState: FedosRuntimeOperationStatus;
 }
 
 /**
@@ -221,5 +258,8 @@ export function runtimeCryptoActivationStatus(
     effectiveProvider,
     activationReason: evaluateRuntimeCryptoActivation(config, env).reason,
     providerImplemented: FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
+    providerImplementationState: fedosProviderImplementationState(),
+    providerExecutionState: fedosProviderExecutionState(),
+    providerOperationState: fedosProviderOperationState(),
   };
 }
