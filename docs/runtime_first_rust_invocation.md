@@ -84,6 +84,19 @@ own Stage 377 candidate list) would:
    (`packages/fedos-core-rust/src/lib.rs`), which already exist and are
    already tested, but are not yet reachable from TypeScript at all.
 
+## 4a. Update (Stage 377–384): the migration path above, step 2, happened
+
+Stage 377 extends `planPing()` to reach `fedos_runtime_ping_internal()`'s
+own contract via a hand-maintained, pure TypeScript mirror
+(`fedosRustPingBridgeCall()`) — WITHOUT introducing the FFI/WASM
+boundary step 1 above still describes as a prerequisite. This is a
+verified logical equivalence, not a literal cross-language call; see
+`docs/runtime_first_rust_ping_execution.md` for the full, honest
+explanation of what changed and what did not. Step 1 (promoting
+`fedos_runtime_ping_internal()` to a real public/FFI/WASM-callable
+surface) and step 3 (any cryptographic function crossing that same
+boundary) remain entirely unstarted.
+
 ## 5. Still true after this stage
 
 - No cryptographic operation of any kind is ever executed.
@@ -99,6 +112,9 @@ own Stage 377 candidate list) would:
 
 ## See also
 
+- `docs/runtime_first_rust_ping_execution.md` (Stage 377–384) — what
+  happened next: `planPing()`'s new, honestly-explained "executed"
+  behavior.
 - `docs/runtime_fedos_rust_invocation_adapter.md` (Stage 361–368) — the
   Rust Invocation Adapter this stage's `planPing()` extends.
 - `docs/runtime_internal_execution_contract.md` (Stage 356) — the
