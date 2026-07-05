@@ -176,8 +176,16 @@ describe("Runtime crypto boundary foundation (Stage 249-256)", () => {
       expect(codeOnly.toLowerCase()).not.toContain("wasm_loader");
       expect(codeOnly).not.toMatch(/import\s+.*fedos-core-rust/);
     }
-    expect(createRuntimeSource).not.toMatch(/RuntimeCryptoProvider|PlaceholderRuntimeCryptoProvider/);
-    expect(runtimeTypesSource).not.toMatch(/RuntimeCryptoProvider/);
+    // Stage 260 legitimately wires RuntimeCryptoProvider into
+    // createRuntime()/AppRuntime as a SELECTION-only field
+    // (`runtime.crypto`) — never calling FedOS or real crypto. The
+    // pre-existing, UNRELATED selectCryptoProvider()/FedosCoreCryptoProvider
+    // wiring (Stage 65) is untouched and still present in this same file —
+    // this check only confirms the NEW seam never calls encrypt/decrypt.
+    expect(createRuntimeSource).toMatch(/selectRuntimeCryptoProvider/);
+    expect(createRuntimeSource).toMatch(/buildRuntimeCryptoProvider/);
+    expect(createRuntimeSource).not.toMatch(/\.\s*(encrypt|decrypt)\s*\(/);
+    expect(runtimeTypesSource).not.toMatch(/new\s+FedosCoreCryptoProvider|new\s+PlaceholderFedosCoreCrypto/);
     expect(workerSource).not.toMatch(/RuntimeCryptoProvider|PlaceholderRuntimeCryptoProvider/);
   });
 

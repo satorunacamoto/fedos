@@ -35,6 +35,7 @@ import type { FederationProvider } from "../federation/types.js";
 import type { ChatProvider } from "../chat/types.js";
 import type { MarketplaceProvider } from "../marketplace/types.js";
 import type { EntitlementProvider } from "../creator/entitlement.js";
+import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -302,6 +303,15 @@ export interface RuntimeOverrides {
    * the runtime never calls its `checkPlaceholder`.
    */
   readonly creatorEntitlementProvider?: EntitlementProvider;
+  /**
+   * Pre-built Runtime crypto provider (Stage 249's `RuntimeCryptoProvider`
+   * seam — deliberately SEPARATE from `cryptoProvider`/`CryptoProvider`
+   * above). Wins over the default. Selection only — the runtime never
+   * calls its `encrypt`/`decrypt`, and this stage's own default
+   * (`buildRuntimeCryptoProvider`, Stage 259) never resolves anything but
+   * a placeholder regardless of this override being supplied or not.
+   */
+  readonly runtimeCryptoProvider?: RuntimeCryptoProvider;
 }
 
 /** The assembled set of boundaries the app runs against. */
@@ -407,4 +417,18 @@ export interface AppRuntime {
    * no access and contacts no payment rail.
    */
   readonly creatorEntitlementProvider: EntitlementProvider;
+  /**
+   * The selected Runtime crypto provider (Stage 249's
+   * `RuntimeCryptoProvider` seam — deliberately SEPARATE from `cryptoProvider`
+   * above; see `docs/runtime_crypto_bridge.md`/`docs/runtime_worker_crypto_bridge.md`).
+   * ALWAYS a `PlaceholderRuntimeCryptoProvider` in this stage (via
+   * `buildRuntimeCryptoProvider`, Stage 259) unless
+   * `overrides.runtimeCryptoProvider` is supplied — and even that override
+   * path never causes THIS runtime to call `encrypt`/`decrypt`
+   * automatically, since `createRuntime` never invokes them.
+   * `runtimeCryptoEnabled` (`src/runtime/runtime_crypto_config.ts`) is
+   * permanently `false`; no `packages/fedos-core-rust` call (Rust crate or
+   * TS package boundary) happens anywhere in resolving this field.
+   */
+  readonly crypto: RuntimeCryptoProvider;
 }

@@ -14,6 +14,14 @@
  *     perform an operation, only to report its own state.
  *   - NO `packages/fedos-core-rust` reference (Rust crate or TS package
  *     boundary).
+ *
+ * Stage 261 adds [`runtimeCryptoActivationStatus`] — a fixed,
+ * `{ enabled: false, provider: "placeholder" }` summary read directly from
+ * `src/runtime/runtime_crypto_config.ts`'s (Stage 258) own config, for a
+ * simple activation-status display distinct from the fuller
+ * `RuntimeCryptoDiagnosticsReport` above. `enabled` is `false` because
+ * `runtimeCryptoEnabled` is permanently `false` — not because this function
+ * re-derives it independently.
  */
 
 import type {
@@ -21,6 +29,7 @@ import type {
   RuntimeCryptoProvider,
   RuntimeCryptoState,
 } from "./crypto_provider.js";
+import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
 
 /**
  * A non-sensitive, display-only readiness label for a `RuntimeCryptoProvider`
@@ -81,5 +90,27 @@ export function runtimeCryptoDiagnosticsPreview(
     state: mapProviderStateToDiagnosticsState(status.state),
     capabilities: provider.capabilities(),
     reason: status.reason,
+  };
+}
+
+/** A minimal, non-sensitive activation summary — see this module's Stage 261 doc comment above. */
+export interface RuntimeCryptoActivationStatus {
+  readonly enabled: boolean;
+  readonly provider: "placeholder";
+}
+
+/**
+ * Read-only activation summary: `enabled` mirrors
+ * `runtimeCryptoEnabled` (`src/runtime/runtime_crypto_config.ts`) exactly —
+ * permanently `false` in this stage — and `provider` is fixed at
+ * `"placeholder"`, the only provider name this stage's registry/bridge ever
+ * resolves. Takes no parameter, reads no environment variable, and never
+ * calls a `RuntimeCryptoProvider` method.
+ */
+export function runtimeCryptoActivationStatus(): RuntimeCryptoActivationStatus {
+  const { runtimeCryptoEnabled } = getRuntimeCryptoConfig();
+  return {
+    enabled: runtimeCryptoEnabled,
+    provider: "placeholder",
   };
 }

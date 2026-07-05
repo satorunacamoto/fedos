@@ -84,6 +84,8 @@ import { NoopMarketplaceProvider } from "../marketplace/noop_marketplace.js";
 import type { MarketplaceProvider } from "../marketplace/types.js";
 import { NoopEntitlementProvider } from "../creator/entitlement.js";
 import type { EntitlementProvider } from "../creator/entitlement.js";
+import type { RuntimeCryptoProvider } from "./crypto_provider.js";
+import { buildRuntimeCryptoProvider } from "./runtime_crypto_bridge.js";
 import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
@@ -549,6 +551,27 @@ export function isPromotionProviderPreviewAllowed(env?: RuntimeEnv): boolean {
   return isEnvFlagTruthy(env?.ENABLE_PROMOTION_PROVIDER_PREVIEW);
 }
 
+/**
+ * Select the Runtime crypto provider (Stage 249's `RuntimeCryptoProvider`
+ * seam, deliberately separate from `cryptoProvider`/`CryptoProvider` above).
+ * Priority:
+ *   1. `overrides.runtimeCryptoProvider` — wins unconditionally.
+ *   2. Otherwise → `buildRuntimeCryptoProvider()` (Stage 259), which always
+ *      resolves the safe placeholder — `runtimeCryptoEnabled`
+ *      (`src/runtime/runtime_crypto_config.ts`) is permanently `false`.
+ *
+ * Reads NO `RuntimeEnv` field — this seam has no env-selectable option in
+ * this stage. Selection only: constructing the provider calls no FedOS core
+ * (Rust crate or TS package boundary), loads no WASM, and never invokes
+ * `encrypt`/`decrypt` automatically.
+ */
+export function selectRuntimeCryptoProvider(
+  overrides: RuntimeOverrides = {},
+): RuntimeCryptoProvider {
+  if (overrides.runtimeCryptoProvider) return overrides.runtimeCryptoProvider;
+  return buildRuntimeCryptoProvider();
+}
+
 /** Cloudflare when any binding/endpoint is present, local with a bare env, else test. */
 function resolveMode(env?: RuntimeEnv): RuntimeMode {
   if (!env) return "test";
@@ -598,5 +621,6 @@ export function createRuntime(
     chatProvider: selectChatProvider(env, overrides),
     marketplaceProvider: selectMarketplaceProvider(env, overrides),
     creatorEntitlementProvider: selectCreatorEntitlementProvider(env, overrides),
+    crypto: selectRuntimeCryptoProvider(overrides),
   };
 }
