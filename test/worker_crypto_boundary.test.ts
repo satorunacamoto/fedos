@@ -1,0 +1,210 @@
+import { describe, it, expect } from "vitest";
+import { PlaceholderRuntimeCryptoProvider } from "../src/runtime/crypto_provider.js";
+import { FedosRuntimeCryptoProvider } from "../src/runtime/fedos_runtime_crypto_provider.js";
+import {
+  WORKER_CRYPTO_CONFIG,
+  WORKER_CRYPTO_PROVIDER_NAMES,
+  getWorkerCryptoConfig,
+} from "../src/runtime/worker_crypto_config.js";
+import {
+  WORKER_FEDOS_PROVIDER_NAME,
+  WORKER_PLACEHOLDER_PROVIDER_NAME,
+  createDefaultWorkerCryptoProviderRegistry,
+} from "../src/runtime/worker_crypto_registry.js";
+import { buildWorkerCryptoProvider } from "../src/runtime/worker_crypto_bridge.js";
+import { workerCryptoActivationStatus } from "../src/runtime/worker_crypto_diagnostics.js";
+import { RuntimeCryptoProviderRegistry } from "../src/runtime/runtime_crypto_registry.js";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import configSource from "../src/runtime/worker_crypto_config.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import registrySource from "../src/runtime/worker_crypto_registry.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import bridgeSource from "../src/runtime/worker_crypto_bridge.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import diagnosticsSource from "../src/runtime/worker_crypto_diagnostics.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import runtimeConfigSource from "../src/runtime/runtime_crypto_config.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import runtimeBridgeSource from "../src/runtime/runtime_crypto_bridge.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import runtimeRegistrySource from "../src/runtime/runtime_crypto_registry.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import runtimeTypesSource from "../src/runtime/types.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import workerSource from "../src/worker.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import packageJsonSource from "../package.json?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import activationBoundaryDocSource from "../docs/runtime_worker_activation_boundary.md?raw";
+
+/**
+ * Stage 273–280 — "Worker Opt-in Gate Foundation":
+ * src/runtime/worker_crypto_config.ts (Stage 273),
+ * src/runtime/worker_crypto_registry.ts (Stage 274),
+ * src/runtime/worker_crypto_bridge.ts (Stage 275),
+ * docs/runtime_worker_activation_boundary.md (Stage 276),
+ * src/runtime/worker_crypto_diagnostics.ts (Stage 277). Default OFF,
+ * Worker never calls FedOS, Runtime never executes crypto, no Relay
+ * connection, and the Worker/Runtime crypto stacks never reach into each
+ * other's registry/bridge/config.
+ */
+describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
+  function codeOnlyOf(source: string): string {
+    return source
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+      .join("\n");
+  }
+
+  const WORKER_PRODUCTION_FILES: [string, string][] = [
+    ["worker_crypto_config.ts", configSource],
+    ["worker_crypto_registry.ts", registrySource],
+    ["worker_crypto_bridge.ts", bridgeSource],
+    ["worker_crypto_diagnostics.ts", diagnosticsSource],
+  ];
+
+  it("1. WORKER_CRYPTO_CONFIG/getWorkerCryptoConfig fix workerCryptoEnabled: false and workerCryptoProvider: 'placeholder'", () => {
+    expect(WORKER_CRYPTO_CONFIG).toEqual({
+      workerCryptoEnabled: false,
+      workerCryptoProvider: "placeholder",
+    });
+    expect(getWorkerCryptoConfig()).toEqual(WORKER_CRYPTO_CONFIG);
+    expect(Object.isFrozen(WORKER_CRYPTO_CONFIG)).toBe(true);
+    expect(WORKER_CRYPTO_PROVIDER_NAMES).toEqual(["placeholder", "fedos"]);
+  });
+
+  it("2. worker_crypto_config.ts reads no RuntimeEnv/process.env field", () => {
+    const codeOnly = codeOnlyOf(configSource);
+    expect(codeOnly).not.toMatch(/process\.env/);
+    expect(codeOnly).not.toMatch(/RuntimeEnv/);
+  });
+
+  it("3. the default Worker registry registers placeholder and fedos, and fedos is constructible but never executed", async () => {
+    const registry = createDefaultWorkerCryptoProviderRegistry();
+    expect(registry.names()).toEqual([
+      WORKER_PLACEHOLDER_PROVIDER_NAME,
+      WORKER_FEDOS_PROVIDER_NAME,
+    ]);
+    const provider = registry.create(WORKER_FEDOS_PROVIDER_NAME);
+    expect(provider).toBeInstanceOf(FedosRuntimeCryptoProvider);
+    const decision = await provider!.encrypt({});
+    expect(decision.state).toBe("Unsupported");
+  });
+
+  it("4. the Worker registry is a separate instance from the Runtime registry", () => {
+    const workerRegistry = createDefaultWorkerCryptoProviderRegistry();
+    expect(workerRegistry).toBeInstanceOf(RuntimeCryptoProviderRegistry);
+    // Registering in one does not appear in the other.
+    workerRegistry.register("custom-worker-only", () => new PlaceholderRuntimeCryptoProvider());
+    expect(workerRegistry.names()).toContain("custom-worker-only");
+  });
+
+  it("5. buildWorkerCryptoProvider always resolves placeholder (the two-flag gate never passes), only via the Worker Registry", () => {
+    const provider = buildWorkerCryptoProvider();
+    expect(provider).toBeInstanceOf(PlaceholderRuntimeCryptoProvider);
+    expect(provider).not.toBeInstanceOf(FedosRuntimeCryptoProvider);
+  });
+
+  it("6. the bridge's two-flag gate is evaluated with && (never ||) in source", () => {
+    expect(bridgeSource).toMatch(
+      /workerCryptoEnabled\s*&&\s*workerCryptoProvider\s*===\s*WORKER_FEDOS_PROVIDER_NAME/,
+    );
+    expect(codeOnlyOf(bridgeSource)).not.toMatch(
+      /workerCryptoEnabled\s*\|\|\s*workerCryptoProvider/,
+    );
+  });
+
+  it("7. no RuntimeCryptoProvider is constructed with `new` outside worker_crypto_registry.ts among the Worker production files", () => {
+    for (const [name, src] of WORKER_PRODUCTION_FILES) {
+      if (name === "worker_crypto_registry.ts") continue;
+      const codeOnly = codeOnlyOf(src);
+      expect(codeOnly, `${name} must not construct a provider with new`).not.toMatch(
+        /new\s+(PlaceholderRuntimeCryptoProvider|FedosRuntimeCryptoProvider)/,
+      );
+    }
+  });
+
+  it("8. Worker crypto files never call encrypt/decrypt themselves", () => {
+    for (const [name, src] of WORKER_PRODUCTION_FILES) {
+      expect(codeOnlyOf(src), name).not.toMatch(/\.\s*(encrypt|decrypt)\s*\(/);
+    }
+  });
+
+  it("9. Worker crypto files never import the Runtime's own registry/bridge/config (each boundary stays independent)", () => {
+    expect(codeOnlyOf(bridgeSource)).not.toMatch(
+      /createDefaultRuntimeCryptoProviderRegistry|buildRuntimeCryptoProvider|getRuntimeCryptoConfig/,
+    );
+    expect(codeOnlyOf(registrySource)).not.toMatch(/createDefaultRuntimeCryptoProviderRegistry/);
+    expect(codeOnlyOf(diagnosticsSource)).not.toMatch(/getRuntimeCryptoConfig|runtimeCryptoActivationStatus/);
+  });
+
+  it("10. the Runtime's own registry/bridge/config never import any Worker crypto file (independent both ways)", () => {
+    for (const src of [runtimeConfigSource, runtimeBridgeSource, runtimeRegistrySource, createRuntimeSource, runtimeTypesSource]) {
+      // Match actual imports/identifiers, not the pre-existing (Stage 252)
+      // docs/runtime_worker_crypto_bridge.md filename reference, which
+      // legitimately contains the substring "worker_crypto_bridge".
+      expect(src).not.toMatch(/from\s+["'][^"']*worker_crypto_(config|registry|bridge|diagnostics)\.js["']/);
+      expect(src).not.toMatch(/\bWorkerCryptoConfig\b|\bbuildWorkerCryptoProvider\b/);
+    }
+  });
+
+  it("11. no direct Rust/WASM/Relay/Storage reference in the four Worker production files", () => {
+    for (const [name, src] of WORKER_PRODUCTION_FILES) {
+      const codeOnly = codeOnlyOf(src);
+      expect(codeOnly, name).not.toMatch(/fedos-core-rust|wasm|Relay|Storage|nip.?17|nip-17/i);
+    }
+  });
+
+  it("12. src/worker.ts does not reference any Worker crypto file", () => {
+    expect(workerSource).not.toMatch(
+      /worker_crypto_config|worker_crypto_registry|worker_crypto_bridge|worker_crypto_diagnostics|buildWorkerCryptoProvider|WorkerCryptoConfig/,
+    );
+  });
+
+  it("13. workerCryptoActivationStatus reports { enabled: false, provider: 'placeholder', reachable: false }", () => {
+    expect(workerCryptoActivationStatus()).toEqual({
+      enabled: false,
+      provider: "placeholder",
+      reachable: false,
+    });
+  });
+
+  it("14. docs/runtime_worker_activation_boundary.md exists, names the five-layer order, and adds no code", () => {
+    expect(activationBoundaryDocSource).toMatch(/this document adds no code/i);
+    expect(activationBoundaryDocSource).toMatch(/Runtime/);
+    expect(activationBoundaryDocSource).toMatch(/Worker Bridge/);
+    expect(activationBoundaryDocSource).toMatch(/FedOS Provider/);
+    expect(activationBoundaryDocSource).toMatch(/FedOS Core/);
+    expect(activationBoundaryDocSource).toMatch(/Crypto/);
+  });
+
+  it("15. public pub fn surface is unchanged at twenty-seven", () => {
+    const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
+    expect(pubFnNames.length).toBe(27);
+  });
+
+  it("16. Cargo.toml and package.json dependency counts are unchanged", () => {
+    const cargoCode = cargoTomlSource
+      .split("\n")
+      .map((line: string) => line.replace(/#.*$/, ""))
+      .join("\n")
+      .toLowerCase();
+    const depsIdx = cargoCode.indexOf("[dependencies]");
+    const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
+    const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
+    const depLines = productionDepsSection
+      .split("\n")
+      .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
+    expect(depLines.length).toBe(10);
+
+    const pkg = JSON.parse(packageJsonSource);
+    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+  });
+});
