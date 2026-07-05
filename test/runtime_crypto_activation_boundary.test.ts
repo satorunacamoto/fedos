@@ -212,6 +212,8 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       runtimeExecutionState: "BlockedByImplementation",
       rustBoundaryState: "NotConnected",
       rustBoundaryReachable: true,
+      rustApiState: "NotConnected",
+      rustApiReachable: true,
     });
   });
 

@@ -153,6 +153,8 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       runtimeExecutionState: "BlockedByImplementation",
       rustBoundaryState: "NotConnected",
       rustBoundaryReachable: true,
+      rustApiState: "NotConnected",
+      rustApiReachable: true,
     });
   });
 

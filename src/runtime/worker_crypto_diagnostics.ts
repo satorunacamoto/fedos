@@ -68,8 +68,11 @@
  *
  * Stage 333 adds `rustBoundaryState`/`rustBoundaryReachable` — see
  * `runtime_crypto_diagnostics.ts`'s own Stage 333 doc comment.
- * `providerImplementationStage` now reflects the extended five-step
- * milestone, fixed at `"RustBoundaryReady"`.
+ *
+ * Stage 341 adds `rustApiState`/`rustApiReachable` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 341 doc comment.
+ * `providerImplementationStage` now reflects the extended six-step
+ * milestone, fixed at `"RustApiReady"`.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -81,6 +84,8 @@ import type {
   FedosProviderImplementationStage,
   FedosRuntimeExecutionState,
 } from "./fedos_runtime_crypto_provider.js";
+import type { FedosRustApiState } from "./fedos_rust_api.js";
+import { fedosRustApiReachable, fedosRustApiState } from "./fedos_rust_api.js";
 import type { FedosRustBoundaryState } from "./fedos_rust_boundary.js";
 import { fedosRustBoundaryReachable, fedosRustBoundaryState } from "./fedos_rust_boundary.js";
 import {
@@ -158,7 +163,7 @@ export interface WorkerCryptoActivationStatus {
   /**
    * The internal architecture's own coarse milestone —
    * `fedosProviderImplementationStage()`'s own answer. Fixed
-   * `"OpaqueApiReady"` in this stage.
+   * `"RustApiReady"` in this stage.
    */
   readonly providerImplementationStage: FedosProviderImplementationStage;
   /**
@@ -184,6 +189,18 @@ export interface WorkerCryptoActivationStatus {
    * crypto executes.
    */
   readonly rustBoundaryReachable: boolean;
+  /**
+   * The Rust API's own status — `fedosRustApiState()`'s own answer.
+   * Fixed `"NotConnected"` in this stage.
+   */
+  readonly rustApiState: FedosRustApiState;
+  /**
+   * Whether the Rust API is structurally reachable from the Rust
+   * Boundary's own internal chain — `fedosRustApiReachable()`'s own
+   * answer. Fixed `true` in this stage, NOT a claim that real Rust
+   * crypto executes.
+   */
+  readonly rustApiReachable: boolean;
 }
 
 /**
@@ -224,5 +241,7 @@ export function workerCryptoActivationStatus(
     runtimeExecutionState: fedosProviderExecutionState(),
     rustBoundaryState: fedosRustBoundaryState(),
     rustBoundaryReachable: fedosRustBoundaryReachable(),
+    rustApiState: fedosRustApiState(),
+    rustApiReachable: fedosRustApiReachable(),
   };
 }
