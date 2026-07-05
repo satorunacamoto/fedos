@@ -182,6 +182,8 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       providerImplementationStage: "RustBoundaryReady",
       opaqueApiState: "NotConnected",
       runtimeExecutionState: "BlockedByImplementation",
+      rustBoundaryState: "NotConnected",
+      rustBoundaryReachable: true,
     });
   });
 

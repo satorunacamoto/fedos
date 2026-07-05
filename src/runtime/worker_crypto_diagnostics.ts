@@ -65,6 +65,11 @@
  * Stage 325 adds `providerImplementationStage`/`opaqueApiState`/
  * `runtimeExecutionState` — see `runtime_crypto_diagnostics.ts`'s own
  * Stage 325 doc comment for the exact meaning of each.
+ *
+ * Stage 333 adds `rustBoundaryState`/`rustBoundaryReachable` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 333 doc comment.
+ * `providerImplementationStage` now reflects the extended five-step
+ * milestone, fixed at `"RustBoundaryReady"`.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -76,6 +81,8 @@ import type {
   FedosProviderImplementationStage,
   FedosRuntimeExecutionState,
 } from "./fedos_runtime_crypto_provider.js";
+import type { FedosRustBoundaryState } from "./fedos_rust_boundary.js";
+import { fedosRustBoundaryReachable, fedosRustBoundaryState } from "./fedos_rust_boundary.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -165,6 +172,18 @@ export interface WorkerCryptoActivationStatus {
    * second name. Fixed `"BlockedByImplementation"` in this stage.
    */
   readonly runtimeExecutionState: FedosRuntimeExecutionState;
+  /**
+   * The Rust Boundary's own status — `fedosRustBoundaryState()`'s own
+   * answer. Fixed `"NotConnected"` in this stage.
+   */
+  readonly rustBoundaryState: FedosRustBoundaryState;
+  /**
+   * Whether the Rust Boundary is structurally reachable from the
+   * Opaque API's own internal chain — `fedosRustBoundaryReachable()`'s
+   * own answer. Fixed `true` in this stage, NOT a claim that real Rust
+   * crypto executes.
+   */
+  readonly rustBoundaryReachable: boolean;
 }
 
 /**
@@ -203,5 +222,7 @@ export function workerCryptoActivationStatus(
     providerImplementationStage: fedosProviderImplementationStage(),
     opaqueApiState: fedosOpaqueApiState(),
     runtimeExecutionState: fedosProviderExecutionState(),
+    rustBoundaryState: fedosRustBoundaryState(),
+    rustBoundaryReachable: fedosRustBoundaryReachable(),
   };
 }
