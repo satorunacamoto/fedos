@@ -106,10 +106,13 @@
  *
  * Stage 332 EXTENDS that milestone from four steps to five:
  * `"Unavailable"` → `"ProviderReady"` → `"OpaqueApiReady"` →
- * `"RustBoundaryReady"` → `"RustReady"`. Fixed at
- * `"RustBoundaryReady"` in this stage — the Rust Boundary abstraction
- * (`fedos_rust_boundary.ts`, Stage 329) now exists and is wired into
- * the Opaque API (Stage 330), but no REAL Rust connection exists yet.
+ * `"RustBoundaryReady"` → `"RustReady"`.
+ *
+ * Stage 340 EXTENDS it again, from five steps to six, inserting
+ * `"RustApiReady"` between `"RustBoundaryReady"` and `"RustReady"`.
+ * Fixed at `"RustApiReady"` in this stage — the Rust API abstraction
+ * (`fedos_rust_api.ts`, Stage 337) now exists and is wired into the
+ * Rust Boundary (Stage 338), but no REAL Rust connection exists yet.
  * `"RustReady"` remains RESERVED and unreachable.
  */
 
@@ -268,7 +271,7 @@ export function fedosProviderOperationState(): FedosRuntimeOperationStatus {
 }
 
 /**
- * A coarse, five-step milestone tracking how far the INTERNAL
+ * A coarse, six-step milestone tracking how far the INTERNAL
  * ARCHITECTURE around `FedosRuntimeCryptoProvider` has progressed —
  * distinct from `FedosRuntimeExecutionState`/`FedosRuntimeOperationStatus`
  * (which describe a single PLANNED operation's fate, not the
@@ -279,18 +282,20 @@ export function fedosProviderOperationState(): FedosRuntimeOperationStatus {
  *   - `"OpaqueApiReady"` — the Opaque API abstraction exists and is
  *     wired (Stage 321–328).
  *   - `"RustBoundaryReady"` — the Rust Boundary abstraction exists and
- *     is wired into the Opaque API (Stage 329–336) — THIS STAGE'S
- *     ACTUAL VALUE.
+ *     is wired into the Opaque API (Stage 329–336).
+ *   - `"RustApiReady"` — the Rust API abstraction exists and is wired
+ *     into the Rust Boundary (Stage 337–344) — THIS STAGE'S ACTUAL
+ *     VALUE.
  *   - `"RustReady"` — RESERVED for a future, separate,
- *     explicitly-reviewed stage that connects the Rust Boundary to
- *     REAL `packages/fedos-core-rust` execution. Unreachable in this
- *     stage.
+ *     explicitly-reviewed stage that connects the Rust API to REAL
+ *     `packages/fedos-core-rust` execution. Unreachable in this stage.
  */
 export type FedosProviderImplementationStage =
   | "Unavailable"
   | "ProviderReady"
   | "OpaqueApiReady"
   | "RustBoundaryReady"
+  | "RustApiReady"
   | "RustReady"; // RESERVED — never produced in this stage
 
 /** Every `FedosProviderImplementationStage`, in order, for validation/documentation helpers. */
@@ -299,16 +304,17 @@ export const FEDOS_PROVIDER_IMPLEMENTATION_STAGES: readonly FedosProviderImpleme
   "ProviderReady",
   "OpaqueApiReady",
   "RustBoundaryReady",
+  "RustApiReady",
   "RustReady",
 ];
 
 /**
  * Pure, standalone: the current `FedosProviderImplementationStage`.
  * Fixed, hand-maintained — never computed from a live probe. Currently
- * `"RustBoundaryReady"`.
+ * `"RustApiReady"`.
  */
 export function fedosProviderImplementationStage(): FedosProviderImplementationStage {
-  return "RustBoundaryReady";
+  return "RustApiReady";
 }
 
 /**

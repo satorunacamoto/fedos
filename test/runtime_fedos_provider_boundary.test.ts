@@ -148,7 +148,7 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       providerImplementationState: "NotImplemented",
       providerExecutionState: "BlockedByImplementation",
       providerOperationState: "Blocked",
-      providerImplementationStage: "RustBoundaryReady",
+      providerImplementationStage: "RustApiReady",
       opaqueApiState: "NotConnected",
       runtimeExecutionState: "BlockedByImplementation",
       rustBoundaryState: "NotConnected",

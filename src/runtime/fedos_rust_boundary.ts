@@ -43,8 +43,18 @@
  *     Nostr/NIP-17 reference.
  *   - Pure; every method here is synchronous, never throws, never
  *     mutates its argument.
+ *
+ * Stage 338 extends `FedosRustBoundaryPlaceholder.planRustEncrypt()`/
+ * `planRustDecrypt()` with a SIXTH link: each now builds a
+ * `FedosRustApi` (`fedos_rust_api.ts`, Stage 337) and routes the
+ * request to it via `planFedosRustApiExecution` — then DISCARDS the
+ * Rust API's own decision and returns its OWN, unchanged
+ * `"BlockedByImplementation"` answer. The Rust API itself never
+ * invokes `packages/fedos-core-rust`/WASM/FFI; execution stops
+ * immediately before the actual Rust implementation.
  */
 
+import { createFedosRustApi, planFedosRustApiExecution } from "./fedos_rust_api.js";
 import type { FedosOpaqueRequest, OpaqueDecryptRequest, OpaqueEncryptRequest } from "./fedos_runtime_opaque_request.js";
 
 /**
@@ -104,12 +114,25 @@ export class FedosRustBoundaryPlaceholder implements FedosRustBoundary {
     };
   }
 
-  planRustEncrypt(_request: OpaqueEncryptRequest): FedosRustBoundaryDecision {
+  planRustEncrypt(request: OpaqueEncryptRequest): FedosRustBoundaryDecision {
+    this.#reachRustApi(request); // result discarded — request terminates at the Rust API
     return this.#blocked("encrypt");
   }
 
-  planRustDecrypt(_request: OpaqueDecryptRequest): FedosRustBoundaryDecision {
+  planRustDecrypt(request: OpaqueDecryptRequest): FedosRustBoundaryDecision {
+    this.#reachRustApi(request); // result discarded — request terminates at the Rust API
     return this.#blocked("decrypt");
+  }
+
+  /**
+   * PRIVATE — builds a `FedosRustApi` and routes `request` to it. The
+   * API's own decision is discarded; it is never passed to
+   * `packages/fedos-core-rust`/WASM/FFI, never passed to Runtime or
+   * Worker. The Rust API itself never invokes any of those either.
+   */
+  #reachRustApi(request: OpaqueEncryptRequest | OpaqueDecryptRequest): void {
+    const api = createFedosRustApi();
+    planFedosRustApiExecution(api, request);
   }
 
   #blocked(operation: "encrypt" | "decrypt"): FedosRustBoundaryDecision {

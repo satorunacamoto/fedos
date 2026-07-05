@@ -207,7 +207,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       providerImplementationState: "NotImplemented",
       providerExecutionState: "BlockedByImplementation",
       providerOperationState: "Blocked",
-      providerImplementationStage: "RustBoundaryReady",
+      providerImplementationStage: "RustApiReady",
       opaqueApiState: "NotConnected",
       runtimeExecutionState: "BlockedByImplementation",
       rustBoundaryState: "NotConnected",
