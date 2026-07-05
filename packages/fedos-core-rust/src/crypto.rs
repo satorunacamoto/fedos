@@ -298,6 +298,22 @@
 //! `nip44_wire_decrypt_invalid_vectors` module against ALL 12
 //! `invalid.decrypt` cases — every one collapses to `InvalidPayload` or
 //! `AuthenticationFailed`, never a more detailed reason.
+//!
+//! Stage 236 adds `nip44_wire_encrypt` — the complete NIP-44 v2
+//! wire-compatible ENCRYPT pipeline: derive exact message keys (Stage
+//! 219) → pad (Stage 202–203, UNCHANGED) → ChaCha20 stream encrypt
+//! (Stage 229) → HMAC-SHA256 (Stage 231) → encode (Stage 234).
+//! `encrypt_wire_internal` is the ONE production entry point, drawing its
+//! nonce ONLY via `crypto::nip44_wire_nonce::generate_wire_nonce_internal`
+//! (Stage 224); a nonce-accepting variant exists ONLY behind
+//! `#[cfg(test)]`, for deterministic vector testing.
+//!
+//! Stage 237 adds the sibling `#[cfg(test)]`-only `nip44_wire_encrypt_vectors`
+//! module: ALL 10 `valid.encrypt_decrypt` cases' encrypted payload
+//! strings match the vectors' own `payload` field EXACTLY, and
+//! decoding+decrypting each reproduces the documented plaintext exactly
+//! — full round-trip, connecting Stage 234–236's new code to the
+//! existing Stage 219–232 pipeline with zero changes to any of it.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -322,6 +338,7 @@ pub(crate) mod nip44_wire;
 pub(crate) mod nip44_wire_decrypt;
 pub(crate) mod nip44_wire_diagnostics;
 pub(crate) mod nip44_wire_encoding;
+pub(crate) mod nip44_wire_encrypt;
 pub(crate) mod nip44_wire_nonce;
 pub(crate) mod nip44_wire_payload;
 #[cfg(test)]
@@ -342,6 +359,8 @@ mod nip44_wire_decrypt_invalid_vectors;
 mod nip44_wire_decrypt_vectors;
 #[cfg(test)]
 mod nip44_wire_encoding_vectors;
+#[cfg(test)]
+mod nip44_wire_encrypt_vectors;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]
