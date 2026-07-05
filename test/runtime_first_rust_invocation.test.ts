@@ -88,8 +88,12 @@ describe("The first minimal Rust invocation, ping only (Stage 369-376)", () => {
     expect(decision.succeeded).toBe(true);
   });
 
-  it("11. no WASM reference anywhere in the Adapter file", () => {
-    expect(codeOnlyOf(invocationAdapterSource)).not.toMatch(/wasm/i);
+  it("11. the Adapter never actually loads or executes WASM (Stage 387 legitimately references the WASM Boundary abstraction; see test/runtime_wasm_boundary.test.ts for the exhaustive WASM guard)", () => {
+    const codeOnly = codeOnlyOf(invocationAdapterSource);
+    expect(codeOnly).not.toMatch(/WebAssembly\s*\.\s*(instantiate|compile)/);
+    expect(codeOnly).not.toMatch(/wasm-bindgen/i);
+    expect(codeOnly).not.toMatch(/\.wasm['"`]/);
+    expect(codeOnly).not.toMatch(/\bimport\s*\(/);
   });
 
   it("12. no FFI reference anywhere in the Adapter file", () => {

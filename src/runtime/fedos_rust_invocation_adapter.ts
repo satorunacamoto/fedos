@@ -64,15 +64,32 @@
  * plus a `succeeded` boolean instead of reusing
  * `FedosRustInvocationAdapterDecisionState`.
  *
+ * Stage 387 extends `planEncrypt()`/`planDecrypt()` with an ELEVENTH
+ * link: each now builds a `FedosWasmBoundary`
+ * (`fedos_wasm_boundary.ts`, Stage 386) and calls its `planLoad()` —
+ * then DISCARDS the result and returns its OWN, unchanged
+ * `"BlockedByImplementation"` answer. Only `planLoad()` is called —
+ * `FedosWasmBoundary.planEncrypt()`/`planDecrypt()` are never reached
+ * from here in this stage, since no real WASM module could ever be
+ * loaded first. `docs/runtime_rust_boundary_decision.md` (Stage 385)
+ * formally decided WebAssembly is the sole official MVP mechanism for
+ * ever reaching `packages/fedos-core-rust` — this wiring reflects that
+ * decision structurally, without loading or executing anything.
+ * `planPing()` is UNCHANGED by this stage — it still reaches Rust's
+ * contract via its own pure TypeScript mirror, entirely separately.
+ *
  * HARD GUARDRAILS:
  *   - `FedosRustInvocationAdapterPlaceholder` NEVER invokes
  *     `packages/fedos-core-rust` (Rust crate or TS package boundary),
- *     never WASM, never FFI, never any cryptographic operation of any
- *     kind. It simply RECEIVES a `FedosInternalRustCall` and returns a
- *     decision — execution stops here, permanently, in this stage,
- *     for `planEncrypt()`/`planDecrypt()`. `planPing()` never touches
- *     `packages/fedos-core-rust`, WASM, or FFI either — it calls only
- *     this file's own pure TypeScript mirror.
+ *     never calls `WebAssembly.instantiate`/`WebAssembly.compile`,
+ *     never `wasm-bindgen`, never FFI, never a Native Addon, never any
+ *     cryptographic operation of any kind. It simply RECEIVES a
+ *     `FedosInternalRustCall` and returns a decision — execution stops
+ *     here, permanently, in this stage, for `planEncrypt()`/
+ *     `planDecrypt()`. `planPing()` never touches
+ *     `packages/fedos-core-rust`, a real WASM/FFI/Native-Addon
+ *     boundary either — it calls only this file's own pure TypeScript
+ *     mirror.
  *   - NO `SecretHandle`, `ConversationKey`, `MessageKey`, or
  *     `Nip44WirePayload` type or value (all `pub(crate)`-private inside
  *     `packages/fedos-core-rust`, never exposed to TypeScript) is
@@ -82,8 +99,7 @@
  *     `"ReadyForRustExecution"` exists in
  *     `FedosRustInvocationAdapterDecisionState` only as a RESERVED
  *     label for a future, separate, explicitly-reviewed stage; nothing
- *     in this file can ever produce it. Stage 377/378 touches ONLY
- *     `planPing()`.
+ *     in this file can ever produce it.
  *   - No `process.env`/`RuntimeEnv` reference. No network/storage/Relay/
  *     Nostr/NIP-17 reference. No Runtime/Worker activation of any kind.
  *   - Pure; every method here is synchronous, never throws, never
@@ -92,6 +108,7 @@
  */
 
 import type { FedosInternalRustCall } from "./fedos_internal_rust_call.js";
+import { createFedosWasmBoundary } from "./fedos_wasm_boundary.js";
 
 /**
  * Coarse status of the Rust Invocation Adapter abstraction itself.
@@ -194,11 +211,25 @@ export class FedosRustInvocationAdapterPlaceholder implements FedosRustInvocatio
   }
 
   planEncrypt(_call: FedosInternalRustCall): FedosRustInvocationAdapterDecision {
+    this.#reachWasmBoundary(); // result discarded -- no WASM module is ever loaded
     return this.#blocked("Encrypt");
   }
 
   planDecrypt(_call: FedosInternalRustCall): FedosRustInvocationAdapterDecision {
+    this.#reachWasmBoundary(); // result discarded -- no WASM module is ever loaded
     return this.#blocked("Decrypt");
+  }
+
+  /**
+   * PRIVATE — builds a `FedosWasmBoundary` and calls its `planLoad()`.
+   * The result is discarded; it is never passed to
+   * `packages/fedos-core-rust`/a real WASM/FFI boundary, never passed
+   * to Runtime or Worker. The WASM Boundary itself never loads
+   * anything either.
+   */
+  #reachWasmBoundary(): void {
+    const boundary = createFedosWasmBoundary();
+    boundary.planLoad();
   }
 
   planPing(): FedosRustInvocationAdapterPingDecision {

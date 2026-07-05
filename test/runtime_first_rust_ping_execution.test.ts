@@ -94,8 +94,12 @@ describe("The first Rust ping 'execution', fail-closed everywhere else (Stage 37
     expect(codeOnly).not.toMatch(/\bcrypto\b/i);
   });
 
-  it("7. no WASM reference anywhere in the Adapter file", () => {
-    expect(codeOnlyOf(invocationAdapterSource)).not.toMatch(/wasm/i);
+  it("7. the Adapter never actually loads or executes WASM (Stage 387 legitimately references the WASM Boundary abstraction; see test/runtime_wasm_boundary.test.ts for the exhaustive WASM guard)", () => {
+    const codeOnly = codeOnlyOf(invocationAdapterSource);
+    expect(codeOnly).not.toMatch(/WebAssembly\s*\.\s*(instantiate|compile)/);
+    expect(codeOnly).not.toMatch(/wasm-bindgen/i);
+    expect(codeOnly).not.toMatch(/\.wasm['"`]/);
+    expect(codeOnly).not.toMatch(/\bimport\s*\(/);
   });
 
   it("8. no FFI reference anywhere in the Adapter file", () => {
