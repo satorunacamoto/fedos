@@ -29,6 +29,14 @@
  * ALWAYS resolve `"BlockedByImplementation"` — never execute anything,
  * never allocate a payload, plaintext, ciphertext, or key of any kind.
  *
+ * Stage 370 adds `planPing()` — the TypeScript-side counterpart of
+ * `packages/fedos-core-rust`'s new, harmless, constant-returning
+ * `fedos_runtime_ping_internal()` (Stage 369). `planPing()` ALWAYS
+ * resolves `"BlockedByImplementation"` too, in THIS stage — it never
+ * calls Rust yet. Wiring an actual cross-language call is a future,
+ * separate, explicitly-reviewed stage's own decision
+ * (`docs/runtime_first_rust_invocation.md`).
+ *
  * HARD GUARDRAILS:
  *   - `FedosRustInvocationAdapterPlaceholder` NEVER invokes
  *     `packages/fedos-core-rust` (Rust crate or TS package boundary),
@@ -82,6 +90,19 @@ export interface FedosRustInvocationAdapterDecision {
 }
 
 /**
+ * The result of `FedosRustInvocationAdapter.planPing()`. No `kind`
+ * field — ping is neither an encrypt nor a decrypt operation, and
+ * carries no `FedosInternalRustCall` of its own. No payload/plaintext/
+ * ciphertext/key material of any kind — indeed no material of any
+ * kind at all, since `fedos_runtime_ping_internal()` takes no
+ * parameters and returns a single constant `bool`.
+ */
+export interface FedosRustInvocationAdapterPingDecision {
+  readonly state: FedosRustInvocationAdapterDecisionState;
+  readonly reason: string;
+}
+
+/**
  * The Provider-internal, final Rust Invocation Adapter. Receives a
  * `FedosInternalRustCall` and returns a decision — never invokes
  * `packages/fedos-core-rust`, WASM, or FFI. `FedosRustInvocationAdapterPlaceholder`
@@ -91,6 +112,7 @@ export interface FedosRustInvocationAdapter {
   status(): FedosRustInvocationAdapterStatus;
   planEncrypt(call: FedosInternalRustCall): FedosRustInvocationAdapterDecision;
   planDecrypt(call: FedosInternalRustCall): FedosRustInvocationAdapterDecision;
+  planPing(): FedosRustInvocationAdapterPingDecision;
 }
 
 /**
@@ -116,6 +138,13 @@ export class FedosRustInvocationAdapterPlaceholder implements FedosRustInvocatio
 
   planDecrypt(_call: FedosInternalRustCall): FedosRustInvocationAdapterDecision {
     return this.#blocked("Decrypt");
+  }
+
+  planPing(): FedosRustInvocationAdapterPingDecision {
+    return {
+      state: "BlockedByImplementation",
+      reason: "FedOS Rust invocation adapter does not call Rust's ping in this stage: no cross-language wiring exists yet",
+    };
   }
 
   #blocked(kind: "Encrypt" | "Decrypt"): FedosRustInvocationAdapterDecision {
