@@ -249,6 +249,26 @@
 //! (Stage 230) against `test-vectors/nip44/nip44-v2.json`'s
 //! `valid.encrypt_decrypt` category's ciphertext bytes.
 //!
+//! Stage 231 adds `nip44_hmac` — the real NIP-44 v2 HMAC-SHA256
+//! authentication step (RFC 2104, hand-implemented against this crate's
+//! already-adopted `sha2` dependency, no `hmac` crate adopted),
+//! `compute_hmac_internal`/`verify_hmac_internal` (`HMAC-SHA256(hmac_key,
+//! nonce ‖ ciphertext)`), using `subtle::ConstantTimeEq` for the tag
+//! comparison — this crate's own `subtle` dependency (adopted Stage 76
+//! "for a future secret-derived byte comparison", per `Cargo.toml`'s own
+//! comment), finally connected to that exact purpose.
+//! `verify_hmac_internal` returns only `Verified`/`AuthenticationFailed`
+//! — no more detailed reason.
+//!
+//! Stage 232 adds `nip44_wire_decrypt` — the complete NIP-44 v2
+//! wire-compatible DECRYPT pipeline: verify HMAC (Stage 231) →
+//! decrypt ChaCha20 stream (Stage 229) → unpad
+//! (`crypto::nip44_padding`, Stage 202–203, UNCHANGED), in that exact
+//! order, collapsing every reachable failure into a single fixed
+//! `Nip44WireDecryptStatus::AuthenticationFailed` label. Vector-verified
+//! end-to-end by the sibling `#[cfg(test)]`-only `nip44_wire_decrypt_vectors`
+//! module against ALL 10 `valid.encrypt_decrypt` cases — every recovered
+//! plaintext matches exactly.
 #![allow(dead_code)]
 
 pub(crate) mod aead_diagnostics;
@@ -265,10 +285,12 @@ pub(crate) mod message_key;
 pub(crate) mod nip44_bridge;
 pub(crate) mod nip44_decrypt;
 pub(crate) mod nip44_encrypt;
+pub(crate) mod nip44_hmac;
 pub(crate) mod nip44_message_keys;
 pub(crate) mod nip44_padding;
 pub(crate) mod nip44_stream_cipher;
 pub(crate) mod nip44_wire;
+pub(crate) mod nip44_wire_decrypt;
 pub(crate) mod nip44_wire_diagnostics;
 pub(crate) mod nip44_wire_nonce;
 pub(crate) mod nip44_wire_payload;
@@ -284,6 +306,8 @@ mod nip44_message_key_vectors;
 mod nip44_padding_vectors;
 #[cfg(test)]
 mod nip44_stream_cipher_vectors;
+#[cfg(test)]
+mod nip44_wire_decrypt_vectors;
 #[cfg(test)]
 mod nip44_vector_schema;
 #[cfg(test)]
