@@ -235,6 +235,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       executionBackendState: "Planning",
       executionBackendReachable: true,
       backendImplemented: false,
+      wasmToolchainInstalled: false,
+      wasmToolchainVerified: false,
+      wasmBuildReady: false,
     });
   });
 

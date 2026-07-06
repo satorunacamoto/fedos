@@ -214,6 +214,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       executionBackendState: "Planning",
       executionBackendReachable: true,
       backendImplemented: false,
+      wasmToolchainInstalled: false,
+      wasmToolchainVerified: false,
+      wasmBuildReady: false,
     });
   });
 

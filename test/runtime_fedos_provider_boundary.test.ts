@@ -176,6 +176,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       executionBackendState: "Planning",
       executionBackendReachable: true,
       backendImplemented: false,
+      wasmToolchainInstalled: false,
+      wasmToolchainVerified: false,
+      wasmBuildReady: false,
     });
   });
 
