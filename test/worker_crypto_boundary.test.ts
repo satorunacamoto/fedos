@@ -219,6 +219,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       wasmBuildReady: false,
       wasmArtifactGenerated: false,
       generatedArtifactPath: null,
+      loaderContractState: "NotLoaded",
+      loaderImportMode: "StaticPlanning",
+      loaderInitialized: false,
     });
   });
 

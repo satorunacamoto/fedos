@@ -181,6 +181,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       wasmBuildReady: false,
       wasmArtifactGenerated: false,
       generatedArtifactPath: null,
+      loaderContractState: "NotLoaded",
+      loaderImportMode: "StaticPlanning",
+      loaderInitialized: false,
     });
   });
 

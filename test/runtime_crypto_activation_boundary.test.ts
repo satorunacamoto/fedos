@@ -240,6 +240,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       wasmBuildReady: false,
       wasmArtifactGenerated: false,
       generatedArtifactPath: null,
+      loaderContractState: "NotLoaded",
+      loaderImportMode: "StaticPlanning",
+      loaderInitialized: false,
     });
   });
 

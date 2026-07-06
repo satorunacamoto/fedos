@@ -1,4 +1,4 @@
-# FedOS internal execution contract (Stage 356, updated Stage 389/397/405)
+# FedOS internal execution contract (Stage 356, updated Stage 389/397/405/484)
 
 **Status: this document records real code's current state.** It names
 the required preconditions for real FedOS Rust crypto execution to
@@ -89,6 +89,63 @@ future, explicitly-reviewed stage's decision.
 - `FedosWasmArtifact` has never built a WASM artifact
   (`fedosWasmArtifactBuilt()` fixed `false`).
 
+## Update — Stage 481–484: Generated JS Glue / Generated `.wasm` are now REAL, still unconnected
+
+Stage 465–480 made link 11 (`FedosWasmArtifact`) and its dependents
+genuinely reachable-in-substance for the first time: a real `.wasm` +
+`wasm-bindgen` JS glue pair now exists on disk whenever `npm run
+build:wasm` is run (`docs/runtime_wasm_artifact_observation.md` §10).
+This update splits link 11's single row into a finer-grained diagram
+— the CALL direction, top-down from link 9 to Rust, complementing
+`docs/runtime_wasm_build_contract.md`'s BUILD direction (bottom-up,
+Rust source to Runtime):
+
+```
+ExecutionBackend                     <-- link 9, REAL placeholder, fixed "Planning"/"NotConnected"
+     |
+     v
+FedosWasmBoundary                    <-- link 10, REAL placeholder, fixed "BlockedByImplementation"
+     |
+     v
+FedosWasmArtifact                    <-- link 11, REAL placeholder, fixed "BlockedByImplementation";
+     |                                   generationState fixed "NotGenerated" (Stage 452) even though
+     |                                   a real artifact now exists on disk -- never a filesystem check
+     v
+FedosWasmLoaderContract              <-- REAL placeholder (src/runtime/fedos_wasm_loader_contract.ts,
+     |                                   Stage 482), fixed "NotLoaded"/"StaticPlanning" -- deliberately
+     |                                   NOT wired to FedosWasmArtifact (see below)
+     v
+Generated JS Glue                    <-- REAL FILE, observed (packages/fedos-core-rust/pkg/fedos_core_rust.js,
+     |                                   docs/runtime_wasm_js_glue_contract.md, Stage 481) -- never imported
+     v
+Generated .wasm                      <-- REAL FILE, observed (fedos_core_rust_bg.wasm) -- never instantiated
+     |
+     v
+Rust                                 <-- REAL, compiled, 27 pub fn, none `#[wasm_bindgen]`-annotated
+```
+
+`FedosWasmLoaderContract` is deliberately NOT wired to
+`FedosWasmArtifact` even at the plan/observation level — unlike every
+adjacent pair above it, which Stages 361–402 progressively wired
+(each still fixed to a permanent denial). No `fedos_wasm_artifact.ts`
+function calls `wasmLoaderState()`/`loaderImportMode()`/
+`loaderInitialized()`, and `fedos_wasm_loader_contract.ts` references
+nothing above it in this diagram. Only
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+483) read its standalone functions, the same diagnostics-only
+treatment `fedos_wasm_toolchain.ts` already receives. This keeps
+Stage 481–488 scoped to OBSERVATION and CONTRACT NAMING only — how a
+real loader would eventually attach to link 11 is left to a future,
+separate, explicitly-reviewed stage.
+
+**Link 12 (Rust Crypto) remains disconnected, unchanged by this
+update.** Nothing above calls `WebAssembly.instantiate`/
+`WebAssembly.compile`/`initSync`/the JS glue's default export;
+`create_runtime.ts`/`src/worker.ts` import none of the boxes in this
+diagram; no generated file is edited or committed; no Rust `pub fn`
+is added or `#[wasm_bindgen]`-annotated (still 27); `"Allowed"`
+remains unreachable from either activation policy.
+
 ## See also
 
 - `docs/runtime_internal_rust_call.md` (Stage 353–360) — the
@@ -107,3 +164,14 @@ future, explicitly-reviewed stage's decision.
 - `docs/runtime_fedos_execution_approval_checklist.md` (Stage 348) —
   the eight-item approval checklist this contract's "why it stops
   here" section references.
+- `docs/runtime_wasm_build_contract.md` (Stage 418, updated 427, 434,
+  445) — the BUILD-direction diagram this update's CALL-direction
+  diagram complements.
+- `docs/runtime_wasm_js_glue_contract.md` (Stage 481) — the direct
+  observation behind the "Generated JS Glue" box in this update's
+  diagram.
+- `src/runtime/fedos_wasm_loader_contract.ts` (Stage 482) — the
+  `FedosWasmLoaderContract` box's real, fixed-value implementation.
+- `docs/runtime_wasm_artifact_observation.md` §10 (Stage 476) — the
+  first successful generation run that makes the "Generated JS Glue"/
+  "Generated .wasm" boxes real files rather than a hypothetical.

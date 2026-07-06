@@ -173,7 +173,17 @@ describe("Runtime crypto boundary foundation (Stage 249-256)", () => {
       const codeOnly = codeOnlyOf(src);
       expect(codeOnly).not.toMatch(/new\s+FedosCoreCryptoProvider/);
       expect(codeOnly).not.toMatch(/new\s+PlaceholderFedosCoreCrypto/);
-      expect(codeOnly.toLowerCase()).not.toContain("wasm_loader");
+      // The OLD, permanently-disabled loader seam
+      // (packages/fedos-core-rust/src/wasm_loader.ts, Stage 63) must never be
+      // referenced -- checked by its actual import path/exported symbol
+      // names, not a bare "wasm_loader" substring: Stage 483 legitimately
+      // adds an import from the UNRELATED ./fedos_wasm_loader_contract.js
+      // (Stage 482's fixed-value-only observation contract), whose file
+      // name happens to share that substring.
+      expect(codeOnly).not.toMatch(/wasm_loader\.(js|ts)/);
+      expect(codeOnly).not.toMatch(
+        /FedosCoreWasmLoader|NoopFedosCoreWasmLoader|PlaceholderFedosCoreWasmLoader|loadFedosCoreWasm/,
+      );
       expect(codeOnly).not.toMatch(/import\s+.*fedos-core-rust/);
     }
     // Stage 260 legitimately wires RuntimeCryptoProvider into
