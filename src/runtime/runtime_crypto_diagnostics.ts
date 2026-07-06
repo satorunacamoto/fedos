@@ -279,6 +279,14 @@ import {
   loaderInitializationAllowed as fedosLoaderInitializationAllowed,
   loaderPlanState as fedosLoaderPlanState,
 } from "./fedos_wasm_loader_plan.js";
+import type {
+  FedosWasmLoaderImportReason,
+  FedosWasmLoaderImportPolicyState,
+} from "./fedos_wasm_loader_import_policy.js";
+import {
+  evaluateWasmLoaderImportPolicy,
+  wasmLoaderImportPolicyState as fedosWasmLoaderImportPolicyState,
+} from "./fedos_wasm_loader_import_policy.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -698,6 +706,25 @@ export interface RuntimeCryptoActivationStatus {
    * `false` in this stage.
    */
   readonly loaderInitializationAllowed: boolean;
+  /**
+   * The Import Policy's own fixed coarse state —
+   * `wasmLoaderImportPolicyState()`'s own answer
+   * (`src/runtime/fedos_wasm_loader_import_policy.ts`, Stage
+   * 510/512). Fixed `"Blocked"` in this stage.
+   */
+  readonly loaderImportPolicyState: FedosWasmLoaderImportPolicyState;
+  /**
+   * Whether the generated JS glue may be `import`ed right now —
+   * `evaluateWasmLoaderImportPolicy()`'s own `allowed` answer. Fixed
+   * `false` in this stage.
+   */
+  readonly loaderImportPolicyAllowed: boolean;
+  /**
+   * WHY the generated JS glue may not be `import`ed right now —
+   * `evaluateWasmLoaderImportPolicy()`'s own `reason` answer. Fixed
+   * `"BlockedByPolicy"` in this stage.
+   */
+  readonly loaderImportPolicyReason: FedosWasmLoaderImportReason;
 }
 
 /**
@@ -776,5 +803,8 @@ export function runtimeCryptoActivationStatus(
     loaderPlanState: fedosLoaderPlanState(),
     loaderImportAllowed: fedosLoaderImportAllowed(),
     loaderInitializationAllowed: fedosLoaderInitializationAllowed(),
+    loaderImportPolicyState: fedosWasmLoaderImportPolicyState(),
+    loaderImportPolicyAllowed: evaluateWasmLoaderImportPolicy().allowed,
+    loaderImportPolicyReason: evaluateWasmLoaderImportPolicy().reason,
   };
 }

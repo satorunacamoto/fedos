@@ -247,8 +247,69 @@ generated JS glue's default export never called; no `fetch`/dynamic
 unchanged; `"Allowed"`/`"Loaded"`/`"Active"`/`"FailOpen"` never
 reached; Rust public API unchanged (27 `pub fn`).
 
+## Update — Stage 509–513: Import Policy, revised diagram
+
+Stage 509 (`docs/runtime_wasm_loader_import_policy.md`) fixes SIX
+minimum conditions phase #2 ("Import Permission") itself requires:
+Loader Plan import allowed, generated artifact present, artifact
+untracked/gitignored, Runtime dev-only approval, no Worker approval,
+Execution Review approval. Stage 510 adds
+`src/runtime/fedos_wasm_loader_import_policy.ts` — a pure decision
+function, `evaluateWasmLoaderImportPolicy()`, mirroring
+`runtime_crypto_activation_policy.ts`'s own
+`ActivationPolicy`/`ActivationDecision`/`ActivationReason` shape one
+level down this WASM arc, ALWAYS resolving
+`{ allowed: false, reason: "BlockedByPolicy" }`. Stage 511 wires
+`FedosWasmLoaderPlan.planImport()` (`fedos_wasm_loader_plan.ts`) to
+CALL this function — the result is DISCARDED and `planImport()`'s own
+return value is UNCHANGED, the same "reach one link deeper, keep your
+own answer" pattern Stage 503 already established one link up.
+
+This revises the Stage 501–505 diagram — Import Policy now sits
+between Loader Plan and Generated JS Glue:
+
+```
+FedosWasmLoaderPlan ("Loader Plan")     <-- REAL placeholder (src/runtime/fedos_wasm_loader_plan.ts, Stage 502),
+     |                                      REAL wiring: planImport() calls evaluateWasmLoaderImportPolicy(),
+     |                                      discards the result (Stage 511)
+     v
+FedosWasmLoaderImportPolicy             <-- REAL, pure decision function (src/runtime/fedos_wasm_loader_import_policy.ts,
+("Import Policy")                            Stage 510), fixed { allowed: false, reason: "BlockedByPolicy" };
+     |                                      state fixed "Blocked"
+     v
+Generated JS Glue                       <-- REAL FILE, observed (Stage 481) -- NOT imported by the Import Policy;
+     |                                      the arrow above is positional (Stage 509's condition table), not a
+     |                                      real import
+     v
+STOP                                    <-- no further link exists; Runtime/Worker connection,
+                                             WebAssembly.instantiate/compile, initSync/default init, and
+                                             import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+512) read `wasmLoaderImportPolicyState()`/`evaluateWasmLoaderImportPolicy()`
+for DISPLAY only — `"Blocked"`/`false`/`"BlockedByPolicy"`, matching
+every other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_wasm_loader_plan.ts` nor `fedos_wasm_loader_import_policy.ts`);
+`WebAssembly.instantiate`/`compile` never invoked; `initSync`/the
+generated JS glue's default export never called; no `fetch`/dynamic
+`import()`; no generated file edited or committed; `encrypt`/`decrypt`
+unchanged; `"Allowed"`/`"Loaded"`/`"Active"`/`"FailOpen"` never
+reached; Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
+`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_wasm_loader_import_policy.md` (Stage 509) — the
+  six-condition import policy: Loader Plan import allowed, generated
+  artifact present, artifact untracked/gitignored, Runtime dev-only
+  approval, no Worker approval, Execution Review approval.
+- `src/runtime/fedos_wasm_loader_import_policy.ts` (Stage 510–511) —
+  the Import Policy's real, fixed-value implementation and its wiring
+  from `FedosWasmLoaderPlan.planImport()`.
 - `docs/runtime_wasm_loader_planning.md` (Stage 501) — the five-phase
   ordering: Loader Creation, Import Permission, Initialization
   Permission, Runtime Attach, Worker Attach.

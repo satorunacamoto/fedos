@@ -228,6 +228,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       loaderPlanState: "PlanningOnly",
       loaderImportAllowed: false,
       loaderInitializationAllowed: false,
+      loaderImportPolicyState: "Blocked",
+      loaderImportPolicyAllowed: false,
+      loaderImportPolicyReason: "BlockedByPolicy",
     });
   });
 
