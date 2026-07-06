@@ -26,15 +26,24 @@
  * established "export for testability, wire nowhere" discipline
  * already used throughout every prior link in this chain).
  *
+ * Stage 395 extends `planLoad()` with a TWELFTH link: it now builds a
+ * `FedosWasmArtifact` (`fedos_wasm_artifact.ts`, Stage 394) and calls
+ * its `planBuild()` — then DISCARDS the result and returns its OWN,
+ * unchanged `"BlockedByImplementation"` answer. Only `planBuild()` is
+ * called — `FedosWasmArtifact.planLoad()` is never reached from here
+ * in this stage, since no real artifact could ever be loaded before
+ * it is built. `planEncrypt()`/`planDecrypt()` are UNCHANGED by this
+ * stage.
+ *
  * HARD GUARDRAILS:
  *   - `FedosWasmBoundaryPlaceholder` NEVER calls
  *     `WebAssembly.instantiate`/`WebAssembly.compile`, never imports
- *     `wasm-bindgen`-generated bindings, never invokes
- *     `packages/fedos-core-rust`, never FFI, never a Node Native
- *     Addon, never a spawned CLI process, never any cryptographic
- *     operation of any kind. It simply RECEIVES a load/encrypt/decrypt
- *     request and returns a decision — nothing is ever actually
- *     loaded or executed.
+ *     `wasm-bindgen`-generated bindings, never invokes `cargo build
+ *     --target wasm32-*`, `wasm-pack`, `packages/fedos-core-rust`,
+ *     never FFI, never a Node Native Addon, never a spawned CLI
+ *     process, never any cryptographic operation of any kind. It
+ *     simply RECEIVES a load/encrypt/decrypt request and returns a
+ *     decision — nothing is ever actually built, loaded, or executed.
  *   - NO `SecretHandle`, `ConversationKey`, `MessageKey`, or
  *     `Nip44WirePayload` type or value (all `pub(crate)`-private inside
  *     `packages/fedos-core-rust`, never exposed to TypeScript) is
@@ -49,9 +58,10 @@
  *   - Pure; every method here is synchronous, never throws, never
  *     mutates its argument, never allocates a payload/plaintext/
  *     ciphertext/key of any kind, never touches a filesystem or network
- *     resource to "load" anything.
+ *     resource to "load" or "build" anything.
  */
 
+import { createFedosWasmArtifact } from "./fedos_wasm_artifact.js";
 import type { OpaqueDecryptRequest, OpaqueEncryptRequest } from "./fedos_runtime_opaque_request.js";
 
 /**
@@ -120,6 +130,7 @@ export class FedosWasmBoundaryPlaceholder implements FedosWasmBoundary {
   }
 
   planLoad(): FedosWasmBoundaryDecision {
+    this.#reachWasmArtifact(); // result discarded -- no WASM artifact is ever built
     return this.#blocked("load");
   }
 
@@ -129,6 +140,18 @@ export class FedosWasmBoundaryPlaceholder implements FedosWasmBoundary {
 
   planDecrypt(_request: OpaqueDecryptRequest): FedosWasmBoundaryDecision {
     return this.#blocked("decrypt");
+  }
+
+  /**
+   * PRIVATE — builds a `FedosWasmArtifact` and calls its
+   * `planBuild()`. The result is discarded; it is never passed to
+   * `cargo build --target wasm32-*`/`wasm-bindgen`/`wasm-pack`/
+   * `packages/fedos-core-rust`, never passed to Runtime or Worker.
+   * The WASM Artifact itself never builds anything either.
+   */
+  #reachWasmArtifact(): void {
+    const artifact = createFedosWasmArtifact();
+    artifact.planBuild();
   }
 
   #blocked(operation: FedosWasmBoundaryOperation): FedosWasmBoundaryDecision {
