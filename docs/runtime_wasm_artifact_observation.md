@@ -1,4 +1,4 @@
-# FedOS WASM artifact generation observation — Stage 457–459 (observation only, no code fix)
+# FedOS WASM artifact generation observation — Stage 457–459 (observation only, no code fix); updated Stage 465–469 with the fixed-cause re-run result
 
 **Status: this document records an OBSERVATION, not a fix.** Stage 458
 ran the real `npm run build:wasm` script (`package.json`, Stage 450)
@@ -144,17 +144,127 @@ prior WASM-arc stage, and this stage does not change that.
   confirmed gitignored/untracked via `git status --ignored` before
   removal) — this document's §4 record stands regardless.
 
+## 7. Update — Stage 465–469: both original causes RESOLVED; re-run reaches a NEW, third failure
+
+`docs/runtime_wasm_artifact_generation_fix.md` (Stage 465) fixed both
+causes §3 classified: Stage 466 added `cdylib` to `[lib]`'s
+`crate-type` (now `["rlib", "cdylib"]`, `rlib` kept); Stage 467
+corrected `build:wasm`'s `wasm-bindgen` input path to
+`packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm`
+(the crate-manifest-relative location `cargo` actually writes to,
+matching §3 Cause B's finding). Stage 468 re-ran the exact same
+command:
+
+```
+RUSTFLAGS='--cfg getrandom_backend="wasm_js"' npm run build:wasm
+```
+
+**Cause A (no `cdylib`) — CONFIRMED RESOLVED.** `cargo build` produced
+a REAL standalone `.wasm` file for the first time in this repository's
+history:
+`packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm`
+(35,744 bytes) — alongside the pre-existing `libfedos_core_rust.rlib`
+(1,229,950 bytes), confirming BOTH crate-types were built from the
+same source, exactly as `docs/runtime_wasm_artifact_generation_fix.md`
+§2 described.
+
+**Cause B (wrong input path) — CONFIRMED RESOLVED.** `wasm-bindgen`
+no longer reports "path not found" — it successfully located and read
+`fedos_core_rust.wasm` at the corrected path, proceeding past the file
+I/O step it failed at in §2, into its own internal version-compatibility
+check (see below). If Cause B were still present, this next error
+could never have been reached.
+
+**A NEW, THIRD failure was reached — `wasm-bindgen` CLI / crate schema
+version mismatch:**
+
+```
+error:
+
+it looks like the Rust project used to create this Wasm file was linked against
+version of wasm-bindgen that uses a different bindgen format than this binary:
+
+  rust Wasm file schema version: 0.2.126
+     this binary schema version: 0.2.100
+```
+
+**Classification: `wasm-bindgen-cli`/crate VERSION MISMATCH, not a
+repeat of either original cause.** The `wasm-bindgen` CLI binary
+installed on this machine (Stage 425) is `0.2.100`. The
+`wasm-bindgen` LIBRARY crate actually compiled into
+`fedos_core_rust.wasm` is `0.2.126` — pulled in transitively as
+`getrandom`'s own internal `wasm_js`-feature dependency (per
+`Cargo.toml`'s existing comment: "the `wasm-bindgen`-based JS-interop
+shim it uses is entirely internal to `getrandom`'s own `Cargo.toml`,
+not a dependency this crate adds"), resolved to whatever the latest
+compatible version is because `Cargo.lock` is never committed
+(`docs/rust_dependency_adoption.md` §7) — so every fresh
+`cargo build` can silently resolve a newer `wasm-bindgen` than the
+locally-installed CLI. `wasm-bindgen`'s own bindgen format is NOT
+forward/backward compatible across schema versions — the CLI and the
+compiled Wasm's embedded schema must match exactly.
+
+**Ruled out, explicitly:**
+
+- **NOT Cause A recurring** — a real, correctly-shaped `.wasm` file
+  exists; `cdylib` is confirmed working.
+- **NOT Cause B recurring** — the path was found and read; this error
+  only occurs AFTER successful file I/O, during
+  `wasm-bindgen`'s internal schema-version check.
+- **NOT a `getrandom`/`k256`/toolchain compile regression** — `cargo
+  build` itself succeeded end-to-end, identically to the prior run.
+
+**Per Stage 468's own instruction ("失敗したら修正せず原因分類" —
+on failure, classify, do not fix), NO further action was taken**: no
+`cargo update -p wasm-bindgen --precise 0.2.100` was run, no
+`cargo install -f wasm-bindgen-cli --version 0.2.126` was run, and no
+`Cargo.toml`/`package.json` edit was made to address this new cause —
+it is left for a future, separate, explicitly-reviewed stage to
+decide whether to pin the crate version (a `Cargo.lock` — never
+committed — or `Cargo.toml` decision) or upgrade the local CLI (a
+machine-local environment-capability change, same category as Stage
+425's original install).
+
+## 8. What was generated, and what was not — Stage 468 re-run
+
+- **Generated:** `packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm`
+  (35,744 bytes, `cdylib` output — NEW, the first real `.wasm` binary
+  ever produced in this repository) AND
+  `libfedos_core_rust.rlib` (1,229,950 bytes, `rlib` output,
+  unchanged in kind from every prior run) plus the usual `cargo`
+  bookkeeping and a freshly resolved `Cargo.lock`. All gitignored,
+  never staged.
+- **NOT generated:** no `wasm-bindgen` JS glue (`*_bg.js`, `*.js`,
+  `*.d.ts`), no `packages/fedos-core-rust/pkg/` directory —
+  `wasm-bindgen` failed its own version check before writing any
+  output file, so `--out-dir` was never created.
+- `git status --short` showed no diff at any point during or after
+  this run.
+
+## 9. Commit policy — unchanged
+
+Per §5's reasoning (still standing): no `.wasm`/`.rlib`/`Cargo.lock`/
+`target/`/`pkg/` file is committed. The NEW `.wasm` file this run
+produced is exactly the same kind of machine-local, reproducible
+build byproduct §5 already covers — nothing about Stage 465–469
+changes that policy. `packages/fedos-core-rust/target/`/`Cargo.lock`
+were confirmed gitignored/untracked (`git status --ignored`) then
+deleted after this update was recorded (Stage 472's own cleanup step,
+same discipline as Stage 463).
+
 ## See also
 
 - `docs/runtime_wasm_generation.md` (Stage 449) — the planning
   document naming the script/output-directory this stage actually ran
   for the first time.
 - `docs/runtime_wasm_build_observation.md` §7–8 (Stage 445) — the
-  prior `.rlib`-only, no-`cdylib` finding this document's Cause A
-  confirms still holds.
+  prior `.rlib`-only, no-`cdylib` finding §3 Cause A described, now
+  resolved per §7.
 - `docs/runtime_wasm_build_contract.md` §6 (Stage 434) — the
-  still-standing decision to defer `cdylib` adoption to its own,
-  separately-reviewed future stage.
+  original decision to defer `cdylib` adoption, resolved by
+  `docs/runtime_wasm_artifact_generation_fix.md` (Stage 465–466).
+- `docs/runtime_wasm_artifact_generation_fix.md` (Stage 465–467) — the
+  fix this document's §7–9 records the (partial) result of.
 - `src/runtime/fedos_wasm_artifact.ts` (Stage 394, updated 452, 460)
   — where this observation's fixed result is exposed as diagnostic
   labels, still never performing a real filesystem check.
