@@ -103,6 +103,11 @@
  * Stage 396 adds `wasmArtifactState`/`wasmArtifactReachable`/
  * `wasmArtifactBuilt` — see `runtime_crypto_diagnostics.ts`'s own
  * Stage 396 doc comment.
+ *
+ * Stage 404 adds `executionBackend`/`executionBackendState`/
+ * `executionBackendReachable`/`backendImplemented` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 404 doc comment. Fixed
+ * `"Wasm"`/`"Planning"`/`true`/`false` respectively.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -135,6 +140,13 @@ import {
   fedosRustPingReachable,
   fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
+import type { FedosExecutionBackendKind, FedosExecutionBackendState } from "./fedos_execution_backend.js";
+import {
+  fedosExecutionBackendImplemented,
+  fedosExecutionBackendKind,
+  fedosExecutionBackendReachable,
+  fedosExecutionBackendState,
+} from "./fedos_execution_backend.js";
 import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
@@ -355,6 +367,31 @@ export interface WorkerCryptoActivationStatus {
    * stage.
    */
   readonly wasmArtifactBuilt: boolean;
+  /**
+   * The Execution Backend's own candidate kind —
+   * `fedosExecutionBackendKind()`'s own answer. Fixed `"Wasm"` in this
+   * stage.
+   */
+  readonly executionBackend: FedosExecutionBackendKind;
+  /**
+   * The Execution Backend's own decision state —
+   * `fedosExecutionBackendState()`'s own answer. Fixed `"Planning"` in
+   * this stage.
+   */
+  readonly executionBackendState: FedosExecutionBackendState;
+  /**
+   * Whether the Execution Backend is structurally reachable from the
+   * Rust Invocation Adapter's own internal chain —
+   * `fedosExecutionBackendReachable()`'s own answer. Fixed `true` in
+   * this stage.
+   */
+  readonly executionBackendReachable: boolean;
+  /**
+   * Whether ANY Execution Backend candidate has ever actually been
+   * implemented and connected — `fedosExecutionBackendImplemented()`'s
+   * own answer. Fixed `false` in this stage.
+   */
+  readonly backendImplemented: boolean;
 }
 
 /**
@@ -414,5 +451,9 @@ export function workerCryptoActivationStatus(
     wasmArtifactState: fedosWasmArtifactState(),
     wasmArtifactReachable: fedosWasmArtifactReachable(),
     wasmArtifactBuilt: fedosWasmArtifactBuilt(),
+    executionBackend: fedosExecutionBackendKind(),
+    executionBackendState: fedosExecutionBackendState(),
+    executionBackendReachable: fedosExecutionBackendReachable(),
+    backendImplemented: fedosExecutionBackendImplemented(),
   };
 }

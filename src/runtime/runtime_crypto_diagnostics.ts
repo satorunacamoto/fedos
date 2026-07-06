@@ -165,6 +165,20 @@
  * (`fedosWasmArtifactBuilt()`, fixed `false` — no real artifact is
  * ever built). None of these expose any implementation detail beyond
  * these values.
+ *
+ * Stage 404 adds `executionBackend` (`fedos_execution_backend.ts`'s
+ * `fedosExecutionBackendKind()`, Stage 402 — fixed `"Wasm"`, the first
+ * implementation candidate), `executionBackendState`
+ * (`fedosExecutionBackendState()`, fixed `"Planning"`),
+ * `executionBackendReachable` (`fedosExecutionBackendReachable()`,
+ * fixed `true` — the Execution Backend IS structurally wired into the
+ * Rust Invocation Adapter's own chain as of Stage 403, REPLACING its
+ * previous direct wiring to the WASM Boundary), and
+ * `backendImplemented` (`fedosExecutionBackendImplemented()`, fixed
+ * `false` — no WASM/Native/Mobile/other backend candidate has ever
+ * actually been selected, connected, or executed). None of these
+ * expose any implementation detail beyond these values; no payload,
+ * plaintext, ciphertext, or key material is ever involved.
  */
 
 import type {
@@ -202,6 +216,13 @@ import {
   fedosRustPingReachable,
   fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
+import type { FedosExecutionBackendKind, FedosExecutionBackendState } from "./fedos_execution_backend.js";
+import {
+  fedosExecutionBackendImplemented,
+  fedosExecutionBackendKind,
+  fedosExecutionBackendReachable,
+  fedosExecutionBackendState,
+} from "./fedos_execution_backend.js";
 import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
@@ -501,6 +522,36 @@ export interface RuntimeCryptoActivationStatus {
    * stage.
    */
   readonly wasmArtifactBuilt: boolean;
+  /**
+   * The Execution Backend's own candidate kind —
+   * `fedosExecutionBackendKind()`'s own answer
+   * (`src/runtime/fedos_execution_backend.ts`, Stage 402/404). Fixed
+   * `"Wasm"` in this stage — the first implementation candidate, not a
+   * claim that it is selected or connected.
+   */
+  readonly executionBackend: FedosExecutionBackendKind;
+  /**
+   * The Execution Backend's own decision state —
+   * `fedosExecutionBackendState()`'s own answer. Fixed `"Planning"` in
+   * this stage.
+   */
+  readonly executionBackendState: FedosExecutionBackendState;
+  /**
+   * Whether the Execution Backend is structurally reachable from the
+   * Rust Invocation Adapter's own internal chain —
+   * `fedosExecutionBackendReachable()`'s own answer. Fixed `true` in
+   * this stage, NOT a claim that any backend is ever selected,
+   * connected, or executed. As of Stage 403, this REPLACES the Rust
+   * Invocation Adapter's previous direct wiring to the WASM Boundary.
+   */
+  readonly executionBackendReachable: boolean;
+  /**
+   * Whether ANY Execution Backend candidate (WASM, Native, Mobile, or
+   * otherwise) has ever actually been implemented and connected —
+   * `fedosExecutionBackendImplemented()`'s own answer. Fixed `false`
+   * in this stage.
+   */
+  readonly backendImplemented: boolean;
 }
 
 /**
@@ -561,5 +612,9 @@ export function runtimeCryptoActivationStatus(
     wasmArtifactState: fedosWasmArtifactState(),
     wasmArtifactReachable: fedosWasmArtifactReachable(),
     wasmArtifactBuilt: fedosWasmArtifactBuilt(),
+    executionBackend: fedosExecutionBackendKind(),
+    executionBackendState: fedosExecutionBackendState(),
+    executionBackendReachable: fedosExecutionBackendReachable(),
+    backendImplemented: fedosExecutionBackendImplemented(),
   };
 }

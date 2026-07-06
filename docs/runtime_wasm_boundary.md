@@ -1,4 +1,13 @@
-# FedOS WASM Boundary — the formally-decided chain terminus (Stage 385–392)
+# FedOS WASM Boundary — the formally-decided chain terminus (Stage 385–392, wiring updated Stage 403)
+
+**Stage 403 update:** §3 below describes the ORIGINAL Stage 387 wiring,
+where the Rust Invocation Adapter built a `FedosWasmBoundary` directly.
+As of Stage 403, the Rust Invocation Adapter instead reaches this same
+`FedosWasmBoundary.planLoad()` THROUGH a new intermediate layer,
+`FedosExecutionBackend` (`src/runtime/fedos_execution_backend.ts`) —
+see `docs/runtime_execution_backend.md` for the current wiring
+diagram. This file (`fedos_wasm_boundary.ts`) itself is BYTE-FOR-BYTE
+UNCHANGED by Stage 403 — only its caller moved one level away.
 
 **Status: this document records real code AND a real architecture
 decision.** It explains the TENTH abstraction link
