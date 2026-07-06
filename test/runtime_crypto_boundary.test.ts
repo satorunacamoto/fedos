@@ -178,9 +178,12 @@ describe("Runtime crypto boundary foundation (Stage 249-256)", () => {
       // referenced -- checked by its actual import path/exported symbol
       // names, not a bare "wasm_loader" substring: Stage 483 legitimately
       // adds an import from the UNRELATED ./fedos_wasm_loader_contract.js
-      // (Stage 482's fixed-value-only observation contract), whose file
-      // name happens to share that substring.
-      expect(codeOnly).not.toMatch(/wasm_loader\.(js|ts)/);
+      // (Stage 482's fixed-value-only observation contract) and Stage 495
+      // legitimately adds one from the UNRELATED ./fedos_wasm_loader.js
+      // (Stage 489's Loader Skeleton), both of whose file names happen to
+      // share that substring -- the negative lookbehind excludes any
+      // `fedos_`-prefixed loader file, leaving only the OLD bare path.
+      expect(codeOnly).not.toMatch(/(?<!fedos_)wasm_loader\.(js|ts)/);
       expect(codeOnly).not.toMatch(
         /FedosCoreWasmLoader|NoopFedosCoreWasmLoader|PlaceholderFedosCoreWasmLoader|loadFedosCoreWasm/,
       );
