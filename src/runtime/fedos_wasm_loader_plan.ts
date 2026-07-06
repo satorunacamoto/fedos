@@ -18,6 +18,13 @@
  * `create_runtime.ts` nor `src/worker.ts` references it, directly or
  * indirectly.
  *
+ * Stage 511 extends `planImport()` DOWNWARD only: it now calls
+ * `evaluateWasmLoaderImportPolicy()` (`fedos_wasm_loader_import_policy.ts`,
+ * Stage 510) — then DISCARDS the result and returns its OWN,
+ * unchanged `"BlockedByPolicy"` answer. This mirrors
+ * `fedos_wasm_loader.ts`'s own Stage 503 precedent of reaching one
+ * link deeper while changing nothing about its own return value.
+ *
  * HARD GUARDRAILS:
  *   - Every function/method in this file is PURE, synchronous, and
  *     returns a hand-fixed constant. None ever inspects
@@ -46,6 +53,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { evaluateWasmLoaderImportPolicy } from "./fedos_wasm_loader_import_policy.js";
 
 /**
  * The Loader Plan's own coarse mode. `"PlanningOnly"` is the ONLY
@@ -114,6 +123,7 @@ export class FedosWasmLoaderPlanSkeleton implements FedosWasmLoaderPlan {
   }
 
   planImport(): FedosWasmLoaderPlanDecision {
+    this.#reachImportPolicy(); // result discarded -- the generated JS glue is never imported
     return this.#blocked("import");
   }
 
@@ -127,6 +137,16 @@ export class FedosWasmLoaderPlanSkeleton implements FedosWasmLoaderPlan {
 
   planWorkerAttach(): FedosWasmLoaderPlanDecision {
     return this.#blocked("workerAttach");
+  }
+
+  /**
+   * PRIVATE — calls `evaluateWasmLoaderImportPolicy()`. The result is
+   * discarded; it is never passed to `WebAssembly.instantiate`/
+   * `compile`, `initSync`/the default init export,
+   * `packages/fedos-core-rust`, Runtime, or Worker.
+   */
+  #reachImportPolicy(): void {
+    evaluateWasmLoaderImportPolicy();
   }
 
   #blocked(operation: FedosWasmLoaderPlanOperation): FedosWasmLoaderPlanDecision {
