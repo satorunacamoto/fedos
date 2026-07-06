@@ -143,15 +143,30 @@ aes-gcm = { version = "0.10.3", default-features = false, features = ["aes", "al
 # `getrandom` (rust-random project, Apache-2.0 OR MIT) — the minimal CSPRNG
 # entropy source a future, explicitly-reviewed stage would implement
 # `randomBytes` (and, through it, AEAD nonce generation) against. Default
-# features are used as-is: on every target this crate currently builds for
-# (native, no WASM target is declared — see `[lib]` above), the default
-# feature set reaches the OS's CSPRNG syscall directly, with no `std`-only
-# gate this crate would need to opt out of. NOT imported/used ANYWHERE in
-# `src/lib.rs` — production or `#[cfg(test)]` — this stage: dependency +
-# build check only, exactly like every prior first-adoption stage
+# features are used as-is on every NATIVE target this crate builds for — the
+# default feature set reaches the OS's CSPRNG syscall directly, with no
+# `std`-only gate this crate would need to opt out of. NOT imported/used
+# ANYWHERE in `src/lib.rs` — production or `#[cfg(test)]` — this stage:
+# dependency + build check only, exactly like every prior first-adoption stage
 # (`chacha20poly1305` Stage 74, `hkdf` Stage 76, `argon2` Stage 84).
 # `random_bytes_placeholder`/`fedos_random_boundary_status` are unchanged.
-getrandom = "0.3"
+#
+# Stage 442 adds the `wasm_js` feature (see
+# `docs/runtime_wasm_getrandom_policy.md`, Stage 441): `getrandom` 0.3.x does
+# NOT support `wasm32-unknown-unknown` by default, and this feature alone is
+# INSUFFICIENT — a compiler `--cfg` flag is also required, which this
+# `Cargo.toml` deliberately does NOT bake in (no `.cargo/config.toml` added).
+# A `wasm32-unknown-unknown` build of this crate requires BOTH this feature
+# AND passing, per-invocation:
+#
+#   RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo check --target wasm32-unknown-unknown
+#
+# `wasm_js` pulls in NO new direct dependency of this crate — the
+# `wasm-bindgen`-based JS-interop shim it uses is entirely internal to
+# `getrandom`'s own `Cargo.toml`, not a dependency this crate adds. Native
+# targets are unaffected: `wasm_js` is a no-op unless both the feature AND
+# the `--cfg` flag are in effect for a `wasm32*` target.
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 # `sha2` (RustCrypto, MIT OR Apache-2.0) — PROMOTED from `[dev-dependencies]`
 # to `[dependencies]` in Stage 147 (the only `Cargo.toml` change in this
