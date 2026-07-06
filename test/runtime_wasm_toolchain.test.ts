@@ -3,8 +3,10 @@ import {
   FedosWasmToolchainPlaceholder,
   createFedosWasmToolchain,
   fedosWasmBindgenExpected,
+  fedosWasmBuildObserved,
   fedosWasmBuildReady,
   fedosWasmPackExpected,
+  fedosWasmTargetCheckObserved,
   fedosWasmTargetExpected,
   fedosWasmToolchainInstalled,
   fedosWasmToolchainPlanStatus,
@@ -15,6 +17,10 @@ import { evaluateRuntimeCryptoActivation } from "../src/runtime/runtime_crypto_a
 import { evaluateWorkerCryptoActivation } from "../src/runtime/worker_crypto_activation_policy.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import toolchainSource from "../src/runtime/fedos_wasm_toolchain.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import buildContractSource from "../docs/runtime_wasm_build_contract.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import buildObservationSource from "../docs/runtime_wasm_build_observation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -42,8 +48,19 @@ import packageJsonSource from "../package.json?raw";
  * never adopted, no build script or dependency is added, no artifact
  * is ever generated or committed, and no Runtime/Worker/crypto
  * behavior changes.
+ *
+ * Stage 433–437 ran a REAL, unmodified (`crate-type = ["rlib"]`,
+ * no `Cargo.toml` edit) `cargo check`/`cargo build --target
+ * wasm32-unknown-unknown` against `packages/fedos-core-rust` and
+ * recorded the result in `docs/runtime_wasm_build_observation.md`:
+ * both FAILED compiling the `getrandom` dependency (WASM support
+ * requires an opt-in `getrandom` doesn't have here) — a `getrandom`
+ * classification, not a fix. Stage 438 adds two more fixed,
+ * non-detecting labels (`wasmTargetCheckObserved`/`wasmBuildObserved`,
+ * both `"Failed"`) recording that ALREADY-COMPLETED observation; no
+ * code fix, no `Cargo.toml` change, no re-run of `cargo` by this file.
  */
-describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-432)", () => {
+describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-440)", () => {
   function codeOnlyOf(source: string): string {
     return source
       .split("\n")
@@ -234,5 +251,35 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(codeOnly).not.toMatch(/cargo\s+build/i);
     expect(codeOnly).not.toMatch(/cargo\s+install/i);
     expect(codeOnly).not.toMatch(/rustup\s+target/i);
+  });
+
+  it("19. status() and the standalone functions expose the fixed Stage 438 observation labels, matching the documented Failed result", () => {
+    const status = new FedosWasmToolchainPlaceholder().status();
+    expect(status.wasmTargetCheckObserved).toBe("Failed");
+    expect(status.wasmBuildObserved).toBe("Failed");
+
+    expect(fedosWasmTargetCheckObserved()).toBe("Failed");
+    expect(fedosWasmBuildObserved()).toBe("Failed");
+  });
+
+  it("20. the cargo build/check commands are documented (build contract + build observation) but not scripted anywhere in package.json", () => {
+    expect(buildContractSource).toMatch(/cargo build --target wasm32-unknown-unknown/);
+    expect(buildContractSource).toMatch(/cargo check --target wasm32-unknown-unknown/);
+    expect(buildObservationSource).toMatch(/cargo check --target wasm32-unknown-unknown/);
+    expect(buildObservationSource).toMatch(/cargo build --target wasm32-unknown-unknown/);
+    expect(buildObservationSource).toMatch(/getrandom/);
+
+    const pkg = JSON.parse(packageJsonSource);
+    const scripts = Object.values(pkg.scripts ?? {}) as string[];
+    for (const script of scripts) {
+      expect(script).not.toMatch(/cargo\s+check/i);
+      expect(script).not.toMatch(/cargo\s+build/i);
+      expect(script).not.toMatch(/wasm32/i);
+    }
+  });
+
+  it("21. wasm-bindgen was not run -- the build observation records the failure occurred before wasm-bindgen could be invoked, and no artifact exists", () => {
+    expect(buildObservationSource).toMatch(/wasm-bindgen.{0,80}NOT run|NOT run.{0,80}wasm-bindgen/is);
+    expect(fedosWasmBuildObserved()).not.toBe("Succeeded");
   });
 });

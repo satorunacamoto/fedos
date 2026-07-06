@@ -1,6 +1,8 @@
 /**
  * Stage 419 — FedOS WASM Toolchain Readiness Model (standalone, unwired).
- * Updated Stage 428 with fixed, non-detecting PLAN labels.
+ * Updated Stage 428 with fixed, non-detecting PLAN labels. Updated
+ * Stage 438 with fixed, non-detecting OBSERVATION labels recording
+ * the Stage 435–436 result (see `docs/runtime_wasm_build_observation.md`).
  *
  * Models the SHAPE of the toolchain-readiness question
  * `docs/runtime_wasm_toolchain_readiness.md` (Stage 417, updated
@@ -32,6 +34,16 @@
  * still makes no claim that a real WASM build has ever been attempted
  * or would succeed, regardless of what is or is not installed on any
  * given machine.
+ *
+ * Stage 438 adds TWO further fixed, non-detecting labels —
+ * `wasmTargetCheckObserved`/`wasmBuildObserved` — recording the ONE,
+ * already-completed Stage 435–436 observation (`cargo check
+ * --target wasm32-unknown-unknown` / `cargo build --target
+ * wasm32-unknown-unknown` both FAILED compiling the `getrandom`
+ * dependency; see `docs/runtime_wasm_build_observation.md`). These are
+ * NOT a live probe either — this file does not re-run `cargo` to
+ * compute them; they are a hand-fixed record of a result already
+ * observed and written down once.
  *
  * HARD GUARDRAILS:
  *   - `FedosWasmToolchainPlaceholder` NEVER installs, downloads, or
@@ -106,6 +118,19 @@ export type FedosWasmToolchainPlanStatus = "Planned";
 export type FedosWasmTargetTriple = "wasm32-unknown-unknown";
 
 /**
+ * Stage 438 — the fixed, non-detecting OBSERVATION outcome of a
+ * `cargo check`/`cargo build` attempt against the target named by
+ * `FedosWasmTargetTriple`. `"NotObserved"` is RESERVED (nothing in
+ * this file produces it, since Stage 435–436 already ran the one
+ * observation this file records); `"Failed"` is the ONLY value this
+ * stage's implementation ever produces, matching
+ * `docs/runtime_wasm_build_observation.md`'s recorded `getrandom`
+ * compile failure; `"Succeeded"` is RESERVED for a future, separate,
+ * explicitly-reviewed re-observation.
+ */
+export type FedosWasmObservationResult = "NotObserved" | "Failed" | "Succeeded";
+
+/**
  * A non-sensitive snapshot of a `FedosWasmToolchain`. `reason` is
  * human-readable and non-sensitive. Stage 428 adds four fixed,
  * non-detecting PLAN fields: `toolchainPlanStatus` (always
@@ -114,7 +139,10 @@ export type FedosWasmTargetTriple = "wasm32-unknown-unknown";
  * `true` — the plan expects a future bindgen step), and
  * `wasmPackExpected` (always `false` — the plan never expects the
  * pack-style bundler tool this stage's adoption deliberately excludes,
- * per `docs/runtime_wasm_toolchain_readiness.md`).
+ * per `docs/runtime_wasm_toolchain_readiness.md`). Stage 438 adds two
+ * more fixed fields: `wasmTargetCheckObserved`/`wasmBuildObserved`
+ * (both always `"Failed"`), recording the Stage 435–436 observation
+ * result.
  */
 export interface FedosWasmToolchainStatus {
   readonly installed: boolean;
@@ -124,6 +152,8 @@ export interface FedosWasmToolchainStatus {
   readonly wasmTargetExpected: FedosWasmTargetTriple;
   readonly bindgenExpected: boolean;
   readonly wasmPackExpected: boolean;
+  readonly wasmTargetCheckObserved: FedosWasmObservationResult;
+  readonly wasmBuildObserved: FedosWasmObservationResult;
 }
 
 /** The result of any `FedosWasmToolchain.plan*()` call. No binary, artifact, or byte of any kind. */
@@ -167,6 +197,8 @@ export class FedosWasmToolchainPlaceholder implements FedosWasmToolchain {
       wasmTargetExpected: "wasm32-unknown-unknown",
       bindgenExpected: true,
       wasmPackExpected: false,
+      wasmTargetCheckObserved: "Failed",
+      wasmBuildObserved: "Failed",
     };
   }
 
@@ -270,4 +302,28 @@ export function fedosWasmBindgenExpected(): boolean {
  */
 export function fedosWasmPackExpected(): boolean {
   return false;
+}
+
+/**
+ * Pure, standalone: the fixed, recorded outcome of the Stage 435
+ * `cargo check --target wasm32-unknown-unknown` observation (Stage
+ * 438) — usable by diagnostics WITHOUT constructing a
+ * `FedosWasmToolchain` instance. Fixed `"Failed"`: the observed
+ * `getrandom` compile failure, per
+ * `docs/runtime_wasm_build_observation.md`. Never re-runs `cargo`.
+ */
+export function fedosWasmTargetCheckObserved(): FedosWasmObservationResult {
+  return "Failed";
+}
+
+/**
+ * Pure, standalone: the fixed, recorded outcome of the Stage 436
+ * `cargo build --target wasm32-unknown-unknown` observation (Stage
+ * 438). Fixed `"Failed"`, identically to
+ * `fedosWasmTargetCheckObserved()` — the same `getrandom` compile
+ * failure, per `docs/runtime_wasm_build_observation.md`. Never re-runs
+ * `cargo`.
+ */
+export function fedosWasmBuildObserved(): FedosWasmObservationResult {
+  return "Failed";
 }
