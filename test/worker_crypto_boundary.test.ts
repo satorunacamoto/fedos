@@ -207,6 +207,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       wasmBoundaryState: "NotLoaded",
       wasmBoundaryReachable: true,
       wasmLoaded: false,
+      wasmArtifactState: "NotBuilt",
+      wasmArtifactReachable: true,
+      wasmArtifactBuilt: false,
     });
   });
 

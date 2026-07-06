@@ -228,6 +228,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       wasmBoundaryState: "NotLoaded",
       wasmBoundaryReachable: true,
       wasmLoaded: false,
+      wasmArtifactState: "NotBuilt",
+      wasmArtifactReachable: true,
+      wasmArtifactBuilt: false,
     });
   });
 

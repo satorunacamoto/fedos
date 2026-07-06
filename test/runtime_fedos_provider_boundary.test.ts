@@ -169,6 +169,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       wasmBoundaryState: "NotLoaded",
       wasmBoundaryReachable: true,
       wasmLoaded: false,
+      wasmArtifactState: "NotBuilt",
+      wasmArtifactReachable: true,
+      wasmArtifactBuilt: false,
     });
   });
 

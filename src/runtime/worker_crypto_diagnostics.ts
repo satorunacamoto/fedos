@@ -99,6 +99,10 @@
  * Stage 388 adds `wasmBoundaryState`/`wasmBoundaryReachable`/
  * `wasmLoaded` — see `runtime_crypto_diagnostics.ts`'s own Stage 388
  * doc comment.
+ *
+ * Stage 396 adds `wasmArtifactState`/`wasmArtifactReachable`/
+ * `wasmArtifactBuilt` — see `runtime_crypto_diagnostics.ts`'s own
+ * Stage 396 doc comment.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -131,6 +135,8 @@ import {
   fedosRustPingReachable,
   fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
+import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
+import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
 import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
 import {
@@ -332,6 +338,23 @@ export interface WorkerCryptoActivationStatus {
    * `fedosWasmLoaded()`'s own answer. Fixed `false` in this stage.
    */
   readonly wasmLoaded: boolean;
+  /**
+   * The WASM Artifact's own status — `fedosWasmArtifactState()`'s own
+   * answer. Fixed `"NotBuilt"` in this stage.
+   */
+  readonly wasmArtifactState: FedosWasmArtifactState;
+  /**
+   * Whether the WASM Artifact is structurally reachable from the WASM
+   * Boundary's own internal chain — `fedosWasmArtifactReachable()`'s
+   * own answer. Fixed `true` in this stage.
+   */
+  readonly wasmArtifactReachable: boolean;
+  /**
+   * Whether a real WASM artifact has ever actually been built —
+   * `fedosWasmArtifactBuilt()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly wasmArtifactBuilt: boolean;
 }
 
 /**
@@ -388,5 +411,8 @@ export function workerCryptoActivationStatus(
     wasmBoundaryState: fedosWasmBoundaryState(),
     wasmBoundaryReachable: fedosWasmBoundaryReachable(),
     wasmLoaded: fedosWasmLoaded(),
+    wasmArtifactState: fedosWasmArtifactState(),
+    wasmArtifactReachable: fedosWasmArtifactReachable(),
+    wasmArtifactBuilt: fedosWasmArtifactBuilt(),
   };
 }

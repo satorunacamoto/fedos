@@ -156,6 +156,15 @@
  * loaded). None of these expose any implementation detail beyond
  * these values; no payload, plaintext, ciphertext, or key material is
  * ever involved.
+ *
+ * Stage 396 adds `wasmArtifactState` (`fedos_wasm_artifact.ts`'s
+ * `fedosWasmArtifactState()`, Stage 394 — fixed `"NotBuilt"`),
+ * `wasmArtifactReachable` (`fedosWasmArtifactReachable()`, fixed
+ * `true` — the WASM Artifact IS structurally wired into the WASM
+ * Boundary's own chain as of Stage 395), and `wasmArtifactBuilt`
+ * (`fedosWasmArtifactBuilt()`, fixed `false` — no real artifact is
+ * ever built). None of these expose any implementation detail beyond
+ * these values.
  */
 
 import type {
@@ -193,6 +202,8 @@ import {
   fedosRustPingReachable,
   fedosRustPingSucceeded,
 } from "./fedos_rust_invocation_adapter.js";
+import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
+import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
 import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
 import {
@@ -471,6 +482,25 @@ export interface RuntimeCryptoActivationStatus {
    * `fedosWasmLoaded()`'s own answer. Fixed `false` in this stage.
    */
   readonly wasmLoaded: boolean;
+  /**
+   * The WASM Artifact's own status — `fedosWasmArtifactState()`'s own
+   * answer (`src/runtime/fedos_wasm_artifact.ts`, Stage 394/396).
+   * Fixed `"NotBuilt"` in this stage.
+   */
+  readonly wasmArtifactState: FedosWasmArtifactState;
+  /**
+   * Whether the WASM Artifact is structurally reachable from the
+   * WASM Boundary's own internal chain — `fedosWasmArtifactReachable()`'s
+   * own answer. Fixed `true` in this stage, NOT a claim that any
+   * artifact is ever built.
+   */
+  readonly wasmArtifactReachable: boolean;
+  /**
+   * Whether a real WASM artifact has ever actually been built —
+   * `fedosWasmArtifactBuilt()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly wasmArtifactBuilt: boolean;
 }
 
 /**
@@ -528,5 +558,8 @@ export function runtimeCryptoActivationStatus(
     wasmBoundaryState: fedosWasmBoundaryState(),
     wasmBoundaryReachable: fedosWasmBoundaryReachable(),
     wasmLoaded: fedosWasmLoaded(),
+    wasmArtifactState: fedosWasmArtifactState(),
+    wasmArtifactReachable: fedosWasmArtifactReachable(),
+    wasmArtifactBuilt: fedosWasmArtifactBuilt(),
   };
 }
