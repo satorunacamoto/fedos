@@ -1,4 +1,4 @@
-# FedOS WASM build observation — Stage 435–437 (observation only, no code fix)
+# FedOS WASM build observation — Stage 435–437 (observation only, no code fix); updated Stage 445 with the Stage 441–444 `getrandom` `wasm_js` result
 
 **Status: this document records an OBSERVATION, not a fix.** Stage
 435–436 ran two real commands against `packages/fedos-core-rust`
@@ -180,6 +180,89 @@ document — they are named so the next stage that picks up
 starting point instead of rediscovering this same `getrandom` error
 from scratch.
 
+## 7. Update — Stage 441–444: `wasm_js` opt-in applied, `cargo check`/`cargo build` now SUCCEED
+
+Stage 441 fixed the policy this section applies
+(`docs/runtime_wasm_getrandom_policy.md`): `getrandom` 0.3.x's
+`wasm32-unknown-unknown` support requires BOTH its own `wasm_js`
+Cargo feature AND a `--cfg getrandom_backend="wasm_js"` compiler flag,
+supplied via `RUSTFLAGS`. Stage 442 made the ONE `Cargo.toml` change
+this required — adding `features = ["wasm_js"]` to the existing
+`getrandom = "0.3"` entry, version unchanged, no new
+`[dependencies]` line, `wasm-bindgen` still not a direct dependency of
+this crate (`getrandom`'s own `Cargo.toml` carries that shim
+internally). Stage 443–444 re-ran exactly the two commands §1 named,
+now WITH the required `RUSTFLAGS`:
+
+```
+# Stage 443
+cd packages/fedos-core-rust
+RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo check --target wasm32-unknown-unknown
+
+# Stage 444
+cd packages/fedos-core-rust
+RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown
+```
+
+**Both SUCCEEDED** — exit code `0`, ending in `Finished \`dev\` profile
+[unoptimized + debuginfo] target(s)`, with `getrandom v0.3.4` and every
+dependency in the graph (including `k256`, never reached by §2's
+failed run) compiling cleanly for `wasm32-unknown-unknown`, followed
+by `fedos-core-rust` itself. This is the FIRST time this crate's own
+`src/lib.rs`/`src/crypto/*` source has actually been compiled for a
+`wasm32` target — Stage 435–437's run never got that far.
+
+**What was produced, and what was not:**
+
+- `target/wasm32-unknown-unknown/debug/libfedos_core_rust.rlib` was
+  produced — an `.rlib`, matching `[lib]`'s unchanged `crate-type =
+  ["rlib"]` (still no `cdylib`, per `docs/runtime_wasm_build_contract.md`
+  §6's still-standing deferral, §8 below).
+- **No `.wasm` file was produced anywhere** — confirmed by a recursive
+  scan of `target/` for `*.wasm` after the build; a `.wasm` artifact
+  requires a `cdylib` target, deliberately not added.
+- **`wasm-bindgen` (the CLI) was NOT run** — only the `wasm-bindgen`
+  library crate (v0.2.126) was compiled, as `getrandom`'s OWN
+  `wasm_js`-feature-gated internal dependency, exactly as
+  `docs/runtime_wasm_getrandom_policy.md` §2 described in advance; no
+  `wasm-bindgen` CLI invocation, no generated JS glue file, no
+  `_bg.js`/`_bg.wasm`/`.d.ts` of any kind exists anywhere in this
+  repository as a result.
+- `Cargo.lock` was freshly resolved by `cargo` as a side effect of both
+  commands (gitignored, never staged); `target/` (gitignored) was
+  deleted after this observation was recorded, per this batch's own
+  scope (Stage 448).
+- `git status` showed no diff beyond the expected `Cargo.toml` edit and
+  new `docs/runtime_wasm_getrandom_policy.md` file at every point
+  during and after Stage 443–444.
+
+**Classification: RESOLVED.** The `getrandom` blocker §2–3 classified
+is no longer reproducible once the `wasm_js` feature (Stage 442) and
+the `--cfg getrandom_backend="wasm_js"` flag (Stage 443–444's
+`RUSTFLAGS`) are both present. §2's ORIGINAL failing run remains an
+accurate historical record of the crate's state BEFORE Stage 441–444 —
+it is not retroactively edited — but it no longer describes the
+crate's CURRENT state.
+
+## 8. What Stage 441–444 still did not do
+
+- `cdylib` was NOT added to `[lib]` — still `crate-type = ["rlib"]`
+  only, per `docs/runtime_wasm_build_contract.md` §6's still-standing
+  decision to defer that as its own, separately-reviewed stage.
+- `wasm-bindgen` (the CLI binary) was NOT invoked — no JS glue, no
+  `.wasm` `wasm-bindgen` could consume even exists yet (that requires
+  `cdylib`, not added).
+- `wasm-pack` was NOT installed or invoked.
+- No `package.json` script was added — the `RUSTFLAGS` invocation was
+  run directly by hand, exactly like every prior Stage in this arc.
+- No Runtime/Worker activation of any kind; no
+  `encrypt`/`decrypt`/NIP-44 code was executed; `getrandom` remains
+  unimported and uncalled anywhere in `src/lib.rs`/`src/crypto/*` —
+  the `wasm_js` feature changes what `getrandom` COULD compile against
+  for `wasm32`, not whether this crate's production code calls it.
+- No fallback/insecure PRNG was added anywhere, per
+  `docs/runtime_wasm_getrandom_policy.md` §5.
+
 ## See also
 
 - `docs/runtime_wasm_build_contract.md` §5–6 (Stage 427, 434) — the
@@ -196,3 +279,6 @@ from scratch.
   "REVIEWED EXCEPTION" record referenced in §6 item 3.
 - `docs/runtime_wasm_migration_plan.md` (Stage 421) — items 3–4, where
   this observation's §6 open questions would next be picked up.
+- `docs/runtime_wasm_getrandom_policy.md` (Stage 441) — the policy §7's
+  `wasm_js`/`--cfg getrandom_backend="wasm_js"` opt-in applies, and the
+  fail-closed/no-fallback-PRNG rule that still holds after §7's result.

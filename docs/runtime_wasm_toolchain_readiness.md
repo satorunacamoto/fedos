@@ -1,4 +1,4 @@
-# FedOS WASM toolchain readiness — Stage 417 (updated Stage 425–426)
+# FedOS WASM toolchain readiness — Stage 417 (updated Stage 425–426, 445)
 
 **Status: this document adds no code.** It is a plain inventory of
 what the eventual real WASM build (`docs/runtime_wasm_build_plan.md`,
@@ -96,7 +96,9 @@ README entry (Stage 430) both use.
   `package.json` script.
 - It does not run `cargo build --target wasm32-unknown-unknown` or
   `wasm-bindgen` against any crate output (Stage 427/431 keep this
-  explicitly out of scope).
+  explicitly out of scope; §5 records that a LATER, separate stage,
+  441–444, did run `cargo check`/`cargo build` — never `wasm-bindgen`
+  — against this target).
 - It does not produce or commit a `.wasm` file or any generated JS
   bindings.
 - It does not change `Cargo.toml`, `package.json`, or any Rust public
@@ -104,7 +106,29 @@ README entry (Stage 430) both use.
 - It does not activate Runtime or Worker, and does not execute
   `encrypt`/`decrypt` in any form.
 
-## 5. Why this preflight, and why now
+## 5. Update — Stage 445: `getrandom` `wasm_js` backend now compiles
+
+Items 1–2 (`wasm32-unknown-unknown` target, `wasm-bindgen-cli`) were
+already "Installed" as of Stage 425–426. Stage 441–444 adds a NEW,
+SEPARATE fact this table did not previously track: whether the
+CRATE ITSELF (`packages/fedos-core-rust`, not just the toolchain
+around it) actually compiles for that target. As of Stage 443–444:
+
+| # | Item | State |
+|---|---|---|
+| 7 | `getrandom` `wasm_js` backend (Cargo feature + `--cfg getrandom_backend="wasm_js"`) | **Applied, verified green** — `Cargo.toml`'s `getrandom` entry now enables `features = ["wasm_js"]` (Stage 442); `RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo check`/`cargo build --target wasm32-unknown-unknown` both SUCCEED (Stage 443–444; `docs/runtime_wasm_build_observation.md` §7). The `--cfg` flag itself is NOT baked into any committed file (no `.cargo/config.toml`) — it must be supplied per-invocation via `RUSTFLAGS`, exactly as documented in `docs/runtime_wasm_getrandom_policy.md`. |
+
+This does NOT change items 3–6's state — `wasm-pack` is still not
+adopted, no build script exists, and no `.wasm`/generated JS bindings
+exist (a `cdylib` target is still required for those, and is still not
+added). Item 7 answers a narrower question than items 3–6: not "is
+this crate a loadable WASM module" but "does this crate's own source,
+plus its entire dependency graph, actually compile for
+`wasm32-unknown-unknown` at all" — the answer is now yes, where it was
+previously no (`docs/runtime_wasm_build_observation.md` §2–3, the
+pre-Stage-442 failing run).
+
+## 6. Why this preflight, and why now
 
 `docs/runtime_backend_implementation_sequence.md` (Stage 410) named
 "WASM build toolchain planning final check" as sequence item 1 and
@@ -136,3 +160,6 @@ explicitly-reviewed stage.
 - `packages/fedos-core-rust/src/wasm_loader.ts` (Stage 63) — the
   existing, permanently-disabled, hand-written loader placeholder
   referenced in §2.
+- `docs/runtime_wasm_getrandom_policy.md` (Stage 441) and
+  `docs/runtime_wasm_build_observation.md` §7–8 (updated Stage 445) —
+  the policy and recorded result behind §5's new item 7.

@@ -1,4 +1,4 @@
-# FedOS WASM build contract — Stage 418 (updated Stage 427, 434)
+# FedOS WASM build contract — Stage 418 (updated Stage 427, 434, 445)
 
 **Status: this document adds no code.** It fixes, as a single diagram,
 the end-to-end path from `packages/fedos-core-rust`'s Rust source to
@@ -189,12 +189,54 @@ is the full extent of what this batch measures; "does it produce a
 and is deferred to a future, separate, explicitly-reviewed stage that
 would ALSO need to justify adding `cdylib` on its own merits.
 
+## 7. Update — Stage 441–445: the "`cargo build` (future)" box is no longer purely future
+
+§1's diagram labeled `cargo build (future)` as "NOT RUN". As of Stage
+443–444, that is now more precise: `cargo build --target
+wasm32-unknown-unknown` (and `cargo check` for the same target) HAVE
+been run, and both SUCCEED, once `getrandom`'s `wasm_js` feature
+(`Cargo.toml`, Stage 442) is enabled and `RUSTFLAGS='--cfg
+getrandom_backend="wasm_js"'` is supplied per-invocation
+(`docs/runtime_wasm_getrandom_policy.md`, Stage 441;
+`docs/runtime_wasm_build_observation.md` §7, Stage 445). This does
+NOT move the diagram's boundary — the next three boxes down
+(`wasm-bindgen (future)`, `Generated JS Glue (future)`, `Generated
+.wasm (future)`) are UNCHANGED and still entirely future: no
+`cdylib` target exists (`[lib]`'s `crate-type` is still `["rlib"]`
+only, §6's decision still stands), so there is still no artifact for
+`wasm-bindgen` to consume, and `wasm-bindgen` (the CLI) was not
+invoked by Stage 443–444 or any stage before it. What changed is
+narrower than the diagram's box boundaries suggest: the crate's own
+Rust source, plus its full dependency graph including `getrandom`,
+now compiles for `wasm32-unknown-unknown` — a necessary but not
+sufficient condition for anything below it in the diagram to become
+real.
+
+**Still unchanged by Stage 441–445:**
+
+- `[lib]` `crate-type` — still `["rlib"]` only, no `cdylib`.
+- `wasm-bindgen` (the CLI) — still never invoked; only the
+  `wasm-bindgen` LIBRARY crate compiles, as `getrandom`'s own
+  `wasm_js`-feature-gated internal dependency, not a direct dependency
+  or CLI invocation of this repository.
+- `wasm-pack` — still not installed or adopted.
+- No `package.json` script — the `RUSTFLAGS` invocation is still run
+  by hand, per-invocation, never scripted or baked into a committed
+  `.cargo/config.toml`.
+- No `.wasm` file or generated JS glue exists anywhere.
+- No Runtime/Worker activation; no `encrypt`/`decrypt` execution; no
+  NIP-44 code path executed.
+
 ## See also
 
 - `docs/runtime_wasm_toolchain_readiness.md` (Stage 417, updated Stage
   425–426) — the inventory this contract's "(future)" boxes are drawn
   against, and the record of which toolchain pieces are now installed
   as environment capabilities vs. still not adopted (`wasm-pack`).
+- `docs/runtime_wasm_getrandom_policy.md` (Stage 441) and
+  `docs/runtime_wasm_build_observation.md` §7–8 (updated Stage 445) —
+  the policy and recorded `cargo check`/`cargo build` SUCCESS behind
+  this document's new §7.
 - `docs/runtime_wasm_build_plan.md` (Stage 393) — the original pipeline
   shape (crate → wasm32 target → bindgen → loader → Runtime Provider)
   this contract extends all the way to `Runtime`.
