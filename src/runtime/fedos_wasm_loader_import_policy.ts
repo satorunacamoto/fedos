@@ -23,6 +23,15 @@
  * anywhere in this repository; neither `create_runtime.ts` nor
  * `src/worker.ts` references it, directly or indirectly.
  *
+ * Stage 519 extends `evaluateWasmLoaderImportPolicy()` DOWNWARD only:
+ * it now builds a `FedosWasmStaticImportPlan`
+ * (`fedos_wasm_static_import_plan.ts`, Stage 518) and calls its
+ * `planStaticImport()` — then DISCARDS the result and returns its
+ * OWN, unchanged `{ allowed: false, reason: "BlockedByPolicy" }`
+ * answer. This mirrors the SAME "reach one link deeper, keep your own
+ * answer" pattern Stage 503/511 already established twice over in
+ * this WASM arc.
+ *
  * HARD GUARDRAILS:
  *   - `evaluateWasmLoaderImportPolicy()` is PURE, synchronous, takes
  *     no argument, and returns a hand-fixed constant. It NEVER
@@ -47,6 +56,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createFedosWasmStaticImportPlan } from "./fedos_wasm_static_import_plan.js";
 
 /**
  * Coarse status of the Import Policy itself. `"Blocked"` is the ONLY
@@ -90,8 +101,22 @@ export type FedosWasmLoaderImportPolicy = () => FedosWasmLoaderImportDecision;
  */
 export const evaluateWasmLoaderImportPolicy: FedosWasmLoaderImportPolicy =
   (): FedosWasmLoaderImportDecision => {
+    reachStaticImportPlan(); // result discarded -- the generated JS glue is never imported
     return { allowed: false, reason: "BlockedByPolicy" };
   };
+
+/**
+ * PRIVATE (module-scoped) — builds a `FedosWasmStaticImportPlan` and
+ * calls its `planStaticImport()`. The result is discarded; it is
+ * never passed to `WebAssembly.instantiate`/`compile`, `initSync`/the
+ * default init export, `packages/fedos-core-rust`, Runtime, or
+ * Worker. The Static Import Plan itself never imports anything
+ * either.
+ */
+function reachStaticImportPlan(): void {
+  const plan = createFedosWasmStaticImportPlan();
+  plan.planStaticImport();
+}
 
 /**
  * Pure, standalone: the Import Policy's own fixed coarse state —
