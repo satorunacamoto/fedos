@@ -114,9 +114,11 @@ describe("FedOS WASM boundary, not loaded, fail-closed everywhere (Stage 385-392
     expect(adapter.planDecrypt({ kind: "Decrypt" }).state).toBe("BlockedByImplementation");
   });
 
-  it("10. Rust invocation adapter wires to the WASM boundary's planLoad() only", () => {
-    expect(invocationAdapterSource).toMatch(/from\s*"\.\/fedos_wasm_boundary\.js"/);
+  it("10. Rust invocation adapter wires to the WASM boundary THROUGH the Execution Backend (Stage 403) -- no longer directly", () => {
+    expect(invocationAdapterSource).not.toMatch(/from\s*"\.\/fedos_wasm_boundary\.js"/);
+    expect(invocationAdapterSource).toMatch(/from\s*"\.\/fedos_execution_backend\.js"/);
     expect(invocationAdapterSource).toMatch(/\.planLoad\(\)/);
+    expect(wasmBoundarySource).toMatch(/export function createFedosWasmBoundary/);
   });
 
   it("11. no Rust crypto is ever called -- no fedos-core-rust reference in the WASM Boundary file", () => {
@@ -178,13 +180,13 @@ describe("FedOS WASM boundary, not loaded, fail-closed everywhere (Stage 385-392
 
   it("20. no Runtime activation -- create_runtime.ts never calls planLoad or any plan*/review*/evaluate* function", () => {
     expect(createRuntimeSource).not.toMatch(
-      /planLoad|planPing|planExecution|planEncrypt|planDecrypt|planRustEncrypt|planRustDecrypt|planRustApiEncrypt|planRustApiDecrypt|reviewEncrypt|reviewDecrypt|planFedosInternalRustCall|evaluateFedosInternalRustCall|planFedosRustInvocationAdapterExecution|createFedosWasmBoundary/,
+      /planLoad|planPing|planExecution|planEncrypt|planDecrypt|planRustEncrypt|planRustDecrypt|planRustApiEncrypt|planRustApiDecrypt|reviewEncrypt|reviewDecrypt|planFedosInternalRustCall|evaluateFedosInternalRustCall|planFedosRustInvocationAdapterExecution|createFedosWasmBoundary|createExecutionBackend|planBackend/,
     );
   });
 
   it("21. no Worker activation -- src/worker.ts still doesn't import the WASM Boundary or any earlier chain link", () => {
     expect(workerSource).not.toMatch(
-      /fedos_wasm_boundary|fedos_rust_invocation_adapter|fedos_internal_rust_call|fedos_rust_execution_review|fedos_rust_api|fedos_rust_boundary|fedos_opaque_api|fedos_runtime_crypto_provider/,
+      /fedos_wasm_boundary|fedos_execution_backend|fedos_rust_invocation_adapter|fedos_internal_rust_call|fedos_rust_execution_review|fedos_rust_api|fedos_rust_boundary|fedos_opaque_api|fedos_runtime_crypto_provider/,
     );
   });
 

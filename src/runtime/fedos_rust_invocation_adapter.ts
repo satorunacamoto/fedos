@@ -78,6 +78,18 @@
  * `planPing()` is UNCHANGED by this stage — it still reaches Rust's
  * contract via its own pure TypeScript mirror, entirely separately.
  *
+ * Stage 403 REPLACES the Stage 387 wiring above: `planEncrypt()`/
+ * `planDecrypt()` now reach `FedosExecutionBackend`
+ * (`fedos_execution_backend.ts`, Stage 402) INSTEAD OF
+ * `FedosWasmBoundary` directly — calling its `planLoad()`, then
+ * DISCARDING the result and returning this file's OWN, unchanged
+ * `"BlockedByImplementation"` answer, exactly as before. The WASM
+ * Boundary file itself is UNCHANGED and UNTOUCHED by this stage; it is
+ * simply reached one level deeper, through the Execution Backend, per
+ * `docs/runtime_execution_backend.md` (Stage 401) — WASM is now
+ * modeled as the first Execution Backend CANDIDATE, not a hard-coded
+ * terminus. `planPing()` remains UNCHANGED.
+ *
  * HARD GUARDRAILS:
  *   - `FedosRustInvocationAdapterPlaceholder` NEVER invokes
  *     `packages/fedos-core-rust` (Rust crate or TS package boundary),
@@ -107,8 +119,8 @@
  *     ciphertext/key of any kind.
  */
 
+import { createExecutionBackend } from "./fedos_execution_backend.js";
 import type { FedosInternalRustCall } from "./fedos_internal_rust_call.js";
-import { createFedosWasmBoundary } from "./fedos_wasm_boundary.js";
 
 /**
  * Coarse status of the Rust Invocation Adapter abstraction itself.
@@ -211,25 +223,26 @@ export class FedosRustInvocationAdapterPlaceholder implements FedosRustInvocatio
   }
 
   planEncrypt(_call: FedosInternalRustCall): FedosRustInvocationAdapterDecision {
-    this.#reachWasmBoundary(); // result discarded -- no WASM module is ever loaded
+    this.#reachExecutionBackend(); // result discarded -- no backend is ever selected, connected, or executed
     return this.#blocked("Encrypt");
   }
 
   planDecrypt(_call: FedosInternalRustCall): FedosRustInvocationAdapterDecision {
-    this.#reachWasmBoundary(); // result discarded -- no WASM module is ever loaded
+    this.#reachExecutionBackend(); // result discarded -- no backend is ever selected, connected, or executed
     return this.#blocked("Decrypt");
   }
 
   /**
-   * PRIVATE — builds a `FedosWasmBoundary` and calls its `planLoad()`.
-   * The result is discarded; it is never passed to
-   * `packages/fedos-core-rust`/a real WASM/FFI boundary, never passed
-   * to Runtime or Worker. The WASM Boundary itself never loads
-   * anything either.
+   * PRIVATE — builds a `FedosExecutionBackend` (Stage 402) and calls
+   * its `planLoad()`, which itself reaches the WASM Boundary's own
+   * `planLoad()` (Stage 386, UNCHANGED). The result is discarded at
+   * every layer; it is never passed to `packages/fedos-core-rust`/a
+   * real WASM/Native/Mobile/FFI boundary, never passed to Runtime or
+   * Worker.
    */
-  #reachWasmBoundary(): void {
-    const boundary = createFedosWasmBoundary();
-    boundary.planLoad();
+  #reachExecutionBackend(): void {
+    const backend = createExecutionBackend();
+    backend.planLoad();
   }
 
   planPing(): FedosRustInvocationAdapterPingDecision {

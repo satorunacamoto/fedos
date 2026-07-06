@@ -153,13 +153,13 @@ describe("FedOS WASM artifact, not built, fail-closed everywhere (Stage 393-400)
 
   it("15. Runtime is unchanged -- create_runtime.ts never calls planBuild or any plan*/review*/evaluate* function", () => {
     expect(createRuntimeSource).not.toMatch(
-      /planBuild|planLoad|planPing|planExecution|planEncrypt|planDecrypt|planRustEncrypt|planRustDecrypt|planRustApiEncrypt|planRustApiDecrypt|reviewEncrypt|reviewDecrypt|planFedosInternalRustCall|evaluateFedosInternalRustCall|planFedosRustInvocationAdapterExecution|createFedosWasmBoundary|createFedosWasmArtifact/,
+      /planBuild|planLoad|planPing|planExecution|planEncrypt|planDecrypt|planRustEncrypt|planRustDecrypt|planRustApiEncrypt|planRustApiDecrypt|reviewEncrypt|reviewDecrypt|planFedosInternalRustCall|evaluateFedosInternalRustCall|planFedosRustInvocationAdapterExecution|createFedosWasmBoundary|createFedosWasmArtifact|createExecutionBackend|planBackend/,
     );
   });
 
   it("16. Worker is unchanged -- src/worker.ts still doesn't import the WASM Artifact or any earlier chain link", () => {
     expect(workerSource).not.toMatch(
-      /fedos_wasm_artifact|fedos_wasm_boundary|fedos_rust_invocation_adapter|fedos_internal_rust_call|fedos_rust_execution_review|fedos_rust_api|fedos_rust_boundary|fedos_opaque_api|fedos_runtime_crypto_provider/,
+      /fedos_wasm_artifact|fedos_wasm_boundary|fedos_execution_backend|fedos_rust_invocation_adapter|fedos_internal_rust_call|fedos_rust_execution_review|fedos_rust_api|fedos_rust_boundary|fedos_opaque_api|fedos_runtime_crypto_provider/,
     );
   });
 
