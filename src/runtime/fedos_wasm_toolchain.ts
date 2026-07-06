@@ -152,6 +152,20 @@ export type FedosWasmTargetTriple = "wasm32-unknown-unknown";
 export type FedosWasmObservationResult = "NotObserved" | "Failed" | "Succeeded";
 
 /**
+ * Stage 477 — the fixed, non-detecting record of Stage 473–476:
+ * `wasm-bindgen-cli` was upgraded to match the `wasm-bindgen` version
+ * the crate's dependency graph resolves to
+ * (`docs/runtime_wasm_bindgen_version_policy.md`), and a subsequent
+ * `npm run build:wasm` re-run FULLY SUCCEEDED — the first real
+ * `.wasm` + JS glue pair ever produced
+ * (`docs/runtime_wasm_artifact_observation.md` §10). This file never
+ * runs `wasm-bindgen --version` or `build:wasm` itself; these are a
+ * hand-fixed record of a result already observed and written down
+ * once, exactly like `FedosWasmObservationResult` above.
+ */
+export type FedosWasmBindgenCliVersion = "0.2.126";
+
+/**
  * Stage 446 — the fixed, non-detecting name of the `getrandom` 0.3.x
  * WASM entropy backend this crate's `Cargo.toml` opts into (Stage 442).
  * `"wasm_js"` is the ONLY value this stage's implementation ever
@@ -206,6 +220,12 @@ export interface FedosWasmToolchainStatus {
   readonly getrandomWasmPolicy: FedosGetrandomWasmPolicy;
   readonly getrandomBackendCfgRequired: boolean;
   readonly wasmTargetCheckStatus: FedosWasmTargetCheckStatus;
+  /** Stage 477 — see `FedosWasmBindgenCliVersion`'s own doc comment. Fixed `"0.2.126"`. */
+  readonly wasmBindgenCliExpectedVersion: FedosWasmBindgenCliVersion;
+  /** Stage 477 — whether the local CLI is expected to match the crate-resolved version. Fixed `true`. */
+  readonly wasmBindgenVersionAligned: boolean;
+  /** Stage 477 — whether a real JS glue generation has ever been observed. Fixed `true`. */
+  readonly wasmGlueGenerationObserved: boolean;
 }
 
 /** The result of any `FedosWasmToolchain.plan*()` call. No binary, artifact, or byte of any kind. */
@@ -254,6 +274,9 @@ export class FedosWasmToolchainPlaceholder implements FedosWasmToolchain {
       getrandomWasmPolicy: "wasm_js",
       getrandomBackendCfgRequired: true,
       wasmTargetCheckStatus: "ObservedGreen",
+      wasmBindgenCliExpectedVersion: "0.2.126",
+      wasmBindgenVersionAligned: true,
+      wasmGlueGenerationObserved: true,
     };
   }
 
@@ -416,4 +439,38 @@ export function fedosGetrandomBackendCfgRequired(): boolean {
  */
 export function fedosWasmTargetCheckStatus(): FedosWasmTargetCheckStatus {
   return "ObservedGreen";
+}
+
+/**
+ * Pure, standalone: the fixed `wasm-bindgen-cli` version the local
+ * CLI is expected to be aligned to (Stage 477 label). Fixed
+ * `"0.2.126"` — matching the version installed at Stage 474
+ * (`cargo install wasm-bindgen-cli --version 0.2.126 --force`). Never
+ * runs `wasm-bindgen --version`.
+ */
+export function fedosWasmBindgenCliExpectedVersion(): FedosWasmBindgenCliVersion {
+  return "0.2.126";
+}
+
+/**
+ * Pure, standalone: whether the local `wasm-bindgen-cli` binary is
+ * expected to be aligned with the crate-resolved `wasm-bindgen`
+ * version (Stage 477 label,
+ * `docs/runtime_wasm_bindgen_version_policy.md`). Fixed `true` — a
+ * policy/record fact, never a live comparison of an installed binary
+ * against `Cargo.lock`.
+ */
+export function fedosWasmBindgenVersionAligned(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: whether a real `wasm-bindgen` JS glue generation
+ * has ever been observed (Stage 477 label). Fixed `true` — recording
+ * Stage 475's `npm run build:wasm` full success
+ * (`docs/runtime_wasm_artifact_observation.md` §10), never a live
+ * filesystem check for `packages/fedos-core-rust/pkg/` contents.
+ */
+export function fedosWasmGlueGenerationObserved(): boolean {
+  return true;
 }

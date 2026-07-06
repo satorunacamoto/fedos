@@ -1,12 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
+// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
+import { execFileSync } from "node:child_process";
 import {
   FedosWasmToolchainPlaceholder,
   createFedosWasmToolchain,
   fedosGetrandomBackendCfgRequired,
   fedosGetrandomWasmPolicy,
+  fedosWasmBindgenCliExpectedVersion,
   fedosWasmBindgenExpected,
+  fedosWasmBindgenVersionAligned,
   fedosWasmBuildObserved,
   fedosWasmBuildReady,
+  fedosWasmGlueGenerationObserved,
   fedosWasmPackExpected,
   fedosWasmTargetCheckObserved,
   fedosWasmTargetCheckStatus,
@@ -26,6 +31,8 @@ import buildContractSource from "../docs/runtime_wasm_build_contract.md?raw";
 import buildObservationSource from "../docs/runtime_wasm_build_observation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import getrandomPolicySource from "../docs/runtime_wasm_getrandom_policy.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import bindgenVersionPolicySource from "../docs/runtime_wasm_bindgen_version_policy.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -87,7 +94,26 @@ import packageJsonSource from "../package.json?raw";
  * generated-glue artifact, no Runtime/Worker activation, no
  * `encrypt`/`decrypt` execution, `"Allowed"` unreachable.
  */
-describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-448)", () => {
+/**
+ * Stage 465–472 adds `cdylib` to `[lib]`'s `crate-type` and corrects
+ * `build:wasm`'s `wasm-bindgen` input path — both original generation
+ * causes resolved (`docs/runtime_wasm_artifact_generation_fix.md`).
+ * Stage 473–477 resolves a THIRD cause (a `wasm-bindgen` CLI/crate
+ * schema-version mismatch) by upgrading the LOCAL `wasm-bindgen-cli`
+ * binary to `0.2.126` (`docs/runtime_wasm_bindgen_version_policy.md`)
+ * -- a machine-local environment-capability change, never a
+ * `Cargo.toml`/`package.json` edit. `fedos_wasm_toolchain.ts` (updated
+ * Stage 477) adds three more fixed, non-detecting labels --
+ * `wasmBindgenCliExpectedVersion` (`"0.2.126"`),
+ * `wasmBindgenVersionAligned` (`true`), `wasmGlueGenerationObserved`
+ * (`true`) -- recording that a subsequent `npm run build:wasm` re-run
+ * FULLY SUCCEEDED, producing the first real `.wasm` + JS glue pair
+ * ever generated in this repository
+ * (`docs/runtime_wasm_artifact_observation.md` section 10). Item 9 is
+ * relaxed accordingly: a generated artifact is ALLOWED to exist
+ * locally, but must never be git-tracked.
+ */
+describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-448, updated 465-480)", () => {
   function codeOnlyOf(source: string): string {
     return source
       .split("\n")
@@ -192,16 +218,29 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     }
   });
 
-  it("9. no .wasm file, no generated JS bindings/glue, no compiled/native artifact exists anywhere in packages/fedos-core-rust", () => {
+  it("9. a locally-generated .wasm/JS-glue/compiled artifact is ALLOWED to exist (Stage 475 may have produced one), but must never be git-tracked", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../packages/fedos-core-rust/**/*");
     const paths = Object.keys(files);
-    const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
-    const forbiddenGlue = /_bg\.(js|ts|wasm)$/i;
-    for (const path of paths) {
-      expect(forbidden.test(path), `unexpected compiled/native artifact: ${path}`).toBe(false);
-      expect(forbiddenGlue.test(path), `unexpected generated bindgen glue: ${path}`).toBe(false);
+    const generated = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
+    const generatedGlue = /_bg\.(js|ts|wasm)$/i;
+    const generatedPkgDir = /\/pkg\//i;
+    const candidates = paths.filter(
+      (path) => generated.test(path) || generatedGlue.test(path) || generatedPkgDir.test(path),
+    );
+    if (candidates.length === 0) {
+      return;
+    }
+    const tracked = execFileSync("git", ["ls-files", "--", "packages/fedos-core-rust"], {
+      encoding: "utf-8",
+    });
+    const trackedPaths = new Set(tracked.split("\n").filter(Boolean));
+    for (const candidate of candidates) {
+      const repoRelative = candidate.replace(/^\.\.\//, "");
+      expect(trackedPaths.has(repoRelative), `generated artifact must never be git-tracked: ${repoRelative}`).toBe(
+        false,
+      );
     }
   });
 
@@ -354,5 +393,31 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(getrandomPolicySource).toMatch(/wasm_js/);
     expect(getrandomPolicySource).toMatch(/fallback/i);
     expect(getrandomPolicySource).toMatch(/fail[s]? closed|fails closed/i);
+  });
+
+  it("25. status() and the standalone functions expose the Stage 477 wasm-bindgen version-alignment labels", () => {
+    const status = new FedosWasmToolchainPlaceholder().status();
+    expect(status.wasmBindgenCliExpectedVersion).toBe("0.2.126");
+    expect(status.wasmBindgenVersionAligned).toBe(true);
+    expect(status.wasmGlueGenerationObserved).toBe(true);
+
+    expect(fedosWasmBindgenCliExpectedVersion()).toBe("0.2.126");
+    expect(fedosWasmBindgenVersionAligned()).toBe(true);
+    expect(fedosWasmGlueGenerationObserved()).toBe(true);
+  });
+
+  it("26. the bindgen version policy doc names the CLI-moves-not-crate policy and the 0.2.126 target version, without pinning Cargo.toml old", () => {
+    expect(bindgenVersionPolicySource).toMatch(/0\.2\.126/);
+    expect(bindgenVersionPolicySource).toMatch(/CLI/);
+    expect(bindgenVersionPolicySource).toMatch(/never.{0,40}pinned|never pin/i);
+    expect(bindgenVersionPolicySource).toMatch(/wasm-pack/i);
+  });
+
+  it("27. no cargo install for wasm-bindgen-cli is scripted anywhere in package.json -- Stage 474 was a manual, one-time machine-local install", () => {
+    const pkg = JSON.parse(packageJsonSource);
+    const scripts = pkg.scripts ?? {};
+    for (const script of Object.values(scripts) as string[]) {
+      expect(script).not.toMatch(/cargo\s+install/i);
+    }
   });
 });
