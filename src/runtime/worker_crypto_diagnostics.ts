@@ -108,6 +108,12 @@
  * `executionBackendReachable`/`backendImplemented` — see
  * `runtime_crypto_diagnostics.ts`'s own Stage 404 doc comment. Fixed
  * `"Wasm"`/`"Planning"`/`true`/`false` respectively.
+ *
+ * Stage 420 adds `wasmToolchainInstalled`/`wasmToolchainVerified`/
+ * `wasmBuildReady` — see `runtime_crypto_diagnostics.ts`'s own Stage
+ * 420 doc comment. All three fixed `false`; unlike every other field
+ * here, `fedos_wasm_toolchain.ts` is NOT structurally wired into the
+ * Runtime -> Rust chain (no `reachable` field is added for it).
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -151,6 +157,11 @@ import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
 import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
+import {
+  fedosWasmBuildReady,
+  fedosWasmToolchainInstalled,
+  fedosWasmToolchainVerified,
+} from "./fedos_wasm_toolchain.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -392,6 +403,25 @@ export interface WorkerCryptoActivationStatus {
    * own answer. Fixed `false` in this stage.
    */
   readonly backendImplemented: boolean;
+  /**
+   * Whether the WASM toolchain has ever actually been installed —
+   * `fedosWasmToolchainInstalled()`'s own answer
+   * (`src/runtime/fedos_wasm_toolchain.ts`, Stage 419/420). Fixed
+   * `false` in this stage.
+   */
+  readonly wasmToolchainInstalled: boolean;
+  /**
+   * Whether the WASM toolchain has ever actually been verified —
+   * `fedosWasmToolchainVerified()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly wasmToolchainVerified: boolean;
+  /**
+   * Whether a real WASM build is ready to be attempted —
+   * `fedosWasmBuildReady()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly wasmBuildReady: boolean;
 }
 
 /**
@@ -455,5 +485,8 @@ export function workerCryptoActivationStatus(
     executionBackendState: fedosExecutionBackendState(),
     executionBackendReachable: fedosExecutionBackendReachable(),
     backendImplemented: fedosExecutionBackendImplemented(),
+    wasmToolchainInstalled: fedosWasmToolchainInstalled(),
+    wasmToolchainVerified: fedosWasmToolchainVerified(),
+    wasmBuildReady: fedosWasmBuildReady(),
   };
 }
