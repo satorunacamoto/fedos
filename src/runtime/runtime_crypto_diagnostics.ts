@@ -188,6 +188,16 @@
  * `fedos_wasm_toolchain.ts` is NOT structurally wired into the
  * Runtime -> Rust chain (no `reachable` field is added for it) — it is
  * a standalone toolchain-readiness model read here for display only.
+ *
+ * Stage 453 adds `wasmArtifactGenerated` (`fedos_wasm_artifact.ts`'s
+ * `fedosWasmArtifactGenerated()`, Stage 452 — fixed `false`) and
+ * `generatedArtifactPath` (`fedosGeneratedArtifactPath()`, fixed
+ * `null`) — see `docs/runtime_wasm_generation.md` §2. These answer
+ * "does a real `.wasm` + JS glue pair exist on disk", DISTINCT from
+ * the existing `wasmArtifactState`/`wasmArtifactBuilt` fields (Stage
+ * 396), which answer "has this Provider-internal abstraction's own
+ * build step ever executed". Neither new field performs a filesystem
+ * check — both are hand-fixed constants.
  */
 
 import type {
@@ -233,7 +243,13 @@ import {
   fedosExecutionBackendState,
 } from "./fedos_execution_backend.js";
 import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
-import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
+import {
+  fedosGeneratedArtifactPath,
+  fedosWasmArtifactBuilt,
+  fedosWasmArtifactGenerated,
+  fedosWasmArtifactReachable,
+  fedosWasmArtifactState,
+} from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
 import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
 import {
@@ -586,6 +602,20 @@ export interface RuntimeCryptoActivationStatus {
    * stage.
    */
   readonly wasmBuildReady: boolean;
+  /**
+   * Whether a real `.wasm` + JS glue pair has ever actually been
+   * generated on disk — `fedosWasmArtifactGenerated()`'s own answer
+   * (`src/runtime/fedos_wasm_artifact.ts`, Stage 452/453). Fixed
+   * `false` in this stage; distinct from `wasmArtifactBuilt` (Stage
+   * 396) — see `docs/runtime_wasm_generation.md` §2.
+   */
+  readonly wasmArtifactGenerated: boolean;
+  /**
+   * The filesystem path a generated artifact would live at, IF one
+   * had ever been generated — `fedosGeneratedArtifactPath()`'s own
+   * answer. Fixed `null` in this stage.
+   */
+  readonly generatedArtifactPath: string | null;
 }
 
 /**
@@ -653,5 +683,7 @@ export function runtimeCryptoActivationStatus(
     wasmToolchainInstalled: fedosWasmToolchainInstalled(),
     wasmToolchainVerified: fedosWasmToolchainVerified(),
     wasmBuildReady: fedosWasmBuildReady(),
+    wasmArtifactGenerated: fedosWasmArtifactGenerated(),
+    generatedArtifactPath: fedosGeneratedArtifactPath(),
   };
 }

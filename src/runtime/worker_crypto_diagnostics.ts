@@ -114,6 +114,10 @@
  * 420 doc comment. All three fixed `false`; unlike every other field
  * here, `fedos_wasm_toolchain.ts` is NOT structurally wired into the
  * Runtime -> Rust chain (no `reachable` field is added for it).
+ *
+ * Stage 453 adds `wasmArtifactGenerated`/`generatedArtifactPath` —
+ * see `runtime_crypto_diagnostics.ts`'s own Stage 453 doc comment.
+ * Fixed `false`/`null` respectively.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -154,7 +158,13 @@ import {
   fedosExecutionBackendState,
 } from "./fedos_execution_backend.js";
 import type { FedosWasmArtifactState } from "./fedos_wasm_artifact.js";
-import { fedosWasmArtifactBuilt, fedosWasmArtifactReachable, fedosWasmArtifactState } from "./fedos_wasm_artifact.js";
+import {
+  fedosGeneratedArtifactPath,
+  fedosWasmArtifactBuilt,
+  fedosWasmArtifactGenerated,
+  fedosWasmArtifactReachable,
+  fedosWasmArtifactState,
+} from "./fedos_wasm_artifact.js";
 import type { FedosWasmBoundaryState } from "./fedos_wasm_boundary.js";
 import { fedosWasmBoundaryReachable, fedosWasmBoundaryState, fedosWasmLoaded } from "./fedos_wasm_boundary.js";
 import {
@@ -422,6 +432,18 @@ export interface WorkerCryptoActivationStatus {
    * stage.
    */
   readonly wasmBuildReady: boolean;
+  /**
+   * Whether a real `.wasm` + JS glue pair has ever actually been
+   * generated on disk — `fedosWasmArtifactGenerated()`'s own answer
+   * (Stage 452/453). Fixed `false` in this stage.
+   */
+  readonly wasmArtifactGenerated: boolean;
+  /**
+   * The filesystem path a generated artifact would live at, IF one
+   * had ever been generated — `fedosGeneratedArtifactPath()`'s own
+   * answer. Fixed `null` in this stage.
+   */
+  readonly generatedArtifactPath: string | null;
 }
 
 /**
@@ -488,5 +510,7 @@ export function workerCryptoActivationStatus(
     wasmToolchainInstalled: fedosWasmToolchainInstalled(),
     wasmToolchainVerified: fedosWasmToolchainVerified(),
     wasmBuildReady: fedosWasmBuildReady(),
+    wasmArtifactGenerated: fedosWasmArtifactGenerated(),
+    generatedArtifactPath: fedosGeneratedArtifactPath(),
   };
 }
