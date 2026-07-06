@@ -65,6 +65,26 @@
  * `fedosGeneratedArtifactPath()` expose the same fact as plain
  * standalone values (`false`/`null`) for diagnostics (Stage 453) to
  * read without constructing an instance.
+ *
+ * Stage 457–460 adds a THIRD status axis, recording the OBSERVATION
+ * result of `docs/runtime_wasm_artifact_observation.md` (Stage 457–459
+ * ran the real `npm run build:wasm` for the first time; `cargo build`
+ * succeeded, `wasm-bindgen` failed — no `.wasm`/JS glue pair was
+ * produced). `artifactGenerationObserved` (fixed `true`) records that a
+ * real generation ATTEMPT has now been observed at least once — a
+ * DIFFERENT question from `generationState`/`fedosWasmArtifactGenerated()`
+ * (whether a real artifact pair actually EXISTS — still
+ * `"NotGenerated"`/`false`, since the attempt failed).
+ * `artifactGeneratedButUntracked` (fixed `true`) and `artifactCommitPolicy`
+ * (fixed `"NeverCommitGeneratedArtifact"`) are PERMANENT POLICY
+ * invariants, not filesystem observations: IF a real artifact is ever
+ * generated locally (in this attempt or a future one), it is
+ * guaranteed to remain untracked by git
+ * (`packages/fedos-core-rust/.gitignore`'s `/pkg/` entry, Stage 451)
+ * and is never committed. Like every other label in this file, all
+ * three are hand-fixed constants — no filesystem check, environment
+ * read, or runtime detection of any kind is ever performed to compute
+ * them.
  */
 
 /**
@@ -89,12 +109,29 @@ export type FedosWasmArtifactState = "NotBuilt";
  */
 export type FedosWasmArtifactGenerationState = "Generated" | "NotGenerated";
 
+/**
+ * Stage 457–460 — the PERMANENT commit policy for any real WASM
+ * artifact this crate would ever generate. `"NeverCommitGeneratedArtifact"`
+ * is the ONLY value — there is no reserved alternative, unlike
+ * `FedosWasmArtifactState`/`FedosWasmArtifactGenerationState`, because
+ * this policy is not expected to change: a locally-generated build
+ * byproduct is never checked into version control, regardless of
+ * whether generation ever succeeds.
+ */
+export type FedosWasmArtifactCommitPolicy = "NeverCommitGeneratedArtifact";
+
 /** A non-sensitive snapshot of a `FedosWasmArtifact`. `reason` is human-readable and non-sensitive. */
 export interface FedosWasmArtifactStatus {
   readonly state: FedosWasmArtifactState;
   readonly reason: string;
   /** Stage 452 — see `FedosWasmArtifactGenerationState`'s own doc comment. Fixed `"NotGenerated"`. */
   readonly generationState: FedosWasmArtifactGenerationState;
+  /** Stage 457–460 — whether a real generation ATTEMPT (`npm run build:wasm`) has ever been observed. Fixed `true`. */
+  readonly artifactGenerationObserved: boolean;
+  /** Stage 457–460 — permanent policy: any generated artifact remains untracked by git. Fixed `true`. */
+  readonly artifactGeneratedButUntracked: boolean;
+  /** Stage 457–460 — see `FedosWasmArtifactCommitPolicy`'s own doc comment. Fixed `"NeverCommitGeneratedArtifact"`. */
+  readonly artifactCommitPolicy: FedosWasmArtifactCommitPolicy;
 }
 
 /**
@@ -142,6 +179,9 @@ export class FedosWasmArtifactPlaceholder implements FedosWasmArtifact {
       state: "NotBuilt",
       reason: "FedOS WASM artifact has not been built",
       generationState: "NotGenerated",
+      artifactGenerationObserved: true,
+      artifactGeneratedButUntracked: true,
+      artifactCommitPolicy: "NeverCommitGeneratedArtifact",
     };
   }
 
@@ -230,4 +270,38 @@ export function fedosWasmArtifactGenerated(): boolean {
  */
 export function fedosGeneratedArtifactPath(): string | null {
   return null;
+}
+
+/**
+ * Pure, standalone: whether a real generation ATTEMPT (`npm run
+ * build:wasm`) has ever been observed (Stage 457–459;
+ * `docs/runtime_wasm_artifact_observation.md`). Fixed `true` — no
+ * filesystem check, environment read, or runtime detection is ever
+ * performed. DISTINCT from `fedosWasmArtifactGenerated()`, which asks
+ * whether that attempt actually produced a real artifact (it did not
+ * — fixed `false`, unchanged).
+ */
+export function fedosArtifactGenerationObserved(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the permanent policy that any WASM artifact this
+ * crate ever generates locally remains untracked by git (Stage
+ * 457–460). Fixed `true` — a structural fact
+ * (`packages/fedos-core-rust/.gitignore`'s `/pkg/` entry, Stage 451),
+ * not a filesystem observation of whether one currently exists.
+ */
+export function fedosArtifactGeneratedButUntracked(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the fixed commit policy for any WASM artifact this
+ * crate ever generates locally (Stage 457–460). Always
+ * `"NeverCommitGeneratedArtifact"` — see
+ * `FedosWasmArtifactCommitPolicy`'s own doc comment.
+ */
+export function fedosArtifactCommitPolicy(): FedosWasmArtifactCommitPolicy {
+  return "NeverCommitGeneratedArtifact";
 }

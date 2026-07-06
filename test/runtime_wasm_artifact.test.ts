@@ -1,9 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
+// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
+import { execFileSync } from "node:child_process";
 import { FedosRuntimeCryptoProvider } from "../src/runtime/fedos_runtime_crypto_provider.js";
 import { FedosRustInvocationAdapterPlaceholder } from "../src/runtime/fedos_rust_invocation_adapter.js";
 import {
   FedosWasmArtifactPlaceholder,
   createFedosWasmArtifact,
+  fedosArtifactCommitPolicy,
+  fedosArtifactGeneratedButUntracked,
+  fedosArtifactGenerationObserved,
   fedosWasmArtifactBuilt,
   fedosWasmArtifactReachable,
   fedosWasmArtifactState,
@@ -35,8 +40,17 @@ import packageJsonSource from "../package.json?raw";
  * models the "build" step as a placeholder that never builds
  * anything; Stage 395 wires the WASM Boundary's planLoad() to reach
  * it via planBuild() only.
+ *
+ * Stage 457–464 — a real `npm run build:wasm` run was actually
+ * observed for the first time (`docs/runtime_wasm_artifact_observation.md`).
+ * Item 2 is relaxed accordingly: a generated `.wasm` file is ALLOWED
+ * to exist locally, but is asserted to never be tracked by git. Item
+ * 23 checks this batch's new fixed labels
+ * (`artifactGenerationObserved`, `artifactGeneratedButUntracked`,
+ * `artifactCommitPolicy`) — still hand-fixed constants, never a real
+ * filesystem/runtime check.
  */
-describe("FedOS WASM artifact, not built, fail-closed everywhere (Stage 393-400)", () => {
+describe("FedOS WASM artifact, not built, fail-closed everywhere (Stage 393-400, updated 457-464)", () => {
   function codeOnlyOf(source: string): string {
     return source
       .split("\n")
@@ -52,13 +66,22 @@ describe("FedOS WASM artifact, not built, fail-closed everywhere (Stage 393-400)
     expect(decision.state).toBe("BlockedByImplementation");
   });
 
-  it("2. no .wasm file exists anywhere in packages/fedos-core-rust", () => {
+  it("2. a locally-generated .wasm file is ALLOWED to exist (Stage 457-459 may have produced build output), but must never be tracked by git", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../packages/fedos-core-rust/**/*");
     const paths = Object.keys(files);
-    for (const path of paths) {
-      expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
+    const candidates = paths.filter((path) => /\.wasm$/i.test(path));
+    if (candidates.length === 0) {
+      return;
+    }
+    const tracked = execFileSync("git", ["ls-files", "--", "packages/fedos-core-rust"], {
+      encoding: "utf-8",
+    });
+    const trackedPaths = new Set(tracked.split("\n").filter(Boolean));
+    for (const candidate of candidates) {
+      const repoRelative = candidate.replace(/^\.\.\//, "");
+      expect(trackedPaths.has(repoRelative), `WASM binary must never be git-tracked: ${repoRelative}`).toBe(false);
     }
   });
 
@@ -230,5 +253,22 @@ describe("FedOS WASM artifact, not built, fail-closed everywhere (Stage 393-400)
     expect(codeOnly).not.toMatch(/\bffi\b/i);
     expect(codeOnly).not.toMatch(/native.?addon/i);
     expect(codeOnly).not.toMatch(/\bnapi\b/i);
+  });
+
+  it("23. Stage 457-460 fixed labels (artifactGenerationObserved/artifactGeneratedButUntracked/artifactCommitPolicy) are hand-fixed, never a runtime/filesystem check", () => {
+    const artifact = new FedosWasmArtifactPlaceholder();
+    const status = artifact.status();
+    expect(status.artifactGenerationObserved).toBe(true);
+    expect(status.artifactGeneratedButUntracked).toBe(true);
+    expect(status.artifactCommitPolicy).toBe("NeverCommitGeneratedArtifact");
+
+    expect(fedosArtifactGenerationObserved()).toBe(true);
+    expect(fedosArtifactGeneratedButUntracked()).toBe(true);
+    expect(fedosArtifactCommitPolicy()).toBe("NeverCommitGeneratedArtifact");
+
+    const codeOnly = codeOnlyOf(wasmArtifactSource);
+    expect(codeOnly).not.toMatch(/\bfs\./);
+    expect(codeOnly).not.toMatch(/from\s*"(node:)?fs(\/promises)?"/);
+    expect(codeOnly).not.toMatch(/child_process/i);
   });
 });

@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
+// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
+import { execFileSync } from "node:child_process";
 import {
   FedosWasmArtifactPlaceholder,
   createFedosWasmArtifact,
+  fedosArtifactCommitPolicy,
+  fedosArtifactGeneratedButUntracked,
+  fedosArtifactGenerationObserved,
   fedosGeneratedArtifactPath,
   fedosWasmArtifactGenerated,
   fedosWasmArtifactGenerationState,
@@ -40,8 +45,19 @@ import workerSource from "../src/worker.ts?raw";
  * generated, built via the new script, or loaded — Runtime/Worker stay
  * unconnected, `encrypt`/`decrypt` are untouched, and `"Allowed"`
  * remains unreachable.
+ *
+ * Stage 457–464 — a real `npm run build:wasm` run was actually
+ * observed for the first time (`docs/runtime_wasm_artifact_observation.md`):
+ * `cargo build` succeeded, `wasm-bindgen` failed (no `cdylib`, no
+ * `.wasm` produced). This test file's item 7 is relaxed accordingly:
+ * a generated `.rlib`/`.wasm`/`pkg/` artifact is ALLOWED to exist
+ * locally, but is asserted to never be tracked by git. Item 15 checks
+ * the three new fixed labels this batch adds to `fedos_wasm_artifact.ts`
+ * (`artifactGenerationObserved`, `artifactGeneratedButUntracked`,
+ * `artifactCommitPolicy`) — still hand-fixed constants, never a real
+ * filesystem/runtime check.
  */
-describe("FedOS WASM generation planning, nothing generated, fail-closed everywhere (Stage 449-456)", () => {
+describe("FedOS WASM generation planning, nothing generated, fail-closed everywhere (Stage 449-456, updated 457-464)", () => {
   it("1. FedosWasmArtifact's new generationState is fixed NotGenerated, distinct from its existing state", () => {
     const artifact = new FedosWasmArtifactPlaceholder();
     const status = artifact.status();
@@ -103,18 +119,34 @@ describe("FedOS WASM generation planning, nothing generated, fail-closed everywh
     expect(cargoGitignoreSource).toMatch(/(^|\n)\/pkg\/(\n|$)/);
   });
 
-  it("7. no .wasm file, generated JS glue, pkg/ directory contents, or other compiled/native artifact exists anywhere in packages/fedos-core-rust", () => {
+  it("7. a locally-generated .wasm/JS-glue/pkg/ artifact is ALLOWED to exist on disk (Stage 457-459 may have produced one), but must NEVER be tracked by git", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../packages/fedos-core-rust/**/*");
     const paths = Object.keys(files);
-    const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
-    const forbiddenGlue = /_bg\.(js|ts|wasm)$/i;
-    const forbiddenPkgDir = /\/pkg\//i;
-    for (const path of paths) {
-      expect(forbidden.test(path), `unexpected compiled/native artifact: ${path}`).toBe(false);
-      expect(forbiddenGlue.test(path), `unexpected generated bindgen glue: ${path}`).toBe(false);
-      expect(forbiddenPkgDir.test(path), `unexpected pkg/ output present: ${path}`).toBe(false);
+    const generated = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
+    const generatedGlue = /_bg\.(js|ts|wasm)$/i;
+    const generatedPkgDir = /\/pkg\//i;
+    const candidates = paths.filter(
+      (path) => generated.test(path) || generatedGlue.test(path) || generatedPkgDir.test(path),
+    );
+    // Presence alone is NOT a failure -- a real `npm run build:wasm` run
+    // (Stage 457-459) may leave `.rlib`/`.wasm`/pkg/ output on disk
+    // locally. What must NEVER happen is one of these paths being
+    // tracked by git -- checked directly against `git ls-files`, not
+    // inferred from `.gitignore` patterns alone.
+    if (candidates.length === 0) {
+      return;
+    }
+    const tracked = execFileSync("git", ["ls-files", "--", "packages/fedos-core-rust"], {
+      encoding: "utf-8",
+    });
+    const trackedPaths = new Set(tracked.split("\n").filter(Boolean));
+    for (const candidate of candidates) {
+      const repoRelative = candidate.replace(/^\.\.\//, "");
+      expect(trackedPaths.has(repoRelative), `generated artifact must never be git-tracked: ${repoRelative}`).toBe(
+        false,
+      );
     }
   });
 
@@ -185,5 +217,22 @@ describe("FedOS WASM generation planning, nothing generated, fail-closed everywh
     expect(generationDocSource).toMatch(/wasm-bindgen/);
     expect(generationDocSource).toMatch(/NOT GENERATED|NotGenerated/);
     expect(generationDocSource).toMatch(/PLANNING ONLY/);
+  });
+
+  it("15. Stage 457-460 fixed labels: a generation attempt has been observed, but any artifact stays untracked and is never committed", () => {
+    const artifact = new FedosWasmArtifactPlaceholder();
+    const status = artifact.status();
+    expect(status.artifactGenerationObserved).toBe(true);
+    expect(status.artifactGeneratedButUntracked).toBe(true);
+    expect(status.artifactCommitPolicy).toBe("NeverCommitGeneratedArtifact");
+
+    expect(fedosArtifactGenerationObserved()).toBe(true);
+    expect(fedosArtifactGeneratedButUntracked()).toBe(true);
+    expect(fedosArtifactCommitPolicy()).toBe("NeverCommitGeneratedArtifact");
+
+    // Still distinct from whether a real artifact actually EXISTS --
+    // that stays false/NotGenerated, since the observed attempt failed.
+    expect(fedosWasmArtifactGenerated()).toBe(false);
+    expect(fedosWasmArtifactGenerationState()).toBe("NotGenerated");
   });
 });
