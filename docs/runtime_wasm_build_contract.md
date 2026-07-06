@@ -1,4 +1,4 @@
-# FedOS WASM build contract — Stage 418 (updated Stage 427)
+# FedOS WASM build contract — Stage 418 (updated Stage 427, 434)
 
 **Status: this document adds no code.** It fixes, as a single diagram,
 the end-to-end path from `packages/fedos-core-rust`'s Rust source to
@@ -131,6 +131,64 @@ these commands lets that future stage start from an agreed shape
 instead of inventing the invocation from scratch; it does not
 authorize running them, and this stage does not run them.
 
+## 6. Build strategy decision for Stage 435–436 — `rlib` stays, observe only — Stage 434
+
+Now that the toolchain exists on this machine (Stage 425), the next
+question is HOW to take the first real step toward §5's `cargo build`
+line — not whether to run it, but what to run it AGAINST. This section
+fixes that decision, in writing, before Stage 435–436 run anything.
+
+**Decision: `[lib]`'s `crate-type` stays `["rlib"]` for Stage 435–436.
+No `cdylib` target is added.** Stage 435–436 will run
+`cargo check --target wasm32-unknown-unknown` and (if that succeeds)
+`cargo build --target wasm32-unknown-unknown` against the crate
+EXACTLY AS IT EXISTS TODAY — no `Cargo.toml` edit of any kind. This is
+an OBSERVATION of how far the existing, unmodified crate reaches
+toward a `wasm32` target, not an attempt to produce a real,
+loadable `.wasm` module (a `cdylib` target is required for that, and
+is deliberately out of scope here).
+
+**Why `cdylib` is deliberately withheld from this decision:**
+
+- **Blast radius.** Adding `crate-type = ["rlib", "cdylib"]` changes
+  what `packages/fedos-core-rust` PRODUCES (a shared-library artifact,
+  loadable by `wasm-bindgen`) and, per
+  `docs/fedos_core_wasm_safety.md`'s existing safety framing, widens
+  the crate's public boundary in a way that needs its own explicit
+  review — it is not a neutral toggle. Bundling it into a
+  "does this crate even build for `wasm32`" check would make one stage
+  responsible for two independently-reviewable decisions
+  (`docs/runtime_backend_implementation_sequence.md` §1's
+  one-concern-per-stage rule).
+  `docs/runtime_wasm_build_contract.md` §5 already flagged this same
+  open question; this section is where it gets deferred, in writing,
+  rather than silently decided by whichever stage happens to need it
+  next.
+- **Diagnostic value without it.** `rlib`-only IS a valid, complete
+  Rust target for `cargo check`/`cargo build --target wasm32-*` — the
+  compiler still type-checks and compiles the crate for that target;
+  it simply produces a `.rlib` (not directly `wasm-bindgen`-loadable)
+  rather than a `.wasm`-producing `cdylib`. This is enough to answer
+  Stage 435's real question — does the EXISTING dependency graph
+  (`chacha20poly1305`/`hkdf`/`zeroize`/`secrecy`/`subtle`/`argon2`/
+  `aes-gcm`/`getrandom`/`sha2`/`k256`) even compile for `wasm32-unknown-
+  unknown` — without also deciding the separate, later question of
+  what artifact shape the crate should eventually export.
+- **Sequencing.** `docs/runtime_wasm_migration_plan.md` item 3 ("Build
+  確認"/"Build confirmation") is scoped to exactly this: confirm the
+  crate builds for the target. Item 4 ("wasm生成"/"WASM generation") is
+  where a `cdylib` target and a real `wasm-bindgen` invocation would
+  first become necessary — this document does not move that boundary.
+
+**What this means concretely for Stage 435–436:** both the `cargo
+check --target wasm32-unknown-unknown` and (conditional) `cargo build
+--target wasm32-unknown-unknown` commands run against the crate's
+CURRENT `Cargo.toml`, unedited. A "does it build" result under `rlib`
+is the full extent of what this batch measures; "does it produce a
+`.wasm` `wasm-bindgen` could consume" is explicitly NOT measured here
+and is deferred to a future, separate, explicitly-reviewed stage that
+would ALSO need to justify adding `cdylib` on its own merits.
+
 ## See also
 
 - `docs/runtime_wasm_toolchain_readiness.md` (Stage 417, updated Stage
@@ -147,3 +205,6 @@ authorize running them, and this stage does not run them.
   MIGRATION order that would eventually walk this diagram top to
   bottom, one reviewed stage at a time; item 3 ("Build確認"/"Build
   confirmation") is where §5's first command would actually run.
+- `docs/runtime_wasm_build_observation.md` (Stage 437) — the actual,
+  recorded result of running §5's `cargo check`/`cargo build` lines
+  against the `rlib`-only crate this §6 decision fixes.
