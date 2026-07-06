@@ -1,19 +1,37 @@
 /**
  * Stage 419 — FedOS WASM Toolchain Readiness Model (standalone, unwired).
+ * Updated Stage 428 with fixed, non-detecting PLAN labels.
  *
  * Models the SHAPE of the toolchain-readiness question
- * `docs/runtime_wasm_toolchain_readiness.md` (Stage 417) and
- * `docs/runtime_wasm_build_contract.md` (Stage 418) describe in
- * writing — whether the `wasm32` target/`wasm-bindgen-cli`/`wasm-pack`
- * toolchain is installed, buildable, bindgen-able, and verifiable —
- * WITHOUT ever installing, invoking, or checking for any of it. This
- * file is deliberately UNWIRED: it is not imported by
- * `fedos_wasm_artifact.ts`, `fedos_wasm_boundary.ts`,
- * `fedos_execution_backend.ts`, `AppRuntime`/`create_runtime.ts`, or
- * `src/worker.ts` — only `runtime_crypto_diagnostics.ts`/
- * `worker_crypto_diagnostics.ts` (Stage 420) read its pure, standalone
- * status functions for DISPLAY, and this codebase's own test suite
- * exercises it directly.
+ * `docs/runtime_wasm_toolchain_readiness.md` (Stage 417, updated
+ * 425–426) and `docs/runtime_wasm_build_contract.md` (Stage 418,
+ * updated 427) describe in writing — whether the `wasm32`
+ * target/`wasm-bindgen-cli`/`wasm-pack` toolchain is installed,
+ * buildable, bindgen-able, and verifiable — WITHOUT ever installing,
+ * invoking, or checking for any of it. This file is deliberately
+ * UNWIRED: it is not imported by `fedos_wasm_artifact.ts`,
+ * `fedos_wasm_boundary.ts`, `fedos_execution_backend.ts`,
+ * `AppRuntime`/`create_runtime.ts`, or `src/worker.ts` — only
+ * `runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts`
+ * (Stage 420) read its pure, standalone status functions for DISPLAY,
+ * and this codebase's own test suite exercises it directly.
+ *
+ * Stage 425 performed a REAL, minimal toolchain PREFLIGHT on the
+ * development machine this stage was authored on: `rustup target add
+ * wasm32-unknown-unknown` and `cargo install wasm-bindgen-cli` were
+ * run (see `docs/runtime_wasm_toolchain_readiness.md` §2),
+ * deliberately NOT installing `wasm-pack`. Stage 428 adds FOUR new,
+ * FIXED, non-detecting diagnostic labels reflecting the resulting
+ * ADOPTION PLAN — `toolchainPlanStatus`/`wasmTargetExpected`/
+ * `bindgenExpected`/`wasmPackExpected` — but this file still NEVER
+ * inspects the real machine to compute them: they are hand-fixed
+ * constants describing WHAT THE PLAN IS, not a live probe of what is
+ * actually installed. `installed`/`verified` (and the standalone
+ * `fedosWasmToolchainInstalled()`/`fedosWasmToolchainVerified()`/
+ * `fedosWasmBuildReady()` functions) remain fixed `false` — this file
+ * still makes no claim that a real WASM build has ever been attempted
+ * or would succeed, regardless of what is or is not installed on any
+ * given machine.
  *
  * HARD GUARDRAILS:
  *   - `FedosWasmToolchainPlaceholder` NEVER installs, downloads, or
@@ -43,6 +61,13 @@
  *     mutates its argument, never touches a filesystem, network, or
  *     child process to "install", "build", "bind", or "verify"
  *     anything.
+ *   - Stage 428's `wasmTargetExpected`/`bindgenExpected` labels NAME
+ *     the `wasm32-unknown-unknown` target and a future `wasm-bindgen`
+ *     step as PLAN facts — fixed string/boolean literals, never a
+ *     `rustup`/`cargo`/filesystem probe of what is actually present on
+ *     any given machine. `wasmPackExpected` is fixed `false`: this
+ *     file's plan never names `wasm-pack` as an expected component,
+ *     mirroring the Stage 425 decision to not adopt it.
  */
 
 /**
@@ -63,11 +88,42 @@ export type FedosWasmToolchainOperation = "install" | "build" | "bindgen" | "ver
  */
 export type FedosWasmToolchainState = "Planning" | "Ready";
 
-/** A non-sensitive snapshot of a `FedosWasmToolchain`. `reason` is human-readable and non-sensitive. */
+/**
+ * Stage 428 — the fixed, non-detecting ADOPTION PLAN status. `"Planned"`
+ * is the ONLY value this stage's implementation ever produces: the
+ * `wasm32`/`wasm-bindgen` adoption named in
+ * `docs/runtime_wasm_toolchain_readiness.md` has been decided and
+ * (on the authoring machine) preflighted, but that decision is a PLAN
+ * label, never a live probe of any particular machine's actual state.
+ */
+export type FedosWasmToolchainPlanStatus = "Planned";
+
+/**
+ * The single Rust target triple this plan expects a future WASM build
+ * to target. Fixed — never derived from `rustup target list` or any
+ * other real inspection.
+ */
+export type FedosWasmTargetTriple = "wasm32-unknown-unknown";
+
+/**
+ * A non-sensitive snapshot of a `FedosWasmToolchain`. `reason` is
+ * human-readable and non-sensitive. Stage 428 adds four fixed,
+ * non-detecting PLAN fields: `toolchainPlanStatus` (always
+ * `"Planned"`), `wasmTargetExpected` (always
+ * `FedosWasmTargetTriple`'s one value), `bindgenExpected` (always
+ * `true` — the plan expects a future bindgen step), and
+ * `wasmPackExpected` (always `false` — the plan never expects the
+ * pack-style bundler tool this stage's adoption deliberately excludes,
+ * per `docs/runtime_wasm_toolchain_readiness.md`).
+ */
 export interface FedosWasmToolchainStatus {
   readonly installed: boolean;
   readonly verified: boolean;
   readonly reason: string;
+  readonly toolchainPlanStatus: FedosWasmToolchainPlanStatus;
+  readonly wasmTargetExpected: FedosWasmTargetTriple;
+  readonly bindgenExpected: boolean;
+  readonly wasmPackExpected: boolean;
 }
 
 /** The result of any `FedosWasmToolchain.plan*()` call. No binary, artifact, or byte of any kind. */
@@ -107,6 +163,10 @@ export class FedosWasmToolchainPlaceholder implements FedosWasmToolchain {
       installed: false,
       verified: false,
       reason: "FedOS WASM toolchain is not installed",
+      toolchainPlanStatus: "Planned",
+      wasmTargetExpected: "wasm32-unknown-unknown",
+      bindgenExpected: true,
+      wasmPackExpected: false,
     };
   }
 
@@ -172,5 +232,42 @@ export function fedosWasmToolchainVerified(): boolean {
  * source of truth independent of the two functions above.
  */
 export function fedosWasmBuildReady(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the fixed adoption-plan status (Stage 428) —
+ * usable by diagnostics WITHOUT constructing a `FedosWasmToolchain`
+ * instance. Fixed `"Planned"` — never derived from any real
+ * inspection of this or any other machine.
+ */
+export function fedosWasmToolchainPlanStatus(): FedosWasmToolchainPlanStatus {
+  return "Planned";
+}
+
+/**
+ * Pure, standalone: the single target triple this plan expects a
+ * future WASM build to target (Stage 428). Fixed
+ * `"wasm32-unknown-unknown"`.
+ */
+export function fedosWasmTargetExpected(): FedosWasmTargetTriple {
+  return "wasm32-unknown-unknown";
+}
+
+/**
+ * Pure, standalone: whether the plan expects a future `wasm-bindgen`
+ * step (Stage 428). Fixed `true` — this is a PLAN fact, not a claim
+ * that `wasm-bindgen` has ever been run against this crate.
+ */
+export function fedosWasmBindgenExpected(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: whether the plan expects `wasm-pack` to ever be
+ * adopted (Stage 428). Fixed `false` — mirrors the Stage 425 decision
+ * to install `wasm-bindgen-cli` without `wasm-pack`.
+ */
+export function fedosWasmPackExpected(): boolean {
   return false;
 }

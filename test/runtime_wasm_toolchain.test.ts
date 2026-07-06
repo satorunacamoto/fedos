@@ -2,15 +2,17 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosWasmToolchainPlaceholder,
   createFedosWasmToolchain,
+  fedosWasmBindgenExpected,
   fedosWasmBuildReady,
+  fedosWasmPackExpected,
+  fedosWasmTargetExpected,
   fedosWasmToolchainInstalled,
+  fedosWasmToolchainPlanStatus,
   fedosWasmToolchainVerified,
 } from "../src/runtime/fedos_wasm_toolchain.js";
 import { FedosRuntimeCryptoProvider } from "../src/runtime/fedos_runtime_crypto_provider.js";
 import { evaluateRuntimeCryptoActivation } from "../src/runtime/runtime_crypto_activation_policy.js";
 import { evaluateWorkerCryptoActivation } from "../src/runtime/worker_crypto_activation_policy.js";
-import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
-import { workerCryptoActivationStatus } from "../src/runtime/worker_crypto_diagnostics.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import toolchainSource from "../src/runtime/fedos_wasm_toolchain.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -25,15 +27,23 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import packageJsonSource from "../package.json?raw";
 
 /**
- * Stage 417–424 — "FedOS WASM toolchain readiness": final preparation
- * before ever introducing a real `wasm32`/`wasm-bindgen`/`wasm-pack`
- * toolchain. Adds a standalone, unwired `FedosWasmToolchain` model
- * (`src/runtime/fedos_wasm_toolchain.ts`, Stage 419) plus diagnostics
- * fields (Stage 420) and four planning docs (Stage 417/418/421). No
- * WASM generation, no toolchain invocation, no Rust/Cargo/package.json
- * change, no Runtime/Worker activation.
+ * Stage 417–424 introduced a standalone, unwired `FedosWasmToolchain`
+ * planning model. Stage 425–432 performs a REAL, minimal toolchain
+ * PREFLIGHT on the authoring machine (`wasm32-unknown-unknown` target
+ * + `wasm-bindgen-cli` installed as environment capabilities,
+ * `wasm-pack` deliberately NOT installed) and adds fixed, non-detecting
+ * PLAN labels (`toolchainPlanStatus`/`wasmTargetExpected`/
+ * `bindgenExpected`/`wasmPackExpected`, Stage 428) to
+ * `fedos_wasm_toolchain.ts`. This means the file's source code now
+ * legitimately CONTAINS the literal strings `"wasm32-unknown-unknown"`
+ * and (in comments) `wasm-bindgen` as PLAN facts — this suite updates
+ * the old "zero wasm32/wasm-bindgen reference" assertions accordingly,
+ * while keeping every guarantee that still must hold: `wasm-pack` is
+ * never adopted, no build script or dependency is added, no artifact
+ * is ever generated or committed, and no Runtime/Worker/crypto
+ * behavior changes.
  */
-describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)", () => {
+describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-432)", () => {
   function codeOnlyOf(source: string): string {
     return source
       .split("\n")
@@ -57,15 +67,42 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
     }
   });
 
-  it("2. no wasm-pack reference anywhere in the toolchain file", () => {
+  it("2. status() and the standalone functions expose the fixed Stage 428 plan labels", () => {
+    const status = new FedosWasmToolchainPlaceholder().status();
+    expect(status.toolchainPlanStatus).toBe("Planned");
+    expect(status.wasmTargetExpected).toBe("wasm32-unknown-unknown");
+    expect(status.bindgenExpected).toBe(true);
+    expect(status.wasmPackExpected).toBe(false);
+
+    expect(fedosWasmToolchainPlanStatus()).toBe("Planned");
+    expect(fedosWasmTargetExpected()).toBe("wasm32-unknown-unknown");
+    expect(fedosWasmBindgenExpected()).toBe(true);
+    expect(fedosWasmPackExpected()).toBe(false);
+  });
+
+  it("3. wasmToolchainInstalled/wasmToolchainVerified/wasmBuildReady remain fixed false, unaffected by the Stage 425 preflight", () => {
+    expect(fedosWasmToolchainInstalled()).toBe(false);
+    expect(fedosWasmToolchainVerified()).toBe(false);
+    expect(fedosWasmBuildReady()).toBe(false);
+  });
+
+  it("4. wasm-pack is not adopted -- no hyphenated 'wasm-pack' reference anywhere in the toolchain file's code, and the plan expects it false", () => {
     expect(codeOnlyOf(toolchainSource)).not.toMatch(/wasm-pack/i);
+    expect(fedosWasmPackExpected()).toBe(false);
   });
 
-  it("3. no wasm-bindgen reference anywhere in the toolchain file", () => {
-    expect(codeOnlyOf(toolchainSource)).not.toMatch(/wasm-bindgen/i);
+  it("5. wasm-bindgen is a planned label only, never a package/Cargo dependency", () => {
+    expect(fedosWasmBindgenExpected()).toBe(true);
+
+    const cargoCode = cargoTomlSource.toLowerCase();
+    expect(cargoCode).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+
+    const pkg = JSON.parse(packageJsonSource);
+    const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+    expect(Object.keys(allDeps)).not.toContain("wasm-bindgen");
   });
 
-  it("4. no child_process reference anywhere in the toolchain file", () => {
+  it("6. no child_process reference anywhere in the toolchain file", () => {
     const codeOnly = codeOnlyOf(toolchainSource);
     expect(codeOnly).not.toMatch(/child_process/i);
     expect(codeOnly).not.toMatch(/\bspawn\s*\(/);
@@ -73,7 +110,7 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
     expect(codeOnly).not.toMatch(/\bfork\s*\(/);
   });
 
-  it("5. no WebAssembly API reference in the toolchain file, and it is never actually invoked at runtime", () => {
+  it("7. no WebAssembly API reference in the toolchain file, and it is never actually invoked at runtime", () => {
     expect(codeOnlyOf(toolchainSource)).not.toMatch(/WebAssembly/);
 
     const instantiate = vi.spyOn(WebAssembly, "instantiate");
@@ -93,7 +130,7 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
     expect(compile).not.toHaveBeenCalled();
   });
 
-  it("6. no build script is generated -- no cargo build/wasm32/rustup/wasm-pack/wasm-bindgen invocation anywhere in package.json scripts", () => {
+  it("8. no wasm build script is generated -- no wasm-pack/wasm-bindgen/wasm32/cargo-build/rustup invocation anywhere in package.json scripts", () => {
     const pkg = JSON.parse(packageJsonSource);
     const scripts = Object.values(pkg.scripts ?? {}) as string[];
     for (const script of scripts) {
@@ -105,18 +142,20 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
     }
   });
 
-  it("7. no .wasm file, no generated JS bindings, no compiled/native artifact exists anywhere in packages/fedos-core-rust", () => {
+  it("9. no .wasm file, no generated JS bindings/glue, no compiled/native artifact exists anywhere in packages/fedos-core-rust", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../packages/fedos-core-rust/**/*");
     const paths = Object.keys(files);
     const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
+    const forbiddenGlue = /_bg\.(js|ts|wasm)$/i;
     for (const path of paths) {
       expect(forbidden.test(path), `unexpected compiled/native artifact: ${path}`).toBe(false);
+      expect(forbiddenGlue.test(path), `unexpected generated bindgen glue: ${path}`).toBe(false);
     }
   });
 
-  it("8. encrypt/decrypt are unchanged -- still always Unsupported", async () => {
+  it("10. encrypt/decrypt are unchanged -- still always Unsupported", async () => {
     const provider = new FedosRuntimeCryptoProvider();
     const encrypted = await provider.encrypt({});
     expect(encrypted.state).toBe("Unsupported");
@@ -126,19 +165,19 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
     expect(decrypted.allowed).toBe(false);
   });
 
-  it("9. Runtime remains unconnected -- create_runtime.ts does not import the toolchain or any earlier chain link", () => {
+  it("11. Runtime remains unconnected -- create_runtime.ts does not import the toolchain or any earlier chain link", () => {
     expect(createRuntimeSource).not.toMatch(
       /fedos_wasm_toolchain|fedos_execution_backend|fedos_wasm_artifact|fedos_wasm_boundary|fedos_rust_invocation_adapter|fedos_internal_rust_call|fedos_rust_execution_review|fedos_rust_api|fedos_rust_boundary|fedos_opaque_api/,
     );
   });
 
-  it("10. Worker remains unconnected -- src/worker.ts does not import the toolchain or any earlier chain link", () => {
+  it("12. Worker remains unconnected -- src/worker.ts does not import the toolchain or any earlier chain link", () => {
     expect(workerSource).not.toMatch(
       /fedos_wasm_toolchain|fedos_execution_backend|fedos_wasm_artifact|fedos_wasm_boundary|fedos_rust_invocation_adapter|fedos_internal_rust_call|fedos_rust_execution_review|fedos_rust_api|fedos_rust_boundary|fedos_opaque_api|fedos_runtime_crypto_provider/,
     );
   });
 
-  it("11. Cargo.toml production dependencies are unchanged (10)", () => {
+  it("13. Cargo.toml is unchanged -- production dependency count (10), no wasm-bindgen/wasm-pack dependency line", () => {
     const cargoCode = cargoTomlSource
       .split("\n")
       .map((line: string) => line.replace(/#.*$/, ""))
@@ -151,23 +190,26 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
     expect(depLines.length).toBe(10);
-    expect(cargoCode).not.toMatch(/wasm-bindgen/);
-    expect(cargoCode).not.toMatch(/wasm-pack/);
+    expect(cargoCode).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+    expect(cargoCode).not.toMatch(/^\s*wasm-pack\s*=/m);
   });
 
-  it("12. package.json dependencies are unchanged (2)", () => {
+  it("14. package.json dependencies are unchanged (2), no wasm-bindgen/wasm-pack dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+    expect(Object.keys(allDeps)).not.toContain("wasm-pack");
+    expect(Object.keys(allDeps)).not.toContain("wasm-bindgen");
   });
 
-  it("13. Rust public API (pub fn count) is unchanged (27)", () => {
+  it("15. Rust public API (pub fn count) is unchanged (27)", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
     expect(pubFnNames.length).toBe(27);
   });
 
-  it("14. Allowed is still unreachable from either activation policy, even with both locks open", () => {
+  it("16. Allowed is still unreachable from either activation policy, even with both locks open", () => {
     const runtimeDecision = evaluateRuntimeCryptoActivation(
       { runtimeCryptoEnabled: true, runtimeCryptoProvider: "fedos" },
       { FEDOS_CRYPTO_PROVIDER: "fedos", FEDOS_CRYPTO_ENABLED: "explicit-dev-only" },
@@ -183,29 +225,14 @@ describe("FedOS WASM toolchain readiness, fail-closed, unwired (Stage 417-424)",
     expect(workerDecision.allowed).toBe(false);
   });
 
-  it("15. diagnostics expose wasmToolchainInstalled/wasmToolchainVerified/wasmBuildReady, fixed false, without constructing an instance", () => {
-    expect(fedosWasmToolchainInstalled()).toBe(false);
-    expect(fedosWasmToolchainVerified()).toBe(false);
-    expect(fedosWasmBuildReady()).toBe(false);
-
-    const status = runtimeCryptoActivationStatus();
-    expect(status.wasmToolchainInstalled).toBe(false);
-    expect(status.wasmToolchainVerified).toBe(false);
-    expect(status.wasmBuildReady).toBe(false);
-
-    const workerStatus = workerCryptoActivationStatus();
-    expect(workerStatus.wasmToolchainInstalled).toBe(false);
-    expect(workerStatus.wasmToolchainVerified).toBe(false);
-    expect(workerStatus.wasmBuildReady).toBe(false);
-  });
-
-  it("16. no process.env reference in the toolchain file", () => {
+  it("17. no process.env reference in the toolchain file", () => {
     expect(codeOnlyOf(toolchainSource)).not.toMatch(/process\.env/);
   });
 
-  it("17. no cargo build --target wasm32 invocation reference anywhere in the toolchain file", () => {
+  it("18. no cargo build invocation, and no rustup/cargo-install invocation, anywhere in the toolchain file's code", () => {
     const codeOnly = codeOnlyOf(toolchainSource);
     expect(codeOnly).not.toMatch(/cargo\s+build/i);
-    expect(codeOnly).not.toMatch(/wasm32/i);
+    expect(codeOnly).not.toMatch(/cargo\s+install/i);
+    expect(codeOnly).not.toMatch(/rustup\s+target/i);
   });
 });
