@@ -1,4 +1,4 @@
-# FedOS WASM artifact generation observation — Stage 457–459 (observation only, no code fix); updated Stage 465–469 with the fixed-cause re-run result
+# FedOS WASM artifact generation observation — Stage 457–459 (observation only, no code fix); updated Stage 465–469 with the fixed-cause re-run result; updated Stage 473–476 with the FIRST real JS glue generation
 
 **Status: this document records an OBSERVATION, not a fix.** Stage 458
 ran the real `npm run build:wasm` script (`package.json`, Stage 450)
@@ -252,6 +252,94 @@ were confirmed gitignored/untracked (`git status --ignored`) then
 deleted after this update was recorded (Stage 472's own cleanup step,
 same discipline as Stage 463).
 
+## 10. Update — Stage 473–476: `wasm-bindgen` version aligned, FIRST real JS glue generated
+
+`docs/runtime_wasm_bindgen_version_policy.md` (Stage 473) fixed the
+policy: the LOCAL `wasm-bindgen-cli` binary moves to match whatever
+`wasm-bindgen` version the crate's dependency graph resolves to,
+never the reverse. Stage 474 applied it once:
+
+```
+cargo install wasm-bindgen-cli --version 0.2.126 --force
+```
+
+`wasm-bindgen --version` now reports `wasm-bindgen 0.2.126` (was
+`0.2.100`). This is a MACHINE-LOCAL environment-capability change,
+same category as the original Stage 425 install — no
+`Cargo.toml`/`package.json`/`Cargo.lock` file changed as a result.
+
+Stage 475 re-ran the exact same command:
+
+```
+RUSTFLAGS='--cfg getrandom_backend="wasm_js"' npm run build:wasm
+```
+
+**RESULT: FULL SUCCESS — the FIRST real `.wasm` + JS glue pair ever
+produced in this repository's history.** Exit code `0`, no error
+output. `cargo build` reproduced the identical, previously-observed
+`fedos_core_rust.wasm` (35,744 bytes, unchanged from Stage 468's
+build — confirming the crate's own compiled output was never the
+problem). `wasm-bindgen --target web --out-dir
+packages/fedos-core-rust/pkg` this time completed end-to-end,
+producing `packages/fedos-core-rust/pkg/`:
+
+| File | Size (bytes) |
+|---|---|
+| `fedos_core_rust_bg.wasm` | 18,377 |
+| `fedos_core_rust.js` | 3,720 |
+| `fedos_core_rust.d.ts` | 1,166 |
+| `fedos_core_rust_bg.wasm.d.ts` | 181 |
+
+**JS glue: `fedos_core_rust.js` (3,720 bytes)** — this `wasm-bindgen`
+version's `--target web` output consolidates what older versions
+split into a separate `*_bg.js` file into this single glue module
+(referencing `./fedos_core_rust_bg.wasm` as its WASM import); no
+separate `_bg.js` file exists, and none is expected — this IS the
+complete JS glue for this `wasm-bindgen` version/target combination.
+**`.d.ts`: present, both `fedos_core_rust.d.ts` (the JS glue's own
+type declarations) and `fedos_core_rust_bg.wasm.d.ts` (the raw WASM
+module's type declarations).** `fedos_core_rust_bg.wasm` (18,377
+bytes) is `wasm-bindgen`'s own post-processed WASM module — smaller
+than the raw `cargo`-produced `fedos_core_rust.wasm` (35,744 bytes)
+because `wasm-bindgen` strips/rewrites custom sections and import
+plumbing during processing; this size difference is expected,
+internal `wasm-bindgen` behavior, not a discrepancy to investigate.
+
+**Classification: the THIRD cause (§7) is RESOLVED.** No further
+failure was reached — this is the first time in this repository's
+history that every step of `docs/runtime_wasm_generation.md` §1's
+diagram (`cargo build` → `wasm-bindgen` → Generated JS Glue →
+Generated `.wasm`) has actually completed.
+
+**Still true after Stage 473–476:**
+
+- No `Cargo.toml` dependency VERSION was changed — the version
+  alignment happened entirely in the local `wasm-bindgen-cli`
+  binary, per `docs/runtime_wasm_bindgen_version_policy.md` §2's
+  reasoning (pinning the crate side down would not have been durable
+  across a freshly-resolved `Cargo.lock` anyway).
+- No `package.json` dependency was added.
+- `wasm-pack` was not installed or invoked.
+- `build:wasm`'s script text is UNCHANGED since Stage 467 — no
+  further script edit was needed once the CLI version matched.
+- Runtime/Worker are untouched; `WebAssembly.instantiate`/`compile`
+  were never called against this or any other artifact;
+  `encrypt`/`decrypt` are unchanged; `"Allowed"` remains unreachable.
+
+## 11. Commit policy — unchanged, now covering the FIRST real JS glue too
+
+Per §5/§9's reasoning (still standing): no `.wasm`/`.rlib`/
+`Cargo.lock`/`target/`/`pkg/` file is committed. `git status --short`
+showed no diff at any point during or after Stage 474–475 — every
+artifact produced (including this stage's NEW `fedos_core_rust.js`/
+`.d.ts`/`_bg.wasm`/`_bg.wasm.d.ts`) lives under
+`packages/fedos-core-rust/pkg/`, already gitignored since Stage 451,
+confirmed via `git status --ignored` before Stage 480's cleanup.
+Nothing about successfully generating real JS glue for the first
+time changes this policy — it is exactly the same kind of
+machine-local, reproducible build byproduct every prior artifact in
+this arc already was.
+
 ## See also
 
 - `docs/runtime_wasm_generation.md` (Stage 449) — the planning
@@ -264,7 +352,15 @@ same discipline as Stage 463).
   original decision to defer `cdylib` adoption, resolved by
   `docs/runtime_wasm_artifact_generation_fix.md` (Stage 465–466).
 - `docs/runtime_wasm_artifact_generation_fix.md` (Stage 465–467) — the
-  fix this document's §7–9 records the (partial) result of.
+  fix this document's §7–9 records the (partial) result of; §10–11
+  record the FULL result once §7's third cause was also resolved.
+- `docs/runtime_wasm_bindgen_version_policy.md` (Stage 473–474) — the
+  version-alignment policy §10 applies, and its own reasoning for why
+  the CLI moves, never the crate side.
 - `src/runtime/fedos_wasm_artifact.ts` (Stage 394, updated 452, 460)
   — where this observation's fixed result is exposed as diagnostic
   labels, still never performing a real filesystem check.
+- `src/runtime/fedos_wasm_toolchain.ts` (updated Stage 477) — where
+  this stage's `wasmBindgenCliExpectedVersion`/
+  `wasmBindgenVersionAligned`/`wasmGlueGenerationObserved` fixed
+  labels are exposed as diagnostics.
