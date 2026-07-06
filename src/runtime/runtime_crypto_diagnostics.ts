@@ -257,6 +257,12 @@ import {
   fedosWasmToolchainInstalled,
   fedosWasmToolchainVerified,
 } from "./fedos_wasm_toolchain.js";
+import type { FedosLoaderImportMode, FedosWasmLoaderState } from "./fedos_wasm_loader_contract.js";
+import {
+  loaderImportMode as fedosLoaderImportMode,
+  loaderInitialized as fedosLoaderInitialized,
+  wasmLoaderState as fedosWasmLoaderState,
+} from "./fedos_wasm_loader_contract.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -616,6 +622,25 @@ export interface RuntimeCryptoActivationStatus {
    * answer. Fixed `null` in this stage.
    */
   readonly generatedArtifactPath: string | null;
+  /**
+   * The generated JS glue loader's own fixed state —
+   * `wasmLoaderState()`'s own answer (`fedos_wasm_loader_contract.ts`,
+   * Stage 482/483). Fixed `"NotLoaded"` in this stage — no loader has
+   * ever run.
+   */
+  readonly loaderContractState: FedosWasmLoaderState;
+  /**
+   * The generated JS glue loader's planned import mode —
+   * `loaderImportMode()`'s own answer. Fixed `"StaticPlanning"` — no
+   * real import-mode decision has been made.
+   */
+  readonly loaderImportMode: FedosLoaderImportMode;
+  /**
+   * Whether the generated JS glue has ever actually been initialized
+   * — `loaderInitialized()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly loaderInitialized: boolean;
 }
 
 /**
@@ -685,5 +710,8 @@ export function runtimeCryptoActivationStatus(
     wasmBuildReady: fedosWasmBuildReady(),
     wasmArtifactGenerated: fedosWasmArtifactGenerated(),
     generatedArtifactPath: fedosGeneratedArtifactPath(),
+    loaderContractState: fedosWasmLoaderState(),
+    loaderImportMode: fedosLoaderImportMode(),
+    loaderInitialized: fedosLoaderInitialized(),
   };
 }
