@@ -235,4 +235,19 @@ describe("FedOS WASM generation planning, nothing generated, fail-closed everywh
     expect(fedosWasmArtifactGenerated()).toBe(false);
     expect(fedosWasmArtifactGenerationState()).toBe("NotGenerated");
   });
+
+  it("16. Stage 465-467 fix: crate-type is rlib + cdylib, and build:wasm's wasm-bindgen input path matches the crate's actual (non-workspace) target-dir", () => {
+    const cargoCode = cargoTomlSource
+      .split("\n")
+      .map((line: string) => line.replace(/#.*$/, ""))
+      .join("\n");
+    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*,\s*"cdylib"\s*\]/);
+
+    const pkg = JSON.parse(packageJsonSource);
+    expect(pkg.scripts["build:wasm"]).toContain(
+      "packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
+    );
+    // The OLD, wrong repo-root-relative path (Stage 458's failure cause) must be gone.
+    expect(pkg.scripts["build:wasm"]).not.toContain(" target/wasm32-unknown-unknown/release/fedos_core_rust.wasm");
+  });
 });

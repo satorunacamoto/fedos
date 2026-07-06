@@ -97,9 +97,8 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     expect(cargoCode).not.toContain("wasm_bindgen");
   });
 
-  it("3. crate-type remains rlib only", () => {
-    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*\]/);
-    expect(cargoCode).not.toContain("cdylib");
+  it("3. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never wasm32 as a literal token", () => {
+    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*,\s*"cdylib"\s*\]/);
     expect(cargoCode).not.toContain("wasm32");
   });
 

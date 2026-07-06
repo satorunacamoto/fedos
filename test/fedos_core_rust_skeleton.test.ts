@@ -182,10 +182,9 @@ describe("FedOS Rust crate skeleton", () => {
     expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(true);
   });
 
-  it("4. Cargo.toml has no wasm-bindgen / cdylib / WASM target", () => {
+  it("4. Cargo.toml has no wasm-bindgen dependency / WASM target (crate-type's cdylib, Stage 466, is a build-output shape, not a dependency)", () => {
     expect(cargoCode).not.toContain("wasm-bindgen");
     expect(cargoCode).not.toContain("wasm_bindgen");
-    expect(cargoCode).not.toContain("cdylib");
     expect(cargoCode).not.toContain("wasm32");
   });
 

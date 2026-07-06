@@ -129,9 +129,8 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     expect(cargoCode).not.toContain("wasm_bindgen");
   });
 
-  it("4. crate-type remains rlib only", () => {
-    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*\]/);
-    expect(cargoCode).not.toContain("cdylib");
+  it("4. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never wasm-bindgen/wasm32 as a literal dependency/config token", () => {
+    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*,\s*"cdylib"\s*\]/);
     expect(cargoCode).not.toContain("wasm32");
   });
 

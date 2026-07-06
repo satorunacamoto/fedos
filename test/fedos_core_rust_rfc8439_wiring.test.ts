@@ -125,8 +125,8 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*\]/);
-    expect(cargoCode).not.toContain("cdylib");
+    // crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix); wasm32 is still never a literal token.
+    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*,\s*"cdylib"\s*\]/);
     expect(cargoCode).not.toContain("wasm32");
   });
 

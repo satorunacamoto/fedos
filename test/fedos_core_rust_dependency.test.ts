@@ -238,9 +238,8 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(cargoCode).not.toContain("wasm_bindgen");
   });
 
-  it("11. crate-type remains rlib only", () => {
-    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*\]/);
-    expect(cargoCode).not.toContain("cdylib");
+  it("11. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never staticlib/wasm32 as a literal token", () => {
+    expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*,\s*"cdylib"\s*\]/);
     expect(cargoCode).not.toContain("staticlib");
     expect(cargoCode).not.toContain("wasm32");
   });
