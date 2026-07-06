@@ -58,9 +58,14 @@ edition = "2021"
 publish = false
 
 [lib]
-# `rlib` only for now. NO `cdylib`/WASM target is declared until a future,
-# explicitly-reviewed stage adds a real (audited) core and a build manifest.
-crate-type = ["rlib"]
+# `rlib` (kept, native `cargo test`/`cargo check` link against it) +
+# `cdylib` (added, Stage 466) -- the ONLY crate-type that makes `cargo
+# build --target wasm32-unknown-unknown` emit a standalone `.wasm`
+# binary for `wasm-bindgen` to consume. See
+# docs/runtime_wasm_artifact_generation_fix.md for the full record;
+# this is the ONE `Cargo.toml` change that document makes -- no
+# dependency, feature, or public-API change.
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 # `chacha20poly1305` (RustCrypto, Apache-2.0 OR MIT) — the AEAD this crate will
