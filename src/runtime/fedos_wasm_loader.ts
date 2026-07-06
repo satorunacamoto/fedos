@@ -26,6 +26,18 @@
  * it directly — the same "export for testability, wire nowhere"
  * precedent every prior link in this chain follows.
  *
+ * Stage 503 extends `planLoad()` DOWNWARD only: it now builds a
+ * `FedosWasmLoaderPlan` (`fedos_wasm_loader_plan.ts`, Stage 502) and
+ * calls its `planImport()` — then DISCARDS the result and returns its
+ * OWN, unchanged `"BlockedByPolicy"` answer. This does NOT change
+ * "unwired" above (still no reference to `fedos_wasm_loader_contract.ts`/
+ * `fedos_wasm_artifact.ts`/`fedos_wasm_boundary.ts`/`create_runtime.ts`/
+ * `src/worker.ts`, and neither does `fedos_wasm_loader_plan.ts` itself)
+ * — it only wires this file to the NEW, separate plan file directly
+ * below it, mirroring `fedos_wasm_boundary.ts`'s own precedent
+ * (`#reachWasmArtifact()`) of reaching one link deeper while changing
+ * nothing about its own return value.
+ *
  * HARD GUARDRAILS:
  *   - Every function/method in this file is PURE, synchronous, and
  *     returns a hand-fixed constant. None ever inspects
@@ -51,6 +63,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
 
 /**
  * The loader's own coarse state. `"NotLoaded"` is the ONLY value this
@@ -138,6 +152,7 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   planLoad(): FedosWasmLoaderDecision {
+    this.#reachLoaderPlan(); // result discarded -- no import/initialize/attach ever happens
     return this.#blocked("load");
   }
 
@@ -147,6 +162,18 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   planUnload(): FedosWasmLoaderDecision {
     return this.#blocked("unload");
+  }
+
+  /**
+   * PRIVATE — builds a `FedosWasmLoaderPlan` and calls its
+   * `planImport()`. The result is discarded; it is never passed to
+   * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+   * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+   * Loader Plan itself never imports anything either.
+   */
+  #reachLoaderPlan(): void {
+    const plan = createFedosWasmLoaderPlan();
+    plan.planImport();
   }
 
   #blocked(operation: FedosWasmLoaderOperation): FedosWasmLoaderDecision {

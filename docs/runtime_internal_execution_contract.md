@@ -188,8 +188,73 @@ dynamic `import()`; no generated file edited or committed;
 `encrypt`/`decrypt` unchanged; `"Allowed"`/`"Loaded"`/`"Active"`/
 `"FailOpen"` never reached; Rust public API unchanged (27 `pub fn`).
 
+## Update — Stage 501–505: Loader Plan, revised diagram
+
+Stage 501 (`docs/runtime_wasm_loader_planning.md`) separates "when may
+the generated JS glue ever load" into FIVE ordered phases: Loader
+Creation (already real), Import Permission, Initialization
+Permission, Runtime Attach, Worker Attach. Stage 502 adds
+`src/runtime/fedos_wasm_loader_plan.ts` — a pure, fixed-value LOADER
+PLAN naming the last four of those phases as
+`planImport()`/`planInitialize()`/`planRuntimeAttach()`/
+`planWorkerAttach()`, each fixed `"BlockedByPolicy"`. Stage 503 wires
+`FedosWasmLoader.planLoad()` (`fedos_wasm_loader.ts`) to CONSTRUCT a
+`FedosWasmLoaderPlan` and call its `planImport()` — the result is
+DISCARDED and `planLoad()`'s own return value is UNCHANGED, the same
+"reach one link deeper, keep your own answer" pattern
+`fedos_wasm_boundary.ts` already established for `FedosWasmArtifact`.
+
+This revises the Stage 489–494 diagram — Loader Plan now sits between
+Loader Skeleton and Generated JS Glue, and Execution Backend is named
+at the top purely for POSITIONAL context (it is NOT wired to Loader
+Skeleton in code — that arrow is conceptual only, exactly like every
+other "where this box eventually sits in the bigger picture" framing
+in this document):
+
+```
+ExecutionBackend                     <-- link 9, REAL placeholder, fixed "Planning"/"NotConnected"
+     :                                   (POSITIONAL ONLY below this line -- ExecutionBackend does NOT
+     :                                   construct or call FedosWasmLoader; no code wire exists here)
+     v
+FedosWasmLoader ("Loader Skeleton")  <-- REAL placeholder (src/runtime/fedos_wasm_loader.ts, Stage 489-492),
+     |                                   fixed state "NotLoaded" / mode "PlanningOnly" / policy "FailClosed"
+     v
+FedosWasmLoaderPlan ("Loader Plan")  <-- REAL placeholder (src/runtime/fedos_wasm_loader_plan.ts, Stage 502),
+     |                                   REAL wiring: planLoad() constructs one and calls planImport(),
+     |                                   discards the result (Stage 503); planImport/planInitialize/
+     |                                   planRuntimeAttach/planWorkerAttach ALL fixed "BlockedByPolicy"
+     v
+Generated JS Glue                    <-- REAL FILE, observed (Stage 481) -- NOT imported by the Loader Plan;
+     |                                   the arrow above is positional (Stage 501's phase table), not a
+     |                                   real import
+     v
+STOP                                 <-- no further link exists; Runtime/Worker connection,
+                                          WebAssembly.instantiate/compile, initSync/default init, and
+                                          import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+504) read `loaderPlanState()`/`loaderImportAllowed()`/
+`loaderInitializationAllowed()` for DISPLAY only — `"PlanningOnly"`/
+`false`/`false`, matching every other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_wasm_loader.ts` nor `fedos_wasm_loader_plan.ts`);
+`WebAssembly.instantiate`/`compile` never invoked; `initSync`/the
+generated JS glue's default export never called; no `fetch`/dynamic
+`import()`; no generated file edited or committed; `encrypt`/`decrypt`
+unchanged; `"Allowed"`/`"Loaded"`/`"Active"`/`"FailOpen"` never
+reached; Rust public API unchanged (27 `pub fn`).
+
 ## See also
 
+- `docs/runtime_wasm_loader_planning.md` (Stage 501) — the five-phase
+  ordering: Loader Creation, Import Permission, Initialization
+  Permission, Runtime Attach, Worker Attach.
+- `src/runtime/fedos_wasm_loader_plan.ts` (Stage 502–503) — the Loader
+  Plan's real, fixed-value implementation and its wiring from
+  `FedosWasmLoader.planLoad()`.
 - `docs/runtime_wasm_loader.md` (Stage 493) — the Loader Skeleton's
   own policy document: `NotLoaded`/`PlanningOnly`/`FailClosed`.
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492) — the Loader
