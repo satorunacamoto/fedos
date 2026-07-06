@@ -49,6 +49,22 @@
  *   - Pure; every method here is synchronous, never throws, never
  *     mutates its argument, never touches a filesystem, network, or
  *     child process to "build" or "load" anything.
+ *
+ * Stage 452 adds a SECOND, independent status axis:
+ * `generationState`/`FedosWasmArtifactGenerationState` (`"Generated"` /
+ * `"NotGenerated"`, fixed `"NotGenerated"`) — see
+ * `docs/runtime_wasm_generation.md` §2. This answers a DIFFERENT
+ * question than the existing `state`/`FedosWasmArtifactState`
+ * (`"NotBuilt"`): `state` asks whether this Provider-internal
+ * abstraction's own `planBuild()` has ever resolved to something other
+ * than `"BlockedByImplementation"` (it never has); `generationState`
+ * asks whether a real `.wasm` file + `wasm-bindgen` JS glue pair
+ * exists on disk anywhere (it never does — no filesystem check is
+ * ever performed; this is a hand-fixed constant, exactly like every
+ * other label in this file). `fedosWasmArtifactGenerated()`/
+ * `fedosGeneratedArtifactPath()` expose the same fact as plain
+ * standalone values (`false`/`null`) for diagnostics (Stage 453) to
+ * read without constructing an instance.
  */
 
 /**
@@ -61,10 +77,24 @@
  */
 export type FedosWasmArtifactState = "NotBuilt";
 
+/**
+ * Stage 452 — whether a real `.wasm` file + `wasm-bindgen` JS glue
+ * pair has ever actually been generated on disk. `"NotGenerated"` is
+ * the ONLY value this stage's implementation produces; `"Generated"`
+ * is RESERVED for a future, separate, explicitly-reviewed stage that
+ * actually runs `npm run build:wasm` (`package.json`, Stage 450) —
+ * nothing in this file can ever produce it. Independent of
+ * `FedosWasmArtifactState`: see this file's Stage 452 doc comment
+ * above for the distinction.
+ */
+export type FedosWasmArtifactGenerationState = "Generated" | "NotGenerated";
+
 /** A non-sensitive snapshot of a `FedosWasmArtifact`. `reason` is human-readable and non-sensitive. */
 export interface FedosWasmArtifactStatus {
   readonly state: FedosWasmArtifactState;
   readonly reason: string;
+  /** Stage 452 — see `FedosWasmArtifactGenerationState`'s own doc comment. Fixed `"NotGenerated"`. */
+  readonly generationState: FedosWasmArtifactGenerationState;
 }
 
 /**
@@ -111,6 +141,7 @@ export class FedosWasmArtifactPlaceholder implements FedosWasmArtifact {
     return {
       state: "NotBuilt",
       reason: "FedOS WASM artifact has not been built",
+      generationState: "NotGenerated",
     };
   }
 
@@ -168,4 +199,35 @@ export function fedosWasmArtifactReachable(): boolean {
  */
 export function fedosWasmArtifactBuilt(): boolean {
   return false;
+}
+
+/**
+ * Pure, standalone: the WASM Artifact's own `FedosWasmArtifactGenerationState`
+ * (Stage 452) — usable by diagnostics WITHOUT constructing a
+ * `FedosWasmArtifact` instance. Fixed `"NotGenerated"`, mirroring
+ * `FedosWasmArtifactPlaceholder.status()` exactly. Never performs a
+ * filesystem check.
+ */
+export function fedosWasmArtifactGenerationState(): FedosWasmArtifactGenerationState {
+  return "NotGenerated";
+}
+
+/**
+ * Pure, standalone: whether a real `.wasm` + JS glue pair has ever
+ * actually been generated (Stage 453 diagnostics label). Fixed
+ * `false` in this stage — no parameter, override, or filesystem check
+ * anywhere can flip it.
+ */
+export function fedosWasmArtifactGenerated(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the filesystem path a generated artifact would
+ * live at, IF one had ever been generated (Stage 453 diagnostics
+ * label). Fixed `null` in this stage — no artifact has ever been
+ * generated, so there is no real path to report.
+ */
+export function fedosGeneratedArtifactPath(): string | null {
+  return null;
 }
