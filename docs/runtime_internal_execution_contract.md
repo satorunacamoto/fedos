@@ -146,8 +146,54 @@ diagram; no generated file is edited or committed; no Rust `pub fn`
 is added or `#[wasm_bindgen]`-annotated (still 27); `"Allowed"`
 remains unreachable from either activation policy.
 
+## Update — Stage 489–494: Loader Skeleton, STOP
+
+Stage 489–492 adds `src/runtime/fedos_wasm_loader.ts` — a LOADER
+SKELETON, separate from Stage 482's `FedosWasmLoaderContract`. Where
+the Contract only ever reports a `status()`, the Skeleton also names
+the three OPERATIONS a real loader would eventually perform
+(`planLoad()`/`planInitialize()`/`planUnload()`) — each one PLANNED,
+never executed, and each one denied by a named POLICY
+(`docs/runtime_wasm_loader.md`, Stage 493), not merely "not
+implemented yet":
+
+```
+Generated JS Glue                    <-- REAL FILE, observed (Stage 481), never imported by this Skeleton
+     |
+     v
+FedosWasmLoader ("Loader Skeleton")  <-- REAL placeholder (src/runtime/fedos_wasm_loader.ts, Stage 489-492),
+     |                                   fixed state "NotLoaded" / mode "PlanningOnly" / policy "FailClosed";
+     |                                   planLoad/planInitialize/planUnload ALL fixed "BlockedByPolicy" --
+     |                                   deliberately NOT wired to Generated JS Glue, FedosWasmLoaderContract,
+     |                                   or anything above it in this diagram
+     v
+STOP                                 <-- no further link exists from this Skeleton; Runtime/Worker connection,
+                                          WebAssembly.instantiate/compile, and import() all remain PROHIBITED
+```
+
+This is a DELIBERATELY SHORT, separate diagram — it does not extend
+or replace the CALL-direction diagram above (which continues past
+Generated JS Glue to Generated `.wasm` and Rust via
+`FedosWasmLoaderContract`). The Loader Skeleton stops immediately
+after Generated JS Glue because this stage's ONLY purpose is naming
+the loader's own operations and policy, never reaching further up or
+down the existing chain. `runtime_crypto_diagnostics.ts`/
+`worker_crypto_diagnostics.ts` (Stage 495) read `loaderState()`/
+`loaderMode()`/`loaderPolicy()` for DISPLAY only — the same
+diagnostics-only treatment every other leaf in this arc receives.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind; `WebAssembly.instantiate`/`compile` never invoked; no `fetch`/
+dynamic `import()`; no generated file edited or committed;
+`encrypt`/`decrypt` unchanged; `"Allowed"`/`"Loaded"`/`"Active"`/
+`"FailOpen"` never reached; Rust public API unchanged (27 `pub fn`).
+
 ## See also
 
+- `docs/runtime_wasm_loader.md` (Stage 493) — the Loader Skeleton's
+  own policy document: `NotLoaded`/`PlanningOnly`/`FailClosed`.
+- `src/runtime/fedos_wasm_loader.ts` (Stage 489–492) — the Loader
+  Skeleton's real, fixed-value implementation.
 - `docs/runtime_internal_rust_call.md` (Stage 353–360) — the
   specification for what link 12 would eventually need, without
   implementing it.
