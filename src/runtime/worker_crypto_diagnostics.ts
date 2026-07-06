@@ -178,6 +178,16 @@ import {
   loaderInitialized as fedosLoaderInitialized,
   wasmLoaderState as fedosWasmLoaderState,
 } from "./fedos_wasm_loader_contract.js";
+import type {
+  FedosWasmLoaderMode,
+  FedosWasmLoaderPolicy,
+  FedosWasmLoaderState as FedosWasmLoaderSkeletonState,
+} from "./fedos_wasm_loader.js";
+import {
+  loaderMode as fedosLoaderSkeletonMode,
+  loaderPolicy as fedosLoaderSkeletonPolicy,
+  loaderState as fedosLoaderSkeletonState,
+} from "./fedos_wasm_loader.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -469,6 +479,27 @@ export interface WorkerCryptoActivationStatus {
    * stage.
    */
   readonly loaderInitialized: boolean;
+  /**
+   * The Loader Skeleton's own fixed state —
+   * `loaderState()`'s own answer (`src/runtime/fedos_wasm_loader.ts`,
+   * Stage 489/495) — DISTINCT from `loaderContractState` above (a
+   * separate, deliberately unwired file). Fixed `"NotLoaded"` in this
+   * stage — no loader has ever run.
+   */
+  readonly loaderSkeletonState: FedosWasmLoaderSkeletonState;
+  /**
+   * The Loader Skeleton's own fixed operating mode —
+   * `loaderMode()`'s own answer. Fixed `"PlanningOnly"` — this stage
+   * only ever plans an operation, never performs one.
+   */
+  readonly loaderSkeletonMode: FedosWasmLoaderMode;
+  /**
+   * The Loader Skeleton's own fixed fail-safety policy —
+   * `loaderPolicy()`'s own answer. Fixed `"FailClosed"` — every
+   * planned operation (`planLoad`/`planInitialize`/`planUnload`) is
+   * denied by policy.
+   */
+  readonly loaderSkeletonPolicy: FedosWasmLoaderPolicy;
 }
 
 /**
@@ -540,5 +571,8 @@ export function workerCryptoActivationStatus(
     loaderContractState: fedosWasmLoaderState(),
     loaderImportMode: fedosLoaderImportMode(),
     loaderInitialized: fedosLoaderInitialized(),
+    loaderSkeletonState: fedosLoaderSkeletonState(),
+    loaderSkeletonMode: fedosLoaderSkeletonMode(),
+    loaderSkeletonPolicy: fedosLoaderSkeletonPolicy(),
   };
 }

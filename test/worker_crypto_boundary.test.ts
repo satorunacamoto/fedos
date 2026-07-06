@@ -222,6 +222,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       loaderContractState: "NotLoaded",
       loaderImportMode: "StaticPlanning",
       loaderInitialized: false,
+      loaderSkeletonState: "NotLoaded",
+      loaderSkeletonMode: "PlanningOnly",
+      loaderSkeletonPolicy: "FailClosed",
     });
   });
 
