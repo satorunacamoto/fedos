@@ -273,6 +273,12 @@ import {
   loaderPolicy as fedosLoaderSkeletonPolicy,
   loaderState as fedosLoaderSkeletonState,
 } from "./fedos_wasm_loader.js";
+import type { FedosWasmLoaderPlanState } from "./fedos_wasm_loader_plan.js";
+import {
+  loaderImportAllowed as fedosLoaderImportAllowed,
+  loaderInitializationAllowed as fedosLoaderInitializationAllowed,
+  loaderPlanState as fedosLoaderPlanState,
+} from "./fedos_wasm_loader_plan.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -672,6 +678,26 @@ export interface RuntimeCryptoActivationStatus {
    * denied by policy.
    */
   readonly loaderSkeletonPolicy: FedosWasmLoaderPolicy;
+  /**
+   * The Loader Plan's own fixed coarse mode —
+   * `loaderPlanState()`'s own answer (`src/runtime/fedos_wasm_loader_plan.ts`,
+   * Stage 502/504). Fixed `"PlanningOnly"` in this stage — this file
+   * only ever plans an operation, never performs one.
+   */
+  readonly loaderPlanState: FedosWasmLoaderPlanState;
+  /**
+   * Whether phase #2 (Import Permission,
+   * `docs/runtime_wasm_loader_planning.md`) is currently granted —
+   * `loaderImportAllowed()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly loaderImportAllowed: boolean;
+  /**
+   * Whether phase #3 (Initialization Permission) is currently
+   * granted — `loaderInitializationAllowed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly loaderInitializationAllowed: boolean;
 }
 
 /**
@@ -747,5 +773,8 @@ export function runtimeCryptoActivationStatus(
     loaderSkeletonState: fedosLoaderSkeletonState(),
     loaderSkeletonMode: fedosLoaderSkeletonMode(),
     loaderSkeletonPolicy: fedosLoaderSkeletonPolicy(),
+    loaderPlanState: fedosLoaderPlanState(),
+    loaderImportAllowed: fedosLoaderImportAllowed(),
+    loaderInitializationAllowed: fedosLoaderInitializationAllowed(),
   };
 }

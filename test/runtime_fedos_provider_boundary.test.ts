@@ -187,6 +187,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       loaderSkeletonState: "NotLoaded",
       loaderSkeletonMode: "PlanningOnly",
       loaderSkeletonPolicy: "FailClosed",
+      loaderPlanState: "PlanningOnly",
+      loaderImportAllowed: false,
+      loaderInitializationAllowed: false,
     });
   });
 

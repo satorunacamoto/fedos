@@ -246,6 +246,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       loaderSkeletonState: "NotLoaded",
       loaderSkeletonMode: "PlanningOnly",
       loaderSkeletonPolicy: "FailClosed",
+      loaderPlanState: "PlanningOnly",
+      loaderImportAllowed: false,
+      loaderInitializationAllowed: false,
     });
   });
 
