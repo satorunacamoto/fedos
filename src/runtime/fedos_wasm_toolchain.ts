@@ -45,6 +45,21 @@
  * compute them; they are a hand-fixed record of a result already
  * observed and written down once.
  *
+ * Stage 446 adds THREE more fixed, non-detecting labels —
+ * `getrandomWasmPolicy` (always `"wasm_js"`),
+ * `getrandomBackendCfgRequired` (always `true`), and
+ * `wasmTargetCheckStatus` (always `"ObservedGreen"`) — recording the
+ * Stage 441–444 result: `getrandom`'s `Cargo.toml` entry now enables
+ * the `wasm_js` feature (Stage 442), and `RUSTFLAGS='--cfg
+ * getrandom_backend="wasm_js"' cargo check`/`cargo build --target
+ * wasm32-unknown-unknown` both SUCCEED (Stage 443–444; see
+ * `docs/runtime_wasm_getrandom_policy.md` and
+ * `docs/runtime_wasm_build_observation.md` §7). Stage 446 also updates
+ * `wasmTargetCheckObserved`/`wasmBuildObserved` from `"Failed"` to
+ * `"Succeeded"` to match this same, now-superseded result — still a
+ * hand-fixed record, never a live re-run of `cargo`, and still no
+ * claim that a `cdylib`/real `.wasm`/`wasm-bindgen` output exists.
+ *
  * HARD GUARDRAILS:
  *   - `FedosWasmToolchainPlaceholder` NEVER installs, downloads, or
  *     verifies any real toolchain component. It never runs `rustup
@@ -122,13 +137,40 @@ export type FedosWasmTargetTriple = "wasm32-unknown-unknown";
  * `cargo check`/`cargo build` attempt against the target named by
  * `FedosWasmTargetTriple`. `"NotObserved"` is RESERVED (nothing in
  * this file produces it, since Stage 435–436 already ran the one
- * observation this file records); `"Failed"` is the ONLY value this
- * stage's implementation ever produces, matching
- * `docs/runtime_wasm_build_observation.md`'s recorded `getrandom`
- * compile failure; `"Succeeded"` is RESERVED for a future, separate,
- * explicitly-reviewed re-observation.
+ * observation this file records). Stage 438 originally fixed both
+ * `wasmTargetCheckObserved`/`wasmBuildObserved` to `"Failed"`,
+ * matching the Stage 435–436 `getrandom` compile failure. Stage 446
+ * updates both to `"Succeeded"`, matching the Stage 443–444
+ * RE-OBSERVATION after `getrandom`'s `wasm_js` feature + `--cfg
+ * getrandom_backend="wasm_js"` opt-in (`docs/runtime_wasm_getrandom_policy.md`,
+ * `docs/runtime_wasm_build_observation.md` §7) — `"Failed"` remains a
+ * valid value of this type (it is what Stage 435–436 actually
+ * observed, and this file's historical doc comments still describe
+ * that run accurately) but is no longer produced by any function in
+ * this file.
  */
 export type FedosWasmObservationResult = "NotObserved" | "Failed" | "Succeeded";
+
+/**
+ * Stage 446 — the fixed, non-detecting name of the `getrandom` 0.3.x
+ * WASM entropy backend this crate's `Cargo.toml` opts into (Stage 442).
+ * `"wasm_js"` is the ONLY value this stage's implementation ever
+ * produces, matching `docs/runtime_wasm_getrandom_policy.md`'s policy
+ * and `getrandom`'s own Cargo feature name.
+ */
+export type FedosGetrandomWasmPolicy = "wasm_js";
+
+/**
+ * Stage 446 — the fixed, non-detecting OUTCOME of a `cargo check`/
+ * `cargo build --target wasm32-unknown-unknown` attempt, phrased as a
+ * human-readable status rather than the boolean-ish
+ * `FedosWasmObservationResult`. `"ObservedGreen"` is the ONLY value
+ * this stage's implementation ever produces, matching the Stage
+ * 443–444 SUCCESS recorded in `docs/runtime_wasm_build_observation.md`
+ * §7; `"ObservedBlocked"` is RESERVED — nothing in this file produces
+ * it, since the one observation this file records already went green.
+ */
+export type FedosWasmTargetCheckStatus = "ObservedGreen" | "ObservedBlocked";
 
 /**
  * A non-sensitive snapshot of a `FedosWasmToolchain`. `reason` is
@@ -140,9 +182,16 @@ export type FedosWasmObservationResult = "NotObserved" | "Failed" | "Succeeded";
  * `wasmPackExpected` (always `false` — the plan never expects the
  * pack-style bundler tool this stage's adoption deliberately excludes,
  * per `docs/runtime_wasm_toolchain_readiness.md`). Stage 438 adds two
- * more fixed fields: `wasmTargetCheckObserved`/`wasmBuildObserved`
- * (both always `"Failed"`), recording the Stage 435–436 observation
- * result.
+ * more fixed fields: `wasmTargetCheckObserved`/`wasmBuildObserved`,
+ * updated by Stage 446 from `"Failed"` to `"Succeeded"` — recording
+ * the Stage 441–444 result (`getrandom`'s `wasm_js` feature + `--cfg
+ * getrandom_backend="wasm_js"` now compile clean for
+ * `wasm32-unknown-unknown`). Stage 446 adds three more fixed fields:
+ * `getrandomWasmPolicy` (always `"wasm_js"`),
+ * `getrandomBackendCfgRequired` (always `true` — the `--cfg` flag is
+ * mandatory in addition to the feature, per
+ * `docs/runtime_wasm_getrandom_policy.md` §3), and
+ * `wasmTargetCheckStatus` (always `"ObservedGreen"`).
  */
 export interface FedosWasmToolchainStatus {
   readonly installed: boolean;
@@ -154,6 +203,9 @@ export interface FedosWasmToolchainStatus {
   readonly wasmPackExpected: boolean;
   readonly wasmTargetCheckObserved: FedosWasmObservationResult;
   readonly wasmBuildObserved: FedosWasmObservationResult;
+  readonly getrandomWasmPolicy: FedosGetrandomWasmPolicy;
+  readonly getrandomBackendCfgRequired: boolean;
+  readonly wasmTargetCheckStatus: FedosWasmTargetCheckStatus;
 }
 
 /** The result of any `FedosWasmToolchain.plan*()` call. No binary, artifact, or byte of any kind. */
@@ -197,8 +249,11 @@ export class FedosWasmToolchainPlaceholder implements FedosWasmToolchain {
       wasmTargetExpected: "wasm32-unknown-unknown",
       bindgenExpected: true,
       wasmPackExpected: false,
-      wasmTargetCheckObserved: "Failed",
-      wasmBuildObserved: "Failed",
+      wasmTargetCheckObserved: "Succeeded",
+      wasmBuildObserved: "Succeeded",
+      getrandomWasmPolicy: "wasm_js",
+      getrandomBackendCfgRequired: true,
+      wasmTargetCheckStatus: "ObservedGreen",
     };
   }
 
@@ -305,25 +360,60 @@ export function fedosWasmPackExpected(): boolean {
 }
 
 /**
- * Pure, standalone: the fixed, recorded outcome of the Stage 435
- * `cargo check --target wasm32-unknown-unknown` observation (Stage
- * 438) — usable by diagnostics WITHOUT constructing a
- * `FedosWasmToolchain` instance. Fixed `"Failed"`: the observed
- * `getrandom` compile failure, per
- * `docs/runtime_wasm_build_observation.md`. Never re-runs `cargo`.
+ * Pure, standalone: the fixed, recorded outcome of the Stage 435/443
+ * `cargo check --target wasm32-unknown-unknown` observation — usable
+ * by diagnostics WITHOUT constructing a `FedosWasmToolchain` instance.
+ * Fixed `"Succeeded"` (updated Stage 446): Stage 443 re-ran this
+ * command with `getrandom`'s `wasm_js` feature (Stage 442) and
+ * `RUSTFLAGS='--cfg getrandom_backend="wasm_js"'`, and it compiled
+ * clean — superseding the Stage 435 `"Failed"` result recorded before
+ * that opt-in existed. Per `docs/runtime_wasm_build_observation.md`
+ * §7. Never re-runs `cargo`.
  */
 export function fedosWasmTargetCheckObserved(): FedosWasmObservationResult {
-  return "Failed";
+  return "Succeeded";
 }
 
 /**
- * Pure, standalone: the fixed, recorded outcome of the Stage 436
- * `cargo build --target wasm32-unknown-unknown` observation (Stage
- * 438). Fixed `"Failed"`, identically to
- * `fedosWasmTargetCheckObserved()` — the same `getrandom` compile
- * failure, per `docs/runtime_wasm_build_observation.md`. Never re-runs
- * `cargo`.
+ * Pure, standalone: the fixed, recorded outcome of the Stage 436/444
+ * `cargo build --target wasm32-unknown-unknown` observation. Fixed
+ * `"Succeeded"` (updated Stage 446), identically to
+ * `fedosWasmTargetCheckObserved()` — the same `wasm_js`/`--cfg`
+ * opt-in result, per `docs/runtime_wasm_build_observation.md` §7.
+ * Never re-runs `cargo`.
  */
 export function fedosWasmBuildObserved(): FedosWasmObservationResult {
-  return "Failed";
+  return "Succeeded";
+}
+
+/**
+ * Pure, standalone: the fixed name of the `getrandom` WASM entropy
+ * backend this crate's `Cargo.toml` opts into (Stage 442, Stage 446
+ * label). Fixed `"wasm_js"` — never derived from any real inspection
+ * of `Cargo.toml`.
+ */
+export function fedosGetrandomWasmPolicy(): FedosGetrandomWasmPolicy {
+  return "wasm_js";
+}
+
+/**
+ * Pure, standalone: whether a `--cfg getrandom_backend="wasm_js"`
+ * compiler flag is required IN ADDITION to the `wasm_js` Cargo
+ * feature (Stage 446 label). Fixed `true` — per
+ * `docs/runtime_wasm_getrandom_policy.md` §3, the feature alone is
+ * documented by `getrandom` itself as insufficient.
+ */
+export function fedosGetrandomBackendCfgRequired(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the fixed, human-readable status of the
+ * `wasm32-unknown-unknown` `cargo check`/`cargo build` observation
+ * (Stage 446 label). Fixed `"ObservedGreen"` — matching the Stage
+ * 443–444 SUCCESS recorded in
+ * `docs/runtime_wasm_build_observation.md` §7. Never re-runs `cargo`.
+ */
+export function fedosWasmTargetCheckStatus(): FedosWasmTargetCheckStatus {
+  return "ObservedGreen";
 }

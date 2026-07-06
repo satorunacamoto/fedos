@@ -2,11 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosWasmToolchainPlaceholder,
   createFedosWasmToolchain,
+  fedosGetrandomBackendCfgRequired,
+  fedosGetrandomWasmPolicy,
   fedosWasmBindgenExpected,
   fedosWasmBuildObserved,
   fedosWasmBuildReady,
   fedosWasmPackExpected,
   fedosWasmTargetCheckObserved,
+  fedosWasmTargetCheckStatus,
   fedosWasmTargetExpected,
   fedosWasmToolchainInstalled,
   fedosWasmToolchainPlanStatus,
@@ -21,6 +24,8 @@ import toolchainSource from "../src/runtime/fedos_wasm_toolchain.ts?raw";
 import buildContractSource from "../docs/runtime_wasm_build_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import buildObservationSource from "../docs/runtime_wasm_build_observation.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import getrandomPolicySource from "../docs/runtime_wasm_getrandom_policy.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -59,8 +64,30 @@ import packageJsonSource from "../package.json?raw";
  * non-detecting labels (`wasmTargetCheckObserved`/`wasmBuildObserved`,
  * both `"Failed"`) recording that ALREADY-COMPLETED observation; no
  * code fix, no `Cargo.toml` change, no re-run of `cargo` by this file.
+ *
+ * Stage 441–444 RESOLVES that `getrandom` blocker: Stage 441 fixes the
+ * policy (`docs/runtime_wasm_getrandom_policy.md`) — `getrandom` 0.3.x
+ * needs BOTH its own `wasm_js` Cargo feature AND a `--cfg
+ * getrandom_backend="wasm_js"` compiler flag; fallback/insecure PRNGs
+ * are permanently forbidden and CSPRNG failure still fails closed.
+ * Stage 442 makes the ONE minimal `Cargo.toml` change this requires —
+ * `getrandom`'s entry gains `features = ["wasm_js"]`, version
+ * unchanged, dependency COUNT unchanged (still 10 production
+ * dependencies), no `wasm-bindgen` direct dependency added. Stage
+ * 443–444 re-ran `cargo check`/`cargo build --target
+ * wasm32-unknown-unknown` with `RUSTFLAGS='--cfg
+ * getrandom_backend="wasm_js"'` — both SUCCEED
+ * (`docs/runtime_wasm_build_observation.md` §7). Stage 446 updates
+ * `wasmTargetCheckObserved`/`wasmBuildObserved` from `"Failed"` to
+ * `"Succeeded"` to match, and adds three new fixed labels:
+ * `getrandomWasmPolicy` (`"wasm_js"`), `getrandomBackendCfgRequired`
+ * (`true`), `wasmTargetCheckStatus` (`"ObservedGreen"`). Still true:
+ * no `cdylib` added, `wasm-bindgen` (the CLI) never invoked,
+ * `wasm-pack` never adopted, no `package.json` script, no `.wasm`/
+ * generated-glue artifact, no Runtime/Worker activation, no
+ * `encrypt`/`decrypt` execution, `"Allowed"` unreachable.
  */
-describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-440)", () => {
+describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (Stage 425-448)", () => {
   function codeOnlyOf(source: string): string {
     return source
       .split("\n")
@@ -253,13 +280,13 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(codeOnly).not.toMatch(/rustup\s+target/i);
   });
 
-  it("19. status() and the standalone functions expose the fixed Stage 438 observation labels, matching the documented Failed result", () => {
+  it("19. status() and the standalone functions expose the Stage 446-updated observation labels, matching the documented Succeeded result", () => {
     const status = new FedosWasmToolchainPlaceholder().status();
-    expect(status.wasmTargetCheckObserved).toBe("Failed");
-    expect(status.wasmBuildObserved).toBe("Failed");
+    expect(status.wasmTargetCheckObserved).toBe("Succeeded");
+    expect(status.wasmBuildObserved).toBe("Succeeded");
 
-    expect(fedosWasmTargetCheckObserved()).toBe("Failed");
-    expect(fedosWasmBuildObserved()).toBe("Failed");
+    expect(fedosWasmTargetCheckObserved()).toBe("Succeeded");
+    expect(fedosWasmBuildObserved()).toBe("Succeeded");
   });
 
   it("20. the cargo build/check commands are documented (build contract + build observation) but not scripted anywhere in package.json", () => {
@@ -278,8 +305,46 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     }
   });
 
-  it("21. wasm-bindgen was not run -- the build observation records the failure occurred before wasm-bindgen could be invoked, and no artifact exists", () => {
+  it("21. Stage 435-436's original failing run is still documented, and the Stage 443-444 re-observation records wasm-bindgen (the CLI) was still never invoked", () => {
     expect(buildObservationSource).toMatch(/wasm-bindgen.{0,80}NOT run|NOT run.{0,80}wasm-bindgen/is);
-    expect(fedosWasmBuildObserved()).not.toBe("Succeeded");
+    expect(buildObservationSource).toMatch(/wasm-bindgen.{0,120}NOT invoked|NOT invoked.{0,120}wasm-bindgen/is);
+    expect(buildObservationSource).toMatch(/RESOLVED/);
+  });
+
+  it("22. Stage 446 getrandom wasm_js policy labels are fixed and match the documented policy/result", () => {
+    const status = new FedosWasmToolchainPlaceholder().status();
+    expect(status.getrandomWasmPolicy).toBe("wasm_js");
+    expect(status.getrandomBackendCfgRequired).toBe(true);
+    expect(status.wasmTargetCheckStatus).toBe("ObservedGreen");
+
+    expect(fedosGetrandomWasmPolicy()).toBe("wasm_js");
+    expect(fedosGetrandomBackendCfgRequired()).toBe(true);
+    expect(fedosWasmTargetCheckStatus()).toBe("ObservedGreen");
+  });
+
+  it("23. Cargo.toml enables getrandom's wasm_js feature, version and dependency count unchanged, no wasm-bindgen dependency", () => {
+    expect(cargoTomlSource).toMatch(/getrandom\s*=\s*\{[^}]*features\s*=\s*\[[^\]]*"wasm_js"[^\]]*\][^}]*\}/);
+    expect(cargoTomlSource).toMatch(/getrandom\s*=\s*\{[^}]*version\s*=\s*"0\.3"/);
+
+    const cargoCode = cargoTomlSource
+      .split("\n")
+      .map((line: string) => line.replace(/#.*$/, ""))
+      .join("\n")
+      .toLowerCase();
+    const depsIdx = cargoCode.indexOf("[dependencies]");
+    const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
+    const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
+    const depLines = productionDepsSection
+      .split("\n")
+      .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
+    expect(depLines.length).toBe(10);
+    expect(cargoCode).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+  });
+
+  it("24. the getrandom wasm_js policy doc names the required RUSTFLAGS cfg flag and forbids fallback PRNGs", () => {
+    expect(getrandomPolicySource).toMatch(/--cfg getrandom_backend="wasm_js"/);
+    expect(getrandomPolicySource).toMatch(/wasm_js/);
+    expect(getrandomPolicySource).toMatch(/fallback/i);
+    expect(getrandomPolicySource).toMatch(/fail[s]? closed|fails closed/i);
   });
 });
