@@ -301,8 +301,73 @@ unchanged; `"Allowed"`/`"Loaded"`/`"Active"`/`"FailOpen"` never
 reached; Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
 `package.json` dependency added.
 
+## Update — Stage 517–521: Static Import Plan, revised diagram
+
+Stage 517 (`docs/runtime_wasm_static_import_plan.md`) names the EXACT
+static `import` statement a future, separate, explicitly-reviewed
+stage would eventually write — target
+`packages/fedos-core-rust/pkg/fedos_core_rust.js`, expecting the two
+exports Stage 481 directly observed (`initSync` named,
+`default`/`__wbg_init` default) — without ever writing that
+statement. Stage 518 adds `src/runtime/fedos_wasm_static_import_plan.ts`
+— a pure, fixed-value STATIC IMPORT PLAN naming
+`planStaticImport()`, fixed `"BlockedByPolicy"`, plus the target path
+recorded as a plain, non-resolved string constant
+(`FEDOS_WASM_STATIC_IMPORT_TARGET`). Stage 519 wires
+`evaluateWasmLoaderImportPolicy()` (`fedos_wasm_loader_import_policy.ts`)
+to CONSTRUCT a `FedosWasmStaticImportPlan` and call its
+`planStaticImport()` — the result is DISCARDED and
+`evaluateWasmLoaderImportPolicy()`'s own return value is UNCHANGED,
+the SAME "reach one link deeper, keep your own answer" pattern
+Stage 503/511 already established twice over.
+
+This revises the Stage 509–513 diagram — Static Import Plan now sits
+between Import Policy and Generated JS Glue:
+
+```
+FedosWasmLoaderImportPolicy                <-- REAL, pure decision function (src/runtime/fedos_wasm_loader_import_policy.ts,
+("Import Policy")                               Stage 510), REAL wiring: evaluateWasmLoaderImportPolicy() calls
+     |                                          FedosWasmStaticImportPlan.planStaticImport(), discards the result
+     |                                          (Stage 519)
+     v
+FedosWasmStaticImportPlan                  <-- REAL placeholder (src/runtime/fedos_wasm_static_import_plan.ts,
+("Static Import Plan")                          Stage 518), fixed state "PlanningOnly", planStaticImport() fixed
+     |                                          "BlockedByPolicy"; target recorded as a plain string constant,
+     |                                          never resolved/imported/required
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported by the Static
+     |                                          Import Plan; the arrow above is positional (Stage 517's target/
+     |                                          export table), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, initSync/default init, and
+                                                 import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+520) read `staticImportPlanState()`/`staticImportTarget()`/
+`staticImportAllowed()` for DISPLAY only — `"PlanningOnly"`/
+`"packages/fedos-core-rust/pkg/fedos_core_rust.js"`/`false`, matching
+every other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_wasm_loader_import_policy.ts` nor
+`fedos_wasm_static_import_plan.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; `initSync`/the generated JS glue's default
+export never called; no `fetch`/dynamic `import()`; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
+`"Loaded"`/`"Active"`/`"FailOpen"` never reached; Rust public API
+unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
+added.
+
 ## See also
 
+- `docs/runtime_wasm_static_import_plan.md` (Stage 517) — the exact
+  static import target and expected exports.
+- `src/runtime/fedos_wasm_static_import_plan.ts` (Stage 518–519) —
+  the Static Import Plan's real, fixed-value implementation and its
+  wiring from `evaluateWasmLoaderImportPolicy()`.
 - `docs/runtime_wasm_loader_import_policy.md` (Stage 509) — the
   six-condition import policy: Loader Plan import allowed, generated
   artifact present, artifact untracked/gitignored, Runtime dev-only

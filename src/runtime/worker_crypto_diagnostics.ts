@@ -202,6 +202,12 @@ import {
   evaluateWasmLoaderImportPolicy,
   wasmLoaderImportPolicyState as fedosWasmLoaderImportPolicyState,
 } from "./fedos_wasm_loader_import_policy.js";
+import type { FedosWasmStaticImportState } from "./fedos_wasm_static_import_plan.js";
+import {
+  staticImportAllowed as fedosStaticImportAllowed,
+  staticImportPlanState as fedosStaticImportPlanState,
+  staticImportTarget as fedosStaticImportTarget,
+} from "./fedos_wasm_static_import_plan.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -553,6 +559,27 @@ export interface WorkerCryptoActivationStatus {
    * `"BlockedByPolicy"` in this stage.
    */
   readonly loaderImportPolicyReason: FedosWasmLoaderImportReason;
+  /**
+   * The Static Import Plan's own fixed coarse mode —
+   * `staticImportPlanState()`'s own answer
+   * (`src/runtime/fedos_wasm_static_import_plan.ts`, Stage 518/520).
+   * Fixed `"PlanningOnly"` in this stage — this file only ever plans
+   * an import, never performs one.
+   */
+  readonly staticImportPlanState: FedosWasmStaticImportState;
+  /**
+   * The exact path a future static import would target —
+   * `staticImportTarget()`'s own answer. Fixed
+   * `"packages/fedos-core-rust/pkg/fedos_core_rust.js"` in this
+   * stage; a plain string label, never resolved against a real path.
+   */
+  readonly staticImportTarget: string;
+  /**
+   * Whether the static import is currently allowed —
+   * `staticImportAllowed()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly staticImportAllowed: boolean;
 }
 
 /**
@@ -633,5 +660,8 @@ export function workerCryptoActivationStatus(
     loaderImportPolicyState: fedosWasmLoaderImportPolicyState(),
     loaderImportPolicyAllowed: evaluateWasmLoaderImportPolicy().allowed,
     loaderImportPolicyReason: evaluateWasmLoaderImportPolicy().reason,
+    staticImportPlanState: fedosStaticImportPlanState(),
+    staticImportTarget: fedosStaticImportTarget(),
+    staticImportAllowed: fedosStaticImportAllowed(),
   };
 }

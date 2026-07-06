@@ -231,6 +231,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       loaderImportPolicyState: "Blocked",
       loaderImportPolicyAllowed: false,
       loaderImportPolicyReason: "BlockedByPolicy",
+      staticImportPlanState: "PlanningOnly",
+      staticImportTarget: "packages/fedos-core-rust/pkg/fedos_core_rust.js",
+      staticImportAllowed: false,
     });
   });
 
