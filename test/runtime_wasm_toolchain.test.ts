@@ -174,15 +174,21 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(compile).not.toHaveBeenCalled();
   });
 
-  it("8. no wasm build script is generated -- no wasm-pack/wasm-bindgen/wasm32/cargo-build/rustup invocation anywhere in package.json scripts", () => {
+  it("8. no wasm build script exists OUTSIDE the single, never-auto-run build:wasm entry (Stage 450) -- no wasm-pack/rustup anywhere, and no OTHER script references wasm-bindgen/wasm32/cargo build", () => {
     const pkg = JSON.parse(packageJsonSource);
-    const scripts = Object.values(pkg.scripts ?? {}) as string[];
-    for (const script of scripts) {
+    const scripts = pkg.scripts ?? {};
+    for (const [name, script] of Object.entries(scripts) as [string, string][]) {
       expect(script).not.toMatch(/wasm-pack/i);
-      expect(script).not.toMatch(/wasm-bindgen/i);
-      expect(script).not.toMatch(/wasm32/i);
-      expect(script).not.toMatch(/cargo\s+build/i);
       expect(script).not.toMatch(/rustup/i);
+      if (name !== "build:wasm") {
+        expect(script).not.toMatch(/wasm-bindgen/i);
+        expect(script).not.toMatch(/wasm32/i);
+        expect(script).not.toMatch(/cargo\s+build/i);
+      }
+    }
+    // no npm lifecycle hook auto-invokes build:wasm
+    for (const hook of ["pretest", "posttest", "prepare", "preinstall", "postinstall", "prebuild", "postbuild", "pretypecheck"]) {
+      expect(Object.keys(scripts)).not.toContain(hook);
     }
   });
 
@@ -289,7 +295,7 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(fedosWasmBuildObserved()).toBe("Succeeded");
   });
 
-  it("20. the cargo build/check commands are documented (build contract + build observation) but not scripted anywhere in package.json", () => {
+  it("20. the cargo build/check commands are documented (build contract + build observation); cargo check is never scripted anywhere, and cargo build/wasm32 appear ONLY in the never-auto-run build:wasm script", () => {
     expect(buildContractSource).toMatch(/cargo build --target wasm32-unknown-unknown/);
     expect(buildContractSource).toMatch(/cargo check --target wasm32-unknown-unknown/);
     expect(buildObservationSource).toMatch(/cargo check --target wasm32-unknown-unknown/);
@@ -297,11 +303,13 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(buildObservationSource).toMatch(/getrandom/);
 
     const pkg = JSON.parse(packageJsonSource);
-    const scripts = Object.values(pkg.scripts ?? {}) as string[];
-    for (const script of scripts) {
+    const scripts = pkg.scripts ?? {};
+    for (const [name, script] of Object.entries(scripts) as [string, string][]) {
       expect(script).not.toMatch(/cargo\s+check/i);
-      expect(script).not.toMatch(/cargo\s+build/i);
-      expect(script).not.toMatch(/wasm32/i);
+      if (name !== "build:wasm") {
+        expect(script).not.toMatch(/cargo\s+build/i);
+        expect(script).not.toMatch(/wasm32/i);
+      }
     }
   });
 
