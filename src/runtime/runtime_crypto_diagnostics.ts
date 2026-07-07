@@ -240,6 +240,25 @@
  * `"ProviderInitializationRequestPending"`. None of these expose any
  * implementation detail beyond these values; no payload, plaintext,
  * ciphertext, or key material is ever involved.
+ *
+ * Stage 620 adds `providerInitializationApprovalState`/
+ * `providerInitializationApproved`/`providerInitializationApprovalReason`
+ * (`fedos_provider_initialization_approval.ts`'s
+ * `providerInitializationApprovalState()`/`providerInitializationApproved()`/
+ * `providerInitializationApprovalReason()`, Stage 618/619) — the
+ * Provider Initialization Approval's own fixed answers:
+ * `"PlanningOnly"`/`false`/
+ * `"ProviderInitializationApprovalPending"`.
+ *
+ * Stage 628 adds `providerInitFacadeContractState`/
+ * `providerInitFacadeContractReady`/`providerInitFacadeContractReason`
+ * (`fedos_provider_init_facade_contract.ts`'s
+ * `providerInitFacadeContractState()`/`providerInitFacadeContractReady()`/
+ * `providerInitFacadeContractReason()`, Stage 626/627) — the Provider
+ * Init Facade Contract's own fixed answers: `"PlanningOnly"`/`false`/
+ * `"ProviderInitFacadeContractPending"`. None of these expose any
+ * implementation detail beyond these values; no payload, plaintext,
+ * ciphertext, or key material is ever involved.
  */
 
 import type {
@@ -441,6 +460,24 @@ import {
   providerInitializationRequested as fedosProviderInitializationRequested,
   providerInitializationRequestState as fedosProviderInitializationRequestState,
 } from "./fedos_crypto_provider_initialization_request.js";
+import type {
+  FedosProviderInitializationApprovalReason,
+  FedosProviderInitializationApprovalState,
+} from "./fedos_provider_initialization_approval.js";
+import {
+  providerInitializationApproved as fedosProviderInitializationApproved,
+  providerInitializationApprovalReason as fedosProviderInitializationApprovalReason,
+  providerInitializationApprovalState as fedosProviderInitializationApprovalState,
+} from "./fedos_provider_initialization_approval.js";
+import type {
+  FedosProviderInitFacadeContractReason,
+  FedosProviderInitFacadeContractState,
+} from "./fedos_provider_init_facade_contract.js";
+import {
+  providerInitFacadeContractReady as fedosProviderInitFacadeContractReady,
+  providerInitFacadeContractReason as fedosProviderInitFacadeContractReason,
+  providerInitFacadeContractState as fedosProviderInitFacadeContractState,
+} from "./fedos_provider_init_facade_contract.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -1148,6 +1185,44 @@ export interface RuntimeCryptoActivationStatus {
    * `"ProviderInitializationRequestPending"` in this stage.
    */
   readonly providerInitializationReason: FedosCryptoProviderInitializationRequestReason;
+  /**
+   * The Provider Initialization Approval's own fixed coarse review
+   * state — `providerInitializationApprovalState()`'s own answer
+   * (`src/runtime/fedos_provider_initialization_approval.ts`, Stage
+   * 618/620). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly providerInitializationApprovalState: FedosProviderInitializationApprovalState;
+  /**
+   * Whether a specific request has ever actually been approved —
+   * `providerInitializationApproved()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly providerInitializationApproved: boolean;
+  /**
+   * WHY the request is not currently approved —
+   * `providerInitializationApprovalReason()`'s own answer. Fixed
+   * `"ProviderInitializationApprovalPending"` in this stage.
+   */
+  readonly providerInitializationApprovalReason: FedosProviderInitializationApprovalReason;
+  /**
+   * The Provider Init Facade Contract's own fixed coarse readiness
+   * state — `providerInitFacadeContractState()`'s own answer
+   * (`src/runtime/fedos_provider_init_facade_contract.ts`, Stage
+   * 626/628). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly providerInitFacadeContractState: FedosProviderInitFacadeContractState;
+  /**
+   * Whether the Provider side and the Facade side currently agree on
+   * a shared call/return shape — `providerInitFacadeContractReady()`'s
+   * own answer. Fixed `false` in this stage.
+   */
+  readonly providerInitFacadeContractReady: boolean;
+  /**
+   * WHY the contract is not currently ready —
+   * `providerInitFacadeContractReason()`'s own answer. Fixed
+   * `"ProviderInitFacadeContractPending"` in this stage.
+   */
+  readonly providerInitFacadeContractReason: FedosProviderInitFacadeContractReason;
 }
 
 /**
@@ -1271,5 +1346,11 @@ export function runtimeCryptoActivationStatus(
     providerInitializationRequested: fedosProviderInitializationRequested(),
     providerInitializationAllowed: fedosProviderInitializationAllowed(),
     providerInitializationReason: fedosProviderInitializationReason(),
+    providerInitializationApprovalState: fedosProviderInitializationApprovalState(),
+    providerInitializationApproved: fedosProviderInitializationApproved(),
+    providerInitializationApprovalReason: fedosProviderInitializationApprovalReason(),
+    providerInitFacadeContractState: fedosProviderInitFacadeContractState(),
+    providerInitFacadeContractReady: fedosProviderInitFacadeContractReady(),
+    providerInitFacadeContractReason: fedosProviderInitFacadeContractReason(),
   };
 }

@@ -235,6 +235,12 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       providerInitializationRequested: false,
       providerInitializationAllowed: false,
       providerInitializationReason: "ProviderInitializationRequestPending",
+      providerInitializationApprovalState: "PlanningOnly",
+      providerInitializationApproved: false,
+      providerInitializationApprovalReason: "ProviderInitializationApprovalPending",
+      providerInitFacadeContractState: "PlanningOnly",
+      providerInitFacadeContractReady: false,
+      providerInitFacadeContractReason: "ProviderInitFacadeContractPending",
     });
   });
 

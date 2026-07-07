@@ -273,6 +273,12 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       providerInitializationRequested: false,
       providerInitializationAllowed: false,
       providerInitializationReason: "ProviderInitializationRequestPending",
+      providerInitializationApprovalState: "PlanningOnly",
+      providerInitializationApproved: false,
+      providerInitializationApprovalReason: "ProviderInitializationApprovalPending",
+      providerInitFacadeContractState: "PlanningOnly",
+      providerInitFacadeContractReady: false,
+      providerInitFacadeContractReason: "ProviderInitFacadeContractPending",
     });
   });
 

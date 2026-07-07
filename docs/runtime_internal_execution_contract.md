@@ -1253,8 +1253,204 @@ anywhere in this repository; no generated file edited or committed;
 `"Loaded"`/`"FailOpen"` never reached; Rust public API unchanged (27
 `pub fn`); no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 617–621: Provider Initialization Approval, revised diagram
+
+Stage 617 (`docs/runtime_provider_initialization_approval.md`) fixes a
+dedicated APPROVAL step one level deeper than
+`FedosCryptoProviderInitializationRequest.allowed` (Stage 610):
+whether a SPECIFIC, already-issued request has actually been reviewed
+and approved, distinct from whether the Boundary would structurally
+accept one. Stage 618 adds
+`src/runtime/fedos_provider_initialization_approval.ts` — a pure,
+fixed-value APPROVAL naming
+`createProviderInitializationApproval()`, fixed `{ state:
+"PlanningOnly", approved: false, reason:
+"ProviderInitializationApprovalPending" }` — with NO side effects and
+NO `import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 619 wires `createCryptoProviderInitializationRequest()`
+(`fedos_crypto_provider_initialization_request.ts`) to CALL
+`createProviderInitializationApproval()` — the result is DISCARDED
+and `createCryptoProviderInitializationRequest()`'s own return value
+is UNCHANGED (`requested: false`, `allowed: false`), the SAME "reach
+one link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611
+already established fourteen times over.
+
+This revises the Stage 609–613 diagram — Provider Initialization
+Approval now sits between Provider Initialization Request and the
+still-positional Dynamic Import box:
+
+```
+FedosCryptoProviderInitializationRequest   <-- REAL, pure decision function (src/runtime/fedos_crypto_provider_initialization_request.ts,
+("Provider Initialization Request")            Stage 610), REAL wiring: createCryptoProviderInitializationRequest() calls
+     |                                          createProviderInitializationApproval(), discards the result (Stage 619)
+     v
+FedosProviderInitializationApproval        <-- REAL, pure decision function (src/runtime/fedos_provider_initialization_approval.ts,
+("Provider Initialization Approval")           Stage 618), fixed { state: "PlanningOnly", approved: false, reason:
+     |                                          "ProviderInitializationApprovalPending" } -- NO side effects, NO import()
+     |                                          of any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_provider_initialization_approval.ts`, directly or indirectly,
+and no `RuntimeCryptoProvider` implementation approves a request.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+620) read `providerInitializationApprovalState()`/
+`providerInitializationApproved()`/
+`providerInitializationApprovalReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`"ProviderInitializationApprovalPending"`,
+matching every other leaf in this arc.
+
+## Update — Stage 625–630: Provider Init Facade Contract, revised diagram, full target architecture named
+
+Stage 625 (`docs/runtime_provider_init_facade_contract.md`) fixes the
+LAST layer before the already-real Provider/Facade Boundary
+(`fedos_crypto_provider_facade_boundary.ts`, Stage 602): whether the
+Provider side and the Facade side currently agree on a shared
+call/return shape for `initializeCrypto()` — distinct from whether a
+request has been approved. Stage 626 adds
+`src/runtime/fedos_provider_init_facade_contract.ts` — a pure,
+fixed-value CONTRACT naming `createProviderInitFacadeContract()`,
+fixed `{ state: "PlanningOnly", contractReady: false, reason:
+"ProviderInitFacadeContractPending" }` — with NO side effects and NO
+`import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 627 wires `createProviderInitializationApproval()`
+(`fedos_provider_initialization_approval.ts`) to CALL
+`createProviderInitFacadeContract()` — the result is DISCARDED and
+`createProviderInitializationApproval()`'s own return value is
+UNCHANGED (`approved: false`), the SAME "reach one link deeper, keep
+your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619
+already established fifteen times over.
+
+This revises the Stage 617–621 diagram — Provider Init Facade
+Contract now sits between Provider Initialization Approval and the
+still-positional Dynamic Import box:
+
+```
+FedosProviderInitializationApproval        <-- REAL, pure decision function (src/runtime/fedos_provider_initialization_approval.ts,
+("Provider Initialization Approval")           Stage 618), REAL wiring: createProviderInitializationApproval() calls
+     |                                          createProviderInitFacadeContract(), discards the result (Stage 627)
+     v
+FedosProviderInitFacadeContract            <-- REAL, pure decision function (src/runtime/fedos_provider_init_facade_contract.ts,
+("Provider Init Facade Contract")              Stage 626), fixed { state: "PlanningOnly", contractReady: false, reason:
+     |                                          "ProviderInitFacadeContractPending" } -- NO side effects, NO import() of
+     |                                          any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+This update also extends the Stage 609 target-architecture diagram to
+its FULL form, per Stage 625's own instruction — every real file added
+across Stage 593–627, named in the order a future Provider would
+eventually traverse them, still stopping at Crypto Loader Facade
+without reaching WASM Loader/Rust/Dynamic Import/Generated JS Glue:
+
+```
+Crypto Provider
+        │
+        ▼
+Provider Initialization Request
+        │
+        ▼
+Provider Initialization Approval
+        │
+        ▼
+Provider Init Facade Contract
+        │
+        ▼
+Provider / Facade Boundary
+        │
+        ▼
+Crypto Loader Facade
+        │
+        ▼
+STOP
+```
+
+**This target diagram is CONCEPTUAL, exactly like the Stage 593/609
+target diagrams it extends.** Every box in it names a REAL,
+independently-tested file — `fedos_crypto_provider_initialization_request.ts`
+(Stage 610), `fedos_provider_initialization_approval.ts` (Stage 618),
+`fedos_provider_init_facade_contract.ts` (Stage 626),
+`fedos_crypto_provider_facade_boundary.ts` (Stage 602),
+`fedos_crypto_loader_facade.ts` (Stage 594) — but the ARROWS are
+conceptual: no Provider implementation constructs a request, no
+Approval ever grants one, no Contract is ever agreed, and the Boundary
+never actually receives anything from a Provider. The real code wires
+in this repository run the OPPOSITE direction, deeper into the parked
+implementation chain shown in the diagram immediately above (Facade ->
+Boundary -> Request -> Approval -> Contract -> Dynamic Import ->
+Generated JS Glue -> STOP), each one reaching one link further and
+discarding the result.
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_provider_init_facade_contract.ts`, directly or indirectly, and
+no `RuntimeCryptoProvider` implementation establishes a contract with
+the Facade.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+628) read `providerInitFacadeContractState()`/
+`providerInitFacadeContractReady()`/`providerInitFacadeContractReason()`
+for DISPLAY only —
+`"PlanningOnly"`/`false`/`"ProviderInitFacadeContractPending"`,
+matching every other leaf in this arc.
+
+**Still true after Stage 617–630**: no Runtime/Worker connection of
+any kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_provider_initialization_approval.ts` nor
+`fedos_provider_init_facade_contract.ts`); no `RuntimeCryptoProvider`
+implementation approves a request or establishes a contract;
+`WebAssembly.instantiate`/`compile` never invoked; no static `import`
+and no dynamic `import()` of the generated JS glue anywhere in this
+repository; no generated file edited or committed; `encrypt`/`decrypt`
+unchanged; NIP-17/NIP-59 unimplemented; `"Allowed"`/`"Approved"`/
+`"Ready"`/`"Present"`/`"Reviewed"`/`"Committed"`/`"PrebuildRequired"`/
+`"OptionalLoader"`/`"Open"`/`"Granted"`/`"Active"`/`"WasmActive"`/
+`"Connected"`/`"Requested"`/`"Loaded"`/`"FailOpen"` never reached; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
+- `docs/runtime_provider_init_facade_contract.md` (Stage 625) — the
+  last layer before the Boundary, and the full target-architecture
+  diagram.
+- `src/runtime/fedos_provider_init_facade_contract.ts` (Stage
+  626–627) — the Contract's real, fixed-value implementation and its
+  wiring from `fedos_provider_initialization_approval.ts`.
+- `docs/runtime_provider_initialization_approval.md` (Stage 617) — the
+  approval step one level above the Contract.
+- `src/runtime/fedos_provider_initialization_approval.ts` (Stage
+  618–619) — the Approval's real, fixed-value implementation and its
+  wiring from `fedos_crypto_provider_initialization_request.ts`.
 - `docs/runtime_crypto_provider_initialization_request.md` (Stage
   609) — provider-side planning for a request one level above the
   Boundary in the target architecture.
