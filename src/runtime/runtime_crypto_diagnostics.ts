@@ -320,6 +320,15 @@ import {
   artifactPresenceState as fedosArtifactPresenceState,
   artifactPresent as fedosArtifactPresent,
 } from "./fedos_generated_artifact_presence.js";
+import type {
+  FedosStaticImportActivationReason,
+  FedosStaticImportActivationState,
+} from "./fedos_static_import_activation_review.js";
+import {
+  staticImportActivationApproved as fedosStaticImportActivationApproved,
+  staticImportActivationReason as fedosStaticImportActivationReason,
+  staticImportActivationState as fedosStaticImportActivationState,
+} from "./fedos_static_import_activation_review.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -835,6 +844,25 @@ export interface RuntimeCryptoActivationStatus {
    * `"ArtifactNotGeneratedForRuntime"` in this stage.
    */
   readonly artifactPresenceReason: FedosGeneratedArtifactPresenceReason;
+  /**
+   * The Static Import Activation Review's own fixed coarse state —
+   * `staticImportActivationState()`'s own answer
+   * (`src/runtime/fedos_static_import_activation_review.ts`, Stage
+   * 546/548). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly staticImportActivationState: FedosStaticImportActivationState;
+  /**
+   * Whether static import activation is currently approved —
+   * `staticImportActivationApproved()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly staticImportActivationApproved: boolean;
+  /**
+   * WHY static import activation is not currently approved —
+   * `staticImportActivationReason()`'s own answer. Fixed
+   * `"RuntimeActivationReviewPending"` in this stage.
+   */
+  readonly staticImportActivationReason: FedosStaticImportActivationReason;
 }
 
 /**
@@ -928,5 +956,8 @@ export function runtimeCryptoActivationStatus(
     artifactPresenceState: fedosArtifactPresenceState(),
     artifactPresent: fedosArtifactPresent(),
     artifactPresenceReason: fedosArtifactPresenceReason(),
+    staticImportActivationState: fedosStaticImportActivationState(),
+    staticImportActivationApproved: fedosStaticImportActivationApproved(),
+    staticImportActivationReason: fedosStaticImportActivationReason(),
   };
 }

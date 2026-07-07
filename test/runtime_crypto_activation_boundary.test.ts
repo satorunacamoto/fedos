@@ -264,6 +264,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       artifactPresenceState: "PlanningOnly",
       artifactPresent: false,
       artifactPresenceReason: "ArtifactNotGeneratedForRuntime",
+      staticImportActivationState: "PlanningOnly",
+      staticImportActivationApproved: false,
+      staticImportActivationReason: "RuntimeActivationReviewPending",
     });
   });
 

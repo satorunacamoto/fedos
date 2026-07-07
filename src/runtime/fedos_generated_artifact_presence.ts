@@ -19,9 +19,19 @@
  * `createGeneratedArtifactPresence()` — the result is DISCARDED, and
  * `createStaticImportReadiness()`'s own return value stays UNCHANGED
  * (`{ readinessState: "PlanningOnly", ready: false, reason:
- * "RuntimeNotReady" }`). That is the ONLY caller of this file anywhere
- * in this repository; neither `create_runtime.ts` nor `src/worker.ts`
- * references it, directly or indirectly.
+ * "RuntimeNotReady" }`). That is one caller of this file; neither
+ * `create_runtime.ts` nor `src/worker.ts` references it, directly or
+ * indirectly.
+ *
+ * Stage 547 extends `createGeneratedArtifactPresence()` DOWNWARD only:
+ * it now calls `createStaticImportActivationReview()`
+ * (`fedos_static_import_activation_review.ts`, Stage 546) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", present: false, reason:
+ * "ArtifactNotGeneratedForRuntime" }` answer. This mirrors the SAME
+ * "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539 already established six times over in
+ * this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createGeneratedArtifactPresence()` is PURE, synchronous, takes
@@ -49,6 +59,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createStaticImportActivationReview } from "./fedos_static_import_activation_review.js";
 
 /**
  * The Generated Artifact Presence Policy's own coarse state.
@@ -85,11 +97,24 @@ export interface FedosGeneratedArtifactPresence {
  * JS glue in any way.
  */
 export function createGeneratedArtifactPresence(): FedosGeneratedArtifactPresence {
+  reachStaticImportActivationReview(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     present: false,
     reason: "ArtifactNotGeneratedForRuntime",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls
+ * `createStaticImportActivationReview()`. The result is discarded; it
+ * is never passed to `WebAssembly.instantiate`/`compile`, `initSync`/
+ * the default init export, `packages/fedos-core-rust`, Runtime, or
+ * Worker. The Activation Review itself never references the generated
+ * JS glue either.
+ */
+function reachStaticImportActivationReview(): void {
+  createStaticImportActivationReview();
 }
 
 /**

@@ -529,8 +529,77 @@ edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
 never reached; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 545–549: Static Import Activation Review, revised diagram
+
+Stage 545 (`docs/runtime_static_import_activation_review.md`) is the
+FINAL GATE immediately before real static import could ever be
+permitted — one level below the Generated Artifact Presence Policy,
+gathering every prior gate's answer (Safety Review, Readiness,
+Artifact Presence, Generated JS Glue built, Runtime-side review, Fail
+Closed, crypto API unexposed) into a single, named ACTIVATION
+decision. Stage 546 adds
+`src/runtime/fedos_static_import_activation_review.ts` — a pure,
+fixed-value STATIC IMPORT ACTIVATION REVIEW naming
+`createStaticImportActivationReview()`, fixed `{ state:
+"PlanningOnly", approved: false, reason:
+"RuntimeActivationReviewPending" }` — never referencing the generated
+JS glue in any way. Stage 547 wires `createGeneratedArtifactPresence()`
+(`fedos_generated_artifact_presence.ts`) to CALL
+`createStaticImportActivationReview()` — the result is DISCARDED and
+`createGeneratedArtifactPresence()`'s own return value is UNCHANGED,
+the SAME "reach one link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539 already established six times over.
+
+This revises the Stage 537–541 diagram — Static Import Activation
+Review now sits between Generated Artifact Presence and Generated JS
+Glue:
+
+```
+FedosGeneratedArtifactPresence              <-- REAL, pure decision function (src/runtime/fedos_generated_artifact_presence.ts,
+("Generated Artifact Presence")                 Stage 538), REAL wiring: createGeneratedArtifactPresence() calls
+     |                                          createStaticImportActivationReview(), discards the result (Stage 547)
+     v
+FedosStaticImportActivationReview           <-- REAL, pure decision function (src/runtime/fedos_static_import_activation_review.ts,
+("Static Import Activation Review")             Stage 546), fixed { state: "PlanningOnly", approved: false, reason:
+     |                                          "RuntimeActivationReviewPending" } -- NEVER references the generated JS glue
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported by the Activation
+     |                                          Review; the arrow above is positional (Stage 545's seven-condition
+     |                                          table), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, initSync/default init, and
+                                                 import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+548) read `staticImportActivationState()`/
+`staticImportActivationApproved()`/`staticImportActivationReason()`
+for DISPLAY only —
+`"PlanningOnly"`/`false`/`"RuntimeActivationReviewPending"`, matching
+every other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_generated_artifact_presence.ts` nor
+`fedos_static_import_activation_review.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; `initSync`/the generated JS glue's default
+export never called; no `fetch`/dynamic `import()`; no `fs`/`path`/
+`existsSync`/`statSync`/glob-based presence check; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; NIP-17/NIP-59
+unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
+`"Reviewed"`/`"Loaded"`/`"Active"`/`"FailOpen"` never reached; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
+- `docs/runtime_static_import_activation_review.md` (Stage 545) — the
+  final gate before real static import, gathering every prior gate's
+  answer into one named activation decision.
+- `src/runtime/fedos_static_import_activation_review.ts` (Stage
+  546–547) — the Activation Review's real, fixed-value implementation
+  and its wiring from `fedos_generated_artifact_presence.ts`.
 - `docs/runtime_generated_artifact_presence_policy.md` (Stage 537) —
   the last safety layer before a static import, fixing what "present"
   and "usable" would need to mean, and why they differ.
