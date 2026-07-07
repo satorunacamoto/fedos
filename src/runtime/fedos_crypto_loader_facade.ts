@@ -22,9 +22,19 @@
  * `createExplicitCryptoInitialization()` to CALL
  * `createCryptoLoaderFacade()` — the result is DISCARDED, and
  * `createExplicitCryptoInitialization()`'s own return value stays
- * UNCHANGED (`initializationAllowed: false`). That is the ONLY caller
- * of this file anywhere in this repository; neither `create_runtime.ts`
- * nor `src/worker.ts` references it, directly or indirectly.
+ * UNCHANGED (`initializationAllowed: false`). That is one caller of
+ * this file; neither `create_runtime.ts` nor `src/worker.ts`
+ * references it, directly or indirectly.
+ *
+ * Stage 603 extends `createCryptoLoaderFacade()` DOWNWARD only: it
+ * now calls `createCryptoProviderFacadeBoundary()`
+ * (`fedos_crypto_provider_facade_boundary.ts`, Stage 602) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", initialized: false, backend: "WasmPlanned", reason:
+ * "FacadeInitializationPending" }` answer. This mirrors the SAME
+ * "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571/579/587/595 already
+ * established thirteen times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createCryptoLoaderFacade()`/`initializeCrypto()` are PURE,
@@ -63,6 +73,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createCryptoProviderFacadeBoundary } from "./fedos_crypto_provider_facade_boundary.js";
 
 /**
  * The Crypto Loader Facade's own coarse state. `"PlanningOnly"` is the
@@ -116,12 +128,25 @@ export interface FedosCryptoLoaderFacadeInitializationDecision {
  * of any kind.
  */
 export function createCryptoLoaderFacade(): FedosCryptoLoaderFacade {
+  reachProviderFacadeBoundary(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     initialized: false,
     backend: "WasmPlanned",
     reason: "FacadeInitializationPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createCryptoProviderFacadeBoundary()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+ * Provider/Facade Boundary itself never references the generated JS
+ * glue or writes `import()` of any kind either.
+ */
+function reachProviderFacadeBoundary(): void {
+  createCryptoProviderFacadeBoundary();
 }
 
 /**
