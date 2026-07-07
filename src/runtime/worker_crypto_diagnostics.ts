@@ -124,6 +124,12 @@
  * `runtime_crypto_diagnostics.ts`'s own Stage 588 doc comment. Fixed
  * `"ExplicitInitialization"`/`false`/`false`/
  * `"InitializationApprovalPending"` respectively.
+ *
+ * Stage 596 adds `cryptoLoaderFacadeState`/`cryptoLoaderFacadeBackend`/
+ * `cryptoLoaderFacadeInitialized`/`cryptoLoaderFacadeReason` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 596 doc comment. Fixed
+ * `"PlanningOnly"`/`"WasmPlanned"`/`false`/
+ * `"FacadeInitializationPending"` respectively.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -290,6 +296,17 @@ import {
   cryptoInitializationReason as fedosCryptoInitializationReason,
   cryptoInitialized as fedosCryptoInitialized,
 } from "./fedos_explicit_crypto_initialization.js";
+import type {
+  FedosCryptoLoaderFacadeBackend,
+  FedosCryptoLoaderFacadeReason,
+  FedosCryptoLoaderFacadeState,
+} from "./fedos_crypto_loader_facade.js";
+import {
+  cryptoLoaderFacadeBackend as fedosCryptoLoaderFacadeBackend,
+  cryptoLoaderFacadeInitialized as fedosCryptoLoaderFacadeInitialized,
+  cryptoLoaderFacadeReason as fedosCryptoLoaderFacadeReason,
+  cryptoLoaderFacadeState as fedosCryptoLoaderFacadeState,
+} from "./fedos_crypto_loader_facade.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -839,6 +856,31 @@ export interface WorkerCryptoActivationStatus {
    * `"InitializationApprovalPending"` in this stage.
    */
   readonly cryptoInitializationReason: FedosCryptoInitializationReason;
+  /**
+   * The Crypto Loader Facade's own fixed coarse state —
+   * `cryptoLoaderFacadeState()`'s own answer
+   * (`src/runtime/fedos_crypto_loader_facade.ts`, Stage 594/596).
+   * Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly cryptoLoaderFacadeState: FedosCryptoLoaderFacadeState;
+  /**
+   * The Facade's currently designated backend candidate —
+   * `cryptoLoaderFacadeBackend()`'s own answer. Fixed `"WasmPlanned"`
+   * in this stage.
+   */
+  readonly cryptoLoaderFacadeBackend: FedosCryptoLoaderFacadeBackend;
+  /**
+   * Whether the Facade has ever actually been initialized —
+   * `cryptoLoaderFacadeInitialized()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly cryptoLoaderFacadeInitialized: boolean;
+  /**
+   * WHY the Facade has not yet been initialized —
+   * `cryptoLoaderFacadeReason()`'s own answer. Fixed
+   * `"FacadeInitializationPending"` in this stage.
+   */
+  readonly cryptoLoaderFacadeReason: FedosCryptoLoaderFacadeReason;
 }
 
 /**
@@ -950,5 +992,9 @@ export function workerCryptoActivationStatus(
     cryptoInitializationAllowed: fedosCryptoInitializationAllowed(),
     cryptoInitialized: fedosCryptoInitialized(),
     cryptoInitializationReason: fedosCryptoInitializationReason(),
+    cryptoLoaderFacadeState: fedosCryptoLoaderFacadeState(),
+    cryptoLoaderFacadeBackend: fedosCryptoLoaderFacadeBackend(),
+    cryptoLoaderFacadeInitialized: fedosCryptoLoaderFacadeInitialized(),
+    cryptoLoaderFacadeReason: fedosCryptoLoaderFacadeReason(),
   };
 }

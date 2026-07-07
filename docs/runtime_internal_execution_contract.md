@@ -963,8 +963,130 @@ unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
 Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
 `package.json` dependency added.
 
+## Update — Stage 593–597: Crypto Loader Facade, revised diagram, target architecture named
+
+Stage 593 (`docs/runtime_crypto_loader_facade.md`) is DESIGN ONLY — it
+names a single, narrow seam Runtime/Provider code would eventually
+call through, without implementing a real load of any kind. It fixes
+the TARGET architecture (distinct from, and higher-level than, the
+parked Dynamic-Loader arc below):
+
+```
+Crypto Runtime
+        │
+        ▼
+Crypto Provider
+        │
+        ▼
+Crypto Loader Facade
+        │
+        ▼
+WASM Loader
+        │
+        ▼
+Rust
+```
+
+**This target diagram is CONCEPTUAL — most of its arrows are NOT real
+code wires today.** `Crypto Runtime`/`Crypto Provider` name
+`create_runtime.ts`'s `AppRuntime.crypto`/`RuntimeCryptoProvider`
+positionally — that existing wiring is real, but it terminates at
+`PlaceholderRuntimeCryptoProvider`, and NEITHER `AppRuntime` NOR any
+`RuntimeCryptoProvider` implementation imports or calls
+`fedos_crypto_loader_facade.ts`. `WASM Loader` names
+`fedos_wasm_loader.ts` positionally — the Facade does not import or
+call it either. The ONE real wire this stage adds is BELOW the Facade
+box in this diagram's own arc, not across it: Stage 594 adds
+`src/runtime/fedos_crypto_loader_facade.ts` — a pure, fixed-value
+FACADE naming `createCryptoLoaderFacade()`, fixed `{ state:
+"PlanningOnly", initialized: false, backend: "WasmPlanned", reason:
+"FacadeInitializationPending" }`, and `initializeCrypto()`, fixed `{
+allowed: false, reason: "FacadeInitializationPending" }` — with NO
+side effects and NO `import()` of any kind (static or dynamic)
+written anywhere in this file. Stage 595 wires
+`createExplicitCryptoInitialization()`
+(`fedos_explicit_crypto_initialization.ts`) to CALL
+`createCryptoLoaderFacade()` — the result is DISCARDED and
+`createExplicitCryptoInitialization()`'s own return value is
+UNCHANGED (`initializationAllowed: false`), the SAME "reach one link
+deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587 already
+established twelve times over.
+
+This revises the Stage 585–589 diagram — Crypto Loader Facade now
+sits between Explicit Crypto Initialization and the (still purely
+positional) Dynamic Import box:
+
+```
+FedosExplicitCryptoInitialization             <-- REAL, pure decision function (src/runtime/fedos_explicit_crypto_initialization.ts,
+("Explicit Crypto Initialization")                 Stage 586), REAL wiring: createExplicitCryptoInitialization() calls
+     |                                          createCryptoLoaderFacade(), discards the result (Stage 595)
+     v
+FedosCryptoLoaderFacade                    <-- REAL, pure decision function (src/runtime/fedos_crypto_loader_facade.ts,
+("Crypto Loader Facade")                       Stage 594), fixed { state: "PlanningOnly", initialized: false, backend:
+     |                                          "WasmPlanned", reason: "FacadeInitializationPending" }; initializeCrypto()
+     |                                          fixed { allowed: false, reason: "FacadeInitializationPending" } -- NO side
+     |                                          effects, NO import() of any kind written, NEVER references the WASM Loader,
+     |                                          the generated JS glue, or Rust
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual, naming what a
+     :  future, separate, explicitly-reviewed stage would eventually write, never a real wire)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_crypto_loader_facade.ts`, directly or indirectly, and no
+`RuntimeCryptoProvider` implementation calls
+`createCryptoLoaderFacade()`/`initializeCrypto()`.
+`docs/runtime_crypto_loader_facade.md` §2 responsibilities #1/#2
+("Runtime sees only the Facade"/"Provider sees only the Facade")
+remain unimplemented as MECHANISMS — the target-architecture diagram
+above names the destination without rewiring `AppRuntime.crypto` to
+reach it. Per the user's own Stage 597 instruction, the target diagram
+STOPS at `Rust` and deliberately does NOT extend to `Dynamic
+Import`/`Generated JS Glue` — those boxes belong only to the SEPARATE,
+lower-level parked-chain diagram immediately above, not to the target
+architecture itself.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+596) read `cryptoLoaderFacadeState()`/`cryptoLoaderFacadeBackend()`/
+`cryptoLoaderFacadeInitialized()`/`cryptoLoaderFacadeReason()` for
+DISPLAY only — `"PlanningOnly"`/`"WasmPlanned"`/`false`/
+`"FacadeInitializationPending"`, matching every other leaf in this
+arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_explicit_crypto_initialization.ts` nor
+`fedos_crypto_loader_facade.ts`); `WebAssembly.instantiate`/`compile`
+never invoked; no static `import` and no dynamic `import()` of the
+generated JS glue anywhere in this repository; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; NIP-17/NIP-59
+unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
+`"Reviewed"`/`"Committed"`/`"PrebuildRequired"`/`"OptionalLoader"`/
+`"Open"`/`"Granted"`/`"Active"`/`"WasmActive"`/`"Loaded"`/`"FailOpen"`
+never reached; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_crypto_loader_facade.md` (Stage 593) — the target
+  architecture (Crypto Runtime -> Crypto Provider -> Crypto Loader
+  Facade -> WASM Loader -> Rust) and the Facade's six responsibilities.
+- `src/runtime/fedos_crypto_loader_facade.ts` (Stage 594–595) — the
+  Facade's real, fixed-value implementation and its wiring from
+  `fedos_explicit_crypto_initialization.ts`.
 - `docs/runtime_explicit_crypto_initialization.md` (Stage 585) — the
   six permanent rules for WHEN the generated JS glue/WASM may ever be
   loaded, all currently unimplemented as mechanisms.

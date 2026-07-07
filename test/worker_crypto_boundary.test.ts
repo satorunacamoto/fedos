@@ -262,6 +262,10 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       cryptoInitializationAllowed: false,
       cryptoInitialized: false,
       cryptoInitializationReason: "InitializationApprovalPending",
+      cryptoLoaderFacadeState: "PlanningOnly",
+      cryptoLoaderFacadeBackend: "WasmPlanned",
+      cryptoLoaderFacadeInitialized: false,
+      cryptoLoaderFacadeReason: "FacadeInitializationPending",
     });
   });
 

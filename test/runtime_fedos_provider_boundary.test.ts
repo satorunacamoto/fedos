@@ -224,6 +224,10 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       cryptoInitializationAllowed: false,
       cryptoInitialized: false,
       cryptoInitializationReason: "InitializationApprovalPending",
+      cryptoLoaderFacadeState: "PlanningOnly",
+      cryptoLoaderFacadeBackend: "WasmPlanned",
+      cryptoLoaderFacadeInitialized: false,
+      cryptoLoaderFacadeReason: "FacadeInitializationPending",
     });
   });
 

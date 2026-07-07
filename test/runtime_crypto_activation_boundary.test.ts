@@ -283,6 +283,10 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       cryptoInitializationAllowed: false,
       cryptoInitialized: false,
       cryptoInitializationReason: "InitializationApprovalPending",
+      cryptoLoaderFacadeState: "PlanningOnly",
+      cryptoLoaderFacadeBackend: "WasmPlanned",
+      cryptoLoaderFacadeInitialized: false,
+      cryptoLoaderFacadeReason: "FacadeInitializationPending",
     });
   });
 
