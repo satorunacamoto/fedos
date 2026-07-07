@@ -256,6 +256,15 @@ import {
   buildTimeLoaderRuntimeAttachAllowed as fedosBuildTimeLoaderRuntimeAttachAllowed,
   buildTimeLoaderStrategy as fedosBuildTimeLoaderStrategy,
 } from "./fedos_build_time_loader_strategy.js";
+import type {
+  FedosDynamicLoaderGateReason,
+  FedosDynamicLoaderGateState,
+} from "./fedos_dynamic_loader_gate.js";
+import {
+  dynamicLoaderAllowed as fedosDynamicLoaderAllowed,
+  dynamicLoaderGateReason as fedosDynamicLoaderGateReason,
+  dynamicLoaderGateState as fedosDynamicLoaderGateState,
+} from "./fedos_dynamic_loader_gate.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -743,6 +752,25 @@ export interface WorkerCryptoActivationStatus {
    * `false` in this stage.
    */
   readonly buildTimeLoaderRuntimeAttachAllowed: boolean;
+  /**
+   * The Dynamic Loader Gate's own fixed coarse state —
+   * `dynamicLoaderGateState()`'s own answer
+   * (`src/runtime/fedos_dynamic_loader_gate.ts`, Stage 570/572). Fixed
+   * `"PlanningOnly"` in this stage.
+   */
+  readonly dynamicLoaderGateState: FedosDynamicLoaderGateState;
+  /**
+   * Whether a dynamic loader is currently allowed —
+   * `dynamicLoaderAllowed()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly dynamicLoaderAllowed: boolean;
+  /**
+   * WHY a dynamic loader is not currently allowed —
+   * `dynamicLoaderGateReason()`'s own answer. Fixed
+   * `"DynamicLoaderGatePending"` in this stage.
+   */
+  readonly dynamicLoaderGateReason: FedosDynamicLoaderGateReason;
 }
 
 /**
@@ -844,5 +872,8 @@ export function workerCryptoActivationStatus(
     buildTimeLoaderStrategy: fedosBuildTimeLoaderStrategy(),
     buildTimeLoaderRequiresPrebuild: fedosBuildTimeLoaderRequiresPrebuild(),
     buildTimeLoaderRuntimeAttachAllowed: fedosBuildTimeLoaderRuntimeAttachAllowed(),
+    dynamicLoaderGateState: fedosDynamicLoaderGateState(),
+    dynamicLoaderAllowed: fedosDynamicLoaderAllowed(),
+    dynamicLoaderGateReason: fedosDynamicLoaderGateReason(),
   };
 }

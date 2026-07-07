@@ -214,6 +214,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       buildTimeLoaderStrategy: "DynamicLoaderPlanned",
       buildTimeLoaderRequiresPrebuild: true,
       buildTimeLoaderRuntimeAttachAllowed: false,
+      dynamicLoaderGateState: "PlanningOnly",
+      dynamicLoaderAllowed: false,
+      dynamicLoaderGateReason: "DynamicLoaderGatePending",
     });
   });
 

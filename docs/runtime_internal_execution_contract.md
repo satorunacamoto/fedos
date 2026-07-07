@@ -725,8 +725,87 @@ file edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
 `"FailOpen"` never reached; Rust public API unchanged (27 `pub fn`);
 no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 569–573: Dynamic Loader Gate, revised diagram
+
+Stage 569 (`docs/runtime_dynamic_loader_gate.md`) fixes EIGHT minimum
+conditions a future, separate, explicitly-reviewed stage would need to
+satisfy before a dynamic `import()` of the generated JS glue could
+ever be written and executed — Build-Time Loader Strategy complete,
+Generated Artifact Distribution policy finalized, Static Import Review
+complete, Runtime Activation Review complete, Runtime dev-only gating,
+Fail Closed maintained, Generated JS Glue unmodified, Worker out of
+scope. Stage 570 adds `src/runtime/fedos_dynamic_loader_gate.ts` — a
+pure, fixed-value GATE naming `createDynamicLoaderGate()`, fixed `{
+gateState: "PlanningOnly", dynamicLoaderAllowed: false, reason:
+"DynamicLoaderGatePending" }` — with NO side effects and NO dynamic
+`import()` written anywhere in this file, even though the gate itself
+concerns a future dynamic loader. Stage 571 wires
+`createBuildTimeLoaderStrategy()`
+(`fedos_build_time_loader_strategy.ts`) to CALL
+`createDynamicLoaderGate()` — the result is DISCARDED and
+`createBuildTimeLoaderStrategy()`'s own return value is UNCHANGED
+(`strategy: "DynamicLoaderPlanned"`), the SAME "reach one link deeper,
+keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563 already established nine
+times over.
+
+This revises the Stage 561–565 diagram — Dynamic Loader Gate now sits
+between Build-Time Loader Strategy and Generated JS Glue:
+
+```
+FedosBuildTimeLoaderStrategy                 <-- REAL, pure decision function (src/runtime/fedos_build_time_loader_strategy.ts,
+("Build-Time Loader Strategy")                   Stage 562), REAL wiring: createBuildTimeLoaderStrategy() calls
+     |                                          createDynamicLoaderGate(), discards the result (Stage 571)
+     v
+FedosDynamicLoaderGate                       <-- REAL, pure decision function (src/runtime/fedos_dynamic_loader_gate.ts,
+("Dynamic Loader Gate")                          Stage 570), fixed { gateState: "PlanningOnly", dynamicLoaderAllowed:
+     |                                          false, reason: "DynamicLoaderGatePending" } -- NO side effects, NO
+     |                                          dynamic import() written, NEVER references the generated JS glue
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic)
+     |                                          by the Dynamic Loader Gate; the arrow above is positional (Stage
+     |                                          569's eight-condition table), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**No Runtime connection of any kind exists yet — not even a dev-only
+one.** `docs/runtime_dynamic_loader_gate.md` §1 condition #5 ("Runtime
+dev-only") is itself UNMET: no dev-only flag, environment variable, or
+code path anywhere in this repository consults
+`fedos_dynamic_loader_gate.ts`'s answer, and `create_runtime.ts` does
+not reference this file, directly or indirectly. Opening the gate is
+explicitly left to a future, separate, explicitly-reviewed stage.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+572) read `dynamicLoaderGateState()`/`dynamicLoaderAllowed()`/
+`dynamicLoaderGateReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`"DynamicLoaderGatePending"`, matching every
+other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_build_time_loader_strategy.ts` nor
+`fedos_dynamic_loader_gate.ts`); `WebAssembly.instantiate`/`compile`
+never invoked; no static `import` and no dynamic `import()` of the
+generated JS glue anywhere in this repository; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; NIP-17/NIP-59
+unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
+`"Reviewed"`/`"Committed"`/`"PrebuildRequired"`/`"OptionalLoader"`/
+`"Open"`/`"Loaded"`/`"Active"`/`"FailOpen"` never reached; Rust public
+API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
+added.
+
 ## See also
 
+- `docs/runtime_dynamic_loader_gate.md` (Stage 569) — the eight
+  minimum conditions a future dynamic loader implementation would need
+  to satisfy, all currently unmet.
+- `src/runtime/fedos_dynamic_loader_gate.ts` (Stage 570–571) — the
+  gate's real, fixed-value implementation and its wiring from
+  `fedos_build_time_loader_strategy.ts`.
 - `docs/runtime_build_time_loader_strategy.md` (Stage 561) — the
   three candidate future loading strategies, and why Option C (dynamic
   loader with an explicit dev-only gate) is designated but not
