@@ -656,8 +656,84 @@ rule unchanged; `encrypt`/`decrypt` unchanged; `"Allowed"`/
 unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 561–565: Build-Time Loader Strategy, revised diagram
+
+Stage 561 (`docs/runtime_build_time_loader_strategy.md`) draws the
+direct consequence of the Distribution Policy's Option B choice
+(never commit the generated artifact) for how the generated JS
+glue/`.wasm` could ever be LOADED: no loader may assume the artifact
+is present, and static import is unsafe. It names THREE candidate
+future loading strategies — (A) require a prebuild step, (B) an
+optional no-op loader, (C) a dynamic loader with an explicit dev-only
+gate — and designates Option C as the future candidate WITHOUT
+implementing it. Stage 562 adds
+`src/runtime/fedos_build_time_loader_strategy.ts` — a pure,
+fixed-value STRATEGY DECISION naming
+`createBuildTimeLoaderStrategy()`, fixed `{ strategy:
+"DynamicLoaderPlanned", requiresPrebuild: true, staticImportAllowed:
+false, dynamicImportAllowed: false, runtimeAttachAllowed: false }` —
+writing no dynamic `import()` of any kind, despite naming one as the
+future candidate. Stage 563 wires
+`createGeneratedArtifactDistribution()`
+(`fedos_generated_artifact_distribution.ts`) to CALL
+`createBuildTimeLoaderStrategy()` — the result is DISCARDED and
+`createGeneratedArtifactDistribution()`'s own return value is
+UNCHANGED, the SAME "reach one link deeper, keep your own answer"
+pattern Stage 503/511/519/527/535/539/547/555 already established
+eight times over.
+
+This revises the Stage 553–557 diagram — Build-Time Loader Strategy
+now sits between Generated Artifact Distribution Policy and Generated
+JS Glue:
+
+```
+FedosGeneratedArtifactDistribution           <-- REAL, pure decision function (src/runtime/fedos_generated_artifact_distribution.ts,
+("Generated Artifact Distribution Policy")       Stage 554), REAL wiring: createGeneratedArtifactDistribution() calls
+     |                                          createBuildTimeLoaderStrategy(), discards the result (Stage 563)
+     v
+FedosBuildTimeLoaderStrategy                 <-- REAL, pure decision function (src/runtime/fedos_build_time_loader_strategy.ts,
+("Build-Time Loader Strategy")                   Stage 562), fixed { strategy: "DynamicLoaderPlanned", requiresPrebuild: true,
+     |                                          staticImportAllowed: false, dynamicImportAllowed: false,
+     |                                          runtimeAttachAllowed: false } -- NEVER writes a dynamic import() or
+     |                                          references the generated JS glue
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic)
+     |                                          by the Loader Strategy; the arrow above is positional (Stage 561's
+     |                                          three-option comparison), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+564) read `buildTimeLoaderStrategy()`/
+`buildTimeLoaderRequiresPrebuild()`/
+`buildTimeLoaderRuntimeAttachAllowed()` for DISPLAY only —
+`"DynamicLoaderPlanned"`/`true`/`false`, matching every other leaf in
+this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_generated_artifact_distribution.ts` nor
+`fedos_build_time_loader_strategy.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; no static `import` and no dynamic `import()`
+of the generated JS glue anywhere in this repository; no generated
+file edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
+`"Approved"`/`"Ready"`/`"Present"`/`"Reviewed"`/`"Committed"`/
+`"PrebuildRequired"`/`"OptionalLoader"`/`"Loaded"`/`"Active"`/
+`"FailOpen"` never reached; Rust public API unchanged (27 `pub fn`);
+no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_build_time_loader_strategy.md` (Stage 561) — the
+  three candidate future loading strategies, and why Option C (dynamic
+  loader with an explicit dev-only gate) is designated but not
+  implemented.
+- `src/runtime/fedos_build_time_loader_strategy.ts` (Stage 562–563) —
+  the Loader Strategy's real, fixed-value implementation and its
+  wiring from `fedos_generated_artifact_distribution.ts`.
 - `docs/runtime_generated_artifact_distribution_policy.md` (Stage 553)
   — the standing Option A vs. Option B distribution policy, and why
   this repository adopts Option B (build-time generation only).

@@ -249,6 +249,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       generatedArtifactDistributionMode: "BuildTimeGenerated",
       generatedArtifactCommitted: false,
       staticImportSafe: false,
+      buildTimeLoaderStrategy: "DynamicLoaderPlanned",
+      buildTimeLoaderRequiresPrebuild: true,
+      buildTimeLoaderRuntimeAttachAllowed: false,
     });
   });
 

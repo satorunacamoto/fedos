@@ -270,6 +270,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       generatedArtifactDistributionMode: "BuildTimeGenerated",
       generatedArtifactCommitted: false,
       staticImportSafe: false,
+      buildTimeLoaderStrategy: "DynamicLoaderPlanned",
+      buildTimeLoaderRequiresPrebuild: true,
+      buildTimeLoaderRuntimeAttachAllowed: false,
     });
   });
 

@@ -22,9 +22,19 @@
  * `createGeneratedArtifactDistribution()` — the result is DISCARDED,
  * and `createStaticImportActivationReview()`'s own return value stays
  * UNCHANGED (`{ state: "PlanningOnly", approved: false, reason:
- * "RuntimeActivationReviewPending" }`). That is the ONLY caller of
- * this file anywhere in this repository; neither `create_runtime.ts`
- * nor `src/worker.ts` references it, directly or indirectly.
+ * "RuntimeActivationReviewPending" }`). That is one caller of this
+ * file; neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 563 extends `createGeneratedArtifactDistribution()` DOWNWARD
+ * only: it now calls `createBuildTimeLoaderStrategy()`
+ * (`fedos_build_time_loader_strategy.ts`, Stage 562) — then DISCARDS
+ * the result and returns its OWN, unchanged `{ distributionMode:
+ * "BuildTimeGenerated", artifactCommitted: false, staticImportSafe:
+ * false, reason: "GeneratedArtifactNotCommitted" }` answer. This
+ * mirrors the SAME "reach one link deeper, keep your own answer"
+ * pattern Stage 503/511/519/527/535/539/547/555 already established
+ * eight times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createGeneratedArtifactDistribution()` is PURE, synchronous,
@@ -54,6 +64,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createBuildTimeLoaderStrategy } from "./fedos_build_time_loader_strategy.js";
 
 /**
  * The Generated Artifact Distribution Policy's own coarse mode.
@@ -93,12 +105,25 @@ export interface FedosGeneratedArtifactDistribution {
  * way.
  */
 export function createGeneratedArtifactDistribution(): FedosGeneratedArtifactDistribution {
+  reachBuildTimeLoaderStrategy(); // result discarded -- the generated JS glue is never imported
   return {
     distributionMode: "BuildTimeGenerated",
     artifactCommitted: false,
     staticImportSafe: false,
     reason: "GeneratedArtifactNotCommitted",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createBuildTimeLoaderStrategy()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The Loader
+ * Strategy itself never references the generated JS glue or writes a
+ * dynamic `import()` either.
+ */
+function reachBuildTimeLoaderStrategy(): void {
+  createBuildTimeLoaderStrategy();
 }
 
 /**

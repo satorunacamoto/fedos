@@ -211,6 +211,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       generatedArtifactDistributionMode: "BuildTimeGenerated",
       generatedArtifactCommitted: false,
       staticImportSafe: false,
+      buildTimeLoaderStrategy: "DynamicLoaderPlanned",
+      buildTimeLoaderRequiresPrebuild: true,
+      buildTimeLoaderRuntimeAttachAllowed: false,
     });
   });
 

@@ -335,6 +335,12 @@ import {
   generatedArtifactDistributionMode as fedosGeneratedArtifactDistributionMode,
   staticImportSafe as fedosStaticImportSafe,
 } from "./fedos_generated_artifact_distribution.js";
+import type { FedosBuildTimeLoaderStrategyKind } from "./fedos_build_time_loader_strategy.js";
+import {
+  buildTimeLoaderRequiresPrebuild as fedosBuildTimeLoaderRequiresPrebuild,
+  buildTimeLoaderRuntimeAttachAllowed as fedosBuildTimeLoaderRuntimeAttachAllowed,
+  buildTimeLoaderStrategy as fedosBuildTimeLoaderStrategy,
+} from "./fedos_build_time_loader_strategy.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -888,6 +894,27 @@ export interface RuntimeCryptoActivationStatus {
    * `false` in this stage.
    */
   readonly staticImportSafe: boolean;
+  /**
+   * This repository's standing Build-Time Loader Strategy decision —
+   * `buildTimeLoaderStrategy()`'s own answer
+   * (`src/runtime/fedos_build_time_loader_strategy.ts`, Stage
+   * 562/564). Fixed `"DynamicLoaderPlanned"` (Option C, designated
+   * but not implemented) in this stage.
+   */
+  readonly buildTimeLoaderStrategy: FedosBuildTimeLoaderStrategyKind;
+  /**
+   * Whether a prebuild step (`npm run build:wasm`) is required before
+   * the generated artifact could ever be loaded —
+   * `buildTimeLoaderRequiresPrebuild()`'s own answer. Fixed `true` in
+   * this stage.
+   */
+  readonly buildTimeLoaderRequiresPrebuild: boolean;
+  /**
+   * Whether Runtime may currently attach to this loader strategy —
+   * `buildTimeLoaderRuntimeAttachAllowed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly buildTimeLoaderRuntimeAttachAllowed: boolean;
 }
 
 /**
@@ -987,5 +1014,8 @@ export function runtimeCryptoActivationStatus(
     generatedArtifactDistributionMode: fedosGeneratedArtifactDistributionMode(),
     generatedArtifactCommitted: fedosGeneratedArtifactCommitted(),
     staticImportSafe: fedosStaticImportSafe(),
+    buildTimeLoaderStrategy: fedosBuildTimeLoaderStrategy(),
+    buildTimeLoaderRequiresPrebuild: fedosBuildTimeLoaderRequiresPrebuild(),
+    buildTimeLoaderRuntimeAttachAllowed: fedosBuildTimeLoaderRuntimeAttachAllowed(),
   };
 }
