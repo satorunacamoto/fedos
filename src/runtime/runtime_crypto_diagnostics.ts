@@ -302,6 +302,15 @@ import {
   staticImportReviewReason as fedosStaticImportReviewReason,
   staticImportReviewState as fedosStaticImportReviewState,
 } from "./fedos_wasm_static_import_review.js";
+import type {
+  FedosWasmStaticImportReadinessReason,
+  FedosWasmStaticImportReadinessState,
+} from "./fedos_wasm_static_import_readiness.js";
+import {
+  staticImportReadinessReason as fedosStaticImportReadinessReason,
+  staticImportReadinessState as fedosStaticImportReadinessState,
+  staticImportReady as fedosStaticImportReady,
+} from "./fedos_wasm_static_import_readiness.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -780,6 +789,24 @@ export interface RuntimeCryptoActivationStatus {
    * `"GeneratedArtifactNotCommitted"` in this stage.
    */
   readonly staticImportReviewReason: FedosWasmStaticImportReviewReason;
+  /**
+   * The Static Import Readiness record's own fixed coarse state —
+   * `staticImportReadinessState()`'s own answer
+   * (`src/runtime/fedos_wasm_static_import_readiness.ts`, Stage
+   * 534/536). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly readinessState: FedosWasmStaticImportReadinessState;
+  /**
+   * Whether the static import is currently ready to run —
+   * `staticImportReady()`'s own answer. Fixed `false` in this stage.
+   */
+  readonly staticImportReady: boolean;
+  /**
+   * WHY the static import is not currently ready —
+   * `staticImportReadinessReason()`'s own answer. Fixed
+   * `"RuntimeNotReady"` in this stage.
+   */
+  readonly staticImportReadinessReason: FedosWasmStaticImportReadinessReason;
 }
 
 /**
@@ -867,5 +894,8 @@ export function runtimeCryptoActivationStatus(
     staticImportReviewState: fedosStaticImportReviewState(),
     staticImportReviewApproved: fedosStaticImportReviewApproved(),
     staticImportReviewReason: fedosStaticImportReviewReason(),
+    readinessState: fedosStaticImportReadinessState(),
+    staticImportReady: fedosStaticImportReady(),
+    staticImportReadinessReason: fedosStaticImportReadinessReason(),
   };
 }

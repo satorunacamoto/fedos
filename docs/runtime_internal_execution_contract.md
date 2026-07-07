@@ -417,8 +417,68 @@ edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 533–536: Static Import Readiness, revised diagram
+
+Stage 533 (`docs/runtime_wasm_static_import_readiness.md`) names EIGHT
+conditions that would ALL need to hold, simultaneously, before the
+static import named by Stage 517 could ever actually run — even
+assuming a future stage someday satisfied the Safety Review (Stage
+526). Stage 534 adds `src/runtime/fedos_wasm_static_import_readiness.ts`
+— a pure, fixed-value STATIC IMPORT READINESS record naming
+`createStaticImportReadiness()`, fixed `{ readinessState:
+"PlanningOnly", ready: false, reason: "RuntimeNotReady" }`. Stage 535
+wires `reviewStaticImport()` (`fedos_wasm_static_import_review.ts`) to
+CALL `createStaticImportReadiness()` — the result is DISCARDED and
+`reviewStaticImport()`'s own return value is UNCHANGED, the SAME
+"reach one link deeper, keep your own answer" pattern
+Stage 503/511/519/527 already established four times over.
+
+This revises the Stage 525–529 diagram — Static Import Readiness now
+sits between Static Import Review and Generated JS Glue:
+
+```
+FedosWasmStaticImportReview                <-- REAL, pure decision function (src/runtime/fedos_wasm_static_import_review.ts,
+("Static Import Review")                        Stage 526), REAL wiring: reviewStaticImport() calls
+     |                                          createStaticImportReadiness(), discards the result (Stage 535)
+     v
+FedosWasmStaticImportReadiness             <-- REAL, pure decision function (src/runtime/fedos_wasm_static_import_readiness.ts,
+("Static Import Readiness")                     Stage 534), fixed { readinessState: "PlanningOnly", ready: false,
+     |                                          reason: "RuntimeNotReady" }
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported by the Static
+     |                                          Import Readiness; the arrow above is positional (Stage 533's
+     |                                          eight-condition table), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, initSync/default init, and
+                                                 import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+536) read `staticImportReadinessState()`/`staticImportReady()`/
+`staticImportReadinessReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`"RuntimeNotReady"`, matching every other leaf
+in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_wasm_static_import_review.ts` nor
+`fedos_wasm_static_import_readiness.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; `initSync`/the generated JS glue's default
+export never called; no `fetch`/dynamic `import()`; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
+`"Approved"`/`"Ready"`/`"Loaded"`/`"Active"`/`"FailOpen"` never
+reached; Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
+`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_wasm_static_import_readiness.md` (Stage 533) — the
+  eight-condition readiness checklist required after Safety Review
+  passes, all currently unmet or insufficient alone.
+- `src/runtime/fedos_wasm_static_import_readiness.ts` (Stage 534–535)
+  — the readiness record's real, fixed-value implementation and its
+  wiring from `fedos_wasm_static_import_review.ts`.
 - `docs/runtime_wasm_static_import_safety_review.md` (Stage 525) — the
   safety review of what would break if the static import were written
   today, and why the generated artifact can never be committed as a

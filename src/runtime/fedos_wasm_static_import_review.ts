@@ -17,9 +17,17 @@
  * Stage 527 wires `src/runtime/fedos_wasm_static_import_plan.ts`'s
  * `planStaticImport()` to CALL `reviewStaticImport()` — the result is
  * DISCARDED, and `planStaticImport()`'s own return value stays
- * UNCHANGED (`"BlockedByPolicy"`). That is the ONLY caller of this
- * file anywhere in this repository; neither `create_runtime.ts` nor
- * `src/worker.ts` references it, directly or indirectly.
+ * UNCHANGED (`"BlockedByPolicy"`). That is one caller of this file;
+ * neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 535 extends `reviewStaticImport()` DOWNWARD only: it now calls
+ * `createStaticImportReadiness()` (`fedos_wasm_static_import_readiness.ts`,
+ * Stage 534) — then DISCARDS the result and returns its OWN, unchanged
+ * `{ approved: false, reason: "GeneratedArtifactNotCommitted" }`
+ * answer. This mirrors the SAME "reach one link deeper, keep your own
+ * answer" pattern Stage 503/511/519/527 already established four times
+ * over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `reviewStaticImport()` is PURE, synchronous, takes no argument,
@@ -43,6 +51,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createStaticImportReadiness } from "./fedos_wasm_static_import_readiness.js";
 
 /**
  * The Static Import Safety Review's own coarse state. `"ReviewedAndBlocked"`
@@ -75,10 +85,22 @@ export interface FedosWasmStaticImportReviewDecision {
  * `import.meta`.
  */
 export function reviewStaticImport(): FedosWasmStaticImportReviewDecision {
+  reachStaticImportReadiness(); // result discarded -- the generated JS glue is never imported
   return {
     approved: false,
     reason: "GeneratedArtifactNotCommitted",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createStaticImportReadiness()`. The
+ * result is discarded; it is never passed to `WebAssembly.instantiate`/
+ * `compile`, `initSync`/the default init export, `packages/fedos-core-rust`,
+ * Runtime, or Worker. The Readiness record itself never imports
+ * anything either.
+ */
+function reachStaticImportReadiness(): void {
+  createStaticImportReadiness();
 }
 
 /**
