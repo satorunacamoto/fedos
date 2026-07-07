@@ -226,6 +226,15 @@ import {
   staticImportReadinessState as fedosStaticImportReadinessState,
   staticImportReady as fedosStaticImportReady,
 } from "./fedos_wasm_static_import_readiness.js";
+import type {
+  FedosGeneratedArtifactPresenceReason,
+  FedosGeneratedArtifactPresenceState,
+} from "./fedos_generated_artifact_presence.js";
+import {
+  artifactPresenceReason as fedosArtifactPresenceReason,
+  artifactPresenceState as fedosArtifactPresenceState,
+  artifactPresent as fedosArtifactPresent,
+} from "./fedos_generated_artifact_presence.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -635,6 +644,25 @@ export interface WorkerCryptoActivationStatus {
    * `"RuntimeNotReady"` in this stage.
    */
   readonly staticImportReadinessReason: FedosWasmStaticImportReadinessReason;
+  /**
+   * The Generated Artifact Presence Policy's own fixed coarse state —
+   * `artifactPresenceState()`'s own answer
+   * (`src/runtime/fedos_generated_artifact_presence.ts`, Stage
+   * 538/540). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly artifactPresenceState: FedosGeneratedArtifactPresenceState;
+  /**
+   * Whether the generated artifact is currently present-and-usable
+   * for Runtime — `artifactPresent()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly artifactPresent: boolean;
+  /**
+   * WHY the generated artifact is not currently present-and-usable —
+   * `artifactPresenceReason()`'s own answer. Fixed
+   * `"ArtifactNotGeneratedForRuntime"` in this stage.
+   */
+  readonly artifactPresenceReason: FedosGeneratedArtifactPresenceReason;
 }
 
 /**
@@ -724,5 +752,8 @@ export function workerCryptoActivationStatus(
     readinessState: fedosStaticImportReadinessState(),
     staticImportReady: fedosStaticImportReady(),
     staticImportReadinessReason: fedosStaticImportReadinessReason(),
+    artifactPresenceState: fedosArtifactPresenceState(),
+    artifactPresent: fedosArtifactPresent(),
+    artifactPresenceReason: fedosArtifactPresenceReason(),
   };
 }

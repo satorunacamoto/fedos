@@ -240,6 +240,9 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
       readinessState: "PlanningOnly",
       staticImportReady: false,
       staticImportReadinessReason: "RuntimeNotReady",
+      artifactPresenceState: "PlanningOnly",
+      artifactPresent: false,
+      artifactPresenceReason: "ArtifactNotGeneratedForRuntime",
     });
   });
 

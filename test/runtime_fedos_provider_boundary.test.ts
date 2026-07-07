@@ -202,6 +202,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       readinessState: "PlanningOnly",
       staticImportReady: false,
       staticImportReadinessReason: "RuntimeNotReady",
+      artifactPresenceState: "PlanningOnly",
+      artifactPresent: false,
+      artifactPresenceReason: "ArtifactNotGeneratedForRuntime",
     });
   });
 

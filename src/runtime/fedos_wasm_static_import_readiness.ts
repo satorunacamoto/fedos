@@ -17,9 +17,18 @@
  * `reviewStaticImport()` to CALL `createStaticImportReadiness()` — the
  * result is DISCARDED, and `reviewStaticImport()`'s own return value
  * stays UNCHANGED (`{ approved: false, reason:
- * "GeneratedArtifactNotCommitted" }`). That is the ONLY caller of this
- * file anywhere in this repository; neither `create_runtime.ts` nor
- * `src/worker.ts` references it, directly or indirectly.
+ * "GeneratedArtifactNotCommitted" }`). That is one caller of this
+ * file; neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 539 extends `createStaticImportReadiness()` DOWNWARD only: it
+ * now calls `createGeneratedArtifactPresence()`
+ * (`fedos_generated_artifact_presence.ts`, Stage 538) — then DISCARDS
+ * the result and returns its OWN, unchanged `{ readinessState:
+ * "PlanningOnly", ready: false, reason: "RuntimeNotReady" }` answer.
+ * This mirrors the SAME "reach one link deeper, keep your own answer"
+ * pattern Stage 503/511/519/527/535 already established five times
+ * over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createStaticImportReadiness()` is PURE, synchronous, takes no
@@ -43,6 +52,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createGeneratedArtifactPresence } from "./fedos_generated_artifact_presence.js";
 
 /**
  * The Static Import Readiness record's own coarse state.
@@ -77,11 +88,24 @@ export interface FedosWasmStaticImportReadiness {
  * `import.meta`. Never touches the generated JS glue in any way.
  */
 export function createStaticImportReadiness(): FedosWasmStaticImportReadiness {
+  reachGeneratedArtifactPresence(); // result discarded -- the generated JS glue is never imported
   return {
     readinessState: "PlanningOnly",
     ready: false,
     reason: "RuntimeNotReady",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createGeneratedArtifactPresence()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The Presence
+ * Policy itself never imports the generated JS glue or reads the
+ * filesystem either.
+ */
+function reachGeneratedArtifactPresence(): void {
+  createGeneratedArtifactPresence();
 }
 
 /**

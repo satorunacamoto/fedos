@@ -471,8 +471,72 @@ edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
 reached; Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
 `package.json` dependency added.
 
+## Update — Stage 537–541: Generated Artifact Presence Policy, revised diagram
+
+Stage 537 (`docs/runtime_generated_artifact_presence_policy.md`) is
+the LAST safety layer immediately before a static import could ever be
+written: it fixes what "the generated JS glue/`.wasm` exist" and "the
+generated JS glue/`.wasm` may be imported" would need to mean, and
+states plainly that presence and usage permission are separate
+concepts. Stage 538 adds `src/runtime/fedos_generated_artifact_presence.ts`
+— a pure, fixed-value GENERATED ARTIFACT PRESENCE POLICY naming
+`createGeneratedArtifactPresence()`, fixed `{ state: "PlanningOnly",
+present: false, reason: "ArtifactNotGeneratedForRuntime" }` — using no
+`fs`/`path`/`existsSync`/`statSync`/glob API of any kind to determine
+that answer. Stage 539 wires `createStaticImportReadiness()`
+(`fedos_wasm_static_import_readiness.ts`) to CALL
+`createGeneratedArtifactPresence()` — the result is DISCARDED and
+`createStaticImportReadiness()`'s own return value is UNCHANGED, the
+SAME "reach one link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535 already established five times over.
+
+This revises the Stage 533–536 diagram — Generated Artifact Presence
+now sits between Static Import Readiness and Generated JS Glue:
+
+```
+FedosWasmStaticImportReadiness             <-- REAL, pure decision function (src/runtime/fedos_wasm_static_import_readiness.ts,
+("Static Import Readiness")                     Stage 534), REAL wiring: createStaticImportReadiness() calls
+     |                                          createGeneratedArtifactPresence(), discards the result (Stage 539)
+     v
+FedosGeneratedArtifactPresence              <-- REAL, pure decision function (src/runtime/fedos_generated_artifact_presence.ts,
+("Generated Artifact Presence")                 Stage 538), fixed { state: "PlanningOnly", present: false, reason:
+     |                                          "ArtifactNotGeneratedForRuntime" } -- NEVER a live filesystem check
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported by the Presence
+     |                                          Policy; the arrow above is positional (Stage 537's condition table),
+     |                                          not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, initSync/default init, and
+                                                 import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+540) read `artifactPresenceState()`/`artifactPresent()`/
+`artifactPresenceReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`"ArtifactNotGeneratedForRuntime"`, matching
+every other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_wasm_static_import_readiness.ts` nor
+`fedos_generated_artifact_presence.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; `initSync`/the generated JS glue's default
+export never called; no `fetch`/dynamic `import()`; no `fs`/`path`/
+`existsSync`/`statSync`/glob-based presence check; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
+`"Approved"`/`"Ready"`/`"Present"`/`"Loaded"`/`"Active"`/`"FailOpen"`
+never reached; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_generated_artifact_presence_policy.md` (Stage 537) —
+  the last safety layer before a static import, fixing what "present"
+  and "usable" would need to mean, and why they differ.
+- `src/runtime/fedos_generated_artifact_presence.ts` (Stage 538–539) —
+  the Presence Policy's real, fixed-value implementation and its
+  wiring from `fedos_wasm_static_import_readiness.ts`.
 - `docs/runtime_wasm_static_import_readiness.md` (Stage 533) — the
   eight-condition readiness checklist required after Safety Review
   passes, all currently unmet or insufficient alone.
