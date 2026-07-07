@@ -276,6 +276,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       dynamicLoaderGateState: "PlanningOnly",
       dynamicLoaderAllowed: false,
       dynamicLoaderGateReason: "DynamicLoaderGatePending",
+      dynamicLoaderDevApprovalState: "PlanningOnly",
+      dynamicLoaderDevApproved: false,
+      dynamicLoaderDevReason: "DevApprovalPending",
     });
   });
 

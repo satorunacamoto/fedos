@@ -798,8 +798,91 @@ unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
 API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 577–581: Dynamic Loader Dev Approval, revised diagram
+
+Stage 577 (`docs/runtime_dynamic_loader_dev_approval.md`) fixes EIGHT
+minimum DEV-ONLY conditions a future, separate, explicitly-reviewed
+stage would need to satisfy before a dynamic `import()` of the
+generated JS glue could ever be ACTIVATED — Dynamic Loader Gate
+passed, dev build only, disabled in production builds, Runtime Review
+complete, Generated JS Glue verified, Fail Closed maintained,
+prohibited in Worker, prohibited in production deploy. This is a
+SEPARATE, narrower question than the Gate's own "may a dynamic
+`import()` ever be written at all" — this approval asks "under what
+conditions may it ever be ACTIVATED, on a given machine, in a given
+build." Stage 578 adds `src/runtime/fedos_dynamic_loader_dev_approval.ts`
+— a pure, fixed-value APPROVAL naming
+`createDynamicLoaderDevApproval()`, fixed `{ approvalState:
+"PlanningOnly", approved: false, reason: "DevApprovalPending" }` —
+with NO side effects and NO `import()` of any kind (static or dynamic)
+written anywhere in this file. Stage 579 wires
+`createDynamicLoaderGate()` (`fedos_dynamic_loader_gate.ts`) to CALL
+`createDynamicLoaderDevApproval()` — the result is DISCARDED and
+`createDynamicLoaderGate()`'s own return value is UNCHANGED
+(`dynamicLoaderAllowed: false`), the SAME "reach one link deeper, keep
+your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571 already established ten
+times over.
+
+This revises the Stage 569–573 diagram — Dynamic Loader Dev Approval
+now sits between Dynamic Loader Gate and Generated JS Glue:
+
+```
+FedosDynamicLoaderGate                       <-- REAL, pure decision function (src/runtime/fedos_dynamic_loader_gate.ts,
+("Dynamic Loader Gate")                          Stage 570), REAL wiring: createDynamicLoaderGate() calls
+     |                                          createDynamicLoaderDevApproval(), discards the result (Stage 579)
+     v
+FedosDynamicLoaderDevApproval                <-- REAL, pure decision function (src/runtime/fedos_dynamic_loader_dev_approval.ts,
+("Dynamic Loader Dev Approval")                  Stage 578), fixed { approvalState: "PlanningOnly", approved: false,
+     |                                          reason: "DevApprovalPending" } -- NO side effects, NO import() of any
+     |                                          kind written, NEVER references the generated JS glue
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic)
+     |                                          by the Dev Approval; the arrow above is positional (Stage 577's
+     |                                          eight-condition table), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_dynamic_loader_dev_approval.ts`, directly or indirectly, and no
+dev-only flag, environment variable, or code path anywhere in this
+repository consults this approval's answer.
+`docs/runtime_dynamic_loader_dev_approval.md` §1 conditions #2/#3/#7/#8
+(dev build only, disabled in production, prohibited in Worker,
+prohibited in production deploy) remain unimplemented as MECHANISMS —
+only the DECISION that they must all hold is recorded here.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+580) read `dynamicLoaderDevApprovalState()`/
+`dynamicLoaderDevApproved()`/`dynamicLoaderDevReason()` for DISPLAY
+only — `"PlanningOnly"`/`false`/`"DevApprovalPending"`, matching every
+other leaf in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_dynamic_loader_gate.ts` nor
+`fedos_dynamic_loader_dev_approval.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; no static `import` and no dynamic `import()`
+of the generated JS glue anywhere in this repository; no generated
+file edited or committed; `encrypt`/`decrypt` unchanged; NIP-17/NIP-59
+unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
+`"Reviewed"`/`"Committed"`/`"PrebuildRequired"`/`"OptionalLoader"`/
+`"Open"`/`"Granted"`/`"Loaded"`/`"Active"`/`"FailOpen"` never reached;
+Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
+`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_dynamic_loader_dev_approval.md` (Stage 577) — the
+  eight dev-only conditions a future dynamic loader activation would
+  need to satisfy, all currently unmet.
+- `src/runtime/fedos_dynamic_loader_dev_approval.ts` (Stage 578–579) —
+  the approval's real, fixed-value implementation and its wiring from
+  `fedos_dynamic_loader_gate.ts`.
 - `docs/runtime_dynamic_loader_gate.md` (Stage 569) — the eight
   minimum conditions a future dynamic loader implementation would need
   to satisfy, all currently unmet.

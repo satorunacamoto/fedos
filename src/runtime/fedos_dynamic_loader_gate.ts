@@ -18,9 +18,19 @@
  * `createBuildTimeLoaderStrategy()` to CALL
  * `createDynamicLoaderGate()` — the result is DISCARDED, and
  * `createBuildTimeLoaderStrategy()`'s own return value stays UNCHANGED
- * (`strategy: "DynamicLoaderPlanned"`). That is the ONLY caller of
- * this file anywhere in this repository; neither `create_runtime.ts`
- * nor `src/worker.ts` references it, directly or indirectly.
+ * (`strategy: "DynamicLoaderPlanned"`). That is one caller of this
+ * file; neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 579 extends `createDynamicLoaderGate()` DOWNWARD only: it now
+ * calls `createDynamicLoaderDevApproval()`
+ * (`fedos_dynamic_loader_dev_approval.ts`, Stage 578) — then DISCARDS
+ * the result and returns its OWN, unchanged `{ gateState:
+ * "PlanningOnly", dynamicLoaderAllowed: false, reason:
+ * "DynamicLoaderGatePending" }` answer. This mirrors the SAME "reach
+ * one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571 already established
+ * ten times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createDynamicLoaderGate()` is PURE, synchronous, takes no
@@ -56,6 +66,8 @@
  *     constructed anywhere in this file.
  */
 
+import { createDynamicLoaderDevApproval } from "./fedos_dynamic_loader_dev_approval.js";
+
 /**
  * The Dynamic Loader Gate's own coarse state. `"PlanningOnly"` is the
  * ONLY value this stage's implementation ever produces; `"Open"` is
@@ -90,11 +102,24 @@ export interface FedosDynamicLoaderGate {
  * generated JS glue, and never writes a dynamic `import()`.
  */
 export function createDynamicLoaderGate(): FedosDynamicLoaderGate {
+  reachDynamicLoaderDevApproval(); // result discarded -- the generated JS glue is never imported
   return {
     gateState: "PlanningOnly",
     dynamicLoaderAllowed: false,
     reason: "DynamicLoaderGatePending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createDynamicLoaderDevApproval()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The Dev
+ * Approval itself never references the generated JS glue or writes
+ * `import()` of any kind either.
+ */
+function reachDynamicLoaderDevApproval(): void {
+  createDynamicLoaderDevApproval();
 }
 
 /**

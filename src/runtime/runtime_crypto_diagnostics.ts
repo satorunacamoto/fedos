@@ -350,6 +350,15 @@ import {
   dynamicLoaderGateReason as fedosDynamicLoaderGateReason,
   dynamicLoaderGateState as fedosDynamicLoaderGateState,
 } from "./fedos_dynamic_loader_gate.js";
+import type {
+  FedosDynamicLoaderDevApprovalReason,
+  FedosDynamicLoaderDevApprovalState,
+} from "./fedos_dynamic_loader_dev_approval.js";
+import {
+  dynamicLoaderDevApprovalState as fedosDynamicLoaderDevApprovalState,
+  dynamicLoaderDevApproved as fedosDynamicLoaderDevApproved,
+  dynamicLoaderDevReason as fedosDynamicLoaderDevReason,
+} from "./fedos_dynamic_loader_dev_approval.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -943,6 +952,25 @@ export interface RuntimeCryptoActivationStatus {
    * `"DynamicLoaderGatePending"` in this stage.
    */
   readonly dynamicLoaderGateReason: FedosDynamicLoaderGateReason;
+  /**
+   * The Dynamic Loader Dev Approval's own fixed coarse state —
+   * `dynamicLoaderDevApprovalState()`'s own answer
+   * (`src/runtime/fedos_dynamic_loader_dev_approval.ts`, Stage
+   * 578/580). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly dynamicLoaderDevApprovalState: FedosDynamicLoaderDevApprovalState;
+  /**
+   * Whether the dev-only dynamic loader is currently approved —
+   * `dynamicLoaderDevApproved()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly dynamicLoaderDevApproved: boolean;
+  /**
+   * WHY the dev-only dynamic loader is not currently approved —
+   * `dynamicLoaderDevReason()`'s own answer. Fixed
+   * `"DevApprovalPending"` in this stage.
+   */
+  readonly dynamicLoaderDevReason: FedosDynamicLoaderDevApprovalReason;
 }
 
 /**
@@ -1048,5 +1076,8 @@ export function runtimeCryptoActivationStatus(
     dynamicLoaderGateState: fedosDynamicLoaderGateState(),
     dynamicLoaderAllowed: fedosDynamicLoaderAllowed(),
     dynamicLoaderGateReason: fedosDynamicLoaderGateReason(),
+    dynamicLoaderDevApprovalState: fedosDynamicLoaderDevApprovalState(),
+    dynamicLoaderDevApproved: fedosDynamicLoaderDevApproved(),
+    dynamicLoaderDevReason: fedosDynamicLoaderDevReason(),
   };
 }
