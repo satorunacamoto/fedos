@@ -198,6 +198,17 @@
  * 396), which answer "has this Provider-internal abstraction's own
  * build step ever executed". Neither new field performs a filesystem
  * check — both are hand-fixed constants.
+ *
+ * Stage 588 adds `cryptoInitializationMode`/`cryptoInitializationAllowed`/
+ * `cryptoInitialized`/`cryptoInitializationReason`
+ * (`fedos_explicit_crypto_initialization.ts`'s
+ * `cryptoInitializationMode()`/`cryptoInitializationAllowed()`/
+ * `cryptoInitialized()`/`cryptoInitializationReason()`, Stage 586/587)
+ * — the standing "explicit initialization only" design's own fixed
+ * answers: `"ExplicitInitialization"`/`false`/`false`/
+ * `"InitializationApprovalPending"`. None of these expose any
+ * implementation detail beyond these values; no payload, plaintext,
+ * ciphertext, or key material is ever involved.
  */
 
 import type {
@@ -359,6 +370,16 @@ import {
   dynamicLoaderDevApproved as fedosDynamicLoaderDevApproved,
   dynamicLoaderDevReason as fedosDynamicLoaderDevReason,
 } from "./fedos_dynamic_loader_dev_approval.js";
+import type {
+  FedosCryptoInitializationMode,
+  FedosCryptoInitializationReason,
+} from "./fedos_explicit_crypto_initialization.js";
+import {
+  cryptoInitializationAllowed as fedosCryptoInitializationAllowed,
+  cryptoInitializationMode as fedosCryptoInitializationMode,
+  cryptoInitializationReason as fedosCryptoInitializationReason,
+  cryptoInitialized as fedosCryptoInitialized,
+} from "./fedos_explicit_crypto_initialization.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -971,6 +992,32 @@ export interface RuntimeCryptoActivationStatus {
    * `"DevApprovalPending"` in this stage.
    */
   readonly dynamicLoaderDevReason: FedosDynamicLoaderDevApprovalReason;
+  /**
+   * The Explicit Crypto Initialization design's own fixed operating
+   * mode — `cryptoInitializationMode()`'s own answer
+   * (`src/runtime/fedos_explicit_crypto_initialization.ts`, Stage
+   * 586/588). Fixed `"ExplicitInitialization"` in this stage — there
+   * is no reachable auto/implicit-load alternative anywhere in this
+   * arc.
+   */
+  readonly cryptoInitializationMode: FedosCryptoInitializationMode;
+  /**
+   * Whether a (future) explicit initialization call is currently
+   * allowed — `cryptoInitializationAllowed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly cryptoInitializationAllowed: boolean;
+  /**
+   * Whether an explicit initialization call has ever actually run —
+   * `cryptoInitialized()`'s own answer. Fixed `false` in this stage.
+   */
+  readonly cryptoInitialized: boolean;
+  /**
+   * WHY a (future) explicit initialization call is not currently
+   * allowed — `cryptoInitializationReason()`'s own answer. Fixed
+   * `"InitializationApprovalPending"` in this stage.
+   */
+  readonly cryptoInitializationReason: FedosCryptoInitializationReason;
 }
 
 /**
@@ -1079,5 +1126,9 @@ export function runtimeCryptoActivationStatus(
     dynamicLoaderDevApprovalState: fedosDynamicLoaderDevApprovalState(),
     dynamicLoaderDevApproved: fedosDynamicLoaderDevApproved(),
     dynamicLoaderDevReason: fedosDynamicLoaderDevReason(),
+    cryptoInitializationMode: fedosCryptoInitializationMode(),
+    cryptoInitializationAllowed: fedosCryptoInitializationAllowed(),
+    cryptoInitialized: fedosCryptoInitialized(),
+    cryptoInitializationReason: fedosCryptoInitializationReason(),
   };
 }

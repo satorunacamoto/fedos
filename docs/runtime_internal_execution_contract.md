@@ -875,8 +875,102 @@ unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
 Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
 `package.json` dependency added.
 
+## Update — Stage 585–589: Explicit Crypto Initialization, revised diagram
+
+Stage 585 (`docs/runtime_explicit_crypto_initialization.md`) fixes SIX
+permanent rules for WHEN the generated JS glue/WASM may ever be
+loaded, one level closer to Runtime's own call surface than the Dev
+Approval's "under what conditions may activation ever happen": no
+auto-load at startup, no implicit load on `encrypt`/`decrypt`, only a
+future `initCrypto()`-style explicit call may ever load anything,
+Runtime never knows WASM/JS Glue directly, everything routes through
+Loader/Backend, Worker out of scope. Stage 586 adds
+`src/runtime/fedos_explicit_crypto_initialization.ts` — a pure,
+fixed-value DESIGN RECORD naming `createExplicitCryptoInitialization()`,
+fixed `{ mode: "ExplicitInitialization", initializationAllowed: false,
+initialized: false, reason: "InitializationApprovalPending" }` — with
+NO side effects and NO `import()` of any kind (static or dynamic)
+written anywhere in this file. Stage 587 wires
+`createDynamicLoaderDevApproval()`
+(`fedos_dynamic_loader_dev_approval.ts`) to CALL
+`createExplicitCryptoInitialization()` — the result is DISCARDED and
+`createDynamicLoaderDevApproval()`'s own return value is UNCHANGED
+(`approved: false`), the SAME "reach one link deeper, keep your own
+answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579 already established
+eleven times over.
+
+This revises the Stage 577–581 diagram — Explicit Crypto Initialization
+now sits between Dynamic Loader Dev Approval and Generated JS Glue,
+with a purely POSITIONAL "Dynamic Import" box named beneath it (the
+exact `import()` call a future dynamic loader would eventually write,
+per `docs/runtime_build_time_loader_strategy.md`'s Option C — still
+never written anywhere in this repository):
+
+```
+FedosDynamicLoaderDevApproval                <-- REAL, pure decision function (src/runtime/fedos_dynamic_loader_dev_approval.ts,
+("Dynamic Loader Dev Approval")                   Stage 578), REAL wiring: createDynamicLoaderDevApproval() calls
+     |                                          createExplicitCryptoInitialization(), discards the result (Stage 587)
+     v
+FedosExplicitCryptoInitialization             <-- REAL, pure decision function (src/runtime/fedos_explicit_crypto_initialization.ts,
+("Explicit Crypto Initialization")                Stage 586), fixed { mode: "ExplicitInitialization", initializationAllowed:
+     |                                          false, initialized: false, reason: "InitializationApprovalPending" } --
+     |                                          NO side effects, NO import() of any kind written, NEVER references the
+     |                                          generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual, naming what a
+     :  future, separate, explicitly-reviewed stage would eventually write, never a real wire)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_explicit_crypto_initialization.ts`, directly or indirectly, and
+no dev-only flag, environment variable, or code path anywhere in this
+repository consults this design record's answer.
+`docs/runtime_explicit_crypto_initialization.md` §1 rule #3 (only a
+future explicit `initCrypto()`-style call may ever load anything)
+remains unimplemented as a MECHANISM — only the DECISION that it must
+hold is recorded here.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+588) read `cryptoInitializationMode()`/`cryptoInitializationAllowed()`/
+`cryptoInitialized()`/`cryptoInitializationReason()` for DISPLAY only —
+`"ExplicitInitialization"`/`false`/`false`/
+`"InitializationApprovalPending"`, matching every other leaf in this
+arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_dynamic_loader_dev_approval.ts` nor
+`fedos_explicit_crypto_initialization.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; no static `import` and no dynamic `import()`
+of the generated JS glue anywhere in this repository; no generated
+file edited or committed; `encrypt`/`decrypt` unchanged; NIP-17/NIP-59
+unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
+`"Reviewed"`/`"Committed"`/`"PrebuildRequired"`/`"OptionalLoader"`/
+`"Open"`/`"Granted"`/`"Loaded"`/`"Active"`/`"FailOpen"` never reached;
+Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/
+`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_explicit_crypto_initialization.md` (Stage 585) — the
+  six permanent rules for WHEN the generated JS glue/WASM may ever be
+  loaded, all currently unimplemented as mechanisms.
+- `src/runtime/fedos_explicit_crypto_initialization.ts` (Stage
+  586–587) — the design record's real, fixed-value implementation and
+  its wiring from `fedos_dynamic_loader_dev_approval.ts`.
 - `docs/runtime_dynamic_loader_dev_approval.md` (Stage 577) — the
   eight dev-only conditions a future dynamic loader activation would
   need to satisfy, all currently unmet.

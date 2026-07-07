@@ -19,9 +19,19 @@
  * `createDynamicLoaderGate()` to CALL
  * `createDynamicLoaderDevApproval()` — the result is DISCARDED, and
  * `createDynamicLoaderGate()`'s own return value stays UNCHANGED
- * (`dynamicLoaderAllowed: false`). That is the ONLY caller of this
- * file anywhere in this repository; neither `create_runtime.ts` nor
- * `src/worker.ts` references it, directly or indirectly.
+ * (`dynamicLoaderAllowed: false`). That is one caller of this file;
+ * neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 587 extends `createDynamicLoaderDevApproval()` DOWNWARD only:
+ * it now calls `createExplicitCryptoInitialization()`
+ * (`fedos_explicit_crypto_initialization.ts`, Stage 586) — then
+ * DISCARDS the result and returns its OWN, unchanged `{
+ * approvalState: "PlanningOnly", approved: false, reason:
+ * "DevApprovalPending" }` answer. This mirrors the SAME "reach one
+ * link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571/579 already
+ * established eleven times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createDynamicLoaderDevApproval()` is PURE, synchronous, takes
@@ -55,6 +65,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createExplicitCryptoInitialization } from "./fedos_explicit_crypto_initialization.js";
 
 /**
  * The Dynamic Loader Dev Approval's own coarse state. `"PlanningOnly"`
@@ -90,11 +102,24 @@ export interface FedosDynamicLoaderDevApproval {
  * generated JS glue, and never writes `import()` of any kind.
  */
 export function createDynamicLoaderDevApproval(): FedosDynamicLoaderDevApproval {
+  reachExplicitCryptoInitialization(); // result discarded -- the generated JS glue is never imported
   return {
     approvalState: "PlanningOnly",
     approved: false,
     reason: "DevApprovalPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createExplicitCryptoInitialization()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+ * Explicit Crypto Initialization design itself never references the
+ * generated JS glue or writes `import()` of any kind either.
+ */
+function reachExplicitCryptoInitialization(): void {
+  createExplicitCryptoInitialization();
 }
 
 /**

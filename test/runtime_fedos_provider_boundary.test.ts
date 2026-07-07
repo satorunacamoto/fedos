@@ -220,6 +220,10 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       dynamicLoaderDevApprovalState: "PlanningOnly",
       dynamicLoaderDevApproved: false,
       dynamicLoaderDevReason: "DevApprovalPending",
+      cryptoInitializationMode: "ExplicitInitialization",
+      cryptoInitializationAllowed: false,
+      cryptoInitialized: false,
+      cryptoInitializationReason: "InitializationApprovalPending",
     });
   });
 
