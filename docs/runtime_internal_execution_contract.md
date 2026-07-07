@@ -592,8 +592,79 @@ unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 553–557: Generated Artifact Distribution Policy, revised diagram
+
+Stage 553 (`docs/runtime_generated_artifact_distribution_policy.md`)
+fixes a standing PROJECT POLICY the arc above left open: whether the
+generated `.wasm`/JS glue pair should ever be committed to version
+control (Option A) or produced fresh at build time on every machine
+that needs it (Option B). This repository adopts Option B — `/pkg/`
+stays gitignored (Stage 451/69), and a fresh clone requires `npm run
+build:wasm` before the generated artifact exists at all. Stage 554
+adds `src/runtime/fedos_generated_artifact_distribution.ts` — a pure,
+fixed-value DISTRIBUTION POLICY naming
+`createGeneratedArtifactDistribution()`, fixed `{ distributionMode:
+"BuildTimeGenerated", artifactCommitted: false, staticImportSafe:
+false, reason: "GeneratedArtifactNotCommitted" }`. Stage 555 wires
+`createStaticImportActivationReview()`
+(`fedos_static_import_activation_review.ts`) to CALL
+`createGeneratedArtifactDistribution()` — the result is DISCARDED and
+`createStaticImportActivationReview()`'s own return value is
+UNCHANGED, the SAME "reach one link deeper, keep your own answer"
+pattern Stage 503/511/519/527/535/539/547 already established seven
+times over.
+
+This revises the Stage 545–549 diagram — Generated Artifact
+Distribution Policy now sits between Static Import Activation Review
+and Generated JS Glue:
+
+```
+FedosStaticImportActivationReview           <-- REAL, pure decision function (src/runtime/fedos_static_import_activation_review.ts,
+("Static Import Activation Review")             Stage 546), REAL wiring: createStaticImportActivationReview() calls
+     |                                          createGeneratedArtifactDistribution(), discards the result (Stage 555)
+     v
+FedosGeneratedArtifactDistribution           <-- REAL, pure decision function (src/runtime/fedos_generated_artifact_distribution.ts,
+("Generated Artifact Distribution Policy")       Stage 554), fixed { distributionMode: "BuildTimeGenerated",
+     |                                          artifactCommitted: false, staticImportSafe: false, reason:
+     |                                          "GeneratedArtifactNotCommitted" } -- NEVER references the generated JS glue
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported by the Distribution
+     |                                          Policy; the arrow above is positional (Stage 553's Option A/B
+     |                                          comparison), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, initSync/default init, and
+                                                 import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+556) read `generatedArtifactDistributionMode()`/
+`generatedArtifactCommitted()`/`staticImportSafe()` for DISPLAY only —
+`"BuildTimeGenerated"`/`false`/`false`, matching every other leaf in
+this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_static_import_activation_review.ts` nor
+`fedos_generated_artifact_distribution.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; `initSync`/the generated JS glue's default
+export never called; no `fetch`/dynamic `import()`; no generated file
+edited or committed; `packages/fedos-core-rust/.gitignore`'s `/pkg/`
+rule unchanged; `encrypt`/`decrypt` unchanged; `"Allowed"`/
+`"Approved"`/`"Ready"`/`"Present"`/`"Reviewed"`/`"Committed"`/
+`"Loaded"`/`"Active"`/`"FailOpen"` never reached; Rust public API
+unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
+added.
+
 ## See also
 
+- `docs/runtime_generated_artifact_distribution_policy.md` (Stage 553)
+  — the standing Option A vs. Option B distribution policy, and why
+  this repository adopts Option B (build-time generation only).
+- `src/runtime/fedos_generated_artifact_distribution.ts` (Stage
+  554–555) — the Distribution Policy's real, fixed-value
+  implementation and its wiring from
+  `fedos_static_import_activation_review.ts`.
 - `docs/runtime_static_import_activation_review.md` (Stage 545) — the
   final gate before real static import, gathering every prior gate's
   answer into one named activation decision.

@@ -244,6 +244,12 @@ import {
   staticImportActivationReason as fedosStaticImportActivationReason,
   staticImportActivationState as fedosStaticImportActivationState,
 } from "./fedos_static_import_activation_review.js";
+import type { FedosGeneratedArtifactDistributionMode } from "./fedos_generated_artifact_distribution.js";
+import {
+  generatedArtifactCommitted as fedosGeneratedArtifactCommitted,
+  generatedArtifactDistributionMode as fedosGeneratedArtifactDistributionMode,
+  staticImportSafe as fedosStaticImportSafe,
+} from "./fedos_generated_artifact_distribution.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -691,6 +697,25 @@ export interface WorkerCryptoActivationStatus {
    * `"RuntimeActivationReviewPending"` in this stage.
    */
   readonly staticImportActivationReason: FedosStaticImportActivationReason;
+  /**
+   * This repository's standing Generated Artifact Distribution
+   * Policy mode — `generatedArtifactDistributionMode()`'s own answer
+   * (`src/runtime/fedos_generated_artifact_distribution.ts`, Stage
+   * 554/556). Fixed `"BuildTimeGenerated"` (Option B) in this stage.
+   */
+  readonly generatedArtifactDistributionMode: FedosGeneratedArtifactDistributionMode;
+  /**
+   * Whether the generated artifact is committed to version control —
+   * `generatedArtifactCommitted()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly generatedArtifactCommitted: boolean;
+  /**
+   * Whether a static import is currently safe given this
+   * distribution policy — `staticImportSafe()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly staticImportSafe: boolean;
 }
 
 /**
@@ -786,5 +811,8 @@ export function workerCryptoActivationStatus(
     staticImportActivationState: fedosStaticImportActivationState(),
     staticImportActivationApproved: fedosStaticImportActivationApproved(),
     staticImportActivationReason: fedosStaticImportActivationReason(),
+    generatedArtifactDistributionMode: fedosGeneratedArtifactDistributionMode(),
+    generatedArtifactCommitted: fedosGeneratedArtifactCommitted(),
+    staticImportSafe: fedosStaticImportSafe(),
   };
 }

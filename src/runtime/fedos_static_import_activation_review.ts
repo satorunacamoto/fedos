@@ -20,9 +20,19 @@
  * `createStaticImportActivationReview()` — the result is DISCARDED,
  * and `createGeneratedArtifactPresence()`'s own return value stays
  * UNCHANGED (`{ state: "PlanningOnly", present: false, reason:
- * "ArtifactNotGeneratedForRuntime" }`). That is the ONLY caller of
- * this file anywhere in this repository; neither `create_runtime.ts`
- * nor `src/worker.ts` references it, directly or indirectly.
+ * "ArtifactNotGeneratedForRuntime" }`). That is one caller of this
+ * file; neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 555 extends `createStaticImportActivationReview()` DOWNWARD
+ * only: it now calls `createGeneratedArtifactDistribution()`
+ * (`fedos_generated_artifact_distribution.ts`, Stage 554) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", approved: false, reason:
+ * "RuntimeActivationReviewPending" }` answer. This mirrors the SAME
+ * "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547 already established seven times
+ * over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createStaticImportActivationReview()` is PURE, synchronous,
@@ -49,6 +59,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createGeneratedArtifactDistribution } from "./fedos_generated_artifact_distribution.js";
 
 /**
  * The Static Import Activation Review's own coarse state.
@@ -85,11 +97,24 @@ export interface FedosStaticImportActivationReview {
  * generated JS glue in any way.
  */
 export function createStaticImportActivationReview(): FedosStaticImportActivationReview {
+  reachGeneratedArtifactDistribution(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     approved: false,
     reason: "RuntimeActivationReviewPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls
+ * `createGeneratedArtifactDistribution()`. The result is discarded; it
+ * is never passed to `WebAssembly.instantiate`/`compile`, `initSync`/
+ * the default init export, `packages/fedos-core-rust`, Runtime, or
+ * Worker. The Distribution Policy itself never references the
+ * generated JS glue either.
+ */
+function reachGeneratedArtifactDistribution(): void {
+  createGeneratedArtifactDistribution();
 }
 
 /**

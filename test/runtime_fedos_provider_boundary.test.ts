@@ -208,6 +208,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       staticImportActivationState: "PlanningOnly",
       staticImportActivationApproved: false,
       staticImportActivationReason: "RuntimeActivationReviewPending",
+      generatedArtifactDistributionMode: "BuildTimeGenerated",
+      generatedArtifactCommitted: false,
+      staticImportSafe: false,
     });
   });
 
