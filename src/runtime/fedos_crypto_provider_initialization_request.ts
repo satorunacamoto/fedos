@@ -18,10 +18,20 @@
  * `createCryptoProviderFacadeBoundary()` to CALL
  * `createCryptoProviderInitializationRequest()` — the result is
  * DISCARDED, and `createCryptoProviderFacadeBoundary()`'s own return
- * value stays UNCHANGED (`providerConnected: false`). That is the
- * ONLY caller of this file anywhere in this repository; neither
- * `create_runtime.ts` nor `src/worker.ts` references it, directly or
- * indirectly.
+ * value stays UNCHANGED (`providerConnected: false`). That is one
+ * caller of this file; neither `create_runtime.ts` nor
+ * `src/worker.ts` references it, directly or indirectly.
+ *
+ * Stage 619 extends `createCryptoProviderInitializationRequest()`
+ * DOWNWARD only: it now calls
+ * `createProviderInitializationApproval()`
+ * (`fedos_provider_initialization_approval.ts`, Stage 618) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", requested: false, allowed: false, reason:
+ * "ProviderInitializationRequestPending" }` answer. This mirrors the
+ * SAME "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603
+ * already established fourteen times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createCryptoProviderInitializationRequest()` is PURE,
@@ -59,6 +69,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createProviderInitializationApproval } from "./fedos_provider_initialization_approval.js";
 
 /**
  * The Provider Initialization Request's own coarse planning state.
@@ -98,12 +110,25 @@ export interface FedosCryptoProviderInitializationRequest {
  * and never writes `import()` of any kind.
  */
 export function createCryptoProviderInitializationRequest(): FedosCryptoProviderInitializationRequest {
+  reachProviderInitializationApproval(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     requested: false,
     allowed: false,
     reason: "ProviderInitializationRequestPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createProviderInitializationApproval()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+ * Provider Initialization Approval itself never references the
+ * generated JS glue or writes `import()` of any kind either.
+ */
+function reachProviderInitializationApproval(): void {
+  createProviderInitializationApproval();
 }
 
 /**
