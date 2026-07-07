@@ -196,6 +196,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       staticImportPlanState: "PlanningOnly",
       staticImportTarget: "packages/fedos-core-rust/pkg/fedos_core_rust.js",
       staticImportAllowed: false,
+      staticImportReviewState: "ReviewedAndBlocked",
+      staticImportReviewApproved: false,
+      staticImportReviewReason: "GeneratedArtifactNotCommitted",
     });
   });
 

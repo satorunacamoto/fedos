@@ -208,6 +208,15 @@ import {
   staticImportPlanState as fedosStaticImportPlanState,
   staticImportTarget as fedosStaticImportTarget,
 } from "./fedos_wasm_static_import_plan.js";
+import type {
+  FedosWasmStaticImportReviewReason,
+  FedosWasmStaticImportReviewState,
+} from "./fedos_wasm_static_import_review.js";
+import {
+  staticImportReviewApproved as fedosStaticImportReviewApproved,
+  staticImportReviewReason as fedosStaticImportReviewReason,
+  staticImportReviewState as fedosStaticImportReviewState,
+} from "./fedos_wasm_static_import_review.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -580,6 +589,25 @@ export interface WorkerCryptoActivationStatus {
    * stage.
    */
   readonly staticImportAllowed: boolean;
+  /**
+   * The Static Import Safety Review's own fixed coarse state —
+   * `staticImportReviewState()`'s own answer
+   * (`src/runtime/fedos_wasm_static_import_review.ts`, Stage 526/528).
+   * Fixed `"ReviewedAndBlocked"` in this stage.
+   */
+  readonly staticImportReviewState: FedosWasmStaticImportReviewState;
+  /**
+   * Whether the static import is currently approved by the Safety
+   * Review — `staticImportReviewApproved()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly staticImportReviewApproved: boolean;
+  /**
+   * WHY the static import is not currently approved —
+   * `staticImportReviewReason()`'s own answer. Fixed
+   * `"GeneratedArtifactNotCommitted"` in this stage.
+   */
+  readonly staticImportReviewReason: FedosWasmStaticImportReviewReason;
 }
 
 /**
@@ -663,5 +691,8 @@ export function workerCryptoActivationStatus(
     staticImportPlanState: fedosStaticImportPlanState(),
     staticImportTarget: fedosStaticImportTarget(),
     staticImportAllowed: fedosStaticImportAllowed(),
+    staticImportReviewState: fedosStaticImportReviewState(),
+    staticImportReviewApproved: fedosStaticImportReviewApproved(),
+    staticImportReviewReason: fedosStaticImportReviewReason(),
   };
 }

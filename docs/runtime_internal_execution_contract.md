@@ -361,8 +361,71 @@ edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
 unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 525–529: Static Import Safety Review, revised diagram
+
+Stage 525 (`docs/runtime_wasm_static_import_safety_review.md`) is a
+dedicated SAFETY REVIEW of what would break, and why, if the static
+`import` statement named by Stage 517 were ever written: the generated
+JS glue is a gitignored, never-committed build artifact
+(`packages/fedos-core-rust/.gitignore`, Stage 451), so a static import
+of it would break every environment that has not just run `npm run
+build:wasm` locally. Stage 526 adds
+`src/runtime/fedos_wasm_static_import_review.ts` — a pure, fixed-value
+STATIC IMPORT SAFETY REVIEW naming `reviewStaticImport()`, fixed
+`{ approved: false, reason: "GeneratedArtifactNotCommitted" }`. Stage
+527 wires `FedosWasmStaticImportPlanSkeleton.planStaticImport()`
+(`fedos_wasm_static_import_plan.ts`) to CALL `reviewStaticImport()` —
+the result is DISCARDED and `planStaticImport()`'s own return value is
+UNCHANGED, the SAME "reach one link deeper, keep your own answer"
+pattern Stage 503/511/519 already established three times over.
+
+This revises the Stage 517–521 diagram — Static Import Safety Review
+now sits between Static Import Plan and Generated JS Glue:
+
+```
+FedosWasmStaticImportPlan                  <-- REAL placeholder (src/runtime/fedos_wasm_static_import_plan.ts,
+("Static Import Plan")                          Stage 518), REAL wiring: planStaticImport() calls
+     |                                          reviewStaticImport(), discards the result (Stage 527)
+     v
+FedosWasmStaticImportReview                <-- REAL, pure decision function (src/runtime/fedos_wasm_static_import_review.ts,
+("Static Import Review")                        Stage 526), fixed { approved: false, reason:
+     |                                          "GeneratedArtifactNotCommitted" }; state fixed "ReviewedAndBlocked"
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported by the Static
+     |                                          Import Review; the arrow above is positional (Stage 525's risk/
+     |                                          policy analysis), not a real import
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, initSync/default init, and
+                                                 import() all remain PROHIBITED
+```
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+528) read `staticImportReviewState()`/`staticImportReviewApproved()`/
+`staticImportReviewReason()` for DISPLAY only — `"ReviewedAndBlocked"`/
+`false`/`"GeneratedArtifactNotCommitted"`, matching every other leaf
+in this arc.
+
+**Still true after this update**: no Runtime/Worker connection of any
+kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_wasm_static_import_plan.ts` nor
+`fedos_wasm_static_import_review.ts`); `WebAssembly.instantiate`/
+`compile` never invoked; `initSync`/the generated JS glue's default
+export never called; no `fetch`/dynamic `import()`; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged; `"Allowed"`/
+`"Approved"`/`"Loaded"`/`"Active"`/`"FailOpen"` never reached; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
+- `docs/runtime_wasm_static_import_safety_review.md` (Stage 525) — the
+  safety review of what would break if the static import were written
+  today, and why the generated artifact can never be committed as a
+  workaround.
+- `src/runtime/fedos_wasm_static_import_review.ts` (Stage 526–527) —
+  the Safety Review's real, fixed-value implementation and its wiring
+  from `FedosWasmStaticImportPlanSkeleton.planStaticImport()`.
 - `docs/runtime_wasm_static_import_plan.md` (Stage 517) — the exact
   static import target and expected exports.
 - `src/runtime/fedos_wasm_static_import_plan.ts` (Stage 518–519) —

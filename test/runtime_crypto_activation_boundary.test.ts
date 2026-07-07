@@ -255,6 +255,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       staticImportPlanState: "PlanningOnly",
       staticImportTarget: "packages/fedos-core-rust/pkg/fedos_core_rust.js",
       staticImportAllowed: false,
+      staticImportReviewState: "ReviewedAndBlocked",
+      staticImportReviewApproved: false,
+      staticImportReviewReason: "GeneratedArtifactNotCommitted",
     });
   });
 

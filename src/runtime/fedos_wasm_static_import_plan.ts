@@ -20,9 +20,17 @@
  * `FedosWasmStaticImportPlan` and call it — the result is DISCARDED,
  * and `evaluateWasmLoaderImportPolicy()`'s own return value stays
  * UNCHANGED (`{ allowed: false, reason: "BlockedByPolicy" }`). That is
- * the ONLY caller of this file anywhere in this repository; neither
- * `create_runtime.ts` nor `src/worker.ts` references it, directly or
- * indirectly.
+ * one caller of this file; `fedos_wasm_loader_import_policy.ts` and
+ * this codebase's own test suite are the only callers anywhere in this
+ * repository — neither `create_runtime.ts` nor `src/worker.ts`
+ * references it, directly or indirectly.
+ *
+ * Stage 527 extends `planStaticImport()` DOWNWARD only: it now calls
+ * `reviewStaticImport()` (`fedos_wasm_static_import_review.ts`, Stage
+ * 526) — then DISCARDS the result and returns its OWN, unchanged
+ * `"BlockedByPolicy"` answer. This mirrors the SAME "reach one link
+ * deeper, keep your own answer" pattern Stage 503/511/519 already
+ * established three times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - Every function/method in this file is PURE, synchronous, and
@@ -48,6 +56,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { reviewStaticImport } from "./fedos_wasm_static_import_review.js";
 
 /**
  * The exact path a future static `import` would target — the SAME
@@ -117,12 +127,24 @@ export class FedosWasmStaticImportPlanSkeleton implements FedosWasmStaticImportP
   }
 
   planStaticImport(): FedosWasmStaticImportDecision {
+    reachStaticImportReview(); // result discarded -- the generated JS glue is never imported
     return {
       state: "BlockedByPolicy",
       target: FEDOS_WASM_STATIC_IMPORT_TARGET,
       reason: "FedOS WASM static import plan does not perform the import in this stage: fail-closed policy blocks it",
     };
   }
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `reviewStaticImport()`. The result
+ * is discarded; it is never passed to `WebAssembly.instantiate`/
+ * `compile`, `initSync`/the default init export, `packages/fedos-core-rust`,
+ * Runtime, or Worker. The Safety Review itself never imports anything
+ * either.
+ */
+function reachStaticImportReview(): void {
+  reviewStaticImport();
 }
 
 /**
