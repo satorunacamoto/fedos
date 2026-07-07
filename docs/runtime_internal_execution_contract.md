@@ -1079,8 +1079,195 @@ unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/
 never reached; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 601–605: Crypto Provider / Facade Boundary, revised diagram
+
+Stage 601 (`docs/runtime_crypto_provider_facade_boundary.md`) fixes a
+dedicated BOUNDARY object sitting exactly at the Facade's own seam —
+recording whether the Provider side (`providerConnected`) and the
+Facade side (`facadeConnected`) have ever actually been connected to
+one another, kept deliberately separate from
+`FedosCryptoLoaderFacade`'s own `state`/`initialized` so the two
+questions ("does a Provider know how to reach the Facade" vs. "is the
+Facade itself ready") can be reasoned about independently. Stage 602
+adds `src/runtime/fedos_crypto_provider_facade_boundary.ts` — a pure,
+fixed-value BOUNDARY naming `createCryptoProviderFacadeBoundary()`,
+fixed `{ state: "PlanningOnly", providerConnected: false,
+facadeConnected: false, reason: "ProviderFacadeConnectionPending" }`
+— with NO side effects and NO `import()` of any kind (static or
+dynamic) written anywhere in this file. Stage 603 wires
+`createCryptoLoaderFacade()` (`fedos_crypto_loader_facade.ts`) to CALL
+`createCryptoProviderFacadeBoundary()` — the result is DISCARDED and
+`createCryptoLoaderFacade()`'s own return value is UNCHANGED
+(`initialized: false`), the SAME "reach one link deeper, keep your
+own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595 already
+established thirteen times over.
+
+This revises the Stage 593–597 diagram — Provider/Facade Boundary now
+sits between Crypto Loader Facade and the still-positional Dynamic
+Import box:
+
+```
+FedosCryptoLoaderFacade                    <-- REAL, pure decision function (src/runtime/fedos_crypto_loader_facade.ts,
+("Crypto Loader Facade")                       Stage 594), REAL wiring: createCryptoLoaderFacade() calls
+     |                                          createCryptoProviderFacadeBoundary(), discards the result (Stage 603)
+     v
+FedosCryptoProviderFacadeBoundary          <-- REAL, pure decision function (src/runtime/fedos_crypto_provider_facade_boundary.ts,
+("Provider/Facade Boundary")                   Stage 602), fixed { state: "PlanningOnly", providerConnected: false,
+     |                                          facadeConnected: false, reason: "ProviderFacadeConnectionPending" } -- NO
+     |                                          side effects, NO import() of any kind written, NEVER references the
+     |                                          generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_crypto_provider_facade_boundary.ts`, directly or indirectly, and
+no `RuntimeCryptoProvider` implementation calls
+`createCryptoProviderFacadeBoundary()`.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+604) read `providerFacadeBoundaryState()`/`providerFacadeConnected()`/
+`providerFacadeReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`"ProviderFacadeConnectionPending"`, matching
+every other leaf in this arc.
+
+## Update — Stage 609–613: Provider Initialization Request Planning, revised diagram, target architecture extended
+
+Stage 609 (`docs/runtime_crypto_provider_initialization_request.md`)
+is PROVIDER-SIDE PLANNING one level ABOVE the Boundary: what a future
+Provider implementation would actually HAND to the Boundary once
+connected. It fixes the extended TARGET architecture:
+
+```
+Crypto Provider
+        │
+        ▼
+Provider Initialization Request
+        │
+        ▼
+Provider/Facade Boundary
+        │
+        ▼
+Crypto Loader Facade
+        │
+        ▼
+STOP
+```
+
+**This target diagram is CONCEPTUAL, exactly like the Stage 593
+target diagram it extends — and per the user's own Stage 613
+instruction, it deliberately STOPS at Crypto Loader Facade, without
+extending further to WASM Loader/Rust/Dynamic Import/Generated JS
+Glue.** No Provider implementation constructs or issues a request
+today, and the Boundary does not accept one. The ONE real wire this
+stage adds runs the OPPOSITE direction, deeper into the already-parked
+chain (mirroring Stage 593/601's own pattern exactly): Stage 610 adds
+`src/runtime/fedos_crypto_provider_initialization_request.ts` — a
+pure, fixed-value REQUEST PLAN naming
+`createCryptoProviderInitializationRequest()`, fixed `{ state:
+"PlanningOnly", requested: false, allowed: false, reason:
+"ProviderInitializationRequestPending" }` — with NO side effects and
+NO `import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 611 wires `createCryptoProviderFacadeBoundary()`
+(`fedos_crypto_provider_facade_boundary.ts`) to CALL
+`createCryptoProviderInitializationRequest()` — the result is
+DISCARDED and `createCryptoProviderFacadeBoundary()`'s own return
+value is UNCHANGED (`providerConnected: false`), the SAME "reach one
+link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603 already
+established fourteen times over.
+
+This revises the Stage 601–605 diagram — Provider Initialization
+Request now sits between Provider/Facade Boundary and the
+still-positional Dynamic Import box (NOTE: this is the PARKED
+IMPLEMENTATION CHAIN's position, one level BELOW the Boundary —
+DISTINCT from the target architecture diagram above, where the
+request sits one level ABOVE the Boundary; the two diagrams show the
+SAME four real files from two different, deliberately separate
+vantage points, and neither is a claim about the other's arrow
+direction):
+
+```
+FedosCryptoProviderFacadeBoundary          <-- REAL, pure decision function (src/runtime/fedos_crypto_provider_facade_boundary.ts,
+("Provider/Facade Boundary")                   Stage 602), REAL wiring: createCryptoProviderFacadeBoundary() calls
+     |                                          createCryptoProviderInitializationRequest(), discards the result (Stage 611)
+     v
+FedosCryptoProviderInitializationRequest   <-- REAL, pure decision function (src/runtime/fedos_crypto_provider_initialization_request.ts,
+("Provider Initialization Request")            Stage 610), fixed { state: "PlanningOnly", requested: false, allowed: false,
+     |                                          reason: "ProviderInitializationRequestPending" } -- NO side effects, NO
+     |                                          import() of any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_crypto_provider_initialization_request.ts`, directly or
+indirectly, and no `RuntimeCryptoProvider` implementation constructs
+or issues a request.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+612) read `providerInitializationRequestState()`/
+`providerInitializationRequested()`/`providerInitializationAllowed()`/
+`providerInitializationReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`false`/
+`"ProviderInitializationRequestPending"`, matching every other leaf in
+this arc.
+
+**Still true after Stage 601–613**: no Runtime/Worker connection of
+any kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_provider_facade_boundary.ts`,
+nor `fedos_crypto_provider_initialization_request.ts`); no
+`RuntimeCryptoProvider` implementation connects to the Facade or
+issues a request; `WebAssembly.instantiate`/`compile` never invoked;
+no static `import` and no dynamic `import()` of the generated JS glue
+anywhere in this repository; no generated file edited or committed;
+`encrypt`/`decrypt` unchanged; NIP-17/NIP-59 unimplemented;
+`"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/`"Reviewed"`/
+`"Committed"`/`"PrebuildRequired"`/`"OptionalLoader"`/`"Open"`/
+`"Granted"`/`"Active"`/`"WasmActive"`/`"Connected"`/`"Requested"`/
+`"Loaded"`/`"FailOpen"` never reached; Rust public API unchanged (27
+`pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_crypto_provider_initialization_request.md` (Stage
+  609) — provider-side planning for a request one level above the
+  Boundary in the target architecture.
+- `src/runtime/fedos_crypto_provider_initialization_request.ts`
+  (Stage 610–611) — the request plan's real, fixed-value
+  implementation and its wiring from
+  `fedos_crypto_provider_facade_boundary.ts`.
+- `docs/runtime_crypto_provider_facade_boundary.md` (Stage 601) — the
+  seam recording whether Provider and Facade have ever been
+  connected.
+- `src/runtime/fedos_crypto_provider_facade_boundary.ts` (Stage
+  602–603) — the Boundary's real, fixed-value implementation and its
+  wiring from `fedos_crypto_loader_facade.ts`.
 - `docs/runtime_crypto_loader_facade.md` (Stage 593) — the target
   architecture (Crypto Runtime -> Crypto Provider -> Crypto Loader
   Facade -> WASM Loader -> Rust) and the Facade's six responsibilities.

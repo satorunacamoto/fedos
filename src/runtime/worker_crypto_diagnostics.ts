@@ -130,6 +130,18 @@
  * `runtime_crypto_diagnostics.ts`'s own Stage 596 doc comment. Fixed
  * `"PlanningOnly"`/`"WasmPlanned"`/`false`/
  * `"FacadeInitializationPending"` respectively.
+ *
+ * Stage 604 adds `providerFacadeBoundaryState`/`providerFacadeConnected`/
+ * `providerFacadeReason` — see `runtime_crypto_diagnostics.ts`'s own
+ * Stage 604 doc comment. Fixed `"PlanningOnly"`/`false`/
+ * `"ProviderFacadeConnectionPending"` respectively.
+ *
+ * Stage 612 adds `providerInitializationRequestState`/
+ * `providerInitializationRequested`/`providerInitializationAllowed`/
+ * `providerInitializationReason` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 612 doc comment. Fixed
+ * `"PlanningOnly"`/`false`/`false`/
+ * `"ProviderInitializationRequestPending"` respectively.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -307,6 +319,25 @@ import {
   cryptoLoaderFacadeReason as fedosCryptoLoaderFacadeReason,
   cryptoLoaderFacadeState as fedosCryptoLoaderFacadeState,
 } from "./fedos_crypto_loader_facade.js";
+import type {
+  FedosCryptoProviderFacadeBoundaryReason,
+  FedosCryptoProviderFacadeBoundaryState,
+} from "./fedos_crypto_provider_facade_boundary.js";
+import {
+  providerFacadeBoundaryState as fedosProviderFacadeBoundaryState,
+  providerFacadeConnected as fedosProviderFacadeConnected,
+  providerFacadeReason as fedosProviderFacadeReason,
+} from "./fedos_crypto_provider_facade_boundary.js";
+import type {
+  FedosCryptoProviderInitializationRequestReason,
+  FedosCryptoProviderInitializationRequestState,
+} from "./fedos_crypto_provider_initialization_request.js";
+import {
+  providerInitializationAllowed as fedosProviderInitializationAllowed,
+  providerInitializationReason as fedosProviderInitializationReason,
+  providerInitializationRequested as fedosProviderInitializationRequested,
+  providerInitializationRequestState as fedosProviderInitializationRequestState,
+} from "./fedos_crypto_provider_initialization_request.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -881,6 +912,50 @@ export interface WorkerCryptoActivationStatus {
    * `"FacadeInitializationPending"` in this stage.
    */
   readonly cryptoLoaderFacadeReason: FedosCryptoLoaderFacadeReason;
+  /**
+   * The Provider/Facade Boundary's own fixed coarse state —
+   * `providerFacadeBoundaryState()`'s own answer
+   * (`src/runtime/fedos_crypto_provider_facade_boundary.ts`, Stage
+   * 602/604). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly providerFacadeBoundaryState: FedosCryptoProviderFacadeBoundaryState;
+  /**
+   * Whether the Provider side AND the Facade side are both currently
+   * connected — `providerFacadeConnected()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly providerFacadeConnected: boolean;
+  /**
+   * WHY the Boundary is not yet fully connected —
+   * `providerFacadeReason()`'s own answer. Fixed
+   * `"ProviderFacadeConnectionPending"` in this stage.
+   */
+  readonly providerFacadeReason: FedosCryptoProviderFacadeBoundaryReason;
+  /**
+   * The Provider Initialization Request planning design's own fixed
+   * coarse state — `providerInitializationRequestState()`'s own
+   * answer (`src/runtime/fedos_crypto_provider_initialization_request.ts`,
+   * Stage 610/612). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly providerInitializationRequestState: FedosCryptoProviderInitializationRequestState;
+  /**
+   * Whether a Provider has ever actually issued such a request —
+   * `providerInitializationRequested()`'s own answer. Fixed `false`
+   * in this stage.
+   */
+  readonly providerInitializationRequested: boolean;
+  /**
+   * Whether the Boundary would currently accept such a request if one
+   * were issued — `providerInitializationAllowed()`'s own answer.
+   * Fixed `false` in this stage.
+   */
+  readonly providerInitializationAllowed: boolean;
+  /**
+   * WHY a request is not currently allowed —
+   * `providerInitializationReason()`'s own answer. Fixed
+   * `"ProviderInitializationRequestPending"` in this stage.
+   */
+  readonly providerInitializationReason: FedosCryptoProviderInitializationRequestReason;
 }
 
 /**
@@ -996,5 +1071,12 @@ export function workerCryptoActivationStatus(
     cryptoLoaderFacadeBackend: fedosCryptoLoaderFacadeBackend(),
     cryptoLoaderFacadeInitialized: fedosCryptoLoaderFacadeInitialized(),
     cryptoLoaderFacadeReason: fedosCryptoLoaderFacadeReason(),
+    providerFacadeBoundaryState: fedosProviderFacadeBoundaryState(),
+    providerFacadeConnected: fedosProviderFacadeConnected(),
+    providerFacadeReason: fedosProviderFacadeReason(),
+    providerInitializationRequestState: fedosProviderInitializationRequestState(),
+    providerInitializationRequested: fedosProviderInitializationRequested(),
+    providerInitializationAllowed: fedosProviderInitializationAllowed(),
+    providerInitializationReason: fedosProviderInitializationReason(),
   };
 }
