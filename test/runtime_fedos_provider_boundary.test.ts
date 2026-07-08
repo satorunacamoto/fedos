@@ -285,6 +285,11 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       cryptoBackendSelected: "WasmPlanned",
       cryptoBackendActivated: false,
       cryptoBackendInterfaceReason: "BackendInterfacePending",
+      cryptoBackendResolverState: "PlanningOnly",
+      cryptoBackendResolverSelected: "WasmPlanned",
+      cryptoBackendResolved: false,
+      cryptoBackendAvailable: false,
+      cryptoBackendResolverReason: "BackendResolutionPending",
     });
   });
 

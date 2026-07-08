@@ -49,6 +49,21 @@
  * the generated JS glue, or Rust in any way — that remains a future,
  * separate, explicitly-reviewed stage's decision.
  *
+ * Stage 764 (Prototype Phase 006) adds a SECOND, separate reach: this
+ * file now ALSO calls `createCryptoBackendResolver()`
+ * (`fedos_crypto_backend_resolver.ts`, Stage 763) — DISCARDING that
+ * result too, and returning its OWN, byte-for-byte unchanged answer.
+ * This mirrors the SAME "a second, separate reach" pattern
+ * `fedos_crypto_loader_facade.ts` already established for
+ * `reachProviderFacadeBoundary()`/`reachCryptoLoaderBackend()` (Stage
+ * 594/721) — the pre-existing reach into `fedos_wasm_backend.ts` is
+ * NOT replaced or removed; both reaches now exist side by side. This
+ * is the ONLY caller of `fedos_crypto_backend_resolver.ts` anywhere in
+ * this repository — per `docs/runtime_crypto_backend_resolver.md`,
+ * ONLY the Backend Interface may reach the Backend Resolver; Runtime,
+ * Worker, the Facade, and the Backend Abstraction never do, directly
+ * or indirectly.
+ *
  * HARD GUARDRAILS:
  *   - `createCryptoBackendInterface()` is PURE, synchronous, takes no
  *     argument, and returns a hand-fixed constant. It NEVER inspects
@@ -87,6 +102,7 @@
 
 import type { FedosCryptoLoaderBackendKind } from "./fedos_crypto_loader_backend.js";
 import { createWasmBackend } from "./fedos_wasm_backend.js";
+import { createCryptoBackendResolver } from "./fedos_crypto_backend_resolver.js";
 
 /**
  * The Backend Interface's own coarse state. `"PlanningOnly"` is the
@@ -124,13 +140,15 @@ export interface FedosCryptoBackendInterface {
  * "BackendInterfacePending" }` in this stage. Pure; never throws;
  * takes no argument, reads no `process.env`/filesystem/`import.meta`.
  * Never references the generated JS glue or the real WASM Loader, and
- * never writes `import()` of any kind. Reaches ONE further link (WASM
- * Backend Planning, `fedos_wasm_backend.ts`, Stage 746) and discards
- * its result — this function's OWN return value stays byte-for-byte
- * unchanged.
+ * never writes `import()` of any kind. Reaches TWO independent leaves
+ * — WASM Backend Planning (`fedos_wasm_backend.ts`, Stage 746) and
+ * the Backend Resolver (`fedos_crypto_backend_resolver.ts`, Stage
+ * 764) — and discards both results; this function's OWN return value
+ * stays byte-for-byte unchanged.
  */
 export function createCryptoBackendInterface(): FedosCryptoBackendInterface {
   reachWasmBackend(); // result discarded -- WASM Backend Planning is a STOP, no real WASM Loader/Rust call
+  reachCryptoBackendResolver(); // result discarded -- Backend Resolver is a STOP, no real WASM Loader/Rust call
   return {
     state: "PlanningOnly",
     backendSelected: "WasmPlanned",
@@ -151,6 +169,20 @@ export function createCryptoBackendInterface(): FedosCryptoBackendInterface {
  */
 function reachWasmBackend(): void {
   createWasmBackend();
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createCryptoBackendResolver()`
+ * (`fedos_crypto_backend_resolver.ts`, Stage 763). The result is
+ * discarded; it is never passed to `WebAssembly.instantiate`/
+ * `compile`, `initSync`/the default init export,
+ * `packages/fedos-core-rust`, Runtime, or Worker. The Backend Resolver
+ * itself never references the generated JS glue, the real WASM
+ * Loader, or writes `import()` of any kind either — it is a TERMINUS
+ * for this stage, independent of the `reachWasmBackend()` leaf above.
+ */
+function reachCryptoBackendResolver(): void {
+  createCryptoBackendResolver();
 }
 
 /**

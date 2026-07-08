@@ -393,6 +393,19 @@
  * `"PlanningOnly"`/`false`/`"WasmPlanned"`/`false`/
  * `"BackendInterfacePending"`. `worker_crypto_diagnostics.ts` is
  * intentionally NOT touched.
+ *
+ * Stage 774 (Prototype Phase 006) adds `cryptoBackendResolverState`/
+ * `cryptoBackendResolverSelected`/`cryptoBackendResolved`/
+ * `cryptoBackendAvailable`/`cryptoBackendResolverReason`, reading
+ * `fedos_crypto_backend_resolver.ts`'s (Stage 762/763)
+ * `cryptoBackendResolverState()`/`cryptoBackendResolverSelected()`/
+ * `cryptoBackendResolved()`/`cryptoBackendAvailable()`/
+ * `cryptoBackendResolverReason()` — the Backend Resolver the Backend
+ * Interface now ALSO reaches as a second, separate leaf (Stage 764),
+ * alongside its pre-existing reach into WASM Backend Planning. Fixed
+ * `"PlanningOnly"`/`"WasmPlanned"`/`false`/`false`/
+ * `"BackendResolutionPending"`. `worker_crypto_diagnostics.ts` is
+ * intentionally NOT touched.
  */
 
 import type {
@@ -609,6 +622,17 @@ import {
   cryptoBackendInterfaceState as fedosCryptoBackendInterfaceState,
   cryptoBackendSelected as fedosCryptoBackendSelected,
 } from "./fedos_crypto_backend_interface.js";
+import type {
+  FedosCryptoBackendResolverReason,
+  FedosCryptoBackendResolverState,
+} from "./fedos_crypto_backend_resolver.js";
+import {
+  cryptoBackendAvailable as fedosCryptoBackendAvailable,
+  cryptoBackendResolved as fedosCryptoBackendResolved,
+  cryptoBackendResolverReason as fedosCryptoBackendResolverReason,
+  cryptoBackendResolverSelected as fedosCryptoBackendResolverSelected,
+  cryptoBackendResolverState as fedosCryptoBackendResolverState,
+} from "./fedos_crypto_backend_resolver.js";
 import type {
   FedosCryptoProviderFacadeBoundaryReason,
   FedosCryptoProviderFacadeBoundaryState,
@@ -1740,6 +1764,37 @@ export interface RuntimeCryptoActivationStatus {
    * own answer. Fixed `"BackendInterfacePending"` in this stage.
    */
   readonly cryptoBackendInterfaceReason: FedosCryptoBackendInterfaceReason;
+  /**
+   * Stage 774 (Prototype Phase 006) — the Backend Resolver's own
+   * fixed coarse state — `cryptoBackendResolverState()`'s own answer
+   * (`src/runtime/fedos_crypto_backend_resolver.ts`, Stage 762/763).
+   * Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly cryptoBackendResolverState: FedosCryptoBackendResolverState;
+  /**
+   * Which backend this repository currently plans to use —
+   * `cryptoBackendResolverSelected()`'s own answer. Fixed
+   * `"WasmPlanned"` in this stage.
+   */
+  readonly cryptoBackendResolverSelected: FedosCryptoLoaderBackendKind;
+  /**
+   * Whether resolution has ever actually completed —
+   * `cryptoBackendResolved()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly cryptoBackendResolved: boolean;
+  /**
+   * Whether the resolved backend is actually available to load right
+   * now — `cryptoBackendAvailable()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly cryptoBackendAvailable: boolean;
+  /**
+   * WHY resolution/availability is not settled —
+   * `cryptoBackendResolverReason()`'s own answer. Fixed
+   * `"BackendResolutionPending"` in this stage.
+   */
+  readonly cryptoBackendResolverReason: FedosCryptoBackendResolverReason;
 }
 
 /**
@@ -1914,5 +1969,10 @@ export function runtimeCryptoActivationStatus(
     cryptoBackendSelected: fedosCryptoBackendSelected(),
     cryptoBackendActivated: fedosCryptoBackendActivated(),
     cryptoBackendInterfaceReason: fedosCryptoBackendInterfaceReason(),
+    cryptoBackendResolverState: fedosCryptoBackendResolverState(),
+    cryptoBackendResolverSelected: fedosCryptoBackendResolverSelected(),
+    cryptoBackendResolved: fedosCryptoBackendResolved(),
+    cryptoBackendAvailable: fedosCryptoBackendAvailable(),
+    cryptoBackendResolverReason: fedosCryptoBackendResolverReason(),
   };
 }
