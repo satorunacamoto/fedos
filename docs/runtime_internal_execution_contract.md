@@ -2051,8 +2051,113 @@ NIP-44/NIP-59 unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/
 never reached; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 689–728: Prototype Phases 001–003, REAL Runtime wiring reaches the Crypto Loader Backend Abstraction
+
+Every diagram above this section describes the `fedos_*.ts`
+`PlanningOnly` chain's own internal target architecture — real,
+independently-tested files connected by conceptual (mostly
+not-yet-wired) arrows, with `create_runtime.ts`/`src/worker.ts`
+explicitly unmodified throughout. Stage 689–728 is different in kind:
+it is the first arc where `AppRuntime` itself gains a REAL, callable
+member, and that member's REAL implementation reaches two links into
+the pre-existing chain above.
+
+```
+Runtime (AppRuntime)                       <-- REAL member added Stage 690/691 (src/runtime/types.ts,
+     |                                          src/runtime/create_runtime.ts) -- AppRuntime.initializeCrypto
+     v                                          did not exist before Stage 691
+initializeCrypto()                         <-- REAL, callable, fixed { allowed: false, initialized: false,
+     |                                          reason: "PrototypeDisabled" } (createRuntimeInitializeCryptoResult,
+     |                                          Stage 691) -- no Rust/WASM/Loader/generated-JS-glue call, no
+     |                                          import() of any kind
+     v
+Crypto Loader Facade                       <-- REAL wiring: createRuntimeInitializeCryptoResult() calls
+("fedos_crypto_loader_facade.ts",              createCryptoLoaderFacade() and DISCARDS the result (Stage 697) --
+Stage 594, UNMODIFIED by Stage 697)            Runtime's own return value stays byte-for-byte unchanged
+     |
+     v
+Crypto Loader Backend Abstraction          <-- REAL wiring: createCryptoLoaderFacade() ALSO calls
+("fedos_crypto_loader_backend.ts",             createCryptoLoaderBackend() and DISCARDS the result (Stage 721) --
+Stage 714)                                     fixed { state: "PlanningOnly", backendKind: "WasmPlanned",
+     |                                          backendReady: false, reason: "BackendAbstractionPending" };
+     |                                          the Facade's own return value stays byte-for-byte unchanged
+     v
+STOP                                       <-- no further link exists; the WASM Loader, the generated JS
+                                                 glue, WebAssembly.instantiate/compile, initSync, the default
+                                                 init export, and static/dynamic import() of any kind ALL
+                                                 remain PROHIBITED and unreachable from this chain
+```
+
+**Every arrow above IS a real function call**, unlike the conceptual
+target-architecture diagrams elsewhere in this document — this is the
+one place in the entire `fedos_*.ts` arc where Runtime's OWN code
+(`create_runtime.ts`) actually calls into the Planning chain, and the
+Facade actually reaches one link further into the new Backend
+Abstraction. Both the Facade and the Backend Abstraction discard
+whatever they receive; nothing downstream ever changes what
+`AppRuntime.initializeCrypto()` returns.
+
+**Worker is explicitly OUT OF SCOPE for this entire arc.**
+`src/worker.ts` is NOT modified by Stage 689–728, references neither
+`initializeCrypto`, `fedos_crypto_loader_facade.ts`, nor
+`fedos_crypto_loader_backend.ts`, directly or indirectly, and
+`worker_crypto_diagnostics.ts` carries none of the new diagnostics
+fields this arc adds — see
+`docs/runtime_initialize_crypto_first_wiring_plan.md` §2, which named
+Worker out of scope for the first wiring, a decision this arc has not
+revisited.
+
+**ONLY the Facade may call the Backend Abstraction.**
+`createCryptoLoaderBackend()`'s only caller anywhere in this
+repository is `fedos_crypto_loader_facade.ts`'s
+`createCryptoLoaderFacade()` — `create_runtime.ts` never references
+`fedos_crypto_loader_backend.ts` directly, and Runtime never learns
+`backendKind`/`backendReady` in any way. This mirrors the SAME
+Runtime-sees-only-the-Facade discipline `docs/runtime_crypto_loader_facade.md`
+§2 already established for the WASM Loader and Rust.
+
+**Division of responsibility, per
+`docs/runtime_crypto_loader_backend_abstraction.md` §3**: Rust
+(`packages/fedos-core-rust`) is responsible for cryptography, keys,
+signatures, and safety boundaries only, and still does not know about
+"backends" or JavaScript at all. Runtime never knows backend detail —
+`"WasmPlanned"`/`"NativePlanned"`/`"PythonPlanned"` are never visible
+past the Facade. The Facade stays a thin entry point for backend
+selection: it asks the question and discards the answer.
+
+`runtime_crypto_diagnostics.ts` (Stage 692/698/725) reads
+`runtimeInitializeCryptoPrototypeExposed`/`...Allowed`/`...Reason`,
+`runtimePrototypeFacadeReached`/`...Connected`/`...Reason`, and
+`cryptoLoaderBackendState`/`...Kind`/`...Ready`/`...Reason` for
+DISPLAY only — `worker_crypto_diagnostics.ts` is untouched by all
+three additions.
+
+**Still true throughout Stage 689–728**: `src/worker.ts` UNMODIFIED
+and never references `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, or `fedos_crypto_loader_backend.ts`;
+`fedos_crypto_loader_facade.ts` UNMODIFIED in its own fixed return
+values (`initialized: false`, `backend: "WasmPlanned"`); no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+generated file edited or committed; `encrypt`/`decrypt` unchanged, in
+Rust or TypeScript; NIP-17/NIP-44/NIP-59 unimplemented; `"Allowed"`/
+`"Active"`/`"Ready"` never reached anywhere in this new chain; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
+- `docs/runtime_crypto_loader_backend_abstraction.md` (Stage 713) —
+  the thin, swappable seam directly below the Facade this arc's REAL
+  wiring now reaches, and the three named (unconnected) backend
+  candidates.
+- `src/runtime/fedos_crypto_loader_backend.ts` (Stage 714) — the
+  Backend Abstraction's real, fixed-value implementation and its
+  wiring from `fedos_crypto_loader_facade.ts` (Stage 721).
+- `docs/runtime_initialize_crypto_prototype.md` (Stage 689) — the
+  start of Prototype Phase 001, where `AppRuntime.initializeCrypto()`
+  first became a real, callable member.
 - `docs/runtime_initialize_crypto_invocation_contract.md` (Stage 673)
   — the terminus of this Public API arc, and the full extended
   target-architecture diagram.
