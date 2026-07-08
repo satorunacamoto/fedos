@@ -343,6 +343,18 @@
  * member IS really wired into `AppRuntime` now); `...Allowed` is
  * fixed `false` and `...Reason` is fixed `"PrototypeDisabled"` — the
  * door exists, but calling it still does no real work.
+ *
+ * Stage 698 (Prototype Phase 002) adds `runtimePrototypeFacadeReached`/
+ * `runtimePrototypeFacadeConnected`/`runtimePrototypeFacadeReason`,
+ * reflecting `create_runtime.ts`'s (Stage 697) extension of
+ * `createRuntimeInitializeCryptoResult()` one link deeper into the
+ * Crypto Loader Facade. `runtimePrototypeFacadeReached` is fixed
+ * `true` (the Facade IS actually called now, its result discarded);
+ * `runtimePrototypeFacadeConnected` reads
+ * `fedos_crypto_loader_facade.ts`'s own `cryptoLoaderFacadeInitialized()`
+ * (fixed `false`, that file UNMODIFIED by this stage); `...Reason`
+ * mirrors the Runtime-level `"PrototypeDisabled"` reason, unchanged.
+ * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
  */
 
 import type {
@@ -1547,6 +1559,30 @@ export interface RuntimeCryptoActivationStatus {
    * `"PrototypeDisabled"` in this stage.
    */
   readonly runtimeInitializeCryptoPrototypeReason: RuntimeInitializeCryptoReason;
+  /**
+   * Stage 698 (Prototype Phase 002) — whether the Runtime prototype's
+   * implementation actually reaches the Crypto Loader Facade —
+   * `create_runtime.ts`'s own `createRuntimeInitializeCryptoResult()`
+   * (Stage 697) now calls `createCryptoLoaderFacade()`, so this is
+   * fixed `true`. Reaching the Facade is a STRUCTURAL fact, distinct
+   * from whether the Facade itself is connected/initialized (see
+   * `runtimePrototypeFacadeConnected` below).
+   */
+  readonly runtimePrototypeFacadeReached: boolean;
+  /**
+   * Whether the Crypto Loader Facade itself is initialized — the SAME
+   * answer as `cryptoLoaderFacadeInitialized()`
+   * (`fedos_crypto_loader_facade.ts`, unmodified by this stage). Fixed
+   * `false`: Runtime reaching the Facade does not connect or initialize
+   * it.
+   */
+  readonly runtimePrototypeFacadeConnected: boolean;
+  /**
+   * WHY the Runtime prototype does not go beyond reaching the Facade —
+   * the same answer as `createRuntimeInitializeCryptoResult().reason`.
+   * Fixed `"PrototypeDisabled"` in this stage.
+   */
+  readonly runtimePrototypeFacadeReason: RuntimeInitializeCryptoReason;
 }
 
 /**
@@ -1569,6 +1605,7 @@ export function runtimeCryptoActivationStatus(
 ): RuntimeCryptoActivationStatus {
   const config = getRuntimeCryptoConfig(env);
   const { runtimeCryptoEnabled, runtimeCryptoProvider } = config;
+  const prototypeResult = createRuntimeInitializeCryptoResult();
   const effectiveProvider: RuntimeCryptoProviderName =
     runtimeCryptoEnabled && runtimeCryptoProvider === FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME
       ? FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME
@@ -1701,7 +1738,10 @@ export function runtimeCryptoActivationStatus(
     initializeCryptoInvocationCompleted: fedosInitializeCryptoInvocationCompleted(),
     initializeCryptoInvocationReason: fedosInitializeCryptoInvocationReason(),
     runtimeInitializeCryptoPrototypeExposed: true,
-    runtimeInitializeCryptoPrototypeAllowed: createRuntimeInitializeCryptoResult().allowed,
-    runtimeInitializeCryptoPrototypeReason: createRuntimeInitializeCryptoResult().reason,
+    runtimeInitializeCryptoPrototypeAllowed: prototypeResult.allowed,
+    runtimeInitializeCryptoPrototypeReason: prototypeResult.reason,
+    runtimePrototypeFacadeReached: true,
+    runtimePrototypeFacadeConnected: fedosCryptoLoaderFacadeInitialized(),
+    runtimePrototypeFacadeReason: prototypeResult.reason,
   };
 }

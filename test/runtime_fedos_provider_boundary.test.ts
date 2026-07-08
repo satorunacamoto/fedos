@@ -268,6 +268,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       runtimeInitializeCryptoPrototypeExposed: true,
       runtimeInitializeCryptoPrototypeAllowed: false,
       runtimeInitializeCryptoPrototypeReason: "PrototypeDisabled",
+      runtimePrototypeFacadeReached: true,
+      runtimePrototypeFacadeConnected: false,
+      runtimePrototypeFacadeReason: "PrototypeDisabled",
     });
   });
 

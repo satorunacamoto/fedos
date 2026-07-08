@@ -72,7 +72,7 @@ describe("FedOS Runtime initializeCrypto Prototype, door added not opened, no si
     expect(status.runtimeInitializeCryptoPrototypeReason).toBe("PrototypeDisabled");
   });
 
-  it("5. create_runtime.ts never writes import()/require, never references the generated JS glue, and never touches WebAssembly/fetch/Facade/Loader", () => {
+  it("5. create_runtime.ts never writes import()/require, never references the generated JS glue, and never touches WebAssembly/fetch/Loader (Facade reference is covered by test/runtime_initialize_crypto_prototype_facade.test.ts as of Stage 697)", () => {
     const codeOnly = codeOnlyLines(createRuntimeSource);
     expect(codeOnly).not.toMatch(/import\s*\(/);
     expect(codeOnly).not.toMatch(/require\s*\(/);
@@ -81,7 +81,6 @@ describe("FedOS Runtime initializeCrypto Prototype, door added not opened, no si
     expect(codeOnly).not.toMatch(/initSync/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/fedos_core_rust\.js|fedos_core_rust_bg\.wasm/);
-    expect(codeOnly).not.toMatch(/fedos_crypto_loader_facade/);
     expect(codeOnly).not.toMatch(/fedos_crypto_provider_facade_boundary/);
     expect(codeOnly).not.toMatch(/fedos_wasm_loader/);
   });

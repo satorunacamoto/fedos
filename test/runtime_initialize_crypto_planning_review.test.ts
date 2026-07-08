@@ -157,13 +157,13 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
 
   it("10. Runtime remains unconnected -- create_runtime.ts references none of the twelve layers", () => {
     expect(createRuntimeSource).not.toMatch(
-      /fedos_crypto_provider_initialization_request|fedos_provider_initialization_approval|fedos_provider_init_facade_contract|fedos_crypto_provider_facade_boundary|fedos_crypto_loader_facade|fedos_explicit_crypto_initialization|fedos_initialize_crypto_api_contract|fedos_crypto_initialization_result|fedos_initialize_crypto_exposure_review|fedos_initialize_crypto_wiring_plan|fedos_initialize_crypto_public_api|fedos_initialize_crypto_invocation_contract/,
+      /fedos_crypto_provider_initialization_request|fedos_provider_initialization_approval|fedos_provider_init_facade_contract|fedos_crypto_provider_facade_boundary|fedos_explicit_crypto_initialization|fedos_initialize_crypto_api_contract|fedos_crypto_initialization_result|fedos_initialize_crypto_exposure_review|fedos_initialize_crypto_wiring_plan|fedos_initialize_crypto_public_api|fedos_initialize_crypto_invocation_contract/,
     );
   });
 
   it("11. Worker remains unconnected -- src/worker.ts references none of the twelve layers", () => {
     expect(workerSource).not.toMatch(
-      /fedos_crypto_provider_initialization_request|fedos_provider_initialization_approval|fedos_provider_init_facade_contract|fedos_crypto_provider_facade_boundary|fedos_crypto_loader_facade|fedos_explicit_crypto_initialization|fedos_initialize_crypto_api_contract|fedos_crypto_initialization_result|fedos_initialize_crypto_exposure_review|fedos_initialize_crypto_wiring_plan|fedos_initialize_crypto_public_api|fedos_initialize_crypto_invocation_contract/,
+      /fedos_crypto_provider_initialization_request|fedos_provider_initialization_approval|fedos_provider_init_facade_contract|fedos_crypto_provider_facade_boundary|fedos_explicit_crypto_initialization|fedos_initialize_crypto_api_contract|fedos_crypto_initialization_result|fedos_initialize_crypto_exposure_review|fedos_initialize_crypto_wiring_plan|fedos_initialize_crypto_public_api|fedos_initialize_crypto_invocation_contract/,
     );
   });
 

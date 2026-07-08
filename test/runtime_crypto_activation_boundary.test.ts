@@ -327,6 +327,9 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       runtimeInitializeCryptoPrototypeExposed: true,
       runtimeInitializeCryptoPrototypeAllowed: false,
       runtimeInitializeCryptoPrototypeReason: "PrototypeDisabled",
+      runtimePrototypeFacadeReached: true,
+      runtimePrototypeFacadeConnected: false,
+      runtimePrototypeFacadeReason: "PrototypeDisabled",
     });
   });
 

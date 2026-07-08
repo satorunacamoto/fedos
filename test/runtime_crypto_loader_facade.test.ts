@@ -177,16 +177,19 @@ describe("FedOS Crypto Loader Facade, PlanningOnly/denied, no side effects anywh
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("8. Runtime remains unconnected -- create_runtime.ts imports none of the WASM chain, including the Facade", () => {
+  it("8. Runtime deliberately reaches ONLY the Facade (Stage 697) -- create_runtime.ts imports none of the rest of the WASM chain", () => {
+    // As of Stage 697 (Prototype Phase 002), create_runtime.ts legitimately
+    // calls createCryptoLoaderFacade() -- see test/runtime_initialize_crypto_prototype_facade.test.ts.
+    expect(createRuntimeSource).toMatch(/fedos_crypto_loader_facade/);
     expect(createRuntimeSource).not.toMatch(
-      /fedos_wasm_static_import_plan|fedos_wasm_static_import_review|fedos_wasm_static_import_readiness|fedos_generated_artifact_presence|fedos_static_import_activation_review|fedos_generated_artifact_distribution|fedos_build_time_loader_strategy|fedos_dynamic_loader_gate|fedos_dynamic_loader_dev_approval|fedos_explicit_crypto_initialization|fedos_crypto_loader_facade|fedos_wasm_loader_import_policy/,
+      /fedos_wasm_static_import_plan|fedos_wasm_static_import_review|fedos_wasm_static_import_readiness|fedos_generated_artifact_presence|fedos_static_import_activation_review|fedos_generated_artifact_distribution|fedos_build_time_loader_strategy|fedos_dynamic_loader_gate|fedos_dynamic_loader_dev_approval|fedos_explicit_crypto_initialization|fedos_wasm_loader_import_policy|fedos_crypto_provider_facade_boundary/,
     );
     expect(createRuntimeSource).not.toMatch(/fedos_core_rust\.js|fedos_core_rust_bg\.wasm/);
   });
 
   it("9. Worker remains unconnected -- src/worker.ts imports none of the WASM chain, including the Facade", () => {
     expect(workerSource).not.toMatch(
-      /fedos_wasm_static_import_plan|fedos_wasm_static_import_review|fedos_wasm_static_import_readiness|fedos_generated_artifact_presence|fedos_static_import_activation_review|fedos_generated_artifact_distribution|fedos_build_time_loader_strategy|fedos_dynamic_loader_gate|fedos_dynamic_loader_dev_approval|fedos_explicit_crypto_initialization|fedos_crypto_loader_facade|fedos_wasm_loader_import_policy/,
+      /fedos_wasm_static_import_plan|fedos_wasm_static_import_review|fedos_wasm_static_import_readiness|fedos_generated_artifact_presence|fedos_static_import_activation_review|fedos_generated_artifact_distribution|fedos_build_time_loader_strategy|fedos_dynamic_loader_gate|fedos_dynamic_loader_dev_approval|fedos_explicit_crypto_initialization|fedos_wasm_loader_import_policy/,
     );
     expect(workerSource).not.toMatch(/fedos_core_rust\.js|fedos_core_rust_bg\.wasm/);
   });
