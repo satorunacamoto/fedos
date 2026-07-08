@@ -428,6 +428,17 @@
  * fields above (Stage 495, UNCHANGED). Fixed
  * `"Planning"`/`"BlockedByPolicy"`/`false`. `worker_crypto_diagnostics.ts`
  * is intentionally NOT touched.
+ *
+ * Stage 817 (Prototype Phase 010) adds `loaderPolicyAllowed`/
+ * `loaderPolicyDecision`/`loaderPolicyReason`, reading
+ * `fedos_wasm_loader.ts`'s (Stage 817) `loaderPolicyAllowed()`/
+ * `loaderPolicyDecision()`/`loaderPolicyReason()` — a NEW, separately-named
+ * Loader Policy reader, independent of the pre-existing
+ * `loaderPlanningState`/`loaderPlanningDecision`/`loaderLoaded` fields
+ * above (Stage 809, UNCHANGED) and of `loaderSkeletonPolicy` (Stage 495,
+ * UNCHANGED — a different, pre-existing `loaderPolicy()` label read).
+ * Fixed `false`/`"BlockedByPolicy"`/`"PrototypePolicy"`.
+ * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
  */
 
 import type {
@@ -506,6 +517,9 @@ import {
   loaderPlanningDecision as fedosLoaderPlanningDecision,
   loaderPlanningState as fedosLoaderPlanningState,
   loaderPolicy as fedosLoaderSkeletonPolicy,
+  loaderPolicyAllowed as fedosLoaderPolicyAllowed,
+  loaderPolicyDecision as fedosLoaderPolicyDecision,
+  loaderPolicyReason as fedosLoaderPolicyReason,
   loaderState as fedosLoaderSkeletonState,
 } from "./fedos_wasm_loader.js";
 import type { FedosWasmLoaderPlanState } from "./fedos_wasm_loader_plan.js";
@@ -1804,6 +1818,24 @@ export interface RuntimeCryptoActivationStatus {
    */
   readonly loaderLoaded: boolean;
   /**
+   * Stage 817 (Prototype Phase 010) — the real `FedosWasmLoader`'s own
+   * fixed POLICY allowance — `loaderPolicyAllowed()`'s own answer
+   * (`src/runtime/fedos_wasm_loader.ts`, Stage 817). Fixed `false` in
+   * this stage.
+   */
+  readonly loaderPolicyAllowed: boolean;
+  /**
+   * The POLICY decision `FedosWasmLoader.policy()` resolves to —
+   * `loaderPolicyDecision()`'s own answer. Fixed `"BlockedByPolicy"`
+   * in this stage.
+   */
+  readonly loaderPolicyDecision: FedosWasmLoaderDecisionState;
+  /**
+   * WHY the POLICY denies every operation — `loaderPolicyReason()`'s
+   * own answer. Fixed `"PrototypePolicy"` in this stage.
+   */
+  readonly loaderPolicyReason: string;
+  /**
    * Stage 757 (Prototype Phase 005) — the Backend Interface's own
    * fixed coarse state — `cryptoBackendInterfaceState()`'s own answer
    * (`src/runtime/fedos_crypto_backend_interface.ts`, Stage 745/746).
@@ -2039,6 +2071,9 @@ export function runtimeCryptoActivationStatus(
     loaderPlanningState: fedosLoaderPlanningState(),
     loaderPlanningDecision: fedosLoaderPlanningDecision(),
     loaderLoaded: fedosLoaderLoaded(),
+    loaderPolicyAllowed: fedosLoaderPolicyAllowed(),
+    loaderPolicyDecision: fedosLoaderPolicyDecision(),
+    loaderPolicyReason: fedosLoaderPolicyReason(),
     cryptoBackendInterfaceState: fedosCryptoBackendInterfaceState(),
     cryptoBackendInterfaceReady: fedosCryptoBackendInterfaceReady(),
     cryptoBackendSelected: fedosCryptoBackendSelected(),
