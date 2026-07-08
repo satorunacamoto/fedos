@@ -41,6 +41,31 @@ import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 export type RuntimeMode = "test" | "local" | "cloudflare";
 
 /**
+ * Stage 689–696 (Prototype Phase 001) — the fixed reason
+ * `AppRuntime.initializeCrypto()` always reports. `"PrototypeDisabled"`
+ * is the ONLY value produced in this stage; this is a Runtime PUBLIC
+ * API PROTOTYPE ONLY, deliberately separate from the twelve
+ * `PlanningOnly` layers in `src/runtime/fedos_*.ts`
+ * (`docs/runtime_initialize_crypto_planning_review.md`) — it neither
+ * calls nor extends any of them.
+ */
+export type RuntimeInitializeCryptoReason = "PrototypeDisabled";
+
+/**
+ * The fixed result `AppRuntime.initializeCrypto()` always returns in
+ * this stage — see `docs/runtime_initialize_crypto_prototype.md`.
+ * `allowed`/`initialized` are typed as the literal `false`: this is a
+ * public API SHAPE only ("adds a door, does not open it"). No
+ * Rust/WASM/Loader/generated JS glue call of any kind, and no
+ * `import()` (static or dynamic), ever produces this value.
+ */
+export interface RuntimeInitializeCryptoResult {
+  readonly allowed: false;
+  readonly initialized: false;
+  readonly reason: RuntimeInitializeCryptoReason;
+}
+
+/**
  * The environment a runtime is built from. Every field is optional: with no env
  * the runtime falls back to test/local-safe in-memory defaults. Cloudflare
  * bindings and promotion config are read but never mutated.
@@ -431,4 +456,17 @@ export interface AppRuntime {
    * TS package boundary) happens anywhere in resolving this field.
    */
   readonly crypto: RuntimeCryptoProvider;
+  /**
+   * Stage 689–696 (Prototype Phase 001) — the first Runtime PUBLIC API
+   * prototype for the twelve-layer `fedos_*.ts` `PlanningOnly` chain
+   * (`docs/runtime_initialize_crypto_planning_review.md`). Calling it
+   * performs NO real work: no Rust/WASM/Loader/generated JS glue call
+   * of any kind, and no `import()` (static or dynamic) anywhere. ALWAYS
+   * resolves `{ allowed: false, initialized: false, reason:
+   * "PrototypeDisabled" }` in this stage — this adds the door; it does
+   * not open it. Deliberately separate from `cryptoProvider`/`crypto`
+   * above, both UNCHANGED by this stage. See
+   * `docs/runtime_initialize_crypto_prototype.md`.
+   */
+  readonly initializeCrypto: () => RuntimeInitializeCryptoResult;
 }

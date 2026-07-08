@@ -12,6 +12,15 @@
  * READY to call out — it is not called here, and the Worker still shows no real
  * ads. The in-memory cache / directory / index defaults are shared module-level
  * singletons so state survives across requests in one isolate.
+ *
+ * Stage 691 (Prototype Phase 001) adds `initializeCrypto`
+ * (`createRuntimeInitializeCryptoResult`) to the assembled `AppRuntime` — a
+ * fixed, side-effect-free prototype ALWAYS resolving `{ allowed: false,
+ * initialized: false, reason: "PrototypeDisabled" }`. It calls no Facade,
+ * Loader, WASM, or Rust code (no `packages/fedos-core-rust` reference of any
+ * kind, no `fedos_*.ts` planning-layer reference, no `import()` of any kind),
+ * and does not touch the pre-existing `cryptoProvider`/`crypto` selection
+ * above. See `docs/runtime_initialize_crypto_prototype.md`.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -86,7 +95,13 @@ import { NoopEntitlementProvider } from "../creator/entitlement.js";
 import type { EntitlementProvider } from "../creator/entitlement.js";
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import { buildRuntimeCryptoProvider } from "./runtime_crypto_bridge.js";
-import type { AppRuntime, RuntimeEnv, RuntimeMode, RuntimeOverrides } from "./types.js";
+import type {
+  AppRuntime,
+  RuntimeEnv,
+  RuntimeInitializeCryptoResult,
+  RuntimeMode,
+  RuntimeOverrides,
+} from "./types.js";
 
 /** Shared in-memory defaults so state persists across requests in one isolate. */
 const defaultEventCache: EventCache = new InMemoryEventCache();
@@ -591,6 +606,20 @@ function resolveMode(env?: RuntimeEnv): RuntimeMode {
 }
 
 /**
+ * Stage 691 (Prototype Phase 001) — `AppRuntime.initializeCrypto()`'s real
+ * implementation: the first Runtime PUBLIC API prototype for the twelve-layer
+ * `fedos_*.ts` `PlanningOnly` chain (`docs/runtime_initialize_crypto_planning_review.md`).
+ * Fixed, synchronous, side-effect-free — it calls no Facade, Loader, WASM, or
+ * Rust code, references no generated JS glue, and writes no `import()` of any
+ * kind (static or dynamic). ALWAYS resolves `{ allowed: false, initialized:
+ * false, reason: "PrototypeDisabled" }`. See
+ * `docs/runtime_initialize_crypto_prototype.md`.
+ */
+export function createRuntimeInitializeCryptoResult(): RuntimeInitializeCryptoResult {
+  return { allowed: false, initialized: false, reason: "PrototypeDisabled" };
+}
+
+/**
  * Assembles the `AppRuntime` for an environment. Pure and side-effect-free: it
  * constructs adapters but opens no socket, issues no `fetch`, and publishes
  * nothing. `overrides` take precedence over anything selected from `env`, and
@@ -622,5 +651,6 @@ export function createRuntime(
     marketplaceProvider: selectMarketplaceProvider(env, overrides),
     creatorEntitlementProvider: selectCreatorEntitlementProvider(env, overrides),
     crypto: selectRuntimeCryptoProvider(overrides),
+    initializeCrypto: createRuntimeInitializeCryptoResult,
   };
 }
