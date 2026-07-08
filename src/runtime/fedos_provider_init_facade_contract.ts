@@ -19,9 +19,19 @@
  * `createProviderInitializationApproval()` to CALL
  * `createProviderInitFacadeContract()` — the result is DISCARDED, and
  * `createProviderInitializationApproval()`'s own return value stays
- * UNCHANGED (`approved: false`). That is the ONLY caller of this file
- * anywhere in this repository; neither `create_runtime.ts` nor
- * `src/worker.ts` references it, directly or indirectly.
+ * UNCHANGED (`approved: false`). That is one caller of this file;
+ * neither `create_runtime.ts` nor `src/worker.ts` references it,
+ * directly or indirectly.
+ *
+ * Stage 635 extends `createProviderInitFacadeContract()` DOWNWARD
+ * only: it now calls `createInitializeCryptoApiContract()`
+ * (`fedos_initialize_crypto_api_contract.ts`, Stage 634) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", contractReady: false, reason:
+ * "ProviderInitFacadeContractPending" }` answer. This mirrors the
+ * SAME "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619
+ * already established fifteen times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createProviderInitFacadeContract()` is PURE, synchronous,
@@ -61,6 +71,8 @@
  *     constructed anywhere in this file.
  */
 
+import { createInitializeCryptoApiContract } from "./fedos_initialize_crypto_api_contract.js";
+
 /**
  * The Provider Init Facade Contract's own coarse readiness state.
  * `"PlanningOnly"` is the ONLY value this stage's implementation ever
@@ -96,11 +108,24 @@ export interface FedosProviderInitFacadeContract {
  * writes `import()` of any kind.
  */
 export function createProviderInitFacadeContract(): FedosProviderInitFacadeContract {
+  reachInitializeCryptoApiContract(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     contractReady: false,
     reason: "ProviderInitFacadeContractPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createInitializeCryptoApiContract()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+ * initializeCrypto API Contract itself never references the
+ * generated JS glue or writes `import()` of any kind either.
+ */
+function reachInitializeCryptoApiContract(): void {
+  createInitializeCryptoApiContract();
 }
 
 /**
