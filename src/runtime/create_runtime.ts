@@ -21,6 +21,18 @@
  * kind, no `fedos_*.ts` planning-layer reference, no `import()` of any kind),
  * and does not touch the pre-existing `cryptoProvider`/`crypto` selection
  * above. See `docs/runtime_initialize_crypto_prototype.md`.
+ *
+ * Stage 697 (Prototype Phase 002) extends `createRuntimeInitializeCryptoResult`
+ * ONE link deeper — it now calls `createCryptoLoaderFacade()`
+ * (`fedos_crypto_loader_facade.ts`, Stage 594) and DISCARDS the result;
+ * the function's own return value stays UNCHANGED (`{ allowed: false,
+ * initialized: false, reason: "PrototypeDisabled" }`). This is the SAME
+ * "reach one link deeper, keep your own answer" pattern already
+ * established throughout the `fedos_*.ts` `PlanningOnly` chain. Runtime
+ * reaches ONLY the Facade — it does not call the Provider/Facade
+ * Boundary, the WASM Loader, `WebAssembly`, or Rust directly, and no
+ * `import()` of any kind is written here. The existing Facade file
+ * itself is UNMODIFIED by this stage.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -95,6 +107,7 @@ import { NoopEntitlementProvider } from "../creator/entitlement.js";
 import type { EntitlementProvider } from "../creator/entitlement.js";
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import { buildRuntimeCryptoProvider } from "./runtime_crypto_bridge.js";
+import { createCryptoLoaderFacade } from "./fedos_crypto_loader_facade.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -609,14 +622,33 @@ function resolveMode(env?: RuntimeEnv): RuntimeMode {
  * Stage 691 (Prototype Phase 001) — `AppRuntime.initializeCrypto()`'s real
  * implementation: the first Runtime PUBLIC API prototype for the twelve-layer
  * `fedos_*.ts` `PlanningOnly` chain (`docs/runtime_initialize_crypto_planning_review.md`).
- * Fixed, synchronous, side-effect-free — it calls no Facade, Loader, WASM, or
- * Rust code, references no generated JS glue, and writes no `import()` of any
+ * Fixed, synchronous, side-effect-free — it calls no Loader, WASM, or Rust
+ * code, references no generated JS glue, and writes no `import()` of any
  * kind (static or dynamic). ALWAYS resolves `{ allowed: false, initialized:
  * false, reason: "PrototypeDisabled" }`. See
  * `docs/runtime_initialize_crypto_prototype.md`.
+ *
+ * Stage 697 (Prototype Phase 002) — now reaches ONE link deeper, into the
+ * Crypto Loader Facade (`reachCryptoLoaderFacade`, below); the Facade's
+ * result is discarded and this function's own fixed return value is
+ * unchanged.
  */
 export function createRuntimeInitializeCryptoResult(): RuntimeInitializeCryptoResult {
+  reachCryptoLoaderFacade(); // result discarded -- Facade stays PlanningOnly, no Loader/WASM/Rust call
   return { allowed: false, initialized: false, reason: "PrototypeDisabled" };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createCryptoLoaderFacade()`
+ * (`fedos_crypto_loader_facade.ts`, Stage 594, UNMODIFIED by this stage).
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init export,
+ * `packages/fedos-core-rust`, or Worker. This is the ONLY point where
+ * Runtime reaches into the `fedos_*.ts` chain — it stops at the Facade and
+ * never calls the Provider/Facade Boundary, WASM Loader, or Rust directly.
+ */
+function reachCryptoLoaderFacade(): void {
+  createCryptoLoaderFacade();
 }
 
 /**
