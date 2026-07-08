@@ -169,11 +169,11 @@ describe("FedOS Runtime initializeCrypto Prototype, door added not opened, no si
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("12. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set is still exactly the known thirty-nine (Stage 714 legitimately added fedos_crypto_loader_backend.ts afterward)", () => {
+  it("12. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set is still exactly the known forty (Stage 714/730 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts afterward)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(39);
+    expect(Object.keys(files).length).toBe(40);
   });
 
   it("13. create_runtime.ts's pre-existing cryptoProvider/crypto selection is unchanged by this stage", () => {

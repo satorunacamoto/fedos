@@ -367,6 +367,18 @@
  * field. Fixed `"PlanningOnly"`/`"WasmPlanned"`/`false`/
  * `"BackendAbstractionPending"`. `worker_crypto_diagnostics.ts` is
  * intentionally NOT touched.
+ *
+ * Stage 741 (Prototype Phase 004) adds `wasmBackendState`/
+ * `wasmBackendReady`/`wasmBackendLoaderAttached`/
+ * `wasmBackendLoaderKind`/`wasmBackendReason`, reading
+ * `fedos_wasm_backend.ts`'s (Stage 729/730)
+ * `wasmBackendState()`/`wasmBackendReady()`/`wasmBackendLoaderAttached()`/
+ * `wasmBackendLoaderKind()`/`wasmBackendReason()` — the WASM Backend
+ * Planning layer the Backend Abstraction now reaches (Stage 737), one
+ * link below the Backend Abstraction's own pre-existing
+ * `cryptoLoaderBackendReady` field. Fixed `"PlanningOnly"`/`false`/
+ * `false`/`"WasmLoaderPlanned"`/`"WasmBackendPlanningPending"`.
+ * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
  */
 
 import type {
@@ -560,6 +572,18 @@ import {
   cryptoLoaderBackendReason as fedosCryptoLoaderBackendReason,
   cryptoLoaderBackendState as fedosCryptoLoaderBackendState,
 } from "./fedos_crypto_loader_backend.js";
+import type {
+  FedosWasmBackendLoaderKind,
+  FedosWasmBackendReason,
+  FedosWasmBackendState,
+} from "./fedos_wasm_backend.js";
+import {
+  wasmBackendLoaderAttached as fedosWasmBackendLoaderAttached,
+  wasmBackendLoaderKind as fedosWasmBackendLoaderKind,
+  wasmBackendReady as fedosWasmBackendReady,
+  wasmBackendReason as fedosWasmBackendReason,
+  wasmBackendState as fedosWasmBackendState,
+} from "./fedos_wasm_backend.js";
 import type {
   FedosCryptoProviderFacadeBoundaryReason,
   FedosCryptoProviderFacadeBoundaryState,
@@ -1632,6 +1656,35 @@ export interface RuntimeCryptoActivationStatus {
    * own answer. Fixed `"BackendAbstractionPending"` in this stage.
    */
   readonly cryptoLoaderBackendReason: FedosCryptoLoaderBackendReason;
+  /**
+   * Stage 741 (Prototype Phase 004) — the WASM Backend Planning
+   * layer's own fixed coarse state — `wasmBackendState()`'s own
+   * answer (`src/runtime/fedos_wasm_backend.ts`, Stage 729/730).
+   * Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly wasmBackendState: FedosWasmBackendState;
+  /**
+   * Whether a real WASM backend is ready to serve a request —
+   * `wasmBackendReady()`'s own answer. Fixed `false` in this stage.
+   */
+  readonly wasmBackendReady: boolean;
+  /**
+   * Whether a real WASM Loader has ever actually been attached —
+   * `wasmBackendLoaderAttached()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly wasmBackendLoaderAttached: boolean;
+  /**
+   * The loader kind this backend currently plans to attach —
+   * `wasmBackendLoaderKind()`'s own answer. Fixed
+   * `"WasmLoaderPlanned"` in this stage.
+   */
+  readonly wasmBackendLoaderKind: FedosWasmBackendLoaderKind;
+  /**
+   * WHY the WASM backend is not ready — `wasmBackendReason()`'s own
+   * answer. Fixed `"WasmBackendPlanningPending"` in this stage.
+   */
+  readonly wasmBackendReason: FedosWasmBackendReason;
 }
 
 /**
@@ -1796,5 +1849,10 @@ export function runtimeCryptoActivationStatus(
     cryptoLoaderBackendKind: fedosCryptoLoaderBackendKind(),
     cryptoLoaderBackendReady: fedosCryptoLoaderBackendReady(),
     cryptoLoaderBackendReason: fedosCryptoLoaderBackendReason(),
+    wasmBackendState: fedosWasmBackendState(),
+    wasmBackendReady: fedosWasmBackendReady(),
+    wasmBackendLoaderAttached: fedosWasmBackendLoaderAttached(),
+    wasmBackendLoaderKind: fedosWasmBackendLoaderKind(),
+    wasmBackendReason: fedosWasmBackendReason(),
   };
 }

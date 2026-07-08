@@ -25,12 +25,26 @@
  * references it, directly or indirectly, and NEITHER FILE IS
  * MODIFIED BY THIS STAGE.
  *
- * This file is a TERMINUS for this stage, not another "reach one link
- * deeper" step: per `docs/runtime_crypto_loader_backend_abstraction.md`
- * §1, the diagram ends `Backend Abstraction -> STOP`. This file does
- * NOT call the WASM Loader (`fedos_wasm_loader.ts`), the generated JS
- * glue, or Rust in any way — that remains a future, separate,
- * explicitly-reviewed stage's decision.
+ * Stage 737 (Prototype Phase 004) extends `createCryptoLoaderBackend()`
+ * DOWNWARD only: it now ALSO calls `createWasmBackend()`
+ * (`fedos_wasm_backend.ts`, Stage 730) — DISCARDING that result too,
+ * and returning its OWN, byte-for-byte unchanged `{ state:
+ * "PlanningOnly", backendKind: "WasmPlanned", backendReady: false,
+ * reason: "BackendAbstractionPending" }` answer. This is the ONLY
+ * caller of `fedos_wasm_backend.ts` anywhere in this repository — per
+ * `docs/runtime_wasm_backend_planning.md`, ONLY the Backend
+ * Abstraction may reach the WASM Backend Planning layer; Runtime,
+ * Worker, and the Facade never do, directly or indirectly.
+ *
+ * This file is a TERMINUS for the Facade's OWN reach, not another
+ * "reach one link deeper" step for the Facade: per
+ * `docs/runtime_crypto_loader_backend_abstraction.md` §1, the
+ * Facade-facing diagram ends `Backend Abstraction -> STOP` from the
+ * Facade's point of view, even though this file itself now reaches
+ * one further link (WASM Backend Planning) internally. This file does
+ * NOT call the real WASM Loader (`fedos_wasm_loader.ts`), the
+ * generated JS glue, or Rust in any way — that remains a future,
+ * separate, explicitly-reviewed stage's decision.
  *
  * HARD GUARDRAILS:
  *   - `createCryptoLoaderBackend()` is PURE, synchronous, takes no
@@ -56,7 +70,7 @@
  *   - NO reference to `fedos_wasm_loader.ts`/`fedos_wasm_loader_plan.ts`/
  *     `fedos_wasm_loader_contract.ts` — this file names WASM as the
  *     FIRST backend candidate positionally only; it does not import or
- *     call the WASM Loader.
+ *     call the real WASM Loader.
  *   - `createCryptoLoaderBackend()` ALWAYS resolves `backendReady:
  *     false` in this stage — `true` exists only as a RESERVED
  *     possibility for a future, separate, explicitly-reviewed stage;
@@ -69,6 +83,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createWasmBackend } from "./fedos_wasm_backend.js";
 
 /**
  * The Backend Abstraction's own coarse state. `"PlanningOnly"` is the
@@ -119,16 +135,31 @@ export interface FedosCryptoLoaderBackend {
  * "BackendAbstractionPending" }` in this stage. Pure; never throws;
  * takes no argument, reads no `process.env`/filesystem/`import.meta`.
  * Never references the generated JS glue, and never writes `import()`
- * of any kind. Calls nothing further — this file is a TERMINUS for
- * this stage (see this module's own top-of-file doc comment).
+ * of any kind. Reaches ONE further link (the WASM Backend Planning
+ * layer, `fedos_wasm_backend.ts`, Stage 737) and discards its result —
+ * this function's OWN return value stays byte-for-byte unchanged.
  */
 export function createCryptoLoaderBackend(): FedosCryptoLoaderBackend {
+  reachWasmBackend(); // result discarded -- WASM Backend Planning is a STOP, no real WASM Loader/Rust call
   return {
     state: "PlanningOnly",
     backendKind: "WasmPlanned",
     backendReady: false,
     reason: "BackendAbstractionPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createWasmBackend()`
+ * (`fedos_wasm_backend.ts`, Stage 730). The result is discarded; it
+ * is never passed to `WebAssembly.instantiate`/`compile`, `initSync`/
+ * the default init export, `packages/fedos-core-rust`, Runtime, or
+ * Worker. The WASM Backend Planning layer itself never references
+ * the generated JS glue, the real WASM Loader, or writes `import()`
+ * of any kind either — it is a TERMINUS for this stage.
+ */
+function reachWasmBackend(): void {
+  createWasmBackend();
 }
 
 /**
