@@ -348,6 +348,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       loaderPolicyAllowed: false,
       loaderPolicyDecision: "BlockedByPolicy",
       loaderPolicyReason: "PrototypePolicy",
+      loaderPlanReachedPolicy: true,
       cryptoBackendInterfaceState: "PlanningOnly",
       cryptoBackendInterfaceReady: false,
       cryptoBackendSelected: "WasmPlanned",

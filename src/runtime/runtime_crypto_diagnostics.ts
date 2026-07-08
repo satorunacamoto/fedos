@@ -439,6 +439,14 @@
  * UNCHANGED — a different, pre-existing `loaderPolicy()` label read).
  * Fixed `false`/`"BlockedByPolicy"`/`"PrototypePolicy"`.
  * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
+ *
+ * Stage 825 (Prototype Phase 011) adds `loaderPlanReachedPolicy`,
+ * reading `fedos_wasm_loader.ts`'s (Stage 825) `loaderPlanReachedPolicy()`
+ * — whether `planLoad()` structurally reaches `policy()` now (it does,
+ * discarding the result). The pre-existing `loaderPolicyAllowed`/
+ * `loaderPolicyDecision`/`loaderPolicyReason` fields above (Stage 817)
+ * are UNCHANGED by this stage. Fixed `true`.
+ * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
  */
 
 import type {
@@ -516,6 +524,7 @@ import {
   loaderMode as fedosLoaderSkeletonMode,
   loaderPlanningDecision as fedosLoaderPlanningDecision,
   loaderPlanningState as fedosLoaderPlanningState,
+  loaderPlanReachedPolicy as fedosLoaderPlanReachedPolicy,
   loaderPolicy as fedosLoaderSkeletonPolicy,
   loaderPolicyAllowed as fedosLoaderPolicyAllowed,
   loaderPolicyDecision as fedosLoaderPolicyDecision,
@@ -1836,6 +1845,15 @@ export interface RuntimeCryptoActivationStatus {
    */
   readonly loaderPolicyReason: string;
   /**
+   * Stage 825 (Prototype Phase 011) — whether `FedosWasmLoader.planLoad()`
+   * structurally reaches `policy()` — `loaderPlanReachedPolicy()`'s
+   * own answer (`src/runtime/fedos_wasm_loader.ts`, Stage 825). Fixed
+   * `true` in this stage: the call happens every time, but its result
+   * is always discarded and `planLoad()`'s own return value never
+   * changes.
+   */
+  readonly loaderPlanReachedPolicy: boolean;
+  /**
    * Stage 757 (Prototype Phase 005) — the Backend Interface's own
    * fixed coarse state — `cryptoBackendInterfaceState()`'s own answer
    * (`src/runtime/fedos_crypto_backend_interface.ts`, Stage 745/746).
@@ -2074,6 +2092,7 @@ export function runtimeCryptoActivationStatus(
     loaderPolicyAllowed: fedosLoaderPolicyAllowed(),
     loaderPolicyDecision: fedosLoaderPolicyDecision(),
     loaderPolicyReason: fedosLoaderPolicyReason(),
+    loaderPlanReachedPolicy: fedosLoaderPlanReachedPolicy(),
     cryptoBackendInterfaceState: fedosCryptoBackendInterfaceState(),
     cryptoBackendInterfaceReady: fedosCryptoBackendInterfaceReady(),
     cryptoBackendSelected: fedosCryptoBackendSelected(),

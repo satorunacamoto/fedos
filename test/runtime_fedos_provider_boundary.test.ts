@@ -289,6 +289,7 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       loaderPolicyAllowed: false,
       loaderPolicyDecision: "BlockedByPolicy",
       loaderPolicyReason: "PrototypePolicy",
+      loaderPlanReachedPolicy: true,
       cryptoBackendInterfaceState: "PlanningOnly",
       cryptoBackendInterfaceReady: false,
       cryptoBackendSelected: "WasmPlanned",

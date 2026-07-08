@@ -2562,6 +2562,79 @@ Ratchet, and onion routing unimplemented; `"Allowed"`/`"Active"`/
 unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 825–840: Prototype Phase 011, `planLoad()` reaches `policy()` — a read, not an obedience
+
+Stage 817 (not previously diagrammed here) added `FedosWasmLoader.policy()`
+— a fixed `{ allowed: false, decision: "BlockedByPolicy", reason:
+"PrototypePolicy" }` reader, independent of `planLoad()`/`planningState()`/
+`status()`. Stage 825 makes `planLoad()` itself reach `policy()` — the
+SAME "reach one link deeper, discard the result" pattern this whole
+document already diagrams everywhere else — WITHOUT moving the `STOP`
+below `BlockedByPolicy` from where the Stage 793 diagram above already
+placed it:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793: still constructs a
+("fedos_wasm_loader.ts", Stage 489-492)         FedosWasmLoaderPlan and calls planImport() (Stage 503),
+     |                                          result discarded
+     +--> FedosWasmLoaderPlan.planImport()      <-- unchanged since Stage 503, result discarded, reaches no
+     |    ("fedos_wasm_loader_plan.ts")             further file
+     |
+     +--> FedosWasmLoader.policy()               <-- NEW Stage 825 reach: planLoad() now ALSO calls
+     |    ("fedos_wasm_loader.ts", Stage 817)         this.policy() exactly once via #reachLoaderPolicy() --
+     |                                                result ({ allowed: false, decision: "BlockedByPolicy",
+     |                                                reason: "PrototypePolicy" }) DISCARDED in full, never
+     |                                                merged into planLoad()'s own return object, never
+     |                                                branched on
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED:
+     |                                          { operation: "load", state: "BlockedByPolicy", policy:
+     |                                          "FailClosed", reason: "..." }
+     v
+STOP                                       <-- SAME position as the Stage 793 diagram above -- not moved by
+                                                 this stage; the generated JS glue, WebAssembly.instantiate/
+                                                 compile, initSync, the default init export, and static/
+                                                 dynamic import() of any kind ALL remain PROHIBITED and
+                                                 unreachable from this chain
+```
+
+**This is a READ, not an obedience.** `planLoad()` now structurally
+calls `policy()`, but its own return value, its own decision, and
+whether it "proceeds" are completely unaffected by what `policy()`
+says — `planLoad()` was already fixed at `"BlockedByPolicy"` before
+this stage and stays fixed at `"BlockedByPolicy"` after it, for the
+same fail-closed reason as always, not because `policy()` told it to
+stop. `policy()` itself is unchanged and still does not call
+`planLoad()`/`planningState()`/`status()` — so the new reach is
+one-directional (`planLoad() -> policy()` only), and no cycle exists.
+`planInitialize()`/`planUnload()`/`planningState()`/`status()` do NOT
+call `policy()` and are untouched by this stage.
+
+**Nothing past the Loader is touched.** `createWasmBackend()`
+(`fedos_wasm_backend.ts`), the Backend Interface, the Backend
+Abstraction, the Facade, and `AppRuntime.initializeCrypto()` all still
+call `planLoad()` exactly as they did before Stage 825 and discard its
+answer exactly as before — none of them, and none of `create_runtime.ts`/
+`src/worker.ts`, references `policy()` directly or indirectly.
+
+`src/runtime/runtime_crypto_diagnostics.ts` (Stage 825) reads
+`loaderPlanReachedPolicy` (fixed `true`) for DISPLAY only —
+`worker_crypto_diagnostics.ts` is untouched by this addition.
+
+**Still true throughout Stage 825–840**: `src/worker.ts` UNMODIFIED and
+never references `policy()`, `planLoad()`, or `initializeCrypto`;
+`fedos_wasm_backend.ts`/Backend Interface/Backend Abstraction/Facade/
+Runtime return values all UNCHANGED; no call-graph cycle exists
+anywhere in this repository; no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind;
+no static `import` and no dynamic `import()` of the generated JS glue
+anywhere in this repository; no generated file edited or committed;
+`encrypt`/`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/
+NIP-59, Double Ratchet, Triple Ratchet, and onion routing
+unimplemented; `"Allowed"` never reached anywhere in this chain; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
