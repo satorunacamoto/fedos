@@ -36,6 +36,19 @@
  * Stage 503/511/519/527/535/539/547/555/563/571/579/587/595 already
  * established thirteen times over in this WASM arc.
  *
+ * Stage 721 (Prototype Phase 003) extends `createCryptoLoaderFacade()`
+ * with a SECOND, separate reach: it now ALSO calls
+ * `createCryptoLoaderBackend()` (`fedos_crypto_loader_backend.ts`,
+ * Stage 714) — DISCARDING that result too, and returning its OWN,
+ * byte-for-byte unchanged `{ state: "PlanningOnly", initialized:
+ * false, backend: "WasmPlanned", reason:
+ * "FacadeInitializationPending" }` answer. `initializeCrypto()`'s own
+ * return value is likewise unchanged. This is the ONLY caller of
+ * `fedos_crypto_loader_backend.ts` anywhere in this repository — per
+ * `docs/runtime_crypto_loader_backend_abstraction.md`, ONLY the
+ * Facade may reach the Backend Abstraction; Runtime and Worker never
+ * do, directly or indirectly.
+ *
  * HARD GUARDRAILS:
  *   - `createCryptoLoaderFacade()`/`initializeCrypto()` are PURE,
  *     synchronous, take no argument, and return hand-fixed constants.
@@ -75,6 +88,7 @@
  */
 
 import { createCryptoProviderFacadeBoundary } from "./fedos_crypto_provider_facade_boundary.js";
+import { createCryptoLoaderBackend } from "./fedos_crypto_loader_backend.js";
 
 /**
  * The Crypto Loader Facade's own coarse state. `"PlanningOnly"` is the
@@ -129,6 +143,7 @@ export interface FedosCryptoLoaderFacadeInitializationDecision {
  */
 export function createCryptoLoaderFacade(): FedosCryptoLoaderFacade {
   reachProviderFacadeBoundary(); // result discarded -- the generated JS glue is never imported
+  reachCryptoLoaderBackend(); // result discarded -- Backend Abstraction is a STOP, no WASM Loader/Rust call
   return {
     state: "PlanningOnly",
     initialized: false,
@@ -147,6 +162,20 @@ export function createCryptoLoaderFacade(): FedosCryptoLoaderFacade {
  */
 function reachProviderFacadeBoundary(): void {
   createCryptoProviderFacadeBoundary();
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createCryptoLoaderBackend()`
+ * (`fedos_crypto_loader_backend.ts`, Stage 714). The result is
+ * discarded; it is never passed to `WebAssembly.instantiate`/
+ * `compile`, `initSync`/the default init export,
+ * `packages/fedos-core-rust`, Runtime, or Worker. The Backend
+ * Abstraction itself never references the generated JS glue, the WASM
+ * Loader, or writes `import()` of any kind either — it is a TERMINUS
+ * for this stage.
+ */
+function reachCryptoLoaderBackend(): void {
+  createCryptoLoaderBackend();
 }
 
 /**

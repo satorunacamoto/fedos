@@ -271,6 +271,10 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       runtimePrototypeFacadeReached: true,
       runtimePrototypeFacadeConnected: false,
       runtimePrototypeFacadeReason: "PrototypeDisabled",
+      cryptoLoaderBackendState: "PlanningOnly",
+      cryptoLoaderBackendKind: "WasmPlanned",
+      cryptoLoaderBackendReady: false,
+      cryptoLoaderBackendReason: "BackendAbstractionPending",
     });
   });
 

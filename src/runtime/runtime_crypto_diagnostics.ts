@@ -355,6 +355,18 @@
  * (fixed `false`, that file UNMODIFIED by this stage); `...Reason`
  * mirrors the Runtime-level `"PrototypeDisabled"` reason, unchanged.
  * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
+ *
+ * Stage 725 (Prototype Phase 003) adds `cryptoLoaderBackendState`/
+ * `cryptoLoaderBackendKind`/`cryptoLoaderBackendReady`/
+ * `cryptoLoaderBackendReason`, reading
+ * `fedos_crypto_loader_backend.ts`'s (Stage 713/714)
+ * `cryptoLoaderBackendState()`/`cryptoLoaderBackendKind()`/
+ * `cryptoLoaderBackendReady()`/`cryptoLoaderBackendReason()` — the
+ * Backend Abstraction the Facade now reaches (Stage 721), one link
+ * below the Facade's own pre-existing `cryptoLoaderFacadeBackend`
+ * field. Fixed `"PlanningOnly"`/`"WasmPlanned"`/`false`/
+ * `"BackendAbstractionPending"`. `worker_crypto_diagnostics.ts` is
+ * intentionally NOT touched.
  */
 
 import type {
@@ -537,6 +549,17 @@ import {
   cryptoLoaderFacadeReason as fedosCryptoLoaderFacadeReason,
   cryptoLoaderFacadeState as fedosCryptoLoaderFacadeState,
 } from "./fedos_crypto_loader_facade.js";
+import type {
+  FedosCryptoLoaderBackendKind,
+  FedosCryptoLoaderBackendReason,
+  FedosCryptoLoaderBackendState,
+} from "./fedos_crypto_loader_backend.js";
+import {
+  cryptoLoaderBackendKind as fedosCryptoLoaderBackendKind,
+  cryptoLoaderBackendReady as fedosCryptoLoaderBackendReady,
+  cryptoLoaderBackendReason as fedosCryptoLoaderBackendReason,
+  cryptoLoaderBackendState as fedosCryptoLoaderBackendState,
+} from "./fedos_crypto_loader_backend.js";
 import type {
   FedosCryptoProviderFacadeBoundaryReason,
   FedosCryptoProviderFacadeBoundaryState,
@@ -1583,6 +1606,32 @@ export interface RuntimeCryptoActivationStatus {
    * Fixed `"PrototypeDisabled"` in this stage.
    */
   readonly runtimePrototypeFacadeReason: RuntimeInitializeCryptoReason;
+  /**
+   * Stage 725 (Prototype Phase 003) — the Crypto Loader Backend
+   * Abstraction's own fixed coarse state —
+   * `cryptoLoaderBackendState()`'s own answer
+   * (`src/runtime/fedos_crypto_loader_backend.ts`, Stage 713/714).
+   * Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly cryptoLoaderBackendState: FedosCryptoLoaderBackendState;
+  /**
+   * The currently designated backend candidate —
+   * `cryptoLoaderBackendKind()`'s own answer. Fixed `"WasmPlanned"`
+   * in this stage; `"NativePlanned"`/`"PythonPlanned"` are named but
+   * never produced.
+   */
+  readonly cryptoLoaderBackendKind: FedosCryptoLoaderBackendKind;
+  /**
+   * Whether the designated backend is ready to serve a request —
+   * `cryptoLoaderBackendReady()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly cryptoLoaderBackendReady: boolean;
+  /**
+   * WHY the designated backend is not ready — `cryptoLoaderBackendReason()`'s
+   * own answer. Fixed `"BackendAbstractionPending"` in this stage.
+   */
+  readonly cryptoLoaderBackendReason: FedosCryptoLoaderBackendReason;
 }
 
 /**
@@ -1743,5 +1792,9 @@ export function runtimeCryptoActivationStatus(
     runtimePrototypeFacadeReached: true,
     runtimePrototypeFacadeConnected: fedosCryptoLoaderFacadeInitialized(),
     runtimePrototypeFacadeReason: prototypeResult.reason,
+    cryptoLoaderBackendState: fedosCryptoLoaderBackendState(),
+    cryptoLoaderBackendKind: fedosCryptoLoaderBackendKind(),
+    cryptoLoaderBackendReady: fedosCryptoLoaderBackendReady(),
+    cryptoLoaderBackendReason: fedosCryptoLoaderBackendReason(),
   };
 }
