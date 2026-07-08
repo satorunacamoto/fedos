@@ -107,6 +107,38 @@
  *   - No `SecretHandle`, `ConversationKey`, `MessageKey`, or
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
+ *
+ * Stage 817 (Prototype Phase 010) adds a LOADER POLICY reader,
+ * `policy()`, plus standalone accessors (`loaderPolicyAllowed()`/
+ * `loaderPolicyDecision()`/`loaderPolicyReason()`). **Naming note — the
+ * same kind of design conflict Stage 809 already found and resolved,
+ * checked again before this addition landed**: a standalone
+ * `loaderPolicy()` function (Stage 489) already exists and already
+ * returns a DIFFERENT, pinned value (the bare label `"FailClosed"`,
+ * `FedosWasmLoaderPolicy`'s own fail-safety posture, guarded by
+ * `test/runtime_wasm_loader_state.test.ts`). `policy()`'s own return
+ * shape (`{ allowed, decision, reason }`) is a NEW, separately-named
+ * type, `FedosWasmLoaderPolicyDecision` — NOT a redefinition of
+ * `FedosWasmLoaderPolicy` — so neither the pre-existing `loaderPolicy()`
+ * function nor its return type is touched. `policy()` is PURE, takes no
+ * argument, and returns a hand-fixed constant `{ allowed: false,
+ * decision: "BlockedByPolicy", reason: "PrototypePolicy" }`. It is
+ * DELIBERATELY independent of every other reader on this class:
+ * it does NOT call `planningState()`, `status()`, or `planLoad()`
+ * (no reverse reference of any kind), and neither `planningState()`
+ * nor `status()` calls `policy()` either — `planLoad()` alone is
+ * PERMITTED to call `policy()` in a future stage, but this stage's
+ * `planLoad()` is byte-for-byte unchanged and does NOT call it, so no
+ * cycle (`policy()` -> `planLoad()` or otherwise) exists anywhere in
+ * this file.
+ *   - `policy().allowed` is fixed `false` — `true` is RESERVED for a
+ *     future, separate, explicitly-reviewed stage; nothing in this
+ *     file can ever produce it.
+ *   - `policy().decision` is fixed `"BlockedByPolicy"` — the SAME
+ *     `FedosWasmLoaderDecisionState` label `planLoad()`/`planInitialize()`/
+ *     `planUnload()`/`planningState()` already use; `"Allowed"` stays
+ *     RESERVED, unreachable from this file.
+ *   - `policy().reason` is fixed `"PrototypePolicy"`.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -188,6 +220,21 @@ export interface FedosWasmLoaderPlanningStatus {
 }
 
 /**
+ * Stage 817 — the Loader's own fixed POLICY answer: whether a real
+ * operation would be allowed, the decision label it maps to, and a
+ * non-sensitive reason. DELIBERATELY a separate shape from
+ * `FedosWasmLoaderStatus`/`FedosWasmLoaderDecision`/
+ * `FedosWasmLoaderPlanningStatus` above, and NOT a redefinition of the
+ * pre-existing `FedosWasmLoaderPolicy` label type — see this module's
+ * top-of-file "Stage 817" doc note for why.
+ */
+export interface FedosWasmLoaderPolicyDecision {
+  readonly allowed: boolean;
+  readonly decision: FedosWasmLoaderDecisionState;
+  readonly reason: string;
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -199,6 +246,7 @@ export interface FedosWasmLoader {
   planInitialize(): FedosWasmLoaderDecision;
   planUnload(): FedosWasmLoaderDecision;
   planningState(): FedosWasmLoaderPlanningStatus;
+  policy(): FedosWasmLoaderPolicyDecision;
 }
 
 /**
@@ -247,6 +295,22 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       state: "Planning",
       decision: "BlockedByPolicy",
       loaded: false,
+    };
+  }
+
+  /**
+   * Stage 817 — the Loader's own fixed POLICY answer, in one
+   * non-sensitive snapshot. PURE: does NOT call `planningState()`,
+   * `status()`, or `planLoad()`/`planInitialize()`/`planUnload()` (no
+   * reverse reference of any kind), and never loads, imports, fetches,
+   * or instantiates anything. Fixed `{ allowed: false, decision:
+   * "BlockedByPolicy", reason: "PrototypePolicy" }`.
+   */
+  policy(): FedosWasmLoaderPolicyDecision {
+    return {
+      allowed: false,
+      decision: "BlockedByPolicy",
+      reason: "PrototypePolicy",
     };
   }
 
@@ -338,4 +402,30 @@ export function loaderPlanningDecision(): FedosWasmLoaderDecisionState {
  */
 export function loaderLoaded(): boolean {
   return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed POLICY allowance — the
+ * same answer as `policy().allowed`. Fixed `false`. Usable by
+ * diagnostics WITHOUT constructing a `FedosWasmLoader` instance.
+ */
+export function loaderPolicyAllowed(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed POLICY decision — the
+ * same answer as `policy().decision`. Fixed `"BlockedByPolicy"` — no
+ * parameter or override anywhere can flip it.
+ */
+export function loaderPolicyDecision(): FedosWasmLoaderDecisionState {
+  return "BlockedByPolicy";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed POLICY reason — the same
+ * answer as `policy().reason`. Fixed `"PrototypePolicy"`.
+ */
+export function loaderPolicyReason(): string {
+  return "PrototypePolicy";
 }
