@@ -139,6 +139,28 @@
  *     `planUnload()`/`planningState()` already use; `"Allowed"` stays
  *     RESERVED, unreachable from this file.
  *   - `policy().reason` is fixed `"PrototypePolicy"`.
+ *
+ * Stage 825 (Prototype Phase 011) wires `planLoad()` to READ the fixed
+ * POLICY answer `policy()` (Stage 817) already provides — WITHOUT
+ * changing what `planLoad()` acts on or returns. A new PRIVATE
+ * `#reachLoaderPolicy()` helper calls `this.policy()` exactly once and
+ * DISCARDS the result in full — the SAME "reach one link deeper,
+ * discard the result, keep your own fixed answer" pattern
+ * `#reachLoaderPlan()` (Stage 503) already established one call above
+ * it. `planLoad()`'s own return value stays byte-for-byte `{
+ * operation: "load", state: "BlockedByPolicy", policy: "FailClosed",
+ * reason: "..." }` — the Policy answer is READ, never MERGED into it,
+ * never branched on, and never used to decide whether to proceed. This
+ * is **NOT** "`planLoad()` now obeys `policy()`" — it is "`planLoad()`
+ * now also reaches `policy()`, and still ignores what it says,"
+ * matching this whole file's own longstanding "plan/observe only,
+ * never a real action" discipline. `policy()` itself is UNCHANGED — it
+ * still does not call `planLoad()`/`planningState()`/`status()`, so no
+ * cycle (`policy()` <-> `planLoad()` or any other direction) exists
+ * anywhere in this file, only the new, one-directional
+ * `planLoad() -> policy()` reach this stage adds. `planInitialize()`/
+ * `planUnload()`/`planningState()`/`status()` are UNTOUCHED by this
+ * stage and do NOT call `policy()`.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -271,6 +293,7 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   planLoad(): FedosWasmLoaderDecision {
     this.#reachLoaderPlan(); // result discarded -- no import/initialize/attach ever happens
+    this.#reachLoaderPolicy(); // result discarded -- reads the fixed Policy answer, never obeys it
     return this.#blocked("load");
   }
 
@@ -324,6 +347,18 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   #reachLoaderPlan(): void {
     const plan = createFedosWasmLoaderPlan();
     plan.planImport();
+  }
+
+  /**
+   * PRIVATE — Stage 825. Calls `this.policy()` exactly once and
+   * discards the result in full: never merged into `planLoad()`'s own
+   * return value, never branched on, never used to decide whether to
+   * proceed. Mirrors `#reachLoaderPlan()`'s own "reach one link
+   * deeper, discard the result" pattern.
+   */
+  #reachLoaderPolicy(): void {
+    const policyDecision = this.policy();
+    void policyDecision; // discarded -- read only, never merged, never branched on
   }
 
   #blocked(operation: FedosWasmLoaderOperation): FedosWasmLoaderDecision {
@@ -428,4 +463,18 @@ export function loaderPolicyDecision(): FedosWasmLoaderDecisionState {
  */
 export function loaderPolicyReason(): string {
   return "PrototypePolicy";
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally reaches
+ * `policy()` — Stage 825. Fixed `true`: `planLoad()`'s own
+ * `#reachLoaderPolicy()` helper DOES call `this.policy()` exactly
+ * once every time `planLoad()` runs (verified via spy in
+ * `test/runtime_wasm_loader_plan_policy_connection.test.ts`), even
+ * though the result is always discarded and `planLoad()`'s own return
+ * value never changes. NOT a claim that `planLoad()` obeys `policy()`
+ * — only that the two are now connected by a real function call.
+ */
+export function loaderPlanReachedPolicy(): boolean {
+  return true;
 }

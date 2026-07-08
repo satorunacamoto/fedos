@@ -123,7 +123,7 @@ describe("FedOS WASM Loader gains a Loader Policy reader, independent of plannin
     });
   });
 
-  it("5. no cycle exists between policy() and planLoad() in either direction", () => {
+  it("5. no cycle exists: policy() never calls planLoad(); planLoad() -> policy() is a new, one-directional reach as of Stage 825", () => {
     const loader = createFedosWasmLoader();
 
     const planLoadSpy = vi.spyOn(FedosWasmLoaderSkeleton.prototype, "planLoad");
@@ -134,14 +134,15 @@ describe("FedOS WASM Loader gains a Loader Policy reader, independent of plannin
       planLoadSpy.mockRestore();
     }
 
-    // planLoad() is PERMITTED to call policy() in a future stage, but
-    // does NOT do so in this one -- assert that today's planLoad()
-    // leaves policy() untouched, matching its byte-for-byte-unchanged
-    // return value above.
+    // Stage 825 (Prototype Phase 011, test/runtime_wasm_loader_plan_policy_connection.test.ts)
+    // wires planLoad() to call policy() exactly once, discarding the
+    // result -- a deliberate, one-directional reach, not a cycle,
+    // since policy() itself still never calls planLoad() (asserted
+    // above).
     const policySpy = vi.spyOn(FedosWasmLoaderSkeleton.prototype, "policy");
     try {
       loader.planLoad();
-      expect(policySpy).not.toHaveBeenCalled();
+      expect(policySpy).toHaveBeenCalledTimes(1);
     } finally {
       policySpy.mockRestore();
     }
