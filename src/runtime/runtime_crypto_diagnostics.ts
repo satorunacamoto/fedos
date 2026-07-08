@@ -303,6 +303,33 @@
  * `false`/`false`/`"RuntimeWiringPlanPending"`. None of these expose
  * any implementation detail beyond these values; no payload,
  * plaintext, ciphertext, or key material is ever involved.
+ *
+ * Stage 668 adds `initializeCryptoPublicApiState`/
+ * `initializeCryptoApiVisible`/`initializeCryptoPublicApiCallable`/
+ * `initializeCryptoPublicApiReason`
+ * (`fedos_initialize_crypto_public_api.ts`'s
+ * `initializeCryptoPublicApiState()`/`initializeCryptoApiVisible()`/
+ * `initializeCryptoPublicApiCallable()`/`initializeCryptoPublicApiReason()`,
+ * Stage 666/667) — the Runtime initializeCrypto Public API's own
+ * fixed answers: `"PlanningOnly"`/`false`/`false`/
+ * `"PublicApiPending"`. `initializeCryptoPublicApiCallable` is
+ * DELIBERATELY named differently from the pre-existing
+ * `initializeCryptoCallable` (Stage 636, which reads
+ * `fedos_initialize_crypto_api_contract.ts`'s INTERNAL Facade-level
+ * callability) to avoid colliding with it — see
+ * `docs/runtime_initialize_crypto_public_api.md` §1.
+ *
+ * Stage 676 adds `initializeCryptoInvocationState`/
+ * `initializeCryptoInvocationAllowed`/
+ * `initializeCryptoInvocationCompleted`/`initializeCryptoInvocationReason`
+ * (`fedos_initialize_crypto_invocation_contract.ts`'s
+ * `initializeCryptoInvocationState()`/`initializeCryptoInvocationAllowed()`/
+ * `initializeCryptoInvocationCompleted()`/`initializeCryptoInvocationReason()`,
+ * Stage 674/675) — the Runtime initializeCrypto Invocation Contract's
+ * own fixed answers: `"PlanningOnly"`/`false`/`false`/
+ * `"InvocationContractPending"`. None of these expose any
+ * implementation detail beyond these values; no payload, plaintext,
+ * ciphertext, or key material is ever involved.
  */
 
 import type {
@@ -563,6 +590,26 @@ import {
   initializeCryptoWiringPlanState as fedosInitializeCryptoWiringPlanState,
   initializeCryptoWorkerWiringAllowed as fedosInitializeCryptoWorkerWiringAllowed,
 } from "./fedos_initialize_crypto_wiring_plan.js";
+import type {
+  FedosInitializeCryptoPublicApiReason,
+  FedosInitializeCryptoPublicApiState,
+} from "./fedos_initialize_crypto_public_api.js";
+import {
+  initializeCryptoApiVisible as fedosInitializeCryptoApiVisible,
+  initializeCryptoPublicApiCallable as fedosInitializeCryptoPublicApiCallable,
+  initializeCryptoPublicApiReason as fedosInitializeCryptoPublicApiReason,
+  initializeCryptoPublicApiState as fedosInitializeCryptoPublicApiState,
+} from "./fedos_initialize_crypto_public_api.js";
+import type {
+  FedosInitializeCryptoInvocationContractReason,
+  FedosInitializeCryptoInvocationContractState,
+} from "./fedos_initialize_crypto_invocation_contract.js";
+import {
+  initializeCryptoInvocationAllowed as fedosInitializeCryptoInvocationAllowed,
+  initializeCryptoInvocationCompleted as fedosInitializeCryptoInvocationCompleted,
+  initializeCryptoInvocationReason as fedosInitializeCryptoInvocationReason,
+  initializeCryptoInvocationState as fedosInitializeCryptoInvocationState,
+} from "./fedos_initialize_crypto_invocation_contract.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -1408,6 +1455,58 @@ export interface RuntimeCryptoActivationStatus {
    * `"RuntimeWiringPlanPending"` in this stage.
    */
   readonly initializeCryptoWiringPlanReason: FedosInitializeCryptoWiringPlanReason;
+  /**
+   * The Runtime initializeCrypto Public API's own fixed coarse
+   * state — `initializeCryptoPublicApiState()`'s own answer
+   * (`src/runtime/fedos_initialize_crypto_public_api.ts`, Stage
+   * 666/668). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly initializeCryptoPublicApiState: FedosInitializeCryptoPublicApiState;
+  /**
+   * Whether `initializeCrypto()` is currently visible as a public
+   * member on `AppRuntime` — `initializeCryptoApiVisible()`'s own
+   * answer. Fixed `false` in this stage.
+   */
+  readonly initializeCryptoApiVisible: boolean;
+  /**
+   * Whether the public-facing member is currently callable —
+   * `initializeCryptoPublicApiCallable()`'s own answer. Fixed
+   * `false` in this stage. DISTINCT from `initializeCryptoCallable`
+   * above (Stage 636, the internal Facade-level answer) — see
+   * `docs/runtime_initialize_crypto_public_api.md` §1.
+   */
+  readonly initializeCryptoPublicApiCallable: boolean;
+  /**
+   * WHY `initializeCrypto()` is not currently visible —
+   * `initializeCryptoPublicApiReason()`'s own answer. Fixed
+   * `"PublicApiPending"` in this stage.
+   */
+  readonly initializeCryptoPublicApiReason: FedosInitializeCryptoPublicApiReason;
+  /**
+   * The Runtime initializeCrypto Invocation Contract's own fixed
+   * coarse state — `initializeCryptoInvocationState()`'s own answer
+   * (`src/runtime/fedos_initialize_crypto_invocation_contract.ts`,
+   * Stage 674/676). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly initializeCryptoInvocationState: FedosInitializeCryptoInvocationContractState;
+  /**
+   * Whether an actual invocation is currently permitted —
+   * `initializeCryptoInvocationAllowed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly initializeCryptoInvocationAllowed: boolean;
+  /**
+   * Whether an invocation has ever actually completed —
+   * `initializeCryptoInvocationCompleted()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly initializeCryptoInvocationCompleted: boolean;
+  /**
+   * WHY an invocation is not currently allowed —
+   * `initializeCryptoInvocationReason()`'s own answer. Fixed
+   * `"InvocationContractPending"` in this stage.
+   */
+  readonly initializeCryptoInvocationReason: FedosInitializeCryptoInvocationContractReason;
 }
 
 /**
@@ -1553,5 +1652,13 @@ export function runtimeCryptoActivationStatus(
     initializeCryptoRuntimeWiringAllowed: fedosInitializeCryptoRuntimeWiringAllowed(),
     initializeCryptoWorkerWiringAllowed: fedosInitializeCryptoWorkerWiringAllowed(),
     initializeCryptoWiringPlanReason: fedosInitializeCryptoWiringPlanReason(),
+    initializeCryptoPublicApiState: fedosInitializeCryptoPublicApiState(),
+    initializeCryptoApiVisible: fedosInitializeCryptoApiVisible(),
+    initializeCryptoPublicApiCallable: fedosInitializeCryptoPublicApiCallable(),
+    initializeCryptoPublicApiReason: fedosInitializeCryptoPublicApiReason(),
+    initializeCryptoInvocationState: fedosInitializeCryptoInvocationState(),
+    initializeCryptoInvocationAllowed: fedosInitializeCryptoInvocationAllowed(),
+    initializeCryptoInvocationCompleted: fedosInitializeCryptoInvocationCompleted(),
+    initializeCryptoInvocationReason: fedosInitializeCryptoInvocationReason(),
   };
 }

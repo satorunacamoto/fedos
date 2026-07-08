@@ -1837,8 +1837,235 @@ in this repository; no generated file edited or committed;
 `"Loaded"`/`"FailOpen"` never reached; Rust public API unchanged (27
 `pub fn`); no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 665–669: Runtime initializeCrypto Public API, revised diagram
+
+Stage 665 (`docs/runtime_initialize_crypto_public_api.md`) fixes the
+SHAPE of what Runtime would actually expose to its own callers — a
+public API surface, not the internal Facade/Boundary/Contract
+machinery — whether `initializeCrypto()` is currently VISIBLE as a
+public member on `AppRuntime`, and whether that member is CALLABLE.
+Stage 666 adds `src/runtime/fedos_initialize_crypto_public_api.ts` —
+a pure, fixed-value PUBLIC API DESIGN naming
+`createInitializeCryptoPublicApi()`, fixed `{ state: "PlanningOnly",
+apiVisible: false, callable: false, reason: "PublicApiPending" }` —
+with NO side effects and NO `import()` of any kind (static or
+dynamic) written anywhere in this file. Its own `callable` field is
+DISTINCT from `FedosInitializeCryptoApiContract.callable` (Stage
+634) — the earlier field answers whether the INTERNAL Facade-level
+`initializeCrypto()` is callable; this one answers whether the
+PUBLIC-FACING `AppRuntime` member is callable — see the doc's own §1.
+Stage 667 wires `createInitializeCryptoWiringPlan()`
+(`fedos_initialize_crypto_wiring_plan.ts`) to CALL
+`createInitializeCryptoPublicApi()` — the result is DISCARDED and
+`createInitializeCryptoWiringPlan()`'s own return value is UNCHANGED
+(`runtimeWiringAllowed: false`, `workerWiringAllowed: false`), the
+SAME "reach one link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635/643/651/659
+already established nineteen times over.
+
+This revises the Stage 657–661 diagram — Runtime initializeCrypto
+Public API now sits between Runtime initializeCrypto Wiring Plan and
+the still-positional Dynamic Import box:
+
+```
+FedosInitializeCryptoWiringPlan            <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_wiring_plan.ts,
+("Runtime initializeCrypto Wiring Plan")       Stage 658), REAL wiring: createInitializeCryptoWiringPlan() calls
+     |                                          createInitializeCryptoPublicApi(), discards the result (Stage 667)
+     v
+FedosInitializeCryptoPublicApi             <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_public_api.ts,
+("Runtime initializeCrypto Public API")        Stage 666), fixed { state: "PlanningOnly", apiVisible: false, callable: false,
+     |                                          reason: "PublicApiPending" } -- NO side effects, NO import() of any kind
+     |                                          written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist. `create_runtime.ts`/`src/worker.ts` are NOT modified by this
+stage.** Neither file references
+`fedos_initialize_crypto_public_api.ts`, directly or indirectly, and
+`initializeCrypto()` is not added as a member of `AppRuntime` — no
+field, method, or property is added to `create_runtime.ts`.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+668) read `initializeCryptoPublicApiState()`/`initializeCryptoApiVisible()`/
+`initializeCryptoPublicApiCallable()`/`initializeCryptoPublicApiReason()`
+for DISPLAY only — `"PlanningOnly"`/`false`/`false`/
+`"PublicApiPending"`, matching every other leaf in this arc.
+`initializeCryptoPublicApiCallable` is DELIBERATELY named differently
+from the pre-existing `initializeCryptoCallable` (Stage 636) to avoid
+colliding with it in the flat diagnostics namespace — the two fields
+answer different questions and are never conflated.
+
+## Update — Stage 673–677: Runtime initializeCrypto Invocation Contract, revised diagram, full target architecture extended
+
+Stage 673 (`docs/runtime_initialize_crypto_invocation_contract.md`) is
+the LAST layer in this arc: even IF `initializeCrypto()` were someday
+visible and callable as a public member, an actual INVOCATION — a real
+caller actually invoking it — is a further, separate, EVENT-level
+question, distinct from the STRUCTURAL question of callability. Stage
+674 adds `src/runtime/fedos_initialize_crypto_invocation_contract.ts`
+— a pure, fixed-value INVOCATION CONTRACT naming
+`createInitializeCryptoInvocationContract()`, fixed `{ state:
+"PlanningOnly", invocationAllowed: false, completed: false, reason:
+"InvocationContractPending" }` — with NO side effects and NO
+`import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 675 wires `createInitializeCryptoPublicApi()`
+(`fedos_initialize_crypto_public_api.ts`) to CALL
+`createInitializeCryptoInvocationContract()` — the result is
+DISCARDED and `createInitializeCryptoPublicApi()`'s own return value
+is UNCHANGED (`apiVisible: false`, `callable: false`), the SAME
+"reach one link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635/643/651/659/667
+already established twenty times over.
+
+This revises the Stage 665–669 diagram — Runtime initializeCrypto
+Invocation Contract now sits between Runtime initializeCrypto Public
+API and the still-positional Dynamic Import box:
+
+```
+FedosInitializeCryptoPublicApi             <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_public_api.ts,
+("Runtime initializeCrypto Public API")        Stage 666), REAL wiring: createInitializeCryptoPublicApi() calls
+     |                                          createInitializeCryptoInvocationContract(), discards the result (Stage 675)
+     v
+FedosInitializeCryptoInvocationContract    <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_invocation_contract.ts,
+("Runtime initializeCrypto Invocation          Stage 674), fixed { state: "PlanningOnly", invocationAllowed: false, completed:
+Contract")                                     false, reason: "InvocationContractPending" } -- NO side effects, NO import()
+     |                                          of any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+This update also extends the Stage 657 full target-architecture
+diagram by two more boxes, exactly as requested — from `Runtime`
+through this Invocation Contract's own `STOP`:
+
+```
+Crypto Provider
+        │
+        ▼
+Provider Initialization Request
+        │
+        ▼
+Provider Initialization Approval
+        │
+        ▼
+Provider Init Facade Contract
+        │
+        ▼
+Provider / Facade Boundary
+        │
+        ▼
+Crypto Loader Facade
+        │
+        ▼
+Explicit Crypto Initialization
+        │
+        ▼
+InitializeCrypto API Contract
+        │
+        ▼
+Crypto Initialization Result Contract
+        │
+        ▼
+Runtime initializeCrypto Exposure Review
+        │
+        ▼
+Runtime initializeCrypto Wiring Plan
+        │
+        ▼
+Runtime initializeCrypto Public API
+        │
+        ▼
+Runtime initializeCrypto Invocation Contract
+        │
+        ▼
+STOP
+```
+
+**This target diagram is CONCEPTUAL, exactly like the Stage 593/609/625/641/657
+target diagrams it extends — every box names a REAL, independently-
+tested file, but the ARROWS remain conceptual for the
+Provider/Request/Approval/Contract/Boundary/Facade/Explicit-Init
+segment (see the Stage 657 update for that segment's exact
+real-vs-positional breakdown).** `Runtime initializeCrypto Public
+API`/`Runtime initializeCrypto Invocation Contract` are the THIRD and
+FOURTH boxes in this diagram whose REAL code wiring runs in the SAME
+direction as the diagram itself (continuing from `InitializeCrypto
+API Contract`/`Crypto Initialization Result Contract`/`Runtime
+initializeCrypto Exposure Review`/`Runtime initializeCrypto Wiring
+Plan`), because they are the deepest links the parked implementation
+chain has reached so far — not because the earlier segment's
+direction has changed.
+
+**Runtime connection does not exist. Worker connection does not
+exist. `create_runtime.ts`/`src/worker.ts` are NOT modified by this
+stage.** Neither file references
+`fedos_initialize_crypto_invocation_contract.ts`, directly or
+indirectly, and no invocation of any kind is ever attempted or
+completed by this file.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+676) read `initializeCryptoInvocationState()`/
+`initializeCryptoInvocationAllowed()`/`initializeCryptoInvocationCompleted()`/
+`initializeCryptoInvocationReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`false`/`"InvocationContractPending"`,
+matching every other leaf in this arc.
+
+**Still true after Stage 665–677**: no Runtime/Worker connection of
+any kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_initialize_crypto_public_api.ts` nor
+`fedos_initialize_crypto_invocation_contract.ts`, and NEITHER FILE IS
+MODIFIED BY THIS STAGE); `initializeCrypto()` is not exposed on, or
+invoked from, `AppRuntime` in any way; `WebAssembly.instantiate`/
+`compile` never invoked; no static `import` and no dynamic `import()`
+of the generated JS glue anywhere in this repository; no generated
+file edited or committed; `encrypt`/`decrypt` unchanged; NIP-17/
+NIP-44/NIP-59 unimplemented; `"Allowed"`/`"Approved"`/`"Ready"`/
+`"Present"`/`"Reviewed"`/`"Committed"`/`"PrebuildRequired"`/
+`"OptionalLoader"`/`"Open"`/`"Granted"`/`"Active"`/`"WasmActive"`/
+`"Connected"`/`"Requested"`/`"Callable"`/`"Completed"`/`"Wasm"`/
+`"Exposed"`/`"Wired"`/`"Visible"`/`"Invoked"`/`"Loaded"`/`"FailOpen"`
+never reached; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_initialize_crypto_invocation_contract.md` (Stage 673)
+  — the terminus of this Public API arc, and the full extended
+  target-architecture diagram.
+- `src/runtime/fedos_initialize_crypto_invocation_contract.ts` (Stage
+  674–675) — the Invocation Contract's real, fixed-value
+  implementation and its wiring from
+  `fedos_initialize_crypto_public_api.ts`.
+- `docs/runtime_initialize_crypto_public_api.md` (Stage 665) — the
+  public-surface visibility/callability layer one level above the
+  Invocation Contract.
+- `src/runtime/fedos_initialize_crypto_public_api.ts` (Stage 666–667)
+  — the Public API's real, fixed-value implementation and its wiring
+  from `fedos_initialize_crypto_wiring_plan.ts`.
 - `docs/runtime_initialize_crypto_wiring_plan.md` (Stage 657) — the
   last layer before any real connection, and the full extended
   target-architecture diagram naming `Explicit Crypto Initialization`.
