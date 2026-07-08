@@ -21,10 +21,19 @@
  * `createInitializeCryptoApiContract()` to CALL
  * `createCryptoInitializationResult()` — the result is DISCARDED, and
  * `createInitializeCryptoApiContract()`'s own return value stays
- * UNCHANGED (`callable: false`, `initialized: false`). That is the
- * ONLY caller of this file anywhere in this repository; neither
- * `create_runtime.ts` nor `src/worker.ts` references it, directly or
- * indirectly.
+ * UNCHANGED (`callable: false`, `initialized: false`). That is one
+ * caller of this file; neither `create_runtime.ts` nor
+ * `src/worker.ts` references it, directly or indirectly.
+ *
+ * Stage 651 extends `createCryptoInitializationResult()` DOWNWARD
+ * only: it now calls `createInitializeCryptoExposureReview()`
+ * (`fedos_initialize_crypto_exposure_review.ts`, Stage 650) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", success: false, backend: "None", reason:
+ * "InitializationResultPending" }` answer. This mirrors the SAME
+ * "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635
+ * already established seventeen times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createCryptoInitializationResult()` is PURE, synchronous,
@@ -62,6 +71,8 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import { createInitializeCryptoExposureReview } from "./fedos_initialize_crypto_exposure_review.js";
 
 /**
  * The Crypto Initialization Result Contract's own coarse completion
@@ -111,12 +122,25 @@ export interface FedosCryptoInitializationResult {
  * writes `import()` of any kind.
  */
 export function createCryptoInitializationResult(): FedosCryptoInitializationResult {
+  reachInitializeCryptoExposureReview(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     success: false,
     backend: "None",
     reason: "InitializationResultPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createInitializeCryptoExposureReview()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+ * Runtime initializeCrypto Exposure Review itself never references
+ * the generated JS glue or writes `import()` of any kind either.
+ */
+function reachInitializeCryptoExposureReview(): void {
+  createInitializeCryptoExposureReview();
 }
 
 /**
