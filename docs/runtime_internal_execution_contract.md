@@ -1003,25 +1003,33 @@ FACADE naming `createCryptoLoaderFacade()`, fixed `{ state:
 "FacadeInitializationPending" }`, and `initializeCrypto()`, fixed `{
 allowed: false, reason: "FacadeInitializationPending" }` — with NO
 side effects and NO `import()` of any kind (static or dynamic)
-written anywhere in this file. Stage 595 wires
+written anywhere in this file. Stage 595 wired
 `createExplicitCryptoInitialization()`
 (`fedos_explicit_crypto_initialization.ts`) to CALL
-`createCryptoLoaderFacade()` — the result is DISCARDED and
-`createExplicitCryptoInitialization()`'s own return value is
+`createCryptoLoaderFacade()` — the result was DISCARDED and
+`createExplicitCryptoInitialization()`'s own return value stayed
 UNCHANGED (`initializationAllowed: false`), the SAME "reach one link
 deeper, keep your own answer" pattern
 Stage 503/511/519/527/535/539/547/555/563/571/579/587 already
-established twelve times over.
+established twelve times over — AT THE TIME. **Stage 793 (Prototype
+Phase 008) REMOVES this Stage 595 reach** — see that stage's own
+update further below for why: connecting `fedos_wasm_backend.ts` to
+the real `FedosWasmLoader` made this reach close a call-graph cycle
+back through `fedos_dynamic_loader_dev_approval.ts` to
+`fedos_explicit_crypto_initialization.ts`. `createExplicitCryptoInitialization()`
+is now a TERMINUS; its own return value remains unchanged.
 
-This revises the Stage 585–589 diagram — Crypto Loader Facade now
-sits between Explicit Crypto Initialization and the (still purely
-positional) Dynamic Import box:
+This revised the Stage 585–589 diagram from Stage 595 through Stage
+792 — Crypto Loader Facade sat between Explicit Crypto Initialization
+and the (still purely positional) Dynamic Import box; AS OF STAGE 793
+THIS ARROW NO LONGER EXISTS IN CODE (kept below for historical record
+only):
 
 ```
 FedosExplicitCryptoInitialization             <-- REAL, pure decision function (src/runtime/fedos_explicit_crypto_initialization.ts,
-("Explicit Crypto Initialization")                 Stage 586), REAL wiring: createExplicitCryptoInitialization() calls
-     |                                          createCryptoLoaderFacade(), discards the result (Stage 595)
-     v
+("Explicit Crypto Initialization")                 Stage 586); Stage 595-792 REAL wiring: createExplicitCryptoInitialization()
+     |                                          called createCryptoLoaderFacade(), discarding the result -- REMOVED at Stage 793
+     v                                          (see that stage's update) to prevent a call-graph cycle; this file is now a TERMINUS
 FedosCryptoLoaderFacade                    <-- REAL, pure decision function (src/runtime/fedos_crypto_loader_facade.ts,
 ("Crypto Loader Facade")                       Stage 594), fixed { state: "PlanningOnly", initialized: false, backend:
      |                                          "WasmPlanned", reason: "FacadeInitializationPending" }; initializeCrypto()
@@ -1790,21 +1798,27 @@ STOP
 target diagrams it extends — every box names a REAL, independently-
 tested file, but the ARROWS are conceptual for the Provider/Request/
 Approval/Contract/Boundary/Facade segment (see the Stage 625 update
-above for that segment's exact real-vs-positional breakdown).** The
-`Explicit Crypto Initialization` box's OWN real position in the parked
-implementation chain is DIFFERENT from its position in this target
-diagram: in the real, independently-tested chain,
-`createDynamicLoaderDevApproval()` (Stage 578) calls
-`createExplicitCryptoInitialization()` (Stage 587), which in turn
-calls `createCryptoLoaderFacade()` (Stage 595) — i.e. Explicit Crypto
-Initialization sits structurally ABOVE Crypto Loader Facade in the
-real call graph, calling INTO it, not below it as the target diagram's
-top-to-bottom reading might suggest. This is the SAME "two diagrams
-name the same real files from two deliberately separate vantage
-points" discipline `docs/runtime_internal_execution_contract.md`'s
-Stage 609 update already established for Provider Initialization
-Request's own position relative to the Boundary — naming a box in the
-target diagram is never a claim about its real wiring direction.
+above for that segment's exact real-vs-positional breakdown).**
+
+**Historical note, corrected at Stage 793 (Prototype Phase 008).**
+From Stage 595 until Stage 793, `createExplicitCryptoInitialization()`
+(Stage 587) additionally called `createCryptoLoaderFacade()` (Stage
+595) — i.e. Explicit Crypto Initialization sat structurally ABOVE
+Crypto Loader Facade in the real call graph, calling INTO it, not
+below it as this target diagram's top-to-bottom reading might suggest.
+That reach was harmless for exactly as long as nothing upstream of the
+Facade ever called back down into `fedos_dynamic_loader_dev_approval.ts`'s
+own chain. Stage 793 ended that isolation: `fedos_wasm_backend.ts` now
+reaches `FedosWasmLoader.planLoad()`, whose own internal chain reaches
+all the way down to `fedos_explicit_crypto_initialization.ts` — so the
+Stage 595 reach into the Facade would now close a cycle (Facade →
+Backend → Interface → WASM Backend → WASM Loader → … → Explicit Crypto
+Initialization → Facade → …), causing unbounded recursion. Stage 793
+REMOVES the Stage 595 reach: `createExplicitCryptoInitialization()` is
+now a TERMINUS, calling nothing further, matching this target
+diagram's own depiction all along (the Stage 595 reach into the Facade
+was never shown in this diagram to begin with). Its own return value
+is UNCHANGED.
 
 **Runtime connection does not exist. Worker connection does not
 exist. `create_runtime.ts`/`src/worker.ts` are NOT modified by this
@@ -2432,8 +2446,134 @@ Ratchet unimplemented; `"Allowed"`/`"Active"`/`"Resolved"`/
 API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 793–808: Prototype Phase 008, REAL WASM Backend Planning wiring reaches the FedosWasmLoader Skeleton
+
+Stage 762–776 (the update immediately above) ended with the Backend
+Resolver and WASM Backend Planning as the two leaves the Backend
+Interface reaches. Stage 793–808 extends WASM Backend Planning's OWN
+leaf one link further — the FIRST time any code in this repository
+reaches `fedos_wasm_loader.ts`'s `FedosWasmLoader` Skeleton, previously
+"unwired" since Stage 489.
+
+```
+WASM Backend Planning                      <-- REAL, unchanged from Stage 729-792 (fixed { state: "PlanningOnly",
+("fedos_wasm_backend.ts", Stage 730)           backendReady: false, loaderAttached: false, loaderKind:
+     |                                          "WasmLoaderPlanned", reason: "WasmBackendPlanningPending" })
+     v
+FedosWasmLoader.planLoad()                 <-- REAL wiring: createWasmBackend() now constructs a FedosWasmLoader
+("fedos_wasm_loader.ts", Stage 489-492,         and calls planLoad() (Stage 793) -- result DISCARDED; the previously
+reached for the first time Stage 793)          "unwired" file (no caller besides tests since Stage 489) now has its
+     |                                          first real caller
+     v
+BlockedByPolicy                            <-- fixed answer ({ operation: "load", state: "BlockedByPolicy",
+     |                                          policy: "FailClosed", reason: "..." }); planLoad() itself only
+     |                                          reaches its own internal Loader Plan (fedos_wasm_loader_plan.ts),
+     |                                          never further -- UNCHANGED by this stage
+     v
+STOP                                       <-- no further link exists; the generated JS glue,
+                                                 WebAssembly.instantiate/compile, initSync, the default init
+                                                 export, and static/dynamic import() of any kind ALL remain
+                                                 PROHIBITED and unreachable from this chain
+```
+
+**Critical fix required for this stage: a pre-existing call-graph
+cycle.** `planLoad()`'s OWN internal chain (`fedos_wasm_loader_plan.ts`
+→ `fedos_wasm_loader_import_policy.ts` → … → nine more files, per
+`docs/runtime_architecture_simplification_review.md` "Chain 3")
+terminates at `fedos_dynamic_loader_dev_approval.ts` calling
+`fedos_explicit_crypto_initialization.ts`'s
+`createExplicitCryptoInitialization()` — which, since Stage 595, ALSO
+called `createCryptoLoaderFacade()` (see the Stage 593–597 update
+above). Before Stage 793, that Stage 595 reach was harmless because
+nothing upstream of the Facade ever called back down into Chain 3.
+Once `fedos_wasm_backend.ts` (reachable FROM the Facade, via Backend
+Abstraction and Backend Interface) also reaches INTO Chain 3 via
+`planLoad()`, that Stage 595 reach would close a cycle — Facade →
+Backend → Interface → WASM Backend → WASM Loader → … → Explicit Crypto
+Initialization → Facade → … — causing unbounded recursion and a stack
+overflow on every call to `createCryptoLoaderFacade()` (including
+every call to `AppRuntime.initializeCrypto()`). **Stage 793 REMOVES
+the Stage 595 reach**: `fedos_explicit_crypto_initialization.ts` no
+longer imports or calls `fedos_crypto_loader_facade.ts` — it is now a
+TERMINUS, exactly as `docs/runtime_internal_execution_contract.md`'s
+own Stage 585–589 target diagram always depicted it (that diagram
+never showed the Stage 595 reach to begin with). Its own return value
+(`{ mode: "ExplicitInitialization", initializationAllowed: false,
+initialized: false, reason: "InitializationApprovalPending" }`) is
+UNCHANGED.
+
+**Every arrow above IS a real function call**, exactly like the Stage
+689–776 diagrams it extends. `createWasmBackend()`'s OWN return value
+is UNCHANGED — reaching the real Loader and discarding its answer does
+not alter `backendReady`/`loaderAttached`/`loaderKind`/`reason` in any
+way, so the Backend Interface's own return value, the Backend
+Abstraction's own return value, the Facade's own return value, and
+Runtime's own `initializeCrypto()` return value are all UNAFFECTED,
+transitively.
+
+**Worker remains explicitly OUT OF SCOPE.** `src/worker.ts` is NOT
+modified by Stage 793–808, references neither `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`,
+`fedos_crypto_backend_interface.ts`, `fedos_wasm_backend.ts`, nor
+`fedos_wasm_loader.ts`, directly or indirectly, and
+`worker_crypto_diagnostics.ts` carries none of this stage's new
+diagnostics fields.
+
+**ONLY WASM Backend Planning may call `FedosWasmLoader.planLoad()`.**
+`createFedosWasmLoader()`'s only real (non-test) caller anywhere in
+this repository is `fedos_wasm_backend.ts`'s `createWasmBackend()` —
+neither `create_runtime.ts`, `src/worker.ts`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`, nor
+`fedos_crypto_backend_interface.ts` references it directly, and
+Runtime never learns the Loader's own decision in any way.
+
+**The Loader itself is unchanged in behavior.** `fedos_wasm_loader.ts`'s
+own fixed answers (`loaderState()` = `"NotLoaded"`, `loaderMode()` =
+`"PlanningOnly"`, `loaderPolicy()` = `"FailClosed"`, `planLoad()` =
+`"BlockedByPolicy"`) are byte-for-byte identical to every stage since
+489 — only WHO calls it changed, never what it returns.
+
+`runtime_crypto_diagnostics.ts` (Stage 793) reads
+`wasmBackendLoaderReached`/`wasmBackendLoaderLoaded`/
+`wasmBackendLoaderDecision` for DISPLAY only —
+`worker_crypto_diagnostics.ts` is untouched by this addition.
+
+**Still true throughout Stage 793–808**: `src/worker.ts` UNMODIFIED
+and never references `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`,
+`fedos_crypto_backend_interface.ts`, `fedos_wasm_backend.ts`, or
+`fedos_wasm_loader.ts`; `fedos_wasm_backend.ts`'s own fixed return
+value UNCHANGED (`state: "PlanningOnly"`, `backendReady: false`,
+`loaderAttached: false`, `loaderKind: "WasmLoaderPlanned"`, `reason:
+"WasmBackendPlanningPending"`); `fedos_wasm_loader.ts`'s own fixed
+answers UNCHANGED; `fedos_explicit_crypto_initialization.ts` no longer
+references `fedos_crypto_loader_facade.ts` (the Stage 595 reach
+removed, see above) and its own fixed return value is UNCHANGED; no
+call-graph cycle exists anywhere in this repository — calling
+`createCryptoLoaderFacade()`, `createRuntime().initializeCrypto()`, or
+any function in this chain terminates normally; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+generated file edited or committed; `encrypt`/`decrypt` unchanged, in
+Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple
+Ratchet, and onion routing unimplemented; `"Allowed"`/`"Active"`/
+`"Loaded"` never reached anywhere in this new chain; Rust public API
+unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
+added.
+
 ## See also
 
+- `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
+  Stage 793) — the Loader Skeleton `fedos_wasm_backend.ts` now calls
+  `planLoad()` on, unchanged in its own fixed behavior.
+- `src/runtime/fedos_explicit_crypto_initialization.ts` (Stage 586,
+  Facade reach REMOVED Stage 793) — the file whose Stage 595 reach
+  into `fedos_crypto_loader_facade.ts` had to be removed to prevent
+  the call-graph cycle Stage 793 would otherwise have closed; its own
+  fixed return value is unchanged.
+- `docs/runtime_wasm_backend_planning.md` (updated Stage 806) — the
+  planning layer's own doc, recording the Loader connection in its §6.
 - `docs/runtime_crypto_backend_resolver.md` (Stage 762) — the pure
   leaf this arc's REAL wiring now adds as a second, separate reach
   below the Backend Interface, answering ONLY "which backend is
