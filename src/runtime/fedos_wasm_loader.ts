@@ -161,6 +161,26 @@
  * `planLoad() -> policy()` reach this stage adds. `planInitialize()`/
  * `planUnload()`/`planningState()`/`status()` are UNTOUCHED by this
  * stage and do NOT call `policy()`.
+ *
+ * Stage 833 (Prototype Phase 012) makes `planLoad()` actually EVALUATE
+ * the `policy()` answer it already reaches (Stage 825), instead of
+ * discarding it: `#reachLoaderPolicy()` now RETURNS the
+ * `FedosWasmLoaderPolicyDecision` it reads (previously it discarded
+ * the value in full), and `planLoad()` branches on `policy.allowed`
+ * (`if (!policy.allowed) { return this.#blocked("load"); }`). Because
+ * `policy().allowed` is fixed `false` in every stage that exists today,
+ * this branch is ALWAYS taken — `planLoad()`'s own return value stays
+ * byte-for-byte `{ operation: "load", state: "BlockedByPolicy", policy:
+ * "FailClosed", reason: "..." }`, key order included. The `allowed:
+ * true` path is NOT implemented — it is a single TODO comment marking
+ * a RESERVED spot for a future, separate, explicitly-reviewed stage;
+ * the line immediately after it still returns the SAME fail-closed
+ * `#blocked("load")` answer, so even a hypothetical future bug in
+ * `policy()` could never silently produce an `"Allowed"` decision from
+ * this function alone. `policy()` itself is UNCHANGED, `planInitialize()`/
+ * `planUnload()`/`planningState()`/`status()` do NOT call `policy()`
+ * and are untouched, and no cycle exists — `policy()` still never calls
+ * `planLoad()`.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -293,7 +313,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   planLoad(): FedosWasmLoaderDecision {
     this.#reachLoaderPlan(); // result discarded -- no import/initialize/attach ever happens
-    this.#reachLoaderPolicy(); // result discarded -- reads the fixed Policy answer, never obeys it
+    const policy = this.#reachLoaderPolicy();
+    if (!policy.allowed) {
+      return this.#blocked("load");
+    }
+    // TODO(reserved for a future, separate, explicitly-reviewed stage):
+    // policy.allowed is permanently false in this Prototype stage (see
+    // policy()'s own fixed answer above), so this line can never
+    // execute today. The real, allowed Load path belongs here -- NOT
+    // implemented in this stage; until it is, this function stays
+    // fail-closed no matter what policy() ever answers.
     return this.#blocked("load");
   }
 
@@ -350,15 +379,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
-   * PRIVATE — Stage 825. Calls `this.policy()` exactly once and
-   * discards the result in full: never merged into `planLoad()`'s own
-   * return value, never branched on, never used to decide whether to
-   * proceed. Mirrors `#reachLoaderPlan()`'s own "reach one link
-   * deeper, discard the result" pattern.
+   * PRIVATE — Stage 825, RETURNS the decision as of Stage 833. Calls
+   * `this.policy()` exactly once. Through Stage 825 the result was
+   * discarded in full; Stage 833 has `planLoad()` actually branch on
+   * `.allowed`, so this helper now returns the decision instead of
+   * swallowing it. Still never merges the decision into `planLoad()`'s
+   * own return VALUE (`.state`/`.policy`/`.reason` stay `planLoad()`'s
+   * own, unrelated to `policy()`'s own `.decision`/`.reason`).
    */
-  #reachLoaderPolicy(): void {
-    const policyDecision = this.policy();
-    void policyDecision; // discarded -- read only, never merged, never branched on
+  #reachLoaderPolicy(): FedosWasmLoaderPolicyDecision {
+    return this.policy();
   }
 
   #blocked(operation: FedosWasmLoaderOperation): FedosWasmLoaderDecision {
@@ -476,5 +506,19 @@ export function loaderPolicyReason(): string {
  * — only that the two are now connected by a real function call.
  */
 export function loaderPlanReachedPolicy(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` actually EVALUATES the
+ * `policy()` answer it reaches (branches on `.allowed`), rather than
+ * merely discarding it — Stage 833. Fixed `true`: `planLoad()`'s own
+ * `if (!policy.allowed) { ... }` check DOES run every time `planLoad()`
+ * executes, even though the branch it takes never varies (`allowed` is
+ * permanently `false`) and `planLoad()`'s own return value never
+ * changes. NOT a claim that a real Load ever proceeds — only that the
+ * decision is now genuinely read and branched on, not merely reached.
+ */
+export function loaderPolicyEvaluated(): boolean {
   return true;
 }
