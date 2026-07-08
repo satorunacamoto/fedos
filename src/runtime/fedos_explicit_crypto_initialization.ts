@@ -22,15 +22,32 @@
  * neither `create_runtime.ts` nor `src/worker.ts` references it,
  * directly or indirectly.
  *
- * Stage 595 extends `createExplicitCryptoInitialization()` DOWNWARD
- * only: it now calls `createCryptoLoaderFacade()`
- * (`fedos_crypto_loader_facade.ts`, Stage 594) — then DISCARDS the
- * result and returns its OWN, unchanged `{ mode:
- * "ExplicitInitialization", initializationAllowed: false, initialized:
- * false, reason: "InitializationApprovalPending" }` answer. This
- * mirrors the SAME "reach one link deeper, keep your own answer"
- * pattern Stage 503/511/519/527/535/539/547/555/563/571/579/587
- * already established twelve times over in this WASM arc.
+ * Stage 595 extended `createExplicitCryptoInitialization()` DOWNWARD
+ * only: it called `createCryptoLoaderFacade()`
+ * (`fedos_crypto_loader_facade.ts`, Stage 594) — then DISCARDED the
+ * result and returned its OWN, unchanged answer. That reach was safe
+ * at the time because nothing upstream of the Facade ever called back
+ * into this file's own chain (`fedos_dynamic_loader_dev_approval.ts`
+ * → ... → this file was, until Stage 793, a fully disconnected island
+ * — see `docs/runtime_architecture_simplification_review.md` "Chain 3").
+ *
+ * Stage 793 (Prototype Phase 008) REMOVES that Stage 595 reach:
+ * `fedos_wasm_backend.ts`'s `createWasmBackend()` now calls
+ * `FedosWasmLoader.planLoad()` (`fedos_wasm_loader.ts`), whose own
+ * internal chain reaches all the way down through
+ * `fedos_dynamic_loader_dev_approval.ts` to THIS file — so the Stage
+ * 595 reach back into `createCryptoLoaderFacade()` would now close a
+ * cycle (Facade → Backend → Interface → WASM Backend → WASM Loader →
+ * … → this file → Facade → …), causing unbounded recursion. This file
+ * NOW returns its own fixed answer directly, calling nothing further —
+ * a TERMINUS, exactly like `docs/runtime_internal_execution_contract.md`'s
+ * own "Explicit Crypto Initialization" target-diagram box always
+ * showed it (the Stage 595 reach into the Facade was never depicted in
+ * that diagram to begin with; only the real, parked implementation
+ * chain wired it that way). `createExplicitCryptoInitialization()`'s
+ * own return value is UNCHANGED (`{ mode: "ExplicitInitialization",
+ * initializationAllowed: false, initialized: false, reason:
+ * "InitializationApprovalPending" }`).
  *
  * HARD GUARDRAILS:
  *   - `createExplicitCryptoInitialization()` is PURE, synchronous,
@@ -64,9 +81,12 @@
  *   - No `SecretHandle`, `ConversationKey`, `MessageKey`, or
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
+ *   - NO reference to `fedos_crypto_loader_facade.ts` — removed at
+ *     Stage 793 specifically to prevent a call-graph cycle now that
+ *     `fedos_wasm_backend.ts` reaches this file's own chain via the
+ *     real `FedosWasmLoader`; this file is a TERMINUS, calling nothing
+ *     further.
  */
-
-import { createCryptoLoaderFacade } from "./fedos_crypto_loader_facade.js";
 
 /**
  * The crypto initialization design's own fixed operating mode.
@@ -103,28 +123,18 @@ export interface FedosExplicitCryptoInitialization {
  * false, reason: "InitializationApprovalPending" }` in this stage.
  * Pure; never throws; takes no argument, reads no `process.env`/
  * filesystem/`import.meta`. Never references the generated JS glue,
- * and never writes `import()` of any kind.
+ * and never writes `import()` of any kind. Calls nothing further —
+ * this file is a TERMINUS (Stage 793; see this module's own
+ * top-of-file doc comment for why the Stage 595 reach into the Facade
+ * was removed).
  */
 export function createExplicitCryptoInitialization(): FedosExplicitCryptoInitialization {
-  reachCryptoLoaderFacade(); // result discarded -- the generated JS glue is never imported
   return {
     mode: "ExplicitInitialization",
     initializationAllowed: false,
     initialized: false,
     reason: "InitializationApprovalPending",
   };
-}
-
-/**
- * PRIVATE (module-scoped) — calls `createCryptoLoaderFacade()`. The
- * result is discarded; it is never passed to
- * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
- * export, `packages/fedos-core-rust`, Runtime, or Worker. The Crypto
- * Loader Facade itself never references the generated JS glue or
- * writes `import()` of any kind either.
- */
-function reachCryptoLoaderFacade(): void {
-  createCryptoLoaderFacade();
 }
 
 /**

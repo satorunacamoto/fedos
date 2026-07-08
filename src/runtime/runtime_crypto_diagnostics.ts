@@ -406,6 +406,18 @@
  * `"PlanningOnly"`/`"WasmPlanned"`/`false`/`false`/
  * `"BackendResolutionPending"`. `worker_crypto_diagnostics.ts` is
  * intentionally NOT touched.
+ *
+ * Stage 793 (Prototype Phase 008) adds `wasmBackendLoaderReached`/
+ * `wasmBackendLoaderLoaded`/`wasmBackendLoaderDecision`, reading
+ * `fedos_wasm_backend.ts`'s (Stage 793) `wasmBackendLoaderReached()`/
+ * `wasmBackendLoaderLoaded()`/`wasmBackendLoaderDecision()` — the
+ * FIRST real connection from WASM Backend Planning to the previously
+ * "unwired" `FedosWasmLoader` Skeleton (`fedos_wasm_loader.ts`,
+ * Stage 489–492). Fixed `true`/`false`/`"BlockedByPolicy"`.
+ * `wasmBackendState`/`wasmBackendReady`/`wasmBackendLoaderAttached`/
+ * `wasmBackendLoaderKind`/`wasmBackendReason` above are UNCHANGED by
+ * this stage. `worker_crypto_diagnostics.ts` is intentionally NOT
+ * touched.
  */
 
 import type {
@@ -472,6 +484,7 @@ import {
   wasmLoaderState as fedosWasmLoaderState,
 } from "./fedos_wasm_loader_contract.js";
 import type {
+  FedosWasmLoaderDecisionState,
   FedosWasmLoaderMode,
   FedosWasmLoaderPolicy,
   FedosWasmLoaderState as FedosWasmLoaderSkeletonState,
@@ -606,7 +619,10 @@ import type {
 } from "./fedos_wasm_backend.js";
 import {
   wasmBackendLoaderAttached as fedosWasmBackendLoaderAttached,
+  wasmBackendLoaderDecision as fedosWasmBackendLoaderDecision,
   wasmBackendLoaderKind as fedosWasmBackendLoaderKind,
+  wasmBackendLoaderLoaded as fedosWasmBackendLoaderLoaded,
+  wasmBackendLoaderReached as fedosWasmBackendLoaderReached,
   wasmBackendReady as fedosWasmBackendReady,
   wasmBackendReason as fedosWasmBackendReason,
   wasmBackendState as fedosWasmBackendState,
@@ -1735,6 +1751,26 @@ export interface RuntimeCryptoActivationStatus {
    */
   readonly wasmBackendReason: FedosWasmBackendReason;
   /**
+   * Stage 793 (Prototype Phase 008) — whether `createWasmBackend()`
+   * has actually reached the real `FedosWasmLoader` —
+   * `wasmBackendLoaderReached()`'s own answer. Fixed `true` in this
+   * stage: the code path exists and runs, NOT a claim that any module
+   * is loaded.
+   */
+  readonly wasmBackendLoaderReached: boolean;
+  /**
+   * Whether the real WASM Loader has ever actually loaded anything —
+   * `wasmBackendLoaderLoaded()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly wasmBackendLoaderLoaded: boolean;
+  /**
+   * The real `FedosWasmLoader.planLoad()`'s own decision state —
+   * `wasmBackendLoaderDecision()`'s own answer. Fixed
+   * `"BlockedByPolicy"` in this stage.
+   */
+  readonly wasmBackendLoaderDecision: FedosWasmLoaderDecisionState;
+  /**
    * Stage 757 (Prototype Phase 005) — the Backend Interface's own
    * fixed coarse state — `cryptoBackendInterfaceState()`'s own answer
    * (`src/runtime/fedos_crypto_backend_interface.ts`, Stage 745/746).
@@ -1964,6 +2000,9 @@ export function runtimeCryptoActivationStatus(
     wasmBackendLoaderAttached: fedosWasmBackendLoaderAttached(),
     wasmBackendLoaderKind: fedosWasmBackendLoaderKind(),
     wasmBackendReason: fedosWasmBackendReason(),
+    wasmBackendLoaderReached: fedosWasmBackendLoaderReached(),
+    wasmBackendLoaderLoaded: fedosWasmBackendLoaderLoaded(),
+    wasmBackendLoaderDecision: fedosWasmBackendLoaderDecision(),
     cryptoBackendInterfaceState: fedosCryptoBackendInterfaceState(),
     cryptoBackendInterfaceReady: fedosCryptoBackendInterfaceReady(),
     cryptoBackendSelected: fedosCryptoBackendSelected(),

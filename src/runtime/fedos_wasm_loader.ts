@@ -17,14 +17,26 @@
  * label, never a real action" discipline every other file in this
  * WASM arc already uses.
  *
- * "Unwired" means: NO other module in this repository imports this
- * file. `create_runtime.ts`/`src/worker.ts` do not reference it,
- * neither does `fedos_wasm_loader_contract.ts`/`fedos_wasm_artifact.ts`/
- * `fedos_wasm_boundary.ts`. Only `runtime_crypto_diagnostics.ts`/
- * `worker_crypto_diagnostics.ts` (Stage 495) read its pure, standalone
- * functions for DISPLAY, and this codebase's own test suite exercises
- * it directly — the same "export for testability, wire nowhere"
- * precedent every prior link in this chain follows.
+ * "Unwired" (Stage 489–789) meant: NO other module in this repository
+ * imported this file. `create_runtime.ts`/`src/worker.ts` did not
+ * reference it, neither did `fedos_wasm_loader_contract.ts`/
+ * `fedos_wasm_artifact.ts`/`fedos_wasm_boundary.ts`. Only
+ * `runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts`
+ * (Stage 495) read its pure, standalone functions for DISPLAY, and
+ * this codebase's own test suite exercised it directly.
+ *
+ * Stage 793 (Prototype Phase 008) ends that isolation, ONCE: `src/runtime/fedos_wasm_backend.ts`'s
+ * `createWasmBackend()` now calls `createFedosWasmLoader()` and its
+ * `planLoad()` — the FIRST real caller of this file anywhere in this
+ * repository besides tests. The result (`"BlockedByPolicy"`) is
+ * discarded, and `createWasmBackend()`'s own return value is
+ * unchanged. `fedos_wasm_loader_plan.ts`/`fedos_wasm_loader_contract.ts`/
+ * `fedos_wasm_artifact.ts`/`fedos_wasm_boundary.ts`/`create_runtime.ts`/
+ * `src/worker.ts` still do NOT reference this file, and none of them
+ * is modified by this stage — this file itself is UNMODIFIED in its
+ * own behavior too: `planLoad()` still always resolves
+ * `"BlockedByPolicy"`, and still reaches nothing past its own internal
+ * Loader Plan (`fedos_wasm_loader_plan.ts`).
  *
  * Stage 503 extends `planLoad()` DOWNWARD only: it now builds a
  * `FedosWasmLoaderPlan` (`fedos_wasm_loader_plan.ts`, Stage 502) and

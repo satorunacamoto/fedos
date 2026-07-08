@@ -120,7 +120,7 @@ describe("FedOS WASM Backend Planning Layer, PlanningOnly/not-ready, no side eff
     expect(workerStatus).not.toHaveProperty("wasmBackendReason");
   });
 
-  it("3. the WASM Backend Planning source never writes import()/require, never imports the generated JS glue, and never touches WebAssembly/fetch/Runtime/Worker/real WASM Loader/the Backend Abstraction", () => {
+  it("3. the WASM Backend Planning source never writes import()/require, never imports the generated JS glue, and never touches WebAssembly/fetch/Runtime/Worker/the Backend Abstraction (it DOES legitimately reach fedos_wasm_loader.ts as of Stage 793 -- see test/runtime_wasm_backend_loader_connection.test.ts)", () => {
     const codeOnly = codeOnlyLines(wasmBackendSource);
     expect(codeOnly).not.toMatch(/import\s*\(/);
     expect(codeOnly).not.toMatch(/require\s*\(/);
@@ -137,12 +137,17 @@ describe("FedOS WASM Backend Planning Layer, PlanningOnly/not-ready, no side eff
     expect(codeOnly).not.toMatch(/worker\.ts|src\/worker/);
     expect(codeOnly).not.toMatch(/fedos_core_rust/);
     expect(codeOnly).not.toMatch(/FedosRuntimeCryptoProvider|RuntimeCryptoProvider/);
-    expect(codeOnly).not.toMatch(/fedos_wasm_loader/);
+    // Stage 793 (Prototype Phase 008): legitimately reaches fedos_wasm_loader.ts itself,
+    // but never its own downstream files directly.
+    expect(codeOnly).toMatch(/fedos_wasm_loader\.js/);
+    expect(codeOnly).not.toMatch(/fedos_wasm_loader_plan/);
+    expect(codeOnly).not.toMatch(/fedos_wasm_loader_contract/);
     // This layer is called BY the Backend Interface (Stage 753), never the reverse.
     expect(codeOnly).not.toMatch(/fedos_crypto_loader_backend/);
     expect(codeOnly).not.toMatch(/fedos_crypto_backend_interface/);
     expect(codeOnly).not.toMatch(/fedos_crypto_loader_facade/);
-    // Terminus: does not call any further link deeper.
+    // Terminus for the Facade/Abstraction/Interface's OWN reach: does not call any
+    // further Planning-chain link besides the real Loader (Stage 793).
     expect(codeOnly).not.toMatch(/fedos_crypto_provider_facade_boundary/);
     expect(codeOnly).not.toMatch(/fedos_explicit_crypto_initialization/);
   });

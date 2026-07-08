@@ -26,12 +26,34 @@
  * `src/worker.ts` references it, directly or indirectly, and NEITHER
  * FILE IS MODIFIED BY THIS STAGE.
  *
- * This file is a TERMINUS for this stage, not another "reach one link
- * deeper" step: per `docs/runtime_wasm_backend_planning.md` §1, the
- * diagram ends `WASM Backend Planning -> STOP`. This file does NOT
- * call the real WASM Loader (`fedos_wasm_loader.ts`), the generated JS
- * glue, or Rust in any way — that remains a future, separate,
- * explicitly-reviewed stage's decision.
+ * Stage 793 (Prototype Phase 008) extends `createWasmBackend()`
+ * DOWNWARD only: it now calls `createFedosWasmLoader()`
+ * (`fedos_wasm_loader.ts`, Stage 489–492) and its `planLoad()` — the
+ * FIRST time anything in this repository ever reaches the real,
+ * previously-"unwired" `FedosWasmLoader` Skeleton. `planLoad()`
+ * resolves `{ operation: "load", state: "BlockedByPolicy", policy:
+ * "FailClosed", reason: "..." }` — that result is DISCARDED, and
+ * `createWasmBackend()`'s own return value stays UNCHANGED
+ * (`state: "PlanningOnly"`, `backendReady: false`, `loaderAttached:
+ * false`, `loaderKind: "WasmLoaderPlanned"`, `reason:
+ * "WasmBackendPlanningPending"`). This is the ONLY caller of
+ * `fedos_wasm_loader.ts` anywhere in this repository besides this
+ * codebase's own test suite — `fedos_wasm_loader_plan.ts`/
+ * `fedos_wasm_loader_contract.ts`/`create_runtime.ts`/`src/worker.ts`
+ * still do NOT reference it, directly or indirectly, and NONE of
+ * those files is modified by this stage.
+ *
+ * This file remains a TERMINUS for the Backend Interface's OWN reach:
+ * per `docs/runtime_wasm_backend_planning.md` §1, the diagram still
+ * ends `WASM Backend Planning -> STOP` from the Interface's point of
+ * view, even though this file itself now reaches one further link
+ * (the real `FedosWasmLoader`, still only PLANNING, never loading)
+ * internally. This file does NOT call the generated JS glue,
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, or Rust in any way — the Loader's own `planLoad()` stops at
+ * `"BlockedByPolicy"`, and reaching further (the generated JS glue,
+ * Rust) remains a future, separate, explicitly-reviewed stage's
+ * decision.
  *
  * HARD GUARDRAILS:
  *   - `createWasmBackend()` is PURE, synchronous, takes no argument,
@@ -54,16 +76,23 @@
  *   - NO reference to `create_runtime.ts`/`AppRuntime`/`src/worker.ts`
  *     — no Runtime or Worker connection of any kind exists yet, and
  *     neither file is modified by this stage.
- *   - NO reference to `fedos_wasm_loader.ts`/`fedos_wasm_loader_plan.ts`/
- *     `fedos_wasm_loader_contract.ts` — this file names a planned
- *     loader kind positionally only; it does not import or call the
- *     real WASM Loader.
- *   - NO reference to `fedos_crypto_loader_backend.ts` — this file is
- *     called BY the Backend Abstraction, never the reverse.
+ *   - NO reference to `fedos_wasm_loader_plan.ts`/
+ *     `fedos_wasm_loader_contract.ts` — only `fedos_wasm_loader.ts`
+ *     itself is reached (Stage 793), and only its `planLoad()`; this
+ *     file does not import or call either of those two other files
+ *     directly.
+ *   - NO reference to `fedos_crypto_loader_backend.ts`/
+ *     `fedos_crypto_backend_interface.ts` — this file is called BY the
+ *     Backend Interface, never the reverse.
+ *   - NO reference to the generated JS glue, `WebAssembly.instantiate`/
+ *     `compile`/`instantiateStreaming`, `initSync`/the default init
+ *     export, or Rust — `FedosWasmLoader.planLoad()` stops at
+ *     `"BlockedByPolicy"` and this file never reaches past it.
  *   - `createWasmBackend()` ALWAYS resolves `backendReady: false` and
  *     `loaderAttached: false` in this stage — `true` exists only as a
  *     RESERVED possibility for a future, separate, explicitly-reviewed
- *     stage; nothing in this file can ever produce either.
+ *     stage; nothing in this file can ever produce either, even though
+ *     the real Loader is now reached.
  *   - `state` is fixed `"PlanningOnly"` and `loaderKind` is fixed
  *     `"WasmLoaderPlanned"` — this file only ever records this
  *     planning layer's fixed, not-yet-active design; it never
@@ -72,6 +101,9 @@
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
  */
+
+import type { FedosWasmLoaderDecisionState } from "./fedos_wasm_loader.js";
+import { createFedosWasmLoader } from "./fedos_wasm_loader.js";
 
 /**
  * The WASM Backend Planning layer's own coarse state. `"PlanningOnly"`
@@ -83,11 +115,13 @@ export type FedosWasmBackendState = "PlanningOnly" | "Active";
 /**
  * The loader kind this backend currently plans to attach.
  * `"WasmLoaderPlanned"` is the ONLY value `createWasmBackend()` ever
- * produces in this stage — positionally the same `fedos_wasm_loader.ts`
- * Loader Skeleton named elsewhere in this arc, but NOT imported,
- * referenced, or called by this file. `"WasmLoaderActive"` names a
- * future, real, attached loader; nothing in this file can ever
- * produce it.
+ * produces in this stage — the SAME `fedos_wasm_loader.ts` Loader
+ * Skeleton this file now actually reaches (Stage 793) via
+ * `reachWasmLoader()`, though `loaderKind` itself remains a fixed
+ * label, never a live read of the Loader's own state. `"WasmLoaderActive"`
+ * names a future, real, ATTACHED loader; nothing in this file can ever
+ * produce it — reaching `planLoad()` and having it resolve
+ * `"BlockedByPolicy"` is not attachment.
  */
 export type FedosWasmBackendLoaderKind = "WasmLoaderPlanned" | "WasmLoaderActive";
 
@@ -119,11 +153,15 @@ export interface FedosWasmBackend {
  * "WasmBackendPlanningPending" }` in this stage. Pure; never throws;
  * takes no argument, reads no `process.env`/filesystem/`import.meta`.
  * Never references the generated JS glue or the real WASM Loader, and
- * never writes `import()` of any kind. Calls nothing further — this
- * file is a TERMINUS for this stage (see this module's own
- * top-of-file doc comment).
+ * never writes `import()` of any kind. Reaches ONE further link (the
+ * real `FedosWasmLoader`, `fedos_wasm_loader.ts`, Stage 793) and
+ * discards its result — this function's OWN return value stays
+ * byte-for-byte unchanged. Never references the generated JS glue,
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, or Rust.
  */
 export function createWasmBackend(): FedosWasmBackend {
+  reachWasmLoader(); // result discarded -- FedosWasmLoader.planLoad() stops at "BlockedByPolicy"
   return {
     state: "PlanningOnly",
     backendReady: false,
@@ -131,6 +169,22 @@ export function createWasmBackend(): FedosWasmBackend {
     loaderKind: "WasmLoaderPlanned",
     reason: "WasmBackendPlanningPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — constructs a `FedosWasmLoader`
+ * (`fedos_wasm_loader.ts`, Stage 489–492) and calls its `planLoad()`.
+ * The result (`{ operation: "load", state: "BlockedByPolicy", policy:
+ * "FailClosed", reason: "..." }`) is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The Loader
+ * itself never imports the generated JS glue or executes Rust either —
+ * `planLoad()` only reaches its own internal Loader Plan
+ * (`fedos_wasm_loader_plan.ts`), never further.
+ */
+function reachWasmLoader(): void {
+  const loader = createFedosWasmLoader();
+  loader.planLoad();
 }
 
 /**
@@ -176,4 +230,36 @@ export function wasmBackendLoaderKind(): FedosWasmBackendLoaderKind {
  */
 export function wasmBackendReason(): FedosWasmBackendReason {
   return "WasmBackendPlanningPending";
+}
+
+/**
+ * Pure, standalone: whether `createWasmBackend()` has actually reached
+ * the real `FedosWasmLoader` (Stage 793) — fixed `true`, since
+ * `reachWasmLoader()` is unconditionally called every time. This is a
+ * STRUCTURAL fact (the code path exists and runs), NOT a claim that
+ * any module is loaded — see `wasmBackendLoaderLoaded()` below.
+ */
+export function wasmBackendLoaderReached(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: whether the real WASM Loader has ever actually
+ * loaded anything — fixed `false`. `planLoad()` only PLANS the
+ * operation and resolves `"BlockedByPolicy"`; no module is ever
+ * imported, fetched, or instantiated.
+ */
+export function wasmBackendLoaderLoaded(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the real `FedosWasmLoader.planLoad()`'s own
+ * decision state — the same answer that call resolves to, echoed here
+ * for diagnostics WITHOUT calling `createWasmBackend()`. Fixed
+ * `"BlockedByPolicy"` — `"Allowed"` is RESERVED for a future, separate,
+ * explicitly-reviewed stage; nothing in this file can ever produce it.
+ */
+export function wasmBackendLoaderDecision(): FedosWasmLoaderDecisionState {
+  return "BlockedByPolicy";
 }
