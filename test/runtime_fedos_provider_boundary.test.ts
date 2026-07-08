@@ -249,6 +249,14 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       cryptoInitializationSuccess: false,
       cryptoInitializationBackend: "None",
       cryptoInitializationResultReason: "InitializationResultPending",
+      initializeCryptoExposureState: "PlanningOnly",
+      initializeCryptoExposed: false,
+      initializeCryptoExposureApproved: false,
+      initializeCryptoExposureReason: "RuntimeExposureReviewPending",
+      initializeCryptoWiringPlanState: "PlanningOnly",
+      initializeCryptoRuntimeWiringAllowed: false,
+      initializeCryptoWorkerWiringAllowed: false,
+      initializeCryptoWiringPlanReason: "RuntimeWiringPlanPending",
     });
   });
 

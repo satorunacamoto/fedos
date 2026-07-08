@@ -168,6 +168,21 @@
  * `runtime_crypto_diagnostics.ts`'s own Stage 644 doc comment. Fixed
  * `"PlanningOnly"`/`false`/`"None"`/`"InitializationResultPending"`
  * respectively.
+ *
+ * Stage 652 adds `initializeCryptoExposureState`/
+ * `initializeCryptoExposed`/`initializeCryptoExposureApproved`/
+ * `initializeCryptoExposureReason` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 652 doc comment. Fixed
+ * `"PlanningOnly"`/`false`/`false`/`"RuntimeExposureReviewPending"`
+ * respectively.
+ *
+ * Stage 660 adds `initializeCryptoWiringPlanState`/
+ * `initializeCryptoRuntimeWiringAllowed`/
+ * `initializeCryptoWorkerWiringAllowed`/
+ * `initializeCryptoWiringPlanReason` — see
+ * `runtime_crypto_diagnostics.ts`'s own Stage 660 doc comment. Fixed
+ * `"PlanningOnly"`/`false`/`false`/`"RuntimeWiringPlanPending"`
+ * respectively.
  */
 
 import type { FedosCryptoEnabledLabel, FedosCryptoProviderEnvLike } from "./crypto_provider_env.js";
@@ -403,6 +418,26 @@ import {
   cryptoInitializationResultState as fedosCryptoInitializationResultState,
   cryptoInitializationSuccess as fedosCryptoInitializationSuccess,
 } from "./fedos_crypto_initialization_result.js";
+import type {
+  FedosInitializeCryptoExposureReviewReason,
+  FedosInitializeCryptoExposureReviewState,
+} from "./fedos_initialize_crypto_exposure_review.js";
+import {
+  initializeCryptoExposed as fedosInitializeCryptoExposed,
+  initializeCryptoExposureApproved as fedosInitializeCryptoExposureApproved,
+  initializeCryptoExposureReason as fedosInitializeCryptoExposureReason,
+  initializeCryptoExposureState as fedosInitializeCryptoExposureState,
+} from "./fedos_initialize_crypto_exposure_review.js";
+import type {
+  FedosInitializeCryptoWiringPlanReason,
+  FedosInitializeCryptoWiringPlanState,
+} from "./fedos_initialize_crypto_wiring_plan.js";
+import {
+  initializeCryptoRuntimeWiringAllowed as fedosInitializeCryptoRuntimeWiringAllowed,
+  initializeCryptoWiringPlanReason as fedosInitializeCryptoWiringPlanReason,
+  initializeCryptoWiringPlanState as fedosInitializeCryptoWiringPlanState,
+  initializeCryptoWorkerWiringAllowed as fedosInitializeCryptoWorkerWiringAllowed,
+} from "./fedos_initialize_crypto_wiring_plan.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -1109,6 +1144,56 @@ export interface WorkerCryptoActivationStatus {
    * `"InitializationResultPending"` in this stage.
    */
   readonly cryptoInitializationResultReason: FedosCryptoInitializationResultReason;
+  /**
+   * The Runtime initializeCrypto Exposure Review's own fixed coarse
+   * state — `initializeCryptoExposureState()`'s own answer
+   * (`src/runtime/fedos_initialize_crypto_exposure_review.ts`, Stage
+   * 650/652). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly initializeCryptoExposureState: FedosInitializeCryptoExposureReviewState;
+  /**
+   * Whether `initializeCrypto()` is currently exposed on `AppRuntime`
+   * in any way — `initializeCryptoExposed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly initializeCryptoExposed: boolean;
+  /**
+   * Whether exposing `initializeCrypto()` has ever been reviewed and
+   * approved — `initializeCryptoExposureApproved()`'s own answer.
+   * Fixed `false` in this stage.
+   */
+  readonly initializeCryptoExposureApproved: boolean;
+  /**
+   * WHY `initializeCrypto()` is not currently exposed —
+   * `initializeCryptoExposureReason()`'s own answer. Fixed
+   * `"RuntimeExposureReviewPending"` in this stage.
+   */
+  readonly initializeCryptoExposureReason: FedosInitializeCryptoExposureReviewReason;
+  /**
+   * The Runtime initializeCrypto Wiring Plan's own fixed coarse
+   * state — `initializeCryptoWiringPlanState()`'s own answer
+   * (`src/runtime/fedos_initialize_crypto_wiring_plan.ts`, Stage
+   * 658/660). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly initializeCryptoWiringPlanState: FedosInitializeCryptoWiringPlanState;
+  /**
+   * Whether a Runtime connection is currently permitted —
+   * `initializeCryptoRuntimeWiringAllowed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly initializeCryptoRuntimeWiringAllowed: boolean;
+  /**
+   * Whether a Worker connection is currently permitted —
+   * `initializeCryptoWorkerWiringAllowed()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly initializeCryptoWorkerWiringAllowed: boolean;
+  /**
+   * WHY neither wiring is currently permitted —
+   * `initializeCryptoWiringPlanReason()`'s own answer. Fixed
+   * `"RuntimeWiringPlanPending"` in this stage.
+   */
+  readonly initializeCryptoWiringPlanReason: FedosInitializeCryptoWiringPlanReason;
 }
 
 /**
@@ -1245,5 +1330,13 @@ export function workerCryptoActivationStatus(
     cryptoInitializationSuccess: fedosCryptoInitializationSuccess(),
     cryptoInitializationBackend: fedosCryptoInitializationBackend(),
     cryptoInitializationResultReason: fedosCryptoInitializationResultReason(),
+    initializeCryptoExposureState: fedosInitializeCryptoExposureState(),
+    initializeCryptoExposed: fedosInitializeCryptoExposed(),
+    initializeCryptoExposureApproved: fedosInitializeCryptoExposureApproved(),
+    initializeCryptoExposureReason: fedosInitializeCryptoExposureReason(),
+    initializeCryptoWiringPlanState: fedosInitializeCryptoWiringPlanState(),
+    initializeCryptoRuntimeWiringAllowed: fedosInitializeCryptoRuntimeWiringAllowed(),
+    initializeCryptoWorkerWiringAllowed: fedosInitializeCryptoWorkerWiringAllowed(),
+    initializeCryptoWiringPlanReason: fedosInitializeCryptoWiringPlanReason(),
   };
 }

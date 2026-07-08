@@ -1628,8 +1628,228 @@ unchanged; NIP-17/NIP-44/NIP-59 unimplemented; `"Allowed"`/
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 649–653: Runtime initializeCrypto Exposure Review, revised diagram
+
+Stage 649 (`docs/runtime_initialize_crypto_exposure_review.md`) is the
+FIRST layer in this arc that looks OUTWARD, toward Runtime, rather
+than downward into the parked chain: whether `initializeCrypto()` is
+currently exposed on `AppRuntime` in any way, and whether that
+exposure has ever been reviewed and approved. Stage 650 adds
+`src/runtime/fedos_initialize_crypto_exposure_review.ts` — a pure,
+fixed-value REVIEW naming `createInitializeCryptoExposureReview()`,
+fixed `{ state: "PlanningOnly", exposed: false, approved: false,
+reason: "RuntimeExposureReviewPending" }` — with NO side effects and
+NO `import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 651 wires `createCryptoInitializationResult()`
+(`fedos_crypto_initialization_result.ts`) to CALL
+`createInitializeCryptoExposureReview()` — the result is DISCARDED
+and `createCryptoInitializationResult()`'s own return value is
+UNCHANGED (`success: false`, `backend: "None"`), the SAME "reach one
+link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635/643
+already established seventeen times over.
+
+This revises the Stage 641–645 diagram — Runtime initializeCrypto
+Exposure Review now sits between Crypto Initialization Result
+Contract and the still-positional Dynamic Import box:
+
+```
+FedosCryptoInitializationResult            <-- REAL, pure decision function (src/runtime/fedos_crypto_initialization_result.ts,
+("Crypto Initialization Result Contract")      Stage 642), REAL wiring: createCryptoInitializationResult() calls
+     |                                          createInitializeCryptoExposureReview(), discards the result (Stage 651)
+     v
+FedosInitializeCryptoExposureReview        <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_exposure_review.ts,
+("Runtime initializeCrypto Exposure            Stage 650), fixed { state: "PlanningOnly", exposed: false, approved: false,
+Review")                                       reason: "RuntimeExposureReviewPending" } -- NO side effects, NO import() of
+     |                                          any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist. `create_runtime.ts`/`src/worker.ts` are NOT modified by this
+stage.** Neither file references
+`fedos_initialize_crypto_exposure_review.ts`, directly or indirectly,
+and `initializeCrypto()` is not exposed on `AppRuntime` in any way.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+652) read `initializeCryptoExposureState()`/`initializeCryptoExposed()`/
+`initializeCryptoExposureApproved()`/`initializeCryptoExposureReason()`
+for DISPLAY only — `"PlanningOnly"`/`false`/`false`/
+`"RuntimeExposureReviewPending"`, matching every other leaf in this
+arc.
+
+## Update — Stage 657–661: Runtime initializeCrypto Wiring Plan, revised diagram, full target architecture named per Stage 649 instruction
+
+Stage 657 (`docs/runtime_initialize_crypto_wiring_plan.md`) is the LAST
+layer before any real connection could ever be attempted: even IF
+exposure were someday approved, a Runtime connection and a Worker
+connection are two SEPARATE decisions, evaluated independently. Stage
+658 adds `src/runtime/fedos_initialize_crypto_wiring_plan.ts` — a
+pure, fixed-value PLAN naming `createInitializeCryptoWiringPlan()`,
+fixed `{ state: "PlanningOnly", runtimeWiringAllowed: false,
+workerWiringAllowed: false, reason: "RuntimeWiringPlanPending" }` —
+with NO side effects and NO `import()` of any kind (static or
+dynamic) written anywhere in this file. Stage 659 wires
+`createInitializeCryptoExposureReview()`
+(`fedos_initialize_crypto_exposure_review.ts`) to CALL
+`createInitializeCryptoWiringPlan()` — the result is DISCARDED and
+`createInitializeCryptoExposureReview()`'s own return value is
+UNCHANGED (`exposed: false`, `approved: false`), the SAME "reach one
+link deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635/643/651
+already established eighteen times over.
+
+This revises the Stage 649–653 diagram — Runtime initializeCrypto
+Wiring Plan now sits between Runtime initializeCrypto Exposure Review
+and the still-positional Dynamic Import box:
+
+```
+FedosInitializeCryptoExposureReview        <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_exposure_review.ts,
+("Runtime initializeCrypto Exposure            Stage 650), REAL wiring: createInitializeCryptoExposureReview() calls
+Review")                                       createInitializeCryptoWiringPlan(), discards the result (Stage 659)
+     |
+     v
+FedosInitializeCryptoWiringPlan            <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_wiring_plan.ts,
+("Runtime initializeCrypto Wiring Plan")       Stage 658), fixed { state: "PlanningOnly", runtimeWiringAllowed: false,
+     |                                          workerWiringAllowed: false, reason: "RuntimeWiringPlanPending" } -- NO
+     |                                          side effects, NO import() of any kind written, NEVER references the
+     |                                          generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+Per the user's own Stage 649 instruction, this update also names the
+FULL target-architecture diagram, from `Runtime` (Crypto Provider)
+through this Wiring Plan's own `STOP`, in a single picture — including
+`Explicit Crypto Initialization`, which no earlier target diagram in
+this arc (Stage 593/609/625/641) named explicitly, even though its
+real file (`fedos_explicit_crypto_initialization.ts`, Stage 586) has
+existed since Stage 585–592:
+
+```
+Crypto Provider
+        │
+        ▼
+Provider Initialization Request
+        │
+        ▼
+Provider Initialization Approval
+        │
+        ▼
+Provider Init Facade Contract
+        │
+        ▼
+Provider / Facade Boundary
+        │
+        ▼
+Crypto Loader Facade
+        │
+        ▼
+Explicit Crypto Initialization
+        │
+        ▼
+InitializeCrypto API Contract
+        │
+        ▼
+Crypto Initialization Result Contract
+        │
+        ▼
+Runtime initializeCrypto Exposure Review
+        │
+        ▼
+Runtime initializeCrypto Wiring Plan
+        │
+        ▼
+STOP
+```
+
+**This target diagram is CONCEPTUAL, exactly like the Stage 593/609/625/641
+target diagrams it extends — every box names a REAL, independently-
+tested file, but the ARROWS are conceptual for the Provider/Request/
+Approval/Contract/Boundary/Facade segment (see the Stage 625 update
+above for that segment's exact real-vs-positional breakdown).** The
+`Explicit Crypto Initialization` box's OWN real position in the parked
+implementation chain is DIFFERENT from its position in this target
+diagram: in the real, independently-tested chain,
+`createDynamicLoaderDevApproval()` (Stage 578) calls
+`createExplicitCryptoInitialization()` (Stage 587), which in turn
+calls `createCryptoLoaderFacade()` (Stage 595) — i.e. Explicit Crypto
+Initialization sits structurally ABOVE Crypto Loader Facade in the
+real call graph, calling INTO it, not below it as the target diagram's
+top-to-bottom reading might suggest. This is the SAME "two diagrams
+name the same real files from two deliberately separate vantage
+points" discipline `docs/runtime_internal_execution_contract.md`'s
+Stage 609 update already established for Provider Initialization
+Request's own position relative to the Boundary — naming a box in the
+target diagram is never a claim about its real wiring direction.
+
+**Runtime connection does not exist. Worker connection does not
+exist. `create_runtime.ts`/`src/worker.ts` are NOT modified by this
+stage.** Neither file references
+`fedos_initialize_crypto_wiring_plan.ts`, directly or indirectly, and
+no wiring of any kind — Runtime or Worker — is ever performed by this
+file.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+660) read `initializeCryptoWiringPlanState()`/
+`initializeCryptoRuntimeWiringAllowed()`/
+`initializeCryptoWorkerWiringAllowed()`/
+`initializeCryptoWiringPlanReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`false`/`"RuntimeWiringPlanPending"`,
+matching every other leaf in this arc.
+
+**Still true after Stage 649–661**: no Runtime/Worker connection of
+any kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_initialize_crypto_exposure_review.ts` nor
+`fedos_initialize_crypto_wiring_plan.ts`, and NEITHER FILE IS MODIFIED
+BY THIS STAGE); `initializeCrypto()` is not exposed on `AppRuntime` in
+any way; `WebAssembly.instantiate`/`compile` never invoked; no static
+`import` and no dynamic `import()` of the generated JS glue anywhere
+in this repository; no generated file edited or committed;
+`encrypt`/`decrypt` unchanged; NIP-17/NIP-44/NIP-59 unimplemented;
+`"Allowed"`/`"Approved"`/`"Ready"`/`"Present"`/`"Reviewed"`/
+`"Committed"`/`"PrebuildRequired"`/`"OptionalLoader"`/`"Open"`/
+`"Granted"`/`"Active"`/`"WasmActive"`/`"Connected"`/`"Requested"`/
+`"Callable"`/`"Completed"`/`"Wasm"`/`"Exposed"`/`"Reviewed"`/`"Wired"`/
+`"Loaded"`/`"FailOpen"` never reached; Rust public API unchanged (27
+`pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_initialize_crypto_wiring_plan.md` (Stage 657) — the
+  last layer before any real connection, and the full extended
+  target-architecture diagram naming `Explicit Crypto Initialization`.
+- `src/runtime/fedos_initialize_crypto_wiring_plan.ts` (Stage
+  658–659) — the Plan's real, fixed-value implementation and its
+  wiring from `fedos_initialize_crypto_exposure_review.ts`.
+- `docs/runtime_initialize_crypto_exposure_review.md` (Stage 649) —
+  the first Runtime-facing layer, one level above the Wiring Plan.
+- `src/runtime/fedos_initialize_crypto_exposure_review.ts` (Stage
+  650–651) — the Review's real, fixed-value implementation and its
+  wiring from `fedos_crypto_initialization_result.ts`.
 - `docs/runtime_crypto_initialization_result.md` (Stage 641) — the
   terminus of the Provider-side Planning arc, and the full extended
   target-architecture diagram.

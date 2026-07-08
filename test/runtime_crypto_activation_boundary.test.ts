@@ -308,6 +308,14 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       cryptoInitializationSuccess: false,
       cryptoInitializationBackend: "None",
       cryptoInitializationResultReason: "InitializationResultPending",
+      initializeCryptoExposureState: "PlanningOnly",
+      initializeCryptoExposed: false,
+      initializeCryptoExposureApproved: false,
+      initializeCryptoExposureReason: "RuntimeExposureReviewPending",
+      initializeCryptoWiringPlanState: "PlanningOnly",
+      initializeCryptoRuntimeWiringAllowed: false,
+      initializeCryptoWorkerWiringAllowed: false,
+      initializeCryptoWiringPlanReason: "RuntimeWiringPlanPending",
     });
   });
 
