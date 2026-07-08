@@ -50,6 +50,30 @@
  * (`#reachWasmArtifact()`) of reaching one link deeper while changing
  * nothing about its own return value.
  *
+ * Stage 809 (Prototype Phase 009) adds a Loader STATE reader,
+ * `planningState()`, plus standalone accessors
+ * (`loaderPlanningState()`/`loaderPlanningDecision()`/`loaderLoaded()`).
+ * **Naming note — a design conflict, found and resolved before this
+ * addition landed**: `status()` (Stage 489) already exists, already
+ * returns a DIFFERENT, exact-shape-pinned value
+ * (`{ state: "NotLoaded", mode: "PlanningOnly", policy: "FailClosed",
+ * reason }`, guarded by `test/runtime_wasm_loader.test.ts` #1/#3 with
+ * `toEqual`), and `FedosWasmLoaderState` (Stage 489) already exports
+ * `"NotLoaded" | "Loaded"`. Redefining either under the SAME name with
+ * DIFFERENT values, as a literal reading of a `{ state, decision,
+ * loaded }` request might suggest, would both fail to compile (duplicate
+ * exported type name in one module) and break that pinned test. This
+ * stage therefore adds a NEW, separately-named method (`planningState()`,
+ * NOT `status()`) and a NEW, separately-named type
+ * (`FedosWasmLoaderPlanningState`, NOT `FedosWasmLoaderState`) instead —
+ * `status()`'s own return value, and every existing export's value, is
+ * byte-for-byte unchanged. `planningState()` is PURE and returns its OWN
+ * fixed `{ state: "Planning", decision: "BlockedByPolicy", loaded: false }`
+ * directly — it does NOT call `planLoad()` (no `status→planLoad` reverse
+ * reference of any kind), and `planLoad()` itself is UNCHANGED and does
+ * NOT call `planningState()` either — the two are independent readers of
+ * the same fixed design, never calling one another.
+ *
  * HARD GUARDRAILS:
  *   - Every function/method in this file is PURE, synchronous, and
  *     returns a hand-fixed constant. None ever inspects
@@ -71,6 +95,15 @@
  *     PLANS an operation, never performs one.
  *   - `loaderPolicy()` is fixed `"FailClosed"` — every planned
  *     operation is denied by policy, not merely "not implemented".
+ *   - `planningState()` is PURE, synchronous, takes no argument, and
+ *     returns a hand-fixed constant. It NEVER calls `planLoad()`/
+ *     `planInitialize()`/`planUnload()`, and neither of THOSE methods
+ *     calls `planningState()` — no reverse reference of any kind
+ *     between the two.
+ *   - `planningState().state` is fixed `"Planning"` — `"Active"` is
+ *     RESERVED, unreachable from this file.
+ *   - `planningState().loaded` is fixed `false` — no module is ever
+ *     loaded, imported, fetched, or instantiated by this file.
  *   - No `SecretHandle`, `ConversationKey`, `MessageKey`, or
  *     `Nip44WirePayload` type or value is imported, referenced, or
  *     constructed anywhere in this file.
@@ -131,6 +164,30 @@ export interface FedosWasmLoaderDecision {
 }
 
 /**
+ * Stage 809 — the Loader's own coarse PLANNING state, DELIBERATELY a
+ * separate type from `FedosWasmLoaderState` above (which already means
+ * something different: `"NotLoaded"`/`"Loaded"`, `status()`'s own
+ * field). `"Planning"` is the ONLY value this stage's implementation
+ * ever produces; `"Active"` is RESERVED, unreachable from this file —
+ * the SAME "Planning vs reserved Active" convention every other layer
+ * in this arc already uses.
+ */
+export type FedosWasmLoaderPlanningState = "Planning" | "Active";
+
+/**
+ * A non-sensitive snapshot combining the Loader's own coarse planning
+ * state, the decision `planLoad()` would resolve to (without calling
+ * it), and whether anything has ever actually loaded. DELIBERATELY a
+ * separate shape from `FedosWasmLoaderStatus` above (`status()`'s own
+ * return type) — see this module's top-of-file "Naming note" for why.
+ */
+export interface FedosWasmLoaderPlanningStatus {
+  readonly state: FedosWasmLoaderPlanningState;
+  readonly decision: FedosWasmLoaderDecisionState;
+  readonly loaded: boolean;
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -141,6 +198,7 @@ export interface FedosWasmLoader {
   planLoad(): FedosWasmLoaderDecision;
   planInitialize(): FedosWasmLoaderDecision;
   planUnload(): FedosWasmLoaderDecision;
+  planningState(): FedosWasmLoaderPlanningStatus;
 }
 
 /**
@@ -177,6 +235,22 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Stage 809 — the Loader's own coarse planning state, decision, and
+   * loaded flag, in one non-sensitive snapshot. PURE: does NOT call
+   * `planLoad()`/`planInitialize()`/`planUnload()` (no reverse
+   * reference), does not read `status()`, and never loads, imports,
+   * fetches, or instantiates anything. Fixed `{ state: "Planning",
+   * decision: "BlockedByPolicy", loaded: false }`.
+   */
+  planningState(): FedosWasmLoaderPlanningStatus {
+    return {
+      state: "Planning",
+      decision: "BlockedByPolicy",
+      loaded: false,
+    };
+  }
+
+  /**
    * PRIVATE — builds a `FedosWasmLoaderPlan` and calls its
    * `planImport()`. The result is discarded; it is never passed to
    * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
@@ -199,10 +273,11 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 }
 
 /**
- * Build a `FedosWasmLoader`. No other module in this repository
- * calls this function yet — it exists for direct construction by
- * this codebase's own test suite and for the pure, standalone
- * functions below. Pure; never throws.
+ * Build a `FedosWasmLoader`. `fedos_wasm_backend.ts`'s
+ * `createWasmBackend()` (Stage 793) is the only real (non-test) caller
+ * of this function; it also exists for direct construction by this
+ * codebase's own test suite and for the pure, standalone functions
+ * below. Pure; never throws.
  */
 export function createFedosWasmLoader(): FedosWasmLoader {
   return new FedosWasmLoaderSkeleton();
@@ -232,4 +307,35 @@ export function loaderMode(): FedosWasmLoaderMode {
  */
 export function loaderPolicy(): FedosWasmLoaderPolicy {
   return "FailClosed";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed coarse PLANNING state —
+ * the same answer as `planningState().state`. Fixed `"Planning"` —
+ * DELIBERATELY separate from `loaderState()` above, which answers a
+ * different question (`"NotLoaded"`/`"Loaded"`, `status()`'s own
+ * field). Usable by diagnostics WITHOUT constructing a
+ * `FedosWasmLoader` instance.
+ */
+export function loaderPlanningState(): FedosWasmLoaderPlanningState {
+  return "Planning";
+}
+
+/**
+ * Pure, standalone: the decision `planLoad()` would resolve to,
+ * without calling it — the same answer as
+ * `planningState().decision`. Fixed `"BlockedByPolicy"` — no
+ * parameter or override anywhere can flip it.
+ */
+export function loaderPlanningDecision(): FedosWasmLoaderDecisionState {
+  return "BlockedByPolicy";
+}
+
+/**
+ * Pure, standalone: whether anything has ever actually loaded — the
+ * same answer as `planningState().loaded`. Fixed `false` — no module
+ * is ever imported, fetched, or instantiated by this file.
+ */
+export function loaderLoaded(): boolean {
+  return false;
 }
