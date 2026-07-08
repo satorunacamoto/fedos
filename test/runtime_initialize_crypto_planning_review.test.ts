@@ -102,7 +102,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     expect(firstWiringPlanDocSource).toMatch(/prohibited|PROHIBITED/);
   });
 
-  it("9. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set is exactly the known forty (Stage 714/730 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts afterward)", () => {
+  it("9. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set is exactly the known forty-one (Stage 714/730/746 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts afterward)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -112,6 +112,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
 
     const knownNames = [
       "fedos_build_time_loader_strategy.ts",
+      "fedos_crypto_backend_interface.ts",
       "fedos_crypto_initialization_result.ts",
       "fedos_crypto_loader_backend.ts",
       "fedos_crypto_loader_facade.ts",
@@ -153,7 +154,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(40);
+    expect(names.length).toBe(41);
     expect(names).toEqual(knownNames);
   });
 

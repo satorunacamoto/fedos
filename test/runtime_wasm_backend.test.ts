@@ -63,18 +63,28 @@ function codeOnlyLines(source: string): string {
  * fields. `src/runtime/fedos_wasm_backend.ts` (Stage 730) fixes
  * `createWasmBackend()` to `{ state: "PlanningOnly", backendReady:
  * false, loaderAttached: false, loaderKind: "WasmLoaderPlanned",
- * reason: "WasmBackendPlanningPending" }`. Stage 737 wires
- * `createCryptoLoaderBackend()` to call it, discarding the result --
- * the Abstraction's own return value, the Facade's own return value,
- * and Runtime's own `initializeCrypto()` return value all stay
- * byte-for-byte unchanged. Neither this test file nor any file it
- * exercises writes `import()` of any kind, imports the generated JS
- * glue, calls `WebAssembly.instantiate`/`compile`, or connects the
- * real WASM Loader/Rust to any of it. Runtime reaches the Facade
- * (Stage 697) and the Facade reaches the Backend Abstraction (Stage
- * 721), but neither Runtime, Worker, nor the Facade ever reaches the
- * WASM Backend Planning layer directly -- ONLY the Backend
- * Abstraction calls `createWasmBackend()`.
+ * reason: "WasmBackendPlanningPending" }`. Stage 737 originally wired
+ * `createCryptoLoaderBackend()` to call it directly, discarding the
+ * result.
+ *
+ * Stage 753 (Prototype Phase 005) REPLACES that direct wire: the
+ * Crypto Backend Interface (`fedos_crypto_backend_interface.ts`,
+ * `docs/runtime_crypto_backend_interface.md`) is now inserted between
+ * the Backend Abstraction and this planning layer, so
+ * `fedos_crypto_loader_backend.ts` no longer references
+ * `fedos_wasm_backend.ts` directly -- see
+ * `test/runtime_crypto_backend_interface.test.ts` for that layer's own
+ * guard suite. This file's fixed value and diagnostics are UNCHANGED
+ * by that move; only WHICH file calls `createWasmBackend()` changed.
+ * Neither this test file nor any file it exercises writes `import()`
+ * of any kind, imports the generated JS glue, calls
+ * `WebAssembly.instantiate`/`compile`, or connects the real WASM
+ * Loader/Rust to any of it. Runtime reaches the Facade (Stage 697),
+ * the Facade reaches the Backend Abstraction (Stage 721), and the
+ * Abstraction reaches the Backend Interface (Stage 753), but neither
+ * Runtime, Worker, the Facade, nor the Backend Abstraction ever
+ * reaches the WASM Backend Planning layer directly anymore -- ONLY the
+ * Backend Interface calls `createWasmBackend()`.
  */
 describe("FedOS WASM Backend Planning Layer, PlanningOnly/not-ready, no side effects, no real WASM Loader connection (Stage 729-744)", () => {
   it("1. createWasmBackend is always fixed -- never a live probe", () => {
@@ -128,17 +138,20 @@ describe("FedOS WASM Backend Planning Layer, PlanningOnly/not-ready, no side eff
     expect(codeOnly).not.toMatch(/fedos_core_rust/);
     expect(codeOnly).not.toMatch(/FedosRuntimeCryptoProvider|RuntimeCryptoProvider/);
     expect(codeOnly).not.toMatch(/fedos_wasm_loader/);
-    // This layer is called BY the Backend Abstraction, never the reverse.
+    // This layer is called BY the Backend Interface (Stage 753), never the reverse.
     expect(codeOnly).not.toMatch(/fedos_crypto_loader_backend/);
+    expect(codeOnly).not.toMatch(/fedos_crypto_backend_interface/);
     expect(codeOnly).not.toMatch(/fedos_crypto_loader_facade/);
     // Terminus: does not call any further link deeper.
     expect(codeOnly).not.toMatch(/fedos_crypto_provider_facade_boundary/);
     expect(codeOnly).not.toMatch(/fedos_explicit_crypto_initialization/);
   });
 
-  it("4. the Backend Abstraction legitimately reaches WASM Backend Planning but never the generated JS glue, WebAssembly, or the real WASM Loader", () => {
-    expect(backendSource).toMatch(/fedos_wasm_backend/);
+  it("4. the Backend Abstraction no longer references WASM Backend Planning directly -- that now happens via the Backend Interface, but the Abstraction's own fixed value is unaffected", () => {
+    expect(backendSource).toMatch(/fedos_crypto_backend_interface/);
     const codeOnly = codeOnlyLines(backendSource);
+    // Code (not doc-comment prose recounting Stage 737's history) no longer references it.
+    expect(codeOnly).not.toMatch(/fedos_wasm_backend/);
     expect(codeOnly).not.toMatch(/fedos_core_rust/);
     expect(codeOnly).not.toMatch(/WebAssembly/);
     expect(codeOnly).not.toMatch(/initSync/);
@@ -175,10 +188,11 @@ describe("FedOS WASM Backend Planning Layer, PlanningOnly/not-ready, no side eff
     });
   });
 
-  it("6. only the Backend Abstraction calls WASM Backend Planning directly -- Runtime, Worker, and the Facade never reference it", () => {
+  it("6. only the Backend Interface calls WASM Backend Planning directly -- Runtime, Worker, the Facade, and the Backend Abstraction never reference it", () => {
     expect(createRuntimeSource).not.toMatch(/fedos_wasm_backend/);
     expect(workerSource).not.toMatch(/fedos_wasm_backend/);
     expect(codeOnlyLines(facadeSource)).not.toMatch(/fedos_wasm_backend/);
+    expect(codeOnlyLines(backendSource)).not.toMatch(/fedos_wasm_backend/);
   });
 
   it("7. the generated JS glue is never imported (code, not comments) anywhere in WASM Backend Planning or the Backend Abstraction source, static or dynamic", () => {

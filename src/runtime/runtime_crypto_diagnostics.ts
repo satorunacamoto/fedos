@@ -379,6 +379,20 @@
  * `cryptoLoaderBackendReady` field. Fixed `"PlanningOnly"`/`false`/
  * `false`/`"WasmLoaderPlanned"`/`"WasmBackendPlanningPending"`.
  * `worker_crypto_diagnostics.ts` is intentionally NOT touched.
+ *
+ * Stage 757 (Prototype Phase 005) adds `cryptoBackendInterfaceState`/
+ * `cryptoBackendInterfaceReady`/`cryptoBackendSelected`/
+ * `cryptoBackendActivated`/`cryptoBackendInterfaceReason`, reading
+ * `fedos_crypto_backend_interface.ts`'s (Stage 745/746)
+ * `cryptoBackendInterfaceState()`/`cryptoBackendInterfaceReady()`/
+ * `cryptoBackendSelected()`/`cryptoBackendActivated()`/
+ * `cryptoBackendInterfaceReason()` — the Backend Interface the
+ * Backend Abstraction now reaches (Stage 753), inserted between the
+ * Abstraction's own pre-existing `cryptoLoaderBackendReady` field and
+ * the WASM Backend Planning layer's own fields above. Fixed
+ * `"PlanningOnly"`/`false`/`"WasmPlanned"`/`false`/
+ * `"BackendInterfacePending"`. `worker_crypto_diagnostics.ts` is
+ * intentionally NOT touched.
  */
 
 import type {
@@ -584,6 +598,17 @@ import {
   wasmBackendReason as fedosWasmBackendReason,
   wasmBackendState as fedosWasmBackendState,
 } from "./fedos_wasm_backend.js";
+import type {
+  FedosCryptoBackendInterfaceReason,
+  FedosCryptoBackendInterfaceState,
+} from "./fedos_crypto_backend_interface.js";
+import {
+  cryptoBackendActivated as fedosCryptoBackendActivated,
+  cryptoBackendInterfaceReady as fedosCryptoBackendInterfaceReady,
+  cryptoBackendInterfaceReason as fedosCryptoBackendInterfaceReason,
+  cryptoBackendInterfaceState as fedosCryptoBackendInterfaceState,
+  cryptoBackendSelected as fedosCryptoBackendSelected,
+} from "./fedos_crypto_backend_interface.js";
 import type {
   FedosCryptoProviderFacadeBoundaryReason,
   FedosCryptoProviderFacadeBoundaryState,
@@ -1685,6 +1710,36 @@ export interface RuntimeCryptoActivationStatus {
    * answer. Fixed `"WasmBackendPlanningPending"` in this stage.
    */
   readonly wasmBackendReason: FedosWasmBackendReason;
+  /**
+   * Stage 757 (Prototype Phase 005) — the Backend Interface's own
+   * fixed coarse state — `cryptoBackendInterfaceState()`'s own answer
+   * (`src/runtime/fedos_crypto_backend_interface.ts`, Stage 745/746).
+   * Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly cryptoBackendInterfaceState: FedosCryptoBackendInterfaceState;
+  /**
+   * Whether the Backend Interface itself is ready to route a real
+   * call — `cryptoBackendInterfaceReady()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly cryptoBackendInterfaceReady: boolean;
+  /**
+   * Which backend candidate the Interface currently talks to —
+   * `cryptoBackendSelected()`'s own answer. Fixed `"WasmPlanned"` in
+   * this stage.
+   */
+  readonly cryptoBackendSelected: FedosCryptoLoaderBackendKind;
+  /**
+   * Whether any backend has ever actually been activated through the
+   * Interface — `cryptoBackendActivated()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly cryptoBackendActivated: boolean;
+  /**
+   * WHY the Interface is not ready — `cryptoBackendInterfaceReason()`'s
+   * own answer. Fixed `"BackendInterfacePending"` in this stage.
+   */
+  readonly cryptoBackendInterfaceReason: FedosCryptoBackendInterfaceReason;
 }
 
 /**
@@ -1854,5 +1909,10 @@ export function runtimeCryptoActivationStatus(
     wasmBackendLoaderAttached: fedosWasmBackendLoaderAttached(),
     wasmBackendLoaderKind: fedosWasmBackendLoaderKind(),
     wasmBackendReason: fedosWasmBackendReason(),
+    cryptoBackendInterfaceState: fedosCryptoBackendInterfaceState(),
+    cryptoBackendInterfaceReady: fedosCryptoBackendInterfaceReady(),
+    cryptoBackendSelected: fedosCryptoBackendSelected(),
+    cryptoBackendActivated: fedosCryptoBackendActivated(),
+    cryptoBackendInterfaceReason: fedosCryptoBackendInterfaceReason(),
   };
 }
