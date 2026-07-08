@@ -265,6 +265,9 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       initializeCryptoInvocationAllowed: false,
       initializeCryptoInvocationCompleted: false,
       initializeCryptoInvocationReason: "InvocationContractPending",
+      runtimeInitializeCryptoPrototypeExposed: true,
+      runtimeInitializeCryptoPrototypeAllowed: false,
+      runtimeInitializeCryptoPrototypeReason: "PrototypeDisabled",
     });
   });
 

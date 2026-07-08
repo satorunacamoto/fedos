@@ -330,6 +330,19 @@
  * `"InvocationContractPending"`. None of these expose any
  * implementation detail beyond these values; no payload, plaintext,
  * ciphertext, or key material is ever involved.
+ *
+ * Stage 692 (Prototype Phase 001) adds
+ * `runtimeInitializeCryptoPrototypeExposed`/
+ * `runtimeInitializeCryptoPrototypeAllowed`/
+ * `runtimeInitializeCryptoPrototypeReason`, reading
+ * `src/runtime/create_runtime.ts`'s (Stage 691)
+ * `createRuntimeInitializeCryptoResult()` — the real, now-wired
+ * `AppRuntime.initializeCrypto()` prototype, DELIBERATELY SEPARATE
+ * from the twelve `fedos_*.ts` `PlanningOnly` layers above.
+ * `runtimeInitializeCryptoPrototypeExposed` is fixed `true` (the
+ * member IS really wired into `AppRuntime` now); `...Allowed` is
+ * fixed `false` and `...Reason` is fixed `"PrototypeDisabled"` — the
+ * door exists, but calling it still does no real work.
  */
 
 import type {
@@ -623,6 +636,8 @@ import { evaluateRuntimeCryptoActivation } from "./runtime_crypto_activation_pol
 import type { RuntimeCryptoProviderName } from "./runtime_crypto_config.js";
 import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
 import { FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME } from "./runtime_crypto_registry.js";
+import type { RuntimeInitializeCryptoReason } from "./types.js";
+import { createRuntimeInitializeCryptoResult } from "./create_runtime.js";
 
 /**
  * A non-sensitive, display-only readiness label for a `RuntimeCryptoProvider`
@@ -1507,6 +1522,31 @@ export interface RuntimeCryptoActivationStatus {
    * `"InvocationContractPending"` in this stage.
    */
   readonly initializeCryptoInvocationReason: FedosInitializeCryptoInvocationContractReason;
+  /**
+   * Stage 692 (Prototype Phase 001) — whether `AppRuntime.initializeCrypto`
+   * is currently exposed as a real, callable member on `AppRuntime` —
+   * `createRuntime()` (Stage 691) always wires it in, so this is fixed
+   * `true`. DELIBERATELY DISTINCT from every `PlanningOnly` layer's own
+   * `exposed`/`visible`-style field above, all of which stay `false`
+   * because none of them is ever wired into `AppRuntime`.
+   */
+  readonly runtimeInitializeCryptoPrototypeExposed: boolean;
+  /**
+   * Whether calling `AppRuntime.initializeCrypto()` actually performs
+   * any real work — the same answer as
+   * `createRuntimeInitializeCryptoResult().allowed`
+   * (`src/runtime/create_runtime.ts`, Stage 691). Fixed `false` in this
+   * stage: the prototype is exposed, but not yet allowed to do
+   * anything.
+   */
+  readonly runtimeInitializeCryptoPrototypeAllowed: boolean;
+  /**
+   * WHY `AppRuntime.initializeCrypto()` is not currently allowed to do
+   * anything — the same answer as
+   * `createRuntimeInitializeCryptoResult().reason`. Fixed
+   * `"PrototypeDisabled"` in this stage.
+   */
+  readonly runtimeInitializeCryptoPrototypeReason: RuntimeInitializeCryptoReason;
 }
 
 /**
@@ -1660,5 +1700,8 @@ export function runtimeCryptoActivationStatus(
     initializeCryptoInvocationAllowed: fedosInitializeCryptoInvocationAllowed(),
     initializeCryptoInvocationCompleted: fedosInitializeCryptoInvocationCompleted(),
     initializeCryptoInvocationReason: fedosInitializeCryptoInvocationReason(),
+    runtimeInitializeCryptoPrototypeExposed: true,
+    runtimeInitializeCryptoPrototypeAllowed: createRuntimeInitializeCryptoResult().allowed,
+    runtimeInitializeCryptoPrototypeReason: createRuntimeInitializeCryptoResult().reason,
   };
 }
