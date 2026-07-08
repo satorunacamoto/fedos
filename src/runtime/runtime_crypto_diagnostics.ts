@@ -259,6 +259,26 @@
  * `"ProviderInitFacadeContractPending"`. None of these expose any
  * implementation detail beyond these values; no payload, plaintext,
  * ciphertext, or key material is ever involved.
+ *
+ * Stage 636 adds `initializeCryptoApiState`/`initializeCryptoCallable`/
+ * `initializeCryptoInitialized`/`initializeCryptoReason`
+ * (`fedos_initialize_crypto_api_contract.ts`'s
+ * `initializeCryptoApiState()`/`initializeCryptoCallable()`/
+ * `initializeCryptoInitialized()`/`initializeCryptoReason()`, Stage
+ * 634/635) — the initializeCrypto API Contract's own fixed answers:
+ * `"PlanningOnly"`/`false`/`false`/`"InitializeCryptoApiPending"`.
+ *
+ * Stage 644 adds `cryptoInitializationResultState`/
+ * `cryptoInitializationSuccess`/`cryptoInitializationBackend`/
+ * `cryptoInitializationResultReason`
+ * (`fedos_crypto_initialization_result.ts`'s
+ * `cryptoInitializationResultState()`/`cryptoInitializationSuccess()`/
+ * `cryptoInitializationBackend()`/`cryptoInitializationResultReason()`,
+ * Stage 642/643) — the Crypto Initialization Result Contract's own
+ * fixed answers: `"PlanningOnly"`/`false`/`"None"`/
+ * `"InitializationResultPending"`. None of these expose any
+ * implementation detail beyond these values; no payload, plaintext,
+ * ciphertext, or key material is ever involved.
  */
 
 import type {
@@ -478,6 +498,27 @@ import {
   providerInitFacadeContractReason as fedosProviderInitFacadeContractReason,
   providerInitFacadeContractState as fedosProviderInitFacadeContractState,
 } from "./fedos_provider_init_facade_contract.js";
+import type {
+  FedosInitializeCryptoApiContractReason,
+  FedosInitializeCryptoApiContractState,
+} from "./fedos_initialize_crypto_api_contract.js";
+import {
+  initializeCryptoApiState as fedosInitializeCryptoApiState,
+  initializeCryptoCallable as fedosInitializeCryptoCallable,
+  initializeCryptoInitialized as fedosInitializeCryptoInitialized,
+  initializeCryptoReason as fedosInitializeCryptoReason,
+} from "./fedos_initialize_crypto_api_contract.js";
+import type {
+  FedosCryptoInitializationResultBackend,
+  FedosCryptoInitializationResultReason,
+  FedosCryptoInitializationResultState,
+} from "./fedos_crypto_initialization_result.js";
+import {
+  cryptoInitializationBackend as fedosCryptoInitializationBackend,
+  cryptoInitializationResultReason as fedosCryptoInitializationResultReason,
+  cryptoInitializationResultState as fedosCryptoInitializationResultState,
+  cryptoInitializationSuccess as fedosCryptoInitializationSuccess,
+} from "./fedos_crypto_initialization_result.js";
 import {
   FEDOS_RUNTIME_PROVIDER_IMPLEMENTED,
   fedosProviderExecutionState,
@@ -1223,6 +1264,56 @@ export interface RuntimeCryptoActivationStatus {
    * `"ProviderInitFacadeContractPending"` in this stage.
    */
   readonly providerInitFacadeContractReason: FedosProviderInitFacadeContractReason;
+  /**
+   * The initializeCrypto API Contract's own fixed coarse readiness
+   * state — `initializeCryptoApiState()`'s own answer
+   * (`src/runtime/fedos_initialize_crypto_api_contract.ts`, Stage
+   * 634/636). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly initializeCryptoApiState: FedosInitializeCryptoApiContractState;
+  /**
+   * Whether `initializeCrypto()` is currently callable at all —
+   * `initializeCryptoCallable()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly initializeCryptoCallable: boolean;
+  /**
+   * Whether `initializeCrypto()` has ever actually been called and
+   * completed — `initializeCryptoInitialized()`'s own answer. Fixed
+   * `false` in this stage.
+   */
+  readonly initializeCryptoInitialized: boolean;
+  /**
+   * WHY `initializeCrypto()` is not currently callable —
+   * `initializeCryptoReason()`'s own answer. Fixed
+   * `"InitializeCryptoApiPending"` in this stage.
+   */
+  readonly initializeCryptoReason: FedosInitializeCryptoApiContractReason;
+  /**
+   * The Crypto Initialization Result Contract's own fixed coarse
+   * completion state — `cryptoInitializationResultState()`'s own
+   * answer (`src/runtime/fedos_crypto_initialization_result.ts`,
+   * Stage 642/644). Fixed `"PlanningOnly"` in this stage.
+   */
+  readonly cryptoInitializationResultState: FedosCryptoInitializationResultState;
+  /**
+   * Whether initialization has ever actually succeeded —
+   * `cryptoInitializationSuccess()`'s own answer. Fixed `false` in
+   * this stage.
+   */
+  readonly cryptoInitializationSuccess: boolean;
+  /**
+   * Which backend (if any) ultimately served a completed request —
+   * `cryptoInitializationBackend()`'s own answer. Fixed `"None"` in
+   * this stage.
+   */
+  readonly cryptoInitializationBackend: FedosCryptoInitializationResultBackend;
+  /**
+   * WHY no result is currently available —
+   * `cryptoInitializationResultReason()`'s own answer. Fixed
+   * `"InitializationResultPending"` in this stage.
+   */
+  readonly cryptoInitializationResultReason: FedosCryptoInitializationResultReason;
 }
 
 /**
@@ -1352,5 +1443,13 @@ export function runtimeCryptoActivationStatus(
     providerInitFacadeContractState: fedosProviderInitFacadeContractState(),
     providerInitFacadeContractReady: fedosProviderInitFacadeContractReady(),
     providerInitFacadeContractReason: fedosProviderInitFacadeContractReason(),
+    initializeCryptoApiState: fedosInitializeCryptoApiState(),
+    initializeCryptoCallable: fedosInitializeCryptoCallable(),
+    initializeCryptoInitialized: fedosInitializeCryptoInitialized(),
+    initializeCryptoReason: fedosInitializeCryptoReason(),
+    cryptoInitializationResultState: fedosCryptoInitializationResultState(),
+    cryptoInitializationSuccess: fedosCryptoInitializationSuccess(),
+    cryptoInitializationBackend: fedosCryptoInitializationBackend(),
+    cryptoInitializationResultReason: fedosCryptoInitializationResultReason(),
   };
 }

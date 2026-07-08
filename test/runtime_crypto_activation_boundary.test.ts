@@ -300,6 +300,14 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
       providerInitFacadeContractState: "PlanningOnly",
       providerInitFacadeContractReady: false,
       providerInitFacadeContractReason: "ProviderInitFacadeContractPending",
+      initializeCryptoApiState: "PlanningOnly",
+      initializeCryptoCallable: false,
+      initializeCryptoInitialized: false,
+      initializeCryptoReason: "InitializeCryptoApiPending",
+      cryptoInitializationResultState: "PlanningOnly",
+      cryptoInitializationSuccess: false,
+      cryptoInitializationBackend: "None",
+      cryptoInitializationResultReason: "InitializationResultPending",
     });
   });
 

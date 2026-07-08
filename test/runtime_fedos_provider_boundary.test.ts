@@ -241,6 +241,14 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
       providerInitFacadeContractState: "PlanningOnly",
       providerInitFacadeContractReady: false,
       providerInitFacadeContractReason: "ProviderInitFacadeContractPending",
+      initializeCryptoApiState: "PlanningOnly",
+      initializeCryptoCallable: false,
+      initializeCryptoInitialized: false,
+      initializeCryptoReason: "InitializeCryptoApiPending",
+      cryptoInitializationResultState: "PlanningOnly",
+      cryptoInitializationSuccess: false,
+      cryptoInitializationBackend: "None",
+      cryptoInitializationResultReason: "InitializationResultPending",
     });
   });
 

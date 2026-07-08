@@ -1438,8 +1438,209 @@ unchanged; NIP-17/NIP-59 unimplemented; `"Allowed"`/`"Approved"`/
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 633–637: initializeCrypto API Contract, revised diagram
+
+Stage 633 (`docs/runtime_initialize_crypto_api_contract.md`) fixes
+whether `FedosCryptoLoaderFacade.initializeCrypto()` (Stage 594)
+itself is currently CALLABLE, and whether it has ever actually run —
+kept separate from `FedosProviderInitFacadeContract.contractReady`
+(Stage 626), which only answers whether the two sides agree on a
+SHAPE. Stage 634 adds
+`src/runtime/fedos_initialize_crypto_api_contract.ts` — a pure,
+fixed-value API CONTRACT naming
+`createInitializeCryptoApiContract()`, fixed `{ state: "PlanningOnly",
+callable: false, initialized: false, reason:
+"InitializeCryptoApiPending" }` — with NO side effects and NO
+`import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 635 wires `createProviderInitFacadeContract()`
+(`fedos_provider_init_facade_contract.ts`) to CALL
+`createInitializeCryptoApiContract()` — the result is DISCARDED and
+`createProviderInitFacadeContract()`'s own return value is UNCHANGED
+(`contractReady: false`), the SAME "reach one link deeper, keep your
+own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627
+already established sixteen times over.
+
+This revises the Stage 625–630 diagram — initializeCrypto API
+Contract now sits between Provider Init Facade Contract and the
+still-positional Dynamic Import box:
+
+```
+FedosProviderInitFacadeContract            <-- REAL, pure decision function (src/runtime/fedos_provider_init_facade_contract.ts,
+("Provider Init Facade Contract")              Stage 626), REAL wiring: createProviderInitFacadeContract() calls
+     |                                          createInitializeCryptoApiContract(), discards the result (Stage 635)
+     v
+FedosInitializeCryptoApiContract           <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_api_contract.ts,
+("initializeCrypto API Contract")              Stage 634), fixed { state: "PlanningOnly", callable: false, initialized:
+     |                                          false, reason: "InitializeCryptoApiPending" } -- NO side effects, NO
+     |                                          import() of any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_initialize_crypto_api_contract.ts`, directly or indirectly, and
+`FedosCryptoLoaderFacade.initializeCrypto()` is never actually called
+by anything in this file.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+636) read `initializeCryptoApiState()`/`initializeCryptoCallable()`/
+`initializeCryptoInitialized()`/`initializeCryptoReason()` for DISPLAY
+only — `"PlanningOnly"`/`false`/`false`/
+`"InitializeCryptoApiPending"`, matching every other leaf in this
+arc.
+
+## Update — Stage 641–645: Crypto Initialization Result Contract, revised diagram, full target architecture extended
+
+Stage 641 (`docs/runtime_crypto_initialization_result.md`) is the
+TERMINUS of the Provider-side Planning arc begun at
+`docs/runtime_crypto_provider_initialization_request.md` (Stage 609):
+what a completed `initializeCrypto()` call would actually REPORT
+back — success/failure, and which backend (if any) ultimately served
+the request — kept separate from
+`FedosInitializeCryptoApiContract.initialized` (Stage 634), which only
+answers whether a call has ever completed, not whether it succeeded.
+Stage 642 adds `src/runtime/fedos_crypto_initialization_result.ts` —
+a pure, fixed-value RESULT CONTRACT naming
+`createCryptoInitializationResult()`, fixed `{ state: "PlanningOnly",
+success: false, backend: "None", reason:
+"InitializationResultPending" }` — with NO side effects and NO
+`import()` of any kind (static or dynamic) written anywhere in this
+file. Stage 643 wires `createInitializeCryptoApiContract()`
+(`fedos_initialize_crypto_api_contract.ts`) to CALL
+`createCryptoInitializationResult()` — the result is DISCARDED and
+`createInitializeCryptoApiContract()`'s own return value is UNCHANGED
+(`callable: false`, `initialized: false`), the SAME "reach one link
+deeper, keep your own answer" pattern
+Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635
+already established seventeen times over.
+
+This revises the Stage 633–637 diagram — Crypto Initialization
+Result Contract now sits between initializeCrypto API Contract and
+the still-positional Dynamic Import box:
+
+```
+FedosInitializeCryptoApiContract           <-- REAL, pure decision function (src/runtime/fedos_initialize_crypto_api_contract.ts,
+("initializeCrypto API Contract")              Stage 634), REAL wiring: createInitializeCryptoApiContract() calls
+     |                                          createCryptoInitializationResult(), discards the result (Stage 643)
+     v
+FedosCryptoInitializationResult            <-- REAL, pure decision function (src/runtime/fedos_crypto_initialization_result.ts,
+("Crypto Initialization Result Contract")      Stage 642), fixed { state: "PlanningOnly", success: false, backend: "None",
+     |                                          reason: "InitializationResultPending" } -- NO side effects, NO import()
+     |                                          of any kind written, NEVER references the generated JS glue
+     :
+     : (POSITIONAL ONLY below this line -- no code implements or calls this box; the arrow is conceptual)
+     v
+Dynamic Import                             <-- CONCEPTUAL ONLY -- the dynamic import() a future dynamic loader would
+     |                                          eventually write (Stage 561's Option C); NOT implemented, NOT written,
+     |                                          anywhere in this repository
+     v
+Generated JS Glue                          <-- REAL FILE, observed (Stage 481) -- NOT imported (static OR dynamic) by
+     |                                          anything in this chain
+     v
+STOP                                       <-- no further link exists; Runtime/Worker connection,
+                                                 WebAssembly.instantiate/compile, static AND dynamic import()
+                                                 all remain PROHIBITED
+```
+
+This update also extends the Stage 625 full target-architecture
+diagram by TWO more boxes — every real file added across Stage
+593–643, still stopping at this Result Contract without reaching WASM
+Loader/Rust/Dynamic Import/Generated JS Glue:
+
+```
+Crypto Provider
+        │
+        ▼
+Provider Initialization Request
+        │
+        ▼
+Provider Initialization Approval
+        │
+        ▼
+Provider Init Facade Contract
+        │
+        ▼
+Provider / Facade Boundary
+        │
+        ▼
+Crypto Loader Facade
+        │
+        ▼
+InitializeCrypto API Contract
+        │
+        ▼
+Crypto Initialization Result Contract
+        │
+        ▼
+STOP
+```
+
+**This target diagram is CONCEPTUAL, exactly like the Stage 593/609/625
+target diagrams it extends.** Every box in it names a REAL,
+independently-tested file, but the ARROWS remain conceptual for the
+Provider/Request/Approval/Contract/Boundary/Facade segment — see the
+Stage 625 update above for that segment's exact real-vs-positional
+breakdown. `initializeCrypto()` and `createCryptoInitializationResult()`
+are the first two boxes in this diagram whose REAL code wiring runs in
+the SAME direction as the diagram itself (API Contract -> Result
+Contract), because they are the deepest links the parked
+implementation chain has reached so far, not because the earlier
+Provider-side segment's direction has changed.
+
+**Runtime connection does not exist. Worker connection does not
+exist.** Neither `create_runtime.ts` nor `src/worker.ts` references
+`fedos_crypto_initialization_result.ts`, directly or indirectly, and
+no initialization of any kind is ever run or completed by this file.
+
+`runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts` (Stage
+644) read `cryptoInitializationResultState()`/
+`cryptoInitializationSuccess()`/`cryptoInitializationBackend()`/
+`cryptoInitializationResultReason()` for DISPLAY only —
+`"PlanningOnly"`/`false`/`"None"`/`"InitializationResultPending"`,
+matching every other leaf in this arc.
+
+**Still true after Stage 633–645**: no Runtime/Worker connection of
+any kind (`create_runtime.ts`/`src/worker.ts` reference neither
+`fedos_initialize_crypto_api_contract.ts` nor
+`fedos_crypto_initialization_result.ts`); no `RuntimeCryptoProvider`
+implementation calls `initializeCrypto()` or produces a result;
+`WebAssembly.instantiate`/`compile` never invoked; no static `import`
+and no dynamic `import()` of the generated JS glue anywhere in this
+repository; no generated file edited or committed; `encrypt`/`decrypt`
+unchanged; NIP-17/NIP-44/NIP-59 unimplemented; `"Allowed"`/
+`"Approved"`/`"Ready"`/`"Present"`/`"Reviewed"`/`"Committed"`/
+`"PrebuildRequired"`/`"OptionalLoader"`/`"Open"`/`"Granted"`/
+`"Active"`/`"WasmActive"`/`"Connected"`/`"Requested"`/`"Callable"`/
+`"Completed"`/`"Wasm"`/`"Loaded"`/`"FailOpen"` never reached; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
+- `docs/runtime_crypto_initialization_result.md` (Stage 641) — the
+  terminus of the Provider-side Planning arc, and the full extended
+  target-architecture diagram.
+- `src/runtime/fedos_crypto_initialization_result.ts` (Stage 642–643)
+  — the Result Contract's real, fixed-value implementation and its
+  wiring from `fedos_initialize_crypto_api_contract.ts`.
+- `docs/runtime_initialize_crypto_api_contract.md` (Stage 633) — the
+  callability layer one level above the Result Contract.
+- `src/runtime/fedos_initialize_crypto_api_contract.ts` (Stage
+  634–635) — the API Contract's real, fixed-value implementation and
+  its wiring from `fedos_provider_init_facade_contract.ts`.
 - `docs/runtime_provider_init_facade_contract.md` (Stage 625) — the
   last layer before the Boundary, and the full target-architecture
   diagram.
