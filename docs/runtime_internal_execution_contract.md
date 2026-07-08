@@ -2146,8 +2146,96 @@ Rust or TypeScript; NIP-17/NIP-44/NIP-59 unimplemented; `"Allowed"`/
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 729–744: Prototype Phase 004, REAL Backend Abstraction wiring reaches the WASM Backend Planning layer
+
+Stage 689–728 (the update immediately above) ended with the Backend
+Abstraction as the deepest REAL link Runtime's own wiring reaches.
+Stage 729–744 extends that chain ONE FURTHER link — not from Runtime's
+side, but from the Backend Abstraction's own side, mirroring the SAME
+"reach one link deeper, keep your own answer" pattern this document's
+Facade-and-below Planning chain has used since Stage 503.
+
+```
+Crypto Loader Backend Abstraction          <-- REAL, unchanged from Stage 689-728 (fixed { state: "PlanningOnly",
+("fedos_crypto_loader_backend.ts",             backendKind: "WasmPlanned", backendReady: false, reason:
+Stage 714)                                     "BackendAbstractionPending" })
+     |
+     v
+WASM Backend Planning                      <-- REAL wiring: createCryptoLoaderBackend() ALSO calls
+("fedos_wasm_backend.ts", Stage 730)           createWasmBackend() and DISCARDS the result (Stage 737) -- fixed
+     |                                          { state: "PlanningOnly", backendReady: false, loaderAttached: false,
+     |                                          loaderKind: "WasmLoaderPlanned", reason:
+     |                                          "WasmBackendPlanningPending" }; the Backend Abstraction's own
+     |                                          return value stays byte-for-byte unchanged
+     v
+STOP                                       <-- no further link exists; the real WASM Loader, the generated JS
+                                                 glue, WebAssembly.instantiate/compile, initSync, the default
+                                                 init export, and static/dynamic import() of any kind ALL
+                                                 remain PROHIBITED and unreachable from this chain
+```
+
+**Every arrow above IS a real function call**, exactly like the Stage
+689–728 diagram it extends. The Backend Abstraction's OWN return value
+is UNCHANGED — reaching WASM Backend Planning and discarding its
+answer does not alter `backendKind`/`backendReady`/`reason` in any
+way, so the Facade's own return value and Runtime's own
+`initializeCrypto()` return value are UNAFFECTED, transitively.
+
+**Worker remains explicitly OUT OF SCOPE.** `src/worker.ts` is NOT
+modified by Stage 729–744, references neither `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`, nor
+`fedos_wasm_backend.ts`, directly or indirectly, and
+`worker_crypto_diagnostics.ts` carries none of this arc's new
+diagnostics fields.
+
+**ONLY the Backend Abstraction may call WASM Backend Planning.**
+`createWasmBackend()`'s only caller anywhere in this repository is
+`fedos_crypto_loader_backend.ts`'s `createCryptoLoaderBackend()` —
+neither `create_runtime.ts`, `src/worker.ts`, nor
+`fedos_crypto_loader_facade.ts` references `fedos_wasm_backend.ts`
+directly, and Runtime never learns `loaderAttached`/`loaderKind` in
+any way. This mirrors the SAME Runtime-sees-only-the-Facade /
+Facade-sees-only-the-Backend-Abstraction discipline
+`docs/runtime_crypto_loader_backend_abstraction.md` §3 already
+established one link up.
+
+**Division of responsibility, per
+`docs/runtime_wasm_backend_planning.md` §3**: Rust
+(`packages/fedos-core-rust`) is still responsible for cryptography,
+keys, signatures, and safety boundaries only, and still does not know
+about "backends," "loaders," or JavaScript at all. Runtime never
+learns backend or loader detail — `loaderAttached`/`loaderKind` are
+never visible past the Backend Abstraction.
+
+`runtime_crypto_diagnostics.ts` (Stage 741) reads
+`wasmBackendState`/`wasmBackendReady`/`wasmBackendLoaderAttached`/
+`wasmBackendLoaderKind`/`wasmBackendReason` for DISPLAY only —
+`worker_crypto_diagnostics.ts` is untouched by this addition.
+
+**Still true throughout Stage 729–744**: `src/worker.ts` UNMODIFIED
+and never references `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`, or
+`fedos_wasm_backend.ts`; `fedos_crypto_loader_backend.ts` UNMODIFIED in
+its own fixed return value (`state: "PlanningOnly"`, `backendKind:
+"WasmPlanned"`, `backendReady: false`, `reason:
+"BackendAbstractionPending"`); no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind;
+no static `import` and no dynamic `import()` of the generated JS glue
+anywhere in this repository; no generated file edited or committed;
+`encrypt`/`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/
+NIP-59 unimplemented; `"Allowed"`/`"Active"`/`"Ready"` never reached
+anywhere in this new chain; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
+- `docs/runtime_wasm_backend_planning.md` (Stage 729) — the thin
+  planning seam directly below the Backend Abstraction this arc's REAL
+  wiring now reaches, naming the loader-attachment fields a real WASM
+  backend would eventually need.
+- `src/runtime/fedos_wasm_backend.ts` (Stage 730) — the WASM Backend
+  Planning layer's real, fixed-value implementation and its wiring
+  from `fedos_crypto_loader_backend.ts` (Stage 737).
 - `docs/runtime_crypto_loader_backend_abstraction.md` (Stage 713) —
   the thin, swappable seam directly below the Facade this arc's REAL
   wiring now reaches, and the three named (unconnected) backend
