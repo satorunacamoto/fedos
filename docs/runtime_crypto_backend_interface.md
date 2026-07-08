@@ -29,6 +29,15 @@ are this repository's concrete backend-candidate echo of that
 positioning's §3/§4; nothing in this file changes as a result of that
 document — it is context, not a new constraint.
 
+**Second-reach note (Stage 764).** `docs/runtime_crypto_backend_resolver.md`
+names a SEPARATE seam directly below this Interface, answering only
+"which backend is planned" (not "is it ready to load"). Stage 764
+wires `createCryptoBackendInterface()` to call
+`createCryptoBackendResolver()` as a SECOND, independent reach —
+alongside, not instead of, this Interface's pre-existing reach into
+WASM Backend Planning (§1 below). This Interface's own fixed return
+value is unaffected either way.
+
 ## 1. The intended shape
 
 ```
@@ -157,6 +166,9 @@ selects, nor activates any backend.
 
 ## See also
 
+- `docs/runtime_crypto_backend_resolver.md` (Stage 762) — the second,
+  separate leaf this Interface now also reaches, answering ONLY
+  "which backend is planned".
 - `docs/fedos_runtime_positioning.md` — the repository-wide scope
   statement this Interface's backend-candidate list echoes: Secure
   Runtime Platform, desktop-first, Rust owns crypto only.

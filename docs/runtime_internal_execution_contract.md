@@ -2338,8 +2338,109 @@ TypeScript; NIP-17/NIP-44/NIP-59 unimplemented; `"Allowed"`/`"Active"`/
 unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 762–776: Prototype Phase 006, REAL Backend Interface wiring reaches the Backend Resolver
+
+Stage 745–760 (the update immediately above) ended with the Backend
+Interface reaching WASM Backend Planning as its one real leaf. Stage
+762–776 gives the Interface a SECOND, separate leaf — the Backend
+Resolver — alongside that pre-existing reach, not replacing it.
+
+```
+Backend Interface                          <-- REAL, unchanged from Stage 745-760 (fixed { state: "PlanningOnly",
+("fedos_crypto_backend_interface.ts",          backendSelected: "WasmPlanned", backendActivated: false,
+Stage 746)                                     interfaceReady: false, reason: "BackendInterfacePending" })
+     |
+     ├──────────────────────────────┐
+     v                              v
+WASM Backend Planning          Backend Resolver             <-- REAL wiring: createCryptoBackendInterface() now
+("fedos_wasm_backend.ts",      ("fedos_crypto_backend_          calls createCryptoBackendResolver() as a SECOND,
+Stage 730, UNCHANGED)          resolver.ts", Stage 763)          separate reach (Stage 764) -- fixed { state:
+     |                              |                            "PlanningOnly", selectedBackend: "WasmPlanned",
+     |                              |                            backendResolved: false, backendAvailable: false,
+     |                              |                            reason: "BackendResolutionPending" }; the
+     |                              |                            Interface's own return value stays byte-for-byte
+     |                              |                            unchanged
+     v                              v
+    STOP                           STOP                      <-- no further link exists from either leaf; the real
+                                                                   WASM Loader, the generated JS glue,
+                                                                   WebAssembly.instantiate/compile, initSync, the
+                                                                   default init export, and static/dynamic import()
+                                                                   of any kind ALL remain PROHIBITED and
+                                                                   unreachable from this chain
+```
+
+**Every arrow above IS a real function call**, exactly like the Stage
+689–760 diagrams it extends. This is the FIRST branching point in the
+Prototype Phase arc — `createCryptoBackendInterface()` now calls TWO
+independent leaves and discards BOTH results, mirroring the SAME
+"a second, separate reach" pattern `fedos_crypto_loader_facade.ts`
+already established for `reachProviderFacadeBoundary()`/
+`reachCryptoLoaderBackend()` (Stage 594/721). Neither leaf calls the
+other; `fedos_wasm_backend.ts` is UNMODIFIED by this stage. The
+Interface's OWN return value, the Backend Abstraction's own return
+value, the Facade's own return value, and Runtime's own
+`initializeCrypto()` return value are all UNAFFECTED, transitively.
+
+**Worker remains explicitly OUT OF SCOPE.** `src/worker.ts` is NOT
+modified by Stage 762–776, references neither `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`,
+`fedos_crypto_backend_interface.ts`, `fedos_wasm_backend.ts`, nor
+`fedos_crypto_backend_resolver.ts`, directly or indirectly, and
+`worker_crypto_diagnostics.ts` carries none of this arc's new
+diagnostics fields.
+
+**ONLY the Backend Interface may call the Backend Resolver.**
+`createCryptoBackendResolver()`'s only caller anywhere in this
+repository is `fedos_crypto_backend_interface.ts`'s
+`createCryptoBackendInterface()` — neither `create_runtime.ts`,
+`src/worker.ts`, `fedos_crypto_loader_facade.ts`, nor
+`fedos_crypto_loader_backend.ts` references it directly, and Runtime
+never learns resolver detail in any way. This mirrors the SAME layered
+discipline `docs/runtime_crypto_backend_resolver.md` §3 already
+established one link up.
+
+**Division of responsibility, per
+`docs/runtime_crypto_backend_resolver.md` §3**: Rust
+(`packages/fedos-core-rust`) is still responsible for cryptography,
+keys, signatures, and safety boundaries only. Runtime never learns
+backend, interface, or resolver detail — `selectedBackend`/
+`backendResolved`/`backendAvailable` are never visible past the
+Backend Interface.
+
+`runtime_crypto_diagnostics.ts` (Stage 774) reads
+`cryptoBackendResolverState`/`cryptoBackendResolverSelected`/
+`cryptoBackendResolved`/`cryptoBackendAvailable`/
+`cryptoBackendResolverReason` for DISPLAY only —
+`worker_crypto_diagnostics.ts` is untouched by this addition.
+
+**Still true throughout Stage 762–776**: `src/worker.ts` UNMODIFIED
+and never references `initializeCrypto`,
+`fedos_crypto_loader_facade.ts`, `fedos_crypto_loader_backend.ts`,
+`fedos_crypto_backend_interface.ts`, `fedos_wasm_backend.ts`, or
+`fedos_crypto_backend_resolver.ts`; `fedos_crypto_backend_interface.ts`
+UNMODIFIED in its own fixed return value (`state: "PlanningOnly"`,
+`backendSelected: "WasmPlanned"`, `backendActivated: false`,
+`interfaceReady: false`, `reason: "BackendInterfacePending"`);
+`fedos_wasm_backend.ts` UNMODIFIED in its own fixed return value; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+generated file edited or committed; `encrypt`/`decrypt` unchanged, in
+Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, and Triple
+Ratchet unimplemented; `"Allowed"`/`"Active"`/`"Resolved"`/
+`"Available"` never reached anywhere in this new chain; Rust public
+API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
+added.
+
 ## See also
 
+- `docs/runtime_crypto_backend_resolver.md` (Stage 762) — the pure
+  leaf this arc's REAL wiring now adds as a second, separate reach
+  below the Backend Interface, answering ONLY "which backend is
+  planned".
+- `src/runtime/fedos_crypto_backend_resolver.ts` (Stage 763) — the
+  Backend Resolver's real, fixed-value implementation, and its wiring
+  from `fedos_crypto_backend_interface.ts` (Stage 764).
 - `docs/fedos_runtime_positioning.md` — the repository-wide scope
   statement above this entire chain: Secure Runtime Platform,
   desktop-first, not an OS replacement, Rust owns crypto only.
