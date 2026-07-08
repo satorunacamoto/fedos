@@ -21,10 +21,20 @@
  * `createInitializeCryptoExposureReview()` to CALL
  * `createInitializeCryptoWiringPlan()` — the result is DISCARDED, and
  * `createInitializeCryptoExposureReview()`'s own return value stays
- * UNCHANGED (`exposed: false`, `approved: false`). That is the ONLY
- * caller of this file anywhere in this repository; neither
- * `create_runtime.ts` nor `src/worker.ts` references it, directly or
- * indirectly, and NEITHER FILE IS MODIFIED BY THIS STAGE.
+ * UNCHANGED (`exposed: false`, `approved: false`). That is one
+ * caller of this file; neither `create_runtime.ts` nor
+ * `src/worker.ts` references it, directly or indirectly, and NEITHER
+ * FILE IS MODIFIED BY THIS STAGE.
+ *
+ * Stage 667 extends `createInitializeCryptoWiringPlan()` DOWNWARD
+ * only: it now calls `createInitializeCryptoPublicApi()`
+ * (`fedos_initialize_crypto_public_api.ts`, Stage 666) — then
+ * DISCARDS the result and returns its OWN, unchanged `{ state:
+ * "PlanningOnly", runtimeWiringAllowed: false, workerWiringAllowed:
+ * false, reason: "RuntimeWiringPlanPending" }` answer. This mirrors
+ * the SAME "reach one link deeper, keep your own answer" pattern
+ * Stage 503/511/519/527/535/539/547/555/563/571/579/587/595/603/611/619/627/635/643/651
+ * already established eighteen times over in this WASM arc.
  *
  * HARD GUARDRAILS:
  *   - `createInitializeCryptoWiringPlan()` is PURE, synchronous,
@@ -64,6 +74,8 @@
  *     constructed anywhere in this file.
  */
 
+import { createInitializeCryptoPublicApi } from "./fedos_initialize_crypto_public_api.js";
+
 /**
  * The Runtime initializeCrypto Wiring Plan's own coarse state.
  * `"PlanningOnly"` is the ONLY value this stage's implementation ever
@@ -100,12 +112,25 @@ export interface FedosInitializeCryptoWiringPlan {
  * generated JS glue, and never writes `import()` of any kind.
  */
 export function createInitializeCryptoWiringPlan(): FedosInitializeCryptoWiringPlan {
+  reachInitializeCryptoPublicApi(); // result discarded -- the generated JS glue is never imported
   return {
     state: "PlanningOnly",
     runtimeWiringAllowed: false,
     workerWiringAllowed: false,
     reason: "RuntimeWiringPlanPending",
   };
+}
+
+/**
+ * PRIVATE (module-scoped) — calls `createInitializeCryptoPublicApi()`.
+ * The result is discarded; it is never passed to
+ * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
+ * export, `packages/fedos-core-rust`, Runtime, or Worker. The
+ * Runtime initializeCrypto Public API itself never references the
+ * generated JS glue or writes `import()` of any kind either.
+ */
+function reachInitializeCryptoPublicApi(): void {
+  createInitializeCryptoPublicApi();
 }
 
 /**
