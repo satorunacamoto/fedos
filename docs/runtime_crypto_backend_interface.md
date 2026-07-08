@@ -18,6 +18,17 @@ backend candidates through the SAME shape, instead of the Abstraction
 (or anything above it) ever branching on which candidate is currently
 designated.
 
+**Positioning note.** `docs/fedos_runtime_positioning.md` fixes, one
+level up from this seam, what "FedOS" names in this repository at all:
+a desktop-first Secure Runtime Platform that runs on top of an
+existing OS — not a Tails/Whonix-style OS replacement — with Rust
+owning cryptography/keys/signatures/safety only, and TypeScript/Python
+handling runtime glue and experimentation/EMSR/Ontology work
+respectively. `"WasmPlanned"`/`"NativePlanned"`/`"PythonPlanned"` below
+are this repository's concrete backend-candidate echo of that
+positioning's §3/§4; nothing in this file changes as a result of that
+document — it is context, not a new constraint.
+
 ## 1. The intended shape
 
 ```
@@ -146,6 +157,9 @@ selects, nor activates any backend.
 
 ## See also
 
+- `docs/fedos_runtime_positioning.md` — the repository-wide scope
+  statement this Interface's backend-candidate list echoes: Secure
+  Runtime Platform, desktop-first, Rust owns crypto only.
 - `docs/runtime_wasm_backend_planning.md` (Stage 729) — the planning
   layer this Interface now sits directly above, whose fixed answer is
   unchanged.

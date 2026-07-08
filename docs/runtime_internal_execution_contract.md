@@ -2229,6 +2229,20 @@ anywhere in this new chain; Rust public API unchanged (27 `pub fn`); no
 
 ## Update — Stage 745–760: Prototype Phase 005, REAL Backend Abstraction wiring reaches the Backend Interface
 
+**Positioning context.** `docs/fedos_runtime_positioning.md` fixes,
+one level above this entire chain, what "FedOS" names in this
+repository at all: a desktop-first Secure Runtime Platform running on
+top of an existing OS (not a Tails/Whonix-style OS replacement), with
+Rust owning cryptography/keys/signatures/safety only and TypeScript/
+Python handling runtime glue and experimentation/EMSR/Ontology work
+respectively. Mobile, Worker, and production activation remain
+explicitly out of scope — this update does not change that, only
+restates it in one place. The Backend Interface below is this
+positioning's concrete echo: ONE shape for
+`"WasmPlanned"`/`"NativePlanned"`/`"PythonPlanned"` candidates so
+Runtime and the Backend Abstraction never branch on which is behind
+it.
+
 Stage 729–744 (the update immediately above) ended with WASM Backend
 Planning as the deepest REAL link this arc reaches, wired directly
 from the Backend Abstraction. Stage 745–760 INSERTS a new seam BETWEEN
@@ -2326,6 +2340,9 @@ added.
 
 ## See also
 
+- `docs/fedos_runtime_positioning.md` — the repository-wide scope
+  statement above this entire chain: Secure Runtime Platform,
+  desktop-first, not an OS replacement, Rust owns crypto only.
 - `docs/runtime_crypto_backend_interface.md` (Stage 745) — the common,
   backend-agnostic contract this arc's REAL wiring now inserts between
   the Backend Abstraction and WASM Backend Planning.

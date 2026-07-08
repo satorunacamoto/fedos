@@ -24,6 +24,8 @@ import { createRuntime } from "../src/runtime/create_runtime.js";
 import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
 import { workerCryptoActivationStatus } from "../src/runtime/worker_crypto_diagnostics.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import positioningDocSource from "../docs/fedos_runtime_positioning.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import interfaceDocSource from "../docs/runtime_crypto_backend_interface.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
@@ -83,6 +85,15 @@ function codeOnlyLines(source: string): string {
  * Backend Interface, but neither Runtime, Worker, nor the Facade ever
  * reaches the Backend Interface directly -- ONLY the Backend
  * Abstraction calls `createCryptoBackendInterface()`.
+ *
+ * `docs/fedos_runtime_positioning.md` fixes the repository-wide scope
+ * this Interface's `"WasmPlanned"`/`"NativePlanned"`/`"PythonPlanned"`
+ * candidate list echoes: FedOS is a desktop-first Secure Runtime
+ * Platform (not a Tails/Whonix-style OS replacement), Rust owns
+ * cryptography only, and TypeScript/Python own runtime glue and
+ * experimentation/EMSR/Ontology work respectively. Test #17 guards
+ * that document's required facts and its cross-reference from this
+ * Interface's own doc.
  */
 describe("FedOS Crypto Backend Interface, PlanningOnly/not-ready, no side effects, no real WASM Loader connection (Stage 745-760)", () => {
   it("1. createCryptoBackendInterface is always fixed -- never a live probe", () => {
@@ -347,5 +358,25 @@ describe("FedOS Crypto Backend Interface, PlanningOnly/not-ready, no side effect
     expect(executionContractDocSource).toMatch(/BackendInterfacePending/);
     expect(executionContractDocSource).toMatch(/\bSTOP\b/);
     expect(executionContractDocSource).toMatch(/Worker/);
+  });
+
+  it("17. the FedOS Runtime Positioning doc fixes FedOS as a desktop-first Secure Runtime Platform, not an OS replacement, and is cross-referenced by the Backend Interface doc", () => {
+    expect(positioningDocSource).toMatch(/Secure Runtime Platform/);
+    expect(positioningDocSource).toMatch(/Desktop-first|desktop-first/);
+    expect(positioningDocSource).toMatch(/Tails/);
+    expect(positioningDocSource).toMatch(/Whonix/);
+    expect(positioningDocSource).toMatch(/not an operating-system replacement|not.*OS replacement/i);
+    expect(positioningDocSource).toMatch(/Mobile/);
+    expect(positioningDocSource).toMatch(/Worker/);
+    expect(positioningDocSource).toMatch(/Production/);
+    expect(positioningDocSource).toMatch(/WasmPlanned/);
+    expect(positioningDocSource).toMatch(/NativePlanned/);
+    expect(positioningDocSource).toMatch(/PythonPlanned/);
+    expect(positioningDocSource).toMatch(/EMSR/);
+    expect(positioningDocSource).toMatch(/Ontology/);
+    // Docs-only: names import()/WebAssembly.instantiate as PROHIBITED, never as a real call.
+    expect(positioningDocSource).toMatch(/prohibited|PROHIBITED|does not/i);
+
+    expect(interfaceDocSource).toMatch(/fedos_runtime_positioning/);
   });
 });
