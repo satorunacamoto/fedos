@@ -2635,6 +2635,83 @@ unimplemented; `"Allowed"` never reached anywhere in this chain; Rust
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 833–848: Prototype Phase 012, `planLoad()` EVALUATES `policy()` — Policy Evaluation, still `BlockedByPolicy`, still `STOP`
+
+Stage 825 (the update immediately above) made `planLoad()` REACH
+`policy()`, discarding the answer in full. Stage 833 makes `planLoad()`
+actually EVALUATE that answer — a genuine `if (!policy.allowed)`
+branch — while changing NOTHING about where the chain stops:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825: still constructs a
+("fedos_wasm_loader.ts", Stage 489-492)         FedosWasmLoaderPlan and calls planImport() (Stage 503,
+     |                                          result discarded, unaffected by this stage)
+     v
+FedosWasmLoader.policy()                    <-- REAL, unchanged since Stage 817: fixed { allowed: false,
+("fedos_wasm_loader.ts", Stage 817,             decision: "BlockedByPolicy", reason: "PrototypePolicy" };
+reached since Stage 825)                        #reachLoaderPolicy() now RETURNS this value (Stage 833)
+     |                                          instead of discarding it
+     v
+Policy Evaluation                          <-- NEW Stage 833: planLoad() branches on policy.allowed --
+(inside planLoad(), no separate file)           `if (!policy.allowed) { return this.#blocked("load"); }`.
+     |                                          allowed is permanently false today, so this branch is
+     |                                          ALWAYS taken. The allowed:true path is a single TODO
+     |                                          comment marking a RESERVED spot for a future, separate,
+     |                                          explicitly-reviewed stage -- the line after it still
+     |                                          returns the SAME fail-closed answer, so this function
+     |                                          stays fail-closed even if that TODO is never filled in
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included: { operation: "load", state:
+     |                                          "BlockedByPolicy", policy: "FailClosed", reason: "..." }
+     v
+STOP                                       <-- SAME position as the Stage 793/825 diagrams above -- this
+                                                 stage does NOT proceed to Load, Import, WebAssembly, or
+                                                 Rust; the generated JS glue, WebAssembly.instantiate/
+                                                 compile, initSync, the default init export, and static/
+                                                 dynamic import() of any kind ALL remain PROHIBITED and
+                                                 unreachable from this chain
+```
+
+**Evaluating is not obeying — the outcome is identical either way.**
+Before this stage, `planLoad()` reached `policy()` and threw the
+answer away; after this stage, it reads `.allowed` and branches on it
+— but because `policy().allowed` is fixed `false` in every stage that
+exists today, both versions of `planLoad()` produce the exact same
+`BlockedByPolicy` answer for the exact same reason (fail-closed
+default), not because the Policy Evaluation "decided" anything new.
+The `allowed: true` path is intentionally NOT implemented: it is one
+TODO comment naming a future, separate, explicitly-reviewed stage,
+immediately followed by the SAME `return this.#blocked("load")` every
+other path already uses.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references `policy()` or the
+Policy Evaluation directly or indirectly. `policy()` itself is
+unchanged and still never calls `planLoad()`, so no cycle exists.
+
+`src/runtime/runtime_crypto_diagnostics.ts` (Stage 833) reads
+`loaderPolicyEvaluated` (fixed `true`) for DISPLAY only —
+`worker_crypto_diagnostics.ts` is untouched by this addition.
+
+**Still true throughout Stage 833–848**: `src/worker.ts` UNMODIFIED and
+never references `policy()`, the Policy Evaluation, `planLoad()`, or
+`initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+generated file edited or committed; `encrypt`/`decrypt` unchanged, in
+Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple
+Ratchet, and onion routing unimplemented; `"Allowed"` never reached
+anywhere in this chain; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
