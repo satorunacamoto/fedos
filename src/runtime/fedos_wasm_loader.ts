@@ -210,6 +210,45 @@
  * kind exists anywhere in this file. `policy()` itself, `planInitialize()`/
  * `planUnload()`/`planningState()`/`status()`, and every upstream layer
  * are UNCHANGED, and no cycle exists.
+ *
+ * Stage 865 (Prototype Phase 015) adds a JS GLUE ACCESS PLAN object,
+ * `FedosWasmLoaderJsGlueAccessPlan` — a NEW, separately-named,
+ * hand-fixed record `{ backend: "Wasm", shouldAccess: false, reason:
+ * "BlockedByLoadPlan", currentStage: "JsGlueAccessPlanning",
+ * nextRequiredCheck: "GeneratedArtifactCheck" }`, built by a new
+ * PRIVATE `#createJsGlueAccessPlan()` method (no argument, calls
+ * nothing, returns a hand-fixed constant — mirrors `#createLoadPlan()`'s
+ * own "pure, no re-fetch" discipline). `planLoad()`'s flow extends ONE
+ * step further, INSIDE the existing `if (!loadPlan.shouldLoad)`
+ * branch: (6) build the JS Glue Access Plan via
+ * `#createJsGlueAccessPlan()`, (7) confirm
+ * `jsGlueAccessPlan.shouldAccess` (`if (!jsGlueAccessPlan.shouldAccess)`,
+ * a THIRD, independent check, ALSO always taken because `shouldAccess`
+ * is fixed `false`), (8) return the SAME `#blocked("load")` answer as
+ * every prior stage. `planLoad()`'s own return value — `{ operation:
+ * "load", state: "BlockedByPolicy", policy: "FailClosed", reason:
+ * "..." }`, key order included — stays byte-for-byte unchanged; the JS
+ * Glue Access Plan's OWN fields are never merged into it, it is not
+ * part of the public `FedosWasmLoader` interface, and it is never
+ * returned to any caller. `reason: "BlockedByLoadPlan"` names WHY
+ * access is denied (the Load Plan one level up already said
+ * `shouldLoad: false`) — `"PrototypeDisabled"`/
+ * `"GeneratedArtifactUnchecked"` are the OTHER two labels the type
+ * permits but this stage's fixed constant never produces, reserved for
+ * a future stage that might deny access for a different reason.
+ * `nextRequiredCheck: "GeneratedArtifactCheck"` NAMES, without
+ * PERFORMING, the very next gate a future, separate,
+ * explicitly-reviewed stage would need to add — this stage does NOT
+ * check whether the generated artifact exists, does NOT `import()`
+ * anything, does NOT reference `WebAssembly`, and does NOT call Rust;
+ * all of that remains Phase 016+'s responsibility. The `shouldAccess:
+ * true` path (like `loadPlan.shouldLoad: true` and `policy.allowed:
+ * true` above it) is a single reserved TODO comment, immediately
+ * followed by the SAME fail-closed fallback, so this function stays
+ * fail-closed no matter what any of the three objects ever answers.
+ * `policy()` itself, `planInitialize()`/`planUnload()`/`planningState()`/
+ * `status()`, and every upstream layer are UNCHANGED, and no cycle
+ * exists — `#createJsGlueAccessPlan()` calls nothing at all.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -323,6 +362,31 @@ export interface FedosWasmLoaderLoadPlan {
 }
 
 /**
+ * Stage 865 — an internal-only JS GLUE ACCESS PLAN object `planLoad()`
+ * builds and confirms one step past the Load Plan, before returning
+ * its own, unrelated `FedosWasmLoaderDecision`. Names the DECISION to
+ * access the generated JS glue (`shouldAccess`), WHY it cannot yet
+ * (`reason`), and WHAT would need to be checked next
+ * (`nextRequiredCheck`) — without performing any of it: no
+ * `import()`, no `WebAssembly` reference, no generated-artifact
+ * existence check, no Rust call. DELIBERATELY a separate shape from
+ * every other type in this file, and DELIBERATELY typed with literal
+ * `"Wasm"`/`false`/`"JsGlueAccessPlanning"`/`"GeneratedArtifactCheck"`
+ * values (plus a three-member `reason` union, only one member of
+ * which this Prototype stage ever actually produces) — see this
+ * module's top-of-file "Stage 865" doc note for why. Not part of the
+ * public `FedosWasmLoader` interface; never returned to a caller of
+ * `planLoad()` directly.
+ */
+export interface FedosWasmLoaderJsGlueAccessPlan {
+  readonly backend: "Wasm";
+  readonly shouldAccess: false;
+  readonly reason: "BlockedByLoadPlan" | "PrototypeDisabled" | "GeneratedArtifactUnchecked";
+  readonly currentStage: "JsGlueAccessPlanning";
+  readonly nextRequiredCheck: "GeneratedArtifactCheck";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -365,7 +429,19 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       const loadPlan = this.#createLoadPlan(); // 3. Load Plan generated
       if (!loadPlan.shouldLoad) {
         // 4. Load Plan's own result confirmed -- ALWAYS false today
-        return this.#blocked("load"); // 5. same BlockedByPolicy answer as every prior stage
+        const jsGlueAccessPlan = this.#createJsGlueAccessPlan(); // 6. JS Glue Access Plan generated
+        if (!jsGlueAccessPlan.shouldAccess) {
+          // 7. JS Glue Access Plan's own result confirmed -- ALWAYS false today
+          return this.#blocked("load"); // 8. same BlockedByPolicy answer as every prior stage
+        }
+        // TODO(reserved for a future, separate, explicitly-reviewed stage):
+        // jsGlueAccessPlan.shouldAccess is permanently false in this
+        // Prototype stage (see FedosWasmLoaderJsGlueAccessPlan's own
+        // fixed shape above), so this line can never execute today.
+        // The real, allowed JS Glue access path -- including the
+        // Generated Artifact Check named in nextRequiredCheck --
+        // belongs here -- NOT implemented in this stage.
+        return this.#blocked("load");
       }
       // TODO(reserved for a future, separate, explicitly-reviewed stage):
       // loadPlan.shouldLoad is permanently false in this Prototype stage
@@ -462,6 +538,26 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       shouldLoad: false,
       backend: "Wasm",
       reason: "BlockedByPolicy",
+    };
+  }
+
+  /**
+   * PRIVATE — Stage 865. Builds the internal-only JS Glue Access Plan
+   * `planLoad()` confirms one step past the Load Plan. PURE: takes no
+   * argument, calls nothing (does NOT call `this.policy()` or
+   * `this.#createLoadPlan()` again -- both already ran exactly once
+   * earlier in `planLoad()`), and returns a hand-fixed constant. Never
+   * loads, imports, fetches, or instantiates anything; does NOT check
+   * whether a generated artifact exists (that remains
+   * `nextRequiredCheck`'s own named, not-yet-performed, future step).
+   */
+  #createJsGlueAccessPlan(): FedosWasmLoaderJsGlueAccessPlan {
+    return {
+      backend: "Wasm",
+      shouldAccess: false,
+      reason: "BlockedByLoadPlan",
+      currentStage: "JsGlueAccessPlanning",
+      nextRequiredCheck: "GeneratedArtifactCheck",
     };
   }
 
@@ -633,4 +729,72 @@ export function loaderLoadPlanShouldLoad(): boolean {
  */
 export function loaderLoadPlanBackend(): "Wasm" {
   return "Wasm";
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally creates a JS
+ * Glue Access Plan — Stage 865. Fixed `true`: `planLoad()`'s own
+ * `#createJsGlueAccessPlan()` call DOES run every time
+ * `loadPlan.shouldLoad` evaluates `false` (which is always, today),
+ * even though the JS Glue Access Plan's own fields are never merged
+ * into `planLoad()`'s return value.
+ */
+export function loaderJsGlueAccessPlanCreated(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed JS Glue Access Plan
+ * `shouldAccess` field — the same answer as
+ * `FedosWasmLoaderJsGlueAccessPlan.shouldAccess`. Fixed `false` — no
+ * parameter or override anywhere can flip it.
+ */
+export function loaderJsGlueAccessPlanShouldAccess(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed JS Glue Access Plan
+ * `backend` field — the same answer as
+ * `FedosWasmLoaderJsGlueAccessPlan.backend`. Fixed `"Wasm"`.
+ */
+export function loaderJsGlueAccessPlanBackend(): "Wasm" {
+  return "Wasm";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed JS Glue Access Plan
+ * `reason` field — the same answer as
+ * `FedosWasmLoaderJsGlueAccessPlan.reason`. Fixed `"BlockedByLoadPlan"`
+ * — the Load Plan one level up already said `shouldLoad: false`;
+ * `"PrototypeDisabled"`/`"GeneratedArtifactUnchecked"` are the OTHER
+ * two labels the type permits but this stage never produces.
+ */
+export function loaderJsGlueAccessPlanReason():
+  | "BlockedByLoadPlan"
+  | "PrototypeDisabled"
+  | "GeneratedArtifactUnchecked" {
+  return "BlockedByLoadPlan";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed JS Glue Access Plan
+ * `currentStage` field — the same answer as
+ * `FedosWasmLoaderJsGlueAccessPlan.currentStage`. Fixed
+ * `"JsGlueAccessPlanning"`.
+ */
+export function loaderJsGlueAccessPlanCurrentStage(): "JsGlueAccessPlanning" {
+  return "JsGlueAccessPlanning";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed JS Glue Access Plan
+ * `nextRequiredCheck` field — the same answer as
+ * `FedosWasmLoaderJsGlueAccessPlan.nextRequiredCheck`. Fixed
+ * `"GeneratedArtifactCheck"` — NAMES, without PERFORMING, the very
+ * next gate a future, separate, explicitly-reviewed stage (Phase
+ * 016+) would need to add.
+ */
+export function loaderJsGlueAccessPlanNextRequiredCheck(): "GeneratedArtifactCheck" {
+  return "GeneratedArtifactCheck";
 }

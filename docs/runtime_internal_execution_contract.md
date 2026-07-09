@@ -2800,6 +2800,89 @@ Ratchet, and onion routing unimplemented; `"Allowed"` never reached
 anywhere in this chain; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 865: Prototype Phase 015, `planLoad()` builds an internal JS GLUE ACCESS PLAN — still `BlockedByPolicy`, still `STOP`
+
+Stage 841 (the update above) made `planLoad()` build and confirm an
+internal Load Plan. Stage 865 inserts ONE more internal step, INSIDE
+the Load Plan's own `shouldLoad: false` branch — still without moving
+`STOP` and without proceeding to Generated Artifact Check, `import()`,
+`WebAssembly`, or Rust
+(`docs/runtime_wasm_loader_activation_readiness_review.md`'s own
+Phase 014 review named this as the FIRST of four ordered next-connection
+candidates; this stage lands ONLY that first one):
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan  <-- REAL, unchanged since Stage 817/833/841; loadPlan.shouldLoad
+     |                                          confirmed false, as always
+     v
+JS Glue Access Plan                        <-- NEW Stage 865: #createJsGlueAccessPlan() builds a hand-fixed
+(inside planLoad(), no separate file;           FedosWasmLoaderJsGlueAccessPlan { backend: "Wasm", shouldAccess:
+FedosWasmLoaderJsGlueAccessPlan type,           false, reason: "BlockedByLoadPlan", currentStage:
+"fedos_wasm_loader.ts", Stage 865)              "JsGlueAccessPlanning", nextRequiredCheck:
+     |                                          "GeneratedArtifactCheck" } -- PURE, no this.policy()/
+     |                                          #createLoadPlan() re-call, no argument. planLoad() then
+     |                                          confirms jsGlueAccessPlan.shouldAccess -- ALWAYS false
+     |                                          today, so this THIRD, independent check is ALSO always
+     |                                          taken. The Plan's OWN fields are NEVER merged into
+     |                                          planLoad()'s return value below
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included
+     v
+STOP                                       <-- SAME position as the Stage 793/825/833/841 diagrams above
+                                                 -- this stage does NOT check whether the generated
+                                                 artifact exists, does NOT call import(), does NOT
+                                                 reference WebAssembly, and does NOT call Rust; all of
+                                                 that remains Phase 016+'s responsibility
+```
+
+**Naming the next check is not performing it.** `nextRequiredCheck:
+"GeneratedArtifactCheck"` records WHAT a future, separate,
+explicitly-reviewed stage would need to confirm before any real JS
+glue access — it does not confirm it, and does not claim the check is
+unnecessary. `reason: "BlockedByLoadPlan"` is the ONE value this
+stage's fixed constant ever produces; `"PrototypeDisabled"`/
+`"GeneratedArtifactUnchecked"` remain reserved, unreachable labels the
+type permits for a future stage that might deny access for a
+different reason.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references the JS Glue Access
+Plan directly or indirectly. `policy()` itself is unchanged and still
+never calls `planLoad()`, and `#createJsGlueAccessPlan()` calls
+nothing at all, so no cycle exists anywhere in this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the JS Glue Access Plan is exposed
+only via standalone accessors on `fedos_wasm_loader.ts` itself
+(`loaderJsGlueAccessPlanCreated()`/`loaderJsGlueAccessPlanShouldAccess()`/
+`loaderJsGlueAccessPlanBackend()`/`loaderJsGlueAccessPlanReason()`/
+`loaderJsGlueAccessPlanCurrentStage()`/
+`loaderJsGlueAccessPlanNextRequiredCheck()`), matching this stage's
+"necessary minimum" scope.
+
+**Still true throughout Stage 865**: `src/worker.ts` UNMODIFIED and
+never references the JS Glue Access Plan, `policy()`, `planLoad()`, or
+`initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+generated artifact existence check performed; no generated file
+edited or committed; `encrypt`/`decrypt` unchanged, in Rust or
+TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple Ratchet, and
+onion routing unimplemented; `"Allowed"`/`true` (for `shouldAccess`)
+never reached anywhere in this chain; Rust public API unchanged (27
+`pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
