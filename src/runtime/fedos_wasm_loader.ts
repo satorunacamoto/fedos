@@ -382,6 +382,51 @@
  * `planningState()`/`status()`, and every upstream layer are
  * UNCHANGED, and no cycle exists — `#createImportPlan()` calls nothing
  * at all.
+ *
+ * Stage 897 (Prototype Phase 019) adds a WEBASSEMBLY PLAN object,
+ * `FedosWasmLoaderWebAssemblyPlan` — a NEW, separately-named,
+ * hand-fixed record `{ backend: "Wasm", shouldInstantiate: false,
+ * reason: "BlockedByImportPlan", currentStage: "WebAssemblyPlanning",
+ * nextRequiredCheck: "RustApiCallPlanning" }`, built by a new PRIVATE
+ * `#createWebAssemblyPlan()` method (no argument, calls nothing,
+ * returns a hand-fixed constant — mirrors `#createImportPlan()`'s own
+ * "pure, no re-fetch" discipline). `planLoad()`'s flow extends ONE
+ * step further, INSIDE the existing `if (!importPlan.shouldImport)`
+ * branch: (18) build the WebAssembly Plan via
+ * `#createWebAssemblyPlan()`, (19) confirm
+ * `webAssemblyPlan.shouldInstantiate`
+ * (`if (!webAssemblyPlan.shouldInstantiate)`, a SEVENTH, independent
+ * check, ALSO always taken because `shouldInstantiate` is fixed
+ * `false`), (20) return the SAME `#blocked("load")` answer as every
+ * prior stage. `planLoad()`'s own return value — `{ operation: "load",
+ * state: "BlockedByPolicy", policy: "FailClosed", reason: "..." }`,
+ * key order included — stays byte-for-byte unchanged; the WebAssembly
+ * Plan's OWN fields are never merged into it, it is not part of the
+ * public `FedosWasmLoader` interface, and it is never returned to any
+ * caller. `shouldInstantiate: false` NAMES the future intent that a
+ * real Loader would eventually create and use a real WebAssembly
+ * instance WITHOUT performing any such instantiation: this stage
+ * contains NO `WebAssembly.instantiate`, NO `WebAssembly.compile`, NO
+ * `new WebAssembly.Module`, and NO `new WebAssembly.Instance` —
+ * `shouldInstantiate` is a hand-fixed constant, not a computed answer.
+ * `reason: "BlockedByImportPlan"` names WHY WebAssembly is not yet
+ * reached (the Import Plan one level up already said `shouldImport:
+ * false`) — `"PrototypeDisabled"`/`"WebAssemblyUnavailable"` are the
+ * OTHER two labels the type permits but this stage's fixed constant
+ * never produces, reserved for a future stage that might defer
+ * instantiation for a different reason. `nextRequiredCheck:
+ * "RustApiCallPlanning"` NAMES, without PERFORMING, the very next gate
+ * a future, separate, explicitly-reviewed stage would need to add —
+ * this stage does NOT call any WebAssembly API, does NOT call
+ * `initSync`, and does NOT call Rust; all of that remains Phase
+ * 020+'s responsibility. The `shouldInstantiate: true` path (like
+ * every fixed-`false` field above it) is a single reserved TODO
+ * comment, immediately followed by the SAME fail-closed fallback, so
+ * this function stays fail-closed no matter what any of the seven
+ * objects ever answers. `policy()` itself, `planInitialize()`/
+ * `planUnload()`/`planningState()`/`status()`, and every upstream
+ * layer are UNCHANGED, and no cycle exists —
+ * `#createWebAssemblyPlan()` calls nothing at all.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -596,6 +641,32 @@ export interface FedosWasmLoaderImportPlan {
 }
 
 /**
+ * Stage 897 — an internal-only WEBASSEMBLY PLAN object `planLoad()`
+ * builds and confirms one step past the Import Plan, before returning
+ * its own, unrelated `FedosWasmLoaderDecision`. Names the FUTURE
+ * intent to create and use a real WebAssembly instance
+ * (`shouldInstantiate`), WHY it cannot happen yet (`reason`), and WHAT
+ * gate comes after it (`nextRequiredCheck`) — without performing any
+ * of it: no `WebAssembly.instantiate`, no `WebAssembly.compile`, no
+ * `new WebAssembly.Module`, no `new WebAssembly.Instance`, no
+ * `initSync`, no Rust call. DELIBERATELY a separate shape from every
+ * other type in this file, and DELIBERATELY typed with literal
+ * `"Wasm"`/`false`/`"WebAssemblyPlanning"`/`"RustApiCallPlanning"`
+ * values (plus a three-member `reason` union, only one member of
+ * which this Prototype stage ever actually produces) — see this
+ * module's top-of-file "Stage 897" doc note for why. Not part of the
+ * public `FedosWasmLoader` interface; never returned to a caller of
+ * `planLoad()` directly.
+ */
+export interface FedosWasmLoaderWebAssemblyPlan {
+  readonly backend: "Wasm";
+  readonly shouldInstantiate: false;
+  readonly reason: "BlockedByImportPlan" | "PrototypeDisabled" | "WebAssemblyUnavailable";
+  readonly currentStage: "WebAssemblyPlanning";
+  readonly nextRequiredCheck: "RustApiCallPlanning";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -650,7 +721,20 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
               const importPlan = this.#createImportPlan(); // 15. Import Plan generated
               if (!importPlan.shouldImport) {
                 // 16. Import Plan's own result confirmed -- ALWAYS false today
-                return this.#blocked("load"); // 17. same BlockedByPolicy answer as every prior stage
+                const webAssemblyPlan = this.#createWebAssemblyPlan(); // 18. WebAssembly Plan generated
+                if (!webAssemblyPlan.shouldInstantiate) {
+                  // 19. WebAssembly Plan's own result confirmed -- ALWAYS false today
+                  return this.#blocked("load"); // 20. same BlockedByPolicy answer as every prior stage
+                }
+                // TODO(reserved for a future, separate, explicitly-reviewed stage):
+                // webAssemblyPlan.shouldInstantiate is permanently false
+                // in this Prototype stage (see
+                // FedosWasmLoaderWebAssemblyPlan's own fixed shape
+                // above), so this line can never execute today. The
+                // real WebAssembly instantiation -- including the Rust
+                // API Call Planning named in nextRequiredCheck --
+                // belongs here -- NOT implemented in this stage.
+                return this.#blocked("load");
               }
               // TODO(reserved for a future, separate, explicitly-reviewed stage):
               // importPlan.shouldImport is permanently false in this
@@ -874,6 +958,31 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       reason: "BlockedByDevOnlyGatePlan",
       currentStage: "ImportPlanning",
       nextRequiredCheck: "WebAssemblyPlanning",
+    };
+  }
+
+  /**
+   * PRIVATE — Stage 897. Builds the internal-only WebAssembly Plan
+   * `planLoad()` confirms one step past the Import Plan. PURE: takes
+   * no argument, calls nothing (does NOT call
+   * `this.policy()`/`this.#createLoadPlan()`/
+   * `this.#createJsGlueAccessPlan()`/`this.#createGeneratedArtifactCheckPlan()`/
+   * `this.#createDevOnlyGatePlan()`/`this.#createImportPlan()` again --
+   * all six already ran exactly once earlier in `planLoad()`), and
+   * returns a hand-fixed constant. Never calls
+   * `WebAssembly.instantiate`/`WebAssembly.compile`, never constructs
+   * `new WebAssembly.Module`/`new WebAssembly.Instance`, never calls
+   * `initSync`, never loads the generated JS glue, and never calls
+   * Rust; does NOT actually instantiate anything (that remains this
+   * Plan's own named, not-yet-performed, future step).
+   */
+  #createWebAssemblyPlan(): FedosWasmLoaderWebAssemblyPlan {
+    return {
+      backend: "Wasm",
+      shouldInstantiate: false,
+      reason: "BlockedByImportPlan",
+      currentStage: "WebAssemblyPlanning",
+      nextRequiredCheck: "RustApiCallPlanning",
     };
   }
 
@@ -1319,4 +1428,75 @@ export function loaderImportPlanCurrentStage(): "ImportPlanning" {
  */
 export function loaderImportPlanNextRequiredCheck(): "WebAssemblyPlanning" {
   return "WebAssemblyPlanning";
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally creates a
+ * WebAssembly Plan — Stage 897. Fixed `true`: `planLoad()`'s own
+ * `#createWebAssemblyPlan()` call DOES run every time
+ * `importPlan.shouldImport` evaluates `false` (which is always,
+ * today), even though the Plan's own fields are never merged into
+ * `planLoad()`'s return value.
+ */
+export function loaderWebAssemblyPlanCreated(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed WebAssembly Plan
+ * `shouldInstantiate` field — the same answer as
+ * `FedosWasmLoaderWebAssemblyPlan.shouldInstantiate`. Fixed `false` —
+ * no parameter or override anywhere can flip it; no
+ * `WebAssembly.instantiate`/`WebAssembly.compile` of any kind is ever
+ * called to compute it.
+ */
+export function loaderWebAssemblyPlanShouldInstantiate(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed WebAssembly Plan `backend`
+ * field — the same answer as
+ * `FedosWasmLoaderWebAssemblyPlan.backend`. Fixed `"Wasm"`.
+ */
+export function loaderWebAssemblyPlanBackend(): "Wasm" {
+  return "Wasm";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed WebAssembly Plan `reason`
+ * field — the same answer as
+ * `FedosWasmLoaderWebAssemblyPlan.reason`. Fixed
+ * `"BlockedByImportPlan"` — the Import Plan one level up already said
+ * `shouldImport: false`; `"PrototypeDisabled"`/
+ * `"WebAssemblyUnavailable"` are the OTHER two labels the type permits
+ * but this stage never produces.
+ */
+export function loaderWebAssemblyPlanReason():
+  | "BlockedByImportPlan"
+  | "PrototypeDisabled"
+  | "WebAssemblyUnavailable" {
+  return "BlockedByImportPlan";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed WebAssembly Plan
+ * `currentStage` field — the same answer as
+ * `FedosWasmLoaderWebAssemblyPlan.currentStage`. Fixed
+ * `"WebAssemblyPlanning"`.
+ */
+export function loaderWebAssemblyPlanCurrentStage(): "WebAssemblyPlanning" {
+  return "WebAssemblyPlanning";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed WebAssembly Plan
+ * `nextRequiredCheck` field — the same answer as
+ * `FedosWasmLoaderWebAssemblyPlan.nextRequiredCheck`. Fixed
+ * `"RustApiCallPlanning"` — NAMES, without PERFORMING, the very next
+ * gate a future, separate, explicitly-reviewed stage (Phase 020+)
+ * would need to add.
+ */
+export function loaderWebAssemblyPlanNextRequiredCheck(): "RustApiCallPlanning" {
+  return "RustApiCallPlanning";
 }

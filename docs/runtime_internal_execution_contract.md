@@ -3143,6 +3143,95 @@ Double Ratchet, Triple Ratchet, and onion routing unimplemented;
 chain; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 897: Prototype Phase 019, `planLoad()` builds an internal WEBASSEMBLY PLAN — still `BlockedByPolicy`, still `STOP`
+
+Stage 889 (the update above) made `planLoad()` build and confirm an
+internal Import Plan. Stage 897 inserts ONE more internal step, INSIDE
+the Import Plan's own `shouldImport: false` branch — still without
+moving `STOP` and without calling any real WebAssembly API or Rust:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841/865/873/881/889
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan -> JS Glue Access Plan -> Generated Artifact Check Plan
+     -> Dev-only Gate Plan -> Import Plan     <-- REAL, unchanged since Stage 817/833/841/865/873/881/889;
+     |                                            importPlan.shouldImport confirmed false, as always
+     v
+WebAssembly Plan                           <-- NEW Stage 897: #createWebAssemblyPlan() builds a hand-fixed
+(inside planLoad(), no separate file;           FedosWasmLoaderWebAssemblyPlan { backend: "Wasm",
+FedosWasmLoaderWebAssemblyPlan type,            shouldInstantiate: false, reason: "BlockedByImportPlan",
+"fedos_wasm_loader.ts", Stage 897)              currentStage: "WebAssemblyPlanning", nextRequiredCheck:
+     |                                          "RustApiCallPlanning" } -- PURE, no re-call of policy()/
+     |                                          #createLoadPlan()/#createJsGlueAccessPlan()/
+     |                                          #createGeneratedArtifactCheckPlan()/
+     |                                          #createDevOnlyGatePlan()/#createImportPlan(), no argument,
+     |                                          no WebAssembly.instantiate/compile, no new
+     |                                          WebAssembly.Module/Instance of any kind. planLoad() then
+     |                                          confirms webAssemblyPlan.shouldInstantiate -- ALWAYS false
+     |                                          today, so this SEVENTH, independent check is ALSO always
+     |                                          taken. The Plan's OWN fields are NEVER merged into
+     |                                          planLoad()'s return value below
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included
+     v
+STOP                                       <-- SAME position as the Stage 793/825/833/841/865/873/881/889
+                                                 diagrams above -- this stage does NOT call any real
+                                                 WebAssembly API, does NOT call initSync, and does NOT
+                                                 call Rust; all of that remains Phase 020+'s responsibility
+```
+
+**Naming the intent to instantiate is not instantiating.**
+`shouldInstantiate: false` records that a real Loader would eventually
+create and use a real WebAssembly instance — without this stage ever
+calling `WebAssembly.instantiate`/`compile` or constructing `new
+WebAssembly.Module`/`new WebAssembly.Instance` in any form.
+`nextRequiredCheck: "RustApiCallPlanning"` records WHAT gate a future,
+separate, explicitly-reviewed stage would need to add next — it does
+not perform it. `reason: "BlockedByImportPlan"` is the ONE value this
+stage's fixed constant ever produces; `"PrototypeDisabled"`/
+`"WebAssemblyUnavailable"` remain reserved, unreachable labels the
+type permits for a future stage that might defer instantiation for a
+different reason.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references the WebAssembly Plan
+directly or indirectly. `policy()` itself is unchanged and still never
+calls `planLoad()`, and `#createWebAssemblyPlan()` calls nothing at
+all, so no cycle exists anywhere in this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the WebAssembly Plan is exposed only
+via standalone accessors on `fedos_wasm_loader.ts` itself
+(`loaderWebAssemblyPlanCreated()`/`...ShouldInstantiate()`/
+`...Backend()`/`...Reason()`/`...CurrentStage()`/
+`...NextRequiredCheck()`), matching this stage's "necessary minimum"
+scope.
+
+**Still true throughout Stage 897**: `src/worker.ts` UNMODIFIED and
+never references the WebAssembly Plan, `policy()`, `planLoad()`, or
+`initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`process.env`/`import.meta`/`NODE_ENV` read of any kind; no static
+`import` and no dynamic `import()` of the generated JS glue anywhere
+in this repository; no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind,
+and no `new WebAssembly.Module`/`new WebAssembly.Instance` of any
+kind (the `"WebAssemblyPlanning"` naming literal itself is explicitly
+permitted); no generated artifact existence check performed; no
+filesystem access of any kind; no generated file edited or committed;
+`encrypt`/`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/
+NIP-59, Double Ratchet, Triple Ratchet, and onion routing
+unimplemented; `"Allowed"`/`true` (for `shouldInstantiate`) never
+reached anywhere in this chain; Rust public API unchanged (27
+`pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
