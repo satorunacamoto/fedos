@@ -1,0 +1,154 @@
+import { describe, it, expect } from "vitest";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import reviewDocSource from "../docs/runtime_wasm_rust_export_readiness_review.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import workerDiagnosticsSource from "../src/runtime/worker_crypto_diagnostics.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import workerSource from "../src/worker.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import packageJsonSource from "../package.json?raw";
+
+/**
+ * Prototype EXECUTION Phase 008 — "FedOS Rust Export Readiness
+ * Review": a REVIEW-ONLY audit of the Rust -> JS export boundary
+ * Prototype EXECUTION Phase 007's own Pre-check found empty (0
+ * #[wasm_bindgen] among 27 pub fn, JS glue exporting only
+ * initSync/default). Recommends a future, separate stage add ONE new,
+ * minimal, side-effect-free version() function -- never retrofitting
+ * any of the 27 existing functions -- and names the Cargo.toml change
+ * (a genuine wasm-bindgen dependency) that would require. No
+ * #[wasm_bindgen] attribute, Rust source, Cargo.toml, package.json,
+ * or TypeScript change of any kind is made by this review.
+ */
+describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/package/TypeScript change", () => {
+  it("1. the review doc exists and is substantial", () => {
+    expect(typeof reviewDocSource).toBe("string");
+    expect(reviewDocSource.length).toBeGreaterThan(3000);
+  });
+
+  it("2. all 27 pub fn are listed, matching the real lib.rs count", () => {
+    const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
+      (m: RegExpMatchArray) => m[1],
+    );
+    expect(pubFnNames.length).toBe(27);
+    for (const name of pubFnNames) {
+      expect(reviewDocSource).toMatch(new RegExp("`" + name + "`"));
+    }
+  });
+
+  it("3. the #[wasm_bindgen] count is confirmed 0, matching the real lib.rs", () => {
+    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+    expect(reviewDocSource).toMatch(/`#\\?\[wasm_bindgen\\?\]`.{0,20}count.{0,20}confirmed `0`|confirmed `0`/is);
+    expect(reviewDocSource).toMatch(/# 0/);
+  });
+
+  it("4. current JS glue exports (default/initSync only, no crate-specific export) are stated", () => {
+    expect(reviewDocSource).toMatch(/export \{ initSync, __wbg_init as default \};/);
+    expect(reviewDocSource).toMatch(/No crate-specific export exists/);
+  });
+
+  it("5. a minimal version() candidate is recommended, with reasons, without adding it", () => {
+    expect(reviewDocSource).toMatch(/pub fn version\(\) -> String/);
+    expect(reviewDocSource).toMatch(/Zero side effects/);
+    expect(reviewDocSource).toMatch(/NOT retrofit any of\s*\n?\s*the 27 existing ones/);
+  });
+
+  it("6. the impact of adding #[wasm_bindgen] to the candidate is analyzed", () => {
+    expect(reviewDocSource).toMatch(/Impact of adding `#\\?\[wasm_bindgen\\?\]`/);
+    expect(reviewDocSource).toMatch(/grows from 27 to 28/);
+  });
+
+  it("7. Cargo.toml change necessity is identified as YES, with the reason", () => {
+    expect(reviewDocSource).toMatch(/Cargo\.toml.{0,20}change necessity.{0,20}YES/is);
+    expect(reviewDocSource).toMatch(/NOT currently a `\[dependencies\]` entry/);
+    expect(reviewDocSource).toMatch(/one dependency per\s*\n?\s*Stage/i);
+  });
+
+  it("8. whether version()-only is sufficient for Prototype termination is answered", () => {
+    expect(reviewDocSource).toMatch(/Is `version\(\)`-only sufficient for Prototype termination/);
+    expect(reviewDocSource).toMatch(/not as the final state/);
+  });
+
+  it("9. explicitly states no #[wasm_bindgen]/Rust/Cargo.toml/package.json/TypeScript change is made by this review", () => {
+    expect(reviewDocSource).toMatch(/REVIEW ONLY/);
+    expect(reviewDocSource).toMatch(/Does \*\*not\*\* add `#\\?\[wasm_bindgen\\?\]` to any function/);
+    expect(reviewDocSource).toMatch(/Does \*\*not\*\* change `Cargo\.toml`/);
+    expect(reviewDocSource).toMatch(/Does \*\*not\*\* change `package\.json`/);
+    expect(reviewDocSource).toMatch(/Does \*\*not\*\* change `src\/runtime\/fedos_wasm_loader\.ts`/);
+  });
+
+  it("10. the review doc never writes real #[wasm_bindgen]-annotated compiling code -- only names it, in prose", () => {
+    const codeBlocks = [...reviewDocSource.matchAll(/```rust\n([\s\S]*?)```/g)].map(
+      (m: RegExpMatchArray) => m[1] ?? "",
+    );
+    expect(codeBlocks.length).toBeGreaterThan(0);
+    // The one rust code block is illustrative only (a future stage's
+    // own candidate), not compiled or wired into lib.rs by this review.
+    expect(libRsSource).not.toMatch(/pub fn version\(\) -> String/);
+  });
+
+  it("11. Runtime, Worker, and both diagnostics files are completely unaffected -- no reference to the new review doc anywhere", () => {
+    expect(createRuntimeSource).not.toMatch(/runtime_wasm_rust_export_readiness_review/);
+    expect(workerSource).not.toMatch(/runtime_wasm_rust_export_readiness_review/);
+    expect(runtimeDiagnosticsSource).not.toMatch(/runtime_wasm_rust_export_readiness_review/);
+    expect(workerDiagnosticsSource).not.toMatch(/runtime_wasm_rust_export_readiness_review/);
+  });
+
+  it("12. runtime_crypto_diagnostics.ts and worker_crypto_diagnostics.ts carry no new field introduced by this stage", () => {
+    expect(runtimeDiagnosticsSource).not.toMatch(/rustExportReadiness/i);
+    expect(workerDiagnosticsSource).not.toMatch(/rustExportReadiness/i);
+  });
+
+  it("13. fedos_wasm_loader.ts source is untouched by this stage -- no new execution logic, no version() call", () => {
+    expect(wasmLoaderSource).not.toMatch(/\bversion\s*\(\s*\)\s*;/);
+    // Still exactly the same seven Plan interfaces and seven
+    // #create*Plan() methods this arc has built through Stage 969 --
+    // no eighth of either.
+    const planInterfaceMatches = [...wasmLoaderSource.matchAll(/export interface FedosWasmLoader\w*Plan\b/g)].map(
+      (m: RegExpMatchArray) => m[0],
+    );
+    expect([...new Set(planInterfaceMatches)].length).toBe(7);
+  });
+
+  it("14. Rust public API is unchanged (27 pub fn, still 0 #[wasm_bindgen]) -- Cargo/package dependencies unchanged", () => {
+    const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
+      (m: RegExpMatchArray) => m[1],
+    );
+    expect(pubFnNames.length).toBe(27);
+    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+
+    const cargoCode = cargoTomlSource
+      .split("\n")
+      .map((line: string) => line.replace(/#.*$/, ""))
+      .join("\n")
+      .toLowerCase();
+    const depsIdx = cargoCode.indexOf("[dependencies]");
+    const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
+    const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
+    const depLines = productionDepsSection
+      .split("\n")
+      .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
+    expect(depLines.length).toBe(10);
+    expect(productionDepsSection).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+
+    const pkg = JSON.parse(packageJsonSource);
+    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+  });
+
+  it("15. cross-references the Stage 969 Pre-check, the Stage 481 JS glue contract, and the Stage 905 Rust API Call Plan this review builds on", () => {
+    expect(reviewDocSource).toMatch(/runtime_wasm_loader_dev_only_wasm_initialization_execution\.md/);
+    expect(reviewDocSource).toMatch(/runtime_wasm_js_glue_contract\.md/);
+    expect(reviewDocSource).toMatch(/runtime_wasm_loader_rust_api_call_plan\.md/);
+    expect(reviewDocSource).toMatch(/rust_dependency_adoption\.md/);
+  });
+});
