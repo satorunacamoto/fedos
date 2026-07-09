@@ -230,7 +230,7 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Load Plan, 
     expect(compile).not.toHaveBeenCalled();
   });
 
-  it("18. no Rust reference anywhere in the Loader source; Rust public API unchanged (27 pub fn, none #[wasm_bindgen]-annotated)", () => {
+  it("18. no Rust reference anywhere in the Loader source; Rust public API unchanged (28 pub fn, one #[wasm_bindgen]-annotated (version(), Stage 986))", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
     // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
     // this one) legitimately names the two Generated Artifact
@@ -242,8 +242,8 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Load Plan, 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
-    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+    expect(pubFnNames.length).toBe(28);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
   });
 
   it("19. no cycle exists: policy() never calls planLoad(), and #createLoadPlan() calls nothing", () => {

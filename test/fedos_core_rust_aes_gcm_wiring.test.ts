@@ -188,8 +188,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_encrypt",
       "fedos_decrypt",
       "fedos_generate_aead_key_32",
+      "version",
     ];
-    expect(pubFnNames.length).toBe(27);
+    expect(pubFnNames.length).toBe(28);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -300,6 +301,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_encrypt",
       "fedos_decrypt",
       "fedos_generate_aead_key_32",
+      // Stage 986's minimal wasm_bindgen-annotated JS export -- see
+      // test/runtime_wasm_rust_version_export.test.ts for the dedicated
+      // checks that it implements no real cryptographic operation.
+      "version",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

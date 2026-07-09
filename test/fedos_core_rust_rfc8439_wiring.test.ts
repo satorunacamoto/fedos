@@ -229,6 +229,7 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       // dedicated checks that it returns only an opaque handle, never a
       // raw byte.
       "fedos_generate_aead_key_32",
+      "version",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

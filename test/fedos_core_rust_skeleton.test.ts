@@ -209,7 +209,7 @@ describe("FedOS Rust crate skeleton", () => {
   const productionLibRs =
     firstCfgTestIdx === -1 ? libRsSource : libRsSource.slice(0, firstCfgTestIdx);
 
-  it("6. lib.rs's production code (up to the FIRST #[cfg(test)] marker, inside secret_handle's own nested tests) imports no crypto/AEAD/KDF crate (zeroize/secrecy are the sole exception, Stage 79 secret-handle skeleton)", () => {
+  it("6. lib.rs's production code (up to the FIRST #[cfg(test)] marker, inside secret_handle's own nested tests) imports no crypto/AEAD/KDF crate (zeroize/secrecy/wasm_bindgen are the sole exceptions, Stage 79/986)", () => {
     // NOTE: `kdf_core` (and its Stage 147 `hkdf`/`sha2` usage) lands textually
     // AFTER this slice's cutoff (the first `#[cfg(test)]` marker is inside
     // `secret_handle`'s own nested `#[cfg(test)] mod tests`, Stage 79) — so
@@ -221,13 +221,17 @@ describe("FedOS Rust crate skeleton", () => {
     expect(firstCfgTestIdx).toBeGreaterThan(-1);
     expect(productionLibRs).not.toMatch(/\bextern\s+crate\b/);
     expect(productionLibRs).not.toMatch(
-      /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|sha2|argon2|subtle|bip39|secp256k1|nostr|wasm_bindgen)\b/,
+      /\buse\s+(chacha20poly1305|aes|aes_gcm|aead|hkdf|sha2|argon2|subtle|bip39|secp256k1|nostr)\b/,
     );
     // zeroize/secrecy ARE used in production code as of Stage 79 (see
     // test/fedos_core_rust_secret_handle.test.ts for the dedicated checks
     // that this stays crate-private and touches no real secret byte).
     expect(productionLibRs).toMatch(/\buse\s+zeroize\b/);
     expect(productionLibRs).toMatch(/\buse\s+secrecy\b/);
+    // wasm_bindgen::prelude IS used in production code as of Stage 986 (see
+    // test/runtime_wasm_rust_version_export.test.ts for the dedicated checks
+    // that it backs exactly one function, version(), and no other change).
+    expect(productionLibRs).toMatch(/\buse\s+wasm_bindgen::prelude::\*;/);
   });
 
   it("7. lib.rs's only real getrandom CALLS are fedos_random_bytes_32 (Stage 137), fedos_aead_nonce_96 (Stage 138), and fedos_generate_aead_key_32 (Stage 171–176) — every other mention is prose naming them, never a fallback PRNG", () => {

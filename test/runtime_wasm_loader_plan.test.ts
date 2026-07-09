@@ -254,12 +254,12 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
     expect(workerDecision.allowed).toBe(false);
   });
 
-  it("13. Rust public API is unchanged (27 pub fn, none #[wasm_bindgen]-annotated)", () => {
+  it("13. Rust public API is unchanged (28 pub fn, one #[wasm_bindgen]-annotated (version(), Stage 986))", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
-    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+    expect(pubFnNames.length).toBe(28);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
   });
 
   it("14. the loader planning doc records the five phases and the execution contract doc records the revised Loader Plan diagram", () => {

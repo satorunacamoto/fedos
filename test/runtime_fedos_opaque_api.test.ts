@@ -153,7 +153,7 @@ describe("FedOS opaque API internal wiring, blocked before Rust (Stage 321-328)"
 
   it("14. dependency counts unchanged -- Cargo.toml (10) and package.json (2) dependencies, Rust pub fn surface (27)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(27);
+    expect(pubFnNames.length).toBe(28);
 
     const cargoCode = cargoTomlSource
       .split("\n")

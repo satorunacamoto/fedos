@@ -592,8 +592,19 @@
 //! API addition — still twenty-seven `pub fn`s. No Runtime/Worker/
 //! Storage/Nostr/NIP-44-cryptography/WASM connection, no `Cargo.toml`
 //! change, no new dependency.
+//!
+//! Stage 986 (Prototype EXECUTION Phase 010) adds the crate's FIRST
+//! wasm_bindgen-annotated function, [`version`] — a minimal, zero-side-
+//! effect JS export made possible by Stage 985's `wasm-bindgen` dependency
+//! adoption (`docs/runtime_wasm_rust_export_bindgen_dependency.md`). It
+//! returns a fixed string, touches no key/seed/plaintext/ciphertext byte,
+//! and is not called from any TypeScript file in this repository yet — see
+//! `docs/runtime_wasm_rust_version_export.md` for the full record. The
+//! other twenty-seven `pub fn`s above/below are untouched.
 
 #![forbid(unsafe_code)]
+
+use wasm_bindgen::prelude::*;
 
 mod crypto;
 
@@ -6012,6 +6023,20 @@ pub fn fedos_decrypt(
 #[allow(dead_code)]
 pub(crate) fn fedos_runtime_ping_internal() -> bool {
     true
+}
+
+/// Stage 986 (Prototype EXECUTION Phase 010) — the crate's FIRST
+/// wasm_bindgen-annotated function, and its 28th `pub fn` overall.
+/// Returns a fixed, non-secret version label — no allocation beyond the
+/// `String` itself, no key/seed/plaintext/ciphertext byte, no I/O, and no
+/// side effect of any kind. Exists ONLY to prove the Rust -> JS export
+/// boundary compiles and cross-links correctly (`docs/
+/// runtime_wasm_rust_export_bindgen_dependency.md` named this as the
+/// minimal candidate); no TypeScript file calls it yet — that is a future,
+/// separate, explicitly-reviewed stage's own responsibility.
+#[wasm_bindgen]
+pub fn version() -> String {
+    "fedos-core-rust/0.0.0".to_string()
 }
 
 /// Stage 75 — RFC 8439 known-answer verification, `#[cfg(test)]` ONLY.

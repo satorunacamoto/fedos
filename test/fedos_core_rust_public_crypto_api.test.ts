@@ -111,7 +111,7 @@ describe("FedOS Rust crate — public fedos_encrypt/fedos_decrypt API (Stage 166
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
+    expect(pubFnNames.length).toBe(28);
     expect(pubFnNames).toContain("fedos_encrypt");
     expect(pubFnNames).toContain("fedos_decrypt");
     expect(pubFnNames).toContain("fedos_generate_aead_key_32");

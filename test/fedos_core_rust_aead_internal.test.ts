@@ -171,7 +171,7 @@ describe("FedOS Rust crate — internal AEAD implementation (Stage 152–154)", 
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
+    expect(pubFnNames.length).toBe(28);
     expect(pubFnNames).not.toContain("seal_internal");
     expect(pubFnNames).not.toContain("open_internal");
   });

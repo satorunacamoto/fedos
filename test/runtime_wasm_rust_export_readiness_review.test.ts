@@ -40,14 +40,14 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
+    expect(pubFnNames.length).toBe(28);
     for (const name of pubFnNames) {
       expect(reviewDocSource).toMatch(new RegExp("`" + name + "`"));
     }
   });
 
   it("3. the #[wasm_bindgen] count is confirmed 0, matching the real lib.rs", () => {
-    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
     expect(reviewDocSource).toMatch(/`#\\?\[wasm_bindgen\\?\]`.{0,20}count.{0,20}confirmed `0`|confirmed `0`/is);
     expect(reviewDocSource).toMatch(/# 0/);
   });
@@ -87,14 +87,16 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     expect(reviewDocSource).toMatch(/Does \*\*not\*\* change `src\/runtime\/fedos_wasm_loader\.ts`/);
   });
 
-  it("10. the review doc never writes real #[wasm_bindgen]-annotated compiling code -- only names it, in prose", () => {
+  it("10. the review doc's own illustrative code block was never compiled or wired into lib.rs BY THIS REVIEW's own Stage 977 scope (Stage 986, Prototype EXECUTION Phase 010, later implemented that exact candidate for real -- see test/runtime_wasm_rust_version_export.test.ts)", () => {
     const codeBlocks = [...reviewDocSource.matchAll(/```rust\n([\s\S]*?)```/g)].map(
       (m: RegExpMatchArray) => m[1] ?? "",
     );
     expect(codeBlocks.length).toBeGreaterThan(0);
-    // The one rust code block is illustrative only (a future stage's
-    // own candidate), not compiled or wired into lib.rs by this review.
-    expect(libRsSource).not.toMatch(/pub fn version\(\) -> String/);
+    // The one rust code block was illustrative-only AT THIS REVIEW's own
+    // time (Stage 977) -- a LATER, separate stage (986) implemented the
+    // exact same candidate for real, so this now confirms presence rather
+    // than absence.
+    expect(libRsSource).toMatch(/pub fn version\(\) -> String/);
   });
 
   it("11. Runtime, Worker, and both diagnostics files are completely unaffected -- no reference to the new review doc anywhere", () => {
@@ -124,8 +126,8 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
-    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+    expect(pubFnNames.length).toBe(28);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
 
     const cargoCode = cargoTomlSource
       .split("\n")

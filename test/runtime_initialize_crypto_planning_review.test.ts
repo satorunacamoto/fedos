@@ -175,8 +175,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(27);
-    expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]/);
+    expect(pubFnNames.length).toBe(28);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
 
     const cargoCode = cargoTomlSource
       .split("\n")
