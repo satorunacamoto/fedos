@@ -3527,6 +3527,117 @@ never reached anywhere in this chain, regardless of what the real
 Dev-only Gate Evaluation finds; Rust public API unchanged (27
 `pub fn`); no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 937: Prototype EXECUTION Phase 003, `planLoad()` performs a REAL Import Readiness evaluation — Planning Chain intact, still `BlockedByPolicy`, still `STOP`
+
+Stage 929 (the update above) made `planLoad()` perform a REAL Dev-only
+Gate Evaluation. Stage 937 inserts ONE more real step, INSIDE the
+Import Plan's own `shouldImport: false` branch — still without moving
+`STOP`, without calling `import()`, and without granting import
+permission. UNLIKE Stage 921/929, this new step reads NO new live
+external state of its own:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841/865/873/881/889/897/905/921/929
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan -> JS Glue Access Plan -> Generated Artifact Check Plan
+     -> Generated Artifact Check (REAL, Stage 921) -> Dev-only Gate Plan
+     -> Dev-only Gate Evaluation (REAL, Stage 929) -> Import Plan
+     |                                          <-- REAL, unchanged; importPlan.shouldImport
+     |                                              confirmed false, as always
+     v
+Import Readiness Evaluation                <-- NEW Stage 937: #evaluateImportReadiness() is a
+(inside planLoad(), no separate file;           PURE combination of the two prior real results
+#evaluateImportReadiness(),                     (this.#generatedArtifactCheckResult.artifactsExist,
+"fedos_wasm_loader.ts", Stage 937)              this.#devOnlyGateEvaluation.developmentAllowed) --
+     |                                          reads NO new filesystem/environment state itself.
+     |                                          Returns FedosWasmLoaderImportReadiness
+     |                                          { evaluated, ready, reason }. Result stored on the
+     |                                          instance (#importReadiness), readable via the new
+     |                                          PUBLIC importReadiness() method -- but NEVER read by
+     |                                          any `if` condition below
+     v
+WebAssembly Plan -> Rust API Call Plan
+     |                                          <-- BOTH Plans still run, in the SAME order,
+     |                                              regardless of what the real evaluation found --
+     |                                              ready: true does NOT flip
+     |                                              webAssemblyPlan.shouldInstantiate or
+     |                                              rustApiCallPlan.shouldCall
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included, REGARDLESS of whether readiness
+     |                                          evaluates true or false
+     v
+STOP                                       <-- SAME position as every prior diagram above -- this
+                                                 stage does NOT call import(); Import Readiness is
+                                                 NOT import permission
+```
+
+**Import Readiness is not import permission.** `#evaluateImportReadiness()`
+NEVER calls `import()` (static or dynamic), NEVER calls `require()`,
+NEVER references `WebAssembly.instantiate`/`compile`/
+`new WebAssembly.Module`/`new WebAssembly.Instance`/`initSync`/
+`__wbg_init`, and NEVER calls any Rust API (including `version()`).
+Finding both known preconditions satisfied (artifacts present AND
+Development Runtime) does NOT flip `Import Plan.shouldImport`,
+`WebAssembly Plan.shouldInstantiate`, `Rust API Call Plan.shouldCall`,
+or any other Plan's own fixed `false` field. Verified directly:
+`planLoad()` returns the identical `BlockedByPolicy` answer across
+every combination of artifact presence and runtime classification,
+including the fully-satisfied `ready: true` case.
+
+A new PUBLIC `executionReadinessSummary()` method combines all three
+real results recorded so far (`artifactsOk`/`runtimeOk`/`importReady`)
+with three permanently-fixed `false` flags
+(`importExecuted`/`webAssemblyExecuted`/`rustExecuted`) into one
+readable snapshot — itself performing no new check, purely reading
+what `planLoad()` already recorded; returns `null` before `planLoad()`
+has ever been called.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references
+`#evaluateImportReadiness()`/`importReadiness()`/
+`executionReadinessSummary()` directly or indirectly. `policy()` itself
+is unchanged and still never calls `planLoad()`, and
+`#evaluateImportReadiness()` calls nothing external at all (only reads
+two already-recorded instance fields), so no cycle exists anywhere in
+this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the evaluation result is exposed only
+via the new `importReadiness()`/`executionReadinessSummary()` methods
+on `fedos_wasm_loader.ts` itself, matching this arc's "necessary
+minimum" scope.
+
+**No new Node dependency and no new type suppression.** This stage
+reads no new filesystem/environment state, so it needed no ambient
+declaration change at all — the `@ts-expect-error` count stays exactly
+two (`node:fs`'s `existsSync`, `node:path`'s `join`), and
+`package.json`/`Cargo.toml` remain untouched.
+
+**Still true throughout Stage 937**: `src/worker.ts` UNMODIFIED and
+never references the Import Readiness evaluation, `policy()`,
+`planLoad()`, or `initializeCrypto`; `fedos_wasm_backend.ts`/Backend
+Interface/Backend Abstraction/Backend Resolver/Facade/Runtime return
+values all UNCHANGED; no call-graph cycle exists anywhere in this
+repository; no `process.env` key other than `NODE_ENV` read anywhere;
+no `import.meta` read of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no CONTENT-reading filesystem
+access of any kind; no generated file edited or committed; no Rust API
+call of any kind, no `#[wasm_bindgen]`, no `__wbg_init`; `encrypt`/
+`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/NIP-59,
+Double Ratchet, Triple Ratchet, and onion routing unimplemented;
+`"Allowed"`/`true` (for `shouldImport`/`shouldInstantiate`/`shouldCall`)
+never reached anywhere in this chain, regardless of what the real
+Import Readiness evaluation finds; Rust public API unchanged (27
+`pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real

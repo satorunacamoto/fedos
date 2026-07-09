@@ -556,6 +556,47 @@
  * `new WebAssembly.Instance`, `initSync`, `__wbg_init`, and any Rust
  * API call (including `version()`) remain exactly as unimplemented
  * and unreachable as every prior Prototype stage.
+ *
+ * Stage 937 (Prototype EXECUTION Phase 003) is the THIRD controlled
+ * exception to the Stage 489 HARD GUARDRAILS — one Planning Chain
+ * link further, past the Stage 929 Dev-only Gate Evaluation. UNLIKE
+ * Stage 921/929, this new step reads NO live external state of its
+ * own — a new PRIVATE `#evaluateImportReadiness()` method is a PURE
+ * combination of the two prior real results
+ * (`this.#generatedArtifactCheckResult.artifactsExist`,
+ * `this.#devOnlyGateEvaluation.developmentAllowed`), and returns
+ * `FedosWasmLoaderImportReadiness`
+ * (`evaluated`/`ready`/`reason`) — the THIRD real (non-fixed-constant)
+ * computation this file has ever performed, though computed WITHOUT
+ * any new filesystem/environment read. `planLoad()`'s flow calls it
+ * EXACTLY once, immediately after `importPlan.shouldImport` is
+ * confirmed `false` (the SAME position the Planning Chain's own
+ * `Import Plan` already occupies) — the result is stored on the
+ * instance (`this.#importReadiness`, readable via the new PUBLIC
+ * `importReadiness()` method) but is NEVER read by any `if` condition
+ * in `planLoad()`: `WebAssembly Plan`/`Rust API Call Plan` still run
+ * in EXACTLY the same order as before, and `planLoad()` still ALWAYS
+ * returns the SAME `#blocked("load")` answer, REGARDLESS of whether
+ * `ready` evaluates `true` or `false`. **Import Readiness is not
+ * import permission.** `FedosWasmLoaderImportPlan.shouldImport`
+ * (Stage 889) and every other Plan's own `should*` field remain fixed
+ * `false`, completely UNCHANGED and completely DECOUPLED from this
+ * real result — `ready: true` (both the artifact AND the runtime
+ * condition satisfied) does NOT flip `shouldImport`,
+ * `shouldInstantiate`, or `shouldCall` to `true` anywhere in this
+ * file; it only NAMES that the two conditions this Prototype knows
+ * how to evaluate are satisfied. A new PUBLIC
+ * `executionReadinessSummary()` method combines all three real
+ * results recorded so far (`artifactsOk`/`runtimeOk`/`importReady`)
+ * with three permanently-fixed `false` flags
+ * (`importExecuted`/`webAssemblyExecuted`/`rustExecuted`) into one
+ * readable snapshot — itself performing no new check, purely reading
+ * what `planLoad()` already recorded. `import()` (static or dynamic),
+ * `require()`, reading or executing the generated JS glue's own
+ * bytes, `WebAssembly.instantiate`/`compile`, `new WebAssembly.Module`/
+ * `new WebAssembly.Instance`, `initSync`, `__wbg_init`, and any Rust
+ * API call (including `version()`) remain exactly as unimplemented
+ * and unreachable as every prior Prototype stage.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -898,6 +939,42 @@ export interface FedosWasmLoaderDevOnlyGateEvaluation {
 }
 
 /**
+ * Stage 937 (Prototype EXECUTION Phase 003) — the result of a REAL
+ * (though purely combinational -- no new filesystem/environment read)
+ * evaluation of whether an eventual `import()` would have its two
+ * KNOWN preconditions satisfied: the Generated Artifact Check
+ * (Stage 921) found both artifacts present, AND the Dev-only Gate
+ * Evaluation (Stage 929) classified the runtime as Development.
+ * `ready: true` NAMES that both conditions are satisfied — it is
+ * NEVER read by `planLoad()`'s `if` conditions and NEVER grants
+ * import permission; see this module's top-of-file "Stage 937" doc
+ * note.
+ */
+export interface FedosWasmLoaderImportReadiness {
+  readonly evaluated: true;
+  readonly ready: boolean;
+  readonly reason: "ReadyForImport" | "MissingArtifacts" | "NotDevelopmentRuntime" | "PrototypeStillClosed";
+}
+
+/**
+ * Stage 937 (Prototype EXECUTION Phase 003) — one readable snapshot
+ * combining the three REAL results this file has recorded so far
+ * (`artifactsOk`/`runtimeOk`/`importReady`) with three
+ * permanently-fixed `false` flags naming what this Prototype has
+ * NEVER performed (`importExecuted`/`webAssemblyExecuted`/
+ * `rustExecuted`). Computed purely from already-recorded state;
+ * performs no check of its own.
+ */
+export interface FedosWasmLoaderExecutionReadinessSummary {
+  readonly artifactsOk: boolean;
+  readonly runtimeOk: boolean;
+  readonly importReady: boolean;
+  readonly importExecuted: false;
+  readonly webAssemblyExecuted: false;
+  readonly rustExecuted: false;
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -936,6 +1013,15 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * once written.
    */
   #devOnlyGateEvaluation: FedosWasmLoaderDevOnlyGateEvaluation | null = null;
+
+  /**
+   * Stage 937 (Prototype EXECUTION Phase 003) — holds the most recent
+   * REAL Import Readiness evaluation `planLoad()` recorded, or `null`
+   * before `planLoad()` has ever been called on this instance. Read
+   * via `importReadiness()`; never read by `planLoad()` itself once
+   * written.
+   */
+  #importReadiness: FedosWasmLoaderImportReadiness | null = null;
 
   constructor() {
     // Does nothing: no file read, no module imported, no WASM instantiated.
@@ -991,6 +1077,19 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
               const importPlan = this.#createImportPlan(); // 15. Import Plan generated
               if (!importPlan.shouldImport) {
                 // 16. Import Plan's own result confirmed -- ALWAYS false today
+                // 16a. Stage 937 (Prototype EXECUTION Phase 003) -- the THIRD
+                // real (non-fixed-constant) check this file ever performs,
+                // though computed WITHOUT any new filesystem/environment
+                // read: a PURE combination of the Generated Artifact Check
+                // and Dev-only Gate Evaluation results already recorded
+                // above. The result is recorded on the instance for later
+                // inspection (importReadiness()) but is NEVER read by the
+                // `if` below or by any branch past it -- WebAssembly
+                // Plan/Rust API Call Plan still run in the SAME order as
+                // before, and this call can never change which value
+                // planLoad() returns. Import Readiness is NOT import
+                // permission.
+                this.#importReadiness = this.#evaluateImportReadiness();
                 const webAssemblyPlan = this.#createWebAssemblyPlan(); // 18. WebAssembly Plan generated
                 if (!webAssemblyPlan.shouldInstantiate) {
                   // 19. WebAssembly Plan's own result confirmed -- ALWAYS false today
@@ -1137,6 +1236,40 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   devOnlyGateEvaluation(): FedosWasmLoaderDevOnlyGateEvaluation | null {
     return this.#devOnlyGateEvaluation;
+  }
+
+  /**
+   * Stage 937 (Prototype EXECUTION Phase 003) — returns the most
+   * recent REAL Import Readiness evaluation recorded by `planLoad()`,
+   * or `null` if `planLoad()` has never been called on this instance.
+   * Reading this value NEVER triggers a new evaluation — only
+   * `planLoad()`'s own call to `#evaluateImportReadiness()` ever does.
+   * Not part of the `FedosWasmLoader` interface.
+   */
+  importReadiness(): FedosWasmLoaderImportReadiness | null {
+    return this.#importReadiness;
+  }
+
+  /**
+   * Stage 937 (Prototype EXECUTION Phase 003) — returns one readable
+   * snapshot combining the three REAL results this instance has
+   * recorded so far, or `null` if `planLoad()` has never been called.
+   * Reading this value triggers NO new check of any kind — it purely
+   * reads `#generatedArtifactCheckResult`/`#devOnlyGateEvaluation`/
+   * `#importReadiness`. Not part of the `FedosWasmLoader` interface.
+   */
+  executionReadinessSummary(): FedosWasmLoaderExecutionReadinessSummary | null {
+    if (!this.#generatedArtifactCheckResult || !this.#devOnlyGateEvaluation || !this.#importReadiness) {
+      return null;
+    }
+    return {
+      artifactsOk: this.#generatedArtifactCheckResult.artifactsExist,
+      runtimeOk: this.#devOnlyGateEvaluation.developmentAllowed,
+      importReady: this.#importReadiness.ready,
+      importExecuted: false,
+      webAssemblyExecuted: false,
+      rustExecuted: false,
+    };
   }
 
   /**
@@ -1341,6 +1474,37 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       currentStage: "ImportPlanning",
       nextRequiredCheck: "WebAssemblyPlanning",
     };
+  }
+
+  /**
+   * PRIVATE — Stage 937 (Prototype EXECUTION Phase 003). The THIRD
+   * real (non-fixed-constant) computation this file ever performs,
+   * though it reads NO new filesystem/environment state of its own --
+   * a PURE combination of the two prior real results
+   * (`this.#generatedArtifactCheckResult`/`this.#devOnlyGateEvaluation`,
+   * both already recorded earlier in this SAME `planLoad()` call).
+   * `ready: true` NAMES that both known preconditions for an eventual
+   * `import()` are satisfied -- it NEVER performs `import()`, never
+   * loads the generated JS glue, never references `WebAssembly`, never
+   * calls Rust. Defensive Fail Closed: if either prior result is
+   * somehow missing (`null`), resolves `"PrototypeStillClosed"`/
+   * `ready: false` rather than throwing -- this never actually happens
+   * given `planLoad()`'s own fixed call order, but the fallback keeps
+   * this method total.
+   */
+  #evaluateImportReadiness(): FedosWasmLoaderImportReadiness {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devOnlyGate = this.#devOnlyGateEvaluation;
+    if (!artifactCheck || !devOnlyGate) {
+      return { evaluated: true, ready: false, reason: "PrototypeStillClosed" };
+    }
+    if (!artifactCheck.artifactsExist) {
+      return { evaluated: true, ready: false, reason: "MissingArtifacts" };
+    }
+    if (!devOnlyGate.developmentAllowed) {
+      return { evaluated: true, ready: false, reason: "NotDevelopmentRuntime" };
+    }
+    return { evaluated: true, ready: true, reason: "ReadyForImport" };
   }
 
   /**
