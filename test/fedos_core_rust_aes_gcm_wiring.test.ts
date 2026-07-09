@@ -189,8 +189,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_decrypt",
       "fedos_generate_aead_key_32",
       "version",
+      "random_bytes_32",
     ];
-    expect(pubFnNames.length).toBe(28);
+    expect(pubFnNames.length).toBe(29);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -305,6 +306,11 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // test/runtime_wasm_rust_version_export.test.ts for the dedicated
       // checks that it implements no real cryptographic operation.
       "version",
+      // Stage 1004's thin, non-cryptographic wasm_bindgen wrapper around
+      // the pre-existing fedos_random_bytes_32() -- see
+      // test/fedos_core_rust_random_bytes.test.ts for the dedicated
+      // checks that it implements no new randomness source/algorithm.
+      "random_bytes_32",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

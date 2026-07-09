@@ -64,8 +64,13 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
   });
 
   it("2. #[wasm_bindgen] appears exactly once in lib.rs", () => {
+    // Stage 1004 (Secure Runtime Alpha 008) legitimately added a SECOND
+    // #[wasm_bindgen]-annotated function (random_bytes_32) -- see
+    // test/fedos_core_rust_random_bytes.test.ts for its own dedicated
+    // checks. This test's own title still reflects Stage 986's original,
+    // now-historical scope.
     const matches = [...libRsSource.matchAll(/#\[wasm_bindgen\]/g)];
-    expect(matches.length).toBe(1);
+    expect(matches.length).toBe(2);
   });
 
   it("3. version() is declared, #[wasm_bindgen]-annotated, and returns a fixed String", () => {
@@ -82,7 +87,7 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(28);
+    expect(pubFnNames.length).toBe(29);
     expect(pubFnNames).toContain("version");
     for (const name of PRE_EXISTING_PUB_FN_NAMES) {
       expect(pubFnNames).toContain(name);

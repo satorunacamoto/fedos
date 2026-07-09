@@ -230,6 +230,9 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       // raw byte.
       "fedos_generate_aead_key_32",
       "version",
+      // Stage 1004's thin, non-cryptographic wasm_bindgen wrapper around
+      // the pre-existing fedos_random_bytes_32().
+      "random_bytes_32",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

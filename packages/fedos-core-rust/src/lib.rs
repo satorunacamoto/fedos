@@ -6039,6 +6039,28 @@ pub fn version() -> String {
     "fedos-core-rust/0.0.0".to_string()
 }
 
+/// Stage 1004 (Secure Runtime Alpha 008) — the crate's SECOND
+/// wasm_bindgen-annotated function, and its 29th `pub fn` overall.
+/// A THIN, NON-CRYPTOGRAPHIC wrapper around the EXISTING, byte-for-byte
+/// UNCHANGED [`fedos_random_bytes_32`] (Stage 137) — calls it EXACTLY
+/// ONCE and reshapes its Rust-native `FedosRandomBytesDecision` return
+/// value (a struct/enum shape `wasm-bindgen` cannot cross the ABI
+/// boundary without its own additional annotation work) into the
+/// natively-supported `Option<Vec<u8>>` — `wasm-bindgen` maps this to
+/// `Uint8Array | undefined` in the generated JS glue. NO new entropy
+/// source, NO new algorithm, NO new random draw: the 32 bytes returned
+/// here are the EXACT SAME `bytes` field `fedos_random_bytes_32()`
+/// itself already produces via `getrandom::fill` — this function reads
+/// that field and converts `[u8; 32]` to `Vec<u8>`, nothing more. On
+/// `FedosRandomBytesState::EntropySourceUnavailable`, returns `None` —
+/// Fail Closed, never a panic, never a partial/zeroed/degraded
+/// substitute. `fedos_random_bytes_32`'s own doc comment, behavior, and
+/// signature are all untouched by this Stage.
+#[wasm_bindgen]
+pub fn random_bytes_32() -> Option<Vec<u8>> {
+    fedos_random_bytes_32().bytes.map(|bytes| bytes.to_vec())
+}
+
 /// Stage 75 — RFC 8439 known-answer verification, `#[cfg(test)]` ONLY.
 ///
 /// This module is not part of the crate's public API: it is compiled only

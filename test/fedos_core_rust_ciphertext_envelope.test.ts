@@ -166,7 +166,7 @@ describe("FedOS Rust crate â€” internal ciphertext envelope skeleton (Stage 157â
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(28);
+    expect(pubFnNames.length).toBe(29);
     expect(pubFnNames).not.toContain("validate_envelope_internal");
   });
 

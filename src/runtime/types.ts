@@ -490,4 +490,25 @@ export interface AppRuntime {
    * `docs/secure_runtime_alpha_005_runtime_state_naming_cleanup.md`.
    */
   readonly runtimeCapabilities: () => Promise<RuntimeCapabilities>;
+  /**
+   * Stage 1004 (Secure Runtime Alpha 008) — the FIRST public Crypto
+   * API Runtime exposes, per this arc's own four-layer Public Runtime
+   * API -> Runtime Service -> Rust Boundary -> Internal Rust design.
+   * Internally calls
+   * `attemptDevOnlyRuntimeRandomBytes()`
+   * (`fedos_runtime_random_bytes.ts`, Stage 1004) exactly once, which
+   * drives a FRESH `FedosWasmLoader` through the SAME six-condition
+   * chain `runtimeCapabilities()` already exercises, then calls the
+   * Rust Boundary's `random_bytes_32()` — a thin, non-cryptographic
+   * wrapper around the pre-existing, unchanged
+   * `fedos_random_bytes_32()`. Fail Closed: resolves `null` whenever
+   * any of the Loader's own six conditions is unmet, the export is
+   * absent, the call throws, or Rust itself reports
+   * `EntropySourceUnavailable` — NEVER a partial/zeroed/degraded
+   * result, and NEVER an exception escaping this field. Deliberately
+   * separate from `initializeCrypto`/`runtimeCapabilities` above, both
+   * UNCHANGED by this stage. See
+   * `docs/secure_runtime_alpha_008_random_bytes.md`.
+   */
+  readonly randomBytes: () => Promise<Uint8Array | null>;
 }

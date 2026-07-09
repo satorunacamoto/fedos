@@ -180,8 +180,8 @@ describe("Secure Runtime Alpha 006 Runtime Mode Authority Review -- review only,
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(28);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
+    expect(pubFnNames.length).toBe(29);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(2);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_006_mode_authority_review/);
 
     const cargoCode = cargoTomlSource

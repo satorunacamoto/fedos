@@ -264,8 +264,8 @@ describe("FedOS WASM Loader Execution Readiness Review -- review only, no runtim
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(28);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(1);
+    expect(pubFnNames.length).toBe(29);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(2);
 
     const cargoCode = cargoTomlSource
       .split("\n")

@@ -127,8 +127,9 @@ describe("FedOS Rust crate — internal crypto pipeline skeleton", () => {
       "fedos_decrypt",
       "fedos_generate_aead_key_32",
       "version",
+      "random_bytes_32",
     ];
-    expect(pubFnNames.length).toBe(28);
+    expect(pubFnNames.length).toBe(29);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

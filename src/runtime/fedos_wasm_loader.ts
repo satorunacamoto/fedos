@@ -1207,6 +1207,37 @@ export interface FedosWasmLoaderRustVersionExecution {
 }
 
 /**
+ * Stage 1004 (Secure Runtime Alpha 008) — the result of a REAL attempt
+ * (or deliberate non-attempt) to call the retained JS glue module's own
+ * `random_bytes_32` property as a function, with NO argument.
+ * `attempted`/`succeeded` genuinely reflect what happened at the moment
+ * `attemptDevOnlyRandomBytesCall()` ran — mirrors
+ * `FedosWasmLoaderRustVersionExecution` (Stage 993) exactly, one field
+ * for one Rust Boundary export. `bytes` is the `Uint8Array` returned by
+ * `module.random_bytes_32()` on success, or `null` on every other
+ * outcome (including a genuine, in-bounds `undefined` return from Rust
+ * itself, which maps to `reason: "EntropySourceUnavailable"` — Fail
+ * Closed, not an error) — NEVER any other value type, and NEVER the
+ * module or any Rust object itself. `succeeded: true` NAMES that the
+ * call resolved a `Uint8Array` — it is NEVER read by `planLoad()`'s
+ * `if` conditions (which this stage does not touch at all), never read
+ * by `initializeCrypto()`/`runtimeCapabilities()`, and never surfaced
+ * in Runtime/Worker diagnostics.
+ */
+export interface FedosWasmLoaderRandomBytesExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly bytes: Uint8Array | null;
+  readonly reason:
+    | "Succeeded"
+    | "EntropySourceUnavailable"
+    | "NotInitialized"
+    | "RandomBytesUnavailable"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
@@ -1314,6 +1345,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * not reference this field at all.
    */
   #rustVersionExecution: FedosWasmLoaderRustVersionExecution | null = null;
+
+  /**
+   * Stage 1004 (Secure Runtime Alpha 008) — holds the most recent REAL
+   * Rust `random_bytes_32()` call result recorded by
+   * `attemptDevOnlyRandomBytesCall()`, or `null` before that method has
+   * ever been called on this instance. Read via
+   * `randomBytesExecution()`; NEVER read by `planLoad()`, which does
+   * not reference this field at all.
+   */
+  #randomBytesExecution: FedosWasmLoaderRandomBytesExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -1637,6 +1678,17 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Stage 1004 (Secure Runtime Alpha 008) — returns the most recent
+   * REAL Rust `random_bytes_32()` call result recorded by
+   * `attemptDevOnlyRandomBytesCall()`, or `null` if that method has
+   * never been called on this instance. Reading this value NEVER
+   * triggers a new call. Not part of the `FedosWasmLoader` interface.
+   */
+  randomBytesExecution(): FedosWasmLoaderRandomBytesExecution | null {
+    return this.#randomBytesExecution;
+  }
+
+  /**
    * Stage 945 (Prototype EXECUTION Phase 004) — PUBLIC, ASYNC (the
    * FIRST async method this class exposes; `planLoad()` itself is
    * UNCHANGED and does NOT call this method). Reads
@@ -1846,6 +1898,90 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#rustVersionExecution = result;
+    return result;
+  }
+
+  /**
+   * Stage 1004 (Secure Runtime Alpha 008) — PUBLIC, ASYNC. Mirrors
+   * `attemptDevOnlyRustVersionCall()` (Stage 993) exactly, gated on the
+   * SAME six previously-recorded conditions
+   * (`this.#generatedArtifactCheckResult`, `this.#devOnlyGateEvaluation`,
+   * `this.#importReadiness`, `this.#importExecution`,
+   * `this.#jsGlueModule !== null`, and
+   * `this.#wasmInitialization.succeeded`) — every one populated by an
+   * EARLIER method call, never re-evaluated here:
+   *   - Any of the six missing entirely (`null`): `module.random_bytes_32`
+   *     is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, bytes: null, reason:
+   *     "PrototypeStillClosed" }`.
+   *   - All six present but at least one condition unmet:
+   *     `module.random_bytes_32` is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, bytes: null, reason:
+   *     "NotInitialized" }`.
+   *   - All six satisfied: checks, AT RUNTIME, ONLY
+   *     `typeof module.random_bytes_32 === "function"` — no export-list
+   *     enumeration or discovery of any kind. Absent: resolves
+   *     `{ attempted: true, succeeded: false, bytes: null, reason:
+   *     "RandomBytesUnavailable" }`. Present: calls
+   *     `module.random_bytes_32()` with NO argument, wrapped in
+   *     `try`/`catch` that Fails Closed to `{ attempted: true,
+   *     succeeded: false, bytes: null, reason: "CallFailed" }` on ANY
+   *     thrown/rejected error OR a non-`Uint8Array`/non-`undefined`
+   *     return value. A genuine `undefined` return (Rust's own Fail
+   *     Closed on `EntropySourceUnavailable`, per Stage 1004's
+   *     `random_bytes_32()` doc comment in `lib.rs`) resolves
+   *     `{ attempted: true, succeeded: false, bytes: null, reason:
+   *     "EntropySourceUnavailable" }` — NOT `"CallFailed"`, since
+   *     nothing threw. On a genuine `Uint8Array` return: resolves
+   *     `{ attempted: true, succeeded: true, bytes: <Uint8Array>,
+   *     reason: "Succeeded" }`.
+   * Never inspects, destructures, or retains the module or any other
+   * Rust object — only the returned `Uint8Array` (or `null`) is ever
+   * stored, on `this.#randomBytesExecution`, readable via the new
+   * PUBLIC `randomBytesExecution()` method. Never calls any Rust API
+   * other than `random_bytes_32()` — no `encrypt`/`decrypt`/
+   * `deriveKey`/any other export. Called by NOTHING else in this file.
+   */
+  async attemptDevOnlyRandomBytesCall(): Promise<FedosWasmLoaderRandomBytesExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderRandomBytesExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, bytes: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, bytes: null, reason: "NotInitialized" };
+    } else {
+      const candidate = module as { random_bytes_32?: unknown };
+      if (typeof candidate.random_bytes_32 !== "function") {
+        result = { attempted: true, succeeded: false, bytes: null, reason: "RandomBytesUnavailable" };
+      } else {
+        try {
+          const value: unknown = (candidate.random_bytes_32 as () => unknown)();
+          if (value instanceof Uint8Array) {
+            result = { attempted: true, succeeded: true, bytes: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, bytes: null, reason: "EntropySourceUnavailable" };
+          } else {
+            result = { attempted: true, succeeded: false, bytes: null, reason: "CallFailed" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, bytes: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#randomBytesExecution = result;
     return result;
   }
 

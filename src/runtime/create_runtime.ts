@@ -47,6 +47,19 @@
  * internally calls `attemptDevOnlyRuntimeRustIntegration()` exactly
  * once — no new Rust call, no new gate, no Worker/Production
  * connection, no Secure Storage of any kind.
+ *
+ * Stage 1004 (Secure Runtime Alpha 008) adds `randomBytes`
+ * (`randomBytes()`, `fedos_runtime_random_bytes.ts`, Stage 1004) to the
+ * assembled `AppRuntime` — the FIRST public Crypto API, implementing
+ * the four-layer Public Runtime API -> Runtime Service -> Rust Boundary
+ * -> Internal Rust architecture end to end for exactly one operation.
+ * It is a THIRD, entirely separate field alongside `initializeCrypto`
+ * and `runtimeCapabilities` — neither is modified, called, or read by
+ * this new field's own implementation. `randomBytes()` internally
+ * drives its own fresh `FedosWasmLoader` through the SAME six-condition
+ * chain and calls the Rust Boundary's own thin, non-cryptographic
+ * wrapper export. No Worker/Production connection, no Secure Storage
+ * of any kind, no new build dependency of any kind.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -123,6 +136,7 @@ import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import { buildRuntimeCryptoProvider } from "./runtime_crypto_bridge.js";
 import { createCryptoLoaderFacade } from "./fedos_crypto_loader_facade.js";
 import { runtimeCapabilities } from "./fedos_runtime_prototype_execution.js";
+import { randomBytes } from "./fedos_runtime_random_bytes.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -700,5 +714,6 @@ export function createRuntime(
     crypto: selectRuntimeCryptoProvider(overrides),
     initializeCrypto: createRuntimeInitializeCryptoResult,
     runtimeCapabilities,
+    randomBytes,
   };
 }

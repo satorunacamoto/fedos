@@ -244,7 +244,7 @@ describe("FedOS Rust crate — AEAD nonce helper (Stage 138)", () => {
       (m) => m[1],
     );
     expect(pubFnNames).toContain("fedos_aead_nonce_96");
-    expect(pubFnNames.length).toBe(28);
+    expect(pubFnNames.length).toBe(29);
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+fedos_aead_nonce_96_/);
   });
 
