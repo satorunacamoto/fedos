@@ -181,6 +181,35 @@
  * `planUnload()`/`planningState()`/`status()` do NOT call `policy()`
  * and are untouched, and no cycle exists — `policy()` still never calls
  * `planLoad()`.
+ *
+ * Stage 841 (Prototype Phase 013) adds a LOAD PLAN object,
+ * `FedosWasmLoaderLoadPlan` — a NEW, separately-named, hand-fixed
+ * record `{ allowed: false, shouldLoad: false, backend: "Wasm",
+ * reason: "BlockedByPolicy" }`, built by a new PRIVATE
+ * `#createLoadPlan()` method (no arguments, no `this.policy()` call —
+ * `policy()` still runs exactly ONCE per `planLoad()` call, inside
+ * `#reachLoaderPolicy()`, unchanged from Stage 833). `planLoad()`'s
+ * flow is now: (1) call `#reachLoaderPolicy()` to get `policy` (one
+ * `policy()` call), (2) evaluate `policy.allowed`
+ * (`if (!policy.allowed)`), (3) inside that branch, call
+ * `#createLoadPlan()` to build the Load Plan, (4) evaluate
+ * `loadPlan.shouldLoad` (`if (!loadPlan.shouldLoad)`) as a SECOND,
+ * independent confirmation, (5) return the SAME `#blocked("load")`
+ * answer as every prior stage. Because `policy().allowed` and
+ * `FedosWasmLoaderLoadPlan.shouldLoad` are BOTH fixed `false`, both
+ * branches are ALWAYS taken, and `planLoad()`'s own return value stays
+ * byte-for-byte `{ operation: "load", state: "BlockedByPolicy", policy:
+ * "FailClosed", reason: "..." }`, key order included — the Load Plan's
+ * OWN fields (`allowed`/`shouldLoad`/`backend`/`reason`) are never
+ * merged into it. The `shouldLoad: true` (and `policy.allowed: true`)
+ * paths remain NOT implemented — reserved TODO comments only, each
+ * immediately followed by the SAME fail-closed `#blocked("load")`
+ * fallback, so this function stays fail-closed no matter what either
+ * object ever answers. This is still NOT a real load: no
+ * `WebAssembly`/generated JS glue/`import()`/Rust reference of any
+ * kind exists anywhere in this file. `policy()` itself, `planInitialize()`/
+ * `planUnload()`/`planningState()`/`status()`, and every upstream layer
+ * are UNCHANGED, and no cycle exists.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -277,6 +306,23 @@ export interface FedosWasmLoaderPolicyDecision {
 }
 
 /**
+ * Stage 841 — an internal-only LOAD PLAN object `planLoad()` builds
+ * and confirms before returning its own, unrelated
+ * `FedosWasmLoaderDecision`. DELIBERATELY a separate shape from every
+ * other type in this file, and DELIBERATELY typed with literal `false`/
+ * `"Wasm"`/`"BlockedByPolicy"` (not `boolean`/`string`) — this
+ * Prototype stage can never construct any other value. Not part of
+ * the public `FedosWasmLoader` interface; never returned to a caller
+ * of `planLoad()` directly.
+ */
+export interface FedosWasmLoaderLoadPlan {
+  readonly allowed: false;
+  readonly shouldLoad: false;
+  readonly backend: "Wasm";
+  readonly reason: "BlockedByPolicy";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -313,8 +359,19 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   planLoad(): FedosWasmLoaderDecision {
     this.#reachLoaderPlan(); // result discarded -- no import/initialize/attach ever happens
-    const policy = this.#reachLoaderPolicy();
+    const policy = this.#reachLoaderPolicy(); // 1. policy() -- exactly one call
     if (!policy.allowed) {
+      // 2. policy.allowed evaluated -- ALWAYS false today, so this branch is ALWAYS taken
+      const loadPlan = this.#createLoadPlan(); // 3. Load Plan generated
+      if (!loadPlan.shouldLoad) {
+        // 4. Load Plan's own result confirmed -- ALWAYS false today
+        return this.#blocked("load"); // 5. same BlockedByPolicy answer as every prior stage
+      }
+      // TODO(reserved for a future, separate, explicitly-reviewed stage):
+      // loadPlan.shouldLoad is permanently false in this Prototype stage
+      // (see FedosWasmLoaderLoadPlan's own fixed shape above), so this
+      // line can never execute today. The real, allowed Load path
+      // belongs here -- NOT implemented in this stage.
       return this.#blocked("load");
     }
     // TODO(reserved for a future, separate, explicitly-reviewed stage):
@@ -389,6 +446,23 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   #reachLoaderPolicy(): FedosWasmLoaderPolicyDecision {
     return this.policy();
+  }
+
+  /**
+   * PRIVATE — Stage 841. Builds the internal-only Load Plan
+   * `planLoad()` confirms before returning. PURE: takes no argument,
+   * calls nothing (in particular, does NOT call `this.policy()` again
+   * — `policy()` already ran exactly once in `planLoad()`, via
+   * `#reachLoaderPolicy()`), and returns a hand-fixed constant. Never
+   * loads, imports, fetches, or instantiates anything.
+   */
+  #createLoadPlan(): FedosWasmLoaderLoadPlan {
+    return {
+      allowed: false,
+      shouldLoad: false,
+      backend: "Wasm",
+      reason: "BlockedByPolicy",
+    };
   }
 
   #blocked(operation: FedosWasmLoaderOperation): FedosWasmLoaderDecision {
@@ -521,4 +595,42 @@ export function loaderPlanReachedPolicy(): boolean {
  */
 export function loaderPolicyEvaluated(): boolean {
   return true;
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally creates a Load
+ * Plan — Stage 841. Fixed `true`: `planLoad()`'s own `#createLoadPlan()`
+ * call DOES run every time `policy.allowed` evaluates `false` (which
+ * is always, today), even though the Load Plan's own fields are never
+ * merged into `planLoad()`'s return value.
+ */
+export function loaderLoadPlanCreated(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Load Plan `allowed` field —
+ * the same answer as `FedosWasmLoaderLoadPlan.allowed`. Fixed `false`.
+ */
+export function loaderLoadPlanAllowed(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Load Plan `shouldLoad`
+ * field — the same answer as `FedosWasmLoaderLoadPlan.shouldLoad`.
+ * Fixed `false` — no parameter or override anywhere can flip it.
+ */
+export function loaderLoadPlanShouldLoad(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Load Plan `backend` field —
+ * the same answer as `FedosWasmLoaderLoadPlan.backend`. Fixed
+ * `"Wasm"` — the first (and, in this stage, only) candidate backend
+ * this Loader's Load Plan ever names.
+ */
+export function loaderLoadPlanBackend(): "Wasm" {
+  return "Wasm";
 }
