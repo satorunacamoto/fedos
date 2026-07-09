@@ -597,6 +597,58 @@
  * `new WebAssembly.Instance`, `initSync`, `__wbg_init`, and any Rust
  * API call (including `version()`) remain exactly as unimplemented
  * and unreachable as every prior Prototype stage.
+ *
+ * Stage 945 (Prototype EXECUTION Phase 004) is the FOURTH controlled
+ * exception to the Stage 489 HARD GUARDRAILS — the FIRST stage this
+ * whole arc ever actually calls `import()`. Real dynamic `import()` is
+ * inherently asynchronous, but `planLoad()` itself is, and stays, a
+ * SYNCHRONOUS method returning `FedosWasmLoaderDecision` directly (not
+ * a `Promise`) — every prior stage's own test suite calls `planLoad()`
+ * and asserts on its return value synchronously, so changing its
+ * signature would be a breaking change far outside this stage's
+ * "necessary minimum" scope. This stage therefore does NOT add any
+ * call inside `planLoad()`'s own body; `planLoad()` is BYTE-FOR-BYTE
+ * UNCHANGED by this stage. Instead, a NEW, separate, PUBLIC, ASYNC
+ * method — `attemptDevOnlyJsGlueImport(): Promise<FedosWasmLoaderImportExecution>`
+ * — reads `this.#importReadiness` (populated by the MOST RECENT
+ * `planLoad()` call; `null` if `planLoad()` was never called) as its
+ * ONLY gate: if `readiness` is `null` or `readiness.ready` is `false`,
+ * `import()` is NEVER attempted at all (`attempted: false`,
+ * `reason: "PrototypeStillClosed"`/`"NotReady"` respectively). ONLY
+ * when `readiness.ready === true` does this method call real,
+ * dynamic `import()` (via `pathToFileURL`, `node:url` — a THIRD
+ * `@ts-expect-error`-suppressed Node built-in, alongside Stage 921's
+ * `node:fs`/`node:path`) on the SAME single Generated JS Glue path
+ * (`packages/fedos-core-rust/pkg/fedos_core_rust.js`, the SAME literal
+ * name `FedosWasmLoaderGeneratedArtifactName`/`GENERATED_ARTIFACT_NAMES`
+ * already name — NO new filesystem exploration, NO new artifact
+ * discovery, and never the `.wasm` file) — wrapped in a `try`/`catch`
+ * that Fails Closed to `reason: "ImportFailed"` on ANY thrown/rejected
+ * error. **Even on success, this method touches nothing further**: the
+ * imported module's own return value is immediately discarded (never
+ * assigned to a field, never inspected, never called) — no
+ * `__wbg_init`, no `initSync`, no `WebAssembly.instantiate`/`compile`,
+ * no `new WebAssembly.Module`/`new WebAssembly.Instance`, and no Rust
+ * API call (including `version()`) of any kind. The result —
+ * `FedosWasmLoaderImportExecution`
+ * (`attempted`/`succeeded`/`reason`) — is stored on the instance
+ * (`this.#importExecution`, readable via the new PUBLIC
+ * `importExecution()` method). This new method is called by NOTHING
+ * else in this file, in `create_runtime.ts`, or in `src/worker.ts` —
+ * it is exactly as unreached by any upstream layer as every other
+ * Execution-stage capability in this arc, and `planLoad()` itself
+ * still ALWAYS returns the SAME `#blocked("load")` answer whether or
+ * not `attemptDevOnlyJsGlueImport()` has ever been called, or with
+ * what result.
+ *
+ * The actual `import()` call is made through
+ * `this.#importGeneratedJsGlue` — a private field defaulting to real,
+ * native dynamic `import()`, optionally overridable via the
+ * constructor's `FedosWasmLoaderSkeletonOptions.importGeneratedJsGlue`
+ * — so tests can observe both the success and failure paths without
+ * depending on a real Generated JS Glue file existing on disk.
+ * `createFedosWasmLoader()` NEVER supplies this option, so every real
+ * caller always gets real dynamic `import()`.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -616,6 +668,12 @@ import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
 import { existsSync } from "node:fs";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
+// Stage 945 (Prototype EXECUTION Phase 004) -- needed to turn the
+// SAME `process.cwd()`-relative path Stage 921 already computes into
+// a valid ESM `import()` specifier (Node's ESM resolver requires a
+// `file://` URL for an absolute filesystem path).
+// @ts-expect-error `node:url` has no type declarations without `@types/node` in this project's tsconfig.
+import { pathToFileURL } from "node:url";
 // Stage 929 (Prototype EXECUTION Phase 002) extends this SAME ambient
 // declaration with `env` -- no NEW `@ts-expect-error` suppression is
 // added, and no new Node/package dependency of any kind.
@@ -975,6 +1033,36 @@ export interface FedosWasmLoaderExecutionReadinessSummary {
 }
 
 /**
+ * Stage 945 (Prototype EXECUTION Phase 004) — the result of a REAL
+ * attempt (or deliberate non-attempt) to `import()` the Generated JS
+ * Glue. `attempted`/`succeeded` genuinely reflect what happened at
+ * the moment `attemptDevOnlyJsGlueImport()` ran — `attempted` is
+ * `false` whenever `import()` was never even called (`reason:
+ * "NotReady"`/`"PrototypeStillClosed"`); `succeeded: true` NAMES that
+ * the import resolved — it is NEVER read by `planLoad()`'s `if`
+ * conditions (which this stage does not touch at all) and NEVER
+ * triggers `WebAssembly`/Rust of any kind; see this module's
+ * top-of-file "Stage 945" doc note.
+ */
+export interface FedosWasmLoaderImportExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly reason: "Imported" | "NotReady" | "ImportFailed" | "PrototypeStillClosed";
+}
+
+/**
+ * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
+ * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
+ * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
+ * paths without depending on a real Generated JS Glue file existing
+ * on disk; `createFedosWasmLoader()` never supplies it, so real usage
+ * always gets real, native dynamic `import()`.
+ */
+export interface FedosWasmLoaderSkeletonOptions {
+  readonly importGeneratedJsGlue?: (specifier: string) => Promise<unknown>;
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -1023,8 +1111,32 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   #importReadiness: FedosWasmLoaderImportReadiness | null = null;
 
-  constructor() {
-    // Does nothing: no file read, no module imported, no WASM instantiated.
+  /**
+   * Stage 945 (Prototype EXECUTION Phase 004) — holds the most recent
+   * REAL import attempt result recorded by
+   * `attemptDevOnlyJsGlueImport()`, or `null` before that method has
+   * ever been called on this instance. Read via `importExecution()`;
+   * NEVER read by `planLoad()`, which does not reference this field at
+   * all.
+   */
+  #importExecution: FedosWasmLoaderImportExecution | null = null;
+
+  /**
+   * Stage 945 (Prototype EXECUTION Phase 004) — the function
+   * `attemptDevOnlyJsGlueImport()` calls to perform the actual
+   * `import()`. Defaults to real, native dynamic `import()`; a test
+   * MAY override it via the constructor's `importGeneratedJsGlue`
+   * option to observe the success/failure paths without depending on
+   * a real Generated JS Glue file on disk. `createFedosWasmLoader()`
+   * never overrides it.
+   */
+  #importGeneratedJsGlue: (specifier: string) => Promise<unknown>;
+
+  constructor(options?: FedosWasmLoaderSkeletonOptions) {
+    // Does nothing but store the (optional, test-only) import hook: no
+    // file read, no module imported, no WASM instantiated.
+    this.#importGeneratedJsGlue =
+      options?.importGeneratedJsGlue ?? ((specifier) => import(/* @vite-ignore */ specifier));
   }
 
   status(): FedosWasmLoaderStatus {
@@ -1270,6 +1382,64 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       webAssemblyExecuted: false,
       rustExecuted: false,
     };
+  }
+
+  /**
+   * Stage 945 (Prototype EXECUTION Phase 004) — returns the most
+   * recent REAL import attempt result recorded by
+   * `attemptDevOnlyJsGlueImport()`, or `null` if that method has never
+   * been called on this instance. Reading this value NEVER triggers a
+   * new import attempt. Not part of the `FedosWasmLoader` interface.
+   */
+  importExecution(): FedosWasmLoaderImportExecution | null {
+    return this.#importExecution;
+  }
+
+  /**
+   * Stage 945 (Prototype EXECUTION Phase 004) — PUBLIC, ASYNC (the
+   * FIRST async method this class exposes; `planLoad()` itself is
+   * UNCHANGED and does NOT call this method). Reads
+   * `this.#importReadiness` — populated by the MOST RECENT `planLoad()`
+   * call — as its ONLY gate:
+   *   - `this.#importReadiness` is `null` (`planLoad()` never called):
+   *     `import()` is NEVER attempted; resolves
+   *     `{ attempted: false, succeeded: false, reason: "PrototypeStillClosed" }`.
+   *   - `this.#importReadiness.ready` is `false`: `import()` is NEVER
+   *     attempted; resolves
+   *     `{ attempted: false, succeeded: false, reason: "NotReady" }`.
+   *   - `this.#importReadiness.ready` is `true`: calls real, dynamic
+   *     `import()` (via `pathToFileURL`) on the SAME single Generated
+   *     JS Glue path Stage 921 already names
+   *     (`packages/fedos-core-rust/pkg/fedos_core_rust.js` — never the
+   *     `.wasm` file, and no new artifact discovery), wrapped in a
+   *     `try`/`catch` that Fails Closed to
+   *     `{ attempted: true, succeeded: false, reason: "ImportFailed" }`
+   *     on ANY thrown/rejected error. On success, the imported
+   *     module's own return value is IMMEDIATELY DISCARDED — never
+   *     assigned to a field, never inspected, never called — resolving
+   *     `{ attempted: true, succeeded: true, reason: "Imported" }`.
+   * Never references `__wbg_init`/`initSync`/`WebAssembly`/any Rust
+   * API, even on success. Called by NOTHING else in this file, in
+   * `create_runtime.ts`, or in `src/worker.ts`.
+   */
+  async attemptDevOnlyJsGlueImport(): Promise<FedosWasmLoaderImportExecution> {
+    const readiness = this.#importReadiness;
+    let result: FedosWasmLoaderImportExecution;
+    if (!readiness) {
+      result = { attempted: false, succeeded: false, reason: "PrototypeStillClosed" };
+    } else if (!readiness.ready) {
+      result = { attempted: false, succeeded: false, reason: "NotReady" };
+    } else {
+      try {
+        const jsGluePath = join(process.cwd(), "packages", "fedos-core-rust", "pkg", "fedos_core_rust.js");
+        await this.#importGeneratedJsGlue(pathToFileURL(jsGluePath).href);
+        result = { attempted: true, succeeded: true, reason: "Imported" };
+      } catch {
+        result = { attempted: true, succeeded: false, reason: "ImportFailed" };
+      }
+    }
+    this.#importExecution = result;
+    return result;
   }
 
   /**

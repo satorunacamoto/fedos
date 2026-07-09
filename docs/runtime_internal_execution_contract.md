@@ -3638,6 +3638,107 @@ never reached anywhere in this chain, regardless of what the real
 Import Readiness evaluation finds; Rust public API unchanged (27
 `pub fn`); no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 945: Prototype EXECUTION Phase 004, `attemptDevOnlyJsGlueImport()` performs a REAL, gated `import()` of the Generated JS Glue — `planLoad()` itself byte-for-byte unchanged, still `BlockedByPolicy`
+
+Stage 937 (the update above) made `planLoad()` perform a REAL Import
+Readiness evaluation. Stage 945 is the FIRST stage this whole arc ever
+actually calls `import()` — but NOT inside `planLoad()`'s own body.
+Real dynamic `import()` is inherently asynchronous; `planLoad()` is,
+and stays, a fully SYNCHRONOUS method every prior stage's own test
+suite calls and asserts on immediately, so changing its signature
+would be a breaking change outside this stage's "necessary minimum"
+scope. Instead, a NEW, separate, PUBLIC, ASYNC method is added:
+
+```
+FedosWasmLoaderSkeleton
+     |
+     +-- planLoad(): FedosWasmLoaderDecision            <-- SYNCHRONOUS, BYTE-FOR-BYTE
+     |                                                       UNCHANGED by this stage; still
+     |                                                       records this.#importReadiness
+     |                                                       exactly as Stage 937 left it
+     |
+     +-- attemptDevOnlyJsGlueImport():                   <-- NEW Stage 945, ASYNC, called by
+     |   Promise<FedosWasmLoaderImportExecution>              NOTHING inside planLoad() or
+     |        |                                                anywhere else in this file
+     |        v
+     |   reads this.#importReadiness (populated by the MOST RECENT planLoad() call)
+     |        |
+     |        +-- null (planLoad() never called)        -> import() NEVER attempted;
+     |        |                                             { attempted: false, succeeded: false,
+     |        |                                               reason: "PrototypeStillClosed" }
+     |        +-- { ready: false, ... }                  -> import() NEVER attempted;
+     |        |                                             { attempted: false, succeeded: false,
+     |        |                                               reason: "NotReady" }
+     |        +-- { ready: true, ... }                   -> real import() attempted, via
+     |                                                       this.#importGeneratedJsGlue
+     |                                                       (defaults to native dynamic
+     |                                                       import(), pathToFileURL'd, on
+     |                                                       packages/fedos-core-rust/pkg/
+     |                                                       fedos_core_rust.js -- NEVER the
+     |                                                       .wasm file, no new artifact
+     |                                                       discovery)
+     |             |
+     |             +-- resolves     -> { attempted: true, succeeded: true, reason: "Imported" }
+     |             |                    (module's own return value IMMEDIATELY DISCARDED --
+     |             |                     never assigned, inspected, or called)
+     |             +-- throws/rejects -> { attempted: true, succeeded: false,
+     |                                     reason: "ImportFailed" } (Fail Closed, never thrown
+     |                                     out of this method)
+     v
+Result stored on the instance (this.#importExecution), readable via importExecution()
+```
+
+**Even a successful import touches nothing further.** No
+`__wbg_init`, no `initSync`, no `WebAssembly.instantiate`/`compile`,
+no `new WebAssembly.Module`/`new WebAssembly.Instance`, and no Rust
+API call (including `version()`) of any kind — the imported module's
+own bytes are never read past the `import()` call resolving.
+
+**A testable seam, not a real-artifact dependency.**
+`FedosWasmLoaderSkeletonOptions.importGeneratedJsGlue` (an optional
+constructor option) lets a test observe both the success and failure
+paths without writing a real file into the shared
+`packages/fedos-core-rust/pkg/` directory (which would risk
+interfering with concurrently-running test files asserting on that
+directory's real, empty state) — `createFedosWasmLoader()` NEVER
+supplies this option, so every real caller always gets real, native
+dynamic `import()` (via `pathToFileURL`, `node:url` — a THIRD
+`@ts-expect-error`-suppressed Node built-in, alongside Stage 921's
+`node:fs`/`node:path`).
+
+**`planLoad()` itself is byte-for-byte unchanged by this stage.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references
+`attemptDevOnlyJsGlueImport()`/`importExecution()` directly or
+indirectly — this new capability is exactly as unreached by any
+upstream layer as every other Execution-stage capability in this arc.
+`policy()` itself is unchanged and still never calls `planLoad()`, and
+`planLoad()` never calls `attemptDevOnlyJsGlueImport()`, so no cycle
+exists anywhere in this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the import result is exposed only via
+the new `importExecution()` method on `fedos_wasm_loader.ts` itself,
+matching this arc's "necessary minimum" scope.
+
+**Still true throughout Stage 945**: `src/worker.ts` UNMODIFIED and
+never references the Dev-only JS Glue Import capability, `policy()`,
+`planLoad()`, or `initializeCrypto`; `fedos_wasm_backend.ts`/Backend
+Interface/Backend Abstraction/Backend Resolver/Facade/Runtime return
+values all UNCHANGED; no call-graph cycle exists anywhere in this
+repository; `planLoad()`'s own return value, key order included, is
+identical whether or not `attemptDevOnlyJsGlueImport()` has ever been
+called, or with what result; no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind;
+no `#[wasm_bindgen]`/`__wbg_init`; no Rust API call of any kind,
+including `version()`; `encrypt`/`decrypt` unchanged, in Rust or
+TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple Ratchet, and
+onion routing unimplemented; Rust public API unchanged (27 `pub fn`);
+no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
