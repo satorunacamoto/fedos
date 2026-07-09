@@ -233,7 +233,7 @@ describe("FedOS Rust crate — public key-format label boundary (Stage 105)", ()
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
   });
 
   it("10. no getrandom call anywhere in the Stage 105 section", () => {

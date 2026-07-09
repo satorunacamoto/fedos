@@ -51,7 +51,7 @@ describe("FedOS wasm-bindgen CLI/crate version alignment, first real JS glue, fa
     expect(bindgenVersionPolicySource).not.toMatch(/wasm-pack (?:is|was) (?:installed|adopted)/i);
   });
 
-  it("2. no Cargo.toml dependency VERSION was changed by this batch -- production dependency count unchanged (10), getrandom's version/features untouched", () => {
+  it("2. no Cargo.toml dependency VERSION was changed by this batch (Stage 473-480) -- getrandom's version/features untouched; production dependency count is now 11 (Stage 985, Prototype EXECUTION Phase 009, added wasm-bindgen as a direct dependency -- see test/runtime_wasm_rust_export_bindgen_dependency.test.ts)", () => {
     const lowerCargoCode = cargoCode.toLowerCase();
     const depsIdx = lowerCargoCode.indexOf("[dependencies]");
     const devDepsIdx = lowerCargoCode.indexOf("[dev-dependencies]");
@@ -59,11 +59,11 @@ describe("FedOS wasm-bindgen CLI/crate version alignment, first real JS glue, fa
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
 
     expect(cargoTomlSource).toMatch(/getrandom\s*=\s*\{[^}]*version\s*=\s*"0\.3"/);
     expect(cargoTomlSource).toMatch(/getrandom\s*=\s*\{[^}]*features\s*=\s*\[[^\]]*"wasm_js"[^\]]*\][^}]*\}/);
-    expect(cargoCode.toLowerCase()).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+    expect(cargoCode.toLowerCase()).toMatch(/^\s*wasm-bindgen\s*=\s*"0\.2\.126"/m);
   });
 
   it("3. no package.json dependency was added -- still 2 production dependencies, no wasm-bindgen/wasm-pack entry", () => {

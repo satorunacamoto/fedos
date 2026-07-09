@@ -145,7 +145,7 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
     const productionDepLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(productionDepLines.length).toBe(10);
+    expect(productionDepLines.length).toBe(11);
     for (const forbidden of ["serde", "serde_json", "hex", "base64", "cbor", "secp256k1"]) {
       expect(
         productionDepLines.some((line: string) => line.trim().startsWith(`${forbidden} `) || line.trim().startsWith(`${forbidden}=`)),

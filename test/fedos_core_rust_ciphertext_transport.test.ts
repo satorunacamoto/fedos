@@ -193,7 +193,7 @@ describe("FedOS Rust crate — ciphertext transport descriptor + NIP-44/storage 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(depLines.some((line: string) => /^\s*secp256k1\s*=/.test(line))).toBe(false);
     expect(cargoCode).not.toMatch(/\bcbor\b/);
   });

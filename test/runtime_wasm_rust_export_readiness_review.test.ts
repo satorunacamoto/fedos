@@ -120,7 +120,7 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     expect([...new Set(planInterfaceMatches)].length).toBe(7);
   });
 
-  it("14. Rust public API is unchanged (27 pub fn, still 0 #[wasm_bindgen]) -- Cargo/package dependencies unchanged", () => {
+  it("14. Rust public API is unchanged (27 pub fn, still 0 #[wasm_bindgen]) -- this review's OWN Stage 977 scope added no Cargo/package dependency (wasm-bindgen was later added directly at Stage 985, Prototype EXECUTION Phase 009 -- see test/runtime_wasm_rust_export_bindgen_dependency.test.ts); package.json dependencies remain unchanged", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -138,8 +138,8 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
-    expect(productionDepsSection).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+    expect(depLines.length).toBe(11);
+    expect(productionDepsSection).toMatch(/^\s*wasm-bindgen\s*=\s*"0\.2\.126"/m);
 
     const pkg = JSON.parse(packageJsonSource);
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);

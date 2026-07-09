@@ -233,9 +233,9 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     expect(cargoCode).not.toMatch(/^rand\s*=/m);
   });
 
-  it("10. Cargo.toml does not contain wasm-bindgen", () => {
-    expect(cargoCode).not.toContain("wasm-bindgen");
-    expect(cargoCode).not.toContain("wasm_bindgen");
+  it("10. Cargo.toml declares wasm-bindgen as a direct dependency (Stage 985, Prototype EXECUTION Phase 009) but lib.rs uses no wasm_bindgen import/attribute yet", () => {
+    expect(cargoCode).toContain("wasm-bindgen");
+    expect(libRsSource).not.toMatch(/wasm_bindgen/);
   });
 
   it("11. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never staticlib/wasm32 as a literal token", () => {

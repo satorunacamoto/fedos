@@ -13,7 +13,12 @@
 # `docs/nip44_dependency_adoption.md` for the full adoption record and
 # `docs/nip44_internal_plan.md` for the future ECDH/conversation-key/
 # message-key/padding/encrypt/decrypt/NIP-44 stages this dependency
-# prepares for, in that fixed order, none of them built yet).
+# prepares for, in that fixed order, none of them built yet) + `wasm-bindgen`
+# dependency ADOPTED (Stage 985, Prototype EXECUTION Phase 009, pinned
+# `0.2.126` — dependency line ONLY; no `#[wasm_bindgen]` attribute anywhere
+# in `src/lib.rs`, no new Rust function, Rust public API unchanged at 27
+# `pub fn`; see `docs/runtime_wasm_rust_export_bindgen_dependency.md` for the
+# full adoption record).
 #
 # Placeholder crate. There is still NO WASM here — the PUBLIC API in
 # `src/lib.rs` is unchanged (placeholder functions only; see
@@ -46,10 +51,13 @@
 # pattern as `chacha20poly1305`/RFC 8439 (Stage 74/75/81) and
 # `argon2`/RFC 9106 (Stage 84/85/86), still no production `aes-gcm` import
 # and `encrypt_placeholder`/`decrypt_placeholder` unchanged. Every other
-# crypto crate, rand / getrandom, bip39 / secp256k1 / nostr, and
-# wasm-bindgen remain ABSENT — each lands only in its own future,
-# explicitly-reviewed, one-crate-per-stage adoption
-# (docs/rust_dependency_adoption.md §1).
+# crypto crate, and bip39 / secp256k1 (beyond `k256`'s own minimal
+# `arithmetic` feature) / nostr, remain ABSENT — each lands only in its own
+# future, explicitly-reviewed, one-crate-per-stage adoption
+# (docs/rust_dependency_adoption.md §1). `wasm-bindgen` is now a DIRECT
+# dependency (Stage 985, pinned `0.2.126`) — but strictly a dependency-only
+# adoption: no `#[wasm_bindgen]` attribute is applied anywhere, no new Rust
+# function exists, and the Rust public API remains 27 `pub fn`, unchanged.
 
 [package]
 name = "fedos-core-rust"
@@ -228,6 +236,27 @@ sha2 = "0.11.0"
 # no NIP-44 code of any kind exists yet — see
 # `docs/nip44_dependency_adoption.md` (updated) for the full record.
 k256 = { version = "0.13", default-features = false, features = ["arithmetic"] }
+
+# `wasm-bindgen` (rustwasm project, MIT OR Apache-2.0) — Prototype EXECUTION
+# Phase 009's own, single, explicitly-reviewed adoption, per
+# `docs/rust_dependency_adoption.md` §12's "one dependency per Stage"
+# convention. Pinned to `0.2.126` to match the SAME version this crate's
+# `wasm32-unknown-unknown` build graph already resolves to transitively (via
+# `getrandom`'s own internal `wasm_js`-feature dependency, unaffected by this
+# line — see `docs/runtime_wasm_bindgen_version_policy.md` §2) and the
+# `wasm-bindgen-cli` binary this repository's `build:wasm` script already
+# invokes at that same version (`docs/runtime_wasm_bindgen_version_policy.md`
+# §1). Making it a DIRECT dependency (rather than only a transitive one) is
+# the ONLY way the `#[wasm_bindgen]` proc-macro attribute becomes usable at
+# all in `src/lib.rs` — this Stage adds ONLY the dependency line itself.
+# `#[wasm_bindgen]` is NOT applied to any function this Stage — Rust public
+# API remains unchanged at 27 `pub fn`, none annotated. No `version()` or any
+# other new Rust function is added this Stage either. Default features are
+# used as-is (`wasm-bindgen`'s own default feature set is the standard,
+# minimal one every `wasm-bindgen`-generated JS glue in this repository's
+# `packages/fedos-core-rust/pkg/` output already depends on). See
+# `docs/runtime_wasm_rust_export_bindgen_dependency.md` for the full record.
+wasm-bindgen = "0.2.126"
 
 [dev-dependencies]
 # Test-only plumbing (Stage 75) to read and assert against the RFC 8439

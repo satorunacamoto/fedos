@@ -71,14 +71,14 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
   const messageKeyProductionOnly = productionOnlyOf(messageKeySource);
   const hkdfBridgeProductionOnly = productionOnlyOf(hkdfBridgeSource);
 
-  it("1. Cargo.toml has exactly 10 production dependencies: the original 9, plus k256 (Stage 194) — no rust-secp256k1/other ECC crate", () => {
+  it("1. Cargo.toml has exactly 11 production dependencies: the original 9, plus k256 (Stage 194) and wasm-bindgen (Stage 985, Prototype EXECUTION Phase 009) — no rust-secp256k1/other ECC crate", () => {
     const depsIdx = cargoCode.indexOf("[dependencies]");
     const devDepsIdx = cargoCode.indexOf("[dev-dependencies]");
     const productionDepsSection = cargoCode.slice(depsIdx, devDepsIdx);
     const productionDepLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(productionDepLines.length).toBe(10);
+    expect(productionDepLines.length).toBe(11);
     const productionDepNames = productionDepLines.map((line: string) => line.trim().split(/\s*=/)[0]);
     expect(productionDepNames.sort()).toEqual(
       [
@@ -92,6 +92,7 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
         "getrandom",
         "sha2",
         "k256",
+        "wasm-bindgen",
       ].sort(),
     );
   });

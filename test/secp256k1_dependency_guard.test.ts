@@ -57,7 +57,7 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
     const depLines = productionDepsSection()
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(depLines.some((line: string) => /^\s*k256\s*=/.test(line))).toBe(true);
   });
 

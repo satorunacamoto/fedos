@@ -154,13 +154,15 @@ describe("FedOS Rust crate skeleton", () => {
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }
-    // The [dependencies] (production) table has exactly nine entries:
+    // The [dependencies] (production) table has exactly eleven entries:
     // chacha20poly1305 (Stage 74), hkdf (Stage 76), zeroize/secrecy/subtle
     // (Stage 78), argon2 (Stage 84), aes-gcm (Stage 101), getrandom
-    // (Stage 104), and sha2 (Stage 147, PROMOTED from [dev-dependencies] —
+    // (Stage 104), sha2 (Stage 147, PROMOTED from [dev-dependencies] —
     // see test/fedos_core_rust_hkdf_internal.test.ts for the dedicated Stage
-    // 147 checks). Stop at the next top-level `[section]` header (Stage 75
-    // adds `[dev-dependencies]` right after it) so its remaining test-only
+    // 147 checks), k256 (Stage 194), and wasm-bindgen (Stage 985, PHASE 009 —
+    // see test/runtime_wasm_rust_export_bindgen_dependency.test.ts). Stop at
+    // the next top-level `[section]` header (Stage 75 adds
+    // `[dev-dependencies]` right after it) so its remaining test-only
     // entries (serde/serde_json/hex) are not counted here.
     expect(cargoCode).toContain("[dependencies]");
     const depsSection = cargoCode.slice(cargoCode.indexOf("[dependencies]"));
@@ -170,7 +172,7 @@ describe("FedOS Rust crate skeleton", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(depLines.some((line: string) => line.includes("getrandom"))).toBe(true);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
@@ -182,10 +184,9 @@ describe("FedOS Rust crate skeleton", () => {
     expect(depLines.some((line: string) => /^\s*sha2\s*=/.test(line))).toBe(true);
   });
 
-  it("4. Cargo.toml has no wasm-bindgen dependency / WASM target (crate-type's cdylib, Stage 466, is a build-output shape, not a dependency)", () => {
-    expect(cargoCode).not.toContain("wasm-bindgen");
-    expect(cargoCode).not.toContain("wasm_bindgen");
+  it("4. Cargo.toml has no wasm32 build target declared (crate-type's cdylib, Stage 466, is a build-output shape, not a target); wasm-bindgen became a direct dependency at Stage 985 (Prototype EXECUTION Phase 009) -- see test/runtime_wasm_rust_export_bindgen_dependency.test.ts for its dedicated checks", () => {
     expect(cargoCode).not.toContain("wasm32");
+    expect(cargoCode).toContain("wasm-bindgen");
   });
 
   it("5. lib.rs has no `unsafe` usage (and forbids it at the crate level)", () => {

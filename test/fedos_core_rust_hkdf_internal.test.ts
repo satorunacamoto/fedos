@@ -145,7 +145,7 @@ describe("FedOS Rust crate — internal HKDF-SHA256 implementation (Stage 147)",
     const depLines = depsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
   });
 
   it("10. Runtime / Worker sources are unchanged: no kdf_core/HKDF reference and no crypto-op auto-call", () => {

@@ -191,7 +191,7 @@ describe("NIP-44 padding/encrypt/decrypt/authentication (Stage 202-208)", () => 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(cargoCode).not.toMatch(/^\s*chacha20\s*=/m);
     expect(cargoCode).not.toMatch(/^\s*hmac\s*=/m);
   });

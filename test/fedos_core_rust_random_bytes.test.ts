@@ -244,7 +244,7 @@ describe("FedOS Rust crate — real randomBytes implementation (Stage 137)", () 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(productionDepsSection).toMatch(/^getrandom\s*=/m);
   });
 

@@ -68,7 +68,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(depLines.some((line: string) => line.includes("chacha20poly1305"))).toBe(true);
     expect(depLines.some((line: string) => /^\s*hkdf\s*=/.test(line))).toBe(true);
     expect(depLines.some((line: string) => /^\s*zeroize\s*=/.test(line))).toBe(true);
@@ -101,7 +101,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
     expect(depsSection).toMatch(/^sha2\s*=/m);
   });
 
-  it("3. Cargo.toml still excludes every other named crypto crate and wasm-bindgen", () => {
+  it("3. Cargo.toml still excludes every other named crypto crate (wasm-bindgen became a real dependency at Stage 985, Prototype EXECUTION Phase 009 -- see test/runtime_wasm_rust_export_bindgen_dependency.test.ts)", () => {
     for (const dep of [
       // zeroize / secrecy / subtle are NOT in this list: since Stage 78
       // they are legitimate PRODUCTION dependencies (a secret-handling
@@ -116,9 +116,10 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
       // NOT in this list: since Stage 104 it is a legitimate PRODUCTION
       // dependency, this crate's own CSPRNG entropy source, adopted
       // build-check ONLY — see test/fedos_core_rust_dependency.test.ts.
+      // wasm-bindgen is likewise NOT in this list: since Stage 985 it is a
+      // legitimate PRODUCTION dependency, adopted as a dependency-line-only
+      // change -- see test/runtime_wasm_rust_export_bindgen_dependency.test.ts.
       "rand_core",
-      "wasm-bindgen",
-      "wasm_bindgen",
     ]) {
       expect(cargoCode, `Cargo.toml must not depend on ${dep}`).not.toContain(dep);
     }

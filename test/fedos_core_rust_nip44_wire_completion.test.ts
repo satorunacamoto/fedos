@@ -265,7 +265,7 @@ describe("NIP-44 wire-compatible implementation completion: base64 encoding + in
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(cargoCode).not.toMatch(/^\s*base64\s*=/m);
   });
 

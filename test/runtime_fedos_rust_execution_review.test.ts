@@ -161,7 +161,7 @@ describe("FedOS private Rust execution review, blocked before crypto (Stage 345-
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
   });
 
   it("17. package.json is unchanged -- exactly 2 dependencies", () => {

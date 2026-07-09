@@ -183,7 +183,7 @@ describe("FedOS Rust crate — internal AEAD implementation (Stage 152–154)", 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(cargoCode).toContain("chacha20poly1305");
     expect(cargoCode).toContain("aes-gcm");
   });

@@ -87,14 +87,12 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
   });
 
-  it("2. getrandom has no direct rand/rand_core sibling dependency, and wasm-bindgen is still absent", () => {
+  it("2. getrandom has no direct rand/rand_core sibling dependency", () => {
     expect(cargoCode).not.toContain("rand_core");
     expect(cargoCode).not.toMatch(/^rand\s*=/m);
-    expect(cargoCode).not.toContain("wasm-bindgen");
-    expect(cargoCode).not.toContain("wasm_bindgen");
   });
 
   it("3. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never wasm32 as a literal token", () => {

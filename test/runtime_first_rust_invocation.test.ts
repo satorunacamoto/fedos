@@ -124,7 +124,7 @@ describe("The first minimal Rust invocation, ping only (Stage 369-376)", () => {
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
   });
 
   it("16. package.json is unchanged -- exactly 2 dependencies", () => {

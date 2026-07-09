@@ -222,7 +222,7 @@ describe("FedOS generated JS glue contract, observed only, never imported/execut
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);

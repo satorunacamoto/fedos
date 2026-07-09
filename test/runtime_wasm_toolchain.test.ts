@@ -161,11 +161,11 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(fedosWasmPackExpected()).toBe(false);
   });
 
-  it("5. wasm-bindgen is a planned label only, never a package/Cargo dependency", () => {
+  it("5. wasm-bindgen is a planned label that came true as a real Cargo dependency at Stage 985 (Prototype EXECUTION Phase 009), but is still never a package.json dependency", () => {
     expect(fedosWasmBindgenExpected()).toBe(true);
 
     const cargoCode = cargoTomlSource.toLowerCase();
-    expect(cargoCode).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+    expect(cargoCode).toMatch(/^\s*wasm-bindgen\s*=/m);
 
     const pkg = JSON.parse(packageJsonSource);
     const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
@@ -266,7 +266,7 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     );
   });
 
-  it("13. Cargo.toml is unchanged -- production dependency count (10), no wasm-bindgen/wasm-pack dependency line", () => {
+  it("13. Cargo.toml production dependency count is 11 (Stage 985, Prototype EXECUTION Phase 009 added wasm-bindgen as a direct dependency), still no wasm-pack dependency line", () => {
     const cargoCode = cargoTomlSource
       .split("\n")
       .map((line: string) => line.replace(/#.*$/, ""))
@@ -278,8 +278,8 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
-    expect(cargoCode).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+    expect(depLines.length).toBe(11);
+    expect(cargoCode).toMatch(/^\s*wasm-bindgen\s*=\s*"0\.2\.126"/m);
     expect(cargoCode).not.toMatch(/^\s*wasm-pack\s*=/m);
   });
 
@@ -369,7 +369,7 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     expect(fedosWasmTargetCheckStatus()).toBe("ObservedGreen");
   });
 
-  it("23. Cargo.toml enables getrandom's wasm_js feature, version and dependency count unchanged, no wasm-bindgen dependency", () => {
+  it("23. Cargo.toml enables getrandom's wasm_js feature, version unchanged; dependency count is 11 (Stage 985 added wasm-bindgen as a direct dependency)", () => {
     expect(cargoTomlSource).toMatch(/getrandom\s*=\s*\{[^}]*features\s*=\s*\[[^\]]*"wasm_js"[^\]]*\][^}]*\}/);
     expect(cargoTomlSource).toMatch(/getrandom\s*=\s*\{[^}]*version\s*=\s*"0\.3"/);
 
@@ -384,8 +384,8 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
-    expect(cargoCode).not.toMatch(/^\s*wasm-bindgen\s*=/m);
+    expect(depLines.length).toBe(11);
+    expect(cargoCode).toMatch(/^\s*wasm-bindgen\s*=\s*"0\.2\.126"/m);
   });
 
   it("24. the getrandom wasm_js policy doc names the required RUSTFLAGS cfg flag and forbids fallback PRNGs", () => {

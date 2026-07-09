@@ -190,7 +190,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
   });
 
   it("12. no unwrap/expect/panic/unsafe anywhere in the crypto module's production code", () => {

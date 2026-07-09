@@ -255,7 +255,7 @@ describe("NIP-44 exact message key derivation review + skeleton (Stage 214-218, 
     const depLines = productionDepsSection
       .split("\n")
       .filter((line: string) => /^\s*[a-z0-9_-]+\s*=/.test(line));
-    expect(depLines.length).toBe(10);
+    expect(depLines.length).toBe(11);
     expect(cargoCode).not.toMatch(/^\s*chacha20\s*=/m);
     expect(cargoCode).not.toMatch(/^\s*hmac\s*=/m);
     expect(cargoCode).not.toMatch(/^\s*base64\s*=/m);

@@ -109,7 +109,7 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     }
   });
 
-  it("3. aes-gcm's own feature list has no direct rand/getrandom opt-in, and wasm-bindgen is still absent", () => {
+  it("3. aes-gcm's own feature list has no direct rand/getrandom opt-in", () => {
     // `aes-gcm`'s `default-features = false`, `features = ["aes", "alloc"]`
     // explicitly excludes its optional `getrandom` feature — see the
     // Cargo.toml comment above the `aes-gcm` entry. Scoped to aes-gcm's own
@@ -125,11 +125,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
     expect(aesGcmLine).not.toContain("getrandom");
     expect(cargoCode).not.toContain("rand_core");
     expect(cargoCode).not.toMatch(/\brand\b/);
-    expect(cargoCode).not.toContain("wasm-bindgen");
-    expect(cargoCode).not.toContain("wasm_bindgen");
   });
 
-  it("4. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never wasm-bindgen/wasm32 as a literal dependency/config token", () => {
+  it("4. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never wasm32 as a literal dependency/config token (wasm-bindgen became a real dependency at Stage 985, see test/runtime_wasm_rust_export_bindgen_dependency.test.ts)", () => {
     expect(cargoCode).toMatch(/crate-type\s*=\s*\[\s*"rlib"\s*,\s*"cdylib"\s*\]/);
     expect(cargoCode).not.toContain("wasm32");
   });
