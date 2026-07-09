@@ -724,6 +724,43 @@
  * happened, never what it produced. Even on success, NO Rust API call
  * of any kind (including `version()`) is ever made, because none is
  * exported by the JS glue to call in the first place.
+ *
+ * Stage 993 (Prototype EXECUTION Phase 012) — the FIRST time this arc
+ * ever calls a real Rust API through the retained JS glue module.
+ * Prototype EXECUTION Phase 010 added `#[wasm_bindgen] pub fn
+ * version() -> String` to `src/lib.rs`; Phase 011's own real,
+ * one-time `npm run build:wasm` run confirmed the generated JS glue
+ * exports exactly `version`/`initSync`/`default`, and that `version()`
+ * calls `wasm.version()` under the hood — see
+ * `docs/runtime_wasm_js_glue_version_export_verification.md`. A NEW,
+ * separate, PUBLIC, ASYNC method —
+ * `attemptDevOnlyRustVersionCall(): Promise<FedosWasmLoaderRustVersionExecution>`
+ * — follows the SAME pattern as Stage 945/969's own async methods:
+ * `planLoad()` itself is NOT called from, and does NOT call, this
+ * method — BYTE-FOR-BYTE UNCHANGED once again, and neither is
+ * `initializeCrypto()`. Its gate is ALL SIX of:
+ * `this.#generatedArtifactCheckResult.artifactsExist`,
+ * `this.#devOnlyGateEvaluation.developmentAllowed`,
+ * `this.#importReadiness.ready`, `this.#importExecution.succeeded`,
+ * `this.#jsGlueModule !== null`, and
+ * `this.#wasmInitialization.succeeded` — every one populated by an
+ * EARLIER method call, never re-evaluated here. When satisfied, checks
+ * ONLY `typeof module.version === "function"` — no export-list
+ * enumeration or discovery of any kind, matching this Phase's own
+ * "`module.version` only" scope. Calls `module.version()` with NO
+ * argument, wrapped in `try`/`catch` that Fails Closed to
+ * `reason: "CallFailed"` on ANY thrown/rejected error OR a non-`string`
+ * return value — only a genuine `string` return resolves
+ * `reason: "Succeeded"`. The result —
+ * `FedosWasmLoaderRustVersionExecution`
+ * (`attempted`/`succeeded`/`version`/`reason`) — is stored on the
+ * instance (`this.#rustVersionExecution`, readable via the new PUBLIC
+ * `rustVersionExecution()` method); the module and any raw Rust
+ * object are NEVER retained — only the decoded `string` (or `null`)
+ * itself. Never calls any Rust API other than `version()`. Not read
+ * by `initializeCrypto()`, `runtime_crypto_diagnostics.ts`, or
+ * `worker_crypto_diagnostics.ts` — all three are UNCHANGED by this
+ * stage.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -1149,6 +1186,27 @@ export interface FedosWasmLoaderWasmInitialization {
 }
 
 /**
+ * Stage 993 (Prototype EXECUTION Phase 012) — the result of a REAL
+ * attempt (or deliberate non-attempt) to call the retained JS glue
+ * module's own `version` property as a function, with NO argument.
+ * `attempted`/`succeeded` genuinely reflect what happened at the
+ * moment `attemptDevOnlyRustVersionCall()` ran. `version` is the
+ * decoded `string` `module.version()` returned on success, or `null`
+ * on every other outcome — NEVER any other value type, and NEVER the
+ * module or any Rust object itself. `succeeded: true` NAMES that the
+ * call resolved a `string` — it is NEVER read by `planLoad()`'s `if`
+ * conditions (which this stage does not touch at all), never read by
+ * `initializeCrypto()`, and never surfaced in Runtime/Worker
+ * diagnostics; see this module's top-of-file "Stage 993" doc note.
+ */
+export interface FedosWasmLoaderRustVersionExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly version: string | null;
+  readonly reason: "Succeeded" | "NotInitialized" | "VersionUnavailable" | "CallFailed" | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
@@ -1246,6 +1304,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * reference this field at all.
    */
   #wasmInitialization: FedosWasmLoaderWasmInitialization | null = null;
+
+  /**
+   * Stage 993 (Prototype EXECUTION Phase 012) — holds the most recent
+   * REAL Rust `version()` call result recorded by
+   * `attemptDevOnlyRustVersionCall()`, or `null` before that method
+   * has ever been called on this instance. Read via
+   * `rustVersionExecution()`; NEVER read by `planLoad()`, which does
+   * not reference this field at all.
+   */
+  #rustVersionExecution: FedosWasmLoaderRustVersionExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -1558,6 +1626,17 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Stage 993 (Prototype EXECUTION Phase 012) — returns the most
+   * recent REAL Rust `version()` call result recorded by
+   * `attemptDevOnlyRustVersionCall()`, or `null` if that method has
+   * never been called on this instance. Reading this value NEVER
+   * triggers a new call. Not part of the `FedosWasmLoader` interface.
+   */
+  rustVersionExecution(): FedosWasmLoaderRustVersionExecution | null {
+    return this.#rustVersionExecution;
+  }
+
+  /**
    * Stage 945 (Prototype EXECUTION Phase 004) — PUBLIC, ASYNC (the
    * FIRST async method this class exposes; `planLoad()` itself is
    * UNCHANGED and does NOT call this method). Reads
@@ -1686,6 +1765,87 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#wasmInitialization = result;
+    return result;
+  }
+
+  /**
+   * Stage 993 (Prototype EXECUTION Phase 012) — PUBLIC, ASYNC (the
+   * SAME pattern as Stage 945/969's own async methods; `planLoad()`
+   * itself is UNCHANGED and does NOT call this method, and neither
+   * does `initializeCrypto()`). The FIRST time this arc ever calls a
+   * real Rust API through the retained module. Its ONLY gate is ALL
+   * SIX of: `this.#generatedArtifactCheckResult.artifactsExist`,
+   * `this.#devOnlyGateEvaluation.developmentAllowed`,
+   * `this.#importReadiness.ready`, `this.#importExecution.succeeded`,
+   * `this.#jsGlueModule !== null`, and
+   * `this.#wasmInitialization.succeeded` — every one populated by an
+   * EARLIER method call, never re-evaluated here:
+   *   - Any of the six missing entirely (`null`): `module.version` is
+   *     NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, version: null, reason:
+   *     "PrototypeStillClosed" }`.
+   *   - All six present but at least one condition unmet: `module.version`
+   *     is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, version: null, reason:
+   *     "NotInitialized" }`.
+   *   - All six satisfied: checks, AT RUNTIME, ONLY
+   *     `typeof module.version === "function"` — no export-list
+   *     enumeration or discovery of any kind. Absent: resolves
+   *     `{ attempted: true, succeeded: false, version: null, reason:
+   *     "VersionUnavailable" }`. Present: calls `module.version()`
+   *     with NO argument, wrapped in `try`/`catch` that Fails Closed
+   *     to `{ attempted: true, succeeded: false, version: null,
+   *     reason: "CallFailed" }` on ANY thrown/rejected error OR a
+   *     non-`string` return value. On a genuine `string` return:
+   *     resolves `{ attempted: true, succeeded: true, version:
+   *     <string>, reason: "Succeeded" }`.
+   * Never inspects, destructures, or retains the module or any other
+   * Rust object — only the decoded `string` (or `null`) is ever
+   * stored, on `this.#rustVersionExecution`, readable via the new
+   * PUBLIC `rustVersionExecution()` method. Never calls any Rust API
+   * other than `version()` — no `encrypt`/`decrypt`/`randomBytes`/
+   * `deriveKey`/any other export. Called by NOTHING else in this
+   * file, in `create_runtime.ts`, or in `src/worker.ts`; not read by
+   * `runtime_crypto_diagnostics.ts`/`worker_crypto_diagnostics.ts`.
+   */
+  async attemptDevOnlyRustVersionCall(): Promise<FedosWasmLoaderRustVersionExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderRustVersionExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, version: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, version: null, reason: "NotInitialized" };
+    } else {
+      const candidate = module as { version?: unknown };
+      if (typeof candidate.version !== "function") {
+        result = { attempted: true, succeeded: false, version: null, reason: "VersionUnavailable" };
+      } else {
+        try {
+          const value: unknown = (candidate.version as () => unknown)();
+          if (typeof value === "string") {
+            result = { attempted: true, succeeded: true, version: value, reason: "Succeeded" };
+          } else {
+            result = { attempted: true, succeeded: false, version: null, reason: "CallFailed" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, version: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#rustVersionExecution = result;
     return result;
   }
 

@@ -118,13 +118,8 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("10. src/runtime/fedos_wasm_loader.ts is byte-for-byte untouched by this stage -- no ACTUAL version() call (pre-existing doc-comment prose naming `version()` as a NOT-yet-called example, since Stage 969, is unaffected), still seven Plan interfaces", () => {
-    // A bare `version()` substring legitimately appears in pre-existing
-    // doc-comment prose (Stage 969 onward) naming it as an example of a
-    // Rust API call that is NOT made -- this checks for an actual
-    // invocation (`.version(`/`= version(`/`await version(`), never present.
-    expect(wasmLoaderSource).not.toMatch(/[.=]\s*version\s*\(/);
-    expect(wasmLoaderSource).not.toMatch(/\bawait\s+version\s*\(/);
+  it("10. src/runtime/fedos_wasm_loader.ts was untouched by THIS stage's own scope (Stage 986) -- a real module.version() call was later added by Stage 993, Prototype EXECUTION Phase 012, see test/runtime_wasm_loader_dev_only_rust_version_call_execution.test.ts -- still seven Plan interfaces", () => {
+    expect(wasmLoaderSource).toMatch(/attemptDevOnlyRustVersionCall/);
     const planInterfaceMatches = [...wasmLoaderSource.matchAll(/export interface FedosWasmLoader\w*Plan\b/g)].map(
       (m: RegExpMatchArray) => m[0],
     );
