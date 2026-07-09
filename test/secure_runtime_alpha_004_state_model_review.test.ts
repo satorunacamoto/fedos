@@ -128,14 +128,14 @@ describe("Secure Runtime Alpha 004 Runtime State Model Review -- review only, no
     expect(baselineDocSource).toMatch(/Crypto API Surface/);
   });
 
-  it("11. Runtime implementation code is confirmed byte-for-byte unchanged -- no reference to this review's doc anywhere", () => {
+  it("11. Runtime implementation code was untouched by THIS review's own scope (Stage 1000) -- create_runtime.ts/fedos_wasm_loader.ts/types.ts still have no reference; fedos_runtime_prototype_execution.ts's own later Stage 1001 doc comments legitimately cite this review's own §1 finding, see test/secure_runtime_alpha_005_runtime_state_naming_cleanup.test.ts", () => {
     expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_004_state_model_review/);
     expect(wasmLoaderSource).not.toMatch(/secure_runtime_alpha_004_state_model_review/);
-    expect(runtimeIntegrationSource).not.toMatch(/secure_runtime_alpha_004_state_model_review/);
+    expect(runtimeIntegrationSource).toMatch(/secure_runtime_alpha_004_state_model_review/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_004_state_model_review/);
   });
 
-  it("12. runtimeCapabilities() and its RuntimeCapabilities type are byte-for-byte unchanged -- still exactly four fields, no new field this stage", () => {
+  it("12. Stage 1001 (Secure Runtime Alpha 005) implemented THIS review's own §1 finding for real -- runtimeState was renamed runtimeMode, 'Prototype' removed from the value union", () => {
     const interfaceMatch = runtimeIntegrationSource.match(
       /export interface RuntimeCapabilities \{[\s\S]*?\n\}/,
     );
@@ -143,7 +143,7 @@ describe("Secure Runtime Alpha 004 Runtime State Model Review -- review only, no
     const interfaceBody = (interfaceMatch as RegExpMatchArray)[0] ?? "";
     const fieldNames = [...interfaceBody.matchAll(/readonly (\w+):/g)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames.sort()).toEqual(
-      ["prototypeCompleted", "rustReachable", "rustVersion", "runtimeState"].sort(),
+      ["prototypeCompleted", "rustReachable", "rustVersion", "runtimeMode"].sort(),
     );
   });
 

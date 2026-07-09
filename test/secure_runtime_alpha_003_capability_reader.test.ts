@@ -90,23 +90,23 @@ describe("Secure Runtime Alpha 003 -- runtimeCapabilities() Runtime Capability R
     expect(caps.rustVersion).toBeNull();
   });
 
-  it("2. runtimeState reflects NODE_ENV -- development/production/otherwise-Prototype", async () => {
+  it("2. runtimeMode reflects NODE_ENV -- development/production/otherwise-Unknown (renamed from runtimeState/\"Prototype\" by Stage 1001, Secure Runtime Alpha 005 -- see test/secure_runtime_alpha_005_runtime_state_naming_cleanup.test.ts)", async () => {
     const devCaps = await withNodeEnv("development", () => runtimeCapabilities());
-    expect(devCaps.runtimeState).toBe("Development");
+    expect(devCaps.runtimeMode).toBe("Development");
 
     const prodCaps = await withNodeEnv("production", () => runtimeCapabilities());
-    expect(prodCaps.runtimeState).toBe("Production");
+    expect(prodCaps.runtimeMode).toBe("Production");
 
     const otherCaps = await withNodeEnv(undefined, () => runtimeCapabilities());
-    expect(otherCaps.runtimeState).toBe("Prototype");
+    expect(otherCaps.runtimeMode).toBe("Unknown");
 
     const testCaps = await withNodeEnv("test", () => runtimeCapabilities());
-    expect(testCaps.runtimeState).toBe("Prototype");
+    expect(testCaps.runtimeMode).toBe("Unknown");
   });
 
   it("3. RuntimeCapabilities carries exactly four fields", async () => {
     const caps = await runtimeCapabilities();
-    expect(Object.keys(caps).sort()).toEqual(["prototypeCompleted", "rustReachable", "rustVersion", "runtimeState"].sort());
+    expect(Object.keys(caps).sort()).toEqual(["prototypeCompleted", "rustReachable", "rustVersion", "runtimeMode"].sort());
   });
 
   it("4. createRuntime()'s own assembled AppRuntime exposes runtimeCapabilities as an async function, alongside the unchanged initializeCrypto", () => {

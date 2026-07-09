@@ -475,7 +475,7 @@ export interface AppRuntime {
    * Capability Reader, per
    * `docs/secure_runtime_alpha_002_public_surface_review.md` §7's own
    * recommendation. Reports ONLY "how far Runtime currently reaches"
-   * (`prototypeCompleted`/`rustReachable`/`rustVersion`/`runtimeState`)
+   * (`prototypeCompleted`/`rustReachable`/`rustVersion`/`runtimeMode`)
    * — it triggers no activation, grants no permission, and is NEVER
    * read by `initializeCrypto()`'s own `if` logic (the two fields
    * above remain byte-for-byte unchanged by this stage). Internally
@@ -483,6 +483,11 @@ export interface AppRuntime {
    * (`fedos_runtime_prototype_execution.ts`, Stage 994) exactly once —
    * no new Rust call, no new gate, no new Fail-Closed reason of its
    * own. See `docs/secure_runtime_alpha_003_capability_reader.md`.
+   * Stage 1001 (Secure Runtime Alpha 005) renamed this field's own
+   * `runtimeState` to `runtimeMode` and dropped `"Prototype"` from its
+   * value union in favor of `"Unknown"` — naming cleanup only, no
+   * behavior change; see
+   * `docs/secure_runtime_alpha_005_runtime_state_naming_cleanup.md`.
    */
   readonly runtimeCapabilities: () => Promise<RuntimeCapabilities>;
 }

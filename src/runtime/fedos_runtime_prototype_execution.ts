@@ -45,21 +45,47 @@
  * `attemptDevOnlyRuntimeRustIntegration()` and
  * `createRuntimeInitializeCryptoResult()` already are.
  *
+ * Stage 1001 (Secure Runtime Alpha 005) — NAMING CLEANUP ONLY, per
+ * `docs/secure_runtime_alpha_004_state_model_review.md` §1's own
+ * finding: the word "Prototype" was overloaded THREE separate ways
+ * across this codebase (the completed historical arc; this file's own
+ * environment-fallback label; `RuntimeInitializeCryptoReason`'s own
+ * `"PrototypeDisabled"` Fail-Closed reason). This Stage renames
+ * `RuntimeCapabilities.runtimeState` to `RuntimeCapabilities.runtimeMode`
+ * and its own `"Prototype" | "Development" | "Production"` union to
+ * `FedosRuntimeMode = "Development" | "Production" | "Unknown"` —
+ * `"Prototype"` is REMOVED from this classification entirely and
+ * replaced with `"Unknown"`, matching
+ * `FedosWasmLoaderDevOnlyGateEvaluation`'s own `"UnknownRuntime"`
+ * value more directly. `determineRuntimeState()` is renamed
+ * `determineRuntimeMode()`. NO new field, NO new gate, NO behavior
+ * change of any kind — `runtimeMode` still returns exactly the same
+ * three logical buckets (`NODE_ENV === "development"`,
+ * `NODE_ENV === "production"`, everything else), only the LABEL for
+ * the third bucket and the FIELD's own name changed.
+ * `RuntimeInitializeCryptoReason`'s own `"PrototypeDisabled"` value
+ * (`src/runtime/types.ts`, Stage 691) is explicitly UNTOUCHED — it
+ * remains a Fail-Closed REASON, a different concept from an
+ * environment classification, and this Stage does not conflate the
+ * two; it only removes the ACCIDENTAL naming overlap the word
+ * "Prototype" previously created between them.
+ *
  * HARD GUARDRAILS:
- *   - `attemptDevOnlyRuntimeRustIntegration()` and (as of Stage 999)
- *     `runtimeCapabilities()`/`RuntimeCapabilities` are the ONLY
- *     exports. Calling either constructs its OWN, fresh
- *     `FedosWasmLoader` instance (via `createFedosWasmLoader()`) — it
- *     never reuses or mutates any instance
- *     `fedos_wasm_backend.ts`/`create_runtime.ts` might hold.
+ *   - `attemptDevOnlyRuntimeRustIntegration()`, `runtimeCapabilities()`/
+ *     `RuntimeCapabilities` (Stage 999), and (as of Stage 1001)
+ *     `FedosRuntimeMode` are the ONLY exports. Calling either function
+ *     constructs its OWN, fresh `FedosWasmLoader` instance (via
+ *     `createFedosWasmLoader()`) — it never reuses or mutates any
+ *     instance `fedos_wasm_backend.ts`/`create_runtime.ts` might hold.
  *   - `runtimeCapabilities()` calls `attemptDevOnlyRuntimeRustIntegration()`
  *     EXACTLY ONCE and reads NOTHING else Rust-related — no second
  *     `FedosWasmLoader` instance, no direct call to
  *     `attemptDevOnlyRustVersionCall()`/`attemptDevOnlyJsGlueImport()`/
- *     `attemptDevOnlyWasmInitialization()` of its own. `runtimeState`
- *     is derived from ONE safe, try/catch-wrapped `process.env.NODE_ENV`
- *     read — no filesystem access, no `import()`, no WebAssembly
- *     reference of any kind.
+ *     `attemptDevOnlyWasmInitialization()` of its own. `runtimeMode`
+ *     (renamed from `runtimeState`, Stage 1001) is derived from ONE
+ *     safe, try/catch-wrapped `process.env.NODE_ENV` read — no
+ *     filesystem access, no `import()`, no WebAssembly reference of
+ *     any kind.
  *   - `prototypeCompleted` is a FIXED constant (`true`) — it does not
  *     read any file, docs, or git state; it is a hand-set label
  *     recording that `docs/fedos_prototype_completion.md` (Stage 996)
@@ -190,21 +216,37 @@ export async function attemptDevOnlyRuntimeRustIntegration(
  *   guarantees. No second `FedosWasmLoader` instance, no direct call
  *   to any of its `attemptDevOnly*` methods, no new Rust reach of any
  *   kind is introduced here.
- * - `runtimeState` — `"Development"`/`"Production"` when
- *   `process.env.NODE_ENV` reads exactly `"development"`/`"production"`,
- *   `"Prototype"` otherwise (unset, `"test"`, or unreadable) — the
- *   SAME three-way, try/catch-wrapped, Fail-Closed-to-a-safe-default
+ * - `runtimeMode` (renamed from `runtimeState`, Stage 1001) —
+ *   `"Development"`/`"Production"` when `process.env.NODE_ENV` reads
+ *   exactly `"development"`/`"production"`, `"Unknown"` otherwise
+ *   (unset, `"test"`, or unreadable — previously labeled `"Prototype"`,
+ *   which collided with the historical arc name and with
+ *   `RuntimeInitializeCryptoReason`'s own `"PrototypeDisabled"`; see
+ *   `docs/secure_runtime_alpha_005_runtime_state_naming_cleanup.md`) —
+ *   the SAME three-way, try/catch-wrapped, Fail-Closed-to-a-safe-default
  *   pattern `FedosWasmLoaderSkeleton`'s own `#evaluateDevOnlyGate()`
  *   already uses, just re-labeled for this reader's own purpose. This
  *   is NOT a new gate — nothing branches on it inside
  *   `attemptDevOnlyRuntimeRustIntegration()`'s own control flow; it
  *   only LABELS which of three states this call observed.
  */
+/**
+ * The three environment buckets `runtimeCapabilities()` can observe.
+ * Renamed and re-scoped, Stage 1001 (Secure Runtime Alpha 005) — see
+ * `docs/secure_runtime_alpha_005_runtime_state_naming_cleanup.md`.
+ * `"Unknown"` covers unset, `"test"`, or an unreadable `process.env`
+ * — it deliberately does NOT use the word `"Prototype"`, which names
+ * a completed historical arc (`docs/fedos_prototype_completion.md`)
+ * and a Fail-Closed REASON (`RuntimeInitializeCryptoReason`), neither
+ * of which is an environment classification.
+ */
+export type FedosRuntimeMode = "Development" | "Production" | "Unknown";
+
 export interface RuntimeCapabilities {
   readonly prototypeCompleted: boolean;
   readonly rustReachable: boolean;
   readonly rustVersion: string | null;
-  readonly runtimeState: "Prototype" | "Development" | "Production";
+  readonly runtimeMode: FedosRuntimeMode;
 }
 
 /**
@@ -222,18 +264,20 @@ export async function runtimeCapabilities(): Promise<RuntimeCapabilities> {
     prototypeCompleted: true,
     rustReachable: executionState.reachedRust,
     rustVersion: executionState.rustVersion,
-    runtimeState: determineRuntimeState(),
+    runtimeMode: determineRuntimeMode(),
   };
 }
 
 /**
  * PRIVATE (module-scoped) — the ONLY environment read this file
  * performs, used solely to LABEL `runtimeCapabilities()`'s own
- * `runtimeState` field. Mirrors `FedosWasmLoaderSkeleton`'s own
+ * `runtimeMode` field. Renamed from `determineRuntimeState()`, Stage
+ * 1001 (Secure Runtime Alpha 005) — naming only, same three logical
+ * buckets. Mirrors `FedosWasmLoaderSkeleton`'s own
  * `#evaluateDevOnlyGate()` Fail-Closed try/catch shape, but is not
  * itself a gate -- nothing in this file branches on its result.
  */
-function determineRuntimeState(): "Prototype" | "Development" | "Production" {
+function determineRuntimeMode(): FedosRuntimeMode {
   try {
     const nodeEnv = process.env?.NODE_ENV;
     if (nodeEnv === "development") {
@@ -242,8 +286,8 @@ function determineRuntimeState(): "Prototype" | "Development" | "Production" {
     if (nodeEnv === "production") {
       return "Production";
     }
-    return "Prototype";
+    return "Unknown";
   } catch {
-    return "Prototype";
+    return "Unknown";
   }
 }
