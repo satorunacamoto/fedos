@@ -427,6 +427,53 @@
  * `planUnload()`/`planningState()`/`status()`, and every upstream
  * layer are UNCHANGED, and no cycle exists —
  * `#createWebAssemblyPlan()` calls nothing at all.
+ *
+ * Stage 905 (Prototype Phase 020) adds a RUST API CALL PLAN object,
+ * `FedosWasmLoaderRustApiCallPlan` — a NEW, separately-named,
+ * hand-fixed record `{ backend: "Wasm", shouldCall: false, reason:
+ * "BlockedByWebAssemblyPlan", currentStage: "RustApiCallPlanning",
+ * nextRequiredCheck: "PrototypeExecutionReadiness" }`, built by a new
+ * PRIVATE `#createRustApiCallPlan()` method (no argument, calls
+ * nothing, returns a hand-fixed constant — mirrors
+ * `#createWebAssemblyPlan()`'s own "pure, no re-fetch" discipline).
+ * `planLoad()`'s flow extends ONE step further, INSIDE the existing
+ * `if (!webAssemblyPlan.shouldInstantiate)` branch: (21) build the
+ * Rust API Call Plan via `#createRustApiCallPlan()`, (22) confirm
+ * `rustApiCallPlan.shouldCall` (`if (!rustApiCallPlan.shouldCall)`, an
+ * EIGHTH, independent check, ALSO always taken because `shouldCall` is
+ * fixed `false`), (23) return the SAME `#blocked("load")` answer as
+ * every prior stage. `planLoad()`'s own return value — `{ operation:
+ * "load", state: "BlockedByPolicy", policy: "FailClosed", reason:
+ * "..." }`, key order included — stays byte-for-byte unchanged; the
+ * Rust API Call Plan's OWN fields are never merged into it, it is not
+ * part of the public `FedosWasmLoader` interface, and it is never
+ * returned to any caller. `shouldCall: false` NAMES the future intent
+ * that a real Loader would eventually call a real Rust public function
+ * (e.g. `version()`) WITHOUT performing any such call: this stage
+ * contains NO Rust API call of any kind, NO `#[wasm_bindgen]`, NO
+ * `__wbg_init`, and NO `initSync` — `shouldCall` is a hand-fixed
+ * constant, not a computed answer. `reason:
+ * "BlockedByWebAssemblyPlan"` names WHY the call is not yet performed
+ * (the WebAssembly Plan one level up already said `shouldInstantiate:
+ * false`) — `"PrototypeDisabled"`/`"RustApiUnavailable"` are the OTHER
+ * two labels the type permits but this stage's fixed constant never
+ * produces, reserved for a future stage that might defer the call for
+ * a different reason. `nextRequiredCheck:
+ * "PrototypeExecutionReadiness"` NAMES, without PERFORMING, the very
+ * next gate a future, separate, explicitly-reviewed stage would need
+ * to add — this Planning Chain (Load Plan → JS Glue Access Plan →
+ * Generated Artifact Check Plan → Dev-only Gate Plan → Import Plan →
+ * WebAssembly Plan → Rust API Call Plan) is now COMPLETE; the next
+ * stage's own responsibility is reviewing the chain as a whole and
+ * naming what Execution Readiness would require, NOT extending the
+ * chain with an eighth internal Plan. The `shouldCall: true` path
+ * (like every fixed-`false` field above it) is a single reserved TODO
+ * comment, immediately followed by the SAME fail-closed fallback, so
+ * this function stays fail-closed no matter what any of the eight
+ * objects ever answers. `policy()` itself, `planInitialize()`/
+ * `planUnload()`/`planningState()`/`status()`, and every upstream
+ * layer are UNCHANGED, and no cycle exists — `#createRustApiCallPlan()`
+ * calls nothing at all.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -667,6 +714,35 @@ export interface FedosWasmLoaderWebAssemblyPlan {
 }
 
 /**
+ * Stage 905 — an internal-only RUST API CALL PLAN object `planLoad()`
+ * builds and confirms one step past the WebAssembly Plan, before
+ * returning its own, unrelated `FedosWasmLoaderDecision`. Names the
+ * FUTURE intent to call a real Rust public function
+ * (`shouldCall`), WHY it cannot happen yet (`reason`), and WHAT comes
+ * after it (`nextRequiredCheck`) — without performing any of it: no
+ * Rust API call of any kind, no `#[wasm_bindgen]`, no `__wbg_init`, no
+ * `initSync`. This is the LAST link in the Planning Chain
+ * (`docs/runtime_wasm_loader_activation_readiness_review.md` §4,
+ * extended by Stage 897) — `nextRequiredCheck:
+ * "PrototypeExecutionReadiness"` names a REVIEW of the completed
+ * chain, not an eighth internal Plan. DELIBERATELY a separate shape
+ * from every other type in this file, and DELIBERATELY typed with
+ * literal `"Wasm"`/`false`/`"RustApiCallPlanning"`/
+ * `"PrototypeExecutionReadiness"` values (plus a three-member `reason`
+ * union, only one member of which this Prototype stage ever actually
+ * produces) — see this module's top-of-file "Stage 905" doc note for
+ * why. Not part of the public `FedosWasmLoader` interface; never
+ * returned to a caller of `planLoad()` directly.
+ */
+export interface FedosWasmLoaderRustApiCallPlan {
+  readonly backend: "Wasm";
+  readonly shouldCall: false;
+  readonly reason: "BlockedByWebAssemblyPlan" | "PrototypeDisabled" | "RustApiUnavailable";
+  readonly currentStage: "RustApiCallPlanning";
+  readonly nextRequiredCheck: "PrototypeExecutionReadiness";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -724,7 +800,21 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
                 const webAssemblyPlan = this.#createWebAssemblyPlan(); // 18. WebAssembly Plan generated
                 if (!webAssemblyPlan.shouldInstantiate) {
                   // 19. WebAssembly Plan's own result confirmed -- ALWAYS false today
-                  return this.#blocked("load"); // 20. same BlockedByPolicy answer as every prior stage
+                  const rustApiCallPlan = this.#createRustApiCallPlan(); // 21. Rust API Call Plan generated
+                  if (!rustApiCallPlan.shouldCall) {
+                    // 22. Rust API Call Plan's own result confirmed -- ALWAYS false today
+                    return this.#blocked("load"); // 23. same BlockedByPolicy answer as every prior stage
+                  }
+                  // TODO(reserved for a future, separate, explicitly-reviewed stage):
+                  // rustApiCallPlan.shouldCall is permanently false in
+                  // this Prototype stage (see
+                  // FedosWasmLoaderRustApiCallPlan's own fixed shape
+                  // above), so this line can never execute today. The
+                  // real Rust API call -- including the Prototype
+                  // Execution Readiness review named in
+                  // nextRequiredCheck -- belongs here -- NOT
+                  // implemented in this stage.
+                  return this.#blocked("load");
                 }
                 // TODO(reserved for a future, separate, explicitly-reviewed stage):
                 // webAssemblyPlan.shouldInstantiate is permanently false
@@ -983,6 +1073,33 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       reason: "BlockedByImportPlan",
       currentStage: "WebAssemblyPlanning",
       nextRequiredCheck: "RustApiCallPlanning",
+    };
+  }
+
+  /**
+   * PRIVATE — Stage 905. Builds the internal-only Rust API Call Plan
+   * `planLoad()` confirms one step past the WebAssembly Plan -- the
+   * LAST link in the Planning Chain. PURE: takes no argument, calls
+   * nothing (does NOT call
+   * `this.policy()`/`this.#createLoadPlan()`/
+   * `this.#createJsGlueAccessPlan()`/`this.#createGeneratedArtifactCheckPlan()`/
+   * `this.#createDevOnlyGatePlan()`/`this.#createImportPlan()`/
+   * `this.#createWebAssemblyPlan()` again -- all seven already ran
+   * exactly once earlier in `planLoad()`), and returns a hand-fixed
+   * constant. Never calls any Rust public function (including
+   * `version()`), never references `#[wasm_bindgen]`/`__wbg_init`,
+   * never calls `initSync`, never references `WebAssembly`, never
+   * loads the generated JS glue; does NOT actually call Rust (that
+   * remains a future, separate, explicitly-reviewed stage's own
+   * responsibility).
+   */
+  #createRustApiCallPlan(): FedosWasmLoaderRustApiCallPlan {
+    return {
+      backend: "Wasm",
+      shouldCall: false,
+      reason: "BlockedByWebAssemblyPlan",
+      currentStage: "RustApiCallPlanning",
+      nextRequiredCheck: "PrototypeExecutionReadiness",
     };
   }
 
@@ -1499,4 +1616,75 @@ export function loaderWebAssemblyPlanCurrentStage(): "WebAssemblyPlanning" {
  */
 export function loaderWebAssemblyPlanNextRequiredCheck(): "RustApiCallPlanning" {
   return "RustApiCallPlanning";
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally creates a Rust
+ * API Call Plan — Stage 905. Fixed `true`: `planLoad()`'s own
+ * `#createRustApiCallPlan()` call DOES run every time
+ * `webAssemblyPlan.shouldInstantiate` evaluates `false` (which is
+ * always, today), even though the Plan's own fields are never merged
+ * into `planLoad()`'s return value.
+ */
+export function loaderRustApiCallPlanCreated(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Rust API Call Plan
+ * `shouldCall` field — the same answer as
+ * `FedosWasmLoaderRustApiCallPlan.shouldCall`. Fixed `false` — no
+ * parameter or override anywhere can flip it; no Rust public function
+ * of any kind is ever called to compute it.
+ */
+export function loaderRustApiCallPlanShouldCall(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Rust API Call Plan
+ * `backend` field — the same answer as
+ * `FedosWasmLoaderRustApiCallPlan.backend`. Fixed `"Wasm"`.
+ */
+export function loaderRustApiCallPlanBackend(): "Wasm" {
+  return "Wasm";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Rust API Call Plan
+ * `reason` field — the same answer as
+ * `FedosWasmLoaderRustApiCallPlan.reason`. Fixed
+ * `"BlockedByWebAssemblyPlan"` — the WebAssembly Plan one level up
+ * already said `shouldInstantiate: false`; `"PrototypeDisabled"`/
+ * `"RustApiUnavailable"` are the OTHER two labels the type permits but
+ * this stage never produces.
+ */
+export function loaderRustApiCallPlanReason():
+  | "BlockedByWebAssemblyPlan"
+  | "PrototypeDisabled"
+  | "RustApiUnavailable" {
+  return "BlockedByWebAssemblyPlan";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Rust API Call Plan
+ * `currentStage` field — the same answer as
+ * `FedosWasmLoaderRustApiCallPlan.currentStage`. Fixed
+ * `"RustApiCallPlanning"`.
+ */
+export function loaderRustApiCallPlanCurrentStage(): "RustApiCallPlanning" {
+  return "RustApiCallPlanning";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Rust API Call Plan
+ * `nextRequiredCheck` field — the same answer as
+ * `FedosWasmLoaderRustApiCallPlan.nextRequiredCheck`. Fixed
+ * `"PrototypeExecutionReadiness"` — NAMES, without PERFORMING, a
+ * REVIEW of the now-complete Planning Chain a future, separate,
+ * explicitly-reviewed stage (Phase 021+) would need to perform — NOT
+ * an eighth internal Plan.
+ */
+export function loaderRustApiCallPlanNextRequiredCheck(): "PrototypeExecutionReadiness" {
+  return "PrototypeExecutionReadiness";
 }

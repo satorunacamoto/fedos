@@ -3232,6 +3232,98 @@ unimplemented; `"Allowed"`/`true` (for `shouldInstantiate`) never
 reached anywhere in this chain; Rust public API unchanged (27
 `pub fn`); no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 905: Prototype Phase 020, `planLoad()` builds an internal RUST API CALL PLAN — Planning Chain COMPLETE, still `BlockedByPolicy`, still `STOP`
+
+Stage 897 (the update above) made `planLoad()` build and confirm an
+internal WebAssembly Plan. Stage 905 inserts ONE more internal step,
+INSIDE the WebAssembly Plan's own `shouldInstantiate: false` branch —
+still without moving `STOP` and without calling any real Rust API.
+**This is the LAST link the Planning Chain adds** — the chain this
+whole document has extended one named-but-unperformed step at a time
+since Stage 841 (Prototype Phase 013) is now COMPLETE:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841/865/873/881/889/897
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan -> JS Glue Access Plan -> Generated Artifact Check Plan
+     -> Dev-only Gate Plan -> Import Plan -> WebAssembly Plan
+     |                                          <-- REAL, unchanged since Stage 817/833/841/865/873/881/889/897;
+     |                                              webAssemblyPlan.shouldInstantiate confirmed false, as always
+     v
+Rust API Call Plan                         <-- NEW Stage 905: #createRustApiCallPlan() builds a hand-fixed
+(inside planLoad(), no separate file;           FedosWasmLoaderRustApiCallPlan { backend: "Wasm", shouldCall:
+FedosWasmLoaderRustApiCallPlan type,            false, reason: "BlockedByWebAssemblyPlan", currentStage:
+"fedos_wasm_loader.ts", Stage 905)              "RustApiCallPlanning", nextRequiredCheck:
+     |                                          "PrototypeExecutionReadiness" } -- PURE, no re-call of
+     |                                          policy()/#createLoadPlan()/#createJsGlueAccessPlan()/
+     |                                          #createGeneratedArtifactCheckPlan()/#createDevOnlyGatePlan()/
+     |                                          #createImportPlan()/#createWebAssemblyPlan(), no argument,
+     |                                          no Rust API call of any kind, no #[wasm_bindgen], no
+     |                                          __wbg_init, no initSync. planLoad() then confirms
+     |                                          rustApiCallPlan.shouldCall -- ALWAYS false today, so this
+     |                                          EIGHTH, independent check is ALSO always taken. The Plan's
+     |                                          OWN fields are NEVER merged into planLoad()'s return value
+     |                                          below
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included
+     v
+STOP                                       <-- SAME position as the Stage 793/825/833/841/865/873/881/889/897
+                                                 diagrams above -- this stage does NOT call any Rust API,
+                                                 including version(); the Planning Chain STOPS here, by
+                                                 design, not by omission
+```
+
+**Naming the intent to call Rust is not calling it.** `shouldCall:
+false` records that a real Loader would eventually call a real Rust
+public function — without this stage ever calling one, referencing
+`#[wasm_bindgen]`, `__wbg_init`, or `initSync`. `nextRequiredCheck:
+"PrototypeExecutionReadiness"` deliberately does NOT name a ninth
+internal Plan — it names a REVIEW of the now-complete eight-Plan
+chain, which a future, separate, explicitly-reviewed stage (Phase
+021+) would need to perform before any of the eight `should*` fields
+could ever be allowed to answer `true`. `reason:
+"BlockedByWebAssemblyPlan"` is the ONE value this stage's fixed
+constant ever produces; `"PrototypeDisabled"`/`"RustApiUnavailable"`
+remain reserved, unreachable labels the type permits for a future
+stage that might defer the call for a different reason.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references the Rust API Call Plan
+directly or indirectly. `policy()` itself is unchanged and still never
+calls `planLoad()`, and `#createRustApiCallPlan()` calls nothing at
+all, so no cycle exists anywhere in this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the Rust API Call Plan is exposed
+only via standalone accessors on `fedos_wasm_loader.ts` itself
+(`loaderRustApiCallPlanCreated()`/`...ShouldCall()`/`...Backend()`/
+`...Reason()`/`...CurrentStage()`/`...NextRequiredCheck()`), matching
+this stage's "necessary minimum" scope.
+
+**Still true throughout Stage 905**: `src/worker.ts` UNMODIFIED and
+never references the Rust API Call Plan, `policy()`, `planLoad()`, or
+`initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`process.env`/`import.meta`/`NODE_ENV` read of any kind; no static
+`import` and no dynamic `import()` of the generated JS glue anywhere
+in this repository; no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind;
+no generated artifact existence check performed; no filesystem access
+of any kind; no generated file edited or committed; no Rust API call
+of any kind, no `#[wasm_bindgen]`, no `__wbg_init`; `encrypt`/`decrypt`
+unchanged, in Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double
+Ratchet, Triple Ratchet, and onion routing unimplemented; `"Allowed"`/
+`true` (for `shouldCall`) never reached anywhere in this chain; Rust
+public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
+dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
