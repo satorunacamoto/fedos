@@ -456,6 +456,17 @@
  * `loaderPlanReachedPolicy` (Stage 825), is UNCHANGED by this stage.
  * Fixed `true`. `worker_crypto_diagnostics.ts` is intentionally NOT
  * touched.
+ *
+ * Stage 841 (Prototype Phase 013) adds `loaderLoadPlanCreated`/
+ * `loaderLoadPlanAllowed`/`loaderLoadPlanShouldLoad`/
+ * `loaderLoadPlanBackend`, reading `fedos_wasm_loader.ts`'s (Stage 841)
+ * `loaderLoadPlanCreated()`/`loaderLoadPlanAllowed()`/
+ * `loaderLoadPlanShouldLoad()`/`loaderLoadPlanBackend()` — the internal
+ * Load Plan object `planLoad()` now builds and confirms before
+ * returning its own, unrelated `BlockedByPolicy` answer. Every
+ * pre-existing field above is UNCHANGED by this stage. Fixed
+ * `true`/`false`/`false`/`"Wasm"`. `worker_crypto_diagnostics.ts` is
+ * intentionally NOT touched.
  */
 
 import type {
@@ -530,6 +541,10 @@ import type {
 } from "./fedos_wasm_loader.js";
 import {
   loaderLoaded as fedosLoaderLoaded,
+  loaderLoadPlanAllowed as fedosLoaderLoadPlanAllowed,
+  loaderLoadPlanBackend as fedosLoaderLoadPlanBackend,
+  loaderLoadPlanCreated as fedosLoaderLoadPlanCreated,
+  loaderLoadPlanShouldLoad as fedosLoaderLoadPlanShouldLoad,
   loaderMode as fedosLoaderSkeletonMode,
   loaderPlanningDecision as fedosLoaderPlanningDecision,
   loaderPlanningState as fedosLoaderPlanningState,
@@ -1875,6 +1890,34 @@ export interface RuntimeCryptoActivationStatus {
    */
   readonly loaderPolicyEvaluated: boolean;
   /**
+   * Stage 841 (Prototype Phase 013) — whether `FedosWasmLoader.planLoad()`
+   * structurally creates an internal Load Plan object —
+   * `loaderLoadPlanCreated()`'s own answer
+   * (`src/runtime/fedos_wasm_loader.ts`, Stage 841). Fixed `true` in
+   * this stage: the Load Plan is built every time `policy.allowed`
+   * evaluates `false` (always, today), but its own fields are never
+   * merged into `planLoad()`'s return value.
+   */
+  readonly loaderLoadPlanCreated: boolean;
+  /**
+   * The Load Plan's own fixed `allowed` field —
+   * `loaderLoadPlanAllowed()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly loaderLoadPlanAllowed: boolean;
+  /**
+   * The Load Plan's own fixed `shouldLoad` field —
+   * `loaderLoadPlanShouldLoad()`'s own answer. Fixed `false` in this
+   * stage.
+   */
+  readonly loaderLoadPlanShouldLoad: boolean;
+  /**
+   * The Load Plan's own fixed `backend` field —
+   * `loaderLoadPlanBackend()`'s own answer. Fixed `"Wasm"` in this
+   * stage.
+   */
+  readonly loaderLoadPlanBackend: "Wasm";
+  /**
    * Stage 757 (Prototype Phase 005) — the Backend Interface's own
    * fixed coarse state — `cryptoBackendInterfaceState()`'s own answer
    * (`src/runtime/fedos_crypto_backend_interface.ts`, Stage 745/746).
@@ -2115,6 +2158,10 @@ export function runtimeCryptoActivationStatus(
     loaderPolicyReason: fedosLoaderPolicyReason(),
     loaderPlanReachedPolicy: fedosLoaderPlanReachedPolicy(),
     loaderPolicyEvaluated: fedosLoaderPolicyEvaluated(),
+    loaderLoadPlanCreated: fedosLoaderLoadPlanCreated(),
+    loaderLoadPlanAllowed: fedosLoaderLoadPlanAllowed(),
+    loaderLoadPlanShouldLoad: fedosLoaderLoadPlanShouldLoad(),
+    loaderLoadPlanBackend: fedosLoaderLoadPlanBackend(),
     cryptoBackendInterfaceState: fedosCryptoBackendInterfaceState(),
     cryptoBackendInterfaceReady: fedosCryptoBackendInterfaceReady(),
     cryptoBackendSelected: fedosCryptoBackendSelected(),

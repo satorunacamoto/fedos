@@ -2712,6 +2712,94 @@ Ratchet, and onion routing unimplemented; `"Allowed"` never reached
 anywhere in this chain; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 841–856: Prototype Phase 013, `planLoad()` builds an internal LOAD PLAN — still `BlockedByPolicy`, still `STOP`
+
+Stage 833 (the update immediately above) made `planLoad()` EVALUATE
+`policy()`'s answer. Stage 841 inserts one more internal step between
+that evaluation and the final answer: a LOAD PLAN object, confirmed
+before `planLoad()` returns — still without moving `STOP` and without
+proceeding to Load, Import, `WebAssembly`, or Rust:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833: still constructs a
+("fedos_wasm_loader.ts", Stage 489-492)         FedosWasmLoaderPlan and calls planImport() (Stage 503,
+     |                                          result discarded, unaffected by this stage)
+     v
+FedosWasmLoader.policy()                    <-- REAL, unchanged since Stage 817: fixed { allowed: false,
+("fedos_wasm_loader.ts", Stage 817,             decision: "BlockedByPolicy", reason: "PrototypePolicy" };
+reached since Stage 825, evaluated              #reachLoaderPolicy() returns this value (Stage 833),
+since Stage 833)                                called EXACTLY ONCE per planLoad() call (unchanged)
+     v
+Policy Evaluation                          <-- unchanged since Stage 833: `if (!policy.allowed) { ... }`;
+(inside planLoad(), no separate file)           allowed is permanently false, so this branch is ALWAYS taken
+     v
+Load Plan                                  <-- NEW Stage 841: #createLoadPlan() builds a hand-fixed
+(inside planLoad(), no separate file;           FedosWasmLoaderLoadPlan { allowed: false, shouldLoad:
+FedosWasmLoaderLoadPlan type,                   false, backend: "Wasm", reason: "BlockedByPolicy" } --
+"fedos_wasm_loader.ts", Stage 841)              PURE, no this.policy() call (policy() already ran once
+     |                                          above), no argument, no further reach. planLoad() then
+     |                                          confirms loadPlan.shouldLoad -- ALWAYS false today, so
+     |                                          this second, independent check is ALSO always taken. The
+     |                                          Load Plan's OWN fields are NEVER merged into planLoad()'s
+     |                                          return value below
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included: { operation: "load", state:
+     |                                          "BlockedByPolicy", policy: "FailClosed", reason: "..." }
+     v
+STOP                                       <-- SAME position as the Stage 793/825/833 diagrams above --
+                                                 this stage does NOT proceed to Load, Import, WebAssembly,
+                                                 or Rust; the generated JS glue, WebAssembly.instantiate/
+                                                 compile, initSync, the default init export, and static/
+                                                 dynamic import() of any kind ALL remain PROHIBITED and
+                                                 unreachable from this chain
+```
+
+**A Load Plan is not a load.** `FedosWasmLoaderLoadPlan` is an
+internal-only record `planLoad()` builds and reads from ITSELF — it is
+never part of the public `FedosWasmLoader` interface, never returned
+to any caller of `planLoad()`, and never merged into
+`FedosWasmLoaderDecision`'s own four fields
+(`operation`/`state`/`policy`/`reason`). Its `allowed`/`shouldLoad`
+fields are typed as the LITERAL `false` (not `boolean`) and `backend`/
+`reason` as the LITERAL `"Wasm"`/`"BlockedByPolicy"` — this Prototype
+stage can never construct any other value, by the type system's own
+construction, not merely by convention. The `shouldLoad: true` path
+(like the pre-existing `policy.allowed: true` path one level up) is a
+single reserved TODO comment, immediately followed by the SAME
+`#blocked("load")` fallback every other path already uses — so
+`planLoad()` stays fail-closed even if that TODO is never filled in.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references the Load Plan directly
+or indirectly. `policy()` itself is unchanged and still never calls
+`planLoad()`, and `#createLoadPlan()` calls nothing at all, so no
+cycle exists anywhere in this file.
+
+`src/runtime/runtime_crypto_diagnostics.ts` (Stage 841) reads
+`loaderLoadPlanCreated`/`loaderLoadPlanAllowed`/
+`loaderLoadPlanShouldLoad`/`loaderLoadPlanBackend` (fixed
+`true`/`false`/`false`/`"Wasm"`) for DISPLAY only —
+`worker_crypto_diagnostics.ts` is untouched by this addition.
+
+**Still true throughout Stage 841–856**: `src/worker.ts` UNMODIFIED and
+never references the Load Plan, `policy()`, `planLoad()`, or
+`initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no static `import` and no dynamic
+`import()` of the generated JS glue anywhere in this repository; no
+generated file edited or committed; `encrypt`/`decrypt` unchanged, in
+Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple
+Ratchet, and onion routing unimplemented; `"Allowed"` never reached
+anywhere in this chain; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
