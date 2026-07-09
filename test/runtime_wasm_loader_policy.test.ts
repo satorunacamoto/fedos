@@ -198,7 +198,12 @@ describe("FedOS WASM Loader gains a Loader Policy reader, independent of plannin
 
   it("9. no WebAssembly/generated JS glue/Rust reference of any kind, and no new import()/require() anywhere in the Loader source", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     // Stage 889's Import Plan legitimately names a future
     // "WebAssemblyPlanning" gate without implementing it, so this
     // checks for real API usage (a dot after the identifier), not the

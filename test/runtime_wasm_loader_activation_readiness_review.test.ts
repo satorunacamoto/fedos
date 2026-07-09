@@ -164,12 +164,19 @@ describe("FedOS WASM Loader Activation Readiness Review -- review only, no runti
     expect(workerDiagnosticsSource).not.toMatch(/loaderActivationReadiness|readinessReview|activationReadiness/i);
   });
 
-  it("12. fedos_wasm_loader.ts source is untouched by this stage -- same public surface, same single pre-existing import", () => {
+  it("12. fedos_wasm_loader.ts source is untouched by this stage -- same public surface; only the Stage 921 existence-check imports were ever added later", () => {
     const importLines = wasmLoaderSource
       .split("\n")
       .filter((line: string) => /^\s*import\s/.test(line));
-    expect(importLines.length).toBe(1);
-    expect(importLines[0]).toMatch(/fedos_wasm_loader_plan\.js/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than this
+    // Phase 014 review) legitimately adds two more imports
+    // (`node:fs`'s `existsSync`, `node:path`'s `join`) for its own
+    // narrowly-scoped existence check -- this stage (Phase 014) itself
+    // added none.
+    expect(importLines.length).toBe(3);
+    expect(importLines.some((line: string) => /fedos_wasm_loader_plan\.js/.test(line))).toBe(true);
+    expect(importLines.some((line: string) => /existsSync/.test(line) && /node:fs/.test(line))).toBe(true);
+    expect(importLines.some((line: string) => /\bjoin\b/.test(line) && /node:path/.test(line))).toBe(true);
 
     // The public FedosWasmLoader interface is still exactly these six members.
     expect(wasmLoaderSource).toMatch(/status\(\):\s*FedosWasmLoaderStatus/);

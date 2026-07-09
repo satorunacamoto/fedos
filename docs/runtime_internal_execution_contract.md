@@ -3324,6 +3324,111 @@ Ratchet, Triple Ratchet, and onion routing unimplemented; `"Allowed"`/
 public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 921: Prototype EXECUTION Phase 001, `planLoad()` performs a REAL Generated Artifact Check — Planning Chain intact, still `BlockedByPolicy`, still `STOP`
+
+Stage 913 (Prototype Phase 021, a docs-only review — no code change)
+confirmed the Planning Chain built across Stage 841–905 is COMPLETE
+and named **Generated Artifact Check** as the recommended first
+candidate for real execution. Stage 921 implements EXACTLY that
+candidate — the FIRST time this file performs a live, real
+computation rather than returning a hand-fixed constant:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841/865/873/881/889/897/905
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan -> JS Glue Access Plan -> Generated Artifact Check Plan
+     |                                          <-- REAL, unchanged; artifactCheckPlan.shouldCheck
+     |                                              confirmed false, as always
+     v
+Generated Artifact Check                   <-- NEW Stage 921: #checkGeneratedArtifacts() calls a
+(inside planLoad(), no separate file;           REAL, read-only existsSync() (node:fs) once per
+#checkGeneratedArtifacts()/                     FedosWasmLoaderGeneratedArtifactName
+#artifactFileExists(),                          ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm"),
+"fedos_wasm_loader.ts", Stage 921)              under process.cwd(). Returns
+     |                                          FedosWasmLoaderGeneratedArtifactCheckResult
+     |                                          { checkedArtifacts, missingArtifacts, artifactsExist } --
+     |                                          genuinely reflects live filesystem state, NOT a fixed
+     |                                          constant. Result stored on the instance
+     |                                          (#generatedArtifactCheckResult), readable via the new
+     |                                          PUBLIC generatedArtifactCheckResult() method -- but NEVER
+     |                                          read by any `if` condition below. Fail Closed even on
+     |                                          failure to check: any thrown error (including
+     |                                          existsSync/process being unavailable) resolves as "not
+     |                                          present," never as a thrown exception
+     v
+Dev-only Gate Plan -> Import Plan -> WebAssembly Plan -> Rust API Call Plan
+     |                                          <-- ALL SEVEN Plans still run, in the SAME order,
+     |                                              regardless of what the real check found
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included, REGARDLESS of whether the artifacts
+     |                                          are found or missing
+     v
+STOP                                       <-- SAME position as every prior diagram above -- this stage
+                                                 does NOT call import()/WebAssembly/Rust; only an
+                                                 existence check is real
+```
+
+**Execution, but only of an existence check.** `#checkGeneratedArtifacts()`
+NEVER reads a file's own bytes (no `readFileSync`/`statSync`), never
+calls `import()` (static or dynamic), never calls `require()`, never
+references `WebAssembly.instantiate`/`compile`/`new WebAssembly.Module`/
+`new WebAssembly.Instance`/`initSync`/`__wbg_init`, and never calls any
+Rust API (including `version()`). Finding the artifacts present does
+NOT flip `Import Plan.shouldImport`, `WebAssembly Plan.shouldInstantiate`,
+`Rust API Call Plan.shouldCall`, or any other Plan's own fixed `false`
+field — every one of the eight Fail Closed values from Stage 905's own
+list remains exactly as fixed as before. Verified directly: `planLoad()`
+returns the identical `BlockedByPolicy` answer whether `existsSync` is
+mocked to return `true` or `false`, or made to throw.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references
+`#checkGeneratedArtifacts()`/`generatedArtifactCheckResult()` directly
+or indirectly. `policy()` itself is unchanged and still never calls
+`planLoad()`, and `#checkGeneratedArtifacts()` calls nothing but
+`#artifactFileExists()`/`existsSync`, so no cycle exists anywhere in
+this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the check result is exposed only via
+the new `generatedArtifactCheckResult()` method and the standalone
+`loaderGeneratedArtifactCheckTargets()` accessor on
+`fedos_wasm_loader.ts` itself, matching this arc's "necessary minimum"
+scope.
+
+This project's `tsconfig.json` carries no `@types/node`
+(`package.json` unmodified for this stage), so the two Node built-ins
+this stage reads from (`node:fs`'s `existsSync`, `node:path`'s `join`)
+are individually type-suppressed with `// @ts-expect-error`, the same
+pattern this repository's own `?raw` test imports already use — both
+resolve and run correctly under this project's actual Node/Vitest
+runtime; only their TYPE information is unavailable.
+
+**Still true throughout Stage 921**: `src/worker.ts` UNMODIFIED and
+never references the Generated Artifact Check, `policy()`, `planLoad()`,
+or `initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`process.env`/`import.meta`/`NODE_ENV` read of any kind; no static
+`import` and no dynamic `import()` of the generated JS glue anywhere in
+this repository; no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind;
+no CONTENT-reading filesystem access of any kind (only a read-only
+existence check); no generated file edited or committed; no Rust API
+call of any kind, no `#[wasm_bindgen]`, no `__wbg_init`; `encrypt`/
+`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/NIP-59,
+Double Ratchet, Triple Ratchet, and onion routing unimplemented;
+`"Allowed"`/`true` (for `shouldImport`/`shouldInstantiate`/`shouldCall`)
+never reached anywhere in this chain, regardless of what the real
+existence check finds; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real

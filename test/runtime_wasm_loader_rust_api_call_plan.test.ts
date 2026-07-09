@@ -200,7 +200,12 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Rust API Ca
 
   it("12. no Rust API call exists anywhere in the Loader source, including version()", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     expect(codeOnly).not.toMatch(/\bversion\s*\(/);
     expect(codeOnly).not.toMatch(/#\[wasm_bindgen\]/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
@@ -222,9 +227,13 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Rust API Ca
     expect(codeOnly).not.toMatch(/new\s+WebAssembly\.Instance/);
   });
 
-  it("15. no filesystem access implementation exists anywhere in the Loader source", () => {
+  it("15. no CONTENT-reading filesystem access implementation exists anywhere in the Loader source", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).not.toMatch(/existsSync|readFileSync|statSync|fs\.\w+\(|node:fs/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately adds a read-only existsSync() existence
+    // check -- this checks for CONTENT-reading filesystem access
+    // (never permitted), not the narrowly-scoped existence check.
+    expect(codeOnly).not.toMatch(/readFileSync|statSync|readFile\(|readdirSync/);
     expect(codeOnly).not.toMatch(/fedos_generated_artifact_presence/);
   });
 

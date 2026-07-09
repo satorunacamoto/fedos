@@ -232,7 +232,12 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Load Plan, 
 
   it("18. no Rust reference anywhere in the Loader source; Rust public API unchanged (27 pub fn, none #[wasm_bindgen]-annotated)", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],

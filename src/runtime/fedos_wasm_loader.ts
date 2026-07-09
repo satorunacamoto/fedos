@@ -474,9 +474,73 @@
  * `planUnload()`/`planningState()`/`status()`, and every upstream
  * layer are UNCHANGED, and no cycle exists — `#createRustApiCallPlan()`
  * calls nothing at all.
+ *
+ * Stage 921 (Prototype EXECUTION Phase 001) is the FIRST controlled
+ * exception to this file's own Stage 489 HARD GUARDRAILS above ("None
+ * ever inspects `packages/fedos-core-rust/pkg/`, `import.meta`, the
+ * filesystem, or any environment variable") — narrowly and explicitly
+ * SCOPED to a live, read-only EXISTENCE check of exactly the two named
+ * Generated Artifact files
+ * (`FedosWasmLoaderGeneratedArtifactName` — `"fedos_core_rust.js"`/
+ * `"fedos_core_rust_bg.wasm"`, matching
+ * `docs/runtime_wasm_js_glue_contract.md`'s own observed
+ * `packages/fedos-core-rust/pkg/` shape). `docs/runtime_wasm_loader_execution_readiness_review.md`
+ * (Stage 913, Prototype Phase 021) named this EXACT check as the
+ * recommended first candidate for real execution — this stage
+ * implements ONLY that one candidate, nothing further. A new PRIVATE
+ * `#checkGeneratedArtifacts()` method calls `existsSync` (`node:fs`)
+ * on each of the two target paths under `process.cwd()` — the FIRST
+ * real (non-fixed-constant) computation this file has ever performed
+ * — and returns `FedosWasmLoaderGeneratedArtifactCheckResult`
+ * (`checkedArtifacts`/`missingArtifacts`/`artifactsExist`), wrapped in
+ * a try/catch that treats ANY failure to check (including `process`/
+ * `existsSync` being unavailable at all) as Fail Closed — a missing
+ * artifact, never a thrown exception. `planLoad()`'s flow calls it
+ * EXACTLY once, immediately after `artifactCheckPlan.shouldCheck` is
+ * confirmed `false` (the SAME position the Planning Chain's own
+ * `Generated Artifact Check Plan` already occupies) — the result is
+ * stored on the instance (`this.#generatedArtifactCheckResult`,
+ * readable via the new PUBLIC `generatedArtifactCheckResult()`
+ * method) but is NEVER read by any `if` condition in `planLoad()`:
+ * every pre-existing nested Plan (`Dev-only Gate Plan` through `Rust
+ * API Call Plan`) still runs in EXACTLY the same order as before, and
+ * `planLoad()` still ALWAYS returns the SAME `#blocked("load")`
+ * answer — `{ operation: "load", state: "BlockedByPolicy", policy:
+ * "FailClosed", reason: "..." }`, key order included — REGARDLESS of
+ * whether the artifacts are found or missing.
+ * `FedosWasmLoaderGeneratedArtifactCheckPlan.shouldCheck` (Stage 873)
+ * and every other Plan's own `should*` field remain fixed `false`,
+ * completely UNCHANGED and completely DECOUPLED from this real
+ * result — an artifact existing does NOT flip `shouldImport`,
+ * `shouldInstantiate`, or `shouldCall` to `true` anywhere in this
+ * file. This is EXECUTION, but only of an existence check — `import()`
+ * (static or dynamic), `require()`, reading or executing the
+ * generated JS glue's own bytes, `WebAssembly.instantiate`/`compile`,
+ * `new WebAssembly.Module`/`new WebAssembly.Instance`, `initSync`,
+ * `__wbg_init`, and any Rust API call (including `version()`) remain
+ * exactly as unimplemented and unreachable as every prior Prototype
+ * stage — `import()` itself stays entirely within `Import Plan`'s own
+ * (Stage 889) unchanged Planning territory.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
+// Stage 921 (Prototype EXECUTION Phase 001) -- the FIRST real (live)
+// filesystem read this file ever performs, narrowly scoped to a
+// read-only existence check of the two Generated Artifact files named
+// below. See this module's top-of-file "Stage 921" doc note.
+//
+// This project's tsconfig.json intentionally carries no `@types/node`
+// (`package.json` is not to be changed for this stage). Both Node
+// built-ins below resolve and run correctly under this project's
+// actual Node/Vitest runtime; only their TYPE information is missing,
+// so each import is individually suppressed the same way this
+// project's own `?raw` imports already are (see any `test/*.test.ts`
+// file's `// @ts-expect-error` comments for the established pattern).
+// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
+import { existsSync } from "node:fs";
+// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
+import { join } from "node:path";
+declare const process: { cwd(): string };
 
 /**
  * The loader's own coarse state. `"NotLoaded"` is the ONLY value this
@@ -743,6 +807,43 @@ export interface FedosWasmLoaderRustApiCallPlan {
 }
 
 /**
+ * Stage 921 (Prototype EXECUTION Phase 001) — the two Generated
+ * Artifact filenames a `FedosWasmLoaderGeneratedArtifactCheckResult`
+ * may name, matching `docs/runtime_wasm_js_glue_contract.md`'s own
+ * observed `packages/fedos-core-rust/pkg/` shape. Fixed, closed union
+ * — no other filename is ever checked.
+ */
+export type FedosWasmLoaderGeneratedArtifactName = "fedos_core_rust.js" | "fedos_core_rust_bg.wasm";
+
+/**
+ * Stage 921 (Prototype EXECUTION Phase 001) — the result of a REAL,
+ * live existence check of the two `FedosWasmLoaderGeneratedArtifactName`
+ * files. UNLIKE every Plan type above, this is NOT a hand-fixed
+ * constant: `missingArtifacts`/`artifactsExist` genuinely reflect
+ * `existsSync`'s own answer at the moment `#checkGeneratedArtifacts()`
+ * ran. Still carries no module bytes, no secret material, and no
+ * decision to import or instantiate anything — see this module's
+ * top-of-file "Stage 921" doc note for the full scope of what this
+ * check does and does not do.
+ */
+export interface FedosWasmLoaderGeneratedArtifactCheckResult {
+  readonly checkedArtifacts: readonly FedosWasmLoaderGeneratedArtifactName[];
+  readonly missingArtifacts: readonly FedosWasmLoaderGeneratedArtifactName[];
+  readonly artifactsExist: boolean;
+}
+
+/**
+ * Stage 921 (Prototype EXECUTION Phase 001) — the fixed, closed list
+ * of artifact names `#checkGeneratedArtifacts()` checks, in the
+ * SAME order every time. Pure, standalone, takes no argument; names
+ * WHAT is checked without performing the check itself.
+ */
+const GENERATED_ARTIFACT_NAMES: readonly FedosWasmLoaderGeneratedArtifactName[] = [
+  "fedos_core_rust.js",
+  "fedos_core_rust_bg.wasm",
+];
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -764,6 +865,15 @@ export interface FedosWasmLoader {
  * nothing: no file read, no module imported, no WASM instantiated.
  */
 export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
+  /**
+   * Stage 921 (Prototype EXECUTION Phase 001) — holds the most recent
+   * REAL Generated Artifact Check result `planLoad()` recorded, or
+   * `null` before `planLoad()` has ever been called on this instance.
+   * Read via `generatedArtifactCheckResult()`; never read by
+   * `planLoad()` itself once written.
+   */
+  #generatedArtifactCheckResult: FedosWasmLoaderGeneratedArtifactCheckResult | null = null;
+
   constructor() {
     // Does nothing: no file read, no module imported, no WASM instantiated.
   }
@@ -791,6 +901,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
           const artifactCheckPlan = this.#createGeneratedArtifactCheckPlan(); // 9. Generated Artifact Check Plan generated
           if (!artifactCheckPlan.shouldCheck) {
             // 10. Generated Artifact Check Plan's own result confirmed -- ALWAYS false today
+            // 10a. Stage 921 (Prototype EXECUTION Phase 001) -- the FIRST
+            // real (non-fixed-constant) check this file ever performs:
+            // a live, read-only existsSync() presence check of the two
+            // Generated Artifact files. The result is recorded on the
+            // instance for later inspection (generatedArtifactCheckResult())
+            // but is NEVER read by the `if` below or by any branch past
+            // it -- every remaining Plan still runs in the SAME order as
+            // before, and this call can never change which value
+            // planLoad() returns.
+            this.#generatedArtifactCheckResult = this.#checkGeneratedArtifacts();
             const devOnlyGatePlan = this.#createDevOnlyGatePlan(); // 12. Dev-only Gate Plan generated
             if (!devOnlyGatePlan.shouldEvaluate) {
               // 13. Dev-only Gate Plan's own result confirmed -- ALWAYS false today
@@ -922,6 +1042,18 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Stage 921 (Prototype EXECUTION Phase 001) — returns the most
+   * recent REAL Generated Artifact Check result recorded by
+   * `planLoad()`, or `null` if `planLoad()` has never been called on
+   * this instance. Reading this value NEVER triggers a new check —
+   * only `planLoad()`'s own call to `#checkGeneratedArtifacts()` ever
+   * does. Not part of the `FedosWasmLoader` interface.
+   */
+  generatedArtifactCheckResult(): FedosWasmLoaderGeneratedArtifactCheckResult | null {
+    return this.#generatedArtifactCheckResult;
+  }
+
+  /**
    * PRIVATE — builds a `FedosWasmLoaderPlan` and calls its
    * `planImport()`. The result is discarded; it is never passed to
    * `WebAssembly.instantiate`/`compile`, `initSync`/the default init
@@ -989,10 +1121,13 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * Plan. PURE: takes no argument, calls nothing (does NOT call
    * `this.policy()`/`this.#createLoadPlan()`/`this.#createJsGlueAccessPlan()`
    * again -- all three already ran exactly once earlier in
-   * `planLoad()`), and returns a hand-fixed constant. Never touches
-   * the filesystem, loads, imports, fetches, or instantiates anything;
-   * does NOT check whether the generated artifact exists (that
-   * remains this Plan's own named, not-yet-performed, future step).
+   * `planLoad()`), and returns a hand-fixed constant. THIS method
+   * itself never touches the filesystem and does not check whether
+   * the generated artifact exists -- `shouldCheck` stays fixed `false`
+   * regardless. Stage 921 (Prototype EXECUTION Phase 001) adds the
+   * REAL check as a separate step, `#checkGeneratedArtifacts()`,
+   * called by `planLoad()` immediately after THIS Plan is confirmed —
+   * see this module's top-of-file "Stage 921" doc note.
    */
   #createGeneratedArtifactCheckPlan(): FedosWasmLoaderGeneratedArtifactCheckPlan {
     return {
@@ -1002,6 +1137,45 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       currentStage: "GeneratedArtifactCheckPlanning",
       nextRequiredCheck: "DevOnlyGate",
     };
+  }
+
+  /**
+   * PRIVATE — Stage 921 (Prototype EXECUTION Phase 001). The FIRST
+   * real (non-fixed-constant) computation this file ever performs:
+   * checks whether each `GENERATED_ARTIFACT_NAMES` file exists under
+   * `packages/fedos-core-rust/pkg/` via `#artifactFileExists()`. Never
+   * reads a file's own bytes, never imports, never instantiates
+   * anything, never calls Rust. The RESULT of this check is recorded
+   * by the caller (`planLoad()`) but NEVER changes `shouldCheck`/
+   * `shouldEvaluate`/`shouldImport`/`shouldInstantiate`/`shouldCall`
+   * on any Plan above -- every one of those stays fixed `false`
+   * regardless of what this method finds.
+   */
+  #checkGeneratedArtifacts(): FedosWasmLoaderGeneratedArtifactCheckResult {
+    const checkedArtifacts = GENERATED_ARTIFACT_NAMES;
+    const missingArtifacts = checkedArtifacts.filter((name) => !this.#artifactFileExists(name));
+    return {
+      checkedArtifacts,
+      missingArtifacts,
+      artifactsExist: missingArtifacts.length === 0,
+    };
+  }
+
+  /**
+   * PRIVATE — Stage 921 (Prototype EXECUTION Phase 001). A single,
+   * read-only `existsSync` check of ONE Generated Artifact file, under
+   * `process.cwd()`. Never reads the file's own bytes (no
+   * `readFileSync`/`statSync`), never opens a handle, never writes.
+   * Fail Closed: ANY failure to check -- including `existsSync` or
+   * `process` being unavailable at all -- is treated as "not present",
+   * never thrown as an exception.
+   */
+  #artifactFileExists(name: FedosWasmLoaderGeneratedArtifactName): boolean {
+    try {
+      return existsSync(join(process.cwd(), "packages", "fedos-core-rust", "pkg", name));
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -1687,4 +1861,15 @@ export function loaderRustApiCallPlanCurrentStage(): "RustApiCallPlanning" {
  */
 export function loaderRustApiCallPlanNextRequiredCheck(): "PrototypeExecutionReadiness" {
   return "PrototypeExecutionReadiness";
+}
+
+/**
+ * Pure, standalone: Stage 921 (Prototype EXECUTION Phase 001) — the
+ * fixed, closed list of Generated Artifact filenames
+ * `#checkGeneratedArtifacts()` checks the existence of, in the SAME
+ * order every time. Names WHAT is checked; performs no check itself
+ * and reads no filesystem state.
+ */
+export function loaderGeneratedArtifactCheckTargets(): readonly FedosWasmLoaderGeneratedArtifactName[] {
+  return GENERATED_ARTIFACT_NAMES;
 }

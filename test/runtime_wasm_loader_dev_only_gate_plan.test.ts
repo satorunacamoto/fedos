@@ -288,11 +288,20 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Dev-only Ga
     expect(codeOnly).not.toMatch(/WebAssembly\./);
     expect(codeOnly).not.toMatch(/initSync/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     expect(codeOnly).not.toMatch(/#\[wasm_bindgen\]/);
     expect(codeOnly).not.toMatch(/create_runtime|AppRuntime/);
     expect(codeOnly).not.toMatch(/worker\.ts|src\/worker/);
-    expect(codeOnly).not.toMatch(/existsSync|readFileSync|statSync|fs\.\w+\(|node:fs/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately adds a read-only existsSync() existence
+    // check -- this checks for CONTENT-reading filesystem access
+    // (never permitted), not the narrowly-scoped existence check.
+    expect(codeOnly).not.toMatch(/readFileSync|statSync|readFile\(|readdirSync/);
     // Still only imports the pre-existing Loader Plan -- no new static import added.
     expect(codeOnly).not.toMatch(/fedos_wasm_loader_contract|fedos_wasm_artifact|fedos_wasm_boundary/);
     expect(codeOnly).not.toMatch(/fedos_generated_artifact_presence/);

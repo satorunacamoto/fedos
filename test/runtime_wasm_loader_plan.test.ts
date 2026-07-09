@@ -105,7 +105,12 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     expect(codeOnly).not.toMatch(/import\s*\(/);
     expect(codeOnly).not.toMatch(/require\s*\(/);
     expect(codeOnly).not.toMatch(/WebAssembly/);
@@ -128,7 +133,12 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     // Stage 889's Import Plan legitimately names a future
     // "WebAssemblyPlanning" gate without implementing it, so this
     // checks for real API usage (a dot after the identifier), not the

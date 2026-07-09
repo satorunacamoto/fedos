@@ -205,7 +205,12 @@ describe("WASM Backend Planning reaches the real FedosWasmLoader.planLoad(), sti
     const codeOnly = codeOnlyLines(wasmBackendSource);
     expect(codeOnly).not.toMatch(/fedos_wasm_loader_plan/);
     expect(codeOnly).not.toMatch(/fedos_wasm_loader_contract/);
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     expect(codeOnly).not.toMatch(/WebAssembly/);
     expect(codeOnly).not.toMatch(/instantiateStreaming/);
     expect(codeOnly).not.toMatch(/initSync/);
@@ -219,7 +224,12 @@ describe("WASM Backend Planning reaches the real FedosWasmLoader.planLoad(), sti
 
   it("8. the real FedosWasmLoader source itself is unchanged in behavior -- still no generated JS glue, WebAssembly, or Rust reference in code", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).not.toMatch(/fedos_core_rust/);
+    // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
+    // this one) legitimately names the two Generated Artifact
+    // filenames ("fedos_core_rust.js"/"fedos_core_rust_bg.wasm") to
+    // check their existence -- this checks for actual Rust
+    // crate/module USAGE, not that naming.
+    expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     // Stage 889's Import Plan legitimately names a future
     // "WebAssemblyPlanning" gate without implementing it, so this
     // checks for real API usage (a dot after the identifier), not the
