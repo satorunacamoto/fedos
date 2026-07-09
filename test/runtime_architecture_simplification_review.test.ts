@@ -86,15 +86,15 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     expect(minimumChainDocSource.length).toBeGreaterThan(1000);
   });
 
-  it("2. the fedos_*.ts file set is exactly the known forty-two, and the review doc names every one of them", () => {
+  it("2. the fedos_*.ts file set is the known forty-two THIS review's own Stage 777-792 scope covered, plus Stage 994's later, separate fedos_runtime_prototype_execution.ts (Prototype EXECUTION Phase 013) -- the review doc names every one of the original forty-two", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
     const names = Object.keys(files)
       .map((path) => path.split("/").pop() as string)
       .sort();
-    expect(names.length).toBe(42);
-    expect(names).toEqual(KNOWN_FEDOS_FILES);
+    expect(names.length).toBe(43);
+    expect(names).toEqual([...KNOWN_FEDOS_FILES, "fedos_runtime_prototype_execution.ts"].sort());
 
     for (const name of KNOWN_FEDOS_FILES) {
       expect(reviewDocSource).toMatch(new RegExp(name.replace(/\./g, "\\.")));

@@ -102,7 +102,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     expect(firstWiringPlanDocSource).toMatch(/prohibited|PROHIBITED/);
   });
 
-  it("9. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set is exactly the known forty-two (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward)", () => {
+  it("9. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set was exactly the known forty-two AS OF THIS stage's own scope (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward; Stage 994, Prototype EXECUTION Phase 013, later added a 43rd, fedos_runtime_prototype_execution.ts)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -155,8 +155,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(42);
-    expect(names).toEqual(knownNames);
+    expect(names.length).toBe(43);
+    expect(names).toEqual([...knownNames, "fedos_runtime_prototype_execution.ts"].sort());
   });
 
   it("10. Runtime remains unconnected -- create_runtime.ts references none of the twelve layers", () => {

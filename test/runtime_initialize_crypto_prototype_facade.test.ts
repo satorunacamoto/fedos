@@ -195,11 +195,11 @@ describe("FedOS Runtime initializeCrypto Prototype reaches the Crypto Loader Fac
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("13. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set is still exactly the known forty-two (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward)", () => {
+  it("13. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set was still exactly the known forty-two AS OF THIS stage's own scope (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward; Stage 994, Prototype EXECUTION Phase 013, later added a 43rd, fedos_runtime_prototype_execution.ts)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(42);
+    expect(Object.keys(files).length).toBe(43);
   });
 
   it("14. repeated calls stay identical, and multiple independent runtimes agree", () => {
