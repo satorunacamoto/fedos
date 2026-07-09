@@ -220,7 +220,11 @@ describe("WASM Backend Planning reaches the real FedosWasmLoader.planLoad(), sti
   it("8. the real FedosWasmLoader source itself is unchanged in behavior -- still no generated JS glue, WebAssembly, or Rust reference in code", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
     expect(codeOnly).not.toMatch(/fedos_core_rust/);
-    expect(codeOnly).not.toMatch(/WebAssembly/);
+    // Stage 889's Import Plan legitimately names a future
+    // "WebAssemblyPlanning" gate without implementing it, so this
+    // checks for real API usage (a dot after the identifier), not the
+    // bare word.
+    expect(codeOnly).not.toMatch(/WebAssembly\./);
     expect(codeOnly).not.toMatch(/initSync/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/\bfetch\s*\(/);

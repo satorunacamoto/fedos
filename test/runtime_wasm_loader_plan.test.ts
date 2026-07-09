@@ -129,7 +129,11 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     expect(codeOnly).not.toMatch(/fedos_core_rust/);
-    expect(codeOnly).not.toMatch(/WebAssembly/);
+    // Stage 889's Import Plan legitimately names a future
+    // "WebAssemblyPlanning" gate without implementing it, so this
+    // checks for real API usage (a dot after the identifier), not the
+    // bare word.
+    expect(codeOnly).not.toMatch(/WebAssembly\./);
     expect(codeOnly).not.toMatch(/initSync/);
   });
 

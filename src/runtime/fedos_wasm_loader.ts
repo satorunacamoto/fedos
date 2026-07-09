@@ -338,6 +338,50 @@
  * `planUnload()`/`planningState()`/`status()`, and every upstream layer
  * are UNCHANGED, and no cycle exists — `#createDevOnlyGatePlan()`
  * calls nothing at all.
+ *
+ * Stage 889 (Prototype Phase 018) adds an IMPORT PLAN object,
+ * `FedosWasmLoaderImportPlan` — a NEW, separately-named, hand-fixed
+ * record `{ backend: "Wasm", shouldImport: false, reason:
+ * "BlockedByDevOnlyGatePlan", currentStage: "ImportPlanning",
+ * nextRequiredCheck: "WebAssemblyPlanning" }`, built by a new PRIVATE
+ * `#createImportPlan()` method (no argument, calls nothing, returns a
+ * hand-fixed constant — mirrors `#createDevOnlyGatePlan()`'s own
+ * "pure, no re-fetch" discipline). `planLoad()`'s flow extends ONE
+ * step further, INSIDE the existing `if (!devOnlyGatePlan.shouldEvaluate)`
+ * branch: (15) build the Import Plan via `#createImportPlan()`, (16)
+ * confirm `importPlan.shouldImport`
+ * (`if (!importPlan.shouldImport)`, a SIXTH, independent check, ALSO
+ * always taken because `shouldImport` is fixed `false`), (17) return
+ * the SAME `#blocked("load")` answer as every prior stage.
+ * `planLoad()`'s own return value — `{ operation: "load", state:
+ * "BlockedByPolicy", policy: "FailClosed", reason: "..." }`, key order
+ * included — stays byte-for-byte unchanged; the Import Plan's OWN
+ * fields are never merged into it, it is not part of the public
+ * `FedosWasmLoader` interface, and it is never returned to any caller.
+ * `shouldImport: false` NAMES the future intent that a real Loader
+ * would eventually `import()` the generated JS glue WITHOUT
+ * performing any such import: this stage contains NO `import()`, NO
+ * dynamic `import()`, and does NOT load the generated JS glue —
+ * `shouldImport` is a hand-fixed constant, not a computed answer.
+ * `reason: "BlockedByDevOnlyGatePlan"` names WHY the import is not yet
+ * performed (the Dev-only Gate Plan one level up already said
+ * `shouldEvaluate: false`) — `"PrototypeDisabled"`/
+ * `"ImportUnavailable"` are the OTHER two labels the type permits but
+ * this stage's fixed constant never produces, reserved for a future
+ * stage that might defer the import for a different reason.
+ * `nextRequiredCheck: "WebAssemblyPlanning"` NAMES, without
+ * PERFORMING, the very next gate a future, separate,
+ * explicitly-reviewed stage would need to add — this stage does NOT
+ * call `import()`, does NOT reference `WebAssembly`, does NOT call
+ * `initSync`, and does NOT call Rust; all of that remains Phase
+ * 019+'s responsibility. The `shouldImport: true` path (like every
+ * fixed-`false` field above it) is a single reserved TODO comment,
+ * immediately followed by the SAME fail-closed fallback, so this
+ * function stays fail-closed no matter what any of the six objects
+ * ever answers. `policy()` itself, `planInitialize()`/`planUnload()`/
+ * `planningState()`/`status()`, and every upstream layer are
+ * UNCHANGED, and no cycle exists — `#createImportPlan()` calls nothing
+ * at all.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -527,6 +571,31 @@ export interface FedosWasmLoaderDevOnlyGatePlan {
 }
 
 /**
+ * Stage 889 — an internal-only IMPORT PLAN object `planLoad()` builds
+ * and confirms one step past the Dev-only Gate Plan, before returning
+ * its own, unrelated `FedosWasmLoaderDecision`. Names the FUTURE
+ * intent to `import()` the generated JS glue (`shouldImport`), WHY it
+ * cannot happen yet (`reason`), and WHAT gate comes after it
+ * (`nextRequiredCheck`) — without performing any of it: no `import()`
+ * (static or dynamic), no generated JS glue load, no `WebAssembly`
+ * reference, no Rust call. DELIBERATELY a separate shape from every
+ * other type in this file, and DELIBERATELY typed with literal
+ * `"Wasm"`/`false`/`"ImportPlanning"`/`"WebAssemblyPlanning"` values
+ * (plus a three-member `reason` union, only one member of which this
+ * Prototype stage ever actually produces) — see this module's
+ * top-of-file "Stage 889" doc note for why. Not part of the public
+ * `FedosWasmLoader` interface; never returned to a caller of
+ * `planLoad()` directly.
+ */
+export interface FedosWasmLoaderImportPlan {
+  readonly backend: "Wasm";
+  readonly shouldImport: false;
+  readonly reason: "BlockedByDevOnlyGatePlan" | "PrototypeDisabled" | "ImportUnavailable";
+  readonly currentStage: "ImportPlanning";
+  readonly nextRequiredCheck: "WebAssemblyPlanning";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -578,7 +647,20 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
             const devOnlyGatePlan = this.#createDevOnlyGatePlan(); // 12. Dev-only Gate Plan generated
             if (!devOnlyGatePlan.shouldEvaluate) {
               // 13. Dev-only Gate Plan's own result confirmed -- ALWAYS false today
-              return this.#blocked("load"); // 14. same BlockedByPolicy answer as every prior stage
+              const importPlan = this.#createImportPlan(); // 15. Import Plan generated
+              if (!importPlan.shouldImport) {
+                // 16. Import Plan's own result confirmed -- ALWAYS false today
+                return this.#blocked("load"); // 17. same BlockedByPolicy answer as every prior stage
+              }
+              // TODO(reserved for a future, separate, explicitly-reviewed stage):
+              // importPlan.shouldImport is permanently false in this
+              // Prototype stage (see FedosWasmLoaderImportPlan's own
+              // fixed shape above), so this line can never execute
+              // today. The real import() of the generated JS glue --
+              // including the WebAssembly Planning named in
+              // nextRequiredCheck -- belongs here -- NOT implemented in
+              // this stage.
+              return this.#blocked("load");
             }
             // TODO(reserved for a future, separate, explicitly-reviewed stage):
             // devOnlyGatePlan.shouldEvaluate is permanently false in
@@ -768,6 +850,30 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       reason: "BlockedByGeneratedArtifactCheckPlan",
       currentStage: "DevOnlyGatePlanning",
       nextRequiredCheck: "ImportPlanning",
+    };
+  }
+
+  /**
+   * PRIVATE — Stage 889. Builds the internal-only Import Plan
+   * `planLoad()` confirms one step past the Dev-only Gate Plan. PURE:
+   * takes no argument, calls nothing (does NOT call
+   * `this.policy()`/`this.#createLoadPlan()`/
+   * `this.#createJsGlueAccessPlan()`/`this.#createGeneratedArtifactCheckPlan()`/
+   * `this.#createDevOnlyGatePlan()` again -- all five already ran
+   * exactly once earlier in `planLoad()`), and returns a hand-fixed
+   * constant. Never calls `import()` (static or dynamic), never loads
+   * the generated JS glue, never references `WebAssembly`, never
+   * touches the filesystem, and never calls Rust; does NOT actually
+   * import anything (that remains this Plan's own named,
+   * not-yet-performed, future step).
+   */
+  #createImportPlan(): FedosWasmLoaderImportPlan {
+    return {
+      backend: "Wasm",
+      shouldImport: false,
+      reason: "BlockedByDevOnlyGatePlan",
+      currentStage: "ImportPlanning",
+      nextRequiredCheck: "WebAssemblyPlanning",
     };
   }
 
@@ -1146,4 +1252,71 @@ export function loaderDevOnlyGatePlanCurrentStage(): "DevOnlyGatePlanning" {
  */
 export function loaderDevOnlyGatePlanNextRequiredCheck(): "ImportPlanning" {
   return "ImportPlanning";
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally creates an
+ * Import Plan — Stage 889. Fixed `true`: `planLoad()`'s own
+ * `#createImportPlan()` call DOES run every time
+ * `devOnlyGatePlan.shouldEvaluate` evaluates `false` (which is always,
+ * today), even though the Plan's own fields are never merged into
+ * `planLoad()`'s return value.
+ */
+export function loaderImportPlanCreated(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Import Plan `shouldImport`
+ * field — the same answer as `FedosWasmLoaderImportPlan.shouldImport`.
+ * Fixed `false` — no parameter or override anywhere can flip it; no
+ * `import()` of any kind is ever performed to compute it.
+ */
+export function loaderImportPlanShouldImport(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Import Plan `backend`
+ * field — the same answer as `FedosWasmLoaderImportPlan.backend`.
+ * Fixed `"Wasm"`.
+ */
+export function loaderImportPlanBackend(): "Wasm" {
+  return "Wasm";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Import Plan `reason` field
+ * — the same answer as `FedosWasmLoaderImportPlan.reason`. Fixed
+ * `"BlockedByDevOnlyGatePlan"` — the Dev-only Gate Plan one level up
+ * already said `shouldEvaluate: false`; `"PrototypeDisabled"`/
+ * `"ImportUnavailable"` are the OTHER two labels the type permits but
+ * this stage never produces.
+ */
+export function loaderImportPlanReason():
+  | "BlockedByDevOnlyGatePlan"
+  | "PrototypeDisabled"
+  | "ImportUnavailable" {
+  return "BlockedByDevOnlyGatePlan";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Import Plan `currentStage`
+ * field — the same answer as
+ * `FedosWasmLoaderImportPlan.currentStage`. Fixed `"ImportPlanning"`.
+ */
+export function loaderImportPlanCurrentStage(): "ImportPlanning" {
+  return "ImportPlanning";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Import Plan
+ * `nextRequiredCheck` field — the same answer as
+ * `FedosWasmLoaderImportPlan.nextRequiredCheck`. Fixed
+ * `"WebAssemblyPlanning"` — NAMES, without PERFORMING, the very next
+ * gate a future, separate, explicitly-reviewed stage (Phase 019+)
+ * would need to add.
+ */
+export function loaderImportPlanNextRequiredCheck(): "WebAssemblyPlanning" {
+  return "WebAssemblyPlanning";
 }

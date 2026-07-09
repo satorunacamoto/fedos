@@ -3057,6 +3057,92 @@ Ratchet, Triple Ratchet, and onion routing unimplemented; `"Allowed"`/
 Rust public API unchanged (27 `pub fn`); no `Cargo.toml`/`package.json`
 dependency added.
 
+## Update — Stage 889: Prototype Phase 018, `planLoad()` builds an internal IMPORT PLAN — still `BlockedByPolicy`, still `STOP`
+
+Stage 881 (the update above) made `planLoad()` build and confirm an
+internal Dev-only Gate Plan. Stage 889 inserts ONE more internal step,
+INSIDE the Dev-only Gate Plan's own `shouldEvaluate: false` branch —
+still without moving `STOP` and without performing any real
+`import()`, `WebAssembly`, or Rust call:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841/865/873/881
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan -> JS Glue Access Plan -> Generated Artifact Check Plan
+     -> Dev-only Gate Plan                    <-- REAL, unchanged since Stage 817/833/841/865/873/881;
+     |                                            devOnlyGatePlan.shouldEvaluate confirmed false, as always
+     v
+Import Plan                                <-- NEW Stage 889: #createImportPlan() builds a hand-fixed
+(inside planLoad(), no separate file;           FedosWasmLoaderImportPlan { backend: "Wasm",
+FedosWasmLoaderImportPlan type,                 shouldImport: false, reason:
+"fedos_wasm_loader.ts", Stage 889)              "BlockedByDevOnlyGatePlan", currentStage:
+     |                                          "ImportPlanning", nextRequiredCheck:
+     |                                          "WebAssemblyPlanning" } -- PURE, no re-call of policy()/
+     |                                          #createLoadPlan()/#createJsGlueAccessPlan()/
+     |                                          #createGeneratedArtifactCheckPlan()/
+     |                                          #createDevOnlyGatePlan(), no argument, no import()
+     |                                          (static or dynamic) of any kind. planLoad() then
+     |                                          confirms importPlan.shouldImport -- ALWAYS false today,
+     |                                          so this SIXTH, independent check is ALSO always taken.
+     |                                          The Plan's OWN fields are NEVER merged into planLoad()'s
+     |                                          return value below
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included
+     v
+STOP                                       <-- SAME position as the Stage 793/825/833/841/865/873/881
+                                                 diagrams above -- this stage does NOT call import(),
+                                                 does NOT load the generated JS glue, does NOT reference
+                                                 WebAssembly, and does NOT call Rust; all of that remains
+                                                 Phase 019+'s responsibility
+```
+
+**Naming the intent to import is not importing.** `shouldImport:
+false` records that a real Loader would eventually `import()` the
+generated JS glue — without this stage ever calling `import()` in any
+form. `nextRequiredCheck: "WebAssemblyPlanning"` records WHAT gate a
+future, separate, explicitly-reviewed stage would need to add next —
+it does not perform it. `reason: "BlockedByDevOnlyGatePlan"` is the
+ONE value this stage's fixed constant ever produces;
+`"PrototypeDisabled"`/`"ImportUnavailable"` remain reserved,
+unreachable labels the type permits for a future stage that might
+defer the import for a different reason.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references the Import Plan
+directly or indirectly. `policy()` itself is unchanged and still never
+calls `planLoad()`, and `#createImportPlan()` calls nothing at all, so
+no cycle exists anywhere in this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the Import Plan is exposed only via
+standalone accessors on `fedos_wasm_loader.ts` itself
+(`loaderImportPlanCreated()`/`...ShouldImport()`/`...Backend()`/
+`...Reason()`/`...CurrentStage()`/`...NextRequiredCheck()`), matching
+this stage's "necessary minimum" scope.
+
+**Still true throughout Stage 889**: `src/worker.ts` UNMODIFIED and
+never references the Import Plan, `policy()`, `planLoad()`, or
+`initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`process.env`/`import.meta`/`NODE_ENV` read of any kind; no static
+`import` and no dynamic `import()` of the generated JS glue anywhere
+in this repository; no `WebAssembly.instantiate`/`compile`/
+`instantiateStreaming`/`initSync`/default-init reference of any kind;
+no generated artifact existence check performed; no filesystem access
+of any kind; no generated file edited or committed; `encrypt`/
+`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/NIP-59,
+Double Ratchet, Triple Ratchet, and onion routing unimplemented;
+`"Allowed"`/`true` (for `shouldImport`) never reached anywhere in this
+chain; Rust public API unchanged (27 `pub fn`); no
+`Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real

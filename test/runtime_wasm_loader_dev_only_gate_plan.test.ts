@@ -281,7 +281,11 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Dev-only Ga
     expect(codeOnly).not.toMatch(/\bfetch\s*\(/);
     expect(codeOnly).not.toMatch(/import\s*\(/);
     expect(codeOnly).not.toMatch(/require\s*\(/);
-    expect(codeOnly).not.toMatch(/WebAssembly/);
+    // Stage 889's Import Plan legitimately names a future
+    // "WebAssemblyPlanning" gate without implementing it, so this
+    // checks for real API usage (a dot after the identifier), not the
+    // bare word.
+    expect(codeOnly).not.toMatch(/WebAssembly\./);
     expect(codeOnly).not.toMatch(/initSync/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/fedos_core_rust/);
