@@ -3739,6 +3739,84 @@ TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple Ratchet, and
 onion routing unimplemented; Rust public API unchanged (27 `pub fn`);
 no `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 961: Prototype EXECUTION Phase 006, `attemptDevOnlyJsGlueImport()` RETAINS the imported module on success — `planLoad()` still byte-for-byte unchanged, still `BlockedByPolicy`
+
+Stage 945 (the update above) made `attemptDevOnlyJsGlueImport()`
+perform a REAL, gated `import()`, discarding the resolved module
+immediately. Stage 961 changes ONLY that one behavior — implementing
+Option B, the responsibility-separation recommendation
+`docs/runtime_wasm_loader_js_glue_import_result_review.md` (a
+docs-only review, Prototype EXECUTION Phase 005) made:
+
+```
+attemptDevOnlyJsGlueImport(): Promise<FedosWasmLoaderImportExecution>
+     |
+     v
+this.#importReadiness gate (UNCHANGED since Stage 945)
+     |
+     +-- null / ready:false  -> import() NEVER attempted;
+     |                          this.#jsGlueModule = null  <-- Stage 961: explicit Fail Closed
+     |
+     +-- ready:true          -> real import() attempted
+              |
+              +-- resolves     -> this.#jsGlueModule = <the resolved module>   <-- NEW Stage 961:
+              |                    RETAINED, opaque, NEVER inspected/destructured/called
+              |                    (Stage 945: was discarded here instead)
+              +-- throws/rejects -> this.#jsGlueModule = null  <-- Fail Closed
+     |
+     v
+Result stored on this.#importExecution (UNCHANGED since Stage 945); module readable via
+the new PUBLIC jsGlueModule() method
+```
+
+**Retention is opaque.** Neither `attemptDevOnlyJsGlueImport()` nor
+`jsGlueModule()` ever reads a property of the retained module,
+destructures it, or calls anything on it — it is stored and returned
+EXACTLY as `import()` resolved it. `WebAssembly.instantiate`/`compile`,
+`new WebAssembly.Module`/`new WebAssembly.Instance`, `initSync`,
+`__wbg_init`, and any Rust API call (including `version()`) remain
+exactly as unimplemented and unreachable as every prior Prototype
+stage.
+
+**A prior success is cleared by a later failure.** If a SAME instance
+calls `attemptDevOnlyJsGlueImport()` again after a successful
+retention, and the later call does NOT succeed, `this.#jsGlueModule`
+is reset to `null` — a stale retained module from an earlier success
+is never left behind by a later `NotReady`/`PrototypeStillClosed`/
+`ImportFailed` outcome.
+
+**`planLoad()` remains byte-for-byte unchanged.** This stage makes no
+change to `planLoad()`'s own body — exactly as Stage 945 left it. No
+new call is added inside it, and its own return value, key order
+included, is identical regardless of `jsGlueModule()`'s current value.
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references `jsGlueModule()`
+directly or indirectly.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the retained module is exposed only
+via the new `jsGlueModule()` method on `fedos_wasm_loader.ts` itself,
+matching this arc's "necessary minimum" scope.
+
+**Still true throughout Stage 961**: `src/worker.ts` UNMODIFIED and
+never references `jsGlueModule()`, `attemptDevOnlyJsGlueImport()`,
+`policy()`, `planLoad()`, or `initializeCrypto`; `fedos_wasm_backend.ts`/
+Backend Interface/Backend Abstraction/Backend Resolver/Facade/Runtime
+return values all UNCHANGED; no call-graph cycle exists anywhere in
+this repository; `planLoad()`'s own return value, key order included,
+is identical regardless of the retained module's presence; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no `#[wasm_bindgen]`/`__wbg_init`;
+no Rust API call of any kind, including `version()`; the retained
+module's own exports are never read anywhere; `encrypt`/`decrypt`
+unchanged, in Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet,
+Triple Ratchet, and onion routing unimplemented; Rust public API
+unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
+added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real
