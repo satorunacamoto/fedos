@@ -101,7 +101,11 @@ describe("FedOS WASM Loader Skeleton, planning only, fail-closed everywhere (Sta
     expect(codeOnly).not.toMatch(/instantiateStreaming/);
     expect(codeOnly).not.toMatch(/\bfs\./);
     expect(codeOnly).not.toMatch(/child_process/i);
-    expect(codeOnly).not.toMatch(/process\.env/);
+    // Stage 929 (Prototype EXECUTION Phase 002, a later stage than
+    // this one) legitimately reads process.env.NODE_ENV (and ONLY that
+    // one key) to evaluate the Dev-only Gate -- this checks for any
+    // OTHER process.env usage, not the narrowly-scoped NODE_ENV read.
+    expect(codeOnly).not.toMatch(/process\.env(?!\??\.NODE_ENV\b)/);
     // Deliberately unwired: no reference to the prior Loader Contract link or anything above it.
     expect(codeOnly).not.toMatch(/fedos_wasm_loader_contract/);
     expect(codeOnly).not.toMatch(/fedos_wasm_artifact/);

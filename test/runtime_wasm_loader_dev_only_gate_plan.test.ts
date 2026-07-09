@@ -182,9 +182,13 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Dev-only Ga
 
   it("12. no Development-judgement implementation exists: no process.env, import.meta, or NODE_ENV reference anywhere in the Loader source", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).not.toMatch(/process\.env/);
+    // Stage 929 (Prototype EXECUTION Phase 002, a later stage than
+    // this one) legitimately reads process.env.NODE_ENV (and ONLY
+    // that one key) to evaluate the Dev-only Gate -- this checks for
+    // any OTHER process.env usage and for import.meta (still fully
+    // forbidden), not the narrowly-scoped NODE_ENV read.
+    expect(codeOnly).not.toMatch(/process\.env(?!\??\.NODE_ENV\b)/);
     expect(codeOnly).not.toMatch(/import\.meta/);
-    expect(codeOnly).not.toMatch(/NODE_ENV/);
     expect(codeOnly).not.toMatch(/isDevelopment|isProduction|is_development|is_production/i);
   });
 

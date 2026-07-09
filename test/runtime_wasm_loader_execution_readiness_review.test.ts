@@ -227,9 +227,13 @@ describe("FedOS WASM Loader Execution Readiness Review -- review only, no runtim
     // check -- this checks for CONTENT-reading filesystem access
     // (never permitted), not the narrowly-scoped existence check.
     expect(codeOnly).not.toMatch(/readFileSync|statSync|readFile\(|readdirSync/);
-    expect(codeOnly).not.toMatch(/process\.env/);
+    // Stage 929 (Prototype EXECUTION Phase 002, a later stage than
+    // this one) legitimately reads process.env.NODE_ENV (and ONLY
+    // that one key) to evaluate the Dev-only Gate -- this checks for
+    // any OTHER process.env usage and for import.meta (still fully
+    // forbidden), not the narrowly-scoped NODE_ENV read.
+    expect(codeOnly).not.toMatch(/process\.env(?!\??\.NODE_ENV\b)/);
     expect(codeOnly).not.toMatch(/import\.meta/);
-    expect(codeOnly).not.toMatch(/NODE_ENV/);
   });
 
   it("15. no NIP-17/NIP-44/NIP-59/Double Ratchet/Triple Ratchet/onion routing is implemented or recommended for implementation", () => {

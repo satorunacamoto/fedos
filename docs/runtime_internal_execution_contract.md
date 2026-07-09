@@ -3429,6 +3429,104 @@ never reached anywhere in this chain, regardless of what the real
 existence check finds; Rust public API unchanged (27 `pub fn`); no
 `Cargo.toml`/`package.json` dependency added.
 
+## Update — Stage 929: Prototype EXECUTION Phase 002, `planLoad()` performs a REAL Dev-only Gate Evaluation — Planning Chain intact, still `BlockedByPolicy`, still `STOP`
+
+Stage 921 (the update above) made `planLoad()` perform a REAL Generated
+Artifact Check. Stage 929 inserts ONE more real step, INSIDE the
+Dev-only Gate Plan's own `shouldEvaluate: false` branch — still
+without moving `STOP`, without calling `import()`, and without
+granting import permission:
+
+```
+FedosWasmLoader.planLoad()                 <-- REAL, unchanged since Stage 793/825/833/841/865/873/881/889/897/905/921
+     |
+     v
+policy() -> Policy Evaluation -> Load Plan -> JS Glue Access Plan -> Generated Artifact Check Plan
+     -> Generated Artifact Check (REAL, Stage 921) -> Dev-only Gate Plan
+     |                                          <-- REAL, unchanged; devOnlyGatePlan.shouldEvaluate
+     |                                              confirmed false, as always
+     v
+Dev-only Gate Evaluation                   <-- NEW Stage 929: #evaluateDevOnlyGate() reads
+(inside planLoad(), no separate file;           process.env.NODE_ENV (the ONLY key read), under a
+#evaluateDevOnlyGate(),                         try/catch that Fails Closed on any read failure.
+"fedos_wasm_loader.ts", Stage 929)              Returns FedosWasmLoaderDevOnlyGateEvaluation
+     |                                          { evaluated, developmentAllowed, reason } --
+     |                                          genuinely reflects the live NODE_ENV value, NOT a
+     |                                          fixed constant. Result stored on the instance
+     |                                          (#devOnlyGateEvaluation), readable via the new
+     |                                          PUBLIC devOnlyGateEvaluation() method -- but NEVER
+     |                                          read by any `if` condition below
+     v
+Import Plan -> WebAssembly Plan -> Rust API Call Plan
+     |                                          <-- ALL THREE Plans still run, in the SAME order,
+     |                                              regardless of what the real evaluation found --
+     |                                              developmentAllowed: true does NOT flip
+     |                                              importPlan.shouldImport
+     v
+BlockedByPolicy                            <-- planLoad()'s OWN fixed answer, byte-for-byte UNCHANGED,
+     |                                          key order included, REGARDLESS of whether the
+     |                                          runtime evaluates as Development, Production, or
+     |                                          Unknown
+     v
+STOP                                       <-- SAME position as every prior diagram above -- this
+                                                 stage does NOT call import(); Development Runtime
+                                                 evaluation is NOT import permission
+```
+
+**Evaluating Development Runtime is not granting import permission.**
+`#evaluateDevOnlyGate()` NEVER calls `import()` (static or dynamic),
+NEVER calls `require()`, NEVER references `WebAssembly.instantiate`/
+`compile`/`new WebAssembly.Module`/`new WebAssembly.Instance`/
+`initSync`/`__wbg_init`, and NEVER calls any Rust API (including
+`version()`). Finding the runtime is Development does NOT flip
+`Import Plan.shouldImport`, `WebAssembly Plan.shouldInstantiate`,
+`Rust API Call Plan.shouldCall`, or any other Plan's own fixed `false`
+field. Verified directly: `planLoad()` returns the identical
+`BlockedByPolicy` answer whether `NODE_ENV` is `"development"`,
+`"production"`, unset, or an unrecognized value.
+
+**Nothing past the Loader is touched, and nothing new is reached.**
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references
+`#evaluateDevOnlyGate()`/`devOnlyGateEvaluation()` directly or
+indirectly. `policy()` itself is unchanged and still never calls
+`planLoad()`, and `#evaluateDevOnlyGate()` calls nothing but
+`process.env`, so no cycle exists anywhere in this file.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the evaluation result is exposed only
+via the new `devOnlyGateEvaluation()` method and the standalone
+`loaderDevOnlyGateEvaluationEnvKey()` accessor on `fedos_wasm_loader.ts`
+itself, matching this arc's "necessary minimum" scope.
+
+**No new Node dependency.** Stage 921's ambient `process` declaration
+(`{ cwd(): string }`) is extended with an optional `env` property on
+the SAME single declaration — no NEW `@ts-expect-error` suppression
+was added (still exactly two: `node:fs`'s `existsSync`, `node:path`'s
+`join`), and `package.json`/`Cargo.toml` remain untouched.
+
+**Still true throughout Stage 929**: `src/worker.ts` UNMODIFIED and
+never references the Dev-only Gate Evaluation, `policy()`, `planLoad()`,
+or `initializeCrypto`; `fedos_wasm_backend.ts`/Backend Interface/Backend
+Abstraction/Backend Resolver/Facade/Runtime return values all
+UNCHANGED; no call-graph cycle exists anywhere in this repository; no
+`process.env` key other than `NODE_ENV` read anywhere; no `import.meta`
+read of any kind; no static `import` and no dynamic `import()` of the
+generated JS glue anywhere in this repository; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming`/`initSync`/
+default-init reference of any kind; no CONTENT-reading filesystem
+access of any kind; no generated file edited or committed; no Rust API
+call of any kind, no `#[wasm_bindgen]`, no `__wbg_init`; `encrypt`/
+`decrypt` unchanged, in Rust or TypeScript; NIP-17/NIP-44/NIP-59,
+Double Ratchet, Triple Ratchet, and onion routing unimplemented;
+`"Allowed"`/`true` (for `shouldImport`/`shouldInstantiate`/`shouldCall`)
+never reached anywhere in this chain, regardless of what the real
+Dev-only Gate Evaluation finds; Rust public API unchanged (27
+`pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real

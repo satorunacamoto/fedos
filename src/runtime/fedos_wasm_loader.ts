@@ -521,6 +521,41 @@
  * exactly as unimplemented and unreachable as every prior Prototype
  * stage — `import()` itself stays entirely within `Import Plan`'s own
  * (Stage 889) unchanged Planning territory.
+ *
+ * Stage 929 (Prototype EXECUTION Phase 002) is the SECOND controlled
+ * exception to the Stage 489 HARD GUARDRAILS — one Planning Chain
+ * link further, past the Stage 921 existence check. A new PRIVATE
+ * `#evaluateDevOnlyGate()` method reads the SAME ambient `process.env`
+ * this file's "Stage 929" extension of the Stage 921 `process`
+ * declaration exposes (`NODE_ENV` only, nothing else), wrapped in a
+ * try/catch that treats ANY failure to read (including `process`/
+ * `process.env` being unavailable at all) as Fail Closed, and returns
+ * `FedosWasmLoaderDevOnlyGateEvaluation`
+ * (`evaluated`/`developmentAllowed`/`reason`) — the SECOND real
+ * (non-fixed-constant) computation this file has ever performed.
+ * `planLoad()`'s flow calls it EXACTLY once, immediately after
+ * `devOnlyGatePlan.shouldEvaluate` is confirmed `false` (the SAME
+ * position the Planning Chain's own `Dev-only Gate Plan` already
+ * occupies) — the result is stored on the instance
+ * (`this.#devOnlyGateEvaluation`, readable via the new PUBLIC
+ * `devOnlyGateEvaluation()` method) but is NEVER read by any `if`
+ * condition in `planLoad()`: `Import Plan`/`WebAssembly Plan`/`Rust
+ * API Call Plan` still run in EXACTLY the same order as before, and
+ * `planLoad()` still ALWAYS returns the SAME `#blocked("load")`
+ * answer, REGARDLESS of whether the runtime evaluates as Development,
+ * Production, or Unknown. **Evaluating Development Runtime is not
+ * granting import permission.** `FedosWasmLoaderImportPlan.shouldImport`
+ * (Stage 889) and every other Plan's own `should*` field remain fixed
+ * `false`, completely UNCHANGED and completely DECOUPLED from this
+ * real result — `developmentAllowed: true` does NOT flip
+ * `shouldImport`, `shouldInstantiate`, or `shouldCall` to `true`
+ * anywhere in this file. This is EXECUTION, but only of a read-only
+ * runtime-kind evaluation — `import()` (static or dynamic),
+ * `require()`, reading or executing the generated JS glue's own
+ * bytes, `WebAssembly.instantiate`/`compile`, `new WebAssembly.Module`/
+ * `new WebAssembly.Instance`, `initSync`, `__wbg_init`, and any Rust
+ * API call (including `version()`) remain exactly as unimplemented
+ * and unreachable as every prior Prototype stage.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -540,7 +575,10 @@ import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
 import { existsSync } from "node:fs";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-declare const process: { cwd(): string };
+// Stage 929 (Prototype EXECUTION Phase 002) extends this SAME ambient
+// declaration with `env` -- no NEW `@ts-expect-error` suppression is
+// added, and no new Node/package dependency of any kind.
+declare const process: { cwd(): string; env?: { readonly NODE_ENV?: string } };
 
 /**
  * The loader's own coarse state. `"NotLoaded"` is the ONLY value this
@@ -844,6 +882,22 @@ const GENERATED_ARTIFACT_NAMES: readonly FedosWasmLoaderGeneratedArtifactName[] 
 ];
 
 /**
+ * Stage 929 (Prototype EXECUTION Phase 002) — the result of a REAL,
+ * live Development Runtime evaluation. UNLIKE every Plan type above,
+ * this is NOT a hand-fixed constant: `developmentAllowed`/`reason`
+ * genuinely reflect `process.env.NODE_ENV`'s own value at the moment
+ * `#evaluateDevOnlyGate()` ran. `developmentAllowed: true` NAMES the
+ * evaluation's own finding — it is NEVER read by `planLoad()`'s `if`
+ * conditions and NEVER grants import permission; see this module's
+ * top-of-file "Stage 929" doc note.
+ */
+export interface FedosWasmLoaderDevOnlyGateEvaluation {
+  readonly evaluated: true;
+  readonly developmentAllowed: boolean;
+  readonly reason: "DevelopmentRuntime" | "ProductionRuntime" | "UnknownRuntime" | "PrototypeStillClosed";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -873,6 +927,15 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * `planLoad()` itself once written.
    */
   #generatedArtifactCheckResult: FedosWasmLoaderGeneratedArtifactCheckResult | null = null;
+
+  /**
+   * Stage 929 (Prototype EXECUTION Phase 002) — holds the most recent
+   * REAL Dev-only Gate Evaluation `planLoad()` recorded, or `null`
+   * before `planLoad()` has ever been called on this instance. Read
+   * via `devOnlyGateEvaluation()`; never read by `planLoad()` itself
+   * once written.
+   */
+  #devOnlyGateEvaluation: FedosWasmLoaderDevOnlyGateEvaluation | null = null;
 
   constructor() {
     // Does nothing: no file read, no module imported, no WASM instantiated.
@@ -914,6 +977,17 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
             const devOnlyGatePlan = this.#createDevOnlyGatePlan(); // 12. Dev-only Gate Plan generated
             if (!devOnlyGatePlan.shouldEvaluate) {
               // 13. Dev-only Gate Plan's own result confirmed -- ALWAYS false today
+              // 13a. Stage 929 (Prototype EXECUTION Phase 002) -- the SECOND
+              // real (non-fixed-constant) check this file ever performs:
+              // reads process.env.NODE_ENV to classify the current runtime.
+              // The result is recorded on the instance for later inspection
+              // (devOnlyGateEvaluation()) but is NEVER read by the `if`
+              // below or by any branch past it -- Import Plan/WebAssembly
+              // Plan/Rust API Call Plan still run in the SAME order as
+              // before, and this call can never change which value
+              // planLoad() returns. Evaluating Development Runtime is NOT
+              // import permission.
+              this.#devOnlyGateEvaluation = this.#evaluateDevOnlyGate();
               const importPlan = this.#createImportPlan(); // 15. Import Plan generated
               if (!importPlan.shouldImport) {
                 // 16. Import Plan's own result confirmed -- ALWAYS false today
@@ -1051,6 +1125,18 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   generatedArtifactCheckResult(): FedosWasmLoaderGeneratedArtifactCheckResult | null {
     return this.#generatedArtifactCheckResult;
+  }
+
+  /**
+   * Stage 929 (Prototype EXECUTION Phase 002) — returns the most
+   * recent REAL Dev-only Gate Evaluation recorded by `planLoad()`, or
+   * `null` if `planLoad()` has never been called on this instance.
+   * Reading this value NEVER triggers a new evaluation — only
+   * `planLoad()`'s own call to `#evaluateDevOnlyGate()` ever does. Not
+   * part of the `FedosWasmLoader` interface.
+   */
+  devOnlyGateEvaluation(): FedosWasmLoaderDevOnlyGateEvaluation | null {
+    return this.#devOnlyGateEvaluation;
   }
 
   /**
@@ -1199,6 +1285,38 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       currentStage: "DevOnlyGatePlanning",
       nextRequiredCheck: "ImportPlanning",
     };
+  }
+
+  /**
+   * PRIVATE — Stage 929 (Prototype EXECUTION Phase 002). The SECOND
+   * real (non-fixed-constant) computation this file ever performs:
+   * reads `process.env.NODE_ENV` (the ONLY environment value this
+   * method ever reads) to classify the current runtime as
+   * Development/Production/Unknown. Never reads any other
+   * `process.env` key, never reads `import.meta`, never touches the
+   * filesystem, never imports, never instantiates anything, never
+   * calls Rust. The RESULT of this evaluation is recorded by the
+   * caller (`planLoad()`) but NEVER changes `shouldEvaluate`/
+   * `shouldImport`/`shouldInstantiate`/`shouldCall` on any Plan above
+   * -- every one of those stays fixed `false` regardless of what this
+   * method finds. Fail Closed: ANY failure to evaluate -- including
+   * `process`/`process.env` being unavailable at all -- resolves as
+   * `"PrototypeStillClosed"`/`developmentAllowed: false`, never thrown
+   * as an exception.
+   */
+  #evaluateDevOnlyGate(): FedosWasmLoaderDevOnlyGateEvaluation {
+    try {
+      const nodeEnv = process.env?.NODE_ENV;
+      if (nodeEnv === "development") {
+        return { evaluated: true, developmentAllowed: true, reason: "DevelopmentRuntime" };
+      }
+      if (nodeEnv === "production") {
+        return { evaluated: true, developmentAllowed: false, reason: "ProductionRuntime" };
+      }
+      return { evaluated: true, developmentAllowed: false, reason: "UnknownRuntime" };
+    } catch {
+      return { evaluated: true, developmentAllowed: false, reason: "PrototypeStillClosed" };
+    }
   }
 
   /**
@@ -1872,4 +1990,14 @@ export function loaderRustApiCallPlanNextRequiredCheck(): "PrototypeExecutionRea
  */
 export function loaderGeneratedArtifactCheckTargets(): readonly FedosWasmLoaderGeneratedArtifactName[] {
   return GENERATED_ARTIFACT_NAMES;
+}
+
+/**
+ * Pure, standalone: Stage 929 (Prototype EXECUTION Phase 002) — the
+ * fixed, single environment variable key `#evaluateDevOnlyGate()`
+ * reads (`"NODE_ENV"`, and nothing else). Names WHAT is read;
+ * performs no read itself.
+ */
+export function loaderDevOnlyGateEvaluationEnvKey(): "NODE_ENV" {
+  return "NODE_ENV";
 }
