@@ -174,7 +174,7 @@ describe("FedOS Rust invocation adapter, blocked before Rust execution (Stage 36
 
   it("18. Rust pub fn count is unchanged -- 27", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(29);
+    expect(pubFnNames.length).toBe(30);
   });
 
   it("19. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is unchanged -- still fixed false", () => {

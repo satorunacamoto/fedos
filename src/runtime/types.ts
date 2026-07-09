@@ -511,4 +511,27 @@ export interface AppRuntime {
    * `docs/secure_runtime_alpha_008_random_bytes.md`.
    */
   readonly randomBytes: () => Promise<Uint8Array | null>;
+  /**
+   * Stage 1005 (Secure Runtime Alpha 010) — the SECOND public Crypto
+   * API Runtime exposes, mirroring `randomBytes` (Stage 1004) exactly.
+   * Internally calls `attemptDevOnlyRuntimeAeadKeyGeneration()`
+   * (`fedos_runtime_aead_key_generation.ts`, Stage 1005) exactly once,
+   * which drives a FRESH `FedosWasmLoader` through the SAME
+   * six-condition chain, then calls the Rust Boundary's
+   * `generate_aead_key_32()` — a thin wrapper around the pre-existing,
+   * unchanged `fedos_generate_aead_key_32()`. Fail Closed: resolves
+   * `null` whenever any of the Loader's own six conditions is unmet,
+   * the export is absent, the call throws, or Rust itself reports
+   * `EntropySourceUnavailable` — NEVER a partial/zeroed/degraded
+   * result, and NEVER an exception escaping this field.
+   * **ALPHA-LIMITED**: returns the generated key's raw 32 bytes, NOT an
+   * opaque key handle, and is NOT Secure Storage — this field retains
+   * no copy of any key beyond one call's own `await` chain. A future
+   * arc is expected to replace this raw-bytes shape with an opaque key
+   * handle before `encrypt()`/`decrypt()` are implemented. Deliberately
+   * separate from `initializeCrypto`/`runtimeCapabilities`/`randomBytes`
+   * above, all UNCHANGED by this stage. See
+   * `docs/secure_runtime_alpha_010_aead_key_generation.md`.
+   */
+  readonly generateAeadKey: () => Promise<Uint8Array | null>;
 }

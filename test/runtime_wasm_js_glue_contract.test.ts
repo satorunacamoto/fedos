@@ -208,8 +208,8 @@ describe("FedOS generated JS glue contract, observed only, never imported/execut
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(29);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(2);
+    expect(pubFnNames.length).toBe(30);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(3);
 
     const cargoCode = cargoTomlSource
       .split("\n")

@@ -60,6 +60,19 @@
  * chain and calls the Rust Boundary's own thin, non-cryptographic
  * wrapper export. No Worker/Production connection, no Secure Storage
  * of any kind, no new build dependency of any kind.
+ *
+ * Stage 1005 (Secure Runtime Alpha 010) adds `generateAeadKey`
+ * (`generateAeadKey()`, `fedos_runtime_aead_key_generation.ts`, Stage
+ * 1005) to the assembled `AppRuntime` — the SECOND public Crypto API,
+ * mirroring `randomBytes`'s own four-layer reach exactly. It is a
+ * FOURTH, entirely separate field alongside `initializeCrypto`/
+ * `runtimeCapabilities`/`randomBytes` — none of which is modified,
+ * called, or read by this new field's own implementation.
+ * `generateAeadKey()` internally drives its own fresh `FedosWasmLoader`
+ * through the SAME six-condition chain and calls the Rust Boundary's
+ * own thin wrapper export. ALPHA-LIMITED: returns raw key bytes, not
+ * an opaque handle; no Worker/Production connection, no Secure Storage
+ * of any kind, no new build dependency of any kind.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -137,6 +150,7 @@ import { buildRuntimeCryptoProvider } from "./runtime_crypto_bridge.js";
 import { createCryptoLoaderFacade } from "./fedos_crypto_loader_facade.js";
 import { runtimeCapabilities } from "./fedos_runtime_prototype_execution.js";
 import { randomBytes } from "./fedos_runtime_random_bytes.js";
+import { generateAeadKey } from "./fedos_runtime_aead_key_generation.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -715,5 +729,6 @@ export function createRuntime(
     initializeCrypto: createRuntimeInitializeCryptoResult,
     runtimeCapabilities,
     randomBytes,
+    generateAeadKey,
   };
 }

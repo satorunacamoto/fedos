@@ -208,7 +208,7 @@ describe("FedOS WASM boundary, not loaded, fail-closed everywhere (Stage 385-392
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(29);
+    expect(pubFnNames.length).toBe(30);
   });
 
   it("23. diagnostics expose wasmBoundaryState/wasmBoundaryReachable/wasmLoaded without constructing an instance", () => {

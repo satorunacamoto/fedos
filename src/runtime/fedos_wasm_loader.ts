@@ -1238,6 +1238,36 @@ export interface FedosWasmLoaderRandomBytesExecution {
 }
 
 /**
+ * Stage 1005 (Secure Runtime Alpha 010) — the result of a REAL attempt
+ * (or deliberate non-attempt) to call the retained JS glue module's own
+ * `generate_aead_key_32` property as a function, with NO argument.
+ * Mirrors `FedosWasmLoaderRandomBytesExecution` (Stage 1004) exactly,
+ * one field for one Rust Boundary export. `keyBytes` is the
+ * `Uint8Array` returned by `module.generate_aead_key_32()` on success,
+ * or `null` on every other outcome (including a genuine, in-bounds
+ * `undefined` return from Rust itself, which maps to `reason:
+ * "EntropySourceUnavailable"` — Fail Closed, not an error) — NEVER any
+ * other value type, and NEVER the module or any Rust object itself.
+ * `succeeded: true` NAMES that the call resolved a `Uint8Array` — it is
+ * NEVER read by `planLoad()`'s `if` conditions (which this stage does
+ * not touch at all), never read by
+ * `initializeCrypto()`/`runtimeCapabilities()`/`randomBytes()`, and
+ * never surfaced in Runtime/Worker diagnostics.
+ */
+export interface FedosWasmLoaderAeadKeyGenerationExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly keyBytes: Uint8Array | null;
+  readonly reason:
+    | "Succeeded"
+    | "EntropySourceUnavailable"
+    | "NotInitialized"
+    | "KeyGenerationUnavailable"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
@@ -1355,6 +1385,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * not reference this field at all.
    */
   #randomBytesExecution: FedosWasmLoaderRandomBytesExecution | null = null;
+
+  /**
+   * Stage 1005 (Secure Runtime Alpha 010) — holds the most recent REAL
+   * Rust `generate_aead_key_32()` call result recorded by
+   * `attemptDevOnlyAeadKeyGenerationCall()`, or `null` before that
+   * method has ever been called on this instance. Read via
+   * `aeadKeyGenerationExecution()`; NEVER read by `planLoad()`, which
+   * does not reference this field at all.
+   */
+  #aeadKeyGenerationExecution: FedosWasmLoaderAeadKeyGenerationExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -1689,6 +1729,17 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Stage 1005 (Secure Runtime Alpha 010) — returns the most recent
+   * REAL Rust `generate_aead_key_32()` call result recorded by
+   * `attemptDevOnlyAeadKeyGenerationCall()`, or `null` if that method
+   * has never been called on this instance. Reading this value NEVER
+   * triggers a new call. Not part of the `FedosWasmLoader` interface.
+   */
+  aeadKeyGenerationExecution(): FedosWasmLoaderAeadKeyGenerationExecution | null {
+    return this.#aeadKeyGenerationExecution;
+  }
+
+  /**
    * Stage 945 (Prototype EXECUTION Phase 004) — PUBLIC, ASYNC (the
    * FIRST async method this class exposes; `planLoad()` itself is
    * UNCHANGED and does NOT call this method). Reads
@@ -1982,6 +2033,90 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#randomBytesExecution = result;
+    return result;
+  }
+
+  /**
+   * Stage 1005 (Secure Runtime Alpha 010) — PUBLIC, ASYNC. Mirrors
+   * `attemptDevOnlyRandomBytesCall()` (Stage 1004) exactly, gated on
+   * the SAME six previously-recorded conditions
+   * (`this.#generatedArtifactCheckResult`, `this.#devOnlyGateEvaluation`,
+   * `this.#importReadiness`, `this.#importExecution`,
+   * `this.#jsGlueModule !== null`, and
+   * `this.#wasmInitialization.succeeded`) — every one populated by an
+   * EARLIER method call, never re-evaluated here:
+   *   - Any of the six missing entirely (`null`): `module.generate_aead_key_32`
+   *     is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, keyBytes: null, reason:
+   *     "PrototypeStillClosed" }`.
+   *   - All six present but at least one condition unmet:
+   *     `module.generate_aead_key_32` is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, keyBytes: null, reason:
+   *     "NotInitialized" }`.
+   *   - All six satisfied: checks, AT RUNTIME, ONLY
+   *     `typeof module.generate_aead_key_32 === "function"` — no
+   *     export-list enumeration or discovery of any kind. Absent:
+   *     resolves `{ attempted: true, succeeded: false, keyBytes: null,
+   *     reason: "KeyGenerationUnavailable" }`. Present: calls
+   *     `module.generate_aead_key_32()` with NO argument, wrapped in
+   *     `try`/`catch` that Fails Closed to `{ attempted: true,
+   *     succeeded: false, keyBytes: null, reason: "CallFailed" }` on
+   *     ANY thrown/rejected error OR a non-`Uint8Array`/non-`undefined`
+   *     return value. A genuine `undefined` return (Rust's own Fail
+   *     Closed on `EntropySourceUnavailable`) resolves
+   *     `{ attempted: true, succeeded: false, keyBytes: null, reason:
+   *     "EntropySourceUnavailable" }` — NOT `"CallFailed"`, since
+   *     nothing threw. On a genuine `Uint8Array` return: resolves
+   *     `{ attempted: true, succeeded: true, keyBytes: <Uint8Array>,
+   *     reason: "Succeeded" }`.
+   * Never inspects, destructures, or retains the module or any other
+   * Rust object — only the returned `Uint8Array` (or `null`) is ever
+   * stored, on `this.#aeadKeyGenerationExecution`, readable via the new
+   * PUBLIC `aeadKeyGenerationExecution()` method. Never calls any Rust
+   * API other than `generate_aead_key_32()` — no `encrypt`/`decrypt`/
+   * `deriveKey`/`randomBytes`/any other export. Called by NOTHING else
+   * in this file.
+   */
+  async attemptDevOnlyAeadKeyGenerationCall(): Promise<FedosWasmLoaderAeadKeyGenerationExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderAeadKeyGenerationExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, keyBytes: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, keyBytes: null, reason: "NotInitialized" };
+    } else {
+      const candidate = module as { generate_aead_key_32?: unknown };
+      if (typeof candidate.generate_aead_key_32 !== "function") {
+        result = { attempted: true, succeeded: false, keyBytes: null, reason: "KeyGenerationUnavailable" };
+      } else {
+        try {
+          const value: unknown = (candidate.generate_aead_key_32 as () => unknown)();
+          if (value instanceof Uint8Array) {
+            result = { attempted: true, succeeded: true, keyBytes: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, keyBytes: null, reason: "EntropySourceUnavailable" };
+          } else {
+            result = { attempted: true, succeeded: false, keyBytes: null, reason: "CallFailed" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, keyBytes: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#aeadKeyGenerationExecution = result;
     return result;
   }
 

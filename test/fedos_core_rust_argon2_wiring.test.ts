@@ -164,8 +164,9 @@ describe("FedOS Rust crate — RFC 9106 Argon2id vectors wired to cargo test", (
       "fedos_generate_aead_key_32",
       "version",
       "random_bytes_32",
+      "generate_aead_key_32",
     ];
-    expect(pubFnNames.length).toBe(29);
+    expect(pubFnNames.length).toBe(30);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
     // The #[cfg(test)] module's own test/helper functions are not `pub`.
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+rfc9106/);

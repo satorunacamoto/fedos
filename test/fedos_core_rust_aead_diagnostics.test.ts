@@ -72,7 +72,7 @@ describe("FedOS Rust crate — AEAD diagnostics preview (Stage 155)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(29);
+    expect(pubFnNames.length).toBe(30);
     expect(pubFnNames).not.toContain("aead_diagnostics_preview");
   });
 

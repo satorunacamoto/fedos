@@ -132,7 +132,7 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     expect(secretHandleModule).not.toMatch(/\bpub\s+fn\b/);
   });
 
-  it("8. SecretHandle's impl block exposes exactly the nine expected pub(crate) methods (Stage 147 adds expose_bytes_for_internal_derivation; Stage 152–154 adds expose_bytes_for_internal_aead; Stage 199 adds expose_bytes_for_internal_ecdh), no tenth raw-byte accessor", () => {
+  it("8. SecretHandle's impl block exposes exactly the ten expected pub(crate) methods (Stage 147 adds expose_bytes_for_internal_derivation; Stage 152–154 adds expose_bytes_for_internal_aead; Stage 199 adds expose_bytes_for_internal_ecdh; Stage 1005, Secure Runtime Alpha 010, adds expose_bytes_for_internal_wasm_export), no eleventh raw-byte accessor", () => {
     const implBlockMatch = secretHandleModule.match(
       /impl\s+SecretHandle\s*\{([\s\S]*?)\n    \}\n/,
     );
@@ -150,6 +150,7 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
         "expose_bytes_for_internal_derivation",
         "expose_bytes_for_internal_aead",
         "expose_bytes_for_internal_ecdh",
+        "expose_bytes_for_internal_wasm_export",
       ].sort(),
     );
   });
@@ -158,7 +159,7 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(29);
+    expect(pubFnNames.length).toBe(30);
     expect(pubFnNames).not.toContain("new_from_32_bytes_for_internal_use");
   });
 

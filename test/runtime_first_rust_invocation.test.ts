@@ -134,7 +134,7 @@ describe("The first minimal Rust invocation, ping only (Stage 369-376)", () => {
 
   it("17. Rust public API is unchanged -- pub fn count still 27 (ping is pub(crate), not counted)", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(29);
+    expect(pubFnNames.length).toBe(30);
     expect(pubFnNames).not.toContain("fedos_runtime_ping_internal");
   });
 
