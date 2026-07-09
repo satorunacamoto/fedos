@@ -675,6 +675,55 @@
  * API call (including `version()`) remain exactly as unimplemented
  * and unreachable as every prior Prototype stage — `planLoad()` itself
  * is UNTOUCHED by this stage, exactly as it was by Stage 945.
+ *
+ * Stage 969 (Prototype EXECUTION Phase 007) is the FIRST stage this
+ * arc ever actually initializes WebAssembly — the FIFTH controlled
+ * exception to the Stage 489 HARD GUARDRAILS. A Pre-check (built the
+ * real artifact once via `npm run build:wasm`, inspected it, then
+ * deleted `target/`/`Cargo.lock`/`pkg/`) confirmed the generated JS
+ * glue is a `--target web` build exposing EXACTLY two init functions
+ * — `initSync` (sync, named) and `default`/`__wbg_init` (async) — and
+ * NO crate-specific export of any kind (no `version`, matching
+ * `docs/runtime_wasm_js_glue_contract.md`'s own Stage 481
+ * observation): neither init function can ever reach a Rust `pub fn`
+ * regardless of outcome. A NEW, separate, PUBLIC, ASYNC method —
+ * `attemptDevOnlyWasmInitialization(): Promise<FedosWasmLoaderWasmInitialization>`
+ * — follows the SAME pattern as Stage 945's
+ * `attemptDevOnlyJsGlueImport()`: `planLoad()` itself is NOT called
+ * from, and does NOT call, this method — BYTE-FOR-BYTE UNCHANGED once
+ * again. Its ONLY gate is ALL FOUR of: `this.#importReadiness.ready`,
+ * `this.#devOnlyGateEvaluation.developmentAllowed`,
+ * `this.#importExecution.succeeded`, and `this.#jsGlueModule !== null`
+ * — every one populated by EARLIER method calls, never re-evaluated
+ * here. The retained module (Stage 961) is checked, at runtime, for
+ * WHICH of its two init functions is actually present
+ * (`typeof module.initSync === "function"`, then `typeof
+ * module.default === "function"`) — NEVER hand-picking one in source
+ * code, and NEVER searching for anything beyond those two names.
+ * `initSync` is preferred WHEN PRESENT, because `default`'s own
+ * built-in no-argument fallback (`fetch(new URL(...,
+ * import.meta.url))`) is a real risk under this project's Node/Vitest
+ * runtime (a `file://` URL passed to `fetch` is not universally
+ * supported); this stage NEVER calls `default()` with no argument
+ * either way — it always passes the SAME `fedos_core_rust_bg.wasm`
+ * bytes Stage 921 already named (via a NEW, injectable
+ * `this.#readGeneratedWasmBytes` field, defaulting to real `node:fs`
+ * `readFileSync` — a FOURTH `@ts-expect-error`-suppressed Node
+ * built-in only in the sense of one more NAMED IMPORT from the SAME
+ * already-suppressed `node:fs` line Stage 921 opened, not a new
+ * module), so `WebAssembly.instantiateStreaming`'s own `Response`
+ * expectation is never exercised either. The whole attempt is wrapped
+ * in `try`/`catch` that Fails Closed to `reason: "InitializationFailed"`
+ * on ANY thrown/rejected error (bytes-read failure included). The
+ * result — `FedosWasmLoaderWasmInitialization`
+ * (`attempted`/`succeeded`/`reason`) — is stored on the instance
+ * (`this.#wasmInitialization`, readable via the new PUBLIC
+ * `wasmInitialization()` method); the `InitOutput`/`memory`/instance
+ * itself is NEVER retained, NEVER inspected, and NEVER read anywhere
+ * in this file — this method only ever RECORDS whether initialization
+ * happened, never what it produced. Even on success, NO Rust API call
+ * of any kind (including `version()`) is ever made, because none is
+ * exported by the JS glue to call in the first place.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -690,8 +739,12 @@ import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
 // so each import is individually suppressed the same way this
 // project's own `?raw` imports already are (see any `test/*.test.ts`
 // file's `// @ts-expect-error` comments for the established pattern).
+// Stage 969 (Prototype EXECUTION Phase 007) adds `readFileSync` to
+// this SAME import line -- no NEW `@ts-expect-error` suppression, no
+// new module. Used ONLY to read the SAME `fedos_core_rust_bg.wasm`
+// bytes Stage 921 already names, for WASM initialization input.
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 // Stage 945 (Prototype EXECUTION Phase 004) -- needed to turn the
@@ -1077,15 +1130,40 @@ export interface FedosWasmLoaderImportExecution {
 }
 
 /**
+ * Stage 969 (Prototype EXECUTION Phase 007) — the result of a REAL
+ * attempt (or deliberate non-attempt) to initialize WebAssembly via
+ * whichever init function the retained JS glue module (Stage 961)
+ * actually exposes. `attempted`/`succeeded` genuinely reflect what
+ * happened at the moment `attemptDevOnlyWasmInitialization()` ran.
+ * `succeeded: true` NAMES that `initSync`/`default` resolved — it is
+ * NEVER read by `planLoad()`'s `if` conditions (which this stage does
+ * not touch at all) and NEVER triggers any Rust API call, because the
+ * generated JS glue exposes none to call; see this module's
+ * top-of-file "Stage 969" doc note. The `InitOutput`/`memory`/instance
+ * itself is NEVER part of this type and NEVER retained anywhere.
+ */
+export interface FedosWasmLoaderWasmInitialization {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly reason: "Initialized" | "NotReady" | "InitializationUnavailable" | "InitializationFailed" | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
  * paths without depending on a real Generated JS Glue file existing
  * on disk; `createFedosWasmLoader()` never supplies it, so real usage
- * always gets real, native dynamic `import()`.
+ * always gets real, native dynamic `import()`. Stage 969 (Prototype
+ * EXECUTION Phase 007) adds `readGeneratedWasmBytes` for the SAME
+ * reason, this time for `attemptDevOnlyWasmInitialization()`'s own
+ * `fedos_core_rust_bg.wasm` bytes read — `createFedosWasmLoader()`
+ * never supplies it either, so real usage always gets real
+ * `node:fs` `readFileSync`.
  */
 export interface FedosWasmLoaderSkeletonOptions {
   readonly importGeneratedJsGlue?: (specifier: string) => Promise<unknown>;
+  readonly readGeneratedWasmBytes?: (path: string) => Uint8Array;
 }
 
 /**
@@ -1160,6 +1238,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   #jsGlueModule: object | null = null;
 
   /**
+   * Stage 969 (Prototype EXECUTION Phase 007) — holds the most recent
+   * REAL WASM initialization attempt result recorded by
+   * `attemptDevOnlyWasmInitialization()`, or `null` before that method
+   * has ever been called on this instance. Read via
+   * `wasmInitialization()`; NEVER read by `planLoad()`, which does not
+   * reference this field at all.
+   */
+  #wasmInitialization: FedosWasmLoaderWasmInitialization | null = null;
+
+  /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
    * `attemptDevOnlyJsGlueImport()` calls to perform the actual
    * `import()`. Defaults to real, native dynamic `import()`; a test
@@ -1170,11 +1258,23 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   #importGeneratedJsGlue: (specifier: string) => Promise<unknown>;
 
+  /**
+   * Stage 969 (Prototype EXECUTION Phase 007) — the function
+   * `attemptDevOnlyWasmInitialization()` calls to read the
+   * `fedos_core_rust_bg.wasm` bytes it passes to `initSync`/`default`.
+   * Defaults to real `node:fs` `readFileSync`; a test MAY override it
+   * via the constructor's `readGeneratedWasmBytes` option to observe
+   * the success/failure paths without depending on a real Generated
+   * WASM file on disk. `createFedosWasmLoader()` never overrides it.
+   */
+  #readGeneratedWasmBytes: (path: string) => Uint8Array;
+
   constructor(options?: FedosWasmLoaderSkeletonOptions) {
-    // Does nothing but store the (optional, test-only) import hook: no
-    // file read, no module imported, no WASM instantiated.
+    // Does nothing but store the (optional, test-only) hooks: no file
+    // read, no module imported, no WASM instantiated.
     this.#importGeneratedJsGlue =
       options?.importGeneratedJsGlue ?? ((specifier) => import(/* @vite-ignore */ specifier));
+    this.#readGeneratedWasmBytes = options?.readGeneratedWasmBytes ?? ((path) => readFileSync(path));
   }
 
   status(): FedosWasmLoaderStatus {
@@ -1446,6 +1546,18 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Stage 969 (Prototype EXECUTION Phase 007) — returns the most
+   * recent REAL WASM initialization attempt result recorded by
+   * `attemptDevOnlyWasmInitialization()`, or `null` if that method has
+   * never been called on this instance. Reading this value NEVER
+   * triggers a new initialization attempt. Not part of the
+   * `FedosWasmLoader` interface.
+   */
+  wasmInitialization(): FedosWasmLoaderWasmInitialization | null {
+    return this.#wasmInitialization;
+  }
+
+  /**
    * Stage 945 (Prototype EXECUTION Phase 004) — PUBLIC, ASYNC (the
    * FIRST async method this class exposes; `planLoad()` itself is
    * UNCHANGED and does NOT call this method). Reads
@@ -1494,6 +1606,86 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
     }
     this.#importExecution = result;
     this.#jsGlueModule = module;
+    return result;
+  }
+
+  /**
+   * Stage 969 (Prototype EXECUTION Phase 007) — PUBLIC, ASYNC (like
+   * Stage 945's `attemptDevOnlyJsGlueImport()`; `planLoad()` itself is
+   * UNCHANGED and does NOT call this method). Its ONLY gate is ALL
+   * FOUR of `this.#importReadiness.ready`,
+   * `this.#devOnlyGateEvaluation.developmentAllowed`,
+   * `this.#importExecution.succeeded`, and `this.#jsGlueModule !==
+   * null` — every one populated by an EARLIER method call, never
+   * re-evaluated here:
+   *   - Any of the four missing/`null`/`false`: `initSync`/`default`
+   *     is NEVER called; resolves `{ attempted: false, succeeded:
+   *     false, reason: "PrototypeStillClosed" }` (prior state
+   *     entirely missing) or `"NotReady"` (prior state present but
+   *     one of the four conditions unmet).
+   *   - All four satisfied: checks, AT RUNTIME, which of EXACTLY two
+   *     named functions the retained module exposes
+   *     (`typeof module.initSync === "function"`, then `typeof
+   *     module.default === "function"`) — NEVER hand-picking one in
+   *     source code, and NEVER searching for anything beyond those
+   *     two names. Neither present: resolves
+   *     `{ attempted: true, succeeded: false, reason:
+   *     "InitializationUnavailable" }`. `initSync` is PREFERRED when
+   *     present (this project's Node/Vitest runtime makes `default`'s
+   *     own no-argument `fetch(new URL(..., import.meta.url))`
+   *     fallback risky); EITHER way, the SAME
+   *     `fedos_core_rust_bg.wasm` bytes Stage 921 already names are
+   *     read (via `this.#readGeneratedWasmBytes`) and passed
+   *     EXPLICITLY — `default()` is NEVER called with no argument.
+   *     Wrapped in `try`/`catch` that Fails Closed to
+   *     `{ attempted: true, succeeded: false, reason:
+   *     "InitializationFailed" }` on ANY thrown/rejected error
+   *     (including a bytes-read failure). On success, resolves
+   *     `{ attempted: true, succeeded: true, reason: "Initialized" }`
+   *     — the init function's own return value (`InitOutput`/
+   *     `memory`/instance) is NEVER retained, NEVER inspected, and
+   *     NEVER read anywhere in this file.
+   * Never calls any Rust API, including `version()` — the generated JS
+   * glue exposes none to call, regardless of outcome. Called by
+   * NOTHING else in this file, in `create_runtime.ts`, or in
+   * `src/worker.ts`.
+   */
+  async attemptDevOnlyWasmInitialization(): Promise<FedosWasmLoaderWasmInitialization> {
+    const readiness = this.#importReadiness;
+    const devGate = this.#devOnlyGateEvaluation;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+
+    let result: FedosWasmLoaderWasmInitialization;
+    if (!readiness || !devGate || !importResult) {
+      result = { attempted: false, succeeded: false, reason: "PrototypeStillClosed" };
+    } else if (!readiness.ready || !devGate.developmentAllowed || !importResult.succeeded || !module) {
+      result = { attempted: false, succeeded: false, reason: "NotReady" };
+    } else {
+      const candidate = module as { initSync?: unknown; default?: unknown };
+      const hasInitSync = typeof candidate.initSync === "function";
+      const hasDefault = typeof candidate.default === "function";
+      if (!hasInitSync && !hasDefault) {
+        result = { attempted: true, succeeded: false, reason: "InitializationUnavailable" };
+      } else {
+        try {
+          const wasmBytes = this.#readGeneratedWasmBytes(
+            join(process.cwd(), "packages", "fedos-core-rust", "pkg", "fedos_core_rust_bg.wasm"),
+          );
+          if (hasInitSync) {
+            (candidate.initSync as (input: { module: Uint8Array }) => unknown)({ module: wasmBytes });
+          } else {
+            await (candidate.default as (input: { module_or_path: Uint8Array }) => Promise<unknown>)({
+              module_or_path: wasmBytes,
+            });
+          }
+          result = { attempted: true, succeeded: true, reason: "Initialized" };
+        } catch {
+          result = { attempted: true, succeeded: false, reason: "InitializationFailed" };
+        }
+      }
+    }
+    this.#wasmInitialization = result;
     return result;
   }
 

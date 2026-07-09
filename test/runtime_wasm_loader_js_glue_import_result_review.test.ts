@@ -138,7 +138,12 @@ describe("FedOS WASM Loader JS Glue Import Result Review -- review only, no runt
     expect(codeOnly).not.toMatch(/WebAssembly\./);
     expect(codeOnly).not.toMatch(/new\s+WebAssembly\.Module/);
     expect(codeOnly).not.toMatch(/new\s+WebAssembly\.Instance/);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/\bversion\s*\(/);
     expect(codeOnly).not.toMatch(/#\[wasm_bindgen\]/);

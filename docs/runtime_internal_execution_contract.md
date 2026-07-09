@@ -3817,6 +3817,96 @@ Triple Ratchet, and onion routing unimplemented; Rust public API
 unchanged (27 `pub fn`); no `Cargo.toml`/`package.json` dependency
 added.
 
+## Update — Stage 969: Prototype EXECUTION Phase 007, `attemptDevOnlyWasmInitialization()` performs REAL, gated WASM initialization — `planLoad()` still byte-for-byte unchanged, still `BlockedByPolicy`, Rust API still unreachable
+
+Stage 961 (the update above) made `attemptDevOnlyJsGlueImport()`
+RETAIN the imported module. Stage 969 is the FIRST stage this arc ever
+initializes WebAssembly. A Pre-check (built the real artifact once via
+`npm run build:wasm`, inspected it, then deleted `target/`/`Cargo.lock`/
+`pkg/`) confirmed the generated JS glue (`--target web`) exposes
+EXACTLY `initSync`/`default`, and NO crate-specific export of any
+kind — neither init function can ever reach a Rust `pub fn`.
+
+```
+attemptDevOnlyWasmInitialization(): Promise<FedosWasmLoaderWasmInitialization>
+     |
+     v
+gate: ALL FOUR of this.#importReadiness.ready / this.#devOnlyGateEvaluation.developmentAllowed /
+      this.#importExecution.succeeded / this.#jsGlueModule !== null (ALL populated by EARLIER calls)
+     |
+     +-- any missing/false/null -> initSync/default NEVER called;
+     |    "PrototypeStillClosed" (prior state entirely missing) / "NotReady" (one condition unmet)
+     |
+     +-- all four satisfied -> checks, AT RUNTIME, which of EXACTLY two named functions
+              the retained module (Stage 961) exposes:
+              1. typeof module.initSync === "function"  -> PREFERRED (avoids default()'s own
+                 fetch(file://...) risk under this project's Node/Vitest runtime)
+              2. else typeof module.default === "function" -> used instead
+              3. else -> "InitializationUnavailable" (no bytes read attempted)
+              |
+              +-- reads packages/fedos-core-rust/pkg/fedos_core_rust_bg.wasm bytes
+              |   (SAME path Stage 921 already names -- no new artifact discovery),
+              |   via this.#readGeneratedWasmBytes (defaults to real node:fs readFileSync)
+              |
+              +-- calls initSync({ module: bytes }) OR default({ module_or_path: bytes })
+                  -- default() is NEVER called with no argument
+                       |
+                       +-- resolves -> { attempted: true, succeeded: true, reason: "Initialized" }
+                       |    (InitOutput/memory/instance NEVER retained, NEVER inspected)
+                       +-- throws/rejects -> { attempted: true, succeeded: false,
+                            reason: "InitializationFailed" } (Fail Closed, never thrown)
+     |
+     v
+Result stored on this.#wasmInitialization, readable via the new PUBLIC wasmInitialization() method
+```
+
+**Rust API remains entirely unreached — not by an additional guard, but
+because the generated JS glue exposes none to call.** `version()` and
+every other of the crate's 27 `pub fn`s remain structurally
+unreachable through this method regardless of outcome, exactly as
+`docs/runtime_wasm_js_glue_contract.md`'s own Stage 481 observation
+(reconfirmed byte-for-byte by this stage's own Pre-check) already
+established.
+
+**`planLoad()` remains byte-for-byte unchanged.** This stage makes no
+change to `planLoad()`'s own body — exactly as Stage 945/961 left it.
+`createWasmBackend()`, the Backend Interface, the Backend Abstraction,
+the Backend Resolver, the Facade, and `AppRuntime.initializeCrypto()`
+all still call `planLoad()` exactly as before and receive the exact
+same `BlockedByPolicy` answer; none of them, and none of
+`create_runtime.ts`/`src/worker.ts`, references
+`attemptDevOnlyWasmInitialization()`/`wasmInitialization()` directly or
+indirectly.
+
+This stage does NOT touch `runtime_crypto_diagnostics.ts` or
+`worker_crypto_diagnostics.ts` — the initialization result is exposed
+only via the new `wasmInitialization()` method on
+`fedos_wasm_loader.ts` itself, matching this arc's "necessary minimum"
+scope.
+
+**No new Node module, one more named import.** `readFileSync` is added
+to the SAME `node:fs` import line Stage 921 opened — no NEW
+`@ts-expect-error` suppression, no new module; `package.json`/
+`Cargo.toml` remain untouched.
+
+**Still true throughout Stage 969**: `src/worker.ts` UNMODIFIED and
+never references `wasmInitialization()`, `attemptDevOnlyWasmInitialization()`,
+`policy()`, `planLoad()`, or `initializeCrypto`; `fedos_wasm_backend.ts`/
+Backend Interface/Backend Abstraction/Backend Resolver/Facade/Runtime
+return values all UNCHANGED; no call-graph cycle exists anywhere in
+this repository; `planLoad()`'s own return value, key order included,
+is identical regardless of the initialization outcome; no
+`WebAssembly.instantiate`/`compile`/`instantiateStreaming` reference of
+any kind (the retained module's own `initSync`/`default` are called by
+NAME, never via any raw `WebAssembly.*` API); no `#[wasm_bindgen]`/
+`__wbg_init`; no Rust API call of any kind, including `version()`; the
+initialization result's own `InitOutput`/`memory`/instance never
+retained or read anywhere; no CONTENT-reading filesystem API other
+than the ONE `readFileSync` call; `encrypt`/`decrypt` unchanged, in
+Rust or TypeScript; NIP-17/NIP-44/NIP-59, Double Ratchet, Triple
+Ratchet, and onion routing unimplemented; Rust public API unchanged
+(27 `pub fn`); no `Cargo.toml`/`package.json` dependency added.
+
 ## See also
 
 - `src/runtime/fedos_wasm_loader.ts` (Stage 489–492, reached for real

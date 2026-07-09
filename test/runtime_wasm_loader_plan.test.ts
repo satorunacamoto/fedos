@@ -116,7 +116,12 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
     expect(codeOnly).not.toMatch(/WebAssembly/);
     expect(codeOnly).not.toMatch(/\bfetch\s*\(/);
     expect(codeOnly).not.toMatch(/instantiateStreaming/);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/\bfs\./);
     expect(codeOnly).not.toMatch(/child_process/i);
     expect(codeOnly).not.toMatch(/process\.env/);
@@ -144,7 +149,12 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
     // checks for real API usage (a dot after the identifier), not the
     // bare word.
     expect(codeOnly).not.toMatch(/WebAssembly\./);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
   });
 
   it("6. WebAssembly.instantiate/compile are never actually invoked, even when exercising the plan's and skeleton's full surface", () => {

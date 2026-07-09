@@ -213,7 +213,12 @@ describe("WASM Backend Planning reaches the real FedosWasmLoader.planLoad(), sti
     expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
     expect(codeOnly).not.toMatch(/WebAssembly/);
     expect(codeOnly).not.toMatch(/instantiateStreaming/);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/\bfetch\s*\(/);
     // Stage 945 (Prototype EXECUTION Phase 004, a later stage than
@@ -239,7 +244,12 @@ describe("WASM Backend Planning reaches the real FedosWasmLoader.planLoad(), sti
     // checks for real API usage (a dot after the identifier), not the
     // bare word.
     expect(codeOnly).not.toMatch(/WebAssembly\./);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/\bfetch\s*\(/);
     // Stage 945 (Prototype EXECUTION Phase 004, a later stage than

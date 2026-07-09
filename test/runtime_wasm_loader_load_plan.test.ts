@@ -281,7 +281,12 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Load Plan, 
     // checks for real API usage (a dot after the identifier), not the
     // bare word.
     expect(codeOnly).not.toMatch(/WebAssembly\./);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     expect(codeOnly).not.toMatch(/create_runtime|AppRuntime/);
     expect(codeOnly).not.toMatch(/worker\.ts|src\/worker/);

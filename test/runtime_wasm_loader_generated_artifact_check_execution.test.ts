@@ -268,7 +268,12 @@ describe("FedosWasmLoader.planLoad() performs a REAL Generated Artifact Check, s
     expect(codeOnly).not.toMatch(/WebAssembly\./);
     expect(codeOnly).not.toMatch(/new\s+WebAssembly\.Module/);
     expect(codeOnly).not.toMatch(/new\s+WebAssembly\.Instance/);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
   });
 
@@ -284,7 +289,12 @@ describe("FedosWasmLoader.planLoad() performs a REAL Generated Artifact Check, s
   it("16. only a read-only existsSync() existence check exists -- no content-reading filesystem API anywhere in the Loader source", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
     expect(codeOnly).toMatch(/existsSync/);
-    expect(codeOnly).not.toMatch(/readFileSync|statSync|readFile\(|readdirSync|writeFileSync|unlinkSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately reads the SAME fedos_core_rust_bg.wasm
+    // bytes Stage 921 already names, via readFileSync -- this checks
+    // for any OTHER content-reading filesystem API, not that one
+    // narrowly-scoped read.
+    expect(codeOnly).not.toMatch(/statSync|readFile\(|readdirSync|writeFileSync|unlinkSync/);
   });
 
   it("17. Worker remains fully unconnected to the real check/policy()/planLoad(), and Production Runtime (create_runtime.ts) remains fully unconnected", () => {

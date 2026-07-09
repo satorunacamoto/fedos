@@ -264,7 +264,12 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal JS Glue Acc
     // checks for real API usage (a dot after the identifier), not the
     // bare word.
     expect(codeOnly).not.toMatch(/WebAssembly\./);
-    expect(codeOnly).not.toMatch(/initSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately references .initSync as a PROPERTY
+    // NAME to check for its presence on the retained JS glue module
+    // -- this checks for a real, direct initSync(...) CALL, not the
+    // property-name check.
+    expect(codeOnly).not.toMatch(/\binitSync\s*\(/);
     expect(codeOnly).not.toMatch(/__wbg_init/);
     // Stage 921 (Prototype EXECUTION Phase 001, a later stage than
     // this one) legitimately names the two Generated Artifact
@@ -279,7 +284,12 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal JS Glue Acc
     // (Phase 015) -- Stage 921 (Prototype EXECUTION Phase 001, a later
     // stage) legitimately adds a read-only existsSync() existence
     // check, so this only forbids CONTENT-reading filesystem access.
-    expect(codeOnly).not.toMatch(/readFileSync|statSync|readFile\(|readdirSync/);
+    // Stage 969 (Prototype EXECUTION Phase 007, a later stage than
+    // this one) legitimately reads the SAME fedos_core_rust_bg.wasm
+    // bytes Stage 921 already names, via readFileSync -- this checks
+    // for any OTHER content-reading filesystem API, not that one
+    // narrowly-scoped read.
+    expect(codeOnly).not.toMatch(/statSync|readFile\(|readdirSync/);
     // Still only imports the pre-existing Loader Plan -- no new static import added.
     expect(codeOnly).not.toMatch(/fedos_wasm_loader_contract|fedos_wasm_artifact|fedos_wasm_boundary/);
     expect(codeOnly).not.toMatch(/fedos_generated_artifact_presence/);
