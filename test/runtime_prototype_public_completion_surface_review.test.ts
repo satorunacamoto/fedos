@@ -130,9 +130,9 @@ describe("FedOS Public Runtime Completion Surface Review -- review only, no Runt
     expect(workerSource).not.toMatch(/fedos_runtime_prototype_execution/);
   });
 
-  it("15. Production is unaffected -- create_runtime.ts's own AppRuntime assembly is byte-for-byte unchanged, still no reference to the new file", () => {
-    expect(createRuntimeSource).not.toMatch(/fedos_runtime_prototype_execution/);
-    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
+  it("15. Production was unaffected AS OF THIS stage's own scope (Stage 995) -- create_runtime.ts's own AppRuntime assembly was byte-for-byte unchanged then; Stage 999 (Secure Runtime Alpha 003) later wired in ONE new, read-only field, runtimeCapabilities, see test/secure_runtime_alpha_003_capability_reader.test.ts", () => {
+    expect(createRuntimeSource).toMatch(/fedos_runtime_prototype_execution/);
+    expect(createRuntimeSource).toMatch(/attemptDevOnlyRuntimeRustIntegration/);
     expect(createRuntimeSource).not.toMatch(/RuntimePrototypeExecutionState/);
   });
 

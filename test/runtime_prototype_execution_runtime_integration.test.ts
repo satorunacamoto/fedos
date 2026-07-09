@@ -134,9 +134,9 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
     expect(Object.keys(runtime)).not.toContain("attemptDevOnlyRuntimeRustIntegration");
   });
 
-  it("9. create_runtime.ts is byte-for-byte untouched -- no reference to the new file/function/type anywhere", () => {
-    expect(createRuntimeSource).not.toMatch(/fedos_runtime_prototype_execution/);
-    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
+  it("9. create_runtime.ts was byte-for-byte untouched AS OF THIS stage's own scope (Stage 994) -- Stage 999 (Secure Runtime Alpha 003) later wired in ONE new, read-only field, runtimeCapabilities, see test/secure_runtime_alpha_003_capability_reader.test.ts", () => {
+    expect(createRuntimeSource).toMatch(/fedos_runtime_prototype_execution/);
+    expect(createRuntimeSource).toMatch(/attemptDevOnlyRuntimeRustIntegration/);
     expect(createRuntimeSource).not.toMatch(/RuntimePrototypeExecutionState/);
     expect(createRuntimeSource).not.toMatch(/reachedRust/);
   });
@@ -153,8 +153,8 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
     expect(codeOnlyLines(runtimeIntegrationSource)).not.toMatch(/from\s+["'].*worker/);
   });
 
-  it("12. Production is unaffected -- no automatic caller of attemptDevOnlyRuntimeRustIntegration() exists anywhere in create_runtime.ts/src/worker.ts", () => {
-    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
+  it("12. Production still has no AUTOMATIC caller -- create_runtime.ts's Stage 999 runtimeCapabilities field is an explicit, caller-invoked reader (its own real code never calls it with parens), and src/worker.ts still references nothing from this chain", () => {
+    expect(codeOnlyLines(createRuntimeSource)).not.toMatch(/runtimeCapabilities\s*\(\s*\)/);
     expect(workerSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
   });
 

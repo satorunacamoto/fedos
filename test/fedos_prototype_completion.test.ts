@@ -4,8 +4,6 @@ import completionDocSource from "../docs/fedos_prototype_completion.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import surfaceReviewDocSource from "../docs/runtime_prototype_public_completion_surface_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
@@ -138,10 +136,9 @@ describe("FedOS Prototype Completion Declaration -- doc-only, no Runtime/Worker/
     expect(decision.policy).toBe("FailClosed");
   });
 
-  it("13. Runtime source files are byte-for-byte untouched by this stage -- no reference to the completion doc anywhere", () => {
+  it("13. Runtime source files were untouched by THIS stage's own scope (Stage 996) -- create_runtime.ts/fedos_wasm_loader.ts still have no reference; fedos_runtime_prototype_execution.ts's own later Stage 999 doc comment legitimately names the completion doc, see test/secure_runtime_alpha_003_capability_reader.test.ts", () => {
     expect(createRuntimeSource).not.toMatch(/fedos_prototype_completion/);
     expect(wasmLoaderSource).not.toMatch(/fedos_prototype_completion/);
-    expect(runtimeIntegrationSource).not.toMatch(/fedos_prototype_completion/);
   });
 
   it("14. Worker remains fully unchanged and unconnected -- src/worker.ts references nothing from this stage or the Rust-reach chain", () => {
@@ -151,9 +148,10 @@ describe("FedOS Prototype Completion Declaration -- doc-only, no Runtime/Worker/
     expect(workerSource).not.toMatch(/fedos_runtime_prototype_execution/);
   });
 
-  it("15. Production is unaffected -- create_runtime.ts's own AppRuntime assembly carries no new field, no reference to the completion doc or the Rust-reach chain", () => {
-    expect(createRuntimeSource).not.toMatch(/fedos_runtime_prototype_execution/);
-    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
+  it("15. Production was unaffected AS OF THIS stage's own scope (Stage 996) -- create_runtime.ts's own AppRuntime assembly carried no new field then; Stage 999 (Secure Runtime Alpha 003) later wired in ONE new, read-only field, runtimeCapabilities, see test/secure_runtime_alpha_003_capability_reader.test.ts", () => {
+    expect(createRuntimeSource).toMatch(/fedos_runtime_prototype_execution/);
+    expect(createRuntimeSource).toMatch(/runtimeCapabilities/);
+    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRustVersionCall/);
     expect(createRuntimeSource).not.toMatch(/RuntimePrototypeExecutionState/);
   });
 

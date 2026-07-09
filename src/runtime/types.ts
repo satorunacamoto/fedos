@@ -36,6 +36,7 @@ import type { ChatProvider } from "../chat/types.js";
 import type { MarketplaceProvider } from "../marketplace/types.js";
 import type { EntitlementProvider } from "../creator/entitlement.js";
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
+import type { RuntimeCapabilities } from "./fedos_runtime_prototype_execution.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -469,4 +470,19 @@ export interface AppRuntime {
    * `docs/runtime_initialize_crypto_prototype.md`.
    */
   readonly initializeCrypto: () => RuntimeInitializeCryptoResult;
+  /**
+   * Stage 999 (Secure Runtime Alpha 003) — the FIRST read-only Runtime
+   * Capability Reader, per
+   * `docs/secure_runtime_alpha_002_public_surface_review.md` §7's own
+   * recommendation. Reports ONLY "how far Runtime currently reaches"
+   * (`prototypeCompleted`/`rustReachable`/`rustVersion`/`runtimeState`)
+   * — it triggers no activation, grants no permission, and is NEVER
+   * read by `initializeCrypto()`'s own `if` logic (the two fields
+   * above remain byte-for-byte unchanged by this stage). Internally
+   * calls `attemptDevOnlyRuntimeRustIntegration()`
+   * (`fedos_runtime_prototype_execution.ts`, Stage 994) exactly once —
+   * no new Rust call, no new gate, no new Fail-Closed reason of its
+   * own. See `docs/secure_runtime_alpha_003_capability_reader.md`.
+   */
+  readonly runtimeCapabilities: () => Promise<RuntimeCapabilities>;
 }

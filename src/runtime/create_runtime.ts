@@ -33,6 +33,20 @@
  * Boundary, the WASM Loader, `WebAssembly`, or Rust directly, and no
  * `import()` of any kind is written here. The existing Facade file
  * itself is UNMODIFIED by this stage.
+ *
+ * Stage 999 (Secure Runtime Alpha 003) adds `runtimeCapabilities`
+ * (`runtimeCapabilities()`, `fedos_runtime_prototype_execution.ts`,
+ * Stage 994) to the assembled `AppRuntime` — the FIRST read-only
+ * Runtime Capability Reader, per
+ * `docs/secure_runtime_alpha_002_public_surface_review.md` §7's own
+ * recommendation. It is a SECOND, entirely separate field alongside
+ * `initializeCrypto` — `createRuntimeInitializeCryptoResult` itself is
+ * UNMODIFIED, still ALWAYS `{ allowed: false, initialized: false,
+ * reason: "PrototypeDisabled" }`, and `runtimeCapabilities()`'s own
+ * result is never read by, or merged into, it. `runtimeCapabilities()`
+ * internally calls `attemptDevOnlyRuntimeRustIntegration()` exactly
+ * once — no new Rust call, no new gate, no Worker/Production
+ * connection, no Secure Storage of any kind.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -108,6 +122,7 @@ import type { EntitlementProvider } from "../creator/entitlement.js";
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import { buildRuntimeCryptoProvider } from "./runtime_crypto_bridge.js";
 import { createCryptoLoaderFacade } from "./fedos_crypto_loader_facade.js";
+import { runtimeCapabilities } from "./fedos_runtime_prototype_execution.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -684,5 +699,6 @@ export function createRuntime(
     creatorEntitlementProvider: selectCreatorEntitlementProvider(env, overrides),
     crypto: selectRuntimeCryptoProvider(overrides),
     initializeCrypto: createRuntimeInitializeCryptoResult,
+    runtimeCapabilities,
   };
 }

@@ -131,14 +131,15 @@ describe("Secure Runtime Alpha 002 Public Surface Review -- review only, no Runt
     expect(decision.policy).toBe("FailClosed");
   });
 
-  it("13. Runtime source files are byte-for-byte untouched by this stage -- no reference to the review doc anywhere", () => {
-    expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_002_public_surface_review/);
+  it("13. fedos_wasm_loader.ts was, and remains, untouched by this review's own scope; create_runtime.ts and fedos_runtime_prototype_execution.ts's own later Stage 999 doc comments legitimately cite this review's own §7 recommendation, see test/secure_runtime_alpha_003_capability_reader.test.ts", () => {
     expect(wasmLoaderSource).not.toMatch(/secure_runtime_alpha_002_public_surface_review/);
-    expect(runtimeIntegrationSource).not.toMatch(/secure_runtime_alpha_002_public_surface_review/);
+    expect(createRuntimeSource).toMatch(/secure_runtime_alpha_002_public_surface_review/);
+    expect(runtimeIntegrationSource).toMatch(/secure_runtime_alpha_002_public_surface_review/);
   });
 
-  it("14. no new public reader (runtimeCapabilities/runtimeState/diagnostics/cryptoRuntime) exists in real source yet", () => {
-    expect(createRuntimeSource).not.toMatch(/runtimeCapabilities|runtimeState\s*\(|cryptoRuntime\s*\(/);
+  it("14. Stage 999 (Secure Runtime Alpha 003) implemented THIS review's own §7 recommendation for real -- runtimeCapabilities now exists in create_runtime.ts, still no runtimeState()/cryptoRuntime()", () => {
+    expect(createRuntimeSource).toMatch(/runtimeCapabilities/);
+    expect(createRuntimeSource).not.toMatch(/runtimeState\s*\(|cryptoRuntime\s*\(/);
   });
 
   it("15. Worker remains fully unchanged and unconnected -- src/worker.ts references nothing from this stage or the Rust-reach chain", () => {
@@ -147,9 +148,9 @@ describe("Secure Runtime Alpha 002 Public Surface Review -- review only, no Runt
     expect(workerSource).not.toMatch(/attemptDevOnlyRustVersionCall/);
   });
 
-  it("16. Production is unaffected -- create_runtime.ts's own AppRuntime assembly carries no new field", () => {
-    expect(createRuntimeSource).not.toMatch(/fedos_runtime_prototype_execution/);
-    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
+  it("16. Production was unaffected AS OF THIS review's own scope (Stage 998) -- create_runtime.ts's own AppRuntime assembly carried no new field then; Stage 999 later wired in ONE new, read-only field, runtimeCapabilities, exactly as this review's own §7 recommended", () => {
+    expect(createRuntimeSource).toMatch(/fedos_runtime_prototype_execution/);
+    expect(createRuntimeSource).toMatch(/attemptDevOnlyRuntimeRustIntegration/);
     expect(createRuntimeSource).not.toMatch(/RuntimePrototypeExecutionState/);
   });
 

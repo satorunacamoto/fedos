@@ -150,9 +150,9 @@ describe("Secure Runtime Alpha 001 Baseline -- review/doc only, no Runtime/Worke
     expect(workerSource).not.toMatch(/fedos_runtime_prototype_execution/);
   });
 
-  it("14. Production is unaffected -- create_runtime.ts's own AppRuntime assembly carries no new field", () => {
-    expect(createRuntimeSource).not.toMatch(/fedos_runtime_prototype_execution/);
-    expect(createRuntimeSource).not.toMatch(/attemptDevOnlyRuntimeRustIntegration/);
+  it("14. Production was unaffected AS OF THIS Baseline's own scope (Stage 997) -- create_runtime.ts's own AppRuntime assembly carried no new field then; Stage 999 (Secure Runtime Alpha 003) later wired in ONE new, read-only field, runtimeCapabilities, resolving this Baseline's own §3 item 1, see test/secure_runtime_alpha_003_capability_reader.test.ts", () => {
+    expect(createRuntimeSource).toMatch(/fedos_runtime_prototype_execution/);
+    expect(createRuntimeSource).toMatch(/attemptDevOnlyRuntimeRustIntegration/);
     expect(createRuntimeSource).not.toMatch(/RuntimePrototypeExecutionState/);
   });
 
