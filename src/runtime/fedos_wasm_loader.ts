@@ -291,6 +291,53 @@
  * `planUnload()`/`planningState()`/`status()`, and every upstream layer
  * are UNCHANGED, and no cycle exists —
  * `#createGeneratedArtifactCheckPlan()` calls nothing at all.
+ *
+ * Stage 881 (Prototype Phase 017) adds a DEV-ONLY GATE PLAN object,
+ * `FedosWasmLoaderDevOnlyGatePlan` — a NEW, separately-named,
+ * hand-fixed record `{ backend: "Wasm", shouldEvaluate: false, reason:
+ * "BlockedByGeneratedArtifactCheckPlan", currentStage:
+ * "DevOnlyGatePlanning", nextRequiredCheck: "ImportPlanning" }`, built
+ * by a new PRIVATE `#createDevOnlyGatePlan()` method (no argument,
+ * calls nothing, returns a hand-fixed constant — mirrors
+ * `#createGeneratedArtifactCheckPlan()`'s own "pure, no re-fetch"
+ * discipline). `planLoad()`'s flow extends ONE step further, INSIDE
+ * the existing `if (!artifactCheckPlan.shouldCheck)` branch: (12)
+ * build the Dev-only Gate Plan via `#createDevOnlyGatePlan()`, (13)
+ * confirm `devOnlyGatePlan.shouldEvaluate`
+ * (`if (!devOnlyGatePlan.shouldEvaluate)`, a FIFTH, independent check,
+ * ALSO always taken because `shouldEvaluate` is fixed `false`), (14)
+ * return the SAME `#blocked("load")` answer as every prior stage.
+ * `planLoad()`'s own return value — `{ operation: "load", state:
+ * "BlockedByPolicy", policy: "FailClosed", reason: "..." }`, key order
+ * included — stays byte-for-byte unchanged; the Dev-only Gate Plan's
+ * OWN fields are never merged into it, it is not part of the public
+ * `FedosWasmLoader` interface, and it is never returned to any caller.
+ * `shouldEvaluate: false` NAMES a future intent (this Plan would only
+ * ever evaluate `true` in a Development Runtime — never Production,
+ * never Worker) WITHOUT performing any such evaluation: this stage
+ * reads NO environment variable, `process.env`, `import.meta`, or
+ * `NODE_ENV` of any kind — `shouldEvaluate` is a hand-fixed constant,
+ * not a computed answer. `reason:
+ * "BlockedByGeneratedArtifactCheckPlan"` names WHY evaluation is not
+ * yet performed (the Generated Artifact Check Plan one level up
+ * already said `shouldCheck: false`) — `"PrototypeDisabled"`/
+ * `"DevelopmentGateUnavailable"` are the OTHER two labels the type
+ * permits but this stage's fixed constant never produces, reserved
+ * for a future stage that might defer evaluation for a different
+ * reason. `nextRequiredCheck: "ImportPlanning"` NAMES, without
+ * PERFORMING, the very next gate a future, separate,
+ * explicitly-reviewed stage would need to add — this stage does NOT
+ * evaluate Development/Production status, does NOT read any
+ * environment variable, does NOT `import()` anything, does NOT
+ * reference `WebAssembly`, and does NOT call Rust; all of that
+ * remains Phase 018+'s responsibility. The `shouldEvaluate: true` path
+ * (like every fixed-`false` field above it) is a single reserved TODO
+ * comment, immediately followed by the SAME fail-closed fallback, so
+ * this function stays fail-closed no matter what any of the five
+ * objects ever answers. `policy()` itself, `planInitialize()`/
+ * `planUnload()`/`planningState()`/`status()`, and every upstream layer
+ * are UNCHANGED, and no cycle exists — `#createDevOnlyGatePlan()`
+ * calls nothing at all.
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
@@ -455,6 +502,31 @@ export interface FedosWasmLoaderGeneratedArtifactCheckPlan {
 }
 
 /**
+ * Stage 881 — an internal-only DEV-ONLY GATE PLAN object `planLoad()`
+ * builds and confirms one step past the Generated Artifact Check
+ * Plan, before returning its own, unrelated `FedosWasmLoaderDecision`.
+ * Names the INTENT that a real Loader would only ever evaluate this
+ * gate in a Development Runtime — never Production, never Worker —
+ * WITHOUT performing any such evaluation: no `process.env`, no
+ * `import.meta`, no `NODE_ENV`, no environment read of any kind.
+ * DELIBERATELY a separate shape from every other type in this file,
+ * and DELIBERATELY typed with literal `"Wasm"`/`false`/
+ * `"DevOnlyGatePlanning"`/`"ImportPlanning"` values (plus a
+ * three-member `reason` union, only one member of which this
+ * Prototype stage ever actually produces) — see this module's
+ * top-of-file "Stage 881" doc note for why. Not part of the public
+ * `FedosWasmLoader` interface; never returned to a caller of
+ * `planLoad()` directly.
+ */
+export interface FedosWasmLoaderDevOnlyGatePlan {
+  readonly backend: "Wasm";
+  readonly shouldEvaluate: false;
+  readonly reason: "BlockedByGeneratedArtifactCheckPlan" | "PrototypeDisabled" | "DevelopmentGateUnavailable";
+  readonly currentStage: "DevOnlyGatePlanning";
+  readonly nextRequiredCheck: "ImportPlanning";
+}
+
+/**
  * The standalone, unwired WASM Loader Skeleton. Names the three
  * operations a real loader would eventually perform — never loads,
  * imports, or executes the generated JS glue. `FedosWasmLoaderSkeleton`
@@ -503,7 +575,20 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
           const artifactCheckPlan = this.#createGeneratedArtifactCheckPlan(); // 9. Generated Artifact Check Plan generated
           if (!artifactCheckPlan.shouldCheck) {
             // 10. Generated Artifact Check Plan's own result confirmed -- ALWAYS false today
-            return this.#blocked("load"); // 11. same BlockedByPolicy answer as every prior stage
+            const devOnlyGatePlan = this.#createDevOnlyGatePlan(); // 12. Dev-only Gate Plan generated
+            if (!devOnlyGatePlan.shouldEvaluate) {
+              // 13. Dev-only Gate Plan's own result confirmed -- ALWAYS false today
+              return this.#blocked("load"); // 14. same BlockedByPolicy answer as every prior stage
+            }
+            // TODO(reserved for a future, separate, explicitly-reviewed stage):
+            // devOnlyGatePlan.shouldEvaluate is permanently false in
+            // this Prototype stage (see FedosWasmLoaderDevOnlyGatePlan's
+            // own fixed shape above), so this line can never execute
+            // today. The real Development-Runtime-only evaluation path
+            // -- including the Import Planning named in
+            // nextRequiredCheck -- belongs here -- NOT implemented in
+            // this stage.
+            return this.#blocked("load");
           }
           // TODO(reserved for a future, separate, explicitly-reviewed stage):
           // artifactCheckPlan.shouldCheck is permanently false in this
@@ -660,6 +745,29 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       reason: "BlockedByJsGlueAccessPlan",
       currentStage: "GeneratedArtifactCheckPlanning",
       nextRequiredCheck: "DevOnlyGate",
+    };
+  }
+
+  /**
+   * PRIVATE — Stage 881. Builds the internal-only Dev-only Gate Plan
+   * `planLoad()` confirms one step past the Generated Artifact Check
+   * Plan. PURE: takes no argument, calls nothing (does NOT call
+   * `this.policy()`/`this.#createLoadPlan()`/
+   * `this.#createJsGlueAccessPlan()`/`this.#createGeneratedArtifactCheckPlan()`
+   * again -- all four already ran exactly once earlier in
+   * `planLoad()`), and returns a hand-fixed constant. Never reads
+   * `process.env`/`import.meta`/`NODE_ENV`, never touches the
+   * filesystem, loads, imports, fetches, or instantiates anything;
+   * does NOT evaluate Development/Production status (that remains
+   * this Plan's own named, not-yet-performed, future step).
+   */
+  #createDevOnlyGatePlan(): FedosWasmLoaderDevOnlyGatePlan {
+    return {
+      backend: "Wasm",
+      shouldEvaluate: false,
+      reason: "BlockedByGeneratedArtifactCheckPlan",
+      currentStage: "DevOnlyGatePlanning",
+      nextRequiredCheck: "ImportPlanning",
     };
   }
 
@@ -968,4 +1076,74 @@ export function loaderGeneratedArtifactCheckPlanCurrentStage(): "GeneratedArtifa
  */
 export function loaderGeneratedArtifactCheckPlanNextRequiredCheck(): "DevOnlyGate" {
   return "DevOnlyGate";
+}
+
+/**
+ * Pure, standalone: whether `planLoad()` structurally creates a
+ * Dev-only Gate Plan — Stage 881. Fixed `true`: `planLoad()`'s own
+ * `#createDevOnlyGatePlan()` call DOES run every time
+ * `artifactCheckPlan.shouldCheck` evaluates `false` (which is always,
+ * today), even though the Plan's own fields are never merged into
+ * `planLoad()`'s return value.
+ */
+export function loaderDevOnlyGatePlanCreated(): boolean {
+  return true;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Dev-only Gate Plan
+ * `shouldEvaluate` field — the same answer as
+ * `FedosWasmLoaderDevOnlyGatePlan.shouldEvaluate`. Fixed `false` — no
+ * parameter or override anywhere can flip it; no environment variable
+ * is ever read to compute it.
+ */
+export function loaderDevOnlyGatePlanShouldEvaluate(): boolean {
+  return false;
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Dev-only Gate Plan
+ * `backend` field — the same answer as
+ * `FedosWasmLoaderDevOnlyGatePlan.backend`. Fixed `"Wasm"`.
+ */
+export function loaderDevOnlyGatePlanBackend(): "Wasm" {
+  return "Wasm";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Dev-only Gate Plan `reason`
+ * field — the same answer as
+ * `FedosWasmLoaderDevOnlyGatePlan.reason`. Fixed
+ * `"BlockedByGeneratedArtifactCheckPlan"` — the Generated Artifact
+ * Check Plan one level up already said `shouldCheck: false`;
+ * `"PrototypeDisabled"`/`"DevelopmentGateUnavailable"` are the OTHER
+ * two labels the type permits but this stage never produces.
+ */
+export function loaderDevOnlyGatePlanReason():
+  | "BlockedByGeneratedArtifactCheckPlan"
+  | "PrototypeDisabled"
+  | "DevelopmentGateUnavailable" {
+  return "BlockedByGeneratedArtifactCheckPlan";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Dev-only Gate Plan
+ * `currentStage` field — the same answer as
+ * `FedosWasmLoaderDevOnlyGatePlan.currentStage`. Fixed
+ * `"DevOnlyGatePlanning"`.
+ */
+export function loaderDevOnlyGatePlanCurrentStage(): "DevOnlyGatePlanning" {
+  return "DevOnlyGatePlanning";
+}
+
+/**
+ * Pure, standalone: the loader's own fixed Dev-only Gate Plan
+ * `nextRequiredCheck` field — the same answer as
+ * `FedosWasmLoaderDevOnlyGatePlan.nextRequiredCheck`. Fixed
+ * `"ImportPlanning"` — NAMES, without PERFORMING, the very next gate a
+ * future, separate, explicitly-reviewed stage (Phase 018+) would need
+ * to add.
+ */
+export function loaderDevOnlyGatePlanNextRequiredCheck(): "ImportPlanning" {
+  return "ImportPlanning";
 }
