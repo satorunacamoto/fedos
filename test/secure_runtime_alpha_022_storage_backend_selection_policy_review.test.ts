@@ -322,10 +322,10 @@ describe("Secure Runtime Alpha 022 -- Storage Backend Selection Policy Review, r
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("20. no fedos_*.ts file was added or removed by this Stage -- still exactly 53 files (documentation-only Stage)", () => {
+  it("20. no fedos_*.ts file was added or removed by THIS Stage -- exactly 53 files AS OF Alpha 022's own scope (Secure Runtime Alpha 023 later added a 54th and 55th, fedos_windows_dpapi_helper.ts/fedos_runtime_storage_backend_windows_dpapi.ts, implementing the DPAPI backend this Stage's own review recommended)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(53);
+    expect(Object.keys(files).length).toBe(55);
   });
 });

@@ -155,7 +155,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(53);
+    expect(names.length).toBe(55);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts.
     // Stage 1005 (Secure Runtime Alpha 010) adds a THIRD, separate,
@@ -175,6 +175,10 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     // exception -- fedos_runtime_storage_backend.ts/
     // fedos_runtime_storage_resolver.ts, the Storage Backend Interface
     // (+Memory implementation) and Storage Resolver.
+    // Secure Runtime Alpha 023 adds a TWELFTH and THIRTEENTH, separate,
+    // later exception -- fedos_windows_dpapi_helper.ts/
+    // fedos_runtime_storage_backend_windows_dpapi.ts, the Windows DPAPI
+    // bridge and the SECOND RuntimeStorageBackend implementation.
     expect(names).toEqual(
       [
         ...knownNames,
@@ -189,6 +193,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
         "fedos_runtime_mode_authority.ts",
         "fedos_runtime_storage_backend.ts",
         "fedos_runtime_storage_resolver.ts",
+        "fedos_windows_dpapi_helper.ts",
+        "fedos_runtime_storage_backend_windows_dpapi.ts",
       ].sort(),
     );
   });
