@@ -296,10 +296,7 @@ describe("Secure Runtime Alpha 023 -- Windows DPAPI Storage Backend, Memory Back
     expect(codeOnlyLines(storageBackendSource)).not.toMatch(/WindowsDpapi|dpapi|powershell/i);
   });
 
-  it("19. the Storage Resolver is confirmed BYTE-FOR-BYTE unchanged -- still hardcoded to MemoryStorageBackend only, no reference to WindowsDpapiStorageBackend of any kind", () => {
-    const codeOnly = codeOnlyLines(storageResolverSource);
-    expect(codeOnly).toMatch(/return sharedBackend;/);
-    expect(codeOnly).not.toMatch(/WindowsDpapi|dpapi|powershell/i);
+  it("19. the Storage Resolver was still hardcoded to MemoryStorageBackend only AS OF Alpha 023's own scope (Secure Runtime Alpha 024 later wired WindowsDpapiStorageBackend in for real, gated on Development Runtime AND Windows platform both) -- exportedFns unchanged, and under this test's own ambient (non-Development) NODE_ENV, resolution still yields MemoryStorageBackend today", () => {
     const exportedFns = [...storageResolverSource.matchAll(/^export (?:async )?function (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -440,10 +437,10 @@ describe("Secure Runtime Alpha 023 -- Windows DPAPI Storage Backend, Memory Back
     expect(pkg.dependencies ?? {}).not.toHaveProperty("keytar");
   });
 
-  it("26. exactly two new fedos_*.ts files were added by this Stage -- still 55 total", () => {
+  it("26. exactly two new fedos_*.ts files were added by THIS Stage -- 55 total AS OF Alpha 023's own scope (Secure Runtime Alpha 024 later added a 56th, fedos_runtime_platform_authority.ts)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(55);
+    expect(Object.keys(files).length).toBe(56);
   });
 });

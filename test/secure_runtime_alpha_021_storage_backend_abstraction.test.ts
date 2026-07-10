@@ -134,16 +134,11 @@ describe("Secure Runtime Alpha 021 -- Storage Backend Abstraction Layer, Public 
     expect(await backend.delete("id-1")).toBe(false);
   });
 
-  it("7. fedos_runtime_storage_resolver.ts exports exactly resolveRuntimeStorageBackend, and it is hardcoded -- no environment read, no platform detection, no switch condition of any kind", () => {
+  it("7. fedos_runtime_storage_resolver.ts exports exactly resolveRuntimeStorageBackend, and it was hardcoded with no environment/platform read AS OF Alpha 021's own scope -- Secure Runtime Alpha 024 later wired in a real Development+Windows-gated switch, per this file's own top-of-file 'a future Stage may add a real selection condition here' note", () => {
     const exportedFns = [...storageResolverSource.matchAll(/^export (?:async )?function (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
     expect(new Set(exportedFns)).toEqual(new Set(["resolveRuntimeStorageBackend"]));
-    const codeOnly = codeOnlyLines(storageResolverSource);
-    expect(codeOnly).not.toMatch(/process\.env/);
-    expect(codeOnly).not.toMatch(/platform|os\.type|navigator/i);
-    expect(codeOnly).not.toMatch(/\bif\s*\(/);
-    expect(codeOnly).not.toMatch(/switch\s*\(/);
   });
 
   it("8. resolveRuntimeStorageBackend() always returns the SAME shared MemoryStorageBackend instance across repeated calls (singleton, not fresh-per-call)", async () => {

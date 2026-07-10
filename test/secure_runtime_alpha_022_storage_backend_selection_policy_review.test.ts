@@ -144,15 +144,7 @@ describe("Secure Runtime Alpha 022 -- Storage Backend Selection Policy Review, r
     expect(alpha020DocSource).toMatch(/classifier/i);
   });
 
-  it("9. fedos_runtime_storage_resolver.ts is confirmed BYTE-FOR-BYTE unchanged from Alpha 021 -- still hardcoded to MemoryStorageBackend only, still no environment/platform read, still no reference to the Runtime Mode Authority", () => {
-    const codeOnly = codeOnlyLines(storageResolverSource);
-    expect(codeOnly).toMatch(/export function resolveRuntimeStorageBackend\(\): RuntimeStorageBackend \{/);
-    expect(codeOnly).toMatch(/return sharedBackend;/);
-    expect(codeOnly).not.toMatch(/process\.env/);
-    expect(codeOnly).not.toMatch(/process\.platform|os\.platform|navigator/i);
-    expect(codeOnly).not.toMatch(/\bif\s*\(/);
-    expect(codeOnly).not.toMatch(/switch\s*\(/);
-    expect(codeOnly).not.toMatch(/fedos_runtime_mode_authority|determineFedosRuntimeMode/);
+  it("9. fedos_runtime_storage_resolver.ts was confirmed BYTE-FOR-BYTE unchanged from Alpha 021 AS OF Alpha 022's own scope (a review-only Stage) -- still hardcoded to MemoryStorageBackend only, still no environment/platform read; Secure Runtime Alpha 024 later implemented exactly the Resolver-based switch this Stage's own §4 recommended, reading BOTH the Runtime Mode Authority and a new, separately-named Platform Authority as two independent classifiers, never merged into one", () => {
     const exportedFns = [...storageResolverSource.matchAll(/^export (?:async )?function (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -322,10 +314,10 @@ describe("Secure Runtime Alpha 022 -- Storage Backend Selection Policy Review, r
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("20. no fedos_*.ts file was added or removed by THIS Stage -- exactly 53 files AS OF Alpha 022's own scope (Secure Runtime Alpha 023 later added a 54th and 55th, fedos_windows_dpapi_helper.ts/fedos_runtime_storage_backend_windows_dpapi.ts, implementing the DPAPI backend this Stage's own review recommended)", () => {
+  it("20. no fedos_*.ts file was added or removed by THIS Stage -- exactly 53 files AS OF Alpha 022's own scope (Secure Runtime Alpha 023 later added a 54th and 55th, fedos_windows_dpapi_helper.ts/fedos_runtime_storage_backend_windows_dpapi.ts, implementing the DPAPI backend this Stage's own review recommended; Secure Runtime Alpha 024 later added a 56th, fedos_runtime_platform_authority.ts, and wired the DPAPI backend into the Resolver this Stage's own review designed for)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(55);
+    expect(Object.keys(files).length).toBe(56);
   });
 });

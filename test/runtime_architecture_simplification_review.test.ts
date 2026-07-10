@@ -93,7 +93,7 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     const names = Object.keys(files)
       .map((path) => path.split("/").pop() as string)
       .sort();
-    expect(names.length).toBe(55);
+    expect(names.length).toBe(56);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts -- the Runtime
     // Service for randomBytes(), same reasoning as
@@ -129,6 +129,10 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     // fedos_runtime_storage_backend_windows_dpapi.ts -- the Windows DPAPI
     // bridge and the SECOND RuntimeStorageBackend implementation it
     // powers, same reasoning.
+    // Secure Runtime Alpha 024 adds a FOURTEENTH, separate, later
+    // exception -- fedos_runtime_platform_authority.ts -- the shared
+    // Platform Authority the Storage Resolver now uses alongside the
+    // Runtime Mode Authority, same reasoning.
     expect(names).toEqual(
       [
         ...KNOWN_FEDOS_FILES,
@@ -145,6 +149,7 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
         "fedos_runtime_storage_resolver.ts",
         "fedos_windows_dpapi_helper.ts",
         "fedos_runtime_storage_backend_windows_dpapi.ts",
+        "fedos_runtime_platform_authority.ts",
       ].sort(),
     );
 
