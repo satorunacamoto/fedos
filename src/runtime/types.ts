@@ -38,6 +38,11 @@ import type { EntitlementProvider } from "../creator/entitlement.js";
 import type { RuntimeCryptoProvider } from "./crypto_provider.js";
 import type { RuntimeCapabilities } from "./fedos_runtime_prototype_execution.js";
 import type { AeadKeyHandle } from "./fedos_runtime_aead_key_generation.js";
+import type {
+  AeadCiphertextHandle,
+  AeadAlgorithm,
+  AeadAadDomain,
+} from "./fedos_runtime_encrypt.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -540,4 +545,36 @@ export interface AppRuntime {
    * `docs/secure_runtime_alpha_013_opaque_aead_key_handle_migration.md`.
    */
   readonly generateAeadKey: () => Promise<AeadKeyHandle | null>;
+  /**
+   * Stage 1009 (Secure Runtime Alpha 014) — the THIRD public Crypto API
+   * Runtime exposes, and the FIRST performing a real cryptographic
+   * OPERATION (as opposed to randomness/key generation). Internally
+   * calls `attemptDevOnlyRuntimeEncrypt()`
+   * (`fedos_runtime_encrypt.ts`) exactly once, which drives a FRESH
+   * `FedosWasmLoader` through the SAME six-condition chain, then calls
+   * the Rust Boundary's `encrypt_aead()` — a thin wrapper around the
+   * pre-existing, unchanged `fedos_encrypt()`. Fail Closed: resolves
+   * `null` whenever any of the Loader's own six conditions is unmet,
+   * `key` is not a genuine opaque handle, the export is absent, the
+   * call throws, the return value is not a genuine ciphertext handle,
+   * or Rust itself fails to encrypt — NEVER a partial/degraded result,
+   * and NEVER an exception escaping this field.
+   * **OPAQUE HANDLE ONLY**: `key` MUST be an `AeadKeyHandle` (Stage
+   * 1008) — no raw `Uint8Array` key is ever accepted anywhere in this
+   * field's own call chain. The returned `AeadCiphertextHandle` is
+   * likewise opaque — no raw ciphertext byte is ever exposed. The
+   * Ciphertext boundary's own final wire-format design remains a
+   * separate, later, unresolved question this field does not attempt
+   * to answer. `decrypt()`/`importKey()`/`exportKey()` remain
+   * unimplemented. Deliberately separate from
+   * `initializeCrypto`/`runtimeCapabilities`/`randomBytes`/
+   * `generateAeadKey` above, all UNCHANGED by this stage. See
+   * `docs/secure_runtime_alpha_014_encrypt_opaque_handle_api.md`.
+   */
+  readonly encrypt: (
+    key: AeadKeyHandle,
+    algorithm: AeadAlgorithm,
+    aadDomain: AeadAadDomain,
+    plaintext: Uint8Array,
+  ) => Promise<AeadCiphertextHandle | null>;
 }

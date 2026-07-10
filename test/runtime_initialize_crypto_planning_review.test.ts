@@ -155,17 +155,20 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(45);
+    expect(names.length).toBe(46);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts.
     // Stage 1005 (Secure Runtime Alpha 010) adds a THIRD, separate,
     // later exception -- fedos_runtime_aead_key_generation.ts.
+    // Stage 1009 (Secure Runtime Alpha 014) adds a FOURTH, separate,
+    // later exception -- fedos_runtime_encrypt.ts.
     expect(names).toEqual(
       [
         ...knownNames,
         "fedos_runtime_prototype_execution.ts",
         "fedos_runtime_random_bytes.ts",
         "fedos_runtime_aead_key_generation.ts",
+        "fedos_runtime_encrypt.ts",
       ].sort(),
     );
   });
@@ -186,8 +189,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(31);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
+    expect(pubFnNames.length).toBe(33);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
 
     const cargoCode = cargoTomlSource
       .split("\n")

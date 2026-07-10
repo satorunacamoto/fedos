@@ -1315,6 +1315,115 @@ export interface FedosWasmLoaderAeadKeyGenerationExecution {
 }
 
 /**
+ * Stage 1009 (Secure Runtime Alpha 014) — the PUBLIC, OPAQUE shape every
+ * layer above this file treats a genuine AEAD ciphertext handle as
+ * satisfying. Mirrors `AeadKeyHandle` (Stage 1008) exactly, one field
+ * for the same reason: `kind` is a FIXED, non-secret label — never
+ * derived from ciphertext bytes — used ONLY so this file's own
+ * `isAeadCiphertextHandleShape()` (below) can structurally confirm
+ * "this is genuinely a handle" before ever passing a value upward.
+ * Deliberately minimal: no `bytes`/`ciphertext`/`nonce`/`export*`/
+ * `serialize*` field, no `toJSON`/`toString` override, and no other
+ * property is declared here. The ACTUAL runtime value crossing the WASM
+ * boundary is the real, wasm-bindgen-generated `AeadCiphertextHandle`
+ * class instance (`lib.rs`) — this file never constructs a synthetic
+ * substitute, unwraps it, or copies any field out of it. The Ciphertext
+ * boundary's own final wire-format design remains a separate, later,
+ * unresolved question — this type does not attempt to answer it.
+ */
+export interface AeadCiphertextHandle {
+  readonly kind: "AeadCiphertextHandle";
+}
+
+/**
+ * PRIVATE — structural Fail-Closed validation for a candidate value
+ * returned by `module.encrypt_aead()`. Mirrors `isAeadKeyHandleShape()`
+ * exactly: returns `true` only when `value` is a non-null object whose
+ * own `kind` property is EXACTLY the literal `"AeadCiphertextHandle"` —
+ * never `instanceof`, never a deep inspection of any other property.
+ */
+function isAeadCiphertextHandleShape(value: unknown): value is AeadCiphertextHandle {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { kind?: unknown }).kind === "AeadCiphertextHandle"
+  );
+}
+
+/**
+ * Stage 1009 (Secure Runtime Alpha 014) — the PUBLIC label an `encrypt()`
+ * caller selects an AEAD algorithm with. A hand-declared TS union,
+ * deliberately NOT imported from any generated glue type (none is ever
+ * committed to this repository) — `attemptDevOnlyEncryptCall()` (below)
+ * maps each label to the exact numeric discriminant
+ * `packages/fedos-core-rust/src/lib.rs`'s own `FedosAeadAlgorithm`
+ * declares (`ChaCha20Poly1305 = 0`, `Aes256Gcm = 1`), verified against
+ * the real generated `.d.ts` during this Stage's own build-and-inspect
+ * step.
+ */
+export type AeadAlgorithm = "ChaCha20Poly1305" | "Aes256Gcm";
+
+/**
+ * Stage 1009 (Secure Runtime Alpha 014) — the PUBLIC label an `encrypt()`
+ * caller selects a fixed AAD-binding domain with. Same discipline as
+ * `AeadAlgorithm` above: a hand-declared TS union, mapped to
+ * `FedosAeadAadDomain`'s own declaration-order discriminants
+ * (`RootKey = 0`, `Identity = 1`, `Storage = 2`, `Conversation = 3`,
+ * `TestOnly = 4`).
+ */
+export type AeadAadDomain = "RootKey" | "Identity" | "Storage" | "Conversation" | "TestOnly";
+
+/** PRIVATE — `AeadAlgorithm` label to `lib.rs`'s own numeric discriminant. */
+const AEAD_ALGORITHM_DISCRIMINANTS: Readonly<Record<AeadAlgorithm, number>> = {
+  ChaCha20Poly1305: 0,
+  Aes256Gcm: 1,
+};
+
+/** PRIVATE — `AeadAadDomain` label to `lib.rs`'s own numeric discriminant. */
+const AEAD_AAD_DOMAIN_DISCRIMINANTS: Readonly<Record<AeadAadDomain, number>> = {
+  RootKey: 0,
+  Identity: 1,
+  Storage: 2,
+  Conversation: 3,
+  TestOnly: 4,
+};
+
+/**
+ * Stage 1009 (Secure Runtime Alpha 014) — the result of a REAL attempt
+ * (or deliberate non-attempt) to call the retained JS glue module's own
+ * `encrypt_aead` property as a function, with the caller's
+ * `key`/`algorithm`/`aadDomain`/`plaintext`. Mirrors
+ * `FedosWasmLoaderAeadKeyGenerationExecution` (Stage 1008) exactly, one
+ * field for one Rust Boundary export. `ciphertextHandle` is the value
+ * returned by `module.encrypt_aead()` on success, structurally verified
+ * by `isAeadCiphertextHandleShape()` above, or `null` on every other
+ * outcome — NEVER any other value type, and NEVER the module itself.
+ * `reason: "InvalidKeyHandle"` is a NEW outcome this Stage adds, checked
+ * BEFORE `module.encrypt_aead` is ever called: the caller's own `key`
+ * argument is validated via `isAeadKeyHandleShape()` first, so an
+ * obviously-wrong `key` (not a genuine `AeadKeyHandle`) never reaches
+ * the WASM call at all. `succeeded: true` NAMES that the call resolved
+ * a genuine `AeadCiphertextHandle` — it is NEVER read by `planLoad()`'s
+ * `if` conditions, never read by
+ * `initializeCrypto()`/`runtimeCapabilities()`/`randomBytes()`/
+ * `generateAeadKey()`, and never surfaced in Runtime/Worker diagnostics.
+ */
+export interface FedosWasmLoaderEncryptExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly ciphertextHandle: AeadCiphertextHandle | null;
+  readonly reason:
+    | "Succeeded"
+    | "InvalidKeyHandle"
+    | "EncryptionFailed"
+    | "InvalidCiphertextShape"
+    | "NotInitialized"
+    | "EncryptUnavailable"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
@@ -1443,6 +1552,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * does not reference this field at all.
    */
   #aeadKeyGenerationExecution: FedosWasmLoaderAeadKeyGenerationExecution | null = null;
+
+  /**
+   * Stage 1009 (Secure Runtime Alpha 014) — holds the most recent REAL
+   * Rust `encrypt_aead()` call result recorded by
+   * `attemptDevOnlyEncryptCall()`, or `null` before that method has
+   * ever been called on this instance. Read via `encryptExecution()`;
+   * NEVER read by `planLoad()`, which does not reference this field at
+   * all.
+   */
+  #encryptExecution: FedosWasmLoaderEncryptExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -1786,6 +1905,17 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   aeadKeyGenerationExecution(): FedosWasmLoaderAeadKeyGenerationExecution | null {
     return this.#aeadKeyGenerationExecution;
+  }
+
+  /**
+   * Stage 1009 (Secure Runtime Alpha 014) — returns the most recent REAL
+   * Rust `encrypt_aead()` call result recorded by
+   * `attemptDevOnlyEncryptCall()`, or `null` if that method has never
+   * been called on this instance. Reading this value NEVER triggers a
+   * new call. Not part of the `FedosWasmLoader` interface.
+   */
+  encryptExecution(): FedosWasmLoaderEncryptExecution | null {
+    return this.#encryptExecution;
   }
 
   /**
@@ -2176,6 +2306,117 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#aeadKeyGenerationExecution = result;
+    return result;
+  }
+
+  /**
+   * Stage 1009 (Secure Runtime Alpha 014) — PUBLIC, ASYNC. The Rust
+   * Boundary reach for `AppRuntime.encrypt()`, gated on the SAME six
+   * previously-recorded conditions
+   * (`this.#generatedArtifactCheckResult`, `this.#devOnlyGateEvaluation`,
+   * `this.#importReadiness`, `this.#importExecution`,
+   * `this.#jsGlueModule !== null`, and
+   * `this.#wasmInitialization.succeeded`) every other Rust Boundary
+   * reach method already uses:
+   *   - Any of the six missing entirely (`null`): `module.encrypt_aead`
+   *     is NEVER read; resolves `{ attempted: false, succeeded: false,
+   *     ciphertextHandle: null, reason: "PrototypeStillClosed" }`.
+   *   - All six present but at least one condition unmet:
+   *     `module.encrypt_aead` is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, ciphertextHandle: null,
+   *     reason: "NotInitialized" }`.
+   *   - All six satisfied, but `key` does NOT structurally satisfy
+   *     `isAeadKeyHandleShape()`: `module.encrypt_aead` is NEVER called
+   *     at all — resolves `{ attempted: true, succeeded: false,
+   *     ciphertextHandle: null, reason: "InvalidKeyHandle" }`. This
+   *     check runs BEFORE the export-presence check below, so an
+   *     obviously-wrong `key` never reaches the WASM call regardless of
+   *     whether the export itself exists.
+   *   - All six satisfied and `key` is structurally valid: checks, AT
+   *     RUNTIME, ONLY `typeof module.encrypt_aead === "function"` — no
+   *     export-list enumeration or discovery of any kind. Absent:
+   *     resolves `{ attempted: true, succeeded: false, ciphertextHandle:
+   *     null, reason: "EncryptUnavailable" }`. Present: calls
+   *     `module.encrypt_aead(key, algorithm, aadDomain, plaintext)` —
+   *     `algorithm`/`aadDomain` translated from their PUBLIC string
+   *     labels to `lib.rs`'s own numeric discriminants via
+   *     `AEAD_ALGORITHM_DISCRIMINANTS`/`AEAD_AAD_DOMAIN_DISCRIMINANTS`
+   *     above — wrapped in `try`/`catch` that Fails Closed to
+   *     `{ attempted: true, succeeded: false, ciphertextHandle: null,
+   *     reason: "CallFailed" }` on ANY thrown/rejected error. A genuine
+   *     `undefined` return (Rust's own `InvalidKey`/`NonceUnavailable`/
+   *     `InternalFailure`, all collapsed by `encrypt_aead()` itself)
+   *     resolves `{ attempted: true, succeeded: false, ciphertextHandle:
+   *     null, reason: "EncryptionFailed" }` — NOT `"CallFailed"`, since
+   *     nothing threw. A genuine return that is NEITHER `undefined` NOR
+   *     structurally a real ciphertext handle (per
+   *     `isAeadCiphertextHandleShape()` above) resolves
+   *     `{ attempted: true, succeeded: false, ciphertextHandle: null,
+   *     reason: "InvalidCiphertextShape" }`. On a structurally genuine
+   *     handle: resolves `{ attempted: true, succeeded: true,
+   *     ciphertextHandle: <AeadCiphertextHandle>, reason: "Succeeded" }`.
+   * Never inspects, destructures, or retains the module itself, and
+   * never reads a byte out of `key` or the returned ciphertext handle —
+   * only the returned `AeadCiphertextHandle` (or `null`) is ever stored,
+   * on `this.#encryptExecution`, readable via the new PUBLIC
+   * `encryptExecution()` method. Never calls any Rust API other than
+   * `encrypt_aead()` — no `decrypt`/`importKey`/`exportKey`/any other
+   * export. Called by NOTHING else in this file.
+   */
+  async attemptDevOnlyEncryptCall(
+    key: unknown,
+    algorithm: AeadAlgorithm,
+    aadDomain: AeadAadDomain,
+    plaintext: Uint8Array,
+  ): Promise<FedosWasmLoaderEncryptExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderEncryptExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, ciphertextHandle: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, ciphertextHandle: null, reason: "NotInitialized" };
+    } else if (!isAeadKeyHandleShape(key)) {
+      result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "InvalidKeyHandle" };
+    } else {
+      const candidate = module as { encrypt_aead?: unknown };
+      if (typeof candidate.encrypt_aead !== "function") {
+        result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "EncryptUnavailable" };
+      } else {
+        try {
+          const value: unknown = (
+            candidate.encrypt_aead as (
+              key: unknown,
+              algorithm: number,
+              aadDomain: number,
+              plaintext: Uint8Array,
+            ) => unknown
+          )(key, AEAD_ALGORITHM_DISCRIMINANTS[algorithm], AEAD_AAD_DOMAIN_DISCRIMINANTS[aadDomain], plaintext);
+          if (isAeadCiphertextHandleShape(value)) {
+            result = { attempted: true, succeeded: true, ciphertextHandle: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "EncryptionFailed" };
+          } else {
+            result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "InvalidCiphertextShape" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#encryptExecution = result;
     return result;
   }
 

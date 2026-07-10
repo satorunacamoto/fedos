@@ -237,6 +237,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
       // label) is the other new pub fn this Stage adds.
       "generate_aead_key_handle",
       "kind",
+      "encrypt_aead",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

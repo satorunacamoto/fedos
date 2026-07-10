@@ -303,10 +303,10 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(createRuntimeSource).not.toMatch(/fedos_generate_aead_key_32/);
   });
 
-  it("17. encrypt()/decrypt() are NOT implemented anywhere in this stage's new files", () => {
+  it("17. encrypt()/decrypt() are NOT implemented anywhere in this stage's own new files -- encrypt() was later added by Stage 1009 (Secure Runtime Alpha 014) to types.ts, an unrelated shared file; decrypt() remains unimplemented everywhere", () => {
     expect(keyGenerationServiceSource).not.toMatch(/fedos_encrypt|fedos_decrypt/);
     expect(keyGenerationServiceSource).not.toMatch(/\.\s*(encrypt|decrypt)\s*\(/);
-    expect(runtimeTypesSource).not.toMatch(/readonly encrypt:|readonly decrypt:/);
+    expect(runtimeTypesSource).not.toMatch(/readonly decrypt:/);
     expect(createRuntimeSource).not.toMatch(/fedos_encrypt|fedos_decrypt/);
   });
 
@@ -366,10 +366,10 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(31);
+    expect(pubFnNames.length).toBe(33);
     expect(pubFnNames).toContain("generate_aead_key_handle");
     expect(pubFnNames).not.toContain("generate_aead_key_32");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
 
     const cargoCode = cargoTomlSource
       .split("\n")

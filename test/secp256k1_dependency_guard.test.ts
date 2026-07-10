@@ -174,7 +174,7 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
 
   it("12. the crate's public pub fn surface is unchanged at twenty-seven — no public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(31);
+    expect(pubFnNames.length).toBe(33);
     for (const name of pubFnNames) {
       expect(name.toLowerCase()).not.toContain("ecdh");
       expect(name.toLowerCase()).not.toContain("conversation");

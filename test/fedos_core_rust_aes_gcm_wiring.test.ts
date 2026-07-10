@@ -192,8 +192,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "random_bytes_32",
       "generate_aead_key_handle",
       "kind",
+      "kind",
+      "encrypt_aead",
     ];
-    expect(pubFnNames.length).toBe(31);
+    expect(pubFnNames.length).toBe(33);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -322,6 +324,16 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // non-secret label) is the other new pub fn this Stage adds.
       "generate_aead_key_handle",
       "kind",
+      // Stage 1009's thin wasm_bindgen wrapper around the pre-existing
+      // fedos_encrypt() -- see
+      // test/secure_runtime_alpha_014_encrypt_opaque_handle_api.test.ts
+      // for the dedicated checks that it implements no new algorithm.
+      // The new AeadCiphertextHandle opaque class's own `kind` getter
+      // reuses the SAME name as AeadKeyHandle's own (already listed
+      // above) -- both are separate impl blocks, so the name appears
+      // twice in the real pub fn list but only needs listing once in
+      // this Set.
+      "encrypt_aead",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

@@ -341,10 +341,10 @@ describe("Secure Runtime Alpha 013 -- Opaque AEAD Key Handle Migration, Fail Clo
     );
   });
 
-  it("18. encrypt()/decrypt()/importKey()/exportKey() are NOT implemented anywhere in this stage's changed files", () => {
+  it("18. decrypt()/importKey()/exportKey() are NOT implemented anywhere in this stage's changed files -- encrypt() was later added by Stage 1009 (Secure Runtime Alpha 014) to types.ts, an unrelated shared file", () => {
     expect(keyGenerationServiceSource).not.toMatch(/fedos_encrypt|fedos_decrypt/);
     expect(keyGenerationServiceSource).not.toMatch(/\.\s*(encrypt|decrypt|importKey|exportKey)\s*\(/);
-    expect(runtimeTypesSource).not.toMatch(/readonly encrypt:|readonly decrypt:|readonly importKey:|readonly exportKey:/);
+    expect(runtimeTypesSource).not.toMatch(/readonly decrypt:|readonly importKey:|readonly exportKey:/);
     expect(createRuntimeSource).not.toMatch(/fedos_encrypt|fedos_decrypt/);
     expect(libRsSource).not.toMatch(/pub fn import_key\b|pub fn export_key\b/);
   });
@@ -422,11 +422,11 @@ describe("Secure Runtime Alpha 013 -- Opaque AEAD Key Handle Migration, Fail Clo
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(31);
+    expect(pubFnNames.length).toBe(33);
     expect(pubFnNames).toContain("generate_aead_key_handle");
     expect(pubFnNames).toContain("kind");
     expect(pubFnNames).not.toContain("generate_aead_key_32");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
 
     const cargoCode = cargoTomlSource
       .split("\n")

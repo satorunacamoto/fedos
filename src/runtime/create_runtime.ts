@@ -80,6 +80,20 @@
  * UNCHANGED — `generateAeadKey` is imported and assigned exactly as
  * before; only the imported function's own return type changed, in
  * `fedos_runtime_aead_key_generation.ts`.
+ *
+ * Stage 1009 (Secure Runtime Alpha 014) adds `encrypt`
+ * (`encrypt()`, `fedos_runtime_encrypt.ts`, Stage 1009) to the assembled
+ * `AppRuntime` — the THIRD public Crypto API, and the FIRST performing
+ * a real cryptographic operation. It is a FIFTH, entirely separate
+ * field alongside `initializeCrypto`/`runtimeCapabilities`/
+ * `randomBytes`/`generateAeadKey` — none of which is modified, called,
+ * or read by this new field's own implementation. `encrypt()` accepts
+ * ONLY an opaque `AeadKeyHandle` (Stage 1008) — never a raw key byte —
+ * and internally drives its own fresh `FedosWasmLoader` through the
+ * SAME six-condition chain before calling the Rust Boundary's own thin
+ * wrapper export. No Worker/Production connection, no Secure Storage of
+ * any kind, no new build dependency of any kind. `decrypt()`/
+ * `importKey()`/`exportKey()` remain unimplemented.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -158,6 +172,7 @@ import { createCryptoLoaderFacade } from "./fedos_crypto_loader_facade.js";
 import { runtimeCapabilities } from "./fedos_runtime_prototype_execution.js";
 import { randomBytes } from "./fedos_runtime_random_bytes.js";
 import { generateAeadKey } from "./fedos_runtime_aead_key_generation.js";
+import { encrypt } from "./fedos_runtime_encrypt.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -737,5 +752,6 @@ export function createRuntime(
     runtimeCapabilities,
     randomBytes,
     generateAeadKey,
+    encrypt,
   };
 }

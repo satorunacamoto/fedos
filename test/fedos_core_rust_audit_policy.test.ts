@@ -136,8 +136,10 @@ describe("FedOS Rust crate — internal audit policy skeleton", () => {
       "random_bytes_32",
       "generate_aead_key_handle",
       "kind",
+      "kind",
+      "encrypt_aead",
     ];
-    expect(pubFnNames.length).toBe(31);
+    expect(pubFnNames.length).toBe(33);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

@@ -184,8 +184,8 @@ describe("Secure Runtime Alpha 004 Runtime State Model Review -- review only, no
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(31);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
+    expect(pubFnNames.length).toBe(33);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_004_state_model_review/);
 
     const cargoCode = cargoTomlSource

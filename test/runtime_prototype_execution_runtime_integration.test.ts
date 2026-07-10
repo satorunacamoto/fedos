@@ -196,8 +196,8 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(31);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
+    expect(pubFnNames.length).toBe(33);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
 
     const cargoCode = cargoTomlSource
       .split("\n")

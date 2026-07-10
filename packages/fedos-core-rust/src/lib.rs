@@ -5786,6 +5786,16 @@ impl FedosCiphertextEnvelope {
 /// Mirrors `AeadCipher`'s two variants today; a future additional cipher
 /// would need its own reviewed addition to both this type and the
 /// conversion below.
+///
+/// Stage 1009 (Secure Runtime Alpha 014) adds a wasm_bindgen annotation
+/// — a pure export-surface change letting this fieldless enum cross the WASM
+/// boundary as a native JS enum (wasm-bindgen's own long-standing support
+/// for C-style enums, already reviewed by this arc's own earlier encrypt
+/// API surface review). Declaration order fixes the wire discriminant:
+/// `ChaCha20Poly1305 = 0`, `Aes256Gcm = 1` — no variant reordering is
+/// authorized without its own review, since `fedos_wasm_loader.ts`
+/// hand-maps these same two values.
+#[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FedosAeadAlgorithm {
     ChaCha20Poly1305,
@@ -5796,6 +5806,12 @@ pub enum FedosAeadAlgorithm {
 /// [`fedos_decrypt`] bind as Associated Data. A NEW public-facing type,
 /// deliberately SEPARATE from `crypto::aead_internal::AeadAadDomain`
 /// (which stays `pub(crate)`-only, unchanged since Stage 152–154).
+///
+/// Stage 1009 (Secure Runtime Alpha 014) adds a wasm_bindgen annotation,
+/// same reasoning as `FedosAeadAlgorithm` above. Declaration order fixes the
+/// wire discriminant: `RootKey = 0`, `Identity = 1`, `Storage = 2`,
+/// `Conversation = 3`, `TestOnly = 4`.
+#[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FedosAeadAadDomain {
     RootKey,
@@ -6085,12 +6101,6 @@ pub fn random_bytes_32() -> Option<Vec<u8>> {
 /// exposed — the ONLY way to obtain one is [`generate_aead_key_handle`].
 #[wasm_bindgen]
 pub struct AeadKeyHandle {
-    // Read by nothing yet in this Stage — `encrypt()`/`decrypt()` are
-    // still unimplemented (see this Stage's own forbidden-scope list). A
-    // future, separate, explicitly-reviewed Stage adds the crate's own
-    // `pub(crate) fn inner()` reviewed seam once it exists to consume it,
-    // mirroring `FedosAeadKeyHandle::inner()`'s own convention.
-    #[allow(dead_code)]
     inner: FedosAeadKeyHandle,
 }
 
@@ -6104,6 +6114,61 @@ impl AeadKeyHandle {
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> String {
         "AeadKeyHandle".to_string()
+    }
+}
+
+impl AeadKeyHandle {
+    /// Stage 1009 (Secure Runtime Alpha 014) — the crate-private reviewed
+    /// seam [`encrypt_aead`] uses to reach the real, permanently-opaque
+    /// [`FedosAeadKeyHandle`] this WASM-exported wrapper holds. Mirrors
+    /// `FedosAeadKeyHandle::inner()`'s own convention exactly — never
+    /// re-exported, never returns anything but a reference. This is the
+    /// consumer `AeadKeyHandle`'s own doc comment (Stage 1008) already
+    /// anticipated: "a future, separate, explicitly-reviewed Stage adds
+    /// the crate's own `pub(crate) fn inner()` reviewed seam once it
+    /// exists to consume it."
+    pub(crate) fn inner(&self) -> &FedosAeadKeyHandle {
+        &self.inner
+    }
+}
+
+/// Stage 1009 (Secure Runtime Alpha 014) — the crate's SECOND opaque
+/// wasm_bindgen-exported CLASS, mirroring [`AeadKeyHandle`] (Stage 1008)
+/// exactly. Wraps the existing, permanently-opaque [`FedosCiphertextEnvelope`]
+/// (Stage 171–176, UNCHANGED) so a genuine sealed envelope can cross the
+/// WASM boundary without ever being serialized, split into fields, or
+/// read for a raw ciphertext/nonce byte — the Ciphertext boundary's own
+/// final wire-format design remains UNDECIDED and unaddressed by this
+/// Stage, per this arc's own earlier encrypt-boundary review, exactly as
+/// the Alpha-limited scope this Stage's own design doc records. The
+/// wrapped `inner` field carries NO modifier (private), so
+/// no code outside this crate's own defining module can read or
+/// construct it. Derives nothing (no `Clone`/`Debug`/`Serialize`).
+/// Exposes exactly ONE method, `kind` — a fixed, non-secret label, same
+/// role as `AeadKeyHandle::kind`. No raw-byte getter, no `toBytes`/
+/// `serialize`-shaped method, and no public constructor are ever
+/// exposed — the ONLY way to obtain one is [`encrypt_aead`].
+#[wasm_bindgen]
+pub struct AeadCiphertextHandle {
+    // Read by nothing yet — `decrypt()` is unimplemented (see this
+    // Stage's own forbidden-scope list). A future, separate,
+    // explicitly-reviewed Stage adds this crate's own `pub(crate) fn
+    // inner()` reviewed seam once it exists to consume it, mirroring
+    // `AeadKeyHandle::inner()`'s own convention.
+    #[allow(dead_code)]
+    inner: FedosCiphertextEnvelope,
+}
+
+#[wasm_bindgen]
+impl AeadCiphertextHandle {
+    /// A FIXED, non-secret label — never derived from ciphertext bytes.
+    /// Exists solely so JS-side code can structurally confirm a value is
+    /// genuinely an `AeadCiphertextHandle` (Fail Closed on anything else)
+    /// without ever inspecting, serializing, or reading a raw byte of
+    /// the wrapped envelope.
+    #[wasm_bindgen(getter)]
+    pub fn kind(&self) -> String {
+        "AeadCiphertextHandle".to_string()
     }
 }
 
@@ -6127,6 +6192,53 @@ impl AeadKeyHandle {
 pub fn generate_aead_key_handle() -> Option<AeadKeyHandle> {
     let key_handle = fedos_generate_aead_key_32().key?;
     Some(AeadKeyHandle { inner: key_handle })
+}
+
+/// Stage 1009 (Secure Runtime Alpha 014) — the crate's FIFTH
+/// wasm_bindgen-annotated item, and the FIRST wasm-bindgen wrapper
+/// around a real cryptographic OPERATION (as opposed to randomness/key
+/// generation). A THIN wrapper around the EXISTING, byte-for-byte
+/// UNCHANGED [`fedos_encrypt`] (Stage 166–176) — calls it EXACTLY ONCE.
+/// NO new entropy source, NO new algorithm, NO new nonce policy: the
+/// seal performed here is the EXACT SAME `fedos_encrypt` call any other
+/// crate-internal caller would make.
+///
+/// Takes `key: &AeadKeyHandle` — a REFERENCE, not an owned value, so the
+/// caller's own handle is never consumed/dropped by one `encrypt_aead()`
+/// call and remains valid for a future call. Reaches the real,
+/// permanently-opaque `FedosAeadKeyHandle` via [`AeadKeyHandle::inner`]
+/// (this Stage's own new reviewed seam) — never reads, copies, or
+/// exposes a raw key byte. `algorithm`/`aad_domain` cross the boundary
+/// as their own already-wasm_bindgen-annotated public label enums
+/// (this Stage's other change to this file); `plaintext` crosses as a
+/// standard `&[u8]`/`Uint8Array`, the same pattern `fedos_encrypt`
+/// itself already uses.
+///
+/// On ANY non-`Ready` `FedosEncryptStatus` (`InvalidKey`/
+/// `NonceUnavailable`/`InternalFailure`), returns `None` — Fail Closed,
+/// collapsing all three failure causes into the same
+/// null-on-any-non-success pattern `random_bytes_32()`/
+/// `generate_aead_key_handle()` already established, never a partial
+/// result. On `Ready`, wraps the resulting `FedosCiphertextEnvelope` in
+/// the new opaque [`AeadCiphertextHandle`] WITHOUT ever reading a byte
+/// out of it — the Ciphertext boundary's own final wire-format design
+/// remains a separate, later, unresolved question. `fedos_encrypt()`'s
+/// own doc comment, behavior, and signature are all untouched by this
+/// Stage.
+#[wasm_bindgen]
+pub fn encrypt_aead(
+    key: &AeadKeyHandle,
+    algorithm: FedosAeadAlgorithm,
+    aad_domain: FedosAeadAadDomain,
+    plaintext: &[u8],
+) -> Option<AeadCiphertextHandle> {
+    let decision = fedos_encrypt(algorithm, key.inner(), aad_domain, plaintext);
+    match decision.status {
+        FedosEncryptStatus::Ready => decision
+            .envelope
+            .map(|envelope| AeadCiphertextHandle { inner: envelope }),
+        _ => None,
+    }
 }
 
 /// Stage 75 — RFC 8439 known-answer verification, `#[cfg(test)]` ONLY.
