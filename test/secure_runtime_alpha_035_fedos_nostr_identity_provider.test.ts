@@ -265,13 +265,13 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect(await second.describeIdentity()).toBeNull();
   });
 
-  it("17. resolveFedosIdentityProvider() (Alpha 032/034) is confirmed unchanged -- still resolves the shared NoopFedosIdentityProvider singleton, never a NostrIdentityProvider instance, and its own CODE (a pre-existing header comment already named NostrIdentityProvider as a future prose reference, per Alpha 034 -- excluded here via codeOnlyLines) neither imports nor instantiates it", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 036): resolveFedosIdentityProvider() (Alpha 032/034) was confirmed to still resolve the shared NoopFedosIdentityProvider singleton, never a NostrIdentityProvider instance, AS OF this Stage's own scope; Alpha 036 later re-wired it to return a shared NostrIdentityProvider singleton instead -- confirmed here as the CURRENT behavior, per this arc's own established ripple convention", () => {
     const resolved = resolveFedosIdentityProvider();
-    expect(resolved).toBeInstanceOf(NoopFedosIdentityProvider);
-    expect(resolved).not.toBeInstanceOf(NostrIdentityProvider);
-    expect(resolverSource).toMatch(/return sharedNoopProvider;/);
+    expect(resolved).toBeInstanceOf(NostrIdentityProvider);
+    expect(resolved).not.toBeInstanceOf(NoopFedosIdentityProvider);
+    expect(resolverSource).toMatch(/return sharedNostrProvider;/);
     const resolverCodeOnly = codeOnlyLines(resolverSource);
-    expect(resolverCodeOnly).not.toMatch(/fedos_nostr_identity_provider|NostrIdentityProvider/);
+    expect(resolverCodeOnly).toMatch(/fedos_nostr_identity_provider|NostrIdentityProvider/);
     expect(resolverSource).not.toMatch(/secure_runtime_alpha_035/);
   });
 
@@ -296,9 +296,10 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect(noopProviderSource).not.toMatch(/secure_runtime_alpha_035/);
   });
 
-  it("21. fedos_nostr_identity_provider.ts has ZERO importers anywhere in src/ -- every other identity/runtime/worker file's CODE (not prose comments -- the Resolver's own Alpha 034 header comment already named NostrIdentityProvider as a future reference) neither imports nor instantiates it", () => {
+  it("21. RIPPLE (Secure Runtime Alpha 036): fedos_nostr_identity_provider.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 036 later made fedos_identity_provider_resolver.ts its first (and, per that Stage's own mandate, only) real importer -- reconfirmed here as the CURRENT state via codeOnlyLines(), per this arc's own established ripple convention. Every other identity/runtime/worker file's CODE remains a non-importer", () => {
+    const resolverCodeOnly = codeOnlyLines(resolverSource);
+    expect(resolverCodeOnly).toMatch(/fedos_nostr_identity_provider|NostrIdentityProvider/);
     for (const source of [
-      resolverSource,
       serviceSource,
       noopProviderSource,
       descriptorSource,

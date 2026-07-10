@@ -10,6 +10,7 @@ import { importCiphertext } from "../src/runtime/fedos_runtime_import_ciphertext
 import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtime/fedos_runtime_ciphertext_storage.js";
 import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
 import { NoopFedosIdentityProvider } from "../src/identity/fedos_noop_identity_provider.js";
+import { NostrIdentityProvider } from "../src/identity/fedos_nostr_identity_provider.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_034_fedos_noop_resolver_wiring.md?raw";
@@ -164,7 +165,7 @@ describe("Secure Runtime Alpha 034 -- FedOS No-op Resolver Wiring, Resolver-only
     expect(designDocSource).toMatch(/Does \*\*not\*\* change `package\.json`/);
   });
 
-  it("9. fedos_identity_provider_resolver.ts exports EXACTLY resolveFedosIdentityProvider, with no branch, no environment/Authority/Storage-Resolver/Service reference", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 036): fedos_identity_provider_resolver.ts exports EXACTLY resolveFedosIdentityProvider, with no branch, no environment/Authority/Storage-Resolver/Service reference -- AS OF this Stage's own scope its CODE also referenced zero Nostr vocabulary; Alpha 036 later re-wired it to import and construct NostrIdentityProvider, so that specific exclusion is reconfirmed here as NO LONGER true, while every other exclusion still holds, per this arc's own established ripple convention", () => {
     const exportedFns = [...resolverSource.matchAll(/^export (?:async )?function (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -182,33 +183,38 @@ describe("Secure Runtime Alpha 034 -- FedOS No-op Resolver Wiring, Resolver-only
     expect(codeOnly).not.toMatch(/resolveRuntimeStorageBackend|fedos_runtime_storage_resolver/);
     expect(codeOnly).not.toMatch(/fedos_identity_service|FedosIdentityService/);
     expect(codeOnly).not.toMatch(/create_runtime|AppRuntime/);
-    expect(codeOnly).not.toMatch(/nostr|Nostr|NIP-|ActivityPub|Bluesky/i);
+    expect(codeOnly).toMatch(/NostrIdentityProvider/);
+    expect(codeOnly).not.toMatch(/NIP-|ActivityPub|Bluesky/i);
+    expect(codeOnly).not.toMatch(/relay|Relay|publish|subscribe|nsec|npub/);
     expect(codeOnly).not.toMatch(/Authenticat|Session|session|credential|Credential/);
   });
 
-  it("10. the function body is EXACTLY 'return sharedNoopProvider;', and exactly one NoopFedosIdentityProvider is ever constructed -- confirmed by literal string extraction", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 036): the function body was EXACTLY 'return sharedNoopProvider;', with exactly one NoopFedosIdentityProvider construction, AS OF this Stage's own scope; Alpha 036 later changed the body to 'return sharedNostrProvider;', constructing NostrIdentityProvider instead and zero NoopFedosIdentityProvider constructions -- confirmed here by literal string extraction of the CURRENT source", () => {
     const body = (
       resolverSource.match(/export function resolveFedosIdentityProvider\(\): FedosIdentityProvider \| null \{([\s\S]*?)\n\}/) ?? []
     )[1] ?? "";
-    expect(body.trim()).toBe("return sharedNoopProvider;");
+    expect(body.trim()).toBe("return sharedNostrProvider;");
 
-    const constructions = [...resolverSource.matchAll(/new NoopFedosIdentityProvider\(\)/g)];
-    expect(constructions.length).toBe(1);
+    const noopConstructions = [...resolverSource.matchAll(/new NoopFedosIdentityProvider\(\)/g)];
+    expect(noopConstructions.length).toBe(0);
+    const nostrConstructions = [...resolverSource.matchAll(/new NostrIdentityProvider\(\)/g)];
+    expect(nostrConstructions.length).toBe(1);
   });
 
-  it("11. behavioral: resolveFedosIdentityProvider() returns a real NoopFedosIdentityProvider, the SAME shared instance on every call (singleton, not fresh-per-call), never null", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 036): behavioral -- resolveFedosIdentityProvider() returned a real NoopFedosIdentityProvider, the SAME shared instance on every call, AS OF this Stage's own scope; Alpha 036 later re-wired it to return a real NostrIdentityProvider instead -- still the SAME shared instance on every call (singleton, not fresh-per-call), never null -- confirmed here as the CURRENT behavior", () => {
     const first = resolveFedosIdentityProvider();
     const second = resolveFedosIdentityProvider();
     const third = resolveFedosIdentityProvider();
-    expect(first).toBeInstanceOf(NoopFedosIdentityProvider);
+    expect(first).toBeInstanceOf(NostrIdentityProvider);
+    expect(first).not.toBeInstanceOf(NoopFedosIdentityProvider);
     expect(first).toBe(second);
     expect(second).toBe(third);
     expect(first).not.toBeNull();
   });
 
-  it("12. behavioral: the resolved Provider reports provider === 'noop' and describeIdentity() always resolves null", async () => {
+  it("12. RIPPLE (Secure Runtime Alpha 036): behavioral -- the resolved Provider reported provider === 'noop' AS OF this Stage's own scope; Alpha 036 later re-wired the Resolver so it now reports provider === 'nostr' instead -- describeIdentity() still always resolves null either way, confirmed here as the CURRENT behavior", async () => {
     const provider = resolveFedosIdentityProvider();
-    expect(provider?.provider).toBe("noop");
+    expect(provider?.provider).toBe("nostr");
     expect(await provider?.describeIdentity()).toBeNull();
     expect(await provider?.describeIdentity()).toBeNull();
   });

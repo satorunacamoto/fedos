@@ -171,12 +171,12 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
     expect(codeOnly).not.toMatch(/fedos_identity_service|FedosIdentityService/);
   });
 
-  it("9. RIPPLE (Secure Runtime Alpha 034): the function body was 'return null;' AS OF this Stage's own scope; Alpha 034 later changed it to return a shared NoopFedosIdentityProvider singleton -- confirmed here by literal string extraction of the CURRENT body, per this arc's own established ripple convention", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 034, then Alpha 036): the function body was 'return null;' AS OF this Stage's own scope; Alpha 034 later changed it to return a shared NoopFedosIdentityProvider singleton, and Alpha 036 later changed it again to return a shared NostrIdentityProvider singleton -- confirmed here by literal string extraction of the CURRENT body, per this arc's own established ripple convention", () => {
     const body = (resolverSource.match(/export function resolveFedosIdentityProvider\(\): FedosIdentityProvider \| null \{([\s\S]*?)\n\}/) ?? [])[1] ?? "";
-    expect(body.trim()).toBe("return sharedNoopProvider;");
+    expect(body.trim()).toBe("return sharedNostrProvider;");
   });
 
-  it("10. RIPPLE (Secure Runtime Alpha 034): behavioral -- resolveFedosIdentityProvider() resolved null on every call AS OF this Stage's own scope; now resolves the SAME shared NoopFedosIdentityProvider singleton on every call, per Alpha 034's own wiring -- see test/secure_runtime_alpha_034_fedos_noop_resolver_wiring.test.ts for that Stage's own full behavioral coverage", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 034, then Alpha 036): behavioral -- resolveFedosIdentityProvider() resolved null on every call AS OF this Stage's own scope; Alpha 034 wired in a shared NoopFedosIdentityProvider singleton, and Alpha 036 later re-wired it to a shared NostrIdentityProvider singleton instead -- the SAME shared instance is still returned on every call, per whichever Stage's own wiring is CURRENT -- see test/secure_runtime_alpha_036_fedos_nostr_resolver_wiring.test.ts for that Stage's own full behavioral coverage", () => {
     const first = resolveFedosIdentityProvider();
     const second = resolveFedosIdentityProvider();
     expect(first).not.toBeNull();
