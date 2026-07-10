@@ -1103,12 +1103,14 @@ describe("Secure Runtime Alpha 050-052 -- Identity Runtime Integration Arc, inte
     expect(fedosRuntimeIdentitySource.length).toBeLessThan(6000);
   });
 
-  it("116. RIPPLE (Secure Runtime Alpha 053-055): create_runtime.ts's own new construction block was exactly two statements -- the const declaration immediately followed by a bare `void runtimeIdentity;` -- AS OF Alpha 050-052's own scope; Alpha 055 later replaced the bare void statement with an actual, discarded, rejection-swallowed describeIdentity() call -- reconfirmed here as the CURRENT two-statement block, per this arc's own established ripple convention", () => {
-    expect(createRuntimeSource).toMatch(/const runtimeIdentity: FedosRuntimeIdentity = new FedosRuntimeIdentity\(\);/);
-    expect(createRuntimeSource).toMatch(/void runtimeIdentity\.describeIdentity\(\)\.catch\(\(\) => \{\}\);/);
-    const constIndex = createRuntimeSource.indexOf("const runtimeIdentity: FedosRuntimeIdentity");
-    const voidIndex = createRuntimeSource.indexOf("void runtimeIdentity.describeIdentity()");
-    const returnIndex = createRuntimeSource.indexOf("return {", voidIndex);
+  it("116. RIPPLE (Secure Runtime Alpha 057): create_runtime.ts's own construction block was exactly two statements -- the const declaration immediately followed by a bare `void runtimeIdentity;` -- AS OF Alpha 050-052's own scope; Alpha 055 replaced the bare void statement with an actual, discarded, rejection-swallowed describeIdentity() call, and Alpha 057 (implementing the Alpha 056 Decision) REMOVED that call, restoring the bare `void runtimeIdentity;` shape -- reconfirmed here as the CURRENT two-statement block within createRuntime()'s own function body (the header comment's own historical prose, which legitimately still names the removed Alpha 055 call, is intentionally excluded from this check), per this arc's own established ripple convention", () => {
+    const body = (createRuntimeSource.match(/export function createRuntime\(([\s\S]*?)\n\}/) ?? [])[1] ?? "";
+    expect(body).toMatch(/const runtimeIdentity: FedosRuntimeIdentity = new FedosRuntimeIdentity\(\);/);
+    expect(body).toMatch(/void runtimeIdentity;/);
+    expect(body).not.toMatch(/void runtimeIdentity\.describeIdentity\(\)\.catch\(\(\) => \{\}\);/);
+    const constIndex = body.indexOf("const runtimeIdentity: FedosRuntimeIdentity");
+    const voidIndex = body.indexOf("void runtimeIdentity;");
+    const returnIndex = body.indexOf("return {", voidIndex);
     expect(constIndex).toBeGreaterThan(-1);
     expect(voidIndex).toBeGreaterThan(constIndex);
     expect(returnIndex).toBeGreaterThan(voidIndex);

@@ -369,10 +369,10 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
   // Alpha 055: create_runtime.ts's own new startup call
   // ---------------------------------------------------------------------
 
-  it("28. create_runtime.ts calls runtimeIdentity.describeIdentity() exactly once, chained with .catch(() => {})", () => {
+  it("28. RIPPLE (Secure Runtime Alpha 057): create_runtime.ts called runtimeIdentity.describeIdentity() exactly once, chained with .catch(() => {}), AS OF this Stage's own Alpha 055 scope; Alpha 057 (implementing the Alpha 056 Decision) removed that call -- reconfirmed here that create_runtime.ts's own createRuntime() body now calls describeIdentity() ZERO times", () => {
     const body = (createRuntimeSource.match(/export function createRuntime\(([\s\S]*?)\n\}/) ?? [])[1] ?? "";
-    expect([...body.matchAll(/\.describeIdentity\(\)/g)].length).toBe(1);
-    expect(body).toMatch(/void runtimeIdentity\.describeIdentity\(\)\.catch\(\(\) => \{\}\);/);
+    expect([...body.matchAll(/\.describeIdentity\(\)/g)].length).toBe(0);
+    expect(body).not.toMatch(/void runtimeIdentity\.describeIdentity\(\)\.catch\(\(\) => \{\}\);/);
   });
 
   it("29. the describeIdentity() call is never awaited -- no 'await runtimeIdentity' anywhere in create_runtime.ts", () => {
@@ -390,14 +390,14 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     expect(typeof result.mode).toBe("string");
   });
 
-  it("32. the describeIdentity() call happens AFTER FedosRuntimeIdentity construction and BEFORE the AppRuntime return statement", () => {
+  it("32. RIPPLE (Secure Runtime Alpha 057): the describeIdentity() call happened AFTER FedosRuntimeIdentity construction and BEFORE the AppRuntime return statement, AS OF this Stage's own Alpha 055 scope; Alpha 057 removed the call entirely -- reconfirmed here that no describeIdentity() call exists anywhere in createRuntime()'s own body, between construction and the return statement", () => {
     const body = (createRuntimeSource.match(/export function createRuntime\(([\s\S]*?)\n\}/) ?? [])[1] ?? "";
     const constructIndex = body.indexOf("new FedosRuntimeIdentity()");
     const callIndex = body.indexOf(".describeIdentity()");
     const returnIndex = body.indexOf("return {");
     expect(constructIndex).toBeGreaterThan(-1);
-    expect(callIndex).toBeGreaterThan(constructIndex);
-    expect(returnIndex).toBeGreaterThan(callIndex);
+    expect(callIndex).toBe(-1);
+    expect(returnIndex).toBeGreaterThan(constructIndex);
   });
 
   it("33. the AppRuntime return statement itself does not reference describeIdentity, runtimeIdentity, or FedosRuntimeIdentity", () => {

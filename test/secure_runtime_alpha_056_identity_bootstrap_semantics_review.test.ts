@@ -281,14 +281,15 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
   // Regression: NO implementation file touched by this review Stage
   // ---------------------------------------------------------------------
 
-  it("27. Regression: create_runtime.ts's own construction block is confirmed BYTE-FOR-BYTE unchanged from Alpha 055 -- exact two-statement shape", () => {
+  it("27. RIPPLE (Secure Runtime Alpha 057): create_runtime.ts's own construction block was confirmed BYTE-FOR-BYTE unchanged from Alpha 055 AS OF this Stage's own review-only scope; Alpha 057 (implementing this Stage's own Decision) removed the describeIdentity() call -- reconfirmed here as the CURRENT two-statement block (construction, then a bare `void runtimeIdentity;`)", () => {
     const body = (createRuntimeSource.match(/export function createRuntime\(([\s\S]*?)\n\}/) ?? [])[1] ?? "";
     const constIndex = body.indexOf("const runtimeIdentity: FedosRuntimeIdentity");
-    const voidIndex = body.indexOf("void runtimeIdentity.describeIdentity()");
+    const voidIndex = body.indexOf("void runtimeIdentity;");
     const returnIndex = body.indexOf("return {", voidIndex);
     expect(constIndex).toBeGreaterThan(-1);
     expect(voidIndex).toBeGreaterThan(constIndex);
     expect(returnIndex).toBeGreaterThan(voidIndex);
+    expect(body).not.toMatch(/\.describeIdentity\(\)/);
   });
 
   it("28. Regression: fedos_runtime_identity.ts's own three methods are confirmed BYTE-FOR-BYTE unchanged", () => {
@@ -307,8 +308,8 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
     expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_056/);
   });
 
-  it("30. Regression: create_runtime.ts does not reference this Stage's own review doc -- confirming this Stage touched no code, only documentation", () => {
-    expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_056/);
+  it("30. RIPPLE (Secure Runtime Alpha 057): create_runtime.ts did not reference this Stage's own review doc AS OF this Stage's own review-only scope, confirming this Stage itself touched no code, only documentation; Alpha 057 (a LATER, separate Stage that implements this Stage's own Decision) legitimately references it in create_runtime.ts's own header comment while recording this arc's history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own no-code-change mandate", () => {
+    expect(createRuntimeSource).toMatch(/secure_runtime_alpha_056/);
   });
 
   it("31. Regression: AppRuntime's own type (types.ts) is confirmed BYTE-FOR-BYTE unchanged -- no identity field, no reference to this Stage's own doc", () => {
@@ -435,8 +436,8 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
     }
   });
 
-  it("42. final sanity: this Stage's own net effect is documentation-only -- two new files added (this test file and the design doc), zero existing src/ files modified", () => {
-    expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_056/);
+  it("42. RIPPLE (Secure Runtime Alpha 057): final sanity -- this Stage's OWN net effect was documentation-only AS OF its own scope (two new files added, zero existing src/ files modified); reconfirmed here that fedos_runtime_identity.ts/types.ts/worker.ts still never reference this Stage's own doc, while create_runtime.ts now legitimately does (Alpha 057's own header-comment history, not a violation of this Stage's own mandate)", () => {
+    expect(createRuntimeSource).toMatch(/secure_runtime_alpha_056/);
     expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_056/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_056/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_056/);

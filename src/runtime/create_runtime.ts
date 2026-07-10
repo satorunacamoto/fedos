@@ -166,19 +166,40 @@
  * for the full design rationale.
  *
  * Secure Runtime Alpha 053–055 (Identity Runtime Internal Operations,
- * Alpha 055 "Identity Runtime First Use") — `createRuntime()` now also
- * calls `runtimeIdentity.describeIdentity()` EXACTLY ONCE per call,
+ * Alpha 055 "Identity Runtime First Use") — `createRuntime()` called
+ * `runtimeIdentity.describeIdentity()` EXACTLY ONCE per call,
  * immediately after constructing it, as a pure startup-confirmation
  * smoke test — a call that (given the current Identity Layer Provider/
- * Source wiring, Alpha 049) always resolves `null`. The returned
- * `Promise` is explicitly discarded via `void`,
- * chained with a no-op `.catch()` so a hypothetical future rejection
- * can never surface as an unhandled promise rejection out of this
- * synchronous function; `createRuntime()` itself remains fully
- * synchronous — it does not `await` this call, and its own return
- * value and timing are byte-for-byte unaffected. See
+ * Source wiring, Alpha 049) always resolved `null`. The returned
+ * `Promise` was explicitly discarded via `void`, chained with a no-op
+ * `.catch()` so a hypothetical future rejection could never surface as
+ * an unhandled promise rejection out of this synchronous function.
+ * REMOVED by Alpha 057 (below) — see
  * `docs/secure_runtime_alpha_053_055_identity_runtime_internal_operations.md`
- * for the full design rationale.
+ * for that call's own original design rationale.
+ *
+ * Secure Runtime Alpha 056 (Identity Bootstrap Semantics Review) —
+ * review/decision only, no code change: formally compared five options
+ * for the Alpha 055 auto-fired Bootstrap call against `createRuntime()`'s
+ * own historically pure, synchronous construction contract, and adopted
+ * Option B — remove the automatic Bootstrap entirely, deferring real
+ * identity retrieval to a future, explicit, separately-reviewed API or
+ * Bootstrap boundary. See
+ * `docs/secure_runtime_alpha_056_identity_bootstrap_semantics_review.md`.
+ *
+ * Secure Runtime Alpha 057 (Identity Bootstrap Removal) implements that
+ * Decision, and ONLY that Decision: the Alpha 055
+ * `void runtimeIdentity.describeIdentity().catch(() => {});` statement
+ * is removed. `createRuntime()` is Construct Only again, exactly as
+ * Alpha 051 first shipped it — `FedosRuntimeIdentity` is still
+ * constructed once per call (Alpha 050-052, unchanged above), held as a
+ * local, function-scoped constant, never attached to the `AppRuntime`
+ * object literal this function returns and never read anywhere else in
+ * this repository. No new Bootstrap API, no new identity-retrieval
+ * method, and no Public Runtime API change of any kind are introduced
+ * by this Stage. See
+ * `docs/secure_runtime_alpha_057_identity_bootstrap_removal.md` for the
+ * full design rationale.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -822,11 +843,11 @@ export function createRuntime(
 ): AppRuntime {
   // Secure Runtime Alpha 050-052: constructed for internal wiring only --
   // never attached to the AppRuntime object below, never read elsewhere.
+  // Secure Runtime Alpha 057: Construct Only, per the Alpha 056 Decision --
+  // the Alpha 055 auto-fired describeIdentity() call is deliberately not
+  // present; identity retrieval is deferred to a future, explicit boundary.
   const runtimeIdentity: FedosRuntimeIdentity = new FedosRuntimeIdentity();
-  // Secure Runtime Alpha 053-055: called once as a startup-confirmation
-  // smoke test only -- return value discarded, rejection swallowed,
-  // never awaited (createRuntime() stays synchronous).
-  void runtimeIdentity.describeIdentity().catch(() => {});
+  void runtimeIdentity;
 
   return {
     mode: overrides.mode ?? resolveMode(env),
