@@ -129,6 +129,25 @@
  * Secure Storage of any kind, no Network connection, no new build
  * dependency of any kind. `importKey()`/`exportKey()` remain
  * unimplemented.
+ *
+ * Stage 1012 (Secure Runtime Alpha 019) adds `storeCiphertext`/
+ * `loadCiphertext`/`deleteCiphertext` (`fedos_runtime_ciphertext_storage.ts`,
+ * Stage 1012) to the assembled `AppRuntime` — the FIRST storage-shaped
+ * Public Runtime API, three entirely separate fields alongside the
+ * eight above, none of which is modified, called, or read by any of
+ * these three new fields' own implementation. Unlike every prior Crypto
+ * API, this Stage reaches NO `FedosWasmLoader` and NO Rust Boundary at
+ * all — the exported ciphertext wire value `exportCiphertext`/
+ * `importCiphertext` already produce/consume is already a plain string
+ * by the time it reaches this layer, so storing/loading/deleting one
+ * needs no cryptographic operation. All three read/write a SINGLE
+ * shared, in-process `MemoryCiphertextStorage` instance (the ONLY
+ * storage backend this Stage ships) through a dedicated
+ * `RuntimeCiphertextStorage` Storage Interface. Stores that ciphertext
+ * wire value ONLY — NEVER an opaque key handle or any raw key byte;
+ * `exportKey()`/`importKey()` remain unimplemented. No Worker/
+ * Production/OS Keychain/Network connection of any kind, no new build
+ * dependency of any kind.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -211,6 +230,11 @@ import { encrypt } from "./fedos_runtime_encrypt.js";
 import { decrypt } from "./fedos_runtime_decrypt.js";
 import { exportCiphertext } from "./fedos_runtime_export_ciphertext.js";
 import { importCiphertext } from "./fedos_runtime_import_ciphertext.js";
+import {
+  storeCiphertext,
+  loadCiphertext,
+  deleteCiphertext,
+} from "./fedos_runtime_ciphertext_storage.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -794,5 +818,8 @@ export function createRuntime(
     decrypt,
     exportCiphertext,
     importCiphertext,
+    storeCiphertext,
+    loadCiphertext,
+    deleteCiphertext,
   };
 }
