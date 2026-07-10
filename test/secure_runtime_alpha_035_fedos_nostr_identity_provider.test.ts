@@ -11,6 +11,7 @@ import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtim
 import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
 import { NoopFedosIdentityProvider } from "../src/identity/fedos_noop_identity_provider.js";
 import { NostrIdentityProvider } from "../src/identity/fedos_nostr_identity_provider.js";
+import { NullNostrPublicIdentitySource } from "../src/identity/fedos_null_nostr_public_identity_source.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_035_fedos_nostr_identity_provider.md?raw";
@@ -205,31 +206,31 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect([...nostrProviderSource.matchAll(/^export const/gm)].length).toBe(0);
   });
 
-  it("12. the class has no constructor, no field beyond the fixed provider literal, and never throws", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 039): the class had no constructor and no field beyond the fixed provider literal AS OF this Stage's own scope; Alpha 039 later gave it a required one-argument constructor (an injected Source) and a second, private field -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention. The class still never throws", () => {
     const codeOnly = codeOnlyLines(nostrProviderSource);
-    expect(codeOnly).not.toMatch(/constructor\s*\(/);
+    expect(codeOnly).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
     expect(codeOnly).not.toMatch(/\bthrow\b/);
-    expect(codeOnly).not.toMatch(/\btry\s*\{/);
-    expect(codeOnly).not.toMatch(/\bif\s*\(/);
-    expect(codeOnly).not.toMatch(/\bswitch\s*\(/);
     expect(codeOnly).toMatch(/readonly provider = "nostr";/);
-    const fieldDeclarations = [...codeOnly.matchAll(/^\s*(?:readonly\s+)?#?\w+\s*[:=]/gm)];
-    expect(fieldDeclarations.length).toBe(1);
+    const fieldDeclarations = [...codeOnly.matchAll(/^ {2}(?:readonly\s+)?#?\w+\s*[:=]/gm)];
+    expect(fieldDeclarations.length).toBe(2);
   });
 
-  it("13. describeIdentity()'s body is EXACTLY 'return null;' -- confirmed by literal string extraction", () => {
+  it("13. RIPPLE (Secure Runtime Alpha 039): describeIdentity()'s body was EXACTLY 'return null;' AS OF this Stage's own scope; Alpha 039 later replaced it with a validated delegation to the injected Source -- reconfirmed here as the CURRENT body, per this arc's own established ripple convention. See test/secure_runtime_alpha_039_nostr_public_identity_source_boundary.test.ts for that Stage's own full behavioral coverage", () => {
     const body = (
-      nostrProviderSource.match(/async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n(?:  )?\}/) ?? []
+      nostrProviderSource.match(/async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*)\n  \}/) ?? []
     )[1] ?? "";
-    expect(body.trim()).toBe("return null;");
+    expect(body).toMatch(/this\.#source\.readPublicIdentity\(\)/);
+    expect(body).toMatch(/return null;/);
+    expect(body).toMatch(/provider: "nostr"/);
   });
 
-  it("14. fedos_nostr_identity_provider.ts imports EXACTLY two type-only modules -- the Descriptor and Provider interfaces -- and nothing from src/nostr/, the Resolver, the Service, or the Runtime", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 039): fedos_nostr_identity_provider.ts imported EXACTLY two type-only modules AS OF this Stage's own scope; Alpha 039 later added a third, importing the new Public Identity Source Boundary -- reconfirmed here as the CURRENT imports, still nothing from src/nostr/, the Resolver, the Service, or the Runtime", () => {
     const importLines = [...nostrProviderSource.matchAll(/^import .*$/gm)].map((m: RegExpMatchArray) => m[0]);
-    expect(importLines.length).toBe(2);
+    expect(importLines.length).toBe(3);
     expect(importLines.every((line: string) => line.startsWith("import type "))).toBe(true);
     expect(nostrProviderSource).toMatch(/from "\.\/fedos_identity_descriptor\.js"/);
     expect(nostrProviderSource).toMatch(/from "\.\/fedos_identity_provider\.js"/);
+    expect(nostrProviderSource).toMatch(/from "\.\/fedos_nostr_public_identity_source\.js"/);
     expect(nostrProviderSource).not.toMatch(/from "\.\.\/nostr\//);
     const importsCodeOnly = importLines.join("\n");
     expect(importsCodeOnly).not.toMatch(/fedos_identity_provider_resolver|resolveFedosIdentityProvider/);
@@ -253,14 +254,14 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect(codeOnly).not.toMatch(/determineFedosRuntimePlatform|fedos_runtime_platform_authority/);
   });
 
-  it("16. behavioral: NostrIdentityProvider reports provider === 'nostr' and describeIdentity() always resolves null, called repeatedly", async () => {
-    const provider = new NostrIdentityProvider();
+  it("16. RIPPLE (Secure Runtime Alpha 039): behavioral -- NostrIdentityProvider took no constructor argument AS OF this Stage's own scope; Alpha 039 later required an injected FedosNostrPublicIdentitySource -- reconfirmed here as the CURRENT constructor shape, still reporting provider === 'nostr' and, with a Null Source injected, describeIdentity() still always resolving null, called repeatedly", async () => {
+    const provider = new NostrIdentityProvider(new NullNostrPublicIdentitySource());
     expect(provider.provider).toBe("nostr");
     expect(await provider.describeIdentity()).toBeNull();
     expect(await provider.describeIdentity()).toBeNull();
     expect(await provider.describeIdentity()).toBeNull();
 
-    const second = new NostrIdentityProvider();
+    const second = new NostrIdentityProvider(new NullNostrPublicIdentitySource());
     expect(second.provider).toBe("nostr");
     expect(await second.describeIdentity()).toBeNull();
   });
@@ -393,7 +394,7 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("26. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- now exactly 18 files", () => {
+  it("26. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- 18 files total AS OF this Stage's own scope (Secure Runtime Alpha 039 later added two more, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -402,7 +403,7 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(18);
+    expect(Object.keys(identityFiles).length).toBe(20);
   });
 
   it("27. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {

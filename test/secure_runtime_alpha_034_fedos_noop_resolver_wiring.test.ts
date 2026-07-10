@@ -189,7 +189,7 @@ describe("Secure Runtime Alpha 034 -- FedOS No-op Resolver Wiring, Resolver-only
     expect(codeOnly).not.toMatch(/Authenticat|Session|session|credential|Credential/);
   });
 
-  it("10. RIPPLE (Secure Runtime Alpha 036): the function body was EXACTLY 'return sharedNoopProvider;', with exactly one NoopFedosIdentityProvider construction, AS OF this Stage's own scope; Alpha 036 later changed the body to 'return sharedNostrProvider;', constructing NostrIdentityProvider instead and zero NoopFedosIdentityProvider constructions -- confirmed here by literal string extraction of the CURRENT source", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 036, then Alpha 039): the function body was EXACTLY 'return sharedNoopProvider;', with exactly one NoopFedosIdentityProvider construction, AS OF this Stage's own scope; Alpha 036 later changed the body to 'return sharedNostrProvider;', constructing NostrIdentityProvider instead; Alpha 039 later gave NostrIdentityProvider a required constructor argument, so the construction call now reads `new NostrIdentityProvider(new NullNostrPublicIdentitySource())` -- confirmed here by literal string extraction of the CURRENT source", () => {
     const body = (
       resolverSource.match(/export function resolveFedosIdentityProvider\(\): FedosIdentityProvider \| null \{([\s\S]*?)\n\}/) ?? []
     )[1] ?? "";
@@ -197,7 +197,7 @@ describe("Secure Runtime Alpha 034 -- FedOS No-op Resolver Wiring, Resolver-only
 
     const noopConstructions = [...resolverSource.matchAll(/new NoopFedosIdentityProvider\(\)/g)];
     expect(noopConstructions.length).toBe(0);
-    const nostrConstructions = [...resolverSource.matchAll(/new NostrIdentityProvider\(\)/g)];
+    const nostrConstructions = [...resolverSource.matchAll(/new NostrIdentityProvider\(new NullNostrPublicIdentitySource\(\)\)/g)];
     expect(nostrConstructions.length).toBe(1);
   });
 
@@ -317,7 +317,7 @@ describe("Secure Runtime Alpha 034 -- FedOS No-op Resolver Wiring, Resolver-only
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("22. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed -- still exactly 56 and 17 files respectively AS OF Alpha 034's own scope, this Stage only modifying an existing file's body (Secure Runtime Alpha 035 later added an 18th src/identity/ file, fedos_nostr_identity_provider.ts)", () => {
+  it("22. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed -- still exactly 56 and 17 files respectively AS OF Alpha 034's own scope, this Stage only modifying an existing file's body (Secure Runtime Alpha 035 later added an 18th src/identity/ file, fedos_nostr_identity_provider.ts; Secure Runtime Alpha 039 later added a 19th and 20th, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -326,7 +326,7 @@ describe("Secure Runtime Alpha 034 -- FedOS No-op Resolver Wiring, Resolver-only
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(18);
+    expect(Object.keys(identityFiles).length).toBe(20);
   });
 
   it("23. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {

@@ -306,7 +306,7 @@ describe("Secure Runtime Alpha 037 -- FedOS Identity Descriptor Field Review, re
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("20. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this documentation-only Stage -- still exactly 56 and 18 files respectively", () => {
+  it("20. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this documentation-only Stage -- still exactly 56 and 18 files respectively AS OF this Stage's own scope (Secure Runtime Alpha 039 later added a 19th and 20th src/identity/ file, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -315,7 +315,7 @@ describe("Secure Runtime Alpha 037 -- FedOS Identity Descriptor Field Review, re
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(18);
+    expect(Object.keys(identityFiles).length).toBe(20);
   });
 
   it("21. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this review", async () => {

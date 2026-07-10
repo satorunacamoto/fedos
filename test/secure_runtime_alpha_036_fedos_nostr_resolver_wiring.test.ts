@@ -184,7 +184,7 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     expect(designDocSource).toMatch(/Does \*\*not\*\* change `package\.json`/);
   });
 
-  it("10. fedos_identity_provider_resolver.ts exports EXACTLY resolveFedosIdentityProvider, with exactly one const declaration and no branch/environment/Authority/Storage-Resolver/Service reference", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 039): fedos_identity_provider_resolver.ts exports EXACTLY resolveFedosIdentityProvider, with exactly one const declaration and no branch/environment/Authority/Storage-Resolver/Service reference; AS OF this Stage's own scope its CODE also referenced zero Relay/npub vocabulary; Alpha 039 later added a Source injection (`new NullNostrPublicIdentitySource()`), so this test now permits the new Source's own class name while still forbidding every other exclusion", () => {
     const exportedFns = [...resolverSource.matchAll(/^export (?:async )?function (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -204,16 +204,17 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     expect(codeOnly).not.toMatch(/create_runtime|AppRuntime/);
     expect(codeOnly).not.toMatch(/worker/i);
     expect(codeOnly).not.toMatch(/fedos_noop_identity_provider|NoopFedosIdentityProvider/);
+    expect(codeOnly).toMatch(/NullNostrPublicIdentitySource/);
     expect(codeOnly).not.toMatch(/relay|Relay|publish|subscribe|nsec|npub|Authenticat|Session|session|credential|Credential/);
   });
 
-  it("11. the function body is EXACTLY 'return sharedNostrProvider;', with exactly one NostrIdentityProvider construction and zero NoopFedosIdentityProvider constructions -- confirmed by literal string extraction", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 039): the function body was EXACTLY 'return sharedNostrProvider;', with exactly one zero-argument NostrIdentityProvider construction, AS OF this Stage's own scope; Alpha 039 later required a constructor argument, so the shared singleton is now constructed with a NullNostrPublicIdentitySource injected -- the function's own body remains EXACTLY 'return sharedNostrProvider;', reconfirmed here as the CURRENT state", () => {
     const body = (
       resolverSource.match(/export function resolveFedosIdentityProvider\(\): FedosIdentityProvider \| null \{([\s\S]*?)\n\}/) ?? []
     )[1] ?? "";
     expect(body.trim()).toBe("return sharedNostrProvider;");
 
-    const nostrConstructions = [...resolverSource.matchAll(/new NostrIdentityProvider\(\)/g)];
+    const nostrConstructions = [...resolverSource.matchAll(/new NostrIdentityProvider\(new NullNostrPublicIdentitySource\(\)\)/g)];
     expect(nostrConstructions.length).toBe(1);
     const noopConstructions = [...resolverSource.matchAll(/new NoopFedosIdentityProvider\(\)/g)];
     expect(noopConstructions.length).toBe(0);
@@ -245,12 +246,10 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     expect(await provider?.describeIdentity()).toBeNull();
   });
 
-  it("15. fedos_nostr_identity_provider.ts (Alpha 035) is confirmed BYTE-FOR-BYTE unchanged -- still fixed provider = 'nostr', still describeIdentity() body EXACTLY 'return null;', no reference to this Stage's own doc", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 039): fedos_nostr_identity_provider.ts (Alpha 035) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- still fixed provider = 'nostr', still describeIdentity() body EXACTLY 'return null;'; Alpha 039 later gave it a constructor and a real delegation body -- reconfirmed here as the CURRENT shape, still fixed provider = 'nostr', no reference to this Stage's own doc", () => {
     expect(nostrProviderSource).toMatch(/readonly provider = "nostr";/);
-    const body = (
-      nostrProviderSource.match(/async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n(?:  )?\}/) ?? []
-    )[1] ?? "";
-    expect(body.trim()).toBe("return null;");
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+    expect(nostrProviderSource).toMatch(/this\.#source\.readPublicIdentity\(\)/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_036/);
   });
 
@@ -360,7 +359,7 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("24. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed -- still exactly 56 and 18 files respectively (this Stage only modifies an existing file's body)", () => {
+  it("24. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this Stage -- still exactly 56 and 18 files respectively AS OF this Stage's own scope (this Stage only modifies an existing file's body; Secure Runtime Alpha 039 later added two more src/identity/ files, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -369,7 +368,7 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(18);
+    expect(Object.keys(identityFiles).length).toBe(20);
   });
 
   it("25. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
