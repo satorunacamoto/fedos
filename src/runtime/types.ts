@@ -699,11 +699,13 @@ export interface AppRuntime {
    * (below)'s own required companion. Internally calls the Runtime
    * Storage Service's own `storeCiphertext()`
    * (`fedos_runtime_ciphertext_storage.ts`) exactly once, which writes
-   * into a SINGLE shared, in-process `MemoryCiphertextStorage` instance
-   * — the ONLY storage backend this Stage ships. Fail Closed: resolves
-   * `null` (never `false`) whenever the Runtime is not Development,
-   * `id`/`wire` is not a genuine non-empty `string`, or the storage
-   * backend itself throws.
+   * into whichever backend the Storage Resolver resolves (Secure
+   * Runtime Alpha 021, `fedos_runtime_storage_resolver.ts`) — a SINGLE
+   * shared, in-process `MemoryStorageBackend` instance today, the ONLY
+   * storage backend this arc ships so far. Fail Closed: resolves `null`
+   * (never `false`) whenever the Runtime is not Development, `id`/`wire`
+   * is not a genuine non-empty `string`, or the storage backend itself
+   * throws.
    * **STORES `AeadCiphertextWire` ONLY — NEVER an `AeadKeyHandle` or any
    * raw key byte.** This field's own type signature makes passing an
    * `AeadKeyHandle` a compile-time error; `exportKey()`/`importKey()`
@@ -724,21 +726,23 @@ export interface AppRuntime {
    * Stage 1012 (Secure Runtime Alpha 019) — `storeCiphertext`'s
    * required companion. Internally calls
    * `fedos_runtime_ciphertext_storage.ts`'s own `loadCiphertext()`
-   * exactly once, reading from the SAME shared `MemoryCiphertextStorage`
-   * instance `storeCiphertext` writes to. Fail Closed: resolves `null`
-   * whenever the Runtime is not Development, `id` is not a genuine
-   * non-empty `string`, nothing was ever stored under `id` (or it was
-   * deleted), or the storage backend itself throws.
+   * exactly once, reading from the SAME Storage-Resolver-resolved
+   * backend instance `storeCiphertext` writes to (Secure Runtime
+   * Alpha 021). Fail Closed: resolves `null` whenever the Runtime is
+   * not Development, `id` is not a genuine non-empty `string`, nothing
+   * was ever stored under `id` (or it was deleted), or the storage
+   * backend itself throws.
    */
   readonly loadCiphertext: (id: string) => Promise<AeadCiphertextWire | null>;
   /**
    * Stage 1012 (Secure Runtime Alpha 019) — `storeCiphertext`'s other
    * required companion. Internally calls
    * `fedos_runtime_ciphertext_storage.ts`'s own `deleteCiphertext()`
-   * exactly once, removing from the SAME shared `MemoryCiphertextStorage`
-   * instance. Fail Closed: resolves `null` (never `false`) whenever the
-   * Runtime is not Development, `id` is not a genuine non-empty
-   * `string`, or the storage backend itself throws.
+   * exactly once, removing from the SAME Storage-Resolver-resolved
+   * backend instance (Secure Runtime Alpha 021). Fail Closed: resolves
+   * `null` (never `false`) whenever the Runtime is not Development, `id`
+   * is not a genuine non-empty `string`, or the storage backend itself
+   * throws.
    */
   readonly deleteCiphertext: (id: string) => Promise<boolean | null>;
 }

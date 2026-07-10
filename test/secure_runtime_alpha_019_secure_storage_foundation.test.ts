@@ -12,14 +12,25 @@ import {
   storeCiphertext,
   loadCiphertext,
   deleteCiphertext,
-  MemoryCiphertextStorage,
-  type RuntimeCiphertextStorage,
 } from "../src/runtime/fedos_runtime_ciphertext_storage.js";
+// Secure Runtime Alpha 021 moved MemoryCiphertextStorage/RuntimeCiphertextStorage
+// out of fedos_runtime_ciphertext_storage.ts into their own module, renamed
+// to MemoryStorageBackend/RuntimeStorageBackend -- see
+// test/secure_runtime_alpha_021_storage_backend_abstraction.test.ts.
+import {
+  MemoryStorageBackend as MemoryCiphertextStorage,
+  type RuntimeStorageBackend as RuntimeCiphertextStorage,
+} from "../src/runtime/fedos_runtime_storage_backend.js";
 import { FedosWasmLoaderSkeleton } from "../src/runtime/fedos_wasm_loader.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_019_secure_storage_foundation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageServiceSource from "../src/runtime/fedos_runtime_ciphertext_storage.ts?raw";
+// Secure Runtime Alpha 021 -- the Storage Backend Interface/Memory
+// implementation's new home, used by test #12 below (moved from this
+// file's own storageServiceSource).
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import storageBackendSource from "../src/runtime/fedos_runtime_storage_backend.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import exportServiceSource from "../src/runtime/fedos_runtime_export_ciphertext.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -338,11 +349,11 @@ describe("Secure Runtime Alpha 019 -- Secure Storage Foundation, AeadCiphertextW
     expect(codeOnly).not.toMatch(/localStorage|sessionStorage|writeFile|fetch\(|WebSocket/i);
   });
 
-  it("12. RuntimeCiphertextStorage's own type signature makes storing an AeadKeyHandle a compile-time error -- structurally confirmed: store()'s second parameter type is AeadCiphertextWire, never AeadKeyHandle", () => {
-    expect(storageServiceSource).toMatch(
+  it("12. the Backend Interface's own type signature makes storing an AeadKeyHandle a compile-time error -- structurally confirmed: store()'s second parameter type is AeadCiphertextWire, never AeadKeyHandle -- Secure Runtime Alpha 021 moved this interface out of fedos_runtime_ciphertext_storage.ts into fedos_runtime_storage_backend.ts", () => {
+    expect(storageBackendSource).toMatch(
       /store\(id: string, wire: AeadCiphertextWire\): Promise<boolean>;/,
     );
-    expect(storageServiceSource).not.toMatch(/store\([^)]*AeadKeyHandle/);
+    expect(storageBackendSource).not.toMatch(/store\([^)]*AeadKeyHandle/);
   });
 
   it("13. importKey()/exportKey() remain unimplemented; encrypt()/decrypt()/exportCiphertext()/importCiphertext() are untouched by this Stage's own changed files", () => {
@@ -390,7 +401,7 @@ describe("Secure Runtime Alpha 019 -- Secure Storage Foundation, AeadCiphertextW
     expect(imported === null || typeof imported === "object").toBe(true);
   });
 
-  it("15. fedos_runtime_ciphertext_storage.ts exports exactly storeCiphertext/loadCiphertext/deleteCiphertext, MemoryCiphertextStorage, and RuntimeCiphertextStorage", () => {
+  it("15. fedos_runtime_ciphertext_storage.ts exports exactly storeCiphertext/loadCiphertext/deleteCiphertext -- Secure Runtime Alpha 021 moved MemoryCiphertextStorage/RuntimeCiphertextStorage into their own Storage Backend module (renamed MemoryStorageBackend/RuntimeStorageBackend), so this file no longer exports an interface or a class", () => {
     const exportedFns = [...storageServiceSource.matchAll(/^export (?:async )?function (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -398,11 +409,11 @@ describe("Secure Runtime Alpha 019 -- Secure Storage Foundation, AeadCiphertextW
     const exportedInterfaces = [...storageServiceSource.matchAll(/^export interface (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(new Set(exportedInterfaces)).toEqual(new Set(["RuntimeCiphertextStorage"]));
+    expect(new Set(exportedInterfaces)).toEqual(new Set([]));
     const exportedClasses = [...storageServiceSource.matchAll(/^export class (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(new Set(exportedClasses)).toEqual(new Set(["MemoryCiphertextStorage"]));
+    expect(new Set(exportedClasses)).toEqual(new Set([]));
   });
 
   it("16. types.ts declares all three new AppRuntime fields with the faithful signatures, still no fedos_wasm_loader reference; createRuntime()'s AppRuntime exposes all three as real functions", () => {

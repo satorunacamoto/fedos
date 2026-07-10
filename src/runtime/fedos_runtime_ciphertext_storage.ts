@@ -24,7 +24,11 @@
  * `packages/fedos-core-rust/src/lib.rs` is untouched by this Stage.
  *
  * **Architecture — deliberately SHORTER than every prior Crypto API's
- * four-layer chain, because there is no Rust Boundary to reach:**
+ * four-layer chain, because there is no Rust Boundary to reach.**
+ * Secure Runtime Alpha 021 ("Storage Backend Abstraction Layer") adds
+ * ONE more link — a Storage Resolver — between this Service and the
+ * backend it uses, so a future OS-backed backend can be added by
+ * changing only the Resolver, never this file:
  *
  *   AppRuntime.storeCiphertext()/loadCiphertext()/deleteCiphertext()  Public Runtime API
  *     |                                                              (create_runtime.ts / types.ts)
@@ -32,11 +36,14 @@
  *   storeCiphertext()/loadCiphertext()/deleteCiphertext()             Runtime Storage Service
  *     |                                                              (THIS FILE)
  *     v
- *   RuntimeCiphertextStorage (Storage Interface)                      Storage Interface
- *     |                                                              (THIS FILE)
+ *   resolveRuntimeStorageBackend()                                   Storage Resolver
+ *     |                                                              (fedos_runtime_storage_resolver.ts)
  *     v
- *   MemoryCiphertextStorage                                          Storage Backend
- *                                                                     (THIS FILE, the ONLY backend)
+ *   RuntimeStorageBackend (Backend Interface)                        Storage Backend Interface
+ *     |                                                              (fedos_runtime_storage_backend.ts)
+ *     v
+ *   MemoryStorageBackend                                             Storage Backend
+ *                                                                     (fedos_runtime_storage_backend.ts, the ONLY backend)
  *
  * **Development-Runtime-limited, exactly like every other Crypto API's
  * own Fail-Closed discipline** — but since there is no `FedosWasmLoader`
@@ -47,34 +54,36 @@
  * three-way shape `#evaluateDevOnlyGate()`/`determineRuntimeMode()`
  * already use, now read from one place instead of three.
  *
- * **`MemoryCiphertextStorage` is the ONLY backend, and is deliberately
- * a Local-Development-only, in-process, non-persistent (across actual
- * process restarts) `Map`.** SQLite, IndexedDB, filesystem, Windows
- * DPAPI, macOS Keychain, and Linux Secret Service are all explicitly
- * NOT implemented by this Stage — `RuntimeCiphertextStorage` (the
- * Storage Interface) exists precisely so a FUTURE, separately-reviewed
- * Stage can add one of those without changing this file's own Public
- * API shape.
+ * **`MemoryStorageBackend` is the ONLY backend the Resolver ever
+ * returns, and is deliberately a Local-Development-only, in-process,
+ * non-persistent (across actual process restarts) `Map`.** SQLite,
+ * IndexedDB, filesystem, Windows DPAPI, macOS Keychain, and Linux
+ * Secret Service are all explicitly NOT implemented by this Stage —
+ * `RuntimeStorageBackend` (the Backend Interface) and the Resolver seam
+ * exist precisely so a FUTURE, separately-reviewed Stage can add one of
+ * those without changing this file's own Public API shape.
  *
  * **Deliberate exception to this arc's own "fresh instance per call"
  * convention:** every prior Crypto API's Runtime Service constructs a
  * BRAND NEW `FedosWasmLoader` on every call (nothing persists between
  * calls). Storage's entire purpose is the opposite — `storeCiphertext()`
  * now and `loadCiphertext()` later must observe the SAME data — so this
- * file's default storage (`defaultCiphertextStorage`) is a SINGLE,
- * module-level instance, shared across every call that omits the
- * optional `storage` parameter. This is the one deliberate, documented
- * departure from the fresh-instance convention, and it is confined
- * entirely to this file.
+ * file's default storage is whatever `resolveRuntimeStorageBackend()`
+ * (`fedos_runtime_storage_resolver.ts`) returns, which is itself a
+ * SINGLE, module-level instance, shared across every call that omits
+ * the optional `storage` parameter. This is the one deliberate,
+ * documented departure from the fresh-instance convention (Alpha 019),
+ * now implemented one hop further down, via the Resolver.
  *
  * HARD GUARDRAILS:
- *   - `storeCiphertext()`/`loadCiphertext()`/`deleteCiphertext()` (plus
- *     the `RuntimeCiphertextStorage` interface and
- *     `MemoryCiphertextStorage` class) are the ONLY exports.
+ *   - `storeCiphertext()`/`loadCiphertext()`/`deleteCiphertext()` are
+ *     the ONLY exports of this file. The Backend Interface and its
+ *     Memory implementation live in `fedos_runtime_storage_backend.ts`;
+ *     the Resolver lives in `fedos_runtime_storage_resolver.ts`.
  *   - NO reference to `src/worker.ts`, and this file is not referenced
  *     BY `src/worker.ts` — Worker remains fully unconnected.
  *   - NO Production connection — outside Development Runtime, every
- *     function resolves `null`, regardless of what `MemoryCiphertextStorage`
+ *     function resolves `null`, regardless of what the resolved backend
  *     itself would have returned.
  *   - NO OS Keychain, Secure Enclave, Cloud, Network, Nostr, ActivityPub,
  *     Bluesky, or Session reference of any kind.
@@ -96,56 +105,17 @@ import type { AeadCiphertextWire } from "./fedos_wasm_loader.js";
 // still makes its own Fail-Closed decision from the classification it
 // returns.
 import { determineFedosRuntimeMode } from "./fedos_runtime_mode_authority.js";
-
-/**
- * The Storage Interface. A future backend (SQLite/IndexedDB/filesystem/
- * OS Keychain/Secret Service — none implemented by this Stage) would
- * implement this SAME shape; `storeCiphertext()`/`loadCiphertext()`/
- * `deleteCiphertext()` (below) depend on nothing beyond it. Deliberately
- * narrow: three methods, no query/list/enumerate capability, no
- * metadata beyond the `id` the caller itself supplies.
- */
-export interface RuntimeCiphertextStorage {
-  store(id: string, wire: AeadCiphertextWire): Promise<boolean>;
-  load(id: string): Promise<AeadCiphertextWire | null>;
-  delete(id: string): Promise<boolean>;
-}
-
-/**
- * The ONLY `RuntimeCiphertextStorage` implementation this Stage ships.
- * A plain in-process `Map` — data does NOT survive an actual process
- * restart, is never written to disk, and is never visible to a Worker
- * or any other process. Stores `AeadCiphertextWire` values ONLY; its
- * own type signature (inherited from `RuntimeCiphertextStorage`) makes
- * accepting an `AeadKeyHandle` a compile-time error, not merely a
- * documented rule.
- */
-export class MemoryCiphertextStorage implements RuntimeCiphertextStorage {
-  #entries = new Map<string, AeadCiphertextWire>();
-
-  async store(id: string, wire: AeadCiphertextWire): Promise<boolean> {
-    this.#entries.set(id, wire);
-    return true;
-  }
-
-  async load(id: string): Promise<AeadCiphertextWire | null> {
-    const value = this.#entries.get(id);
-    return value === undefined ? null : value;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    return this.#entries.delete(id);
-  }
-}
-
-/**
- * PRIVATE (module-scoped) — the ONE shared `MemoryCiphertextStorage`
- * instance every exported function below uses when its caller omits the
- * optional `storage` parameter. See this file's own top-of-file doc
- * comment ("Deliberate exception...") for why this is a singleton
- * rather than a fresh instance per call.
- */
-const defaultCiphertextStorage: RuntimeCiphertextStorage = new MemoryCiphertextStorage();
+// Secure Runtime Alpha 021 -- the Backend Interface (RuntimeStorageBackend)
+// and its ONLY implementation (MemoryStorageBackend) moved to their own
+// module. This file no longer defines either -- see
+// fedos_runtime_storage_backend.ts's own top-of-file doc comment.
+import type { RuntimeStorageBackend } from "./fedos_runtime_storage_backend.js";
+// Secure Runtime Alpha 021 -- the Storage Resolver, the ONE seam that
+// decides WHICH RuntimeStorageBackend this Service uses. Currently
+// always resolves MemoryStorageBackend; a future Stage can change ONLY
+// this Resolver to add a real backend switch. See
+// fedos_runtime_storage_resolver.ts's own top-of-file doc comment.
+import { resolveRuntimeStorageBackend } from "./fedos_runtime_storage_resolver.js";
 
 /**
  * PRIVATE — delegated to the shared Runtime Mode Authority
@@ -174,18 +144,20 @@ function isGenuineNonEmptyString(value: unknown): value is string {
 
 /**
  * PUBLIC, ASYNC — wired into `AppRuntime` as `storeCiphertext`
- * (`create_runtime.ts`). Stores `wire` under `id` in the shared
- * `MemoryCiphertextStorage` (or an injected `storage`, purely for
- * testability — every REAL call site omits it). Fail Closed to `null`
- * (never `false`) when: not Development Runtime; `id`/`wire` is not a
- * genuine non-empty `string`; or the storage backend itself throws.
- * Resolves the backend's own `true`/`false` only when the gate and
- * shape checks both pass and the call did not throw.
+ * (`create_runtime.ts`). Stores `wire` under `id` in the backend the
+ * Storage Resolver resolves (`resolveRuntimeStorageBackend()`, Secure
+ * Runtime Alpha 021 — currently always `MemoryStorageBackend`), or an
+ * injected `storage`, purely for testability — every REAL call site
+ * omits it. Fail Closed to `null` (never `false`) when: not Development
+ * Runtime; `id`/`wire` is not a genuine non-empty `string`; or the
+ * storage backend itself throws. Resolves the backend's own
+ * `true`/`false` only when the gate and shape checks both pass and the
+ * call did not throw.
  */
 export async function storeCiphertext(
   id: string,
   wire: AeadCiphertextWire,
-  storage: RuntimeCiphertextStorage = defaultCiphertextStorage,
+  storage: RuntimeStorageBackend = resolveRuntimeStorageBackend(),
 ): Promise<boolean | null> {
   if (!isDevelopmentRuntimeForCiphertextStorage()) {
     return null;
@@ -203,15 +175,15 @@ export async function storeCiphertext(
 /**
  * PUBLIC, ASYNC — wired into `AppRuntime` as `loadCiphertext`
  * (`create_runtime.ts`). Loads whatever `storeCiphertext()` most
- * recently stored under `id` from the shared `MemoryCiphertextStorage`
- * (or an injected `storage`, purely for testability). Fail Closed to
- * `null` when: not Development Runtime; `id` is not a genuine non-empty
- * `string`; no value was ever stored under `id` (or it was deleted); or
- * the storage backend itself throws.
+ * recently stored under `id` from the backend the Storage Resolver
+ * resolves (or an injected `storage`, purely for testability). Fail
+ * Closed to `null` when: not Development Runtime; `id` is not a genuine
+ * non-empty `string`; no value was ever stored under `id` (or it was
+ * deleted); or the storage backend itself throws.
  */
 export async function loadCiphertext(
   id: string,
-  storage: RuntimeCiphertextStorage = defaultCiphertextStorage,
+  storage: RuntimeStorageBackend = resolveRuntimeStorageBackend(),
 ): Promise<AeadCiphertextWire | null> {
   if (!isDevelopmentRuntimeForCiphertextStorage()) {
     return null;
@@ -229,16 +201,16 @@ export async function loadCiphertext(
 /**
  * PUBLIC, ASYNC — wired into `AppRuntime` as `deleteCiphertext`
  * (`create_runtime.ts`). Removes whatever is stored under `id` from the
- * shared `MemoryCiphertextStorage` (or an injected `storage`, purely
- * for testability). Fail Closed to `null` (never `false`) when: not
- * Development Runtime; `id` is not a genuine non-empty `string`; or the
- * storage backend itself throws. Resolves the backend's own
+ * backend the Storage Resolver resolves (or an injected `storage`,
+ * purely for testability). Fail Closed to `null` (never `false`) when:
+ * not Development Runtime; `id` is not a genuine non-empty `string`; or
+ * the storage backend itself throws. Resolves the backend's own
  * `true`/`false` only when the gate and shape checks both pass and the
  * call did not throw.
  */
 export async function deleteCiphertext(
   id: string,
-  storage: RuntimeCiphertextStorage = defaultCiphertextStorage,
+  storage: RuntimeStorageBackend = resolveRuntimeStorageBackend(),
 ): Promise<boolean | null> {
   if (!isDevelopmentRuntimeForCiphertextStorage()) {
     return null;
