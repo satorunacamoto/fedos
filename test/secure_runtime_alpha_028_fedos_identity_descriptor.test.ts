@@ -267,11 +267,11 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
     expect(Object.keys(files).length).toBe(56);
   });
 
-  it("15. exactly one new file was added under src/identity/ -- 12 files total AS OF Alpha 028's own scope (Secure Runtime Alpha 029 later added a 13th, fedos_identity_provider.ts; Secure Runtime Alpha 030 later added a 14th, fedos_identity_capability.ts)", () => {
+  it("15. exactly one new file was added under src/identity/ -- 12 files total AS OF Alpha 028's own scope (Secure Runtime Alpha 029 later added a 13th, fedos_identity_provider.ts; Secure Runtime Alpha 030 later added a 14th, fedos_identity_capability.ts; Secure Runtime Alpha 031 later added a 15th, fedos_identity_service.ts)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(files).length).toBe(14);
+    expect(Object.keys(files).length).toBe(15);
   });
 
   it("16. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
