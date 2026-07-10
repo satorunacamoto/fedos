@@ -173,11 +173,15 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
     );
   });
 
-  it("7. ABSOLUTE PROHIBITION: fedos_identity_descriptor.ts contains NONE of the 17 mandated forbidden terms, anywhere in its own source (including comments)", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 045): ABSOLUTE PROHIBITION -- fedos_identity_descriptor.ts contained NONE of the 17 mandated forbidden terms AS OF this Stage's own scope; Alpha 045 later formally ADOPTED (Alpha 038) and added `avatar` as an optional field -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every OTHER forbidden term (16 of the original 17) remains absent, including 'Profile' -- `displayName`/`avatar` were added as two individually-reviewed, named fields, never a generic profile container", () => {
     for (const term of FORBIDDEN_SUBSTRINGS) {
+      if (term === "Avatar") {
+        continue;
+      }
       const pattern = term.length <= 4 ? new RegExp(`\\b${term}\\b`, "i") : new RegExp(term, "i");
       expect(descriptorSource).not.toMatch(pattern);
     }
+    expect(descriptorSource).toMatch(/readonly avatar\?: string;/);
   });
 
   it("8. type-level: a real object literal matching FedosIdentityDescriptor compiles and holds exactly the three fields", () => {

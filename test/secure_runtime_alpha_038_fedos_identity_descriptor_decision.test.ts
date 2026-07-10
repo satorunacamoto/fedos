@@ -216,12 +216,14 @@ describe("Secure Runtime Alpha 038 -- FedOS Identity Descriptor Decision, review
     expect(alpha012DocSource).toMatch(/Status: REVIEW \/ DESIGN DECISION ONLY/);
   });
 
-  it("16. fedos_identity_descriptor.ts is confirmed BYTE-FOR-BYTE unchanged -- still exactly three readonly fields, none of the eight-plus-two candidate names present, no reference to this Stage's own doc", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 045): fedos_identity_descriptor.ts was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- still exactly three readonly fields, none of the eight-plus-two candidate names present; Alpha 045 later added displayName/avatar as two OPTIONAL fields, formally executing this Stage's own ADOPT decision -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention. The other six candidates remain absent", () => {
     expect(descriptorSource).toMatch(/export interface FedosIdentityDescriptor \{/);
-    const fieldDeclarations = [...descriptorSource.matchAll(/^\s*readonly \w+: string;/gm)];
-    expect(fieldDeclarations.length).toBe(3);
+    const requiredFieldDeclarations = [...descriptorSource.matchAll(/^\s*readonly \w+: string;/gm)];
+    expect(requiredFieldDeclarations.length).toBe(3);
+    expect(descriptorSource).toMatch(/readonly displayName\?: string;/);
+    expect(descriptorSource).toMatch(/readonly avatar\?: string;/);
     expect(descriptorSource).not.toMatch(
-      /displayName|avatar|profile|linkedProtocols|capabilities|device|metadata|createdAt|updatedAt/,
+      /profile|linkedProtocols|capabilities|device|metadata|createdAt|updatedAt/,
     );
     expect(descriptorSource).not.toMatch(/secure_runtime_alpha_038/);
   });

@@ -373,11 +373,12 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_039/);
   });
 
-  it("28. Regression: fedos_identity_descriptor.ts (Alpha 028) is confirmed BYTE-FOR-BYTE unchanged -- still exactly three fields, per this Stage's own Option A decision", () => {
+  it("28. RIPPLE (Secure Runtime Alpha 045): fedos_identity_descriptor.ts (Alpha 028) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- still exactly three fields, per this Stage's own Option A decision; Alpha 045 later added displayName/avatar as two OPTIONAL fields -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention", () => {
     expect(descriptorSource).toMatch(/export interface FedosIdentityDescriptor \{/);
-    const fieldDeclarations = [...descriptorSource.matchAll(/^\s*readonly \w+: string;/gm)];
-    expect(fieldDeclarations.length).toBe(3);
-    expect(descriptorSource).not.toMatch(/displayName|avatar/);
+    const requiredFieldDeclarations = [...descriptorSource.matchAll(/^\s*readonly \w+: string;/gm)];
+    expect(requiredFieldDeclarations.length).toBe(3);
+    expect(descriptorSource).toMatch(/readonly displayName\?: string;/);
+    expect(descriptorSource).toMatch(/readonly avatar\?: string;/);
     expect(descriptorSource).not.toMatch(/secure_runtime_alpha_039/);
   });
 
