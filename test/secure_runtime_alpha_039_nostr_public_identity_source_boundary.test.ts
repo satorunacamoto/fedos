@@ -206,7 +206,7 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     expect(designDocSource).toMatch(/Does \*\*not\*\* change `package\.json`/);
   });
 
-  it("11. fedos_nostr_public_identity_source.ts defines TYPES ONLY -- exactly two exported interfaces, no class, no function, no secret-shaped field", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 044): fedos_nostr_public_identity_source.ts defined TYPES ONLY -- exactly two exported interfaces, no class, no function, no secret-shaped field, and its own Snapshot carried zero displayName/avatar vocabulary AS OF this Stage's own scope; Alpha 044 later added both, deliberately, as optional Snapshot fields -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention", () => {
     expect([...sourceInterfaceSource.matchAll(/^export interface (\w+)/gm)].map((m: RegExpMatchArray) => m[1]).sort()).toEqual(
       ["FedosNostrPublicIdentitySnapshot", "FedosNostrPublicIdentitySource"].sort(),
     );
@@ -214,7 +214,8 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     expect([...sourceInterfaceSource.matchAll(/^export (?:async )?function/gm)].length).toBe(0);
     expect(sourceInterfaceSource).toMatch(/readonly id: string;/);
     expect(sourceInterfaceSource).toMatch(/readonly publicIdentifier: string;/);
-    expect(sourceInterfaceSource).not.toMatch(/displayName|avatar/);
+    expect(sourceInterfaceSource).toMatch(/readonly displayName\?: string;/);
+    expect(sourceInterfaceSource).toMatch(/readonly avatar\?: string;/);
     const codeOnly = codeOnlyLines(sourceInterfaceSource);
     expect(codeOnly).not.toMatch(/nsec|seed|mnemonic|privateKey|secretKey|AeadKeyHandle|AeadCiphertextHandle/i);
     expect(codeOnly).not.toMatch(/relay|Relay|Authenticat|session|Session|credential|Credential/);
