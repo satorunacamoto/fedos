@@ -267,11 +267,11 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
     expect(Object.keys(files).length).toBe(56);
   });
 
-  it("15. exactly one new file was added under src/identity/ -- 12 files total AS OF Alpha 028's own scope (Secure Runtime Alpha 029 later added a 13th, fedos_identity_provider.ts; Secure Runtime Alpha 030 later added a 14th, fedos_identity_capability.ts; Secure Runtime Alpha 031 later added a 15th, fedos_identity_service.ts; Secure Runtime Alpha 032 later added a 16th, fedos_identity_provider_resolver.ts; Secure Runtime Alpha 033 later added a 17th, fedos_noop_identity_provider.ts)", () => {
+  it("15. exactly one new file was added under src/identity/ -- 12 files total AS OF Alpha 028's own scope (Secure Runtime Alpha 029 later added a 13th, fedos_identity_provider.ts; Secure Runtime Alpha 030 later added a 14th, fedos_identity_capability.ts; Secure Runtime Alpha 031 later added a 15th, fedos_identity_service.ts; Secure Runtime Alpha 032 later added a 16th, fedos_identity_provider_resolver.ts; Secure Runtime Alpha 033 later added a 17th, fedos_noop_identity_provider.ts; Secure Runtime Alpha 035 later added an 18th, fedos_nostr_identity_provider.ts)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(files).length).toBe(17);
+    expect(Object.keys(files).length).toBe(18);
   });
 
   it("16. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {

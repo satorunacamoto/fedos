@@ -324,7 +324,7 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("23. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- now exactly 17 files", () => {
+  it("23. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- 17 files total AS OF Alpha 033's own scope (Secure Runtime Alpha 035 later added an 18th, fedos_nostr_identity_provider.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -333,7 +333,7 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(17);
+    expect(Object.keys(identityFiles).length).toBe(18);
   });
 
   it("24. RIPPLE (Secure Runtime Alpha 034): resolveFedosIdentityProvider() resolved null on every call AS OF this Stage's own scope; Alpha 034 later wired it to return this Stage's own NoopFedosIdentityProvider on every call instead -- confirmed here as the CURRENT behavior, per this arc's own established ripple convention", () => {
