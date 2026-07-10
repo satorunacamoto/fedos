@@ -224,8 +224,8 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     expect(resolverSource).not.toMatch(/secure_runtime_alpha_033/);
   });
 
-  it("16. fedos_identity_service.ts (Alpha 031) is confirmed BYTE-FOR-BYTE unchanged -- constructor still requires an explicit FedosIdentityProvider argument, no default, no reference to the Noop Provider", () => {
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
+  it("16. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts (Alpha 031) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 042 later added a required second constructor argument (an injected FedosIdentityRegistry) -- reconfirmed here as the CURRENT signature, still no reference to the Noop Provider", () => {
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
     expect(serviceSource).not.toMatch(/NoopFedosIdentityProvider|fedos_noop_identity_provider/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_033/);
   });

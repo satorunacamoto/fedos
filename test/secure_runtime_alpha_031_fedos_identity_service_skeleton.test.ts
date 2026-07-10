@@ -11,6 +11,7 @@ import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtim
 import type { FedosIdentityDescriptor } from "../src/identity/fedos_identity_descriptor.js";
 import type { FedosIdentityProvider } from "../src/identity/fedos_identity_provider.js";
 import { FedosIdentityService } from "../src/identity/fedos_identity_service.js";
+import { FedosIdentityRegistry } from "../src/identity/fedos_identity_registry.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_031_fedos_identity_service_skeleton.md?raw";
@@ -19,7 +20,13 @@ import alpha029DocSource from "../docs/secure_runtime_alpha_029_fedos_identity_p
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import alpha030DocSource from "../docs/secure_runtime_alpha_030_fedos_identity_capability.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import alpha042DocSource from "../docs/secure_runtime_alpha_042_fedos_identity_service_registry_integration.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/identity/fedos_identity_service.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import registrySource from "../src/identity/fedos_identity_registry.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import recordSource from "../src/identity/fedos_identity_record.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -159,49 +166,59 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     expect(designDocSource).toMatch(/Does \*\*not\*\* change `package\.json`/);
   });
 
-  it("8. fedos_identity_service.ts exports EXACTLY FedosIdentityService, with EXACTLY the mandated constructor and two methods, no other export", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts exports EXACTLY FedosIdentityService AS OF this Stage's own scope, with a single-argument constructor; Alpha 042 later required a second constructor argument (an injected FedosIdentityRegistry) -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention. Still EXACTLY two methods, no other export", () => {
     const exportedClasses = [...serviceSource.matchAll(/^export class (\w+)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(new Set(exportedClasses)).toEqual(new Set(["FedosIdentityService"]));
     expect([...serviceSource.matchAll(/^export interface/gm)].length).toBe(0);
     expect([...serviceSource.matchAll(/^export (?:async )?function/gm)].length).toBe(0);
     expect(serviceSource).not.toMatch(/export default/);
 
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
     const methodNames = [...serviceSource.matchAll(/^\s*async (\w+)\(/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(new Set(methodNames)).toEqual(new Set(["describeIdentity", "describeCapability"]));
   });
 
-  it("9. ABSOLUTE PROHIBITION: fedos_identity_service.ts defines no field beyond the single injected provider, no cache/memo/timestamp/counter, and no begin/login/authenticate/create method", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts defined no field beyond the single injected provider AS OF this Stage's own scope; Alpha 042 later added a second field, the injected registry -- reconfirmed here as the CURRENT shape. Still no cache/memo/timestamp/counter, and no begin/login/authenticate/create method", () => {
     const codeOnly = codeOnlyLines(serviceSource);
     const fieldDeclarations = [...codeOnly.matchAll(/^\s*readonly #(\w+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldDeclarations).toEqual(["provider"]);
+    expect(fieldDeclarations).toEqual(["provider", "registry"]);
     expect(codeOnly).not.toMatch(/cache|memo|timestamp|counter/i);
     for (const method of ["begin", "login", "authenticate", "create"]) {
       expect(codeOnly).not.toMatch(new RegExp(`\\b${method}\\s*\\(`));
     }
   });
 
-  it("10. fedos_identity_service.ts's describeIdentity() body is pure delegation, and describeCapability() only reads provider.provider plus a fixed literal true -- no call to describeIdentity() inside describeCapability()", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts's describeIdentity() body was pure delegation ('return this.#provider.describeIdentity();') AS OF this Stage's own scope; Alpha 042 later replaced it with a Descriptor->Record mapping plus registry.register(), still returning the ORIGINAL Descriptor unchanged -- reconfirmed here as the CURRENT body. describeCapability() remains BYTE-FOR-BYTE UNCHANGED -- only reads provider.provider plus a fixed literal true, no call to describeIdentity() or the registry inside it", () => {
     const codeOnly = codeOnlyLines(serviceSource);
-    const describeIdentityBody = (codeOnly.match(/async describeIdentity\(\)[^{]*\{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
-    expect(describeIdentityBody.trim()).toBe("return this.#provider.describeIdentity();");
+    const describeIdentityBody = (codeOnly.match(/async describeIdentity\(\)[^{]*\{([\s\S]*)\n  \}/) ?? [])[1] ?? "";
+    expect(describeIdentityBody).toMatch(/const descriptor = await this\.#provider\.describeIdentity\(\);/);
+    expect(describeIdentityBody).toMatch(/if \(descriptor === null\) \{/);
+    expect(describeIdentityBody).toMatch(/return null;/);
+    expect(describeIdentityBody).toMatch(/this\.#registry\.register\(record\);/);
+    expect(describeIdentityBody).toMatch(/return descriptor;/);
+    expect(describeIdentityBody).not.toMatch(/\.find\(|\.list\(|\.remove\(/);
 
     const describeCapabilityBody = (codeOnly.match(/async describeCapability\(\)[^{]*\{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
+    expect(describeCapabilityBody.trim()).toBe("return { provider: this.#provider.provider, available: true };");
     expect(describeCapabilityBody).not.toMatch(/describeIdentity/);
-    expect(describeCapabilityBody).toMatch(/this\.#provider\.provider/);
-    expect(describeCapabilityBody).toMatch(/available:\s*true/);
+    expect(describeCapabilityBody).not.toMatch(/registry|#registry/);
   });
 
-  it("11. fedos_identity_service.ts imports only the three existing Identity types (type-only) and references no Runtime/Storage/Worker/Nostr module", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts imported only three existing Identity types AS OF this Stage's own scope; Alpha 042 later added two more (FedosIdentityRecord, FedosIdentityRegistry), all still type-only -- reconfirmed here as the CURRENT imports, still referencing no Runtime/Storage/Worker/Nostr module", () => {
     const codeOnly = codeOnlyLines(serviceSource);
     expect(codeOnly).toMatch(/import type \{ FedosIdentityDescriptor \} from "\.\/fedos_identity_descriptor\.js";/);
     expect(codeOnly).toMatch(/import type \{ FedosIdentityProvider \} from "\.\/fedos_identity_provider\.js";/);
     expect(codeOnly).toMatch(/import type \{ FedosIdentityCapability \} from "\.\/fedos_identity_capability\.js";/);
+    expect(codeOnly).toMatch(/import type \{ FedosIdentityRecord \} from "\.\/fedos_identity_record\.js";/);
+    expect(codeOnly).toMatch(/import type \{ FedosIdentityRegistry \} from "\.\/fedos_identity_registry\.js";/);
+    const importLines = [...codeOnly.matchAll(/^import .*$/gm)].map((m: RegExpMatchArray) => m[0]);
+    expect(importLines.length).toBe(5);
+    expect(importLines.every((line: string) => line.startsWith("import type "))).toBe(true);
     expect(codeOnly).not.toMatch(/fedos_wasm_loader|fedos_runtime_storage_backend|fedos_runtime_ciphertext_storage|runtime\//);
     expect(codeOnly).not.toMatch(/nostr\//);
   });
 
-  it("12. behavioral: describeIdentity() delegates exactly to the injected provider's own result, including null, across repeated calls with no memoization", async () => {
+  it("12. RIPPLE (Secure Runtime Alpha 042): behavioral -- describeIdentity() delegated exactly to the injected provider's own result AS OF this Stage's own scope; Alpha 042 later required a second, injected FedosIdentityRegistry -- reconfirmed here as the CURRENT behavior: still delegates to the provider's own result, including null, across repeated calls with no memoization of the RETURN VALUE", async () => {
     let callCount = 0;
     const descriptor: FedosIdentityDescriptor = { id: "local-1", provider: "test-provider", publicIdentifier: "public-1" };
     const provider = makeTestProvider({
@@ -211,7 +228,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
         return callCount === 1 ? descriptor : null;
       },
     });
-    const service = new FedosIdentityService(provider);
+    const service = new FedosIdentityService(provider, new FedosIdentityRegistry());
 
     const first = await service.describeIdentity();
     expect(first).toEqual(descriptor);
@@ -220,7 +237,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     expect(callCount).toBe(2);
   });
 
-  it("13. behavioral: describeCapability() reports the injected provider's own label with available: true, and does not call describeIdentity()", async () => {
+  it("13. RIPPLE (Secure Runtime Alpha 042): behavioral -- describeCapability() reported the injected provider's own label with available: true, and did not call describeIdentity(), AS OF this Stage's own scope; Alpha 042 later required a second, injected FedosIdentityRegistry for construction -- reconfirmed here as the CURRENT behavior: describeCapability() still does not call describeIdentity() or touch the registry", async () => {
     let describeIdentityCalls = 0;
     const provider = makeTestProvider({
       provider: "capability-check-provider",
@@ -229,11 +246,30 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
         return null;
       },
     });
-    const service = new FedosIdentityService(provider);
+    const service = new FedosIdentityService(provider, new FedosIdentityRegistry());
 
     const capability = await service.describeCapability();
     expect(capability).toEqual({ provider: "capability-check-provider", available: true });
     expect(describeIdentityCalls).toBe(0);
+  });
+
+  it("13b. RIPPLE (Secure Runtime Alpha 042): behavioral -- a successful describeIdentity() now also registers a FedosIdentityRecord into the injected Registry, mapping the three fields verbatim, and a null result registers nothing", async () => {
+    const descriptor: FedosIdentityDescriptor = { id: "local-2", provider: "test-provider", publicIdentifier: "public-2" };
+    const registry = new FedosIdentityRegistry();
+    const provider = makeTestProvider({ provider: "test-provider", describeIdentity: async () => descriptor });
+    const service = new FedosIdentityService(provider, registry);
+
+    expect(registry.find("local-2")).toBeNull();
+    const result = await service.describeIdentity();
+    expect(result).toEqual(descriptor);
+    expect(registry.find("local-2")).toEqual({ id: "local-2", provider: "test-provider", publicIdentifier: "public-2" });
+    expect(registry.list().length).toBe(1);
+
+    const nullRegistry = new FedosIdentityRegistry();
+    const nullProvider = makeTestProvider({ provider: "empty-provider", describeIdentity: async () => null });
+    const nullService = new FedosIdentityService(nullProvider, nullRegistry);
+    expect(await nullService.describeIdentity()).toBeNull();
+    expect(nullRegistry.list()).toEqual([]);
   });
 
   it("14. fedos_identity_provider.ts (Alpha 029) is confirmed BYTE-FOR-BYTE unchanged -- still exactly one method, no describeCapability()", () => {

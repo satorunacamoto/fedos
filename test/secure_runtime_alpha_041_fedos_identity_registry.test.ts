@@ -350,10 +350,9 @@ describe("Secure Runtime Alpha 041 -- FedOS Identity Registry, Memory-only, no P
     expect(resolverSource).not.toMatch(/FedosIdentityRegistry|fedos_identity_registry/);
   });
 
-  it("30. Regression: fedos_identity_service.ts and fedos_identity_capability.ts are confirmed unchanged, no reference to the new Registry", () => {
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
+  it("30. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts was confirmed unchanged with no reference to the new Registry AS OF this Stage's own scope; Alpha 042 later gave it a required second constructor argument (an injected FedosIdentityRegistry) -- reconfirmed here as the CURRENT signature. fedos_identity_capability.ts remains confirmed unchanged", () => {
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_041/);
-    expect(serviceSource).not.toMatch(/FedosIdentityRegistry/);
     expect(capabilitySource).toMatch(/readonly available: boolean;/);
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_041/);
   });
@@ -365,13 +364,13 @@ describe("Secure Runtime Alpha 041 -- FedOS Identity Registry, Memory-only, no P
     expect(await resolved?.describeIdentity()).toBeNull();
   });
 
-  it("32. fedos_identity_registry.ts has ZERO importers anywhere in src/ -- confirmed across every other identity/runtime/nostr/worker file", () => {
+  it("32. RIPPLE (Secure Runtime Alpha 042): fedos_identity_registry.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 042 later made fedos_identity_service.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
+    expect(serviceSource).toMatch(/fedos_identity_registry|FedosIdentityRegistry/);
     for (const source of [
       recordSource,
       descriptorSource,
       providerInterfaceSource,
       capabilitySource,
-      serviceSource,
       resolverSource,
       noopProviderSource,
       nostrProviderSource,

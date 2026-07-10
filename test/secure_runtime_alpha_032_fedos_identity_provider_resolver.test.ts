@@ -206,8 +206,8 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
     }
   });
 
-  it("12. fedos_identity_service.ts (Alpha 031) is confirmed BYTE-FOR-BYTE unchanged -- constructor still requires an explicit FedosIdentityProvider argument, no default, no reference to this Stage's own doc", () => {
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
+  it("12. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts (Alpha 031) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- constructor required an explicit FedosIdentityProvider argument, no default; Alpha 042 later added a required second constructor argument (an injected FedosIdentityRegistry) -- reconfirmed here as the CURRENT signature, still no reference to this Stage's own doc", () => {
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
     expect(serviceSource).not.toMatch(/resolveFedosIdentityProvider/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_032/);
   });

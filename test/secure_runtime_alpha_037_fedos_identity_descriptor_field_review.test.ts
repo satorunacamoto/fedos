@@ -257,7 +257,7 @@ describe("Secure Runtime Alpha 037 -- FedOS Identity Descriptor Field Review, re
     }
     expect(providerInterfaceSource).toMatch(/describeIdentity\(\): Promise<FedosIdentityDescriptor \| null>;/);
     expect(capabilitySource).toMatch(/readonly available: boolean;/);
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
     expect(resolverSource).toMatch(/return sharedNostrProvider;/);
     expect(noopProviderSource).toMatch(/readonly provider = "noop";/);
     expect(nostrProviderSource).toMatch(/readonly provider = "nostr";/);

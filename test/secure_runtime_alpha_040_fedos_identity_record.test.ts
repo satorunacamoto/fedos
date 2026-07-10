@@ -268,12 +268,12 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     expect(Object.keys(record).sort()).toEqual(["id", "provider", "publicIdentifier"].sort());
   });
 
-  it("15. fedos_identity_record.ts has ZERO importers anywhere in src/ -- confirmed across every other identity/runtime/nostr/worker file", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 042): fedos_identity_record.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 042 later made fedos_identity_service.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
+    expect(serviceSource).toMatch(/fedos_identity_record|FedosIdentityRecord/);
     for (const source of [
       descriptorSource,
       providerInterfaceSource,
       capabilitySource,
-      serviceSource,
       resolverSource,
       noopProviderSource,
       nostrProviderSource,
@@ -321,7 +321,7 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
   });
 
   it("19. Regression: fedos_identity_service.ts (Alpha 031) and fedos_identity_capability.ts (Alpha 030) are confirmed unchanged", () => {
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_040/);
     expect(capabilitySource).toMatch(/readonly available: boolean;/);
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_040/);

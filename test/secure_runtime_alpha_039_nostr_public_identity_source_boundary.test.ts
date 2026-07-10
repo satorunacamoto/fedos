@@ -359,9 +359,9 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     expect(noopProviderSource).not.toMatch(/secure_runtime_alpha_039/);
   });
 
-  it("26. Regression: FedosIdentityService (Alpha 031) is confirmed unchanged -- pure delegation, constructor still requires an explicit FedosIdentityProvider argument", () => {
-    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider\) \{/);
-    expect(serviceSource).toMatch(/return this\.#provider\.describeIdentity\(\);/);
+  it("26. RIPPLE (Secure Runtime Alpha 042): FedosIdentityService (Alpha 031) was confirmed unchanged AS OF this Stage's own scope -- pure delegation, constructor requiring an explicit FedosIdentityProvider argument; Alpha 042 later added a required second constructor argument (an injected FedosIdentityRegistry) and a Descriptor->Record registration step -- reconfirmed here as the CURRENT signature and body, still calling the Provider's own describeIdentity()", () => {
+    expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
+    expect(serviceSource).toMatch(/const descriptor = await this\.#provider\.describeIdentity\(\);/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_039/);
   });
 
