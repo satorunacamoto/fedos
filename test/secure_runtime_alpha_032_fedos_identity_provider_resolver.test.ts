@@ -19,6 +19,8 @@ import resolverSource from "../src/identity/fedos_identity_provider_resolver.ts?
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/identity/fedos_identity_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
@@ -183,7 +185,7 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
     expect(first).toBe(second);
   });
 
-  it("11. fedos_identity_provider_resolver.ts has ZERO importers anywhere in src/ other than this Stage's own guard test", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 050-052): fedos_identity_provider_resolver.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 050-052 later made fedos_runtime_identity.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other file listed remains a non-importer", () => {
     for (const source of [
       serviceSource,
       descriptorSource,
@@ -204,6 +206,7 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
       expect(source).not.toMatch(/fedos_identity_provider_resolver/);
       expect(source).not.toMatch(/resolveFedosIdentityProvider/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import \{ resolveFedosIdentityProvider \} from "\.\.\/identity\/fedos_identity_provider_resolver\.js";/);
   });
 
   it("12. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts (Alpha 031) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- constructor required an explicit FedosIdentityProvider argument, no default; Alpha 042 later added a required second constructor argument (an injected FedosIdentityRegistry) -- reconfirmed here as the CURRENT signature, still no reference to this Stage's own doc", () => {
@@ -284,7 +287,7 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

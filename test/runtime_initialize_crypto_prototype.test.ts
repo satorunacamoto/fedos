@@ -173,7 +173,7 @@ describe("FedOS Runtime initializeCrypto Prototype, door added not opened, no si
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 
   it("13. create_runtime.ts's pre-existing cryptoProvider/crypto selection is unchanged by this stage", () => {

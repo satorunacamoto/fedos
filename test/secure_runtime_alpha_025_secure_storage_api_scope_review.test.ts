@@ -216,7 +216,7 @@ describe("Secure Runtime Alpha 025 -- Secure Storage API Scope Review, review on
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 
   it("13. fedos_runtime_ciphertext_storage.ts/fedos_runtime_storage_backend.ts/fedos_runtime_storage_backend_windows_dpapi.ts/fedos_runtime_storage_resolver.ts are all confirmed to have no reference to this Stage's own doc", () => {

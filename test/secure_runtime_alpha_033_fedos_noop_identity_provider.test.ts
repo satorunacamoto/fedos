@@ -22,6 +22,8 @@ import resolverSource from "../src/identity/fedos_identity_provider_resolver.ts?
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/identity/fedos_identity_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
@@ -239,7 +241,7 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_033/);
   });
 
-  it("18. RIPPLE (Secure Runtime Alpha 034, then Alpha 036): fedos_noop_identity_provider.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 034 later made fedos_identity_provider_resolver.ts its first (and, per that Stage's own mandate, only) real importer; Alpha 036 later re-wired the Resolver to import NostrIdentityProvider instead, returning fedos_noop_identity_provider.ts to ZERO real (code-level) importers -- the Resolver's own header comment still names NoopFedosIdentityProvider in prose (explaining why it was not deleted), but its CODE no longer imports it, confirmed here as the CURRENT state via codeOnlyLines(), per this arc's own established ripple convention. Every other file remains a non-importer", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 034, then Alpha 036, then Alpha 050-052): fedos_noop_identity_provider.ts had ZERO importers anywhere in src/ AS OF Alpha 033's own scope; Alpha 034 later made fedos_identity_provider_resolver.ts its first (and, per that Stage's own mandate, only) real importer; Alpha 036 later re-wired the Resolver to import NostrIdentityProvider instead, returning fedos_noop_identity_provider.ts to ZERO real (code-level) importers -- the Resolver's own header comment still names NoopFedosIdentityProvider in prose (explaining why it was not deleted), but its CODE no longer imports it; Alpha 050-052 later made fedos_runtime_identity.ts a new, real, code-level importer (a safe fallback for the Provider Resolver's own nullable return type) -- reconfirmed here as the CURRENT state via codeOnlyLines(), per this arc's own established ripple convention. Every other file remains a non-importer", () => {
     expect(resolverSource).toMatch(/fedos_noop_identity_provider|NoopFedosIdentityProvider/);
     expect(codeOnlyLines(resolverSource)).not.toMatch(/fedos_noop_identity_provider|NoopFedosIdentityProvider/);
     for (const source of [
@@ -263,6 +265,7 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
       expect(source).not.toMatch(/fedos_noop_identity_provider/);
       expect(source).not.toMatch(/NoopFedosIdentityProvider/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import \{ NoopFedosIdentityProvider \} from "\.\.\/identity\/fedos_noop_identity_provider\.js";/);
   });
 
   it("19. MemoryStorageBackend (fedos_runtime_storage_backend.ts) is confirmed unchanged -- no reference to this Stage's own doc or the new Noop Provider", () => {
@@ -329,7 +332,7 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

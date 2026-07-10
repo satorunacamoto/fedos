@@ -441,6 +441,6 @@ describe("Secure Runtime Alpha 023 -- Windows DPAPI Storage Backend, Memory Back
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 });

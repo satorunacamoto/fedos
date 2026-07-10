@@ -24,6 +24,8 @@ import alpha042DocSource from "../docs/secure_runtime_alpha_042_fedos_identity_s
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/identity/fedos_identity_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import registrySource from "../src/identity/fedos_identity_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import recordSource from "../src/identity/fedos_identity_record.ts?raw";
@@ -293,7 +295,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_031/);
   });
 
-  it("16. fedos_identity_service.ts has ZERO importers anywhere in src/ other than this Stage's own guard test", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 050-052): fedos_identity_service.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 050-052 later made fedos_runtime_identity.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other file listed remains a non-importer", () => {
     for (const source of [
       descriptorSource,
       providerInterfaceSource,
@@ -312,6 +314,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
       expect(source).not.toMatch(/fedos_identity_service/);
       expect(source).not.toMatch(/FedosIdentityService/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import \{ FedosIdentityService \} from "\.\.\/identity\/fedos_identity_service\.js";/);
   });
 
   it("17. no existing src/identity/* file was modified, and no Runtime/Worker/Nostr file references this Stage's own doc", () => {
@@ -372,7 +375,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

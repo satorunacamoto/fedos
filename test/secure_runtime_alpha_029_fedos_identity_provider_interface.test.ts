@@ -20,6 +20,8 @@ import alpha028DocSource from "../docs/secure_runtime_alpha_028_fedos_identity_d
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerBoundarySource from "../src/identity/provider_boundary.ts?raw";
@@ -202,7 +204,7 @@ describe("Secure Runtime Alpha 029 -- FedOS Identity Provider Interface, interfa
     expect(await emptyProvider.describeIdentity()).toBeNull();
   });
 
-  it("11. fedos_identity_provider.ts has ZERO importers anywhere in src/ or referenced test sources other than this Stage's own guard test", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 050-052): fedos_identity_provider.ts had ZERO importers anywhere in src/ or referenced test sources AS OF this Stage's own scope; Alpha 050-052 later made fedos_runtime_identity.ts an indirect referrer via `resolveFedosIdentityProvider` (whose own name contains the substring `FedosIdentityProvider`), without importing the bare Interface file itself -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other file listed remains a non-importer of the Interface file", () => {
     for (const source of [
       descriptorSource,
       providerBoundarySource,
@@ -218,6 +220,8 @@ describe("Secure Runtime Alpha 029 -- FedOS Identity Provider Interface, interfa
       expect(source).not.toMatch(/fedos_identity_provider/);
       expect(source).not.toMatch(/FedosIdentityProvider/);
     }
+    expect(fedosRuntimeIdentitySource).not.toMatch(/from "\.\.\/identity\/fedos_identity_provider\.js"/);
+    expect(fedosRuntimeIdentitySource).toMatch(/resolveFedosIdentityProvider/);
   });
 
   it("12. no existing src/identity/* file was modified -- zero reference to this Stage's own doc in any of them", () => {
@@ -273,7 +277,7 @@ describe("Secure Runtime Alpha 029 -- FedOS Identity Provider Interface, interfa
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

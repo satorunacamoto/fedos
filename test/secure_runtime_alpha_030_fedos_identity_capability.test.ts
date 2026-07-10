@@ -271,7 +271,7 @@ describe("Secure Runtime Alpha 030 -- FedOS Identity Capability, type only, no P
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

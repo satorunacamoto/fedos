@@ -22,6 +22,8 @@ import registrySource from "../src/identity/fedos_identity_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import recordSource from "../src/identity/fedos_identity_record.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
@@ -364,7 +366,7 @@ describe("Secure Runtime Alpha 041 -- FedOS Identity Registry, Memory-only, no P
     expect(await resolved?.describeIdentity()).toBeNull();
   });
 
-  it("32. RIPPLE (Secure Runtime Alpha 042): fedos_identity_registry.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 042 later made fedos_identity_service.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
+  it("32. RIPPLE (Secure Runtime Alpha 042, then Alpha 050-052): fedos_identity_registry.ts had ZERO importers anywhere in src/ AS OF Alpha 041's own scope; Alpha 042 later made fedos_identity_service.ts its first real importer; Alpha 050-052 later made fedos_runtime_identity.ts a second real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
     expect(serviceSource).toMatch(/fedos_identity_registry|FedosIdentityRegistry/);
     for (const source of [
       recordSource,
@@ -396,6 +398,7 @@ describe("Secure Runtime Alpha 041 -- FedOS Identity Registry, Memory-only, no P
       expect(source).not.toMatch(/fedos_identity_registry/);
       expect(source).not.toMatch(/FedosIdentityRegistry/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import \{ FedosIdentityRegistry \} from "\.\.\/identity\/fedos_identity_registry\.js";/);
   });
 
   it("33. no existing src/nostr/* file was modified, and none references this Stage's own doc or the new Registry", () => {
@@ -456,7 +459,7 @@ describe("Secure Runtime Alpha 041 -- FedOS Identity Registry, Memory-only, no P
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

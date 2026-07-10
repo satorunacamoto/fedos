@@ -247,7 +247,7 @@ describe("Secure Runtime Alpha 026 -- Identity Layer / Secure Runtime Boundary R
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 
   it("18. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this review", async () => {

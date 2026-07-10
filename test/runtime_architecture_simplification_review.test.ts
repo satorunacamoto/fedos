@@ -86,14 +86,14 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     expect(minimumChainDocSource.length).toBeGreaterThan(1000);
   });
 
-  it("2. the fedos_*.ts file set is the known forty-two THIS review's own Stage 777-792 scope covered, plus Stage 994's later, separate fedos_runtime_prototype_execution.ts (Prototype EXECUTION Phase 013) -- the review doc names every one of the original forty-two", () => {
+  it("2. RIPPLE (Secure Runtime Alpha 050-052): the fedos_*.ts file set is the known forty-two THIS review's own Stage 777-792 scope covered, plus Stage 994's later, separate fedos_runtime_prototype_execution.ts (Prototype EXECUTION Phase 013) and a chain of later, separate Runtime Service/Authority/Backend files, per the exceptions below; Secure Runtime Alpha 050-052 later added a FIFTEENTH such exception, fedos_runtime_identity.ts -- the review doc names every one of the original forty-two, reconfirmed here as the CURRENT file set, per this arc's own established ripple convention", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
     const names = Object.keys(files)
       .map((path) => path.split("/").pop() as string)
       .sort();
-    expect(names.length).toBe(56);
+    expect(names.length).toBe(57);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts -- the Runtime
     // Service for randomBytes(), same reasoning as
@@ -150,6 +150,11 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
         "fedos_windows_dpapi_helper.ts",
         "fedos_runtime_storage_backend_windows_dpapi.ts",
         "fedos_runtime_platform_authority.ts",
+        // Secure Runtime Alpha 050-052 adds a FIFTEENTH, separate, later
+        // exception -- fedos_runtime_identity.ts, the Identity Layer's
+        // own internal Runtime wiring (FedosRuntimeIdentity), held
+        // internally by create_runtime.ts and never exposed on AppRuntime.
+        "fedos_runtime_identity.ts",
       ].sort(),
     );
 

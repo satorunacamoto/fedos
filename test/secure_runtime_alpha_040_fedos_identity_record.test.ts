@@ -23,6 +23,8 @@ import recordSource from "../src/identity/fedos_identity_record.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import capabilitySource from "../src/identity/fedos_identity_capability.ts?raw";
@@ -268,7 +270,7 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     expect(Object.keys(record).sort()).toEqual(["id", "provider", "publicIdentifier"].sort());
   });
 
-  it("15. RIPPLE (Secure Runtime Alpha 042): fedos_identity_record.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 042 later made fedos_identity_service.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 042, then Alpha 050-052): fedos_identity_record.ts had ZERO importers anywhere in src/ AS OF Alpha 040's own scope; Alpha 042 later made fedos_identity_service.ts its first real importer; Alpha 050-052 later made fedos_runtime_identity.ts a second real importer (a type-only reference) -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
     expect(serviceSource).toMatch(/fedos_identity_record|FedosIdentityRecord/);
     for (const source of [
       descriptorSource,
@@ -299,6 +301,7 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
       expect(source).not.toMatch(/fedos_identity_record/);
       expect(source).not.toMatch(/FedosIdentityRecord/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import type \{ FedosIdentityRecord \} from "\.\.\/identity\/fedos_identity_record\.js";/);
   });
 
   it("16. Regression: fedos_identity_descriptor.ts (Alpha 028) is confirmed BYTE-FOR-BYTE unchanged -- still exactly three fields, no reference to this Stage's own doc", () => {
@@ -413,7 +416,7 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

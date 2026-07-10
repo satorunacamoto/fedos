@@ -31,6 +31,8 @@ import registrySource from "../src/identity/fedos_identity_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import recordSource from "../src/identity/fedos_identity_record.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
@@ -398,7 +400,7 @@ describe("Secure Runtime Alpha 043 -- FedOS Identity Resolver, Registry read-onl
     expect(await resolved?.describeIdentity()).toBeNull();
   });
 
-  it("30. fedos_identity_resolver.ts has ZERO importers anywhere in src/ -- confirmed across every other identity/runtime/nostr/worker file", () => {
+  it("30. RIPPLE (Secure Runtime Alpha 050-052): fedos_identity_resolver.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 050-052 later made fedos_runtime_identity.ts its first real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other identity/runtime/nostr/worker file remains a non-importer", () => {
     for (const source of [
       recordSource,
       registrySource,
@@ -431,6 +433,7 @@ describe("Secure Runtime Alpha 043 -- FedOS Identity Resolver, Registry read-onl
       expect(source).not.toMatch(/fedos_identity_resolver/);
       expect(source).not.toMatch(/FedosIdentityResolver/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import \{ FedosIdentityResolver \} from "\.\.\/identity\/fedos_identity_resolver\.js";/);
   });
 
   it("31. no Runtime/Storage/Worker file references this Stage's own doc, and no existing src/nostr/* file was modified", () => {
@@ -493,7 +496,7 @@ describe("Secure Runtime Alpha 043 -- FedOS Identity Resolver, Registry read-onl
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(runtimeFiles).length).toBe(56);
+    expect(Object.keys(runtimeFiles).length).toBe(57);
 
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }

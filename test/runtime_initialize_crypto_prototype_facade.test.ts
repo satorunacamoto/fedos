@@ -199,7 +199,7 @@ describe("FedOS Runtime initializeCrypto Prototype reaches the Crypto Loader Fac
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 
   it("14. repeated calls stay identical, and multiple independent runtimes agree", () => {

@@ -17,6 +17,8 @@ import alpha027DocSource from "../docs/secure_runtime_alpha_027_identity_foundat
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerBoundarySource from "../src/identity/provider_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import providerTypesSource from "../src/identity/provider_types.ts?raw";
@@ -196,9 +198,7 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
     expect(typeof descriptor.publicIdentifier).toBe("string");
   });
 
-  it("9. fedos_identity_descriptor.ts has ZERO importers anywhere in src/ or test/ other than this Stage's own guard test -- confirmed disconnected by design", () => {
-    // Every other src/identity/ file, src/runtime/*, src/worker.ts, and
-    // src/nostr/* must NOT reference the new file or its exported type.
+  it("9. RIPPLE (Secure Runtime Alpha 050-052): fedos_identity_descriptor.ts had ZERO importers anywhere in src/ or test/ AS OF this Stage's own scope -- confirmed disconnected by design; Alpha 050-052 later made fedos_runtime_identity.ts its first real importer (a type-only reference) -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other src/identity/ file, src/runtime/*, src/worker.ts, and src/nostr/* remains a non-importer", () => {
     for (const source of [
       providerBoundarySource,
       providerTypesSource,
@@ -213,6 +213,7 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
       expect(source).not.toMatch(/fedos_identity_descriptor/);
       expect(source).not.toMatch(/FedosIdentityDescriptor/);
     }
+    expect(fedosRuntimeIdentitySource).toMatch(/import type \{ FedosIdentityDescriptor \} from "\.\.\/identity\/fedos_identity_descriptor\.js";/);
   });
 
   it("10. no existing src/identity/* file was modified -- zero reference to this Stage's own doc in any of them", () => {
@@ -268,7 +269,7 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 
   it("15. exactly one new file was added under src/identity/ -- 12 files total AS OF Alpha 028's own scope (Secure Runtime Alpha 029 later added a 13th, fedos_identity_provider.ts; Secure Runtime Alpha 030 later added a 14th, fedos_identity_capability.ts; Secure Runtime Alpha 031 later added a 15th, fedos_identity_service.ts; Secure Runtime Alpha 032 later added a 16th, fedos_identity_provider_resolver.ts; Secure Runtime Alpha 033 later added a 17th, fedos_noop_identity_provider.ts; Secure Runtime Alpha 035 later added an 18th, fedos_nostr_identity_provider.ts; Secure Runtime Alpha 039 later added a 19th and 20th, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts; Secure Runtime Alpha 040 later added a 21st, fedos_identity_record.ts)", () => {

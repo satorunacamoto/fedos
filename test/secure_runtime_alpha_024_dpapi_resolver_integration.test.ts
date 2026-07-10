@@ -420,7 +420,7 @@ describe("Secure Runtime Alpha 024 -- DPAPI Resolver Integration, Memory Backend
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(56);
+    expect(Object.keys(files).length).toBe(57);
   });
 
   it("26. sanity: the Runtime Mode Authority itself is untouched and still the sole real NODE_ENV gate this Resolver defers to", () => {

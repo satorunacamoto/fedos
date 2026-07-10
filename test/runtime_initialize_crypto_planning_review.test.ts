@@ -102,7 +102,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     expect(firstWiringPlanDocSource).toMatch(/prohibited|PROHIBITED/);
   });
 
-  it("9. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set was exactly the known forty-two AS OF THIS stage's own scope (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward; Stage 994, Prototype EXECUTION Phase 013, later added a 43rd, fedos_runtime_prototype_execution.ts)", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 050-052): no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set was exactly the known forty-two AS OF THIS stage's own scope (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward; Stage 994, Prototype EXECUTION Phase 013, later added a 43rd, fedos_runtime_prototype_execution.ts; a long chain of later, separate, non-PlanningOnly Runtime Service/Authority/Backend files followed, per the exceptions below; Secure Runtime Alpha 050-052 later added a FIFTEENTH such exception, fedos_runtime_identity.ts, the Identity Layer's own internal Runtime wiring -- reconfirmed here as the CURRENT file set, per this arc's own established ripple convention)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -155,7 +155,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(56);
+    expect(names.length).toBe(57);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts.
     // Stage 1005 (Secure Runtime Alpha 010) adds a THIRD, separate,
@@ -182,6 +182,10 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     // Secure Runtime Alpha 024 adds a FOURTEENTH, separate, later
     // exception -- fedos_runtime_platform_authority.ts, the shared
     // Platform Authority.
+    // Secure Runtime Alpha 050-052 adds a FIFTEENTH, separate, later
+    // exception -- fedos_runtime_identity.ts, the Identity Layer's own
+    // internal Runtime wiring (FedosRuntimeIdentity), held internally by
+    // create_runtime.ts and never exposed on AppRuntime.
     expect(names).toEqual(
       [
         ...knownNames,
@@ -199,6 +203,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
         "fedos_windows_dpapi_helper.ts",
         "fedos_runtime_storage_backend_windows_dpapi.ts",
         "fedos_runtime_platform_authority.ts",
+        "fedos_runtime_identity.ts",
       ].sort(),
     );
   });

@@ -148,6 +148,22 @@
  * `exportKey()`/`importKey()` remain unimplemented. No Worker/
  * Production/OS Keychain/Network connection of any kind, no new build
  * dependency of any kind.
+ *
+ * Secure Runtime Alpha 050–052 (Identity Runtime Integration Arc,
+ * Alpha 051 "Runtime Identity Bootstrap") — `createRuntime()` now also
+ * constructs ONE `FedosRuntimeIdentity` (`fedos_runtime_identity.ts`,
+ * Alpha 050) per call, assigned to a local, function-scoped constant
+ * that is NEVER attached to the `AppRuntime` object literal this
+ * function returns and NEVER read anywhere else in this repository —
+ * the Identity Layer's first real connection into the Runtime, held
+ * entirely internally. `AppRuntime`'s own field set (`types.js`) is
+ * UNCHANGED — no `identity` field, no new Public Runtime API of any
+ * kind. Construction is unconditional and identical across every
+ * Runtime Mode (`Development`/`Production`/`Unknown`) — `resolveMode()`
+ * is not read by, and does not influence, this construction in any
+ * way. See
+ * `docs/secure_runtime_alpha_050_052_identity_runtime_integration_arc.md`
+ * for the full design rationale.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -235,6 +251,7 @@ import {
   loadCiphertext,
   deleteCiphertext,
 } from "./fedos_runtime_ciphertext_storage.js";
+import { FedosRuntimeIdentity } from "./fedos_runtime_identity.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -788,6 +805,11 @@ export function createRuntime(
   env?: RuntimeEnv,
   overrides: RuntimeOverrides = {},
 ): AppRuntime {
+  // Secure Runtime Alpha 050-052: constructed for internal wiring only --
+  // never attached to the AppRuntime object below, never read elsewhere.
+  const runtimeIdentity: FedosRuntimeIdentity = new FedosRuntimeIdentity();
+  void runtimeIdentity;
+
   return {
     mode: overrides.mode ?? resolveMode(env),
     eventCache: overrides.eventCache ?? selectEventCache(env),
