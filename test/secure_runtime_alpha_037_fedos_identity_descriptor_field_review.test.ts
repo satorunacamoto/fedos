@@ -315,7 +315,7 @@ describe("Secure Runtime Alpha 037 -- FedOS Identity Descriptor Field Review, re
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(22);
+    expect(Object.keys(identityFiles).length).toBe(23);
   });
 
   it("21. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this review", async () => {

@@ -271,7 +271,7 @@ describe("Secure Runtime Alpha 028 -- FedOS Identity Descriptor, type only, no S
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(files).length).toBe(22);
+    expect(Object.keys(files).length).toBe(23);
   });
 
   it("16. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {

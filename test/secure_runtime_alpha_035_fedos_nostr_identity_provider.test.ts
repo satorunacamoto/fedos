@@ -403,7 +403,7 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(22);
+    expect(Object.keys(identityFiles).length).toBe(23);
   });
 
   it("27. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
