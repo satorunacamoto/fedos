@@ -163,9 +163,13 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
     // wrapper around the pre-existing `fedos_random_bytes_32`, exactly
     // like `version` above.
     // Updated Stage 1005 (Secure Runtime Alpha 010): `generate_aead_key_32`
-    // (see test/secure_runtime_alpha_010_aead_key_generation.test.ts)
-    // joins the same closed exception set — a thin wasm_bindgen wrapper
-    // around the pre-existing `fedos_generate_aead_key_32`.
+    // joined the same closed exception set — a thin wasm_bindgen wrapper
+    // around the pre-existing `fedos_generate_aead_key_32`. REPLACED
+    // Stage 1008 (Secure Runtime Alpha 013) by `generate_aead_key_handle`
+    // (see
+    // test/secure_runtime_alpha_013_opaque_aead_key_handle_migration.test.ts),
+    // whose opaque wrapper class's own `kind` getter (a fixed, non-secret
+    // label) joins the same set too.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
@@ -177,7 +181,8 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
       "fedos_generate_aead_key_32",
       "version",
       "random_bytes_32",
-      "generate_aead_key_32",
+      "generate_aead_key_handle",
+      "kind",
     ]);
     for (const name of pubFnNames) {
       const hasSafeSuffix =

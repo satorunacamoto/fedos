@@ -131,9 +131,10 @@ describe("FedOS Rust crate — test-only ChaCha20-Poly1305 helper", () => {
       "fedos_generate_aead_key_32",
       "version",
       "random_bytes_32",
-      "generate_aead_key_32",
+      "generate_aead_key_handle",
+      "kind",
     ];
-    expect(pubFnNames.length).toBe(30);
+    expect(pubFnNames.length).toBe(31);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

@@ -234,8 +234,13 @@ describe("FedOS Rust crate — RFC 8439 vectors wired to cargo test", () => {
       // the pre-existing fedos_random_bytes_32().
       "random_bytes_32",
       // Stage 1005's thin wasm_bindgen wrapper around the pre-existing
-      // fedos_generate_aead_key_32().
-      "generate_aead_key_32",
+      // fedos_generate_aead_key_32(), REPLACED Stage 1008 (Secure Runtime
+      // Alpha 013) by generate_aead_key_handle() -- see
+      // test/secure_runtime_alpha_013_opaque_aead_key_handle_migration.test.ts.
+      // Its opaque wrapper class's own `kind` getter (a fixed, non-secret
+      // label) is the other new pub fn this Stage adds.
+      "generate_aead_key_handle",
+      "kind",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

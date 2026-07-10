@@ -171,7 +171,7 @@ describe("FedOS private Rust execution review, blocked before crypto (Stage 345-
 
   it("18. Rust pub fn count is unchanged -- 27", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(30);
+    expect(pubFnNames.length).toBe(31);
   });
 
   it("19. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is unchanged -- still fixed false", () => {

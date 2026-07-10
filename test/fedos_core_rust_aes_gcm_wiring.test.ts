@@ -190,9 +190,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "fedos_generate_aead_key_32",
       "version",
       "random_bytes_32",
-      "generate_aead_key_32",
+      "generate_aead_key_handle",
+      "kind",
     ];
-    expect(pubFnNames.length).toBe(30);
+    expect(pubFnNames.length).toBe(31);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -313,10 +314,14 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // checks that it implements no new randomness source/algorithm.
       "random_bytes_32",
       // Stage 1005's thin wasm_bindgen wrapper around the pre-existing
-      // fedos_generate_aead_key_32() -- see
-      // test/secure_runtime_alpha_010_aead_key_generation.test.ts for
-      // the dedicated checks that it implements no new algorithm.
-      "generate_aead_key_32",
+      // fedos_generate_aead_key_32(), REPLACED Stage 1008 (Secure
+      // Runtime Alpha 013) by generate_aead_key_handle() -- see
+      // test/secure_runtime_alpha_013_opaque_aead_key_handle_migration.test.ts
+      // for the dedicated checks that it implements no new algorithm.
+      // Its opaque wrapper class's own `kind` getter (a fixed,
+      // non-secret label) is the other new pub fn this Stage adds.
+      "generate_aead_key_handle",
+      "kind",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

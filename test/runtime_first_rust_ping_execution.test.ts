@@ -206,7 +206,7 @@ describe("The first Rust ping 'execution', fail-closed everywhere else (Stage 37
 
   it("22. Rust public API is unchanged -- pub fn count still 27", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(30);
+    expect(pubFnNames.length).toBe(31);
   });
 
   it("23. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is untouched -- still fixed false", async () => {

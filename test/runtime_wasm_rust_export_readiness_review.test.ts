@@ -40,25 +40,26 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(30);
-    // `random_bytes_32` (Stage 1004, Secure Runtime Alpha 008) and
-    // `generate_aead_key_32` (Stage 1005, Secure Runtime Alpha 010) are
+    expect(pubFnNames.length).toBe(31);
+    // `random_bytes_32` (Stage 1004, Secure Runtime Alpha 008),
+    // `generate_aead_key_handle`, and `kind` (Stage 1008, Secure Runtime
+    // Alpha 013 -- REPLACING Stage 1005's `generate_aead_key_32`) are
     // genuinely NEW pub fn added long after THIS review's own Stage 977
     // scope -- the review doc's table only ever named the 27 functions
     // that existed at that time (plus `version`, Stage 986, which this
     // doc's OWN forward-looking recommendation text happens to already
     // mention). It is never retroactively edited to document later
     // additions -- see `docs/secure_runtime_alpha_008_random_bytes.md`/
-    // `docs/secure_runtime_alpha_010_aead_key_generation.md` for those
-    // functions' own reviews.
+    // `docs/secure_runtime_alpha_013_opaque_aead_key_handle_migration.md`
+    // for those functions' own reviews.
     for (const name of pubFnNames) {
-      if (name === "random_bytes_32" || name === "generate_aead_key_32") continue;
+      if (name === "random_bytes_32" || name === "generate_aead_key_handle" || name === "kind") continue;
       expect(reviewDocSource).toMatch(new RegExp("`" + name + "`"));
     }
   });
 
   it("3. the #[wasm_bindgen] count is confirmed 0, matching the real lib.rs", () => {
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(3);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
     expect(reviewDocSource).toMatch(/`#\\?\[wasm_bindgen\\?\]`.{0,20}count.{0,20}confirmed `0`|confirmed `0`/is);
     expect(reviewDocSource).toMatch(/# 0/);
   });
@@ -137,8 +138,8 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(30);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(3);
+    expect(pubFnNames.length).toBe(31);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
 
     const cargoCode = cargoTomlSource
       .split("\n")

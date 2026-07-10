@@ -1982,23 +1982,6 @@ mod secret_handle {
             }
         }
 
-        /// Stage 1005 (Secure Runtime Alpha 010) — a FOURTH
-        /// narrowly-scoped internal accessor, identical in shape to the
-        /// three above but named for its own sole reviewed caller: the
-        /// wasm_bindgen-annotated `generate_aead_key_32()` wrapper (below),
-        /// which crosses this handle's bytes over the WASM boundary as a
-        /// plain `Uint8Array` — an explicit, ALPHA-LIMITED design choice
-        /// (see `docs/secure_runtime_alpha_010_aead_key_generation.md`),
-        /// not a general-purpose exposer. Same rules as the other three:
-        /// returns `None` for the Stage 79 placeholder path and after
-        /// `clear()`; returns a COPY, never a reference; the caller
-        /// zeroizes its own copy once done.
-        pub(crate) fn expose_bytes_for_internal_wasm_export(&self) -> Option<[u8; 32]> {
-            match &self.payload {
-                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
-                _ => None,
-            }
-        }
     }
 
     #[cfg(test)]
@@ -6079,41 +6062,71 @@ pub fn random_bytes_32() -> Option<Vec<u8>> {
     fedos_random_bytes_32().bytes.map(|bytes| bytes.to_vec())
 }
 
-/// Stage 1005 (Secure Runtime Alpha 010) — the crate's THIRD
-/// wasm_bindgen-annotated function, and its 30th `pub fn` overall.
-/// A THIN wrapper around the EXISTING, byte-for-byte UNCHANGED
-/// [`fedos_generate_aead_key_32`] (Stage 171–176) — calls it EXACTLY
-/// ONCE. NO new entropy source, NO new algorithm: the 32 bytes returned
-/// here are the EXACT SAME bytes `fedos_generate_aead_key_32()` itself
-/// already draws via `getrandom::fill` and wraps in an opaque
-/// [`FedosAeadKeyHandle`].
-///
-/// **ALPHA-LIMITED DESIGN, NOT THE FUTURE SHAPE**: this wrapper
-/// immediately unwraps the opaque key handle back into raw bytes via
-/// the new, narrowly-scoped `SecretHandle::expose_bytes_for_internal_wasm_export()`
-/// accessor (mirroring this crate's own established one-accessor-per-consumer
-/// convention — Stage 147/152–154/199 each added their own for their
-/// own sole caller) and returns them as a plain `Vec<u8>` — deliberately
-/// NOT an opaque handle. `docs/secure_runtime_alpha_010_aead_key_generation.md`
-/// records this as a temporary, Alpha-only choice: no long-lived Rust-side
-/// copy is retained (the local `[u8; 32]` copy is zeroized immediately
-/// after conversion to `Vec<u8>`), but the *returned* bytes are, by
-/// design, raw application data once they cross into JS — a future arc
-/// is expected to replace this with an opaque, wasm_bindgen-exported
-/// key-handle class (per this arc's own Crypto API Surface Review) before
-/// `encrypt()`/`decrypt()` are implemented.
-/// On `FedosKeyGenerationStatus::EntropySourceUnavailable`, returns
-/// `None` — Fail Closed, never a panic, never a partial/zeroed/degraded
-/// result. `fedos_generate_aead_key_32()`'s own doc comment, behavior,
-/// and signature are all untouched by this Stage.
+/// Stage 1008 (Secure Runtime Alpha 013) — the crate's FOURTH
+/// wasm_bindgen-annotated item, and the crate's first OPAQUE
+/// wasm_bindgen-exported CLASS (as opposed to a plain function). Wraps
+/// the existing, permanently-opaque [`FedosAeadKeyHandle`] (Stage
+/// 171–176, UNCHANGED) for the SOLE purpose of letting a genuine handle
+/// value cross the WASM boundary without ever being unwrapped into raw
+/// bytes — the migration this arc's own Alpha 012 Key Boundary Decision
+/// decided and `docs/secure_runtime_alpha_013_opaque_aead_key_handle_migration.md`
+/// implements. The wrapped `inner` field carries NO modifier (private),
+/// so no code outside this crate's own defining module can read or
+/// construct it — the same discipline
+/// `docs/public_crypto_opaque_handles.md` already established for
+/// `FedosAeadKeyHandle`/`FedosCiphertextEnvelope` themselves, now
+/// extended one layer further, across the WASM boundary itself. Derives
+/// nothing (no `Clone`/`Debug`/`Serialize`, matching `FedosAeadKeyHandle`'s
+/// own rule) and exposes exactly ONE method — [`AeadKeyHandle::kind`], a
+/// fixed, non-secret label used ONLY so calling code can confirm "this
+/// is genuinely a handle" (this crate's Fail-Closed WASM Boundary reach
+/// relies on it structurally; see `fedos_wasm_loader.ts`). No raw-byte
+/// getter, no `exportKey`-shaped method, and no constructor are ever
+/// exposed — the ONLY way to obtain one is [`generate_aead_key_handle`].
 #[wasm_bindgen]
-pub fn generate_aead_key_32() -> Option<Vec<u8>> {
-    use zeroize::Zeroize;
+pub struct AeadKeyHandle {
+    // Read by nothing yet in this Stage — `encrypt()`/`decrypt()` are
+    // still unimplemented (see this Stage's own forbidden-scope list). A
+    // future, separate, explicitly-reviewed Stage adds the crate's own
+    // `pub(crate) fn inner()` reviewed seam once it exists to consume it,
+    // mirroring `FedosAeadKeyHandle::inner()`'s own convention.
+    #[allow(dead_code)]
+    inner: FedosAeadKeyHandle,
+}
+
+#[wasm_bindgen]
+impl AeadKeyHandle {
+    /// A FIXED, non-secret label — never derived from key material,
+    /// never a byte of it. Exists solely so JS-side code can structurally
+    /// confirm a value is genuinely an `AeadKeyHandle` (Fail Closed on
+    /// anything else) without ever inspecting, serializing, or reading a
+    /// raw byte of the wrapped handle.
+    #[wasm_bindgen(getter)]
+    pub fn kind(&self) -> String {
+        "AeadKeyHandle".to_string()
+    }
+}
+
+/// Stage 1008 (Secure Runtime Alpha 013) — REPLACES Stage 1005's
+/// `generate_aead_key_32()` (Secure Runtime Alpha 010), per this arc's
+/// own Alpha 012 Key Boundary Decision's deliberate breaking-change
+/// decision. A THIN wrapper around the
+/// EXISTING, byte-for-byte UNCHANGED [`fedos_generate_aead_key_32`]
+/// (Stage 171–176) — calls it EXACTLY ONCE and wraps its
+/// [`FedosAeadKeyHandle`] in the new opaque [`AeadKeyHandle`] WITHOUT
+/// ever unwrapping it into raw bytes. NO new entropy source, NO new
+/// algorithm: the key crossing the WASM boundary here is the EXACT SAME
+/// [`FedosAeadKeyHandle`] `fedos_generate_aead_key_32()` itself already
+/// produces via `getrandom::fill` — this function only moves it into the
+/// wasm-bindgen-exported wrapper, never reads or copies a byte out of
+/// it. On `FedosKeyGenerationStatus::EntropySourceUnavailable`, returns
+/// `None` — Fail Closed, never a panic, never a partial/degraded result.
+/// `fedos_generate_aead_key_32()`'s own doc comment, behavior, and
+/// signature are all untouched by this Stage.
+#[wasm_bindgen]
+pub fn generate_aead_key_handle() -> Option<AeadKeyHandle> {
     let key_handle = fedos_generate_aead_key_32().key?;
-    let mut bytes = key_handle.inner().expose_bytes_for_internal_wasm_export()?;
-    let result = bytes.to_vec();
-    bytes.zeroize();
-    Some(result)
+    Some(AeadKeyHandle { inner: key_handle })
 }
 
 /// Stage 75 — RFC 8439 known-answer verification, `#[cfg(test)]` ONLY.

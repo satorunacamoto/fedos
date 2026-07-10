@@ -1,9 +1,10 @@
 /**
- * Stage 1005 (Secure Runtime Alpha 010) — "Public Runtime AEAD Key
- * Generation API": the SECOND public Crypto API Runtime exposes,
- * implementing this arc's own four-layer Public Runtime API -> Runtime
- * Service -> Rust Boundary -> Internal Rust architecture end to end,
- * mirroring `fedos_runtime_random_bytes.ts` (Stage 1004) exactly:
+ * Stage 1005 (Secure Runtime Alpha 010), reshaped Stage 1008 (Secure
+ * Runtime Alpha 013) — "Public Runtime AEAD Key Generation API": the
+ * SECOND public Crypto API Runtime exposes, implementing this arc's own
+ * four-layer Public Runtime API -> Runtime Service -> Rust Boundary ->
+ * Internal Rust architecture end to end, mirroring
+ * `fedos_runtime_random_bytes.ts` (Stage 1004):
  *
  *   AppRuntime.generateAeadKey()                          Public Runtime API
  *     |                                                  (create_runtime.ts / types.ts)
@@ -14,23 +15,25 @@
  *   FedosWasmLoaderSkeleton.attemptDevOnlyAeadKeyGenerationCall()  Rust Boundary reach
  *     |                                                  (fedos_wasm_loader.ts)
  *     v
- *   generate_aead_key_32()                                Rust Boundary
- *     |                                                  (lib.rs, #[wasm_bindgen])
+ *   generate_aead_key_handle()                            Rust Boundary
+ *     |                                                  (lib.rs, wasm_bindgen)
  *     v
  *   fedos_generate_aead_key_32()                          Internal Rust
  *                                                          (lib.rs, Stage 171-176, UNCHANGED)
  *
- * **ALPHA-LIMITED DESIGN, per
- * `docs/secure_runtime_alpha_010_aead_key_generation.md`**: this is NOT
- * an opaque key-handle design and NOT Secure Storage. `generateAeadKey()`
- * returns the generated key's raw 32 bytes as a plain, transient
- * `Uint8Array` — nothing is written to disk, `localStorage`, or any
- * storage backend, and this file retains no copy of any key beyond the
- * single `await` chain of one `generateAeadKey()` call. A future arc is
- * expected to replace this raw-bytes shape with an opaque key handle
- * before `encrypt()`/`decrypt()` are implemented (per
- * `docs/secure_runtime_alpha_009_encrypt_api_surface_review.md`'s own
- * recommendation).
+ * **OPAQUE KEY HANDLE, per
+ * `docs/secure_runtime_alpha_013_opaque_aead_key_handle_migration.md`**:
+ * per this arc's own Alpha 012 Key Boundary Decision's deliberate
+ * breaking-change decision, `generateAeadKey()` NO LONGER
+ * returns raw key bytes — it resolves an opaque `AeadKeyHandle` (or
+ * `null`). This file never reads, copies, or exposes a raw byte of any
+ * key: the value `attemptDevOnlyAeadKeyGenerationCall()` hands back is
+ * threaded through unchanged, the same reference, all the way to the
+ * Public Runtime API. Still NOT Secure Storage — nothing is written to
+ * disk, `localStorage`, or any storage backend, and this file retains
+ * no copy of any handle beyond the single `await` chain of one
+ * `generateAeadKey()` call. `encrypt()`/`decrypt()`/`importKey()`/
+ * `exportKey()` remain unimplemented anywhere in this file.
  *
  * This file is the Runtime Service layer: TypeScript orchestration that
  * decides HOW to reach the Rust Boundary and reshapes its answer into a
@@ -59,30 +62,36 @@
  *     `generateAeadKey()` invocation — no retry, no second attempt, no
  *     caching of a prior result.
  *   - NO `encrypt`/`decrypt`/`deriveKey`/`importKey`/`exportKey`, or any
- *     Rust API other than `generate_aead_key_32()` (via the Loader's
- *     own existing gate), is ever called.
+ *     Rust API other than `generate_aead_key_handle()` (via the
+ *     Loader's own existing gate), is ever called.
  *   - NO reference to `src/worker.ts`, and this file is not referenced
  *     BY `src/worker.ts` — Worker remains fully unconnected.
  *   - NO `fedos_crypto_backend_resolver.ts` reference — the Backend
  *     Resolver is unmodified and unreferenced by this file.
- *   - NO new persistent/Secure Storage of any kind — the returned key
- *     bytes are a plain, transient `Uint8Array`; nothing is written to
- *     disk, `localStorage`, or any storage backend.
+ *   - NO new persistent/Secure Storage of any kind — the returned
+ *     `AeadKeyHandle` is a plain, transient, opaque value; nothing is
+ *     written to disk, `localStorage`, or any storage backend.
  */
 
-import { createFedosWasmLoader, type FedosWasmLoaderSkeleton } from "./fedos_wasm_loader.js";
+import {
+  createFedosWasmLoader,
+  type FedosWasmLoaderSkeleton,
+  type AeadKeyHandle,
+} from "./fedos_wasm_loader.js";
+
+export type { AeadKeyHandle };
 
 /**
  * The Runtime Service-level record of one `generateAeadKey()` attempt.
  * `succeeded: true` names that the full six-condition Loader chain
- * resolved a genuine `Uint8Array` from `generate_aead_key_32()`;
- * `keyBytes` is that value, or `null` on every other outcome (unmet
- * gate, absent export, thrown error, or Rust's own
- * `EntropySourceUnavailable` Fail Closed).
+ * resolved a genuine `AeadKeyHandle` from `generate_aead_key_handle()`;
+ * `keyHandle` is that value, or `null` on every other outcome (unmet
+ * gate, absent export, thrown error, a wrongly-shaped return, or Rust's
+ * own `EntropySourceUnavailable` Fail Closed).
  */
 export interface RuntimeAeadKeyGenerationState {
   readonly succeeded: boolean;
-  readonly keyBytes: Uint8Array | null;
+  readonly keyHandle: AeadKeyHandle | null;
 }
 
 /**
@@ -90,8 +99,8 @@ export interface RuntimeAeadKeyGenerationState {
  * Constructs a fresh `FedosWasmLoader` (`createFedosWasmLoader()`) and
  * drives it through `planLoad()` -> `attemptDevOnlyJsGlueImport()` ->
  * `attemptDevOnlyWasmInitialization()` ->
- * `attemptDevOnlyAeadKeyGenerationCall()` (Stage 1005), then reads back
- * ONLY `succeeded`/`keyBytes` from the final result. Outside
+ * `attemptDevOnlyAeadKeyGenerationCall()` (Stage 1008), then reads back
+ * ONLY `succeeded`/`keyHandle` from the final result. Outside
  * Development Runtime, every step of the Loader's own chain Fails
  * Closed exactly as `attemptDevOnlyAeadKeyGenerationCall()`'s own
  * design already guarantees — this function adds no additional
@@ -116,14 +125,14 @@ export async function attemptDevOnlyRuntimeAeadKeyGeneration(
   const keyGenerationResult = await loader.attemptDevOnlyAeadKeyGenerationCall();
   return {
     succeeded: keyGenerationResult.succeeded,
-    keyBytes: keyGenerationResult.keyBytes,
+    keyHandle: keyGenerationResult.keyHandle,
   };
 }
 
 /**
  * PUBLIC, ASYNC — wired into `AppRuntime` as `generateAeadKey`
  * (`create_runtime.ts`). Calls `attemptDevOnlyRuntimeAeadKeyGeneration()`
- * EXACTLY ONCE and returns its `keyBytes` on success, or `null` on any
+ * EXACTLY ONCE and returns its `keyHandle` on success, or `null` on any
  * other outcome. Fail Closed: wrapped in `try`/`catch` so that ANY
  * unexpected error anywhere in the Loader chain — beyond the chain's
  * own already-Fail-Closed `attemptDevOnlyAeadKeyGenerationCall()` —
@@ -133,10 +142,10 @@ export async function attemptDevOnlyRuntimeAeadKeyGeneration(
  * `createRuntimeInitializeCryptoResult()`/`AppRuntime.initializeCrypto()`/
  * `runtimeCapabilities()`/`randomBytes()`.
  */
-export async function generateAeadKey(): Promise<Uint8Array | null> {
+export async function generateAeadKey(): Promise<AeadKeyHandle | null> {
   try {
     const state = await attemptDevOnlyRuntimeAeadKeyGeneration();
-    return state.succeeded ? state.keyBytes : null;
+    return state.succeeded ? state.keyHandle : null;
   } catch {
     return null;
   }

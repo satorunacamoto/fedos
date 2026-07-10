@@ -70,9 +70,16 @@
  * called, or read by this new field's own implementation.
  * `generateAeadKey()` internally drives its own fresh `FedosWasmLoader`
  * through the SAME six-condition chain and calls the Rust Boundary's
- * own thin wrapper export. ALPHA-LIMITED: returns raw key bytes, not
- * an opaque handle; no Worker/Production connection, no Secure Storage
- * of any kind, no new build dependency of any kind.
+ * own thin wrapper export. No Worker/Production connection, no Secure
+ * Storage of any kind, no new build dependency of any kind.
+ *
+ * Stage 1008 (Secure Runtime Alpha 013) — `generateAeadKey()`'s own
+ * return shape changes from raw key bytes to an opaque `AeadKeyHandle`,
+ * per this arc's own Alpha 012 Key Boundary Decision's deliberate
+ * breaking-change decision. This file's own wiring is
+ * UNCHANGED — `generateAeadKey` is imported and assigned exactly as
+ * before; only the imported function's own return type changed, in
+ * `fedos_runtime_aead_key_generation.ts`.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";

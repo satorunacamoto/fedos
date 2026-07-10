@@ -1238,29 +1238,76 @@ export interface FedosWasmLoaderRandomBytesExecution {
 }
 
 /**
- * Stage 1005 (Secure Runtime Alpha 010) — the result of a REAL attempt
+ * Stage 1008 (Secure Runtime Alpha 013) — the PUBLIC, OPAQUE shape every
+ * layer above this file treats a genuine AEAD key handle as satisfying.
+ * `kind` is a FIXED, non-secret label — never derived from key
+ * material, never a byte of it — used ONLY so this file's own
+ * `isAeadKeyHandleShape()` (below) can structurally confirm "this is
+ * genuinely a handle" before ever passing a value upward. Deliberately
+ * minimal: no `bytes`/`key`/`material`/`export*` field, no
+ * `toJSON`/`toString` override, and no other property is declared here
+ * — a caller relying on this type can observe nothing about a handle
+ * beyond "it exists" and "kind === 'AeadKeyHandle'". The ACTUAL runtime
+ * value crossing the WASM boundary is the real, wasm-bindgen-generated
+ * `AeadKeyHandle` class instance (`lib.rs`) — this file never
+ * constructs a synthetic substitute, unwraps it, or copies any field
+ * out of it; the SAME reference is threaded, unchanged, through every
+ * layer up to the Public Runtime API.
+ */
+export interface AeadKeyHandle {
+  readonly kind: "AeadKeyHandle";
+}
+
+/**
+ * PRIVATE — structural Fail-Closed validation for a candidate value
+ * returned by `module.generate_aead_key_handle()`. Returns `true` only
+ * when `value` is a non-null object whose own `kind` property is
+ * EXACTLY the literal `"AeadKeyHandle"` — never `instanceof` (this file
+ * never imports or references the generated JS glue's own class
+ * constructor), never a deep inspection of any other property. A
+ * `Uint8Array`, a plain `{}`, `null`, a number, or any other shape all
+ * resolve `false` here, which `attemptDevOnlyAeadKeyGenerationCall()`
+ * (below) Fails Closed on via `reason: "InvalidHandleShape"`.
+ */
+function isAeadKeyHandleShape(value: unknown): value is AeadKeyHandle {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { kind?: unknown }).kind === "AeadKeyHandle"
+  );
+}
+
+/**
+ * Stage 1008 (Secure Runtime Alpha 013) — the result of a REAL attempt
  * (or deliberate non-attempt) to call the retained JS glue module's own
- * `generate_aead_key_32` property as a function, with NO argument.
- * Mirrors `FedosWasmLoaderRandomBytesExecution` (Stage 1004) exactly,
- * one field for one Rust Boundary export. `keyBytes` is the
- * `Uint8Array` returned by `module.generate_aead_key_32()` on success,
- * or `null` on every other outcome (including a genuine, in-bounds
- * `undefined` return from Rust itself, which maps to `reason:
- * "EntropySourceUnavailable"` — Fail Closed, not an error) — NEVER any
- * other value type, and NEVER the module or any Rust object itself.
- * `succeeded: true` NAMES that the call resolved a `Uint8Array` — it is
- * NEVER read by `planLoad()`'s `if` conditions (which this stage does
- * not touch at all), never read by
+ * `generate_aead_key_handle` property as a function, with NO argument.
+ * REPLACES Stage 1005's `keyBytes: Uint8Array | null` field with
+ * `keyHandle: AeadKeyHandle | null`, per this arc's own Alpha 012 Key
+ * Boundary Decision's deliberate breaking-change decision — otherwise
+ * mirrors
+ * `FedosWasmLoaderRandomBytesExecution` (Stage 1004) exactly, one field
+ * for one Rust Boundary export. `keyHandle` is the value returned by
+ * `module.generate_aead_key_handle()` on success, structurally verified
+ * by `isAeadKeyHandleShape()` above, or `null` on every other outcome
+ * (including a genuine, in-bounds `undefined` return from Rust itself,
+ * which maps to `reason: "EntropySourceUnavailable"` — Fail Closed, not
+ * an error, and a genuine but WRONGLY-shaped return, which maps to
+ * `reason: "InvalidHandleShape"`) — NEVER any other value type, and
+ * NEVER the module itself. `succeeded: true` NAMES that the call
+ * resolved a genuine `AeadKeyHandle` — it is NEVER read by
+ * `planLoad()`'s `if` conditions (which this stage does not touch at
+ * all), never read by
  * `initializeCrypto()`/`runtimeCapabilities()`/`randomBytes()`, and
  * never surfaced in Runtime/Worker diagnostics.
  */
 export interface FedosWasmLoaderAeadKeyGenerationExecution {
   readonly attempted: boolean;
   readonly succeeded: boolean;
-  readonly keyBytes: Uint8Array | null;
+  readonly keyHandle: AeadKeyHandle | null;
   readonly reason:
     | "Succeeded"
     | "EntropySourceUnavailable"
+    | "InvalidHandleShape"
     | "NotInitialized"
     | "KeyGenerationUnavailable"
     | "CallFailed"
@@ -1387,8 +1434,9 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   #randomBytesExecution: FedosWasmLoaderRandomBytesExecution | null = null;
 
   /**
-   * Stage 1005 (Secure Runtime Alpha 010) — holds the most recent REAL
-   * Rust `generate_aead_key_32()` call result recorded by
+   * Stage 1005 (Secure Runtime Alpha 010), reshaped Stage 1008 (Secure
+   * Runtime Alpha 013) — holds the most recent REAL Rust
+   * `generate_aead_key_handle()` call result recorded by
    * `attemptDevOnlyAeadKeyGenerationCall()`, or `null` before that
    * method has ever been called on this instance. Read via
    * `aeadKeyGenerationExecution()`; NEVER read by `planLoad()`, which
@@ -1729,8 +1777,9 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
-   * Stage 1005 (Secure Runtime Alpha 010) — returns the most recent
-   * REAL Rust `generate_aead_key_32()` call result recorded by
+   * Stage 1005 (Secure Runtime Alpha 010), reshaped Stage 1008 (Secure
+   * Runtime Alpha 013) — returns the most recent REAL Rust
+   * `generate_aead_key_handle()` call result recorded by
    * `attemptDevOnlyAeadKeyGenerationCall()`, or `null` if that method
    * has never been called on this instance. Reading this value NEVER
    * triggers a new call. Not part of the `FedosWasmLoader` interface.
@@ -2037,7 +2086,11 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
-   * Stage 1005 (Secure Runtime Alpha 010) — PUBLIC, ASYNC. Mirrors
+   * Stage 1008 (Secure Runtime Alpha 013) — PUBLIC, ASYNC. REPLACES
+   * Stage 1005's `module.generate_aead_key_32` reach (Secure Runtime
+   * Alpha 010) with `module.generate_aead_key_handle`, per this arc's
+   * own Alpha 012 Key Boundary Decision's deliberate breaking-change
+   * decision — otherwise mirrors
    * `attemptDevOnlyRandomBytesCall()` (Stage 1004) exactly, gated on
    * the SAME six previously-recorded conditions
    * (`this.#generatedArtifactCheckResult`, `this.#devOnlyGateEvaluation`,
@@ -2045,37 +2098,43 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * `this.#jsGlueModule !== null`, and
    * `this.#wasmInitialization.succeeded`) — every one populated by an
    * EARLIER method call, never re-evaluated here:
-   *   - Any of the six missing entirely (`null`): `module.generate_aead_key_32`
+   *   - Any of the six missing entirely (`null`): `module.generate_aead_key_handle`
    *     is NEVER read; resolves
-   *     `{ attempted: false, succeeded: false, keyBytes: null, reason:
+   *     `{ attempted: false, succeeded: false, keyHandle: null, reason:
    *     "PrototypeStillClosed" }`.
    *   - All six present but at least one condition unmet:
-   *     `module.generate_aead_key_32` is NEVER read; resolves
-   *     `{ attempted: false, succeeded: false, keyBytes: null, reason:
+   *     `module.generate_aead_key_handle` is NEVER read; resolves
+   *     `{ attempted: false, succeeded: false, keyHandle: null, reason:
    *     "NotInitialized" }`.
    *   - All six satisfied: checks, AT RUNTIME, ONLY
-   *     `typeof module.generate_aead_key_32 === "function"` — no
+   *     `typeof module.generate_aead_key_handle === "function"` — no
    *     export-list enumeration or discovery of any kind. Absent:
-   *     resolves `{ attempted: true, succeeded: false, keyBytes: null,
+   *     resolves `{ attempted: true, succeeded: false, keyHandle: null,
    *     reason: "KeyGenerationUnavailable" }`. Present: calls
-   *     `module.generate_aead_key_32()` with NO argument, wrapped in
+   *     `module.generate_aead_key_handle()` with NO argument, wrapped in
    *     `try`/`catch` that Fails Closed to `{ attempted: true,
-   *     succeeded: false, keyBytes: null, reason: "CallFailed" }` on
-   *     ANY thrown/rejected error OR a non-`Uint8Array`/non-`undefined`
-   *     return value. A genuine `undefined` return (Rust's own Fail
-   *     Closed on `EntropySourceUnavailable`) resolves
-   *     `{ attempted: true, succeeded: false, keyBytes: null, reason:
+   *     succeeded: false, keyHandle: null, reason: "CallFailed" }` on
+   *     ANY thrown/rejected error. A genuine `undefined` return (Rust's
+   *     own Fail Closed on `EntropySourceUnavailable`) resolves
+   *     `{ attempted: true, succeeded: false, keyHandle: null, reason:
    *     "EntropySourceUnavailable" }` — NOT `"CallFailed"`, since
-   *     nothing threw. On a genuine `Uint8Array` return: resolves
-   *     `{ attempted: true, succeeded: true, keyBytes: <Uint8Array>,
-   *     reason: "Succeeded" }`.
-   * Never inspects, destructures, or retains the module or any other
-   * Rust object — only the returned `Uint8Array` (or `null`) is ever
-   * stored, on `this.#aeadKeyGenerationExecution`, readable via the new
-   * PUBLIC `aeadKeyGenerationExecution()` method. Never calls any Rust
-   * API other than `generate_aead_key_32()` — no `encrypt`/`decrypt`/
-   * `deriveKey`/`randomBytes`/any other export. Called by NOTHING else
-   * in this file.
+   *     nothing threw. A genuine return that is NEITHER `undefined` NOR
+   *     structurally a real handle (per `isAeadKeyHandleShape()` above —
+   *     e.g. a raw `Uint8Array`, a plain `{}`, or any other value)
+   *     resolves `{ attempted: true, succeeded: false, keyHandle: null,
+   *     reason: "InvalidHandleShape" }` — a DISTINCT Fail-Closed reason
+   *     from `"CallFailed"`, since nothing threw either. On a
+   *     structurally genuine handle: resolves `{ attempted: true,
+   *     succeeded: true, keyHandle: <AeadKeyHandle>, reason: "Succeeded"
+   *     }`.
+   * Never inspects, destructures, or retains the module itself — only
+   * the returned `AeadKeyHandle` (or `null`) is ever stored, on
+   * `this.#aeadKeyGenerationExecution`, readable via the new PUBLIC
+   * `aeadKeyGenerationExecution()` method, and NEVER unwrapped, copied,
+   * or read into raw bytes anywhere in this method. Never calls any
+   * Rust API other than `generate_aead_key_handle()` — no
+   * `encrypt`/`decrypt`/`deriveKey`/`randomBytes`/any other export.
+   * Called by NOTHING else in this file.
    */
   async attemptDevOnlyAeadKeyGenerationCall(): Promise<FedosWasmLoaderAeadKeyGenerationExecution> {
     const artifactCheck = this.#generatedArtifactCheckResult;
@@ -2087,7 +2146,7 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
     let result: FedosWasmLoaderAeadKeyGenerationExecution;
     if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
-      result = { attempted: false, succeeded: false, keyBytes: null, reason: "PrototypeStillClosed" };
+      result = { attempted: false, succeeded: false, keyHandle: null, reason: "PrototypeStillClosed" };
     } else if (
       !artifactCheck.artifactsExist ||
       !devGate.developmentAllowed ||
@@ -2096,23 +2155,23 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       !module ||
       !wasmInit.succeeded
     ) {
-      result = { attempted: false, succeeded: false, keyBytes: null, reason: "NotInitialized" };
+      result = { attempted: false, succeeded: false, keyHandle: null, reason: "NotInitialized" };
     } else {
-      const candidate = module as { generate_aead_key_32?: unknown };
-      if (typeof candidate.generate_aead_key_32 !== "function") {
-        result = { attempted: true, succeeded: false, keyBytes: null, reason: "KeyGenerationUnavailable" };
+      const candidate = module as { generate_aead_key_handle?: unknown };
+      if (typeof candidate.generate_aead_key_handle !== "function") {
+        result = { attempted: true, succeeded: false, keyHandle: null, reason: "KeyGenerationUnavailable" };
       } else {
         try {
-          const value: unknown = (candidate.generate_aead_key_32 as () => unknown)();
-          if (value instanceof Uint8Array) {
-            result = { attempted: true, succeeded: true, keyBytes: value, reason: "Succeeded" };
+          const value: unknown = (candidate.generate_aead_key_handle as () => unknown)();
+          if (isAeadKeyHandleShape(value)) {
+            result = { attempted: true, succeeded: true, keyHandle: value, reason: "Succeeded" };
           } else if (value === undefined) {
-            result = { attempted: true, succeeded: false, keyBytes: null, reason: "EntropySourceUnavailable" };
+            result = { attempted: true, succeeded: false, keyHandle: null, reason: "EntropySourceUnavailable" };
           } else {
-            result = { attempted: true, succeeded: false, keyBytes: null, reason: "CallFailed" };
+            result = { attempted: true, succeeded: false, keyHandle: null, reason: "InvalidHandleShape" };
           }
         } catch {
-          result = { attempted: true, succeeded: false, keyBytes: null, reason: "CallFailed" };
+          result = { attempted: true, succeeded: false, keyHandle: null, reason: "CallFailed" };
         }
       }
     }

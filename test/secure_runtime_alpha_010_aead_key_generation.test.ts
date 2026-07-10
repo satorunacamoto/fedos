@@ -55,10 +55,20 @@ import * as nodeFs from "node:fs";
  * Secure Runtime Alpha 010 — "Public Runtime AEAD Key Generation API":
  * adds `generateAeadKey()` (Stage 1005), the SECOND public Crypto API
  * wired into `AppRuntime`, mirroring `randomBytes()`'s (Stage 1004)
- * four-layer architecture exactly. Alpha-limited: returns raw key
- * bytes, not an opaque handle; not Secure Storage.
+ * four-layer architecture exactly.
  * `initializeCrypto()`/`runtimeCapabilities()`/`randomBytes()` stay
  * byte-for-byte unchanged.
+ *
+ * UPDATED Stage 1008 (Secure Runtime Alpha 013): per this arc's own
+ * Alpha 012 Key Boundary Decision, `generateAeadKey()`'s Alpha-limited
+ * raw-bytes shape was a DELIBERATE, one-time breaking change, replaced
+ * by an opaque `AeadKeyHandle` — see
+ * `test/secure_runtime_alpha_013_opaque_aead_key_handle_migration.test.ts`
+ * for that Stage's own dedicated guard suite. This file's assertions
+ * that depended on the now-superseded raw-bytes contract are updated
+ * below to reflect current reality; `docs/secure_runtime_alpha_010_aead_key_generation.md`
+ * itself remains an unedited historical record of Alpha 010's own
+ * moment (test 25 below still guards its own, unchanged text).
  */
 describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail Closed everywhere else (Stage 1005)", () => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -90,22 +100,21 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(key).toBeNull();
   });
 
-  it("3. generateAeadKey() succeeds end-to-end with a real, Uint8Array-returning module.generate_aead_key_32() (injected loader), and Fails Closed with no throw when it is absent", async () => {
+  it("3. generateAeadKey() succeeds end-to-end with a real, opaque-handle-returning module.generate_aead_key_handle() (injected loader), and Fails Closed with no throw when it is absent", async () => {
     await withNodeEnv("development", async () => {
       const mock = vi.mocked(nodeFs.existsSync).mockReturnValue(true);
       try {
-        const okKeyBytes = new Uint8Array(32).fill(9);
+        const okKeyHandle = { kind: "AeadKeyHandle" as const };
         const okLoader = new FedosWasmLoaderSkeleton({
           importGeneratedJsGlue: async () => ({
             initSync: vi.fn(() => ({})),
-            generate_aead_key_32: () => okKeyBytes,
+            generate_aead_key_handle: () => okKeyHandle,
           }),
           readGeneratedWasmBytes: () => new Uint8Array([1]),
         });
         const okState = await attemptDevOnlyRuntimeAeadKeyGeneration(okLoader);
         expect(okState.succeeded).toBe(true);
-        expect(okState.keyBytes).toEqual(okKeyBytes);
-        expect(okState.keyBytes?.length).toBe(32);
+        expect(okState.keyHandle).toEqual(okKeyHandle);
 
         const absentLoader = new FedosWasmLoaderSkeleton({
           importGeneratedJsGlue: async () => ({ initSync: vi.fn(() => ({})) }),
@@ -113,13 +122,13 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
         });
         await expect(attemptDevOnlyRuntimeAeadKeyGeneration(absentLoader)).resolves.toEqual({
           succeeded: false,
-          keyBytes: null,
+          keyHandle: null,
         });
 
         const throwingLoader = new FedosWasmLoaderSkeleton({
           importGeneratedJsGlue: async () => ({
             initSync: vi.fn(() => ({})),
-            generate_aead_key_32: () => {
+            generate_aead_key_handle: () => {
               throw new Error("simulated CSPRNG failure");
             },
           }),
@@ -127,19 +136,31 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
         });
         await expect(attemptDevOnlyRuntimeAeadKeyGeneration(throwingLoader)).resolves.toEqual({
           succeeded: false,
-          keyBytes: null,
+          keyHandle: null,
         });
 
         const entropyUnavailableLoader = new FedosWasmLoaderSkeleton({
           importGeneratedJsGlue: async () => ({
             initSync: vi.fn(() => ({})),
-            generate_aead_key_32: () => undefined,
+            generate_aead_key_handle: () => undefined,
           }),
           readGeneratedWasmBytes: () => new Uint8Array([1]),
         });
         await expect(attemptDevOnlyRuntimeAeadKeyGeneration(entropyUnavailableLoader)).resolves.toEqual({
           succeeded: false,
-          keyBytes: null,
+          keyHandle: null,
+        });
+
+        const wronglyShapedLoader = new FedosWasmLoaderSkeleton({
+          importGeneratedJsGlue: async () => ({
+            initSync: vi.fn(() => ({})),
+            generate_aead_key_handle: () => new Uint8Array(32).fill(9),
+          }),
+          readGeneratedWasmBytes: () => new Uint8Array([1]),
+        });
+        await expect(attemptDevOnlyRuntimeAeadKeyGeneration(wronglyShapedLoader)).resolves.toEqual({
+          succeeded: false,
+          keyHandle: null,
         });
       } finally {
         mock.mockReset();
@@ -154,7 +175,7 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(result).toEqual({
       attempted: false,
       succeeded: false,
-      keyBytes: null,
+      keyHandle: null,
       reason: "PrototypeStillClosed",
     });
   });
@@ -166,15 +187,15 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
         new FedosWasmLoaderSkeleton({
           importGeneratedJsGlue: async () => ({
             initSync: vi.fn(() => ({})),
-            generate_aead_key_32: () => new Uint8Array(32).fill(3),
+            generate_aead_key_handle: () => ({ kind: "AeadKeyHandle" }),
           }),
           readGeneratedWasmBytes: () => new Uint8Array([1]),
         });
       const prodState = await withNodeEnv("production", () => attemptDevOnlyRuntimeAeadKeyGeneration(okLoader()));
-      expect(prodState).toEqual({ succeeded: false, keyBytes: null });
+      expect(prodState).toEqual({ succeeded: false, keyHandle: null });
 
       const unknownState = await withNodeEnv(undefined, () => attemptDevOnlyRuntimeAeadKeyGeneration(okLoader()));
-      expect(unknownState).toEqual({ succeeded: false, keyBytes: null });
+      expect(unknownState).toEqual({ succeeded: false, keyHandle: null });
     } finally {
       mock.mockReset();
       mock.mockReturnValue(false);
@@ -189,10 +210,13 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(typeof runtime.randomBytes).toBe("function");
   });
 
-  it("7. calling runtime.generateAeadKey() via the real AppRuntime object works end-to-end and never throws", async () => {
+  it("7. calling runtime.generateAeadKey() via the real AppRuntime object works end-to-end and never throws -- resolves null or an opaque handle, never raw bytes", async () => {
     const runtime = createRuntime();
     const key = await withNodeEnv("development", () => runtime.generateAeadKey());
-    expect(key === null || key instanceof Uint8Array).toBe(true);
+    expect(key === null || (typeof key === "object" && (key as { kind?: unknown }).kind === "AeadKeyHandle")).toBe(
+      true,
+    );
+    expect(key).not.toBeInstanceOf(Uint8Array);
   });
 
   it("8. initializeCrypto()'s own return value is byte-for-byte unaffected by calling generateAeadKey() first", async () => {
@@ -241,8 +265,8 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(new Set(exportedInterfaces)).toEqual(new Set(["RuntimeAeadKeyGenerationState"]));
   });
 
-  it("13. src/runtime/types.ts declares generateAeadKey as a new AppRuntime field, initializeCrypto/runtimeCapabilities/randomBytes untouched", () => {
-    expect(runtimeTypesSource).toMatch(/readonly generateAeadKey: \(\) => Promise<Uint8Array \| null>;/);
+  it("13. src/runtime/types.ts declares generateAeadKey as a new AppRuntime field (now returning an opaque AeadKeyHandle, per Stage 1008), initializeCrypto/runtimeCapabilities/randomBytes untouched", () => {
+    expect(runtimeTypesSource).toMatch(/readonly generateAeadKey: \(\) => Promise<AeadKeyHandle \| null>;/);
     expect(runtimeTypesSource).toMatch(/readonly initializeCrypto: \(\) => RuntimeInitializeCryptoResult;/);
     expect(runtimeTypesSource).toMatch(/readonly runtimeCapabilities: \(\) => Promise<RuntimeCapabilities>;/);
     expect(runtimeTypesSource).toMatch(/readonly randomBytes: \(\) => Promise<Uint8Array \| null>;/);
@@ -250,7 +274,7 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
 
   it("14. generateAeadKey()'s own try/catch guarantees no exception ever escapes -- Fail Closed at the Runtime Service boundary", () => {
     const fnMatch = codeOnlyLines(keyGenerationServiceSource).match(
-      /export async function generateAeadKey\(\): Promise<Uint8Array \| null> \{[\s\S]*?\n\}/,
+      /export async function generateAeadKey\(\): Promise<AeadKeyHandle \| null> \{[\s\S]*?\n\}/,
     );
     expect(fnMatch).not.toBeNull();
     const fnBody = (fnMatch as RegExpMatchArray)[0] ?? "";
@@ -259,14 +283,15 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(fnBody).toMatch(/return null;/);
   });
 
-  it("15. Worker remains fully unconnected -- src/worker.ts references neither generateAeadKey nor any part of the new chain", () => {
+  it("15. Worker remains fully unconnected -- src/worker.ts references neither generateAeadKey nor any part of the chain", () => {
     expect(workerSource).not.toMatch(/\.\s*generateAeadKey\s*\(/);
     expect(workerSource).not.toMatch(/attemptDevOnlyRuntimeAeadKeyGeneration/);
     expect(workerSource).not.toMatch(/attemptDevOnlyAeadKeyGenerationCall/);
     expect(workerSource).not.toMatch(/fedos_runtime_aead_key_generation/);
-    expect(workerSource).not.toMatch(/generate_aead_key_32/);
+    expect(workerSource).not.toMatch(/generate_aead_key_handle/);
     expect(workerSource).not.toMatch(/fedos_generate_aead_key_32/);
     expect(workerSource).not.toMatch(/FedosAeadKeyHandle/);
+    expect(workerSource).not.toMatch(/\bAeadKeyHandle\b/);
   });
 
   it("16. Production is unaffected beyond the ONE new field -- create_runtime.ts references nothing else from the key generation chain", () => {
@@ -305,13 +330,14 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     expect(decision.policy).toBe("FailClosed");
   });
 
-  it("21. generate_aead_key_32() is a thin wrapper -- calls fedos_generate_aead_key_32() exactly once, zeroizes its local copy, no new getrandom/algorithm, no unsafe", () => {
-    const fnMatch = libRsSource.match(/pub fn generate_aead_key_32\(\) -> Option<Vec<u8>> \{[\s\S]*?\n\}/);
+  it("21. generate_aead_key_32() was REPLACED Stage 1008 by generate_aead_key_handle() -- a thin wrapper calling fedos_generate_aead_key_32() exactly once, never unwrapping to raw bytes, no new getrandom/algorithm, no unsafe", () => {
+    expect(libRsSource).not.toMatch(/pub fn generate_aead_key_32\(\)/);
+    const fnMatch = libRsSource.match(/pub fn generate_aead_key_handle\(\) -> Option<AeadKeyHandle> \{[\s\S]*?\n\}/);
     expect(fnMatch).not.toBeNull();
     const fnBody = (fnMatch as RegExpMatchArray)[0] ?? "";
     expect(fnBody).toMatch(/fedos_generate_aead_key_32\(\)\.key/);
-    expect(fnBody).toMatch(/expose_bytes_for_internal_wasm_export/);
-    expect(fnBody).toMatch(/\.zeroize\(\)/);
+    expect(fnBody).not.toMatch(/expose_bytes_for_internal_wasm_export/);
+    expect(fnBody).not.toMatch(/\.zeroize\(\)/);
     expect(fnBody).not.toMatch(/getrandom/);
     expect(fnBody).not.toMatch(/unsafe/);
   });
@@ -322,7 +348,7 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     );
   });
 
-  it("23. the new SecretHandle accessor is narrowly-scoped -- a fourth, separately-named accessor, not a reuse of the AEAD/KDF/ECDH ones", () => {
+  it("23. the FOURTH SecretHandle accessor this Stage added was REMOVED Stage 1008 once its sole caller was replaced -- only the AEAD/KDF/ECDH accessors remain", () => {
     const accessorNames = [
       ...libRsSource.matchAll(/pub\(crate\) fn (expose_bytes_for_internal_\w+)\(&self\) -> Option<\[u8; 32\]>/g),
     ].map((m: RegExpMatchArray) => m[1]);
@@ -331,18 +357,19 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
         "expose_bytes_for_internal_derivation",
         "expose_bytes_for_internal_aead",
         "expose_bytes_for_internal_ecdh",
-        "expose_bytes_for_internal_wasm_export",
       ]),
     );
+    expect(libRsSource).not.toMatch(/expose_bytes_for_internal_wasm_export/);
   });
 
-  it("24. Rust and Cargo/package sources are otherwise unchanged -- still 30 pub fn, three #[wasm_bindgen], 11/2 dependencies, no new dependency added", () => {
+  it("24. Rust and Cargo/package sources -- now 31 pub fn, five #[wasm_bindgen] (Stage 1008 added the AeadKeyHandle opaque class + its impl block + generate_aead_key_handle()), 11/2 dependencies, no new dependency added", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(30);
-    expect(pubFnNames).toContain("generate_aead_key_32");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(3);
+    expect(pubFnNames.length).toBe(31);
+    expect(pubFnNames).toContain("generate_aead_key_handle");
+    expect(pubFnNames).not.toContain("generate_aead_key_32");
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
 
     const cargoCode = cargoTomlSource
       .split("\n")

@@ -366,8 +366,8 @@ describe("FedosWasmLoader.planLoad() builds and confirms an internal Import Plan
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(30);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(3);
+    expect(pubFnNames.length).toBe(31);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(5);
 
     const cargoCode = cargoTomlSource
       .split("\n")
