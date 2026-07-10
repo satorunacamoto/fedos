@@ -332,7 +332,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("20. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- still exactly 15 files", () => {
+  it("20. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- 15 files total AS OF Alpha 031's own scope (Secure Runtime Alpha 032 later added a 16th, fedos_identity_provider_resolver.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -341,7 +341,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(15);
+    expect(Object.keys(identityFiles).length).toBe(16);
   });
 
   it("21. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
