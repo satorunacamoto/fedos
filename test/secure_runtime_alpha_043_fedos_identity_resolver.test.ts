@@ -489,7 +489,7 @@ describe("Secure Runtime Alpha 043 -- FedOS Identity Resolver, Registry read-onl
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("34. exactly one new file was added under src/identity/ -- now exactly 23 files; no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files", () => {
+  it("34. RIPPLE (Secure Runtime Alpha 048): exactly one new file was added under src/identity/ -- 23 files total AS OF this Stage's own scope; Alpha 048 later added a 24th, fedos_nostr_public_identity_source_resolver.ts -- reconfirmed here as the CURRENT count, per this arc's own established ripple convention; no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -498,7 +498,7 @@ describe("Secure Runtime Alpha 043 -- FedOS Identity Resolver, Registry read-onl
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(23);
+    expect(Object.keys(identityFiles).length).toBe(24);
   });
 
   it("35. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {

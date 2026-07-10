@@ -452,7 +452,7 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(23);
+    expect(Object.keys(identityFiles).length).toBe(24);
   });
 
   it("34. cross-references Alpha 035/038 without revising either", () => {
