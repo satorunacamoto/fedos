@@ -149,8 +149,8 @@ describe("FedOS Runtime initializeCrypto Prototype, door added not opened, no si
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect(pubFnNames.length).toBe(36);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
 
     const cargoCode = cargoTomlSource
       .split("\n")
@@ -169,11 +169,11 @@ describe("FedOS Runtime initializeCrypto Prototype, door added not opened, no si
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("12. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set was still exactly the known forty-two AS OF THIS stage's own scope (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward; Stage 994, Prototype EXECUTION Phase 013, later added a 43rd, fedos_runtime_prototype_execution.ts; Stage 1004, Secure Runtime Alpha 008, later added a 44th, fedos_runtime_random_bytes.ts; Stage 1005, Secure Runtime Alpha 010, later added a 45th, fedos_runtime_aead_key_generation.ts; Stage 1009, Secure Runtime Alpha 014, later added a 46th, fedos_runtime_encrypt.ts; Stage 1010, Secure Runtime Alpha 015, later added a 47th, fedos_runtime_decrypt.ts)", () => {
+  it("12. no new PlanningOnly runtime module was added by THIS stage -- the fedos_*.ts file set was still exactly the known forty-two AS OF THIS stage's own scope (Stage 714/730/746/763 legitimately added fedos_crypto_loader_backend.ts/fedos_wasm_backend.ts/fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts afterward; Stage 994, Prototype EXECUTION Phase 013, later added a 43rd, fedos_runtime_prototype_execution.ts; Stage 1004, Secure Runtime Alpha 008, later added a 44th, fedos_runtime_random_bytes.ts; Stage 1005, Secure Runtime Alpha 010, later added a 45th, fedos_runtime_aead_key_generation.ts; Stage 1009, Secure Runtime Alpha 014, later added a 46th, fedos_runtime_encrypt.ts; Stage 1010, Secure Runtime Alpha 015, later added a 47th, fedos_runtime_decrypt.ts; Stage 1011, Secure Runtime Alpha 018, later added a 48th and 49th, fedos_runtime_export_ciphertext.ts/fedos_runtime_import_ciphertext.ts)", () => {
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(47);
+    expect(Object.keys(files).length).toBe(49);
   });
 
   it("13. create_runtime.ts's pre-existing cryptoProvider/crypto selection is unchanged by this stage", () => {

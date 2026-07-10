@@ -108,6 +108,27 @@
  * wrapper export. No Worker/Production connection, no Secure Storage
  * of any kind, no new build dependency of any kind. `importKey()`/
  * `exportKey()` remain unimplemented.
+ *
+ * Stage 1011 (Secure Runtime Alpha 018) adds `exportCiphertext`/
+ * `importCiphertext` (`fedos_runtime_export_ciphertext.ts`/
+ * `fedos_runtime_import_ciphertext.ts`, Stage 1011) to the assembled
+ * `AppRuntime` — the FIFTH and SIXTH public Crypto APIs, added TOGETHER
+ * as a required pair per
+ * `docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+ * §7. They are two entirely separate fields — none of the six above is
+ * modified, called, or read by either new field's own implementation.
+ * `exportCiphertext()` accepts ONLY the same opaque ciphertext handle
+ * type `encrypt` already produces and returns a branded wire string;
+ * `importCiphertext()` accepts that wire string (treated as COMPLETELY
+ * UNTRUSTED) and returns the SAME opaque ciphertext handle type on
+ * success. Both internally drive their OWN fresh `FedosWasmLoader`
+ * through the SAME six-condition chain before calling the Rust
+ * Boundary's own thin wrapper export — reusing this crate's existing,
+ * unchanged canonical JSON + base64url ciphertext codec (Stage 182/186)
+ * rather than any new wire format. No Worker/Production connection, no
+ * Secure Storage of any kind, no Network connection, no new build
+ * dependency of any kind. `importKey()`/`exportKey()` remain
+ * unimplemented.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -188,6 +209,8 @@ import { randomBytes } from "./fedos_runtime_random_bytes.js";
 import { generateAeadKey } from "./fedos_runtime_aead_key_generation.js";
 import { encrypt } from "./fedos_runtime_encrypt.js";
 import { decrypt } from "./fedos_runtime_decrypt.js";
+import { exportCiphertext } from "./fedos_runtime_export_ciphertext.js";
+import { importCiphertext } from "./fedos_runtime_import_ciphertext.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -769,5 +792,7 @@ export function createRuntime(
     generateAeadKey,
     encrypt,
     decrypt,
+    exportCiphertext,
+    importCiphertext,
   };
 }

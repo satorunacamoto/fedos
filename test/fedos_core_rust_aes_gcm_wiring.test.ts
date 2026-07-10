@@ -195,8 +195,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "kind",
       "encrypt_aead",
       "decrypt_aead",
+      "serialize_aead_ciphertext",
+      "deserialize_aead_ciphertext",
     ];
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -340,6 +342,13 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // test/secure_runtime_alpha_015_decrypt_opaque_handle_api.test.ts
       // for the dedicated checks that it implements no new algorithm.
       "decrypt_aead",
+      // Stage 1011's thin wasm_bindgen wrappers around the pre-existing
+      // encode_envelope_internal()/decode_envelope_internal() -- see
+      // test/secure_runtime_alpha_018_ciphertext_wire_export_import_api.test.ts
+      // for the dedicated checks that they implement no new wire format
+      // or AEAD algorithm.
+      "serialize_aead_ciphertext",
+      "deserialize_aead_ciphertext",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

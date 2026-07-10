@@ -208,25 +208,19 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
     expect(libRsSource).toMatch(/AeadCiphertextHandle \{ inner: envelope \}/);
   });
 
-  it("17. no exportCiphertext/importCiphertext/serialize_aead_ciphertext/deserialize_aead_ciphertext identifier exists anywhere in the real Runtime/Loader/Worker/Rust surface", () => {
-    expect(wasmLoaderSource).not.toMatch(
-      /exportCiphertext|importCiphertext|attemptDevOnlyExportCiphertextCall|attemptDevOnlyImportCiphertextCall|FedosWasmLoaderExportCiphertextExecution|FedosWasmLoaderImportCiphertextExecution/,
-    );
-    expect(runtimeTypesSource).not.toMatch(/exportCiphertext|importCiphertext|AeadCiphertextWire/);
-    expect(createRuntimeSource).not.toMatch(/exportCiphertext|importCiphertext/);
+  it("17. Worker remains unconnected to exportCiphertext/importCiphertext/serialize_aead_ciphertext/deserialize_aead_ciphertext -- all four were later added to the Runtime/Loader/Rust surface by Stage 1011 (Secure Runtime Alpha 018), per this decision's own contract", () => {
     expect(workerSource).not.toMatch(/exportCiphertext|importCiphertext/);
-    expect(libRsSource).not.toMatch(/serialize_aead_ciphertext|deserialize_aead_ciphertext/);
   });
 
-  it("18. Runtime implementation code is confirmed byte-for-byte unchanged -- no reference to this decision's doc anywhere", () => {
-    expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
-    expect(wasmLoaderSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
+  it("18. Runtime implementation code is confirmed unchanged in every file this decision does NOT authorize touching; create_runtime.ts/fedos_wasm_loader.ts/types.ts legitimately reference this decision's own doc as of Stage 1011 (Secure Runtime Alpha 018), executing exactly the contract this decision fixed -- see docs/secure_runtime_alpha_018_ciphertext_wire_export_import_api.md", () => {
+    expect(createRuntimeSource).toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
+    expect(wasmLoaderSource).toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
+    expect(runtimeTypesSource).toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
     expect(runtimeIntegrationSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
     expect(randomBytesServiceSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
     expect(keyGenerationServiceSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
     expect(encryptServiceSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
     expect(decryptServiceSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
-    expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
   });
 
   it("19. initializeCrypto()'s own return value is confirmed byte-for-byte unchanged by an ACTUAL call", async () => {
@@ -266,7 +260,7 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
     expect(plaintext === null || plaintext instanceof Uint8Array).toBe(true);
   });
 
-  it("21. createRuntime()'s assembled AppRuntime still exposes exactly the same six fields, still no exportCiphertext/importCiphertext", async () => {
+  it("21. createRuntime()'s assembled AppRuntime still exposes the same six fields this decision found -- exportCiphertext/importCiphertext were later added by Stage 1011 (Secure Runtime Alpha 018), executing this decision's own contract", async () => {
     const { createRuntime } = await import("../src/runtime/create_runtime.js");
     const runtime = createRuntime();
     expect(typeof runtime.initializeCrypto).toBe("function");
@@ -275,8 +269,8 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
     expect(typeof runtime.generateAeadKey).toBe("function");
     expect(typeof runtime.encrypt).toBe("function");
     expect(typeof runtime.decrypt).toBe("function");
-    expect((runtime as unknown as { exportCiphertext?: unknown }).exportCiphertext).toBeUndefined();
-    expect((runtime as unknown as { importCiphertext?: unknown }).importCiphertext).toBeUndefined();
+    expect(typeof (runtime as unknown as { exportCiphertext?: unknown }).exportCiphertext).toBe("function");
+    expect(typeof (runtime as unknown as { importCiphertext?: unknown }).importCiphertext).toBe("function");
   });
 
   it("22. FedosWasmLoader.planLoad() is confirmed byte-for-byte unchanged -- still BlockedByPolicy", async () => {
@@ -301,14 +295,15 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
     );
   });
 
-  it("25. Rust and Cargo/package sources are unchanged -- still 34 pub fn, eleven #[wasm_bindgen], 11/2 dependencies", () => {
+  it("25. Rust and Cargo/package sources -- 34 pub fn AS OF THIS decision, eleven #[wasm_bindgen], 11/2 dependencies; serialize_aead_ciphertext()/deserialize_aead_ciphertext() and a legitimate reference to this decision's own doc were later added by Stage 1011 (Secure Runtime Alpha 018), executing exactly the contract §5 decided", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
-    expect(libRsSource).not.toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
-    expect(libRsSource).not.toMatch(/pub fn serialize_aead_ciphertext\b|pub fn deserialize_aead_ciphertext\b/);
+    expect(pubFnNames.length).toBe(36);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(libRsSource).toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
+    expect(libRsSource).toMatch(/pub fn serialize_aead_ciphertext\b/);
+    expect(libRsSource).toMatch(/pub fn deserialize_aead_ciphertext\b/);
 
     const cargoCode = cargoTomlSource
       .split("\n")

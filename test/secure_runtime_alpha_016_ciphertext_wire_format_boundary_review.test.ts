@@ -193,10 +193,7 @@ describe("Secure Runtime Alpha 016 Ciphertext Wire Format Boundary Review -- rev
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_016_ciphertext_wire_format_boundary_review/);
   });
 
-  it("12. no exportCiphertext/importCiphertext identifier exists anywhere in the real Runtime/Loader/Worker surface", () => {
-    expect(wasmLoaderSource).not.toMatch(/exportCiphertext|importCiphertext|attemptDevOnlyExportCiphertextCall|attemptDevOnlyImportCiphertextCall/);
-    expect(runtimeTypesSource).not.toMatch(/exportCiphertext|importCiphertext/);
-    expect(createRuntimeSource).not.toMatch(/exportCiphertext|importCiphertext/);
+  it("12. Worker remains unconnected to exportCiphertext/importCiphertext -- both were later added to the Runtime/Loader surface by Stage 1011 (Secure Runtime Alpha 018), per this review's own §6/§12 recommendation", () => {
     expect(workerSource).not.toMatch(/exportCiphertext|importCiphertext/);
   });
 
@@ -237,7 +234,7 @@ describe("Secure Runtime Alpha 016 Ciphertext Wire Format Boundary Review -- rev
     expect(plaintext === null || plaintext instanceof Uint8Array).toBe(true);
   });
 
-  it("15. createRuntime()'s assembled AppRuntime still exposes exactly the same six fields, still no exportCiphertext/importCiphertext", async () => {
+  it("15. createRuntime()'s assembled AppRuntime still exposes the same six fields this review found -- exportCiphertext/importCiphertext were later added by Stage 1011 (Secure Runtime Alpha 018), still no importKey/exportKey", async () => {
     const { createRuntime } = await import("../src/runtime/create_runtime.js");
     const runtime = createRuntime();
     expect(typeof runtime.initializeCrypto).toBe("function");
@@ -246,8 +243,6 @@ describe("Secure Runtime Alpha 016 Ciphertext Wire Format Boundary Review -- rev
     expect(typeof runtime.generateAeadKey).toBe("function");
     expect(typeof runtime.encrypt).toBe("function");
     expect(typeof runtime.decrypt).toBe("function");
-    expect((runtime as unknown as { exportCiphertext?: unknown }).exportCiphertext).toBeUndefined();
-    expect((runtime as unknown as { importCiphertext?: unknown }).importCiphertext).toBeUndefined();
     expect((runtime as unknown as { importKey?: unknown }).importKey).toBeUndefined();
     expect((runtime as unknown as { exportKey?: unknown }).exportKey).toBeUndefined();
   });
@@ -278,8 +273,8 @@ describe("Secure Runtime Alpha 016 Ciphertext Wire Format Boundary Review -- rev
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect(pubFnNames.length).toBe(36);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_016_ciphertext_wire_format_boundary_review/);
     expect(libRsSource).not.toMatch(/pub fn export_ciphertext\b|pub fn import_ciphertext\b/);
 

@@ -562,9 +562,9 @@ describe("Secure Runtime Alpha 014 -- encrypt() Public Runtime API (Opaque Handl
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
     expect(pubFnNames).toContain("encrypt_aead");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
 
     const cargoCode = cargoTomlSource
       .split("\n")

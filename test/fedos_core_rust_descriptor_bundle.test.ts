@@ -143,8 +143,10 @@ describe("FedOS Rust crate — internal descriptor bundle skeleton", () => {
       "kind",
       "encrypt_aead",
       "decrypt_aead",
+      "serialize_aead_ciphertext",
+      "deserialize_aead_ciphertext",
     ];
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

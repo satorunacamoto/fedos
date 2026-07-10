@@ -155,7 +155,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(47);
+    expect(names.length).toBe(49);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts.
     // Stage 1005 (Secure Runtime Alpha 010) adds a THIRD, separate,
@@ -164,6 +164,9 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     // later exception -- fedos_runtime_encrypt.ts.
     // Stage 1010 (Secure Runtime Alpha 015) adds a FIFTH, separate,
     // later exception -- fedos_runtime_decrypt.ts.
+    // Stage 1011 (Secure Runtime Alpha 018) adds a SIXTH and SEVENTH,
+    // separate, later exception -- fedos_runtime_export_ciphertext.ts/
+    // fedos_runtime_import_ciphertext.ts.
     expect(names).toEqual(
       [
         ...knownNames,
@@ -172,6 +175,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
         "fedos_runtime_aead_key_generation.ts",
         "fedos_runtime_encrypt.ts",
         "fedos_runtime_decrypt.ts",
+        "fedos_runtime_export_ciphertext.ts",
+        "fedos_runtime_import_ciphertext.ts",
       ].sort(),
     );
   });
@@ -192,8 +197,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect(pubFnNames.length).toBe(36);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
 
     const cargoCode = cargoTomlSource
       .split("\n")

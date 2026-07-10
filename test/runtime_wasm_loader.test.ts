@@ -211,8 +211,8 @@ describe("FedOS WASM Loader Skeleton, planning only, fail-closed everywhere (Sta
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect(pubFnNames.length).toBe(36);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
   });
 
   it("13. the loader policy doc records the three fixed states and the execution contract doc records the Loader Skeleton / STOP diagram", () => {

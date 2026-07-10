@@ -93,7 +93,7 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     const names = Object.keys(files)
       .map((path) => path.split("/").pop() as string)
       .sort();
-    expect(names.length).toBe(47);
+    expect(names.length).toBe(49);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts -- the Runtime
     // Service for randomBytes(), same reasoning as
@@ -107,6 +107,10 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     // Stage 1010 (Secure Runtime Alpha 015) adds a FIFTH, separate,
     // later exception -- fedos_runtime_decrypt.ts -- the Runtime
     // Service for decrypt(), same reasoning.
+    // Stage 1011 (Secure Runtime Alpha 018) adds a SIXTH and SEVENTH,
+    // separate, later exception -- fedos_runtime_export_ciphertext.ts/
+    // fedos_runtime_import_ciphertext.ts -- the Runtime Service pair for
+    // exportCiphertext()/importCiphertext(), same reasoning.
     expect(names).toEqual(
       [
         ...KNOWN_FEDOS_FILES,
@@ -115,6 +119,8 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
         "fedos_runtime_aead_key_generation.ts",
         "fedos_runtime_encrypt.ts",
         "fedos_runtime_decrypt.ts",
+        "fedos_runtime_export_ciphertext.ts",
+        "fedos_runtime_import_ciphertext.ts",
       ].sort(),
     );
 
@@ -217,8 +223,8 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect(pubFnNames.length).toBe(36);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
 
     const cargoCode = cargoTomlSource
       .split("\n")

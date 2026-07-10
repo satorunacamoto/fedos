@@ -422,11 +422,11 @@ describe("Secure Runtime Alpha 013 -- Opaque AEAD Key Handle Migration, Fail Clo
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
     expect(pubFnNames).toContain("generate_aead_key_handle");
     expect(pubFnNames).toContain("kind");
     expect(pubFnNames).not.toContain("generate_aead_key_32");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
 
     const cargoCode = cargoTomlSource
       .split("\n")

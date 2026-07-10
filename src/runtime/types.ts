@@ -43,6 +43,7 @@ import type {
   AeadAlgorithm,
   AeadAadDomain,
 } from "./fedos_runtime_encrypt.js";
+import type { AeadCiphertextWire } from "./fedos_runtime_export_ciphertext.js";
 
 /** Where the runtime believes it is running. Affects defaults/diagnostics only. */
 export type RuntimeMode = "test" | "local" | "cloudflare";
@@ -605,7 +606,9 @@ export interface AppRuntime {
    * RECOVERED PLAINTEXT is the one value this field returns as a plain
    * `Uint8Array` — there is no opaque wrapper for a caller's own
    * requested plaintext to hide behind. `importKey()`/`exportKey()`
-   * remain unimplemented. Deliberately separate from
+   * remain unimplemented. `exportCiphertext`/`importCiphertext` (below)
+   * were added later by Stage 1011 (Secure Runtime Alpha 018).
+   * Deliberately separate from
    * `initializeCrypto`/`runtimeCapabilities`/`randomBytes`/
    * `generateAeadKey`/`encrypt` above, all UNCHANGED by this stage. See
    * `docs/secure_runtime_alpha_015_decrypt_opaque_handle_api.md`.
@@ -616,4 +619,78 @@ export interface AppRuntime {
     aadDomain: AeadAadDomain,
     ciphertext: AeadCiphertextHandle,
   ) => Promise<Uint8Array | null>;
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — the FIFTH public Crypto API
+   * Runtime exposes, executing
+   * `docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`'s
+   * own formally-decided contract. Internally calls
+   * `attemptDevOnlyRuntimeExportCiphertext()`
+   * (`fedos_runtime_export_ciphertext.ts`) exactly once, which drives a
+   * FRESH `FedosWasmLoader` through the SAME six-condition chain, then
+   * calls the Rust Boundary's `serialize_aead_ciphertext()` — a thin
+   * wrapper around the pre-existing, unchanged
+   * `encode_envelope_internal()` (Stage 186). Fail Closed: resolves
+   * `null` whenever any of the Loader's own six conditions is unmet,
+   * `ciphertext` is not a genuine opaque handle, the export is absent,
+   * the call throws, or the return value is not a genuine, non-empty
+   * `string` — NEVER a partial/degraded result, and NEVER an exception
+   * escaping this field.
+   * **OPAQUE HANDLE IN, BRANDED WIRE STRING OUT**: `ciphertext` MUST be
+   * the SAME `AeadCiphertextHandle` type `encrypt()` already produces —
+   * no raw ciphertext byte is ever accepted or returned anywhere in
+   * this field's own call chain. The returned `AeadCiphertextWire` is a
+   * branded `string` — the SAME canonical JSON + base64url text
+   * (`v`/`alg`/`aad`/`n`/`ct`/`tag`) this crate's own
+   * `docs/ciphertext_serialization_format_decision.md` (Stage 182)
+   * fixed and Stage 186 already implements; no new wire format is
+   * created. The brand is a COMPILE-TIME-ONLY API-misuse boundary, NEVER
+   * a runtime security boundary — all real Fail-Closed validation of
+   * the wire content happens entirely inside Rust. `importCiphertext`
+   * (below) is this field's required pair — both were added together,
+   * in this same Stage. Deliberately separate from
+   * `initializeCrypto`/`runtimeCapabilities`/`randomBytes`/
+   * `generateAeadKey`/`encrypt`/`decrypt` above, all UNCHANGED by this
+   * stage. See
+   * `docs/secure_runtime_alpha_018_ciphertext_wire_export_import_api.md`.
+   */
+  readonly exportCiphertext: (
+    ciphertext: AeadCiphertextHandle,
+  ) => Promise<AeadCiphertextWire | null>;
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — the SIXTH public Crypto API
+   * Runtime exposes, and `exportCiphertext`'s (above) required pair.
+   * Internally calls `attemptDevOnlyRuntimeImportCiphertext()`
+   * (`fedos_runtime_import_ciphertext.ts`) exactly once, which drives a
+   * FRESH `FedosWasmLoader` through the SAME six-condition chain, then
+   * calls the Rust Boundary's `deserialize_aead_ciphertext()` — a thin
+   * wrapper around the pre-existing, unchanged
+   * `decode_envelope_internal()` (Stage 186). Fail Closed: resolves
+   * `null` whenever any of the Loader's own six conditions is unmet,
+   * `serialized` is not a genuine `string`, the import is absent, the
+   * call throws, or the return value is not a genuine opaque
+   * `AeadCiphertextHandle` — including every one of
+   * `decode_envelope_internal`'s own wire-structure rejections
+   * (malformed JSON, an unrecognized version/algorithm/AAD-domain
+   * label, invalid base64url, a missing/unknown/reordered field) — ALL
+   * collapsed into the SAME Fail-Closed outcome, never a distinguishable
+   * reason — NEVER a partial/degraded result, and NEVER an exception
+   * escaping this field.
+   * **INPUT IS COMPLETELY UNTRUSTED**: `serialized` may originate from
+   * Secure Storage, a network peer, or an adversarial caller — this
+   * field performs NO content validation of its own; that is entirely
+   * `decode_envelope_internal`'s own, already-reviewed job. **THIS
+   * FIELD SUCCEEDING DOES NOT IMPLY A SUBSEQUENT `decrypt` CALL WILL
+   * SUCCEED** — this field validates WIRE STRUCTURE only, never
+   * cryptographic validity (key/AAD/algorithm match, authentication);
+   * that separation is deliberate, per
+   * `docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+   * §9. Deliberately separate from
+   * `initializeCrypto`/`runtimeCapabilities`/`randomBytes`/
+   * `generateAeadKey`/`encrypt`/`decrypt`/`exportCiphertext` above, all
+   * UNCHANGED by this stage. See
+   * `docs/secure_runtime_alpha_018_ciphertext_wire_export_import_api.md`.
+   */
+  readonly importCiphertext: (
+    serialized: AeadCiphertextWire,
+  ) => Promise<AeadCiphertextHandle | null>;
 }

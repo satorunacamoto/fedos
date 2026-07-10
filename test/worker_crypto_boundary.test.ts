@@ -317,7 +317,7 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
 
   it("15. public pub fn surface is unchanged at twenty-seven", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
   });
 
   it("16. Cargo.toml and package.json dependency counts are unchanged", () => {

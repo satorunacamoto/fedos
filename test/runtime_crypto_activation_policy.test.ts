@@ -193,7 +193,7 @@ describe("Runtime/Worker crypto activation policy, fail-closed (Stage 289-296)",
 
   it("14. public pub fn surface is unchanged at twenty-seven, Cargo.toml/package.json dependency counts unchanged", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
 
     const cargoCode = cargoTomlSource
       .split("\n")

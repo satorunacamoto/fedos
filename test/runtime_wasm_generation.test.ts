@@ -154,7 +154,7 @@ describe("FedOS WASM generation planning, nothing generated, fail-closed everywh
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
   });
 
   it("9. Runtime remains unconnected -- create_runtime.ts imports none of the WASM chain", () => {

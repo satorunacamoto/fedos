@@ -1389,6 +1389,26 @@ const AEAD_AAD_DOMAIN_DISCRIMINANTS: Readonly<Record<AeadAadDomain, number>> = {
 };
 
 /**
+ * Stage 1011 (Secure Runtime Alpha 018) — the wire value
+ * `exportCiphertext()` returns and `importCiphertext()` accepts, per
+ * `docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+ * §3/§4. A `string` — never `Uint8Array`, never a parsed object — is
+ * the canonical JSON + base64url text `serialize_aead_ciphertext()`
+ * (via the EXISTING, byte-for-byte UNCHANGED
+ * `encode_envelope_internal`, Stage 186) produces; the `__brand` field
+ * is a COMPILE-TIME-ONLY marker, never present on any real runtime
+ * value, and NEVER checked or enforced at this or any other boundary —
+ * all real Fail-Closed validation of the ACTUAL string content happens
+ * entirely inside Rust's `decode_envelope_internal`, regardless of
+ * whether a caller obtained this type honestly or via an `as` cast. Its
+ * only job is to stop a caller from accidentally passing an unrelated
+ * `string` to `importCiphertext()` without an explicit, deliberate cast.
+ */
+export type AeadCiphertextWire = string & {
+  readonly __brand: "AeadCiphertextWire";
+};
+
+/**
  * Stage 1009 (Secure Runtime Alpha 014) — the result of a REAL attempt
  * (or deliberate non-attempt) to call the retained JS glue module's own
  * `encrypt_aead` property as a function, with the caller's
@@ -1475,6 +1495,99 @@ export interface FedosWasmLoaderDecryptExecution {
     | "InvalidPlaintextShape"
     | "NotInitialized"
     | "DecryptUnavailable"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
+ * Stage 1011 (Secure Runtime Alpha 018) — the result of a REAL attempt
+ * (or deliberate non-attempt) to call the retained JS glue module's own
+ * `serialize_aead_ciphertext` property as a function, with the caller's
+ * `ciphertext`. Mirrors `FedosWasmLoaderEncryptExecution`/
+ * `DecryptExecution` (Stage 1009/1010) exactly, one field for one Rust
+ * Boundary export. `wire` is the `AeadCiphertextWire` string returned by
+ * `module.serialize_aead_ciphertext()` on success, or `null` on every
+ * other outcome — NEVER any other value type.
+ *
+ * `reason: "InvalidCiphertextHandle"` is checked structurally, via
+ * `isAeadCiphertextHandleShape()`, BEFORE `module.serialize_aead_ciphertext`
+ * is ever called — an obviously-wrong `ciphertext` never reaches the
+ * WASM call at all. This is a SHAPE check only: a hand-forged plain
+ * object satisfying this shape (e.g. `{ kind: "AeadCiphertextHandle" }`
+ * with no other property) still PASSES it — the REAL wasm-bindgen
+ * runtime type check inside `serialize_aead_ciphertext` itself is what
+ * then rejects a non-genuine value, surfacing as `reason: "CallFailed"`
+ * (below), never as a false `"Succeeded"`.
+ *
+ * `reason: "SerializationFailed"` is a genuine, in-bounds `undefined`
+ * return from Rust (`encode_envelope_internal`'s own ONE documented edge
+ * case: a Stage 157–158 SKELETON placeholder envelope shorter than the
+ * fixed AEAD tag length — never a real sealed envelope). `reason:
+ * "InvalidWireOutputShape"` covers every other wrongly-shaped return,
+ * INCLUDING an empty string (`encode_envelope_internal` never
+ * legitimately produces one — its minimum output is the fixed
+ * `{"v":...}` prefix).
+ */
+export interface FedosWasmLoaderExportCiphertextExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly wire: AeadCiphertextWire | null;
+  readonly reason:
+    | "Succeeded"
+    | "InvalidCiphertextHandle"
+    | "SerializationFailed"
+    | "InvalidWireOutputShape"
+    | "NotInitialized"
+    | "ExportUnavailable"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
+ * Stage 1011 (Secure Runtime Alpha 018) — the result of a REAL attempt
+ * (or deliberate non-attempt) to call the retained JS glue module's own
+ * `deserialize_aead_ciphertext` property as a function, with the
+ * caller's `serialized` candidate. Mirrors
+ * `FedosWasmLoaderExportCiphertextExecution` above exactly, in reverse.
+ * `ciphertextHandle` is the value returned by
+ * `module.deserialize_aead_ciphertext()` on success, structurally
+ * verified by `isAeadCiphertextHandleShape()`, or `null` on every other
+ * outcome.
+ *
+ * `reason: "InvalidWireInputShape"` is checked BEFORE
+ * `module.deserialize_aead_ciphertext` is ever called: `serialized` must
+ * be a genuine `string` — an obviously-wrong candidate (not a string at
+ * all) never reaches the WASM call. This is the ONLY pre-call check on
+ * this side, deliberately: `serialized`'s CONTENT is untrusted by
+ * construction (per
+ * `docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+ * §8/§9) and is validated ENTIRELY by `decode_envelope_internal` inside
+ * Rust — this Loader method adds NO duplicate content validation of its
+ * own (no version/algorithm/AAD-domain/base64url check here).
+ *
+ * `reason: "DeserializationFailed"` is a genuine, in-bounds `undefined`
+ * return from Rust — covering EVERY ONE of `decode_envelope_internal`'s
+ * own seven internal rejection causes
+ * (`InvalidVersion`/`InvalidAlgorithm`/`InvalidAadDomain`/
+ * `InvalidBase64Url`/`MissingField`/`UnknownField`/`MalformedJson`),
+ * collapsed into ONE Loader-level outcome — mirroring
+ * `FedosWasmLoaderDecryptExecution`'s own `"DecryptionFailed"` collapsing
+ * multiple Rust-internal causes into one reason. `reason:
+ * "InvalidHandleOutputShape"` covers every other wrongly-shaped return —
+ * a defensive check only; `decode_envelope_internal` itself never
+ * produces one.
+ */
+export interface FedosWasmLoaderImportCiphertextExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly ciphertextHandle: AeadCiphertextHandle | null;
+  readonly reason:
+    | "Succeeded"
+    | "InvalidWireInputShape"
+    | "DeserializationFailed"
+    | "InvalidHandleOutputShape"
+    | "NotInitialized"
+    | "ImportUnavailable"
     | "CallFailed"
     | "PrototypeStillClosed";
 }
@@ -1627,6 +1740,26 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * read by `planLoad()`, which does not reference this field at all.
    */
   #decryptExecution: FedosWasmLoaderDecryptExecution | null = null;
+
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — holds the most recent REAL
+   * Rust `serialize_aead_ciphertext()` call result recorded by
+   * `attemptDevOnlyExportCiphertextCall()`, or `null` before that method
+   * has ever been called on this instance. Read via
+   * `exportCiphertextExecution()`; NEVER read by `planLoad()`, which
+   * does not reference this field at all.
+   */
+  #exportCiphertextExecution: FedosWasmLoaderExportCiphertextExecution | null = null;
+
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — holds the most recent REAL
+   * Rust `deserialize_aead_ciphertext()` call result recorded by
+   * `attemptDevOnlyImportCiphertextCall()`, or `null` before that method
+   * has ever been called on this instance. Read via
+   * `importCiphertextExecution()`; NEVER read by `planLoad()`, which
+   * does not reference this field at all.
+   */
+  #importCiphertextExecution: FedosWasmLoaderImportCiphertextExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -1992,6 +2125,28 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   decryptExecution(): FedosWasmLoaderDecryptExecution | null {
     return this.#decryptExecution;
+  }
+
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — returns the most recent REAL
+   * Rust `serialize_aead_ciphertext()` call result recorded by
+   * `attemptDevOnlyExportCiphertextCall()`, or `null` if that method has
+   * never been called on this instance. Reading this value NEVER
+   * triggers a new call. Not part of the `FedosWasmLoader` interface.
+   */
+  exportCiphertextExecution(): FedosWasmLoaderExportCiphertextExecution | null {
+    return this.#exportCiphertextExecution;
+  }
+
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — returns the most recent REAL
+   * Rust `deserialize_aead_ciphertext()` call result recorded by
+   * `attemptDevOnlyImportCiphertextCall()`, or `null` if that method has
+   * never been called on this instance. Reading this value NEVER
+   * triggers a new call. Not part of the `FedosWasmLoader` interface.
+   */
+  importCiphertextExecution(): FedosWasmLoaderImportCiphertextExecution | null {
+    return this.#importCiphertextExecution;
   }
 
   /**
@@ -2602,6 +2757,166 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#decryptExecution = result;
+    return result;
+  }
+
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — the result of this call is
+   * recorded in `this.#exportCiphertextExecution`, readable via the new
+   * PUBLIC `exportCiphertextExecution()` method. Never calls any Rust
+   * API other than the retained module's own `serialize_aead_ciphertext`
+   * property, and only ever calls it ONCE per invocation of this method.
+   *
+   * Gate order, mirroring `attemptDevOnlyDecryptCall()` exactly:
+   *   - `reason: "PrototypeStillClosed"` — the six-condition Loader
+   *     chain never ran (`attempted: false`).
+   *   - `reason: "NotInitialized"` — it ran, but one of the six
+   *     conditions failed (`attempted: false`).
+   *   - `reason: "InvalidCiphertextHandle"` — `ciphertext` does not
+   *     structurally satisfy `isAeadCiphertextHandleShape()`: the WASM
+   *     call is never attempted (`attempted: true`, `succeeded: false`).
+   *   - `reason: "ExportUnavailable"` — the retained module has no
+   *     `serialize_aead_ciphertext` function property.
+   *   - `reason: "CallFailed"` — the call THREW (including a
+   *     structurally-shaped but non-genuine `ciphertext` object that
+   *     wasm-bindgen's own runtime type check rejects).
+   *   - `reason: "SerializationFailed"` — a genuine, in-bounds
+   *     `undefined` return from Rust.
+   *   - `reason: "InvalidWireOutputShape"` — any other wrongly-shaped
+   *     return, including an empty string.
+   *   - `reason: "Succeeded"` — a non-empty `string`, recorded as
+   *     `wire`.
+   */
+  async attemptDevOnlyExportCiphertextCall(
+    ciphertext: unknown,
+  ): Promise<FedosWasmLoaderExportCiphertextExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderExportCiphertextExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, wire: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, wire: null, reason: "NotInitialized" };
+    } else if (!isAeadCiphertextHandleShape(ciphertext)) {
+      result = { attempted: true, succeeded: false, wire: null, reason: "InvalidCiphertextHandle" };
+    } else {
+      const candidate = module as { serialize_aead_ciphertext?: unknown };
+      if (typeof candidate.serialize_aead_ciphertext !== "function") {
+        result = { attempted: true, succeeded: false, wire: null, reason: "ExportUnavailable" };
+      } else {
+        try {
+          const value: unknown = (
+            candidate.serialize_aead_ciphertext as (ciphertext: unknown) => unknown
+          )(ciphertext);
+          if (typeof value === "string" && value.length > 0) {
+            result = {
+              attempted: true,
+              succeeded: true,
+              wire: value as AeadCiphertextWire,
+              reason: "Succeeded",
+            };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, wire: null, reason: "SerializationFailed" };
+          } else {
+            result = { attempted: true, succeeded: false, wire: null, reason: "InvalidWireOutputShape" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, wire: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#exportCiphertextExecution = result;
+    return result;
+  }
+
+  /**
+   * Stage 1011 (Secure Runtime Alpha 018) — the result of this call is
+   * recorded in `this.#importCiphertextExecution`, readable via the new
+   * PUBLIC `importCiphertextExecution()` method. Never calls any Rust
+   * API other than the retained module's own
+   * `deserialize_aead_ciphertext` property, and only ever calls it ONCE
+   * per invocation of this method.
+   *
+   * `reason: "InvalidWireInputShape"` is the ONLY pre-call check on this
+   * side — `serialized` must be a genuine `string`. Deliberately, this
+   * method does NOT attempt to validate `serialized`'s own CONTENT
+   * (version/algorithm/AAD-domain/base64url) itself — `serialized` is
+   * untrusted by construction
+   * (`docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+   * §8/§9), and content validation is `decode_envelope_internal`'s own,
+   * already-reviewed, already-`cargo test`-verified job. `reason:
+   * "DeserializationFailed"` folds EVERY ONE of that function's seven
+   * internal rejection causes into one outcome, mirroring
+   * `attemptDevOnlyDecryptCall()`'s own `"DecryptionFailed"` collapse.
+   */
+  async attemptDevOnlyImportCiphertextCall(
+    serialized: unknown,
+  ): Promise<FedosWasmLoaderImportCiphertextExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderImportCiphertextExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, ciphertextHandle: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, ciphertextHandle: null, reason: "NotInitialized" };
+    } else if (typeof serialized !== "string") {
+      result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "InvalidWireInputShape" };
+    } else {
+      const candidate = module as { deserialize_aead_ciphertext?: unknown };
+      if (typeof candidate.deserialize_aead_ciphertext !== "function") {
+        result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "ImportUnavailable" };
+      } else {
+        try {
+          const value: unknown = (
+            candidate.deserialize_aead_ciphertext as (serialized: string) => unknown
+          )(serialized);
+          if (isAeadCiphertextHandleShape(value)) {
+            result = { attempted: true, succeeded: true, ciphertextHandle: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = {
+              attempted: true,
+              succeeded: false,
+              ciphertextHandle: null,
+              reason: "DeserializationFailed",
+            };
+          } else {
+            result = {
+              attempted: true,
+              succeeded: false,
+              ciphertextHandle: null,
+              reason: "InvalidHandleOutputShape",
+            };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, ciphertextHandle: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#importCiphertextExecution = result;
     return result;
   }
 

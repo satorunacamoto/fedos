@@ -158,7 +158,7 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
     expect(pubFnNames).not.toContain("new_from_32_bytes_for_internal_use");
   });
 

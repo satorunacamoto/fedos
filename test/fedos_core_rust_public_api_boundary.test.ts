@@ -185,6 +185,8 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
       "kind",
       "encrypt_aead",
       "decrypt_aead",
+      "serialize_aead_ciphertext",
+      "deserialize_aead_ciphertext",
     ]);
     for (const name of pubFnNames) {
       const hasSafeSuffix =

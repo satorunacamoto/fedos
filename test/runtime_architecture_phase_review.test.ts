@@ -119,7 +119,7 @@ describe("Runtime architecture phase review, docs only, chain unchanged (Stage 4
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(34);
+    expect(pubFnNames.length).toBe(36);
   });
 
   it("8. Allowed is still unreachable from either activation policy", () => {

@@ -5761,9 +5761,15 @@ pub struct FedosCiphertextEnvelope {
 
 impl FedosCiphertextEnvelope {
     /// Crate-private only: wraps an already-sealed real envelope produced
-    /// by [`fedos_encrypt`]. Never constructs one from untrusted/candidate
-    /// bytes — that remains a future, separate, explicitly-reviewed stage
-    /// (see `docs/ciphertext_envelope_plan.md`).
+    /// by [`fedos_encrypt`] — OR, as of Stage 1011 (Secure Runtime
+    /// Alpha 018), an envelope reconstructed by
+    /// [`deserialize_aead_ciphertext`] from a candidate string ALREADY
+    /// fully validated by
+    /// `crate::crypto::ciphertext_serialization::decode_envelope_internal`.
+    /// This is the "future, separate, explicitly-reviewed stage" this
+    /// comment used to reserve (see `docs/ciphertext_envelope_plan.md`,
+    /// `docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+    /// §5) — never called with a still-untrusted/unvalidated candidate.
     pub(crate) fn from_inner(
         inner: crate::crypto::ciphertext_envelope::AeadCiphertextEnvelope,
     ) -> Self {
@@ -6363,6 +6369,60 @@ pub fn decrypt_aead(
     let decision = fedos_decrypt(key.inner(), envelope);
     match decision.status {
         FedosDecryptStatus::Ready => decision.plaintext,
+        _ => None,
+    }
+}
+
+/// Stage 1011 (Secure Runtime Alpha 018) — a THIN wrapper reaching the
+/// EXISTING, byte-for-byte UNCHANGED
+/// [`crate::crypto::ciphertext_serialization::encode_envelope_internal`]
+/// (Stage 186) EXACTLY ONCE. Reaches the real, permanently-opaque
+/// envelope via the SAME two-hop `inner()` chain [`decrypt_aead`] already
+/// established (`ciphertext.inner()` → [`FedosCiphertextEnvelope`], then
+/// its own `.inner()` → the crate-internal
+/// `crypto::ciphertext_envelope::AeadCiphertextEnvelope`). Returns
+/// `None` only when the wrapped envelope is a Stage 157–158 SKELETON
+/// placeholder (shorter than the fixed AEAD tag length) — the SAME one
+/// edge case `encode_envelope_internal` itself already documents — never
+/// panics. No new wire format, no new dependency, no raw byte exposed
+/// beyond the SAME canonical `v`/`alg`/`aad`/`n`/`ct`/`tag` JSON string
+/// `docs/ciphertext_serialization_format_decision.md` (Stage 182) already
+/// fixed and Stage 186 already implements.
+#[wasm_bindgen]
+pub fn serialize_aead_ciphertext(ciphertext: &AeadCiphertextHandle) -> Option<String> {
+    crate::crypto::ciphertext_serialization::encode_envelope_internal(ciphertext.inner().inner())
+}
+
+/// Stage 1011 (Secure Runtime Alpha 018) — a THIN wrapper reaching the
+/// EXISTING, byte-for-byte UNCHANGED
+/// [`crate::crypto::ciphertext_serialization::decode_envelope_internal`]
+/// (Stage 186) EXACTLY ONCE against an UNTRUSTED candidate string. Every
+/// Fail-Closed rejection this function returns `None` for
+/// (`InvalidVersion`/`InvalidAlgorithm`/`InvalidAadDomain`/
+/// `InvalidBase64Url`/`MissingField`/`UnknownField`/`MalformedJson`) is
+/// entirely `decode_envelope_internal`'s OWN pre-existing, `cargo
+/// test`-verified decision — this wrapper adds NO new validation logic
+/// of its own. On `CiphertextSerializationStatus::Valid` (the ONLY
+/// status carrying `Some` in `decision.envelope`), constructs a NEW
+/// `AeadCiphertextHandle` the SAME way [`encrypt_aead`] already does
+/// today — a plain struct literal, reachable because both are defined in
+/// this same crate — via [`FedosCiphertextEnvelope::from_inner`], never
+/// a new public constructor. This function validates WIRE STRUCTURE
+/// only: it holds no key and performs no AEAD operation, so it neither
+/// checks nor guesses whether the reconstructed envelope will later
+/// authenticate successfully against any key — that remains entirely
+/// [`decrypt_aead`]'s own, separate, no-oracle-preserving responsibility
+/// (`docs/secure_runtime_alpha_017_ciphertext_wire_format_decision.md`
+/// §9).
+#[wasm_bindgen]
+pub fn deserialize_aead_ciphertext(serialized: &str) -> Option<AeadCiphertextHandle> {
+    let decision = crate::crypto::ciphertext_serialization::decode_envelope_internal(serialized);
+    match decision.status {
+        crate::crypto::ciphertext_serialization::CiphertextSerializationStatus::Valid => {
+            decision.envelope.map(|envelope| AeadCiphertextHandle {
+                inner: FedosCiphertextEnvelope::from_inner(envelope),
+            })
+        }
         _ => None,
     }
 }
