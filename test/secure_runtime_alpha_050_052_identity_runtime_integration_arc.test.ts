@@ -1103,13 +1103,15 @@ describe("Secure Runtime Alpha 050-052 -- Identity Runtime Integration Arc, inte
     expect(fedosRuntimeIdentitySource.length).toBeLessThan(6000);
   });
 
-  it("116. create_runtime.ts's own new construction block is exactly two statements -- the const declaration immediately followed by the void statement", () => {
+  it("116. RIPPLE (Secure Runtime Alpha 053-055): create_runtime.ts's own new construction block was exactly two statements -- the const declaration immediately followed by a bare `void runtimeIdentity;` -- AS OF Alpha 050-052's own scope; Alpha 055 later replaced the bare void statement with an actual, discarded, rejection-swallowed describeIdentity() call -- reconfirmed here as the CURRENT two-statement block, per this arc's own established ripple convention", () => {
     expect(createRuntimeSource).toMatch(/const runtimeIdentity: FedosRuntimeIdentity = new FedosRuntimeIdentity\(\);/);
-    expect(createRuntimeSource).toMatch(/void runtimeIdentity;/);
+    expect(createRuntimeSource).toMatch(/void runtimeIdentity\.describeIdentity\(\)\.catch\(\(\) => \{\}\);/);
     const constIndex = createRuntimeSource.indexOf("const runtimeIdentity: FedosRuntimeIdentity");
-    const voidIndex = createRuntimeSource.indexOf("void runtimeIdentity;");
-    const between = createRuntimeSource.slice(constIndex, voidIndex);
-    expect(between.split("\n").length).toBe(2);
+    const voidIndex = createRuntimeSource.indexOf("void runtimeIdentity.describeIdentity()");
+    const returnIndex = createRuntimeSource.indexOf("return {", voidIndex);
+    expect(constIndex).toBeGreaterThan(-1);
+    expect(voidIndex).toBeGreaterThan(constIndex);
+    expect(returnIndex).toBeGreaterThan(voidIndex);
   });
 
   it("117. behavioral: FedosRuntimeIdentity is not a singleton at the module level -- each createRuntime() call gets its own fresh instance (confirmed indirectly: repeated createRuntime() calls never throw and never share visible state)", () => {

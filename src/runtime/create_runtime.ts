@@ -164,6 +164,21 @@
  * way. See
  * `docs/secure_runtime_alpha_050_052_identity_runtime_integration_arc.md`
  * for the full design rationale.
+ *
+ * Secure Runtime Alpha 053–055 (Identity Runtime Internal Operations,
+ * Alpha 055 "Identity Runtime First Use") — `createRuntime()` now also
+ * calls `runtimeIdentity.describeIdentity()` EXACTLY ONCE per call,
+ * immediately after constructing it, as a pure startup-confirmation
+ * smoke test — a call that (given the current Identity Layer Provider/
+ * Source wiring, Alpha 049) always resolves `null`. The returned
+ * `Promise` is explicitly discarded via `void`,
+ * chained with a no-op `.catch()` so a hypothetical future rejection
+ * can never surface as an unhandled promise rejection out of this
+ * synchronous function; `createRuntime()` itself remains fully
+ * synchronous — it does not `await` this call, and its own return
+ * value and timing are byte-for-byte unaffected. See
+ * `docs/secure_runtime_alpha_053_055_identity_runtime_internal_operations.md`
+ * for the full design rationale.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -808,7 +823,10 @@ export function createRuntime(
   // Secure Runtime Alpha 050-052: constructed for internal wiring only --
   // never attached to the AppRuntime object below, never read elsewhere.
   const runtimeIdentity: FedosRuntimeIdentity = new FedosRuntimeIdentity();
-  void runtimeIdentity;
+  // Secure Runtime Alpha 053-055: called once as a startup-confirmation
+  // smoke test only -- return value discarded, rejection swallowed,
+  // never awaited (createRuntime() stays synchronous).
+  void runtimeIdentity.describeIdentity().catch(() => {});
 
   return {
     mode: overrides.mode ?? resolveMode(env),

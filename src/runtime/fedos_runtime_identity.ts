@@ -1,6 +1,9 @@
 /**
  * Secure Runtime Alpha 050–052 — "Identity Runtime Integration Arc"
- * (Alpha 050: Runtime Identity Authority).
+ * (Alpha 050: Runtime Identity Authority). Secure Runtime Alpha
+ * 053–055 — "Identity Runtime Internal Operations" (this revision —
+ * header comment only; `describeIdentity()`/`findIdentity()`/
+ * `listIdentities()` themselves are BYTE-FOR-BYTE unchanged).
  *
  * The FIRST connection anywhere in this repository between the
  * Identity Layer (`src/identity/*`, Alpha 027–049) and the Runtime
@@ -12,23 +15,32 @@
  * `resolveFedosIdentityProvider()` (Alpha 032/034/036/039/049)
  * resolves), and `FedosIdentityResolver` (Alpha 043, the reader) — all
  * three wired to the SAME `FedosIdentityRegistry` instance, exactly as
- * `FedosIdentityResolver`'s own design has always required. See
+ * `FedosIdentityResolver`'s own design has always required. Alpha 050
+ * shipped `describeIdentity()`/`findIdentity()`/`listIdentities()`
+ * alongside that construction, as pure pass-throughs, so that Alpha
+ * 052's own verification tests would have something to call. Alpha
+ * 053 and Alpha 054 formally re-confirm those same three methods as
+ * their own, separately-reviewed deliverables — `describeIdentity()`
+ * (Alpha 053) and `findIdentity()`/`listIdentities()` (Alpha 054) —
+ * with ZERO functional change, since Alpha 050 already implemented
+ * them to this exact same specification. See
  * `docs/secure_runtime_alpha_050_052_identity_runtime_integration_arc.md`
- * for the full design rationale: why this class exists, why it wires
- * Service/Registry/Resolver together rather than leaving Runtime to
- * construct each separately, why it is not yet exposed on `AppRuntime`,
- * why identity retrieval is always `null` today, and the Development/
- * Production/Unknown Runtime Mode verification this Arc performs.
+ * for the original Runtime/Identity Layer connection rationale, and
+ * `docs/secure_runtime_alpha_053_055_identity_runtime_internal_operations.md`
+ * for this Arc's own rationale: why Alpha 053/054 made no code change,
+ * why the three methods stay pure pass-throughs, why `findIdentity()`/
+ * `listIdentities()` stay synchronous, and Alpha 055's own
+ * `create_runtime.ts` startup-confirmation call.
  *
  * This file defines a SINGLE CLASS and nothing else — no function, no
  * module-scoped singleton, no environment read, no Worker reference,
  * no Storage reference, no Rust reference, and no wiring into
  * `AppRuntime`/`RuntimeEnv`/`RuntimeOverrides` (`types.js`) or the
- * Public Runtime API. `create_runtime.ts` (Alpha 051) is the ONLY file
- * in this repository that constructs a `FedosRuntimeIdentity` — held as
- * a private, module-scoped field there, never returned from
- * `createRuntime()`, never attached to the `AppRuntime` object literal
- * that function assembles, and never read by any other file.
+ * Public Runtime API. `create_runtime.ts` (Alpha 051/055) is the ONLY
+ * file in this repository that constructs a `FedosRuntimeIdentity` —
+ * held as a private, function-scoped constant there, never returned
+ * from `createRuntime()`, never attached to the `AppRuntime` object
+ * literal that function assembles, and never read by any other file.
  *
  * HARD GUARDRAILS:
  *   - `FedosRuntimeIdentity` is the ONLY export.
@@ -47,6 +59,10 @@
  *   - `describeIdentity()`/`findIdentity()`/`listIdentities()` are PURE
  *     PASS-THROUGHS to the internally-held Service/Resolver — no new
  *     validation, caching, aggregation, or transformation of any kind.
+ *     `findIdentity()`/`listIdentities()` remain SYNCHRONOUS, matching
+ *     `FedosIdentityResolver`'s own synchronous API exactly (Alpha
+ *     054); `describeIdentity()` remains `async`, matching
+ *     `FedosIdentityService`'s own async API exactly (Alpha 053).
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
