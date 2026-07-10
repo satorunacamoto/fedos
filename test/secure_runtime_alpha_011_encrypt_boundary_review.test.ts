@@ -151,14 +151,13 @@ describe("Secure Runtime Alpha 011 Public encrypt() Boundary Review -- review on
     expect(key === null || key instanceof Uint8Array).toBe(true);
   });
 
-  it("16. createRuntime()'s assembled AppRuntime still exposes the same four Crypto API fields this review found -- encrypt() was later added by Stage 1009 (Secure Runtime Alpha 014); decrypt() remains unimplemented", async () => {
+  it("16. createRuntime()'s assembled AppRuntime still exposes the same four Crypto API fields this review found -- encrypt()/decrypt() were later added by Stage 1009 (Secure Runtime Alpha 014)/Stage 1010 (Secure Runtime Alpha 015) respectively", async () => {
     const { createRuntime } = await import("../src/runtime/create_runtime.js");
     const runtime = createRuntime();
     expect(typeof runtime.initializeCrypto).toBe("function");
     expect(typeof runtime.runtimeCapabilities).toBe("function");
     expect(typeof runtime.randomBytes).toBe("function");
     expect(typeof runtime.generateAeadKey).toBe("function");
-    expect((runtime as unknown as { decrypt?: unknown }).decrypt).toBeUndefined();
   });
 
   it("17. FedosWasmLoader.planLoad() is confirmed byte-for-byte unchanged -- still BlockedByPolicy", async () => {
@@ -187,8 +186,8 @@ describe("Secure Runtime Alpha 011 Public encrypt() Boundary Review -- review on
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect(pubFnNames.length).toBe(34);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_011_encrypt_boundary_review/);
     expect(libRsSource).not.toMatch(/pub fn encrypt\b|pub fn decrypt\b/);
 

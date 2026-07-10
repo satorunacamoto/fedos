@@ -82,7 +82,7 @@ describe("FedOS WASM artifact generation fix, both original causes resolved, fai
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
   });
 
   it("6. packages/fedos-core-rust/.gitignore still ignores /pkg/, /target/, and Cargo.lock", () => {

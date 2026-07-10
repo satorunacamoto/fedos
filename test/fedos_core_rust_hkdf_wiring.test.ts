@@ -238,6 +238,7 @@ describe("FedOS Rust crate — RFC 5869 HKDF vectors wired to cargo test", () =>
       "generate_aead_key_handle",
       "kind",
       "encrypt_aead",
+      "decrypt_aead",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

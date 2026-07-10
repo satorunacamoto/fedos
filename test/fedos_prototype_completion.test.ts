@@ -159,8 +159,8 @@ describe("FedOS Prototype Completion Declaration -- doc-only, no Runtime/Worker/
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect(pubFnNames.length).toBe(34);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
     expect(libRsSource).not.toMatch(/fedos_prototype_completion/);
 
     const cargoCode = cargoTomlSource

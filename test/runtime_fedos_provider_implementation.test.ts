@@ -153,7 +153,7 @@ describe("FedOS provider implementation readiness, shape only (Stage 305-312)", 
 
   it("13. Rust is untouched -- pub fn surface (27) and Cargo.toml/package.json dependency counts unchanged", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
 
     const cargoCode = cargoTomlSource
       .split("\n")

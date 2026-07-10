@@ -158,8 +158,9 @@ describe("FedOS Rust crate — consolidated placeholder API boundary (Stage 103)
       "kind",
       "kind",
       "encrypt_aead",
+      "decrypt_aead",
     ];
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

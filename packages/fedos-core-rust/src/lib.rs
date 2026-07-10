@@ -6150,12 +6150,6 @@ impl AeadKeyHandle {
 /// exposed — the ONLY way to obtain one is [`encrypt_aead`].
 #[wasm_bindgen]
 pub struct AeadCiphertextHandle {
-    // Read by nothing yet — `decrypt()` is unimplemented (see this
-    // Stage's own forbidden-scope list). A future, separate,
-    // explicitly-reviewed Stage adds this crate's own `pub(crate) fn
-    // inner()` reviewed seam once it exists to consume it, mirroring
-    // `AeadKeyHandle::inner()`'s own convention.
-    #[allow(dead_code)]
     inner: FedosCiphertextEnvelope,
 }
 
@@ -6169,6 +6163,21 @@ impl AeadCiphertextHandle {
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> String {
         "AeadCiphertextHandle".to_string()
+    }
+}
+
+impl AeadCiphertextHandle {
+    /// Stage 1010 (Secure Runtime Alpha 015) — the crate-private reviewed
+    /// seam [`decrypt_aead`] uses to reach the real, permanently-opaque
+    /// [`FedosCiphertextEnvelope`] this WASM-exported wrapper holds.
+    /// Mirrors [`AeadKeyHandle::inner`]'s own convention exactly — never
+    /// re-exported, never returns anything but a reference. This is the
+    /// consumer `AeadCiphertextHandle`'s own doc comment (Stage 1009)
+    /// already anticipated: "a future, separate, explicitly-reviewed
+    /// Stage adds this crate's own `pub(crate) fn inner()` reviewed seam
+    /// once it exists to consume it."
+    pub(crate) fn inner(&self) -> &FedosCiphertextEnvelope {
+        &self.inner
     }
 }
 
@@ -6237,6 +6246,123 @@ pub fn encrypt_aead(
         FedosEncryptStatus::Ready => decision
             .envelope
             .map(|envelope| AeadCiphertextHandle { inner: envelope }),
+        _ => None,
+    }
+}
+
+/// Stage 1010 (Secure Runtime Alpha 015) — compares the caller-supplied
+/// PUBLIC `algorithm` label against the value ALREADY SEALED into the
+/// envelope at `encrypt_aead()` time (`AeadEnvelopeAlgorithm`, a
+/// SEPARATE type from `FedosAeadAlgorithm` — this crate's own
+/// "separate label per boundary" discipline requires bridging, never
+/// direct equality, between any two of `FedosAeadAlgorithm`/`AeadCipher`/
+/// `AeadEnvelopeAlgorithm`). A mismatch here is folded, by
+/// [`decrypt_aead`] itself, into the exact same `None` result an
+/// authentication failure would produce — this function's own boolean
+/// result is NEVER surfaced as a distinguishable Rust-side status,
+/// matching `FedosDecryptStatus::AuthenticationFailed`'s own documented
+/// "never distinguish WHY" discipline (RFC 8439/NIST AEAD guidance:
+/// telling a caller WHICH check failed is itself an oracle).
+fn fedos_aead_algorithm_matches_envelope(
+    algorithm: FedosAeadAlgorithm,
+    envelope_algorithm: crate::crypto::ciphertext_envelope::AeadEnvelopeAlgorithm,
+) -> bool {
+    matches!(
+        (algorithm, envelope_algorithm),
+        (
+            FedosAeadAlgorithm::ChaCha20Poly1305,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAlgorithm::ChaCha20Poly1305
+        ) | (
+            FedosAeadAlgorithm::Aes256Gcm,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAlgorithm::Aes256Gcm
+        )
+    )
+}
+
+/// Stage 1010 (Secure Runtime Alpha 015) — same reasoning as
+/// [`fedos_aead_algorithm_matches_envelope`] above, for `aad_domain`.
+fn fedos_aead_aad_domain_matches_envelope(
+    aad_domain: FedosAeadAadDomain,
+    envelope_aad_domain: crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain,
+) -> bool {
+    matches!(
+        (aad_domain, envelope_aad_domain),
+        (
+            FedosAeadAadDomain::RootKey,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::RootKey
+        ) | (
+            FedosAeadAadDomain::Identity,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::Identity
+        ) | (
+            FedosAeadAadDomain::Storage,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::Storage
+        ) | (
+            FedosAeadAadDomain::Conversation,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::Conversation
+        ) | (
+            FedosAeadAadDomain::TestOnly,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::TestOnly
+        )
+    )
+}
+
+/// Stage 1010 (Secure Runtime Alpha 015) — the crate's SIXTH
+/// wasm_bindgen-annotated item, and the SECOND wasm-bindgen wrapper
+/// around a real cryptographic OPERATION. A THIN wrapper around the
+/// EXISTING, byte-for-byte UNCHANGED [`fedos_decrypt`] (Stage 166–176)
+/// — calls it AT MOST once. NO new entropy source, NO new algorithm, NO
+/// new authentication policy.
+///
+/// Takes `key: &AeadKeyHandle` and `ciphertext: &AeadCiphertextHandle` —
+/// both REFERENCES, so neither the caller's key nor ciphertext handle is
+/// consumed/dropped by one `decrypt_aead()` call. Reaches the real,
+/// permanently-opaque `FedosAeadKeyHandle`/`FedosCiphertextEnvelope` via
+/// [`AeadKeyHandle::inner`]/[`AeadCiphertextHandle::inner`] (this
+/// Stage's own new reviewed seam on the latter) — never reads, copies,
+/// or exposes a raw key or ciphertext byte beyond what `fedos_decrypt`
+/// itself already returns as recovered plaintext.
+///
+/// BEFORE calling `fedos_decrypt` at all, checks that the caller-supplied
+/// `algorithm`/`aad_domain` match the values ALREADY SEALED into
+/// `ciphertext` at `encrypt_aead()` time
+/// (`fedos_aead_algorithm_matches_envelope`/
+/// `fedos_aead_aad_domain_matches_envelope` above) — a mismatch resolves
+/// `None` immediately, WITHOUT ever calling `fedos_decrypt`. This is a
+/// structural input-validation check, not a new cryptographic behavior:
+/// `fedos_decrypt` itself never accepted an algorithm/AAD-domain
+/// parameter to begin with (both are already recovered from the
+/// envelope internally, per `fedos_decrypt`'s own unchanged signature)
+/// — this Stage's own public `decrypt_aead` merely REQUIRES the caller
+/// to state, up front, the SAME algorithm/domain `encrypt()`'s own
+/// caller already used, and folds any mismatch into the SAME `None`
+/// result an authentication failure produces, never a distinguishable
+/// Rust-side status.
+///
+/// On ANY non-`Ready` `FedosDecryptStatus` (`InvalidKey`/
+/// `AuthenticationFailed`/`InternalFailure`), returns `None` — Fail
+/// Closed, collapsing every Rust-side failure cause (wrong key, wrong
+/// algorithm/AAD-domain, tampered ciphertext, internal failure) into
+/// the SAME null-on-any-non-success pattern this crate's every other
+/// wasm-bindgen wrapper already established. `fedos_decrypt()`'s own
+/// doc comment, behavior, and signature are all untouched by this
+/// Stage.
+#[wasm_bindgen]
+pub fn decrypt_aead(
+    key: &AeadKeyHandle,
+    algorithm: FedosAeadAlgorithm,
+    aad_domain: FedosAeadAadDomain,
+    ciphertext: &AeadCiphertextHandle,
+) -> Option<Vec<u8>> {
+    let envelope = ciphertext.inner();
+    let inner_envelope = envelope.inner();
+    if !fedos_aead_algorithm_matches_envelope(algorithm, inner_envelope.algorithm())
+        || !fedos_aead_aad_domain_matches_envelope(aad_domain, inner_envelope.aad_domain())
+    {
+        return None;
+    }
+    let decision = fedos_decrypt(key.inner(), envelope);
+    match decision.status {
+        FedosDecryptStatus::Ready => decision.plaintext,
         _ => None,
     }
 }

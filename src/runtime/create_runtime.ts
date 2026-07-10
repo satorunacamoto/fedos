@@ -92,8 +92,22 @@
  * and internally drives its own fresh `FedosWasmLoader` through the
  * SAME six-condition chain before calling the Rust Boundary's own thin
  * wrapper export. No Worker/Production connection, no Secure Storage of
- * any kind, no new build dependency of any kind. `decrypt()`/
- * `importKey()`/`exportKey()` remain unimplemented.
+ * any kind, no new build dependency of any kind. `importKey()`/
+ * `exportKey()` remain unimplemented.
+ *
+ * Stage 1010 (Secure Runtime Alpha 015) adds `decrypt`
+ * (`decrypt()`, `fedos_runtime_decrypt.ts`, Stage 1010) to the assembled
+ * `AppRuntime` — the FOURTH public Crypto API, and the counterpart to
+ * `encrypt`. It is a SIXTH, entirely separate field — none of the
+ * five above is modified, called, or read by this new field's own
+ * implementation. `decrypt()` accepts ONLY opaque handle values (the
+ * SAME key handle and ciphertext handle types `generateAeadKey()`/
+ * `encrypt` already produce) — never raw bytes for either — and
+ * internally drives its own fresh `FedosWasmLoader` through the SAME
+ * six-condition chain before calling the Rust Boundary's own thin
+ * wrapper export. No Worker/Production connection, no Secure Storage
+ * of any kind, no new build dependency of any kind. `importKey()`/
+ * `exportKey()` remain unimplemented.
  */
 
 import { CompositeAssetCache } from "../asset/composite_asset_cache.js";
@@ -173,6 +187,7 @@ import { runtimeCapabilities } from "./fedos_runtime_prototype_execution.js";
 import { randomBytes } from "./fedos_runtime_random_bytes.js";
 import { generateAeadKey } from "./fedos_runtime_aead_key_generation.js";
 import { encrypt } from "./fedos_runtime_encrypt.js";
+import { decrypt } from "./fedos_runtime_decrypt.js";
 import type {
   AppRuntime,
   RuntimeEnv,
@@ -753,5 +768,6 @@ export function createRuntime(
     randomBytes,
     generateAeadKey,
     encrypt,
+    decrypt,
   };
 }

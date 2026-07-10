@@ -565,8 +565,9 @@ export interface AppRuntime {
    * likewise opaque — no raw ciphertext byte is ever exposed. The
    * Ciphertext boundary's own final wire-format design remains a
    * separate, later, unresolved question this field does not attempt
-   * to answer. `decrypt()`/`importKey()`/`exportKey()` remain
-   * unimplemented. Deliberately separate from
+   * to answer. `importKey()`/`exportKey()` remain unimplemented.
+   * `decrypt()` (below) was added later by Stage 1010 (Secure Runtime
+   * Alpha 015). Deliberately separate from
    * `initializeCrypto`/`runtimeCapabilities`/`randomBytes`/
    * `generateAeadKey` above, all UNCHANGED by this stage. See
    * `docs/secure_runtime_alpha_014_encrypt_opaque_handle_api.md`.
@@ -577,4 +578,42 @@ export interface AppRuntime {
     aadDomain: AeadAadDomain,
     plaintext: Uint8Array,
   ) => Promise<AeadCiphertextHandle | null>;
+  /**
+   * Stage 1010 (Secure Runtime Alpha 015) — the FOURTH public Crypto
+   * API Runtime exposes, and the SECOND performing a real cryptographic
+   * operation — the counterpart to `encrypt` above. Internally calls
+   * `attemptDevOnlyRuntimeDecrypt()` (`fedos_runtime_decrypt.ts`)
+   * exactly once, which drives a FRESH `FedosWasmLoader` through the
+   * SAME six-condition chain, then calls the Rust Boundary's
+   * `decrypt_aead()` — a thin wrapper around the pre-existing,
+   * unchanged `fedos_decrypt()`. Fail Closed: resolves `null` whenever
+   * any of the Loader's own six conditions is unmet, `key`/`ciphertext`
+   * is not a genuine opaque handle, `algorithm`/`aadDomain` is not a
+   * known label, the export is absent, the call throws, the return
+   * value is not a genuine `Uint8Array`, or Rust itself declines to
+   * decrypt (wrong key, an algorithm/AAD-domain that does not match
+   * what was actually sealed into `ciphertext`, a tampered ciphertext,
+   * or an internal failure — ALL collapsed into the SAME Fail-Closed
+   * outcome, never a distinguishable reason, per this crate's own
+   * "never expose WHY a decrypt failed" AEAD discipline) — NEVER a
+   * partial/degraded result, and NEVER an exception escaping this
+   * field.
+   * **OPAQUE HANDLES ONLY**: `key`/`ciphertext` MUST be the SAME
+   * `AeadKeyHandle`/`AeadCiphertextHandle` types `generateAeadKey()`/
+   * `encrypt()` already produce — no raw `Uint8Array` key or ciphertext
+   * is ever accepted anywhere in this field's own call chain. The
+   * RECOVERED PLAINTEXT is the one value this field returns as a plain
+   * `Uint8Array` — there is no opaque wrapper for a caller's own
+   * requested plaintext to hide behind. `importKey()`/`exportKey()`
+   * remain unimplemented. Deliberately separate from
+   * `initializeCrypto`/`runtimeCapabilities`/`randomBytes`/
+   * `generateAeadKey`/`encrypt` above, all UNCHANGED by this stage. See
+   * `docs/secure_runtime_alpha_015_decrypt_opaque_handle_api.md`.
+   */
+  readonly decrypt: (
+    key: AeadKeyHandle,
+    algorithm: AeadAlgorithm,
+    aadDomain: AeadAadDomain,
+    ciphertext: AeadCiphertextHandle,
+  ) => Promise<Uint8Array | null>;
 }

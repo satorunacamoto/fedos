@@ -40,14 +40,15 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     // `random_bytes_32` (Stage 1004, Secure Runtime Alpha 008),
     // `generate_aead_key_handle`/`kind` (Stage 1008, Secure Runtime
-    // Alpha 013 -- REPLACING Stage 1005's `generate_aead_key_32`), and
+    // Alpha 013 -- REPLACING Stage 1005's `generate_aead_key_32`),
     // `encrypt_aead` (Stage 1009, Secure Runtime Alpha 014 -- `kind`
     // appears TWICE in the real pub fn list, once per opaque class, but
     // only needs skipping once here since this loop iterates every
-    // occurrence) are genuinely NEW pub fn added long after THIS
+    // occurrence), and `decrypt_aead` (Stage 1010, Secure Runtime
+    // Alpha 015) are genuinely NEW pub fn added long after THIS
     // review's own Stage 977 scope -- the review doc's table only ever
     // named the 27 functions that existed at that time (plus `version`,
     // Stage 986, which this doc's OWN forward-looking recommendation
@@ -55,14 +56,16 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     // edited to document later additions -- see
     // `docs/secure_runtime_alpha_008_random_bytes.md`/
     // `docs/secure_runtime_alpha_013_opaque_aead_key_handle_migration.md`/
-    // `docs/secure_runtime_alpha_014_encrypt_opaque_handle_api.md` for
+    // `docs/secure_runtime_alpha_014_encrypt_opaque_handle_api.md`/
+    // `docs/secure_runtime_alpha_015_decrypt_opaque_handle_api.md` for
     // those functions' own reviews.
     for (const name of pubFnNames) {
       if (
         name === "random_bytes_32" ||
         name === "generate_aead_key_handle" ||
         name === "kind" ||
-        name === "encrypt_aead"
+        name === "encrypt_aead" ||
+        name === "decrypt_aead"
       ) {
         continue;
       }
@@ -71,7 +74,7 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
   });
 
   it("3. the #[wasm_bindgen] count is confirmed 0, matching the real lib.rs", () => {
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
     expect(reviewDocSource).toMatch(/`#\\?\[wasm_bindgen\\?\]`.{0,20}count.{0,20}confirmed `0`|confirmed `0`/is);
     expect(reviewDocSource).toMatch(/# 0/);
   });
@@ -150,8 +153,8 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect(pubFnNames.length).toBe(34);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
 
     const cargoCode = cargoTomlSource
       .split("\n")

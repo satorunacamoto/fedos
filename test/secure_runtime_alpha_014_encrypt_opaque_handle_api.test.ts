@@ -442,12 +442,12 @@ describe("Secure Runtime Alpha 014 -- encrypt() Public Runtime API (Opaque Handl
     );
   });
 
-  it("19. decrypt()/importKey()/exportKey() are NOT implemented anywhere in this stage's changed files, in either language", () => {
+  it("19. importKey()/exportKey() are NOT implemented anywhere in this stage's changed files, in either language -- decrypt() was later added by Stage 1010 (Secure Runtime Alpha 015)", () => {
     expect(encryptServiceSource).not.toMatch(/fedos_decrypt/);
     expect(encryptServiceSource).not.toMatch(/\.\s*(decrypt|importKey|exportKey)\s*\(/);
-    expect(runtimeTypesSource).not.toMatch(/readonly decrypt:|readonly importKey:|readonly exportKey:/);
+    expect(runtimeTypesSource).not.toMatch(/readonly importKey:|readonly exportKey:/);
     expect(createRuntimeSource).not.toMatch(/fedos_decrypt/);
-    expect(libRsSource).not.toMatch(/pub fn decrypt_aead\b|pub fn import_key\b|pub fn export_key\b/);
+    expect(libRsSource).not.toMatch(/pub fn import_key\b|pub fn export_key\b/);
   });
 
   it("20. initializeCrypto()'s own return value is byte-for-byte unaffected by calling encrypt() first", async () => {
@@ -562,9 +562,9 @@ describe("Secure Runtime Alpha 014 -- encrypt() Public Runtime API (Opaque Handl
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     expect(pubFnNames).toContain("encrypt_aead");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
 
     const cargoCode = cargoTomlSource
       .split("\n")

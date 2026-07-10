@@ -79,10 +79,13 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     // (FedosAeadAlgorithm, FedosAeadAadDomain, the AeadCiphertextHandle
     // struct + its impl block, and encrypt_aead()) -- see
     // test/secure_runtime_alpha_014_encrypt_opaque_handle_api.test.ts.
+    // Stage 1010 (Secure Runtime Alpha 015) legitimately added ONE more
+    // (decrypt_aead()) -- see
+    // test/secure_runtime_alpha_015_decrypt_opaque_handle_api.test.ts.
     // This test's own title still reflects Stage 986's original,
     // now-historical scope.
     const matches = [...libRsSource.matchAll(/#\[wasm_bindgen\]/g)];
-    expect(matches.length).toBe(10);
+    expect(matches.length).toBe(11);
   });
 
   it("3. version() is declared, #[wasm_bindgen]-annotated, and returns a fixed String", () => {
@@ -99,7 +102,7 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     expect(pubFnNames).toContain("version");
     for (const name of PRE_EXISTING_PUB_FN_NAMES) {
       expect(pubFnNames).toContain(name);

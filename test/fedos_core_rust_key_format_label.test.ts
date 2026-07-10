@@ -184,8 +184,9 @@ describe("FedOS Rust crate — public key-format label boundary (Stage 105)", ()
       "kind",
       "kind",
       "encrypt_aead",
+      "decrypt_aead",
     ];
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

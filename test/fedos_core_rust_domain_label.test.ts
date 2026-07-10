@@ -122,8 +122,9 @@ describe("FedOS Rust crate — internal domain label skeleton", () => {
       "kind",
       "kind",
       "encrypt_aead",
+      "decrypt_aead",
     ];
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

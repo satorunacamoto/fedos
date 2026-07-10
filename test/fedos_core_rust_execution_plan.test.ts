@@ -141,8 +141,9 @@ describe("FedOS Rust crate — internal execution plan skeleton", () => {
       "kind",
       "kind",
       "encrypt_aead",
+      "decrypt_aead",
     ];
-    expect(pubFnNames.length).toBe(33);
+    expect(pubFnNames.length).toBe(34);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

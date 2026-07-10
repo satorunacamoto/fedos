@@ -1424,6 +1424,62 @@ export interface FedosWasmLoaderEncryptExecution {
 }
 
 /**
+ * Stage 1010 (Secure Runtime Alpha 015) — the result of a REAL attempt
+ * (or deliberate non-attempt) to call the retained JS glue module's own
+ * `decrypt_aead` property as a function, with the caller's
+ * `key`/`algorithm`/`aadDomain`/`ciphertext`. Mirrors
+ * `FedosWasmLoaderEncryptExecution` (Stage 1009) exactly, one field for
+ * one Rust Boundary export. `plaintext` is the `Uint8Array` returned by
+ * `module.decrypt_aead()` on success, or `null` on every other outcome —
+ * NEVER any other value type, and NEVER the module itself.
+ *
+ * FOUR outcomes are checked BEFORE `module.decrypt_aead` is ever called,
+ * mirroring `FedosWasmLoaderEncryptExecution`'s own `"InvalidKeyHandle"`
+ * precedent:
+ *   - `reason: "InvalidKeyHandle"` — `key` does not structurally satisfy
+ *     `isAeadKeyHandleShape()`.
+ *   - `reason: "InvalidCiphertextHandle"` — `ciphertext` does not
+ *     structurally satisfy `isAeadCiphertextHandleShape()`.
+ *   - `reason: "InvalidAlgorithm"` — `algorithm` is not one of the two
+ *     known `AeadAlgorithm` labels (a runtime defense-in-depth check;
+ *     TypeScript's own literal-union type does not survive an `as any`
+ *     bypass at a public API boundary).
+ *   - `reason: "InvalidAadDomain"` — same reasoning, for `aadDomain`.
+ * An obviously-wrong argument of any of these four kinds never reaches
+ * the WASM call at all.
+ *
+ * `reason: "DecryptionFailed"` is a genuine, in-bounds `undefined`
+ * return from Rust — covering EVERY Rust-side semantic failure cause
+ * uniformly (wrong key, an algorithm/AAD-domain that does not match
+ * what was actually sealed into `ciphertext`, a tampered ciphertext, or
+ * an internal failure) — deliberately NOT distinguished further, per
+ * `FedosDecryptStatus::AuthenticationFailed`'s own "never distinguish
+ * WHY" discipline (RFC 8439/NIST AEAD guidance: a distinguishable
+ * failure reason is itself an oracle). `succeeded: true` NAMES that the
+ * call resolved a genuine `Uint8Array` — it is NEVER read by
+ * `planLoad()`'s `if` conditions, never read by
+ * `initializeCrypto()`/`runtimeCapabilities()`/`randomBytes()`/
+ * `generateAeadKey()`, and never surfaced in Runtime/Worker diagnostics.
+ */
+export interface FedosWasmLoaderDecryptExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly plaintext: Uint8Array | null;
+  readonly reason:
+    | "Succeeded"
+    | "InvalidKeyHandle"
+    | "InvalidCiphertextHandle"
+    | "InvalidAlgorithm"
+    | "InvalidAadDomain"
+    | "DecryptionFailed"
+    | "InvalidPlaintextShape"
+    | "NotInitialized"
+    | "DecryptUnavailable"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
@@ -1562,6 +1618,15 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * all.
    */
   #encryptExecution: FedosWasmLoaderEncryptExecution | null = null;
+
+  /**
+   * Stage 1010 (Secure Runtime Alpha 015) — holds the most recent REAL
+   * Rust `decrypt_aead()` call result recorded by
+   * `attemptDevOnlyDecryptCall()`, or `null` before that method has ever
+   * been called on this instance. Read via `decryptExecution()`; NEVER
+   * read by `planLoad()`, which does not reference this field at all.
+   */
+  #decryptExecution: FedosWasmLoaderDecryptExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -1916,6 +1981,17 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   encryptExecution(): FedosWasmLoaderEncryptExecution | null {
     return this.#encryptExecution;
+  }
+
+  /**
+   * Stage 1010 (Secure Runtime Alpha 015) — returns the most recent REAL
+   * Rust `decrypt_aead()` call result recorded by
+   * `attemptDevOnlyDecryptCall()`, or `null` if that method has never
+   * been called on this instance. Reading this value NEVER triggers a
+   * new call. Not part of the `FedosWasmLoader` interface.
+   */
+  decryptExecution(): FedosWasmLoaderDecryptExecution | null {
+    return this.#decryptExecution;
   }
 
   /**
@@ -2417,6 +2493,115 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#encryptExecution = result;
+    return result;
+  }
+
+  /**
+   * Stage 1010 (Secure Runtime Alpha 015) — PUBLIC, ASYNC. The Rust
+   * Boundary reach for `AppRuntime.decrypt()`, gated on the SAME six
+   * previously-recorded conditions every other Rust Boundary reach
+   * method uses. Mirrors `attemptDevOnlyEncryptCall()`'s own shape, with
+   * FOUR structural checks (not one) run BEFORE `module.decrypt_aead` is
+   * ever read or called:
+   *   - Any of the six missing/unmet: resolves `"PrototypeStillClosed"`/
+   *     `"NotInitialized"` — `module.decrypt_aead` is NEVER read.
+   *   - `key` does not structurally satisfy `isAeadKeyHandleShape()`:
+   *     resolves `"InvalidKeyHandle"`.
+   *   - `ciphertext` does not structurally satisfy
+   *     `isAeadCiphertextHandleShape()`: resolves
+   *     `"InvalidCiphertextHandle"`.
+   *   - `algorithm` is not a known key of `AEAD_ALGORITHM_DISCRIMINANTS`:
+   *     resolves `"InvalidAlgorithm"` — a runtime defense-in-depth check,
+   *     since TypeScript's own literal-union type does not survive an
+   *     `as any` bypass at a public API boundary.
+   *   - `aadDomain` is not a known key of
+   *     `AEAD_AAD_DOMAIN_DISCRIMINANTS`: resolves `"InvalidAadDomain"`.
+   * All four checks pass: checks, AT RUNTIME, ONLY
+   * `typeof module.decrypt_aead === "function"`. Absent: resolves
+   * `"DecryptUnavailable"`. Present: calls
+   * `module.decrypt_aead(key, algorithm, aadDomain, ciphertext)` —
+   * `algorithm`/`aadDomain` translated to `lib.rs`'s own numeric
+   * discriminants via the SAME two lookup tables
+   * `attemptDevOnlyEncryptCall()` already uses — wrapped in `try`/`catch`
+   * that Fails Closed to `"CallFailed"` on ANY thrown/rejected error. A
+   * genuine `undefined` return (Rust's own `decrypt_aead()` — EVERY
+   * semantic failure cause collapsed uniformly: wrong key, an
+   * algorithm/AAD-domain that does not match what was actually sealed
+   * into `ciphertext`, a tampered ciphertext, or an internal failure)
+   * resolves `"DecryptionFailed"` — NOT `"CallFailed"`, since nothing
+   * threw. A genuine return that is NEITHER `undefined` NOR a real
+   * `Uint8Array` resolves `"InvalidPlaintextShape"`. On a genuine
+   * `Uint8Array`: resolves `{ attempted: true, succeeded: true,
+   * plaintext: <Uint8Array>, reason: "Succeeded" }`.
+   * Never inspects, destructures, or retains the module itself, and
+   * never reads a byte out of `key`/`ciphertext` beyond what
+   * `decrypt_aead()` itself returns as recovered plaintext — only that
+   * `Uint8Array` (or `null`) is ever stored, on
+   * `this.#decryptExecution`, readable via the new PUBLIC
+   * `decryptExecution()` method. Never calls any Rust API other than
+   * `decrypt_aead()` — no `importKey`/`exportKey`/any other export.
+   * Called by NOTHING else in this file.
+   */
+  async attemptDevOnlyDecryptCall(
+    key: unknown,
+    algorithm: AeadAlgorithm,
+    aadDomain: AeadAadDomain,
+    ciphertext: unknown,
+  ): Promise<FedosWasmLoaderDecryptExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderDecryptExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, plaintext: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, plaintext: null, reason: "NotInitialized" };
+    } else if (!isAeadKeyHandleShape(key)) {
+      result = { attempted: true, succeeded: false, plaintext: null, reason: "InvalidKeyHandle" };
+    } else if (!isAeadCiphertextHandleShape(ciphertext)) {
+      result = { attempted: true, succeeded: false, plaintext: null, reason: "InvalidCiphertextHandle" };
+    } else if (!(algorithm in AEAD_ALGORITHM_DISCRIMINANTS)) {
+      result = { attempted: true, succeeded: false, plaintext: null, reason: "InvalidAlgorithm" };
+    } else if (!(aadDomain in AEAD_AAD_DOMAIN_DISCRIMINANTS)) {
+      result = { attempted: true, succeeded: false, plaintext: null, reason: "InvalidAadDomain" };
+    } else {
+      const candidate = module as { decrypt_aead?: unknown };
+      if (typeof candidate.decrypt_aead !== "function") {
+        result = { attempted: true, succeeded: false, plaintext: null, reason: "DecryptUnavailable" };
+      } else {
+        try {
+          const value: unknown = (
+            candidate.decrypt_aead as (
+              key: unknown,
+              algorithm: number,
+              aadDomain: number,
+              ciphertext: unknown,
+            ) => unknown
+          )(key, AEAD_ALGORITHM_DISCRIMINANTS[algorithm], AEAD_AAD_DOMAIN_DISCRIMINANTS[aadDomain], ciphertext);
+          if (value instanceof Uint8Array) {
+            result = { attempted: true, succeeded: true, plaintext: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, plaintext: null, reason: "DecryptionFailed" };
+          } else {
+            result = { attempted: true, succeeded: false, plaintext: null, reason: "InvalidPlaintextShape" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, plaintext: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#decryptExecution = result;
     return result;
   }
 

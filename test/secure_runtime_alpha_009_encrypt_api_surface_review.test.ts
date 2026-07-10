@@ -175,8 +175,8 @@ describe("Secure Runtime Alpha 009 Public encrypt() API Surface Review -- review
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(33);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect(pubFnNames.length).toBe(34);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_009_encrypt_api_surface_review/);
 
     const cargoCode = cargoTomlSource

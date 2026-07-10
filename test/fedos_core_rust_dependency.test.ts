@@ -236,7 +236,7 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
   it("10. Cargo.toml declares wasm-bindgen as a direct dependency (Stage 985, Prototype EXECUTION Phase 009), and lib.rs now imports it for exactly one #[wasm_bindgen] function, version() (Stage 986, Prototype EXECUTION Phase 010)", () => {
     expect(cargoCode).toContain("wasm-bindgen");
     expect(libRsSource).toMatch(/use wasm_bindgen::prelude::\*;/);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(10);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(11);
   });
 
   it("11. crate-type is rlib + cdylib (Stage 466 -- WASM artifact generation fix), never staticlib/wasm32 as a literal token", () => {
