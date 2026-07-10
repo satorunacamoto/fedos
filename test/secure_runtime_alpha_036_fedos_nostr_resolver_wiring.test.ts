@@ -359,7 +359,7 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("24. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this Stage -- still exactly 56 and 18 files respectively AS OF this Stage's own scope (this Stage only modifies an existing file's body; Secure Runtime Alpha 039 later added two more src/identity/ files, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
+  it("24. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this Stage -- still exactly 56 and 18 files respectively AS OF this Stage's own scope (this Stage only modifies an existing file's body; Secure Runtime Alpha 039 later added two more src/identity/ files, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts; Secure Runtime Alpha 040 later added a 21st, fedos_identity_record.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -368,7 +368,7 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(20);
+    expect(Object.keys(identityFiles).length).toBe(21);
   });
 
   it("25. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {

@@ -441,7 +441,7 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("33. exactly two new files were added under src/identity/ -- now exactly 20 files; no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files", () => {
+  it("33. exactly two new files were added under src/identity/ -- 20 files total AS OF this Stage's own scope (Secure Runtime Alpha 040 later added a 21st, fedos_identity_record.ts); no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -450,7 +450,7 @@ describe("Secure Runtime Alpha 039 -- Nostr Public Identity Source Boundary, Des
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(20);
+    expect(Object.keys(identityFiles).length).toBe(21);
   });
 
   it("34. cross-references Alpha 035/038 without revising either", () => {

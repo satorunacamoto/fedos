@@ -299,7 +299,7 @@ describe("Secure Runtime Alpha 038 -- FedOS Identity Descriptor Decision, review
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("21. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this decision-only Stage -- still exactly 56 and 18 files respectively AS OF this Stage's own scope (Secure Runtime Alpha 039 later added a 19th and 20th src/identity/ file, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
+  it("21. no fedos_*.ts file under src/runtime/ or src/identity/ was added or removed by this decision-only Stage -- still exactly 56 and 18 files respectively AS OF this Stage's own scope (Secure Runtime Alpha 039 later added a 19th and 20th src/identity/ file, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts; Secure Runtime Alpha 040 later added a 21st, fedos_identity_record.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -308,7 +308,7 @@ describe("Secure Runtime Alpha 038 -- FedOS Identity Descriptor Decision, review
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(20);
+    expect(Object.keys(identityFiles).length).toBe(21);
   });
 
   it("22. behavioral: resolveFedosIdentityProvider() is unaffected -- still resolves the shared NostrIdentityProvider singleton, describeIdentity() still always null", async () => {

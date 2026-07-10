@@ -280,7 +280,7 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("18. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- 16 files total AS OF Alpha 032's own scope (Secure Runtime Alpha 033 later added a 17th, fedos_noop_identity_provider.ts; Secure Runtime Alpha 035 later added an 18th, fedos_nostr_identity_provider.ts; Secure Runtime Alpha 039 later added a 19th and 20th, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts)", () => {
+  it("18. no fedos_*.ts file under src/runtime/ was added or removed -- still exactly 56 files; exactly one new file was added under src/identity/ -- 16 files total AS OF Alpha 032's own scope (Secure Runtime Alpha 033 later added a 17th, fedos_noop_identity_provider.ts; Secure Runtime Alpha 035 later added an 18th, fedos_nostr_identity_provider.ts; Secure Runtime Alpha 039 later added a 19th and 20th, fedos_nostr_public_identity_source.ts and fedos_null_nostr_public_identity_source.ts; Secure Runtime Alpha 040 later added a 21st, fedos_identity_record.ts)", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -289,7 +289,7 @@ describe("Secure Runtime Alpha 032 -- FedOS Identity Provider Resolver, null-onl
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(20);
+    expect(Object.keys(identityFiles).length).toBe(21);
   });
 
   it("19. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
