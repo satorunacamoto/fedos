@@ -308,8 +308,8 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     expect(descriptorSource).not.toMatch(/secure_runtime_alpha_040/);
   });
 
-  it("17. Regression: fedos_nostr_identity_provider.ts (Alpha 035/039) is confirmed unchanged -- constructor still requires an injected Source, describeIdentity() still delegates to it, no reference to this Stage's own doc", () => {
-    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+  it("17. RIPPLE (Secure Runtime Alpha 049): fedos_nostr_identity_provider.ts (Alpha 035/039) required an injected Source with no default AS OF this Stage's own scope; Alpha 049 later gave that same parameter a default value (`resolveNostrPublicIdentitySource()`), still fully overridable by explicit injection -- reconfirmed here as the CURRENT signature; describeIdentity() still delegates to the injected Source, no reference to this Stage's own doc", () => {
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
     expect(nostrProviderSource).toMatch(/this\.#source\.readPublicIdentity\(\)/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_040/);
   });

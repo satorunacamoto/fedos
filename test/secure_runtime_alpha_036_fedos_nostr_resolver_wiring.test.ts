@@ -246,9 +246,9 @@ describe("Secure Runtime Alpha 036 -- FedOS Nostr Resolver Wiring, Runtime/Servi
     expect(await provider?.describeIdentity()).toBeNull();
   });
 
-  it("15. RIPPLE (Secure Runtime Alpha 039): fedos_nostr_identity_provider.ts (Alpha 035) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- still fixed provider = 'nostr', still describeIdentity() body EXACTLY 'return null;'; Alpha 039 later gave it a constructor and a real delegation body -- reconfirmed here as the CURRENT shape, still fixed provider = 'nostr', no reference to this Stage's own doc", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 039, constructor defaulted at Alpha 049): fedos_nostr_identity_provider.ts (Alpha 035) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- still fixed provider = 'nostr', still describeIdentity() body EXACTLY 'return null;'; Alpha 039 later gave it a constructor and a real delegation body; Alpha 049 later gave that constructor's parameter a default value -- reconfirmed here as the CURRENT shape, still fixed provider = 'nostr', no reference to this Stage's own doc", () => {
     expect(nostrProviderSource).toMatch(/readonly provider = "nostr";/);
-    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
     expect(nostrProviderSource).toMatch(/this\.#source\.readPublicIdentity\(\)/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_036/);
   });

@@ -393,13 +393,13 @@ describe("Secure Runtime Alpha 042 -- FedOS Identity Service Registry Integratio
     expect(registrySource).not.toMatch(/secure_runtime_alpha_042/);
   });
 
-  it("24. Regression: fedos_identity_provider_resolver.ts/fedos_noop_identity_provider.ts/fedos_nostr_identity_provider.ts are all confirmed BYTE-FOR-BYTE unchanged", () => {
+  it("24. RIPPLE (Secure Runtime Alpha 049): fedos_identity_provider_resolver.ts/fedos_noop_identity_provider.ts are confirmed BYTE-FOR-BYTE unchanged; fedos_nostr_identity_provider.ts's constructor required an injected Source with no default AS OF this Stage's own scope, Alpha 049 later gave it a default value -- reconfirmed here as the CURRENT signature", () => {
     expect(resolverSource).toMatch(/return sharedNostrProvider;/);
     expect(codeOnlyLines(resolverSource)).not.toMatch(/FedosIdentityService|FedosIdentityRegistry/);
     expect(resolverSource).not.toMatch(/secure_runtime_alpha_042/);
     expect(noopProviderSource).toMatch(/readonly provider = "noop";/);
     expect(noopProviderSource).not.toMatch(/secure_runtime_alpha_042/);
-    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
     expect(codeOnlyLines(nostrProviderSource)).not.toMatch(/FedosIdentityService|FedosIdentityRegistry/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_042/);
   });

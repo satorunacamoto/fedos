@@ -338,8 +338,8 @@ describe("Secure Runtime Alpha 041 -- FedOS Identity Registry, Memory-only, no P
     expect(descriptorSource).not.toMatch(/secure_runtime_alpha_041/);
   });
 
-  it("28. Regression: fedos_nostr_identity_provider.ts (Alpha 035/039) is confirmed unchanged -- constructor still requires an injected Source, no reference to this Stage's own doc or the new Registry", () => {
-    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+  it("28. RIPPLE (Secure Runtime Alpha 049): fedos_nostr_identity_provider.ts (Alpha 035/039) required an injected Source with no default AS OF this Stage's own scope; Alpha 049 later gave that same parameter a default value -- reconfirmed here as the CURRENT signature, no reference to this Stage's own doc or the Registry", () => {
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_041/);
     expect(nostrProviderSource).not.toMatch(/FedosIdentityRegistry|fedos_identity_registry/);
   });

@@ -206,9 +206,9 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect([...nostrProviderSource.matchAll(/^export const/gm)].length).toBe(0);
   });
 
-  it("12. RIPPLE (Secure Runtime Alpha 039): the class had no constructor and no field beyond the fixed provider literal AS OF this Stage's own scope; Alpha 039 later gave it a required one-argument constructor (an injected Source) and a second, private field -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention. The class still never throws", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 039, defaulted at Alpha 049): the class had no constructor and no field beyond the fixed provider literal AS OF this Stage's own scope; Alpha 039 later gave it a required one-argument constructor (an injected Source) and a second, private field; Alpha 049 later gave that same parameter a default value (`resolveNostrPublicIdentitySource()`) without adding a new field -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention. The class still never throws", () => {
     const codeOnly = codeOnlyLines(nostrProviderSource);
-    expect(codeOnly).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+    expect(codeOnly).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
     expect(codeOnly).not.toMatch(/\bthrow\b/);
     expect(codeOnly).toMatch(/readonly provider = "nostr";/);
     const fieldDeclarations = [...codeOnly.matchAll(/^ {2}(?:readonly\s+)?#?\w+\s*[:=]/gm)];
@@ -224,13 +224,14 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect(body).toMatch(/provider: "nostr"/);
   });
 
-  it("14. RIPPLE (Secure Runtime Alpha 039): fedos_nostr_identity_provider.ts imported EXACTLY two type-only modules AS OF this Stage's own scope; Alpha 039 later added a third, importing the new Public Identity Source Boundary -- reconfirmed here as the CURRENT imports, still nothing from src/nostr/, the Resolver, the Service, or the Runtime", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 039, expanded at Alpha 049): fedos_nostr_identity_provider.ts imported EXACTLY two type-only modules AS OF Alpha 035's own scope; Alpha 039 later added a third, importing the new Public Identity Source Boundary; Alpha 049 later added a fourth, VALUE import -- `resolveNostrPublicIdentitySource()`, used only as the constructor's own default parameter -- reconfirmed here as the CURRENT imports, still nothing from src/nostr/, the Identity Provider Resolver, the Service, or the Runtime", () => {
     const importLines = [...nostrProviderSource.matchAll(/^import .*$/gm)].map((m: RegExpMatchArray) => m[0]);
-    expect(importLines.length).toBe(3);
-    expect(importLines.every((line: string) => line.startsWith("import type "))).toBe(true);
+    expect(importLines.length).toBe(4);
+    expect(importLines.filter((line: string) => line.startsWith("import type ")).length).toBe(3);
     expect(nostrProviderSource).toMatch(/from "\.\/fedos_identity_descriptor\.js"/);
     expect(nostrProviderSource).toMatch(/from "\.\/fedos_identity_provider\.js"/);
     expect(nostrProviderSource).toMatch(/from "\.\/fedos_nostr_public_identity_source\.js"/);
+    expect(nostrProviderSource).toMatch(/from "\.\/fedos_nostr_public_identity_source_resolver\.js"/);
     expect(nostrProviderSource).not.toMatch(/from "\.\.\/nostr\//);
     const importsCodeOnly = importLines.join("\n");
     expect(importsCodeOnly).not.toMatch(/fedos_identity_provider_resolver|resolveFedosIdentityProvider/);

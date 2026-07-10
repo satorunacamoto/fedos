@@ -1,8 +1,9 @@
 /**
  * Secure Runtime Alpha 035 — "FedOS Nostr Identity Provider". Secure
  * Runtime Alpha 039 — "Nostr Public Identity Source Boundary". Secure
- * Runtime Alpha 046 — "Nostr Identity Provider Descriptor Expansion"
- * (this revision — mapping only).
+ * Runtime Alpha 046 — "Nostr Identity Provider Descriptor Expansion".
+ * Secure Runtime Alpha 049 — "Nostr Identity Provider Source Resolver
+ * Integration" (this revision — constructor default only).
  *
  * The FIRST Nostr-specific `FedosIdentityProvider` (Alpha 029)
  * implementation anywhere in this repository — the "leading candidate"
@@ -12,15 +13,20 @@
  * information source — a single injected `FedosNostrPublicIdentitySource`
  * — and changed `describeIdentity()` from a fixed `return null;` into a
  * validated DELEGATION to that source, mapping only `id`/`publicIdentifier`
- * onto the returned Descriptor. Alpha 044 then added optional
- * `displayName`/`avatar` fields to the Snapshot, and Alpha 045 added the
- * identical two optional fields to `FedosIdentityDescriptor` — both
- * additions this Provider's own mapping logic did not yet read or write.
- * THIS Stage is the wiring: the mapping now ALSO copies
- * `snapshot.displayName`/`snapshot.avatar` onto the returned Descriptor,
- * verbatim, unconditionally — no validation, no reformatting, no
- * conditional omission when either is `undefined`. See
- * `docs/secure_runtime_alpha_046_nostr_identity_provider_descriptor_expansion.md`
+ * onto the returned Descriptor. Alpha 046 then wired
+ * `snapshot.displayName`/`snapshot.avatar` onto the returned Descriptor
+ * too. Every caller before this Stage had to supply a
+ * `FedosNostrPublicIdentitySource` explicitly — `fedos_identity_provider_resolver.ts`
+ * (Alpha 039) constructs one inline (`new NullNostrPublicIdentitySource()`)
+ * every time it builds the shared `NostrIdentityProvider` singleton.
+ * Alpha 048 then gave Source selection its own dedicated seam,
+ * `resolveNostrPublicIdentitySource()`, without wiring it into anything.
+ * THIS Stage is that wiring: the constructor's `source` parameter now
+ * DEFAULTS to `resolveNostrPublicIdentitySource()` when the caller omits
+ * it — explicit injection remains fully supported, unchanged, for any
+ * caller (including every existing test) that still wants to pass its
+ * own Source. See
+ * `docs/secure_runtime_alpha_049_nostr_identity_provider_source_resolver_integration.md`
  * for this Stage's own full design rationale, and
  * `docs/secure_runtime_alpha_039_nostr_public_identity_source_boundary.md`
  * for the original Source Boundary rationale: why a Source Boundary was
@@ -31,12 +37,13 @@
  * responsibility split.
  *
  * This file defines a SINGLE CLASS and nothing else — one constructor
- * parameter (the injected Source), one private field, no other
- * configuration, no Resolver reference, no Runtime reference, and no
+ * parameter (the injected Source, now with a default value), one
+ * private field, no other configuration, no Runtime reference, and no
  * wiring into `FedosIdentityService` (Alpha 031) or any other module in
- * this repository. `describeIdentity()` reads the injected Source
- * EXACTLY ONCE per call, never throws, and returns `null` on any
- * invalid or missing input.
+ * this repository beyond the Source Resolver this Stage adds. `describeIdentity()`
+ * reads the injected Source EXACTLY ONCE per call, never throws, and
+ * returns `null` on any invalid or missing input — all BYTE-FOR-BYTE
+ * unchanged by this Stage.
  *
  * HARD GUARDRAILS:
  *   - NO Relay connection of any kind (no `src/nostr/relay.ts` or
@@ -49,7 +56,9 @@
  *   - NO secret key, `nsec`, seed, mnemonic, or `npub` ENCODE/DECODE
  *     handling of any kind (no `src/nostr/crypto.ts` import, no bech32
  *     logic).
- *   - NO Resolver, Service, Runtime, or Worker reference.
+ *   - NO Service, Runtime, or Worker reference — this file's ONLY new
+ *     reference (this Stage) is `resolveNostrPublicIdentitySource()`
+ *     itself, used solely as the constructor's default parameter value.
  *   - The Source is read EXACTLY ONCE per `describeIdentity()` call —
  *     never zero times (when a Source exists), never twice.
  *   - `provider` is ALWAYS the fixed literal `"nostr"` — the injected
@@ -68,18 +77,23 @@
  *     reference — `displayName`/`avatar` reach only the Descriptor this
  *     method returns; nothing downstream of it is touched by this
  *     Stage.
+ *   - The default parameter is evaluated ONCE per construction, at
+ *     `new NostrIdentityProvider()` call time — never re-evaluated on
+ *     any later `describeIdentity()` call, matching ordinary JavaScript
+ *     default-parameter semantics.
  */
 
 import type { FedosIdentityDescriptor } from "./fedos_identity_descriptor.js";
 import type { FedosIdentityProvider } from "./fedos_identity_provider.js";
 import type { FedosNostrPublicIdentitySnapshot, FedosNostrPublicIdentitySource } from "./fedos_nostr_public_identity_source.js";
+import { resolveNostrPublicIdentitySource } from "./fedos_nostr_public_identity_source_resolver.js";
 
 export class NostrIdentityProvider implements FedosIdentityProvider {
   readonly provider = "nostr";
 
   readonly #source: FedosNostrPublicIdentitySource;
 
-  constructor(source: FedosNostrPublicIdentitySource) {
+  constructor(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource()) {
     this.#source = source;
   }
 

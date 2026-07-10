@@ -265,10 +265,13 @@ describe("Secure Runtime Alpha 046 -- Nostr Identity Provider Descriptor Expansi
     expect(codeOnly).not.toMatch(/snapshot\.avatar\.length/);
   });
 
-  it("14. fedos_nostr_identity_provider.ts still imports the same three type-only modules, nothing new added", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 049): fedos_nostr_identity_provider.ts imported exactly three type-only modules, nothing else, AS OF this Stage's own scope; Alpha 049 later added a fourth, value import (`resolveNostrPublicIdentitySource`) for use as the constructor's own default parameter -- reconfirmed here as the CURRENT import set, per this arc's own established ripple convention", () => {
     const importLines = [...nostrProviderSource.matchAll(/^import .*$/gm)].map((m: RegExpMatchArray) => m[0]);
-    expect(importLines.length).toBe(3);
-    expect(importLines.every((line: string) => line.startsWith("import type "))).toBe(true);
+    expect(importLines.length).toBe(4);
+    expect(importLines.filter((line: string) => line.startsWith("import type ")).length).toBe(3);
+    expect(importLines).toContainEqual(
+      expect.stringMatching(/^import \{ resolveNostrPublicIdentitySource \} from "\.\/fedos_nostr_public_identity_source_resolver\.js";$/),
+    );
   });
 
   it("15. fedos_nostr_identity_provider.ts's own CODE (excluding its own explanatory header comment) references zero Runtime/Storage/Worker/Registry/Record/Authentication/Nostr-network vocabulary", () => {

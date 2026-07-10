@@ -404,8 +404,8 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_045/);
   });
 
-  it("26. RIPPLE (Secure Runtime Alpha 045): fedos_nostr_identity_provider.ts's own code had no reference to displayName/avatar anywhere AS OF this Stage's own scope; Alpha 046 later added both to its own return statement -- reconfirmed here as the CURRENT (mapping-expanded) shape, per this arc's own established ripple convention", () => {
-    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
+  it("26. RIPPLE (Secure Runtime Alpha 045, constructor defaulted at Alpha 049): fedos_nostr_identity_provider.ts's own code had no reference to displayName/avatar anywhere AS OF this Stage's own scope; Alpha 046 later added both to its own return statement, and Alpha 049 later gave the constructor's Source parameter a default value -- reconfirmed here as the CURRENT (mapping-expanded, default-parameter) shape, per this arc's own established ripple convention", () => {
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
     expect(nostrProviderSource).toMatch(/this\.#source\.readPublicIdentity\(\)/);
     expect(codeOnlyLines(nostrProviderSource)).toMatch(/displayName: snapshot\.displayName,/);
     expect(codeOnlyLines(nostrProviderSource)).toMatch(/avatar: snapshot\.avatar,/);

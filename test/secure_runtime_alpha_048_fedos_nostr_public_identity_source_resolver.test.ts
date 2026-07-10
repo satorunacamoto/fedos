@@ -228,9 +228,8 @@ describe("Secure Runtime Alpha 048 -- FedOS Nostr Public Identity Source Resolve
     expect(codeOnly).not.toMatch(/fedos_identity_provider_resolver/);
   });
 
-  it("12. nothing in this repository imports fedos_nostr_public_identity_source_resolver.ts yet -- fully unwired", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 049): nothing in this repository imported fedos_nostr_public_identity_source_resolver.ts AS OF this Stage's own scope -- fully unwired; Alpha 049 later wired exactly ONE caller, fedos_nostr_identity_provider.ts's own constructor default -- reconfirmed here as the CURRENT wiring, with every OTHER file still confirmed to have zero reference", () => {
     for (const source of [
-      nostrProviderSource,
       identityProviderResolverSource,
       serviceSource,
       registrySource,
@@ -243,6 +242,8 @@ describe("Secure Runtime Alpha 048 -- FedOS Nostr Public Identity Source Resolve
       expect(source).not.toMatch(/fedos_nostr_public_identity_source_resolver/);
       expect(source).not.toMatch(/resolveNostrPublicIdentitySource/);
     }
+    expect(nostrProviderSource).toMatch(/fedos_nostr_public_identity_source_resolver/);
+    expect(nostrProviderSource).toMatch(/resolveNostrPublicIdentitySource/);
   });
 
   it("13. behavioral: 常に同じインスタンス -- resolveNostrPublicIdentitySource() always returns the exact same object across repeated calls", () => {
@@ -289,9 +290,9 @@ describe("Secure Runtime Alpha 048 -- FedOS Nostr Public Identity Source Resolve
     expect(provider.provider).toBe("nostr");
   });
 
-  it("20. Regression: fedos_nostr_identity_provider.ts (Alpha 035/039/046) is confirmed BYTE-FOR-BYTE unchanged -- still depends only on the Source interface", () => {
-    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
-    expect(nostrProviderSource).not.toMatch(/fedos_nostr_public_identity_source_resolver/);
+  it("20. RIPPLE (Secure Runtime Alpha 049): fedos_nostr_identity_provider.ts (Alpha 035/039/046) had a required, no-default constructor and no reference to this Stage's own new Resolver AS OF this Stage's own scope; Alpha 049 later gave the constructor's Source parameter a default value of `resolveNostrPublicIdentitySource()` -- reconfirmed here as the CURRENT (wired) shape, per this arc's own established ripple convention", () => {
+    expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource = resolveNostrPublicIdentitySource\(\)\) \{/);
+    expect(nostrProviderSource).toMatch(/fedos_nostr_public_identity_source_resolver/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_048/);
   });
 
