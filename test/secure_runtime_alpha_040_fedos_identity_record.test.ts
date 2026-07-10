@@ -418,7 +418,7 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(21);
+    expect(Object.keys(identityFiles).length).toBe(22);
   });
 
   it("26. cross-references Alpha 028's own exclusion-table format and Alpha 038's own routing decisions without revising either", () => {

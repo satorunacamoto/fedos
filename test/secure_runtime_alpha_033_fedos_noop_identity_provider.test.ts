@@ -334,7 +334,7 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(21);
+    expect(Object.keys(identityFiles).length).toBe(22);
   });
 
   it("24. RIPPLE (Secure Runtime Alpha 034, then Alpha 036): resolveFedosIdentityProvider() resolved null on every call AS OF this Stage's own scope; Alpha 034 later wired it to return this Stage's own NoopFedosIdentityProvider on every call instead; Alpha 036 later re-wired it again to return a shared NostrIdentityProvider instead -- confirmed here as the CURRENT behavior (still a real, non-null, same-instance-every-call singleton -- just no longer THIS Stage's own NoopFedosIdentityProvider), per this arc's own established ripple convention", () => {

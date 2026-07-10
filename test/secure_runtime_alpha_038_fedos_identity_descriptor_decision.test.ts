@@ -308,7 +308,7 @@ describe("Secure Runtime Alpha 038 -- FedOS Identity Descriptor Decision, review
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(21);
+    expect(Object.keys(identityFiles).length).toBe(22);
   });
 
   it("22. behavioral: resolveFedosIdentityProvider() is unaffected -- still resolves the shared NostrIdentityProvider singleton, describeIdentity() still always null", async () => {

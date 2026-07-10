@@ -341,7 +341,7 @@ describe("Secure Runtime Alpha 031 -- FedOS Identity Service Skeleton, delegatio
     const identityFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/identity/*.ts");
-    expect(Object.keys(identityFiles).length).toBe(21);
+    expect(Object.keys(identityFiles).length).toBe(22);
   });
 
   it("21. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
