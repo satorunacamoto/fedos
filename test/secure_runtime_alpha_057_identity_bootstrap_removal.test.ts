@@ -352,7 +352,7 @@ describe("Secure Runtime Alpha 057 -- Identity Bootstrap Removal, create_runtime
   // Regression: only create_runtime.ts changed; everything else byte-for-byte
   // ---------------------------------------------------------------------
 
-  it("34. Regression: fedos_runtime_identity.ts is confirmed BYTE-FOR-BYTE unchanged -- all three methods still exact pass-throughs", () => {
+  it("34. RIPPLE (Secure Runtime Alpha 058): fedos_runtime_identity.ts's three Alpha 050/053/054 methods remain exact pass-throughs; this Stage itself did not reference the Alpha 057 doc, but a LATER Stage (Alpha 058, adding bootstrapIdentity()) legitimately does in its own header-comment history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own scope", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
       /async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
     );
@@ -362,7 +362,7 @@ describe("Secure Runtime Alpha 057 -- Identity Bootstrap Removal, create_runtime
     expect(fedosRuntimeIdentitySource).toMatch(
       /listIdentities\(\): readonly FedosIdentityRecord\[\] \{\s*\n\s*return this\.#resolver\.listIdentities\(\);\s*\n\s*\}/,
     );
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_057/);
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_057/);
   });
 
   it("35. Regression: AppRuntime's own type (types.ts) is confirmed BYTE-FOR-BYTE unchanged -- no identity field, no reference to this Stage's own doc", () => {
@@ -471,8 +471,8 @@ describe("Secure Runtime Alpha 057 -- Identity Bootstrap Removal, create_runtime
     }
   });
 
-  it("45. final sanity: this Stage's own net effect is exactly one line removed from create_runtime.ts, plus its own header-comment update -- zero other src/ files touched", () => {
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_057/);
+  it("45. RIPPLE (Secure Runtime Alpha 058): final sanity -- this Stage's OWN net effect was exactly one line removed from create_runtime.ts, plus its own header-comment update, touching zero other src/ files AS OF this Stage's own scope; reconfirmed here that types.ts/worker.ts still never reference this Stage's own doc, while fedos_runtime_identity.ts now legitimately does (Alpha 058's own header-comment history, added by a LATER Stage)", () => {
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_057/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_057/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_057/);
     expect(createRuntimeSource).toMatch(/secure_runtime_alpha_057/);

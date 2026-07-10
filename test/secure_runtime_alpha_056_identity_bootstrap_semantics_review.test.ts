@@ -304,8 +304,8 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
     );
   });
 
-  it("29. Regression: fedos_runtime_identity.ts does not reference this Stage's own review doc -- confirming this Stage touched no code, only documentation", () => {
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_056/);
+  it("29. RIPPLE (Secure Runtime Alpha 058): fedos_runtime_identity.ts did not reference this Stage's own review doc AS OF this Stage's own review-only scope, confirming this Stage itself touched no code, only documentation; Alpha 058 (a LATER, separate Stage that adds bootstrapIdentity()) legitimately references it in fedos_runtime_identity.ts's own header comment while recording this arc's history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own no-code-change mandate", () => {
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_056/);
   });
 
   it("30. RIPPLE (Secure Runtime Alpha 057): create_runtime.ts did not reference this Stage's own review doc AS OF this Stage's own review-only scope, confirming this Stage itself touched no code, only documentation; Alpha 057 (a LATER, separate Stage that implements this Stage's own Decision) legitimately references it in create_runtime.ts's own header comment while recording this arc's history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own no-code-change mandate", () => {
@@ -436,9 +436,9 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
     }
   });
 
-  it("42. RIPPLE (Secure Runtime Alpha 057): final sanity -- this Stage's OWN net effect was documentation-only AS OF its own scope (two new files added, zero existing src/ files modified); reconfirmed here that fedos_runtime_identity.ts/types.ts/worker.ts still never reference this Stage's own doc, while create_runtime.ts now legitimately does (Alpha 057's own header-comment history, not a violation of this Stage's own mandate)", () => {
+  it("42. RIPPLE (Secure Runtime Alpha 057, Alpha 058): final sanity -- this Stage's OWN net effect was documentation-only AS OF its own scope (two new files added, zero existing src/ files modified); reconfirmed here that types.ts/worker.ts still never reference this Stage's own doc, while create_runtime.ts (Alpha 057) and fedos_runtime_identity.ts (Alpha 058) now legitimately do (each LATER Stage's own header-comment history, not a violation of this Stage's own mandate)", () => {
     expect(createRuntimeSource).toMatch(/secure_runtime_alpha_056/);
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_056/);
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_056/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_056/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_056/);
   });

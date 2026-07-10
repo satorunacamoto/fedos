@@ -868,7 +868,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     expect(listIndex).toBeGreaterThan(findIndex);
   });
 
-  it("84. FedosRuntimeIdentity's own class still has exactly three public methods -- no fourth method was added by this Arc", () => {
+  it("84. RIPPLE (Secure Runtime Alpha 058): FedosRuntimeIdentity's own class had exactly three public methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 (a LATER, separate Stage) added a fourth method, bootstrapIdentity() -- reconfirmed here that the original three (describeIdentity/findIdentity/listIdentities) remain present and unchanged, alongside the new fourth method", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -876,7 +876,9 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
-    expect(new Set(methodNames)).toEqual(new Set(["describeIdentity", "findIdentity", "listIdentities"]));
+    expect(new Set(methodNames)).toEqual(
+      new Set(["describeIdentity", "findIdentity", "listIdentities", "bootstrapIdentity"]),
+    );
   });
 
   it("85. behavioral: findIdentity() called before AND after describeIdentity() both still resolve null, confirming no hidden state mutation between the two", async () => {

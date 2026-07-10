@@ -1,9 +1,9 @@
 /**
  * Secure Runtime Alpha 050–052 — "Identity Runtime Integration Arc"
  * (Alpha 050: Runtime Identity Authority). Secure Runtime Alpha
- * 053–055 — "Identity Runtime Internal Operations" (this revision —
- * header comment only; `describeIdentity()`/`findIdentity()`/
- * `listIdentities()` themselves are BYTE-FOR-BYTE unchanged).
+ * 053–055 — "Identity Runtime Internal Operations" (header comment
+ * only; `describeIdentity()`/`findIdentity()`/`listIdentities()`
+ * themselves BYTE-FOR-BYTE unchanged by that Arc).
  *
  * The FIRST connection anywhere in this repository between the
  * Identity Layer (`src/identity/*`, Alpha 027–049) and the Runtime
@@ -27,20 +27,46 @@
  * `docs/secure_runtime_alpha_050_052_identity_runtime_integration_arc.md`
  * for the original Runtime/Identity Layer connection rationale, and
  * `docs/secure_runtime_alpha_053_055_identity_runtime_internal_operations.md`
- * for this Arc's own rationale: why Alpha 053/054 made no code change,
+ * for that Arc's own rationale: why Alpha 053/054 made no code change,
  * why the three methods stay pure pass-throughs, why `findIdentity()`/
- * `listIdentities()` stay synchronous, and Alpha 055's own
- * `create_runtime.ts` startup-confirmation call.
+ * `listIdentities()` stay synchronous, and Alpha 055's own (since
+ * REMOVED — see below) `create_runtime.ts` startup-confirmation call.
+ *
+ * Secure Runtime Alpha 056 (review only, no code change) reviewed that
+ * Alpha 055 call and adopted Option B — remove it — as this arc's own
+ * Decision; Secure Runtime Alpha 057 implemented that Decision,
+ * removing the call from `create_runtime.ts` entirely. See
+ * `docs/secure_runtime_alpha_056_identity_bootstrap_semantics_review.md`
+ * and `docs/secure_runtime_alpha_057_identity_bootstrap_removal.md`.
+ *
+ * Secure Runtime Alpha 058 ("Identity Bootstrap Boundary") adds
+ * `bootstrapIdentity(): Promise<void>` — a FOURTH method, alongside
+ * `describeIdentity()`/`findIdentity()`/`listIdentities()`, all three
+ * of which stay BYTE-FOR-BYTE unchanged. `bootstrapIdentity()` is a
+ * one-line delegation, `await this.#service.describeIdentity();`,
+ * discarding the resolved Descriptor and returning nothing — Registry
+ * registration on a non-`null` Descriptor remains entirely
+ * `FedosIdentityService`'s own responsibility (Alpha 042), exactly as
+ * `describeIdentity()` itself already relies on. Unlike Alpha 055's
+ * removed call, `bootstrapIdentity()` does NOT swallow a rejection —
+ * any exception `describeIdentity()` throws propagates to
+ * `bootstrapIdentity()`'s own caller, letting that caller decide how
+ * to react. `create_runtime.ts` does NOT call this method — Alpha 057
+ * left `createRuntime()` Construct Only, and this Stage does not
+ * change that; this method exists but remains, as of this Stage,
+ * called by nothing anywhere in this repository. See
+ * `docs/secure_runtime_alpha_058_identity_bootstrap_boundary.md` for
+ * the full design rationale.
  *
  * This file defines a SINGLE CLASS and nothing else — no function, no
  * module-scoped singleton, no environment read, no Worker reference,
  * no Storage reference, no Rust reference, and no wiring into
  * `AppRuntime`/`RuntimeEnv`/`RuntimeOverrides` (`types.js`) or the
- * Public Runtime API. `create_runtime.ts` (Alpha 051/055) is the ONLY
- * file in this repository that constructs a `FedosRuntimeIdentity` —
- * held as a private, function-scoped constant there, never returned
- * from `createRuntime()`, never attached to the `AppRuntime` object
- * literal that function assembles, and never read by any other file.
+ * Public Runtime API. `create_runtime.ts` (Alpha 051) is the ONLY file
+ * in this repository that constructs a `FedosRuntimeIdentity` — held
+ * as a private, function-scoped constant there, never returned from
+ * `createRuntime()`, never attached to the `AppRuntime` object literal
+ * that function assembles, and never read by any other file.
  *
  * HARD GUARDRAILS:
  *   - `FedosRuntimeIdentity` is the ONLY export.
@@ -63,6 +89,13 @@
  *     `FedosIdentityResolver`'s own synchronous API exactly (Alpha
  *     054); `describeIdentity()` remains `async`, matching
  *     `FedosIdentityService`'s own async API exactly (Alpha 053).
+ *   - `bootstrapIdentity()` (Alpha 058) is ALSO a pure delegation — it
+ *     calls `this.#service.describeIdentity()` exactly once, `await`s
+ *     it, and returns nothing; it performs NO Registry read/write of
+ *     its own, NO retry, NO caching, and NO error handling of any kind
+ *     — a rejection from `describeIdentity()` propagates unmodified.
+ *     It is NEVER called from anywhere in this file or from
+ *     `create_runtime.ts`.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -99,5 +132,9 @@ export class FedosRuntimeIdentity {
 
   listIdentities(): readonly FedosIdentityRecord[] {
     return this.#resolver.listIdentities();
+  }
+
+  async bootstrapIdentity(): Promise<void> {
+    await this.#service.describeIdentity();
   }
 }
