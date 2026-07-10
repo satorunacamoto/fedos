@@ -219,12 +219,8 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     expect(await second.describeIdentity()).toBeNull();
   });
 
-  it("15. resolveFedosIdentityProvider() (Alpha 032) is confirmed BYTE-FOR-BYTE unchanged -- still hardcoded to null, no reference to the Noop Provider", () => {
-    const body = (
-      resolverSource.match(/export function resolveFedosIdentityProvider\(\): FedosIdentityProvider \| null \{([\s\S]*?)\n\}/) ?? []
-    )[1] ?? "";
-    expect(body.trim()).toBe("return null;");
-    expect(resolverSource).not.toMatch(/NoopFedosIdentityProvider|fedos_noop_identity_provider/);
+  it("15. RIPPLE (Secure Runtime Alpha 034): resolveFedosIdentityProvider() (Alpha 032) was confirmed hardcoded to null with zero reference to the Noop Provider AS OF this Stage's own scope; Alpha 034 later wired it to return this Stage's own NoopFedosIdentityProvider -- confirmed here by inspecting the CURRENT resolver source, per this arc's own established ripple convention. This Stage's own file, fedos_noop_identity_provider.ts, remains untouched by that later wiring (its own CODE, excluding its explanatory header comment, still makes zero reference to the Resolver -- reconfirmed by test 13 above)", () => {
+    expect(resolverSource).toMatch(/NoopFedosIdentityProvider|fedos_noop_identity_provider/);
     expect(resolverSource).not.toMatch(/secure_runtime_alpha_033/);
   });
 
@@ -243,9 +239,9 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_033/);
   });
 
-  it("18. fedos_noop_identity_provider.ts has ZERO importers anywhere in src/ other than this Stage's own guard test", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 034): fedos_noop_identity_provider.ts had ZERO importers anywhere in src/ AS OF this Stage's own scope; Alpha 034 later made fedos_identity_provider_resolver.ts its first (and, per that Stage's own mandate, only) real importer -- reconfirmed here as the CURRENT state, per this arc's own established ripple convention. Every other file remains a non-importer", () => {
+    expect(resolverSource).toMatch(/fedos_noop_identity_provider|NoopFedosIdentityProvider/);
     for (const source of [
-      resolverSource,
       serviceSource,
       descriptorSource,
       providerInterfaceSource,
@@ -340,9 +336,10 @@ describe("Secure Runtime Alpha 033 -- FedOS No-op Identity Provider, Resolver/Se
     expect(Object.keys(identityFiles).length).toBe(17);
   });
 
-  it("24. Regression: resolveFedosIdentityProvider() still resolves null on every call, entirely unaffected by this Stage", () => {
-    expect(resolveFedosIdentityProvider()).toBeNull();
-    expect(resolveFedosIdentityProvider()).toBeNull();
+  it("24. RIPPLE (Secure Runtime Alpha 034): resolveFedosIdentityProvider() resolved null on every call AS OF this Stage's own scope; Alpha 034 later wired it to return this Stage's own NoopFedosIdentityProvider on every call instead -- confirmed here as the CURRENT behavior, per this arc's own established ripple convention", () => {
+    const resolved = resolveFedosIdentityProvider();
+    expect(resolved).toBeInstanceOf(NoopFedosIdentityProvider);
+    expect(resolveFedosIdentityProvider()).toBe(resolved);
   });
 
   it("25. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip in Development via the real AppRuntime object, entirely unaffected by this Stage", async () => {
