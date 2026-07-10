@@ -130,12 +130,11 @@
  */
 
 import { createFedosWasmLoader, type FedosWasmLoaderSkeleton } from "./fedos_wasm_loader.js";
-
-// This project's tsconfig.json carries no `@types/node`; declared
-// ambient here the same, minimal way `fedos_wasm_loader.ts` itself
-// does (Stage 929) — used ONLY to read `NODE_ENV` for `runtimeState`
-// below, never for filesystem or process control of any kind.
-declare const process: { env?: { readonly NODE_ENV?: string } };
+// Secure Runtime Alpha 020 -- determineRuntimeMode() below now
+// delegates to the shared Runtime Mode Authority instead of reading
+// process.env.NODE_ENV itself. See fedos_runtime_mode_authority.ts's
+// own top-of-file doc comment.
+import { determineFedosRuntimeMode } from "./fedos_runtime_mode_authority.js";
 
 /**
  * The Runtime-side record of THIS Prototype's own end-to-end reach
@@ -269,25 +268,13 @@ export async function runtimeCapabilities(): Promise<RuntimeCapabilities> {
 }
 
 /**
- * PRIVATE (module-scoped) — the ONLY environment read this file
- * performs, used solely to LABEL `runtimeCapabilities()`'s own
- * `runtimeMode` field. Renamed from `determineRuntimeState()`, Stage
- * 1001 (Secure Runtime Alpha 005) — naming only, same three logical
- * buckets. Mirrors `FedosWasmLoaderSkeleton`'s own
- * `#evaluateDevOnlyGate()` Fail-Closed try/catch shape, but is not
- * itself a gate -- nothing in this file branches on its result.
+ * PRIVATE (module-scoped) — used solely to LABEL `runtimeCapabilities()`'s
+ * own `runtimeMode` field. Renamed from `determineRuntimeState()`, Stage
+ * 1001 (Secure Runtime Alpha 005); delegated to the shared Runtime Mode
+ * Authority (`fedos_runtime_mode_authority.ts`) by Secure Runtime Alpha
+ * 020 — this file no longer reads `process.env` itself. Not itself a
+ * gate -- nothing in this file branches on its result.
  */
 function determineRuntimeMode(): FedosRuntimeMode {
-  try {
-    const nodeEnv = process.env?.NODE_ENV;
-    if (nodeEnv === "development") {
-      return "Development";
-    }
-    if (nodeEnv === "production") {
-      return "Production";
-    }
-    return "Unknown";
-  } catch {
-    return "Unknown";
-  }
+  return determineFedosRuntimeMode();
 }

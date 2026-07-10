@@ -93,7 +93,7 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     const names = Object.keys(files)
       .map((path) => path.split("/").pop() as string)
       .sort();
-    expect(names.length).toBe(50);
+    expect(names.length).toBe(51);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts -- the Runtime
     // Service for randomBytes(), same reasoning as
@@ -115,6 +115,10 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     // later exception -- fedos_runtime_ciphertext_storage.ts -- the
     // Runtime Storage Service for storeCiphertext()/loadCiphertext()/
     // deleteCiphertext(), same reasoning.
+    // Secure Runtime Alpha 020 adds a NINTH, separate, later exception --
+    // fedos_runtime_mode_authority.ts -- the shared Runtime Mode
+    // Authority, consolidating the three independent NODE_ENV
+    // classifiers this review's own Stage 777-792 scope predates.
     expect(names).toEqual(
       [
         ...KNOWN_FEDOS_FILES,
@@ -126,6 +130,7 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
         "fedos_runtime_export_ciphertext.ts",
         "fedos_runtime_import_ciphertext.ts",
         "fedos_runtime_ciphertext_storage.ts",
+        "fedos_runtime_mode_authority.ts",
       ].sort(),
     );
 

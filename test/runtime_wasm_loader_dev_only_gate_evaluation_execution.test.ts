@@ -25,6 +25,8 @@ import { createRuntime } from "../src/runtime/create_runtime.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import modeAuthoritySource from "../src/runtime/fedos_runtime_mode_authority.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
@@ -295,12 +297,19 @@ describe("FedosWasmLoader.planLoad() performs a REAL Dev-only Gate Evaluation, s
     expect(codeOnly).not.toMatch(/fedos_core_rust(?!\.js"|_bg\.wasm")/);
   });
 
-  it("16. only process.env.NODE_ENV is read -- no other environment variable, and no import.meta", () => {
+  it("16. Secure Runtime Alpha 020 -- the Loader no longer reads process.env itself; it delegates to the shared Runtime Mode Authority, which reads only NODE_ENV, and no import.meta", () => {
     const codeOnly = codeOnlyLines(wasmLoaderSource);
-    expect(codeOnly).toMatch(/process\.env/);
-    expect(codeOnly).toMatch(/NODE_ENV/);
-    expect(codeOnly).not.toMatch(/process\.env(?!\??\.NODE_ENV\b)/);
+    expect(codeOnly).not.toMatch(/process\.env/);
+    expect(codeOnly).toMatch(/determineFedosRuntimeMode/);
+    expect(codeOnly).toMatch(/from ".\/fedos_runtime_mode_authority\.js"/);
     expect(codeOnly).not.toMatch(/import\.meta/);
+
+    // The Authority itself (the ONLY file that still reads process.env
+    // for this purpose) still reads exactly NODE_ENV, and nothing else.
+    const authorityCodeOnly = codeOnlyLines(modeAuthoritySource);
+    expect(authorityCodeOnly).toMatch(/process\.env/);
+    expect(authorityCodeOnly).toMatch(/NODE_ENV/);
+    expect(authorityCodeOnly).not.toMatch(/process\.env(?!\??\.NODE_ENV\b)/);
   });
 
   it("17. no new Node built-in or @ts-expect-error suppression was added by THIS stage (Stage 921's existing two; Stage 945, a later stage, adds one more)", () => {

@@ -155,7 +155,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(50);
+    expect(names.length).toBe(51);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts.
     // Stage 1005 (Secure Runtime Alpha 010) adds a THIRD, separate,
@@ -169,6 +169,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     // fedos_runtime_import_ciphertext.ts.
     // Stage 1012 (Secure Runtime Alpha 019) adds an EIGHTH, separate,
     // later exception -- fedos_runtime_ciphertext_storage.ts.
+    // Secure Runtime Alpha 020 adds a NINTH, separate, later exception --
+    // fedos_runtime_mode_authority.ts, the shared Runtime Mode Authority.
     expect(names).toEqual(
       [
         ...knownNames,
@@ -180,6 +182,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
         "fedos_runtime_export_ciphertext.ts",
         "fedos_runtime_import_ciphertext.ts",
         "fedos_runtime_ciphertext_storage.ts",
+        "fedos_runtime_mode_authority.ts",
       ].sort(),
     );
   });

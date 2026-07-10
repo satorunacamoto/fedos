@@ -183,13 +183,14 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
     expect(codeOnly).not.toMatch(/localStorage|sessionStorage|indexedDB|writeFile|localStorage/i);
   });
 
-  it("17. the new file's ONLY import is fedos_wasm_loader.ts -- no import of create_runtime.ts, and no real (non-prose) AppRuntime usage", () => {
+  it("17. the new file's imports are fedos_wasm_loader.ts and (Secure Runtime Alpha 020) the shared fedos_runtime_mode_authority.ts ONLY -- no import of create_runtime.ts, and no real (non-prose) AppRuntime usage", () => {
     const codeOnly = codeOnlyLines(runtimeIntegrationSource);
     expect(codeOnly).toMatch(/from ".\/fedos_wasm_loader\.js"/);
+    expect(codeOnly).toMatch(/from ".\/fedos_runtime_mode_authority\.js"/);
     expect(codeOnly).not.toMatch(/from ".\/create_runtime\.js"/);
     expect(codeOnly).not.toMatch(/\bAppRuntime\b/);
     const importLines = [...runtimeIntegrationSource.matchAll(/^import .*$/gm)].map((m: RegExpMatchArray) => m[0]);
-    expect(importLines.length).toBe(1);
+    expect(importLines.length).toBe(2);
   });
 
   it("18. Rust public API is unchanged -- still 28 pub fn, still exactly one #[wasm_bindgen]; Cargo/package dependencies unchanged", () => {

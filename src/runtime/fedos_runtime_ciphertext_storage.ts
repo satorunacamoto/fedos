@@ -40,12 +40,12 @@
  *
  * **Development-Runtime-limited, exactly like every other Crypto API's
  * own Fail-Closed discipline** — but since there is no `FedosWasmLoader`
- * to reach for this gate, this file performs its OWN, directly
- * analogous `process.env.NODE_ENV` read
- * (`#evaluateDevOnlyGate()`/`determineRuntimeMode()`'s own established
- * three-way shape: `"development"` allowed, `"production"`/anything
- * else/an unreadable `process.env` all Fail Closed), wrapped in the SAME
- * try/catch discipline.
+ * to reach for this gate, this file makes its OWN Fail-Closed decision
+ * from the shared Runtime Mode Authority's classification (Secure
+ * Runtime Alpha 020, `fedos_runtime_mode_authority.ts`): `"Development"`
+ * allowed, `"Production"`/`"Unknown"` Fail Closed — the SAME established
+ * three-way shape `#evaluateDevOnlyGate()`/`determineRuntimeMode()`
+ * already use, now read from one place instead of three.
  *
  * **`MemoryCiphertextStorage` is the ONLY backend, and is deliberately
  * a Local-Development-only, in-process, non-persistent (across actual
@@ -88,8 +88,14 @@
  */
 
 import type { AeadCiphertextWire } from "./fedos_wasm_loader.js";
-
-declare const process: { env?: { readonly NODE_ENV?: string } };
+// Secure Runtime Alpha 020 -- isDevelopmentRuntimeForCiphertextStorage()
+// below now delegates to the shared Runtime Mode Authority instead of
+// reading process.env.NODE_ENV itself. See
+// fedos_runtime_mode_authority.ts's own top-of-file doc comment; this
+// import is a classifier only, never an authorization one -- this file
+// still makes its own Fail-Closed decision from the classification it
+// returns.
+import { determineFedosRuntimeMode } from "./fedos_runtime_mode_authority.js";
 
 /**
  * The Storage Interface. A future backend (SQLite/IndexedDB/filesystem/
@@ -142,18 +148,20 @@ export class MemoryCiphertextStorage implements RuntimeCiphertextStorage {
 const defaultCiphertextStorage: RuntimeCiphertextStorage = new MemoryCiphertextStorage();
 
 /**
- * PRIVATE — mirrors `FedosWasmLoaderSkeleton#evaluateDevOnlyGate()`/
- * `fedos_runtime_prototype_execution.ts`'s own `determineRuntimeMode()`
- * Fail-Closed try/catch shape exactly: reads ONLY `process.env.NODE_ENV`,
- * treats `"development"` as the ONE allowed value, and treats
- * `"production"`, any other value, or a read failure (including
- * `process`/`process.env` being unavailable at all) as Fail Closed.
- * Unlike `determineRuntimeMode()` (a label only), this function's
- * result IS a real gate — every exported function below branches on it.
+ * PRIVATE — delegated to the shared Runtime Mode Authority
+ * (`fedos_runtime_mode_authority.ts`) by Secure Runtime Alpha 020; this
+ * file no longer reads `process.env` itself. Treats `"Development"` as
+ * the ONE allowed classification, and treats `"Production"`/`"Unknown"`
+ * (including a classification failure, which the Authority itself
+ * already resolves to `"Unknown"` rather than throwing) as Fail Closed.
+ * Unlike the Authority's own classification (a label only), this
+ * function's result IS a real gate — every exported function below
+ * branches on it; this file keeps making its OWN Fail-Closed decision
+ * from the shared classification, never delegating the decision itself.
  */
 function isDevelopmentRuntimeForCiphertextStorage(): boolean {
   try {
-    return process.env?.NODE_ENV === "development";
+    return determineFedosRuntimeMode() === "Development";
   } catch {
     return false;
   }

@@ -764,6 +764,13 @@
  */
 
 import { createFedosWasmLoaderPlan } from "./fedos_wasm_loader_plan.js";
+// Secure Runtime Alpha 020 -- the single Runtime Mode Authority
+// #evaluateDevOnlyGate() below now delegates to, instead of reading
+// process.env.NODE_ENV directly. See fedos_runtime_mode_authority.ts's
+// own top-of-file doc comment; this is a classifier import only, never
+// an authorization one -- #evaluateDevOnlyGate() still makes its own
+// Fail-Closed decision from the classification it returns.
+import { determineFedosRuntimeMode } from "./fedos_runtime_mode_authority.js";
 // Stage 921 (Prototype EXECUTION Phase 001) -- the FIRST real (live)
 // filesystem read this file ever performs, narrowly scoped to a
 // read-only existence check of the two Generated Artifact files named
@@ -793,7 +800,10 @@ import { pathToFileURL } from "node:url";
 // Stage 929 (Prototype EXECUTION Phase 002) extends this SAME ambient
 // declaration with `env` -- no NEW `@ts-expect-error` suppression is
 // added, and no new Node/package dependency of any kind.
-declare const process: { cwd(): string; env?: { readonly NODE_ENV?: string } };
+// Secure Runtime Alpha 020 narrows this ambient declaration back to
+// `cwd()` only -- `env` moved to fedos_runtime_mode_authority.ts, the
+// ONLY file in this project that still declares it.
+declare const process: { cwd(): string };
 
 /**
  * The loader's own coarse state. `"NotLoaded"` is the ONLY value this
@@ -1829,8 +1839,9 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
               // 13. Dev-only Gate Plan's own result confirmed -- ALWAYS false today
               // 13a. Stage 929 (Prototype EXECUTION Phase 002) -- the SECOND
               // real (non-fixed-constant) check this file ever performs:
-              // reads process.env.NODE_ENV to classify the current runtime.
-              // The result is recorded on the instance for later inspection
+              // classifies the current runtime via the shared Runtime Mode
+              // Authority (Secure Runtime Alpha 020), which reads
+              // process.env.NODE_ENV. The result is recorded on the instance for later inspection
               // (devOnlyGateEvaluation()) but is NEVER read by the `if`
               // below or by any branch past it -- Import Plan/WebAssembly
               // Plan/Rust API Call Plan still run in the SAME order as
@@ -3069,29 +3080,33 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
-   * PRIVATE — Stage 929 (Prototype EXECUTION Phase 002). The SECOND
-   * real (non-fixed-constant) computation this file ever performs:
-   * reads `process.env.NODE_ENV` (the ONLY environment value this
-   * method ever reads) to classify the current runtime as
-   * Development/Production/Unknown. Never reads any other
-   * `process.env` key, never reads `import.meta`, never touches the
-   * filesystem, never imports, never instantiates anything, never
-   * calls Rust. The RESULT of this evaluation is recorded by the
-   * caller (`planLoad()`) but NEVER changes `shouldEvaluate`/
-   * `shouldImport`/`shouldInstantiate`/`shouldCall` on any Plan above
-   * -- every one of those stays fixed `false` regardless of what this
-   * method finds. Fail Closed: ANY failure to evaluate -- including
-   * `process`/`process.env` being unavailable at all -- resolves as
-   * `"PrototypeStillClosed"`/`developmentAllowed: false`, never thrown
-   * as an exception.
+   * PRIVATE — Stage 929 (Prototype EXECUTION Phase 002); delegated to
+   * the shared Runtime Mode Authority by Secure Runtime Alpha 020
+   * (`fedos_runtime_mode_authority.ts`). Classifies the current runtime
+   * as Development/Production/Unknown via `determineFedosRuntimeMode()`
+   * — the ONLY environment classification this method performs; it
+   * never reads `process.env` directly anymore, never reads
+   * `import.meta`, never touches the filesystem, never imports, never
+   * instantiates anything, never calls Rust. This method's OWN result
+   * type/reason set (`FedosWasmLoaderDevOnlyGateEvaluation`) is
+   * unchanged — the shared Authority only classifies, it does NOT
+   * decide `developmentAllowed`; THIS method still makes that Fail-Closed
+   * decision itself, one `FedosRuntimeMode` value at a time. The RESULT
+   * of this evaluation is recorded by the caller (`planLoad()`) but
+   * NEVER changes `shouldEvaluate`/`shouldImport`/`shouldInstantiate`/
+   * `shouldCall` on any Plan above -- every one of those stays fixed
+   * `false` regardless of what this method finds. Fail Closed: ANY
+   * failure to evaluate -- including the Authority call itself somehow
+   * throwing -- resolves as `"PrototypeStillClosed"`/
+   * `developmentAllowed: false`, never thrown as an exception.
    */
   #evaluateDevOnlyGate(): FedosWasmLoaderDevOnlyGateEvaluation {
     try {
-      const nodeEnv = process.env?.NODE_ENV;
-      if (nodeEnv === "development") {
+      const mode = determineFedosRuntimeMode();
+      if (mode === "Development") {
         return { evaluated: true, developmentAllowed: true, reason: "DevelopmentRuntime" };
       }
-      if (nodeEnv === "production") {
+      if (mode === "Production") {
         return { evaluated: true, developmentAllowed: false, reason: "ProductionRuntime" };
       }
       return { evaluated: true, developmentAllowed: false, reason: "UnknownRuntime" };
