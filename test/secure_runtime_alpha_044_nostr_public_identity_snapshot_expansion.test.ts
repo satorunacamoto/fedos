@@ -299,7 +299,7 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
     expect(await source.readPublicIdentity()).toBeNull();
   });
 
-  it("20. behavioral: NostrIdentityProvider still maps ONLY id/publicIdentifier onto the Descriptor, ignoring a Source's displayName/avatar entirely", async () => {
+  it("20. RIPPLE (Secure Runtime Alpha 044): NostrIdentityProvider mapped ONLY id/publicIdentifier onto the Descriptor, ignoring a Source's displayName/avatar entirely, AS OF this Stage's own scope; Alpha 046 later wired displayName/avatar through onto the Descriptor as well -- reconfirmed here as the CURRENT behavior, per this arc's own established ripple convention", async () => {
     const source = new FakeSource({
       id: "user-3",
       publicIdentifier: "npub1ghi",
@@ -308,15 +308,24 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
     });
     const provider = new NostrIdentityProvider(source);
     const descriptor = await provider.describeIdentity();
-    expect(descriptor).toEqual({ id: "user-3", provider: "nostr", publicIdentifier: "npub1ghi" });
-    expect(descriptor).not.toHaveProperty("displayName");
-    expect(descriptor).not.toHaveProperty("avatar");
+    expect(descriptor).toEqual({
+      id: "user-3",
+      provider: "nostr",
+      publicIdentifier: "npub1ghi",
+      displayName: "Bob",
+      avatar: "https://example.invalid/bob.png",
+    });
+    expect(descriptor).toHaveProperty("displayName", "Bob");
+    expect(descriptor).toHaveProperty("avatar", "https://example.invalid/bob.png");
   });
 
-  it("21. behavioral: a Snapshot with only displayName (no avatar) still validates -- id/publicIdentifier presence rules are unaffected", async () => {
+  it("21. RIPPLE (Secure Runtime Alpha 044): a Snapshot with only displayName (no avatar) still validated with id/publicIdentifier presence rules unaffected, and AS OF this Stage's own scope the resulting Descriptor omitted displayName entirely; Alpha 046 later wired displayName through onto the Descriptor -- reconfirmed here as the CURRENT behavior, per this arc's own established ripple convention", async () => {
     const source = new FakeSource({ id: "user-4", publicIdentifier: "npub1jkl", displayName: "Carol" });
     const provider = new NostrIdentityProvider(source);
-    expect(await provider.describeIdentity()).toEqual({ id: "user-4", provider: "nostr", publicIdentifier: "npub1jkl" });
+    const descriptor = await provider.describeIdentity();
+    expect(descriptor).toEqual({ id: "user-4", provider: "nostr", publicIdentifier: "npub1jkl", displayName: "Carol" });
+    expect(descriptor?.displayName).toBe("Carol");
+    expect(descriptor?.avatar).toBeUndefined();
   });
 
   it("22. behavioral: empty-string id/publicIdentifier still resolve null, even when displayName/avatar are populated -- the new optional fields do not bypass existing Fail-Closed validation", async () => {
@@ -369,11 +378,12 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_044/);
   });
 
-  it("27. Regression: fedos_nostr_identity_provider.ts is confirmed BYTE-FOR-BYTE unchanged -- constructor/body still exactly as Alpha 039/042 shipped, no reference to displayName/avatar anywhere in its own code", () => {
+  it("27. RIPPLE (Secure Runtime Alpha 044): fedos_nostr_identity_provider.ts's own code had no reference to displayName/avatar anywhere AS OF this Stage's own scope; Alpha 046 later added both to its own return statement -- reconfirmed here as the CURRENT (mapping-expanded) shape, per this arc's own established ripple convention", () => {
     expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
     expect(nostrProviderSource).toMatch(/this\.#source\.readPublicIdentity\(\)/);
     const codeOnly = codeOnlyLines(nostrProviderSource);
-    expect(codeOnly).not.toMatch(/displayName|avatar/);
+    expect(codeOnly).toMatch(/displayName: snapshot\.displayName,/);
+    expect(codeOnly).toMatch(/avatar: snapshot\.avatar,/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_044/);
   });
 

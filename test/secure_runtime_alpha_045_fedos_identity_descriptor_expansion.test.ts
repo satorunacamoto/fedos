@@ -312,7 +312,7 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(descriptor.avatar).toBeUndefined();
   });
 
-  it("18. behavioral: NostrIdentityProvider still maps ONLY id/publicIdentifier onto the Descriptor, even when the Source's own Snapshot carries displayName/avatar -- the resulting Descriptor omits both", async () => {
+  it("18. RIPPLE (Secure Runtime Alpha 045): NostrIdentityProvider mapped ONLY id/publicIdentifier onto the Descriptor, even when the Source's own Snapshot carried displayName/avatar, AS OF this Stage's own scope; Alpha 046 later wired displayName/avatar through onto the Descriptor as well -- reconfirmed here as the CURRENT behavior, per this arc's own established ripple convention", async () => {
     const source = new FakeSource({
       id: "user-3",
       publicIdentifier: "npub1ghi",
@@ -321,9 +321,15 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     });
     const provider = new NostrIdentityProvider(source);
     const descriptor = await provider.describeIdentity();
-    expect(descriptor).toEqual({ id: "user-3", provider: "nostr", publicIdentifier: "npub1ghi" });
-    expect(descriptor).not.toHaveProperty("displayName");
-    expect(descriptor).not.toHaveProperty("avatar");
+    expect(descriptor).toEqual({
+      id: "user-3",
+      provider: "nostr",
+      publicIdentifier: "npub1ghi",
+      displayName: "Bob",
+      avatar: "https://example.invalid/bob.png",
+    });
+    expect(descriptor).toHaveProperty("displayName", "Bob");
+    expect(descriptor).toHaveProperty("avatar", "https://example.invalid/bob.png");
   });
 
   it("19. behavioral: NullNostrPublicIdentitySource still always resolves null, unaffected by the Descriptor's own field expansion", async () => {
@@ -331,10 +337,10 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(await source.readPublicIdentity()).toBeNull();
   });
 
-  it("20. behavioral: resolveFedosIdentityProvider()'s own shared NostrIdentityProvider still resolves a Descriptor (via a fake, direct construction) with only three fields present", async () => {
+  it("20. RIPPLE (Secure Runtime Alpha 045): a directly-constructed NostrIdentityProvider resolved a Descriptor with only three keys present (via a fake Source) AS OF this Stage's own scope; Alpha 046 later wired displayName/avatar through, so the same Descriptor now carries five keys -- reconfirmed here as the CURRENT behavior, per this arc's own established ripple convention", async () => {
     const provider = new NostrIdentityProvider(new FakeSource({ id: "x", publicIdentifier: "npub1x", displayName: "X", avatar: "https://x.invalid/a.png" }));
     const descriptor = await provider.describeIdentity();
-    expect(Object.keys(descriptor ?? {}).sort()).toEqual(["id", "provider", "publicIdentifier"].sort());
+    expect(Object.keys(descriptor ?? {}).sort()).toEqual(["avatar", "displayName", "id", "provider", "publicIdentifier"].sort());
   });
 
   it("21. behavioral: end-to-end -- a Service registers a Record from a Descriptor that (if it HAD displayName/avatar) would still produce a three-field Record, confirmed via a directly-constructed Descriptor carrying both fields", async () => {
@@ -391,10 +397,11 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(capabilitySource).not.toMatch(/secure_runtime_alpha_045/);
   });
 
-  it("26. Regression: fedos_nostr_identity_provider.ts is confirmed BYTE-FOR-BYTE unchanged -- constructor/body still exactly as Alpha 039/042 shipped, no reference to displayName/avatar anywhere in its own code", () => {
+  it("26. RIPPLE (Secure Runtime Alpha 045): fedos_nostr_identity_provider.ts's own code had no reference to displayName/avatar anywhere AS OF this Stage's own scope; Alpha 046 later added both to its own return statement -- reconfirmed here as the CURRENT (mapping-expanded) shape, per this arc's own established ripple convention", () => {
     expect(nostrProviderSource).toMatch(/constructor\(source: FedosNostrPublicIdentitySource\) \{/);
     expect(nostrProviderSource).toMatch(/this\.#source\.readPublicIdentity\(\)/);
-    expect(codeOnlyLines(nostrProviderSource)).not.toMatch(/displayName|avatar/);
+    expect(codeOnlyLines(nostrProviderSource)).toMatch(/displayName: snapshot\.displayName,/);
+    expect(codeOnlyLines(nostrProviderSource)).toMatch(/avatar: snapshot\.avatar,/);
     expect(nostrProviderSource).not.toMatch(/secure_runtime_alpha_045/);
   });
 
