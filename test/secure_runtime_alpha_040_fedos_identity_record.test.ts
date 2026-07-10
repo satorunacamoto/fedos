@@ -226,11 +226,9 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     expect(importLines.length).toBe(0);
   });
 
-  it("12. fedos_identity_record.ts's own CODE (excluding its own explanatory header comment) contains none of the mandated forbidden terms", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 047): fedos_identity_record.ts's own CODE contained none of the mandated forbidden terms, including displayName/avatar, AS OF this Stage's own scope; Alpha 047 later added displayName/avatar as two individually-reviewed OPTIONAL fields -- reconfirmed here as the CURRENT (expanded) shape, per this arc's own established ripple convention, while the other eighteen forbidden terms remain strictly enforced", () => {
     const codeOnly = codeOnlyLines(recordSource);
     for (const forbidden of [
-      "displayName",
-      "avatar",
       "profile",
       "metadata",
       "linkedProtocols",
@@ -252,6 +250,8 @@ describe("Secure Runtime Alpha 040 -- FedOS Identity Record, type-only, no Descr
     ]) {
       expect(codeOnly.toLowerCase()).not.toMatch(new RegExp(forbidden.toLowerCase()));
     }
+    expect(codeOnly).toMatch(/readonly displayName\?: string;/);
+    expect(codeOnly).toMatch(/readonly avatar\?: string;/);
   });
 
   it("13. FedosIdentityRecord and FedosIdentityDescriptor remain two independent declarations, never a type alias of one to the other, in either file -- the Record's own header comment legitimately names the Descriptor in prose, excluded here via codeOnlyLines()", () => {

@@ -380,7 +380,7 @@ describe("Secure Runtime Alpha 046 -- Nostr Identity Provider Descriptor Expansi
     expect(await source.readPublicIdentity()).toBeNull();
   });
 
-  it("28. behavioral: end-to-end -- a Descriptor with real displayName/avatar, once passed through FedosIdentityService (unmodified), still produces a Record with only its own original three fields, even though the Service returns the full, five-field Descriptor to its own caller", async () => {
+  it("28. RIPPLE (Secure Runtime Alpha 046): end-to-end -- a Descriptor with real displayName/avatar, once passed through FedosIdentityService (unmodified), produced a Record with only its own original three fields AS OF this Stage's own scope; Alpha 047 later expanded FedosIdentityRecord and wired the Service to copy displayName/avatar onto it -- reconfirmed here as the CURRENT (five-field) behavior, per this arc's own established ripple convention", async () => {
     const registry = new FedosIdentityRegistry();
     const source = new FakeSource({
       id: "e2e-1",
@@ -402,9 +402,15 @@ describe("Secure Runtime Alpha 046 -- Nostr Identity Provider Descriptor Expansi
     });
 
     const record = resolver.findIdentity("e2e-1");
-    expect(record).toEqual({ id: "e2e-1", provider: "nostr", publicIdentifier: "npub1e2e" });
-    expect(record).not.toHaveProperty("displayName");
-    expect(record).not.toHaveProperty("avatar");
+    expect(record).toEqual({
+      id: "e2e-1",
+      provider: "nostr",
+      publicIdentifier: "npub1e2e",
+      displayName: "Dana",
+      avatar: "https://example.invalid/dana.png",
+    });
+    expect(record).toHaveProperty("displayName", "Dana");
+    expect(record).toHaveProperty("avatar", "https://example.invalid/dana.png");
   });
 
   it("29. Regression: fedos_identity_descriptor.ts (Alpha 028/045) is confirmed BYTE-FOR-BYTE unchanged -- still exactly five fields, three required plus two optional", () => {
@@ -416,11 +422,12 @@ describe("Secure Runtime Alpha 046 -- Nostr Identity Provider Descriptor Expansi
     expect(descriptorSource).not.toMatch(/secure_runtime_alpha_046/);
   });
 
-  it("30. Regression: fedos_identity_record.ts (Alpha 040) is confirmed BYTE-FOR-BYTE unchanged -- still exactly three fields, no displayName/avatar in its own code", () => {
+  it("30. RIPPLE (Secure Runtime Alpha 046): fedos_identity_record.ts (Alpha 040) had exactly three fields and no displayName/avatar in its own code AS OF this Stage's own scope; Alpha 047 later expanded the Record with the identical two OPTIONAL fields Alpha 045 gave the Descriptor -- reconfirmed here as the CURRENT (expanded) shape, per this arc's own established ripple convention", () => {
     expect(recordSource).toMatch(/export interface FedosIdentityRecord \{/);
-    const fieldDeclarations = [...recordSource.matchAll(/^\s*readonly \w+: string;/gm)];
-    expect(fieldDeclarations.length).toBe(3);
-    expect(codeOnlyLines(recordSource)).not.toMatch(/displayName|avatar/);
+    const requiredFieldDeclarations = [...recordSource.matchAll(/^\s*readonly \w+: string;/gm)];
+    expect(requiredFieldDeclarations.length).toBe(3);
+    expect(codeOnlyLines(recordSource)).toMatch(/readonly displayName\?: string;/);
+    expect(codeOnlyLines(recordSource)).toMatch(/readonly avatar\?: string;/);
     expect(recordSource).not.toMatch(/secure_runtime_alpha_046/);
   });
 
@@ -433,9 +440,10 @@ describe("Secure Runtime Alpha 046 -- Nostr Identity Provider Descriptor Expansi
     expect(noopProviderSource).not.toMatch(/secure_runtime_alpha_046/);
   });
 
-  it("32. Regression: fedos_identity_service.ts/fedos_identity_registry.ts/fedos_identity_resolver.ts are all confirmed BYTE-FOR-BYTE unchanged, no displayName/avatar in their own code", () => {
+  it("32. RIPPLE (Secure Runtime Alpha 046): fedos_identity_service.ts/fedos_identity_registry.ts/fedos_identity_resolver.ts had no displayName/avatar in their own code AS OF this Stage's own scope; Alpha 047 later wired the Service's own Descriptor-to-Record mapping to copy both fields through, while the Registry and Resolver remained untouched -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention", () => {
     expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
-    expect(codeOnlyLines(serviceSource)).not.toMatch(/displayName|avatar/);
+    expect(codeOnlyLines(serviceSource)).toMatch(/displayName: descriptor\.displayName,/);
+    expect(codeOnlyLines(serviceSource)).toMatch(/avatar: descriptor\.avatar,/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_046/);
     expect(registrySource).toMatch(/register\(record: FedosIdentityRecord\): void \{/);
     expect(registrySource).not.toMatch(/secure_runtime_alpha_046/);

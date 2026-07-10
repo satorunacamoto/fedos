@@ -343,7 +343,7 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(Object.keys(descriptor ?? {}).sort()).toEqual(["avatar", "displayName", "id", "provider", "publicIdentifier"].sort());
   });
 
-  it("21. behavioral: end-to-end -- a Service registers a Record from a Descriptor that (if it HAD displayName/avatar) would still produce a three-field Record, confirmed via a directly-constructed Descriptor carrying both fields", async () => {
+  it("21. RIPPLE (Secure Runtime Alpha 045): end-to-end -- a Service registered a Record from a directly-constructed Descriptor carrying displayName/avatar, and the Record still carried only three fields, AS OF this Stage's own scope; Alpha 047 later expanded FedosIdentityRecord and wired the Service to copy displayName/avatar onto it -- reconfirmed here as the CURRENT (five-field) behavior, per this arc's own established ripple convention", async () => {
     const registry = new FedosIdentityRegistry();
     const provider = makeTestProvider({
       provider: "nostr",
@@ -363,9 +363,15 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(returned).toHaveProperty("avatar", "https://example.invalid/dana.png");
 
     const record = resolver.findIdentity("e2e-1");
-    expect(record).toEqual({ id: "e2e-1", provider: "nostr", publicIdentifier: "npub1e2e" });
-    expect(record).not.toHaveProperty("displayName");
-    expect(record).not.toHaveProperty("avatar");
+    expect(record).toEqual({
+      id: "e2e-1",
+      provider: "nostr",
+      publicIdentifier: "npub1e2e",
+      displayName: "Dana",
+      avatar: "https://example.invalid/dana.png",
+    });
+    expect(record).toHaveProperty("displayName", "Dana");
+    expect(record).toHaveProperty("avatar", "https://example.invalid/dana.png");
   });
 
   it("22. behavioral: describeCapability() is entirely unaffected by the Descriptor's own field expansion -- still only provider label + available: true", async () => {
@@ -376,11 +382,12 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(capability).toEqual({ provider: "capability-only", available: true });
   });
 
-  it("23. RIPPLE (Secure Runtime Alpha 045): fedos_identity_record.ts (Alpha 040) had zero displayName/avatar vocabulary in its own code AS OF this Stage's own scope, and STILL does -- the Record's own field set was deliberately NOT expanded alongside the Descriptor's own, confirmed here as the CURRENT (unchanged) shape", () => {
+  it("23. RIPPLE (Secure Runtime Alpha 045): fedos_identity_record.ts (Alpha 040) had zero displayName/avatar vocabulary in its own code AS OF this Stage's own scope -- the Record's own field set was deliberately NOT expanded alongside the Descriptor's own at that time; Alpha 047 later expanded the Record with the identical two OPTIONAL fields -- reconfirmed here as the CURRENT (expanded) shape, per this arc's own established ripple convention", () => {
     expect(recordSource).toMatch(/export interface FedosIdentityRecord \{/);
-    const fieldDeclarations = [...recordSource.matchAll(/^\s*readonly \w+: string;/gm)];
-    expect(fieldDeclarations.length).toBe(3);
-    expect(codeOnlyLines(recordSource)).not.toMatch(/displayName|avatar/);
+    const requiredFieldDeclarations = [...recordSource.matchAll(/^\s*readonly \w+: string;/gm)];
+    expect(requiredFieldDeclarations.length).toBe(3);
+    expect(codeOnlyLines(recordSource)).toMatch(/readonly displayName\?: string;/);
+    expect(codeOnlyLines(recordSource)).toMatch(/readonly avatar\?: string;/);
     expect(recordSource).not.toMatch(/secure_runtime_alpha_045/);
   });
 
@@ -410,9 +417,10 @@ describe("Secure Runtime Alpha 045 -- FedOS Identity Descriptor Expansion, Descr
     expect(noopProviderSource).not.toMatch(/secure_runtime_alpha_045/);
   });
 
-  it("28. Regression: fedos_identity_service.ts (Alpha 031/042) is confirmed BYTE-FOR-BYTE unchanged, no reference to displayName/avatar anywhere in its own code", () => {
+  it("28. RIPPLE (Secure Runtime Alpha 045): fedos_identity_service.ts (Alpha 031/042) had no reference to displayName/avatar anywhere in its own code AS OF this Stage's own scope; Alpha 047 later wired the Service's own Descriptor-to-Record mapping to copy both fields through -- reconfirmed here as the CURRENT (expanded) shape, per this arc's own established ripple convention", () => {
     expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
-    expect(codeOnlyLines(serviceSource)).not.toMatch(/displayName|avatar/);
+    expect(codeOnlyLines(serviceSource)).toMatch(/displayName: descriptor\.displayName,/);
+    expect(codeOnlyLines(serviceSource)).toMatch(/avatar: descriptor\.avatar,/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_045/);
   });
 

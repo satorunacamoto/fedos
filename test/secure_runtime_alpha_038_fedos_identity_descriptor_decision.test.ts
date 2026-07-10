@@ -174,12 +174,12 @@ describe("Secure Runtime Alpha 038 -- FedOS Identity Descriptor Decision, review
     expect(designDocSource).toMatch(/`FedosIdentityCapability`\s+may never grow Descriptor-shaped content/);
   });
 
-  it("11. RIPPLE (Secure Runtime Alpha 042): formally fixes the boundary with Identity Service -- pure delegation, no aggregation, no cross-provider merging. The Service's own header comment quoted 'wraps exactly ONE `FedosIdentityProvider`' AS OF this Stage's own scope; Alpha 042 later gave it a second dependency (an injected FedosIdentityRegistry) and rewrote its own header comment accordingly -- reconfirmed here via the CURRENT header's own 'holds exactly two things' framing, per this arc's own established ripple convention", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 042, re-wrapped at Alpha 047): formally fixes the boundary with Identity Service -- pure delegation, no aggregation, no cross-provider merging. The Service's own header comment quoted 'wraps exactly ONE `FedosIdentityProvider`' AS OF this Stage's own scope; Alpha 042 later gave it a second dependency (an injected FedosIdentityRegistry) and rewrote its own header comment accordingly; Alpha 047 then re-wrapped the same sentence while adding its own lineage note -- reconfirmed here via the CURRENT header's own 'holds exactly two things' framing, per this arc's own established ripple convention", () => {
     expect(designDocSource).toMatch(/Identity Serviceとの境界 \(boundary with `FedosIdentityService`, Alpha 031\)/);
     expect(designDocSource).toMatch(
       /the Service remains PURE DELEGATION and never\s+synthesizes, caches, or derives Descriptor content/,
     );
-    expect(serviceSource).toMatch(/It holds exactly two things — the\s+\* `FedosIdentityProvider` and the `FedosIdentityRegistry`/);
+    expect(serviceSource).toMatch(/It holds exactly two things — the `FedosIdentityProvider` and the\s+\* `FedosIdentityRegistry`/);
   });
 
   it("12. formally fixes the boundary with Runtime and Storage, cross-checked against the LIVE source files by direct grep", () => {

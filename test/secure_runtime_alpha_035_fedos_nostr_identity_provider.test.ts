@@ -276,9 +276,9 @@ describe("Secure Runtime Alpha 035 -- FedOS Nostr Identity Provider, Resolver/Se
     expect(resolverSource).not.toMatch(/secure_runtime_alpha_035/);
   });
 
-  it("18. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts (Alpha 031) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 042 later added a required second constructor argument (an injected FedosIdentityRegistry) -- reconfirmed here as the CURRENT signature, still no reference to the Nostr Provider", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 042, header comment updated at Alpha 047): fedos_identity_service.ts (Alpha 031) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 042 later added a required second constructor argument (an injected FedosIdentityRegistry); Alpha 047 later still added a lineage note to the header comment naming NostrIdentityProvider in prose (excluded here via codeOnlyLines()) -- reconfirmed here as the CURRENT signature, with the Service's own CODE still never referencing the Nostr Provider", () => {
     expect(serviceSource).toMatch(/constructor\(provider: FedosIdentityProvider, registry: FedosIdentityRegistry\) \{/);
-    expect(serviceSource).not.toMatch(/NostrIdentityProvider|fedos_nostr_identity_provider/);
+    expect(codeOnlyLines(serviceSource)).not.toMatch(/NostrIdentityProvider|fedos_nostr_identity_provider/);
     expect(serviceSource).not.toMatch(/secure_runtime_alpha_035/);
   });
 

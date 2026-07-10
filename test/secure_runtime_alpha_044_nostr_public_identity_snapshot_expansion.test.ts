@@ -334,7 +334,7 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
     expect(await provider.describeIdentity()).toBeNull();
   });
 
-  it("23. behavioral: end-to-end -- a Service registers a Record from a Descriptor built via a displayName/avatar-carrying Snapshot, and the Record still carries only three fields", async () => {
+  it("23. RIPPLE (Secure Runtime Alpha 044): end-to-end -- a Service registered a Record from a Descriptor built via a displayName/avatar-carrying Snapshot, and the Record carried only three fields, AS OF this Stage's own scope; Alpha 047 later expanded FedosIdentityRecord and wired the Service to copy displayName/avatar onto it -- reconfirmed here as the CURRENT (five-field) behavior, per this arc's own established ripple convention", async () => {
     const registry = new FedosIdentityRegistry();
     const source = new FakeSource({
       id: "e2e-1",
@@ -349,9 +349,15 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
 
     await service.describeIdentity();
     const record = resolver.findIdentity("e2e-1");
-    expect(record).toEqual({ id: "e2e-1", provider: "nostr", publicIdentifier: "npub1e2e" });
-    expect(record).not.toHaveProperty("displayName");
-    expect(record).not.toHaveProperty("avatar");
+    expect(record).toEqual({
+      id: "e2e-1",
+      provider: "nostr",
+      publicIdentifier: "npub1e2e",
+      displayName: "Dana",
+      avatar: "https://example.invalid/dana.png",
+    });
+    expect(record).toHaveProperty("displayName", "Dana");
+    expect(record).toHaveProperty("avatar", "https://example.invalid/dana.png");
   });
 
   it("24. RIPPLE (Secure Runtime Alpha 045): fedos_identity_descriptor.ts (Alpha 028) was confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope -- still exactly three fields; Alpha 045 later added displayName/avatar as two OPTIONAL fields, formally executing Alpha 038's own ADOPT decision -- reconfirmed here as the CURRENT shape, per this arc's own established ripple convention", () => {
@@ -363,11 +369,12 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
     expect(descriptorSource).not.toMatch(/secure_runtime_alpha_044/);
   });
 
-  it("25. Regression: fedos_identity_record.ts (Alpha 040) is confirmed BYTE-FOR-BYTE unchanged -- still exactly three fields", () => {
+  it("25. RIPPLE (Secure Runtime Alpha 044): fedos_identity_record.ts (Alpha 040) had exactly three fields and zero displayName/avatar vocabulary AS OF this Stage's own scope; Alpha 047 later added displayName/avatar as two OPTIONAL fields -- reconfirmed here as the CURRENT (expanded) shape, per this arc's own established ripple convention, while the three original REQUIRED fields remain unchanged", () => {
     expect(recordSource).toMatch(/export interface FedosIdentityRecord \{/);
-    const fieldDeclarations = [...recordSource.matchAll(/^\s*readonly \w+: string;/gm)];
-    expect(fieldDeclarations.length).toBe(3);
-    expect(codeOnlyLines(recordSource)).not.toMatch(/displayName|avatar/);
+    const requiredFieldDeclarations = [...recordSource.matchAll(/^\s*readonly \w+: string;/gm)];
+    expect(requiredFieldDeclarations.length).toBe(3);
+    expect(codeOnlyLines(recordSource)).toMatch(/readonly displayName\?: string;/);
+    expect(codeOnlyLines(recordSource)).toMatch(/readonly avatar\?: string;/);
     expect(recordSource).not.toMatch(/secure_runtime_alpha_044/);
   });
 

@@ -269,11 +269,12 @@ describe("Secure Runtime Alpha 042 -- FedOS Identity Service Registry Integratio
     expect(codeOnly).not.toMatch(/nostr\//);
   });
 
-  it("14. fedos_identity_service.ts's own CODE (excluding its own explanatory header comment) references zero Authentication/Nostr/displayName/avatar vocabulary", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 042): fedos_identity_service.ts's own CODE referenced zero Authentication/Nostr/displayName/avatar vocabulary AS OF this Stage's own scope; Alpha 047 later added displayName/avatar to the Service's own Descriptor-to-Record mapping -- reconfirmed here as the CURRENT (expanded) shape, per this arc's own established ripple convention, while Authentication/Nostr vocabulary remains strictly absent", () => {
     const codeOnly = codeOnlyLines(serviceSource);
     expect(codeOnly).not.toMatch(/Authenticat|session|Session|credential|Credential/);
     expect(codeOnly).not.toMatch(/nostr|Nostr|relay|Relay|npub|nsec/);
-    expect(codeOnly).not.toMatch(/displayName|avatar/);
+    expect(codeOnly).toMatch(/displayName: descriptor\.displayName,/);
+    expect(codeOnly).toMatch(/avatar: descriptor\.avatar,/);
     expect(codeOnly).not.toMatch(/create_runtime|AppRuntime/);
   });
 
