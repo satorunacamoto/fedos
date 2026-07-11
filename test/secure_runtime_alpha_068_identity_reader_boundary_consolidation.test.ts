@@ -211,7 +211,7 @@ describe("Secure Runtime Alpha 068 -- Identity Reader Boundary Consolidation", (
     expect(callSites.length).toBe(1);
   });
 
-  it("12. RIPPLE (Secure Runtime Alpha 072): the class had exactly FIVE public methods and ONE private method AS OF this Stage's own scope; Alpha 069 (Identity Bootstrap State Consolidation) added a second private method, #completeBootstrap(), Alpha 070 (Identity Bootstrap Entry Consolidation) added a third, #bootstrapIdentity(), and Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth, #isBootstrapped() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside FOUR private methods", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 073): the class had exactly FIVE public methods and ONE private method AS OF this Stage's own scope; Alpha 069 (Identity Bootstrap State Consolidation) added a second private method, #completeBootstrap(), Alpha 070 (Identity Bootstrap Entry Consolidation) added a third, #bootstrapIdentity(), Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth, #isBootstrapped(), and Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth, #currentIdentity() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside FIVE private methods", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const publicMethodNames = [
@@ -225,7 +225,7 @@ describe("Secure Runtime Alpha 068 -- Identity Reader Boundary Consolidation", (
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "bootstrapIdentity"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "bootstrapIdentity"]));
   });
 
   it("13. findIdentity()/listIdentities()/isBootstrapped()/currentIdentity() remain BYTE-FOR-BYTE unchanged", () => {

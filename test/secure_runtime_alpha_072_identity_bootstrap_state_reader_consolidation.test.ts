@@ -282,7 +282,7 @@ describe("Secure Runtime Alpha 072 -- Identity Bootstrap State Reader Consolidat
     expect(callSites.length).toBe(2);
   });
 
-  it("19. the class now has exactly FIVE public methods and FOUR private methods", () => {
+  it("19. RIPPLE (Secure Runtime Alpha 073): the class had exactly FIVE public methods and FOUR private methods AS OF this Stage's own scope; Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth private method, #currentIdentity() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside FIVE private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -296,7 +296,7 @@ describe("Secure Runtime Alpha 072 -- Identity Bootstrap State Reader Consolidat
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
     expect(new Set(privateMethodNames)).toEqual(
-      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "bootstrapIdentity"]),
+      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "bootstrapIdentity"]),
     );
   });
 

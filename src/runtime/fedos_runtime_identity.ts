@@ -404,6 +404,40 @@
  *     `return this.#isBootstrapped();`, nothing more.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 073 ("Identity Descriptor Reader Consolidation")
+ * adds a private, SYNCHRONOUS method,
+ * `#currentIdentity(): FedosIdentityDescriptor | null`, whose own
+ * entire body is `return this.#descriptor;` — and NOTHING else: no
+ * `if`, no `try`/`catch`, no `await`, no Provider/Registry/Resolver/
+ * Storage reference. The PUBLIC
+ * `currentIdentity(): FedosIdentityDescriptor | null` becomes a pure
+ * one-line wrapper, `return this.#currentIdentity();`, and performs
+ * NOTHING else. `#descriptor` is now READ in exactly ONE place in
+ * this file — inside `#currentIdentity()` — matching the
+ * single-reader-site/single-writer-site/single-entry-site discipline
+ * Alpha 068/069/070/072 already established for the Identity Service
+ * READ path, Bootstrap STATE writes, the Bootstrap ENTRY point, and
+ * the Bootstrap STATE read, respectively. `#completeBootstrap()`
+ * (Alpha 069) remains the ONLY place in this file that ever WRITES
+ * `#descriptor`, completely unaffected by this Stage. This Stage adds
+ * NO new field, NO new public API, and changes NO observable behavior
+ * of any kind. See
+ * `docs/secure_runtime_alpha_073_identity_descriptor_reader_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#currentIdentity()` (Alpha 073) is the ONLY place in this file
+ *     that ever READS `#descriptor`. It is SYNCHRONOUS (no `async`,
+ *     no `await`), takes no parameters, returns
+ *     `FedosIdentityDescriptor | null`, and performs no I/O, no
+ *     branching, and no error handling of any kind. It has EXACTLY
+ *     ONE caller anywhere in this file: the PUBLIC
+ *     `currentIdentity()`'s own single statement.
+ *   - PUBLIC `currentIdentity(): FedosIdentityDescriptor | null`
+ *     (Alpha 073) is a PURE WRAPPER — its own entire body is
+ *     `return this.#currentIdentity();`, nothing more.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
@@ -441,6 +475,10 @@ export class FedosRuntimeIdentity {
     return this.#bootstrapped;
   }
 
+  #currentIdentity(): FedosIdentityDescriptor | null {
+    return this.#descriptor;
+  }
+
   async #bootstrapIdentity(): Promise<void> {
     if (this.#isBootstrapped()) {
       return;
@@ -466,6 +504,6 @@ export class FedosRuntimeIdentity {
   }
 
   currentIdentity(): FedosIdentityDescriptor | null {
-    return this.#descriptor;
+    return this.#currentIdentity();
   }
 }

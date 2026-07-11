@@ -876,7 +876,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     expect(listIndex).toBeGreaterThan(findIndex);
   });
 
-  it("84. RIPPLE (Secure Runtime Alpha 072): FedosRuntimeIdentity's own class had exactly three PUBLIC methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 added a fourth (bootstrapIdentity()), Alpha 060 added a fifth (isBootstrapped()), Alpha 063 added a sixth (currentIdentity()), Alpha 064 added a seventh (identityVersion()), Alpha 066 removed that seventh again, Alpha 068 made describeIdentity() a true private #describeIdentity() method, Alpha 069 added a second private method (#completeBootstrap()), Alpha 070 (Identity Bootstrap Entry Consolidation) added a third private method (#bootstrapIdentity()), turning the PUBLIC bootstrapIdentity() into a pure wrapper, and Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth private method (#isBootstrapped()), turning the PUBLIC isBootstrapped() into a pure wrapper too -- reconfirmed here that findIdentity()/listIdentities() (this Arc's own original two, describeIdentity now excluded since it is no longer public) remain present and unchanged, alongside the three still-current newer PUBLIC methods (bootstrapIdentity/isBootstrapped/currentIdentity)", () => {
+  it("84. RIPPLE (Secure Runtime Alpha 073): FedosRuntimeIdentity's own class had exactly three PUBLIC methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 added a fourth (bootstrapIdentity()), Alpha 060 added a fifth (isBootstrapped()), Alpha 063 added a sixth (currentIdentity()), Alpha 064 added a seventh (identityVersion()), Alpha 066 removed that seventh again, Alpha 068 made describeIdentity() a true private #describeIdentity() method, Alpha 069 added a second private method (#completeBootstrap()), Alpha 070 (Identity Bootstrap Entry Consolidation) added a third private method (#bootstrapIdentity()), turning the PUBLIC bootstrapIdentity() into a pure wrapper, Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth private method (#isBootstrapped()), turning the PUBLIC isBootstrapped() into a pure wrapper too, and Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth private method (#currentIdentity()), turning the PUBLIC currentIdentity() into a pure wrapper too -- reconfirmed here that findIdentity()/listIdentities() (this Arc's own original two, describeIdentity now excluded since it is no longer public) remain present and unchanged, alongside the three still-current newer PUBLIC methods (bootstrapIdentity/isBootstrapped/currentIdentity)", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -897,7 +897,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
     expect(new Set(privateMethodNames)).toEqual(
-      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "bootstrapIdentity"]),
+      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "bootstrapIdentity"]),
     );
   });
 
