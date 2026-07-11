@@ -225,11 +225,11 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
     expect(body).toMatch(/if \(this\.#isBootstrapped\(\)\) \{/);
   });
 
-  it("12. the #describeIdentity() call exists in EXACTLY ONE place anywhere in the class body: inside #bootstrapIdentity()", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 074): the #describeIdentity() call existed in EXACTLY ONE place anywhere in the class body, inside #bootstrapIdentity(), AS OF this Stage's own scope; Alpha 074 (Identity Bootstrap Flow Consolidation) rewired that call site to a new private #performBootstrap() method -- reconfirmed here that the #describeIdentity() call still exists in EXACTLY ONE place, now inside #performBootstrap()", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const callSites = [...classBody.matchAll(/this\.#describeIdentity\(\)/g)];
     expect(callSites.length).toBe(1);
-    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #performBootstrap\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(body).toMatch(/this\.#describeIdentity\(\)/);
   });
 
@@ -241,23 +241,26 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
     expect(body).toMatch(/this\.#completeBootstrap\(descriptor\);/);
   });
 
-  it("14. the ONLY await anywhere in the class body is inside #bootstrapIdentity()", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 074): the ONLY await anywhere in the class body was inside #bootstrapIdentity() AS OF this Stage's own scope; Alpha 074 (Identity Bootstrap Flow Consolidation) rewrote #bootstrapIdentity()'s own awaited call from #describeIdentity() to a new private #performBootstrap() method, whose own body is a bare 'return this.#describeIdentity();' with NO await keyword of its own (a pure Promise pass-through, per this Stage's own mandate) -- reconfirmed here that the class body still has EXACTLY ONE await total, inside #bootstrapIdentity(), now awaiting #performBootstrap()", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const awaitSites = [...classBody.matchAll(/\bawait\b/g)];
     expect(awaitSites.length).toBe(1);
-    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
-    expect(body).toMatch(/await this\.#describeIdentity\(\)/);
+    const bootstrapIdentityBody = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(bootstrapIdentityBody).toMatch(/await this\.#performBootstrap\(\)/);
+    const performBootstrapBody = (classBody.match(/async #performBootstrap\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(performBootstrapBody.trim()).toBe("return this.#describeIdentity();");
+    expect(performBootstrapBody).not.toMatch(/\bawait\b/);
   });
 
-  it("15. the Descriptor capture ('const descriptor = await ...') exists in EXACTLY ONE place anywhere in the class body: inside #bootstrapIdentity()", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 074): the Descriptor capture ('const descriptor = await ...') existed in EXACTLY ONE place anywhere in the class body, inside #bootstrapIdentity(), AS OF this Stage's own scope; Alpha 074 (Identity Bootstrap Flow Consolidation) rewired the awaited call from #describeIdentity() to #performBootstrap() -- reconfirmed here that the Descriptor capture still exists in EXACTLY ONE place, inside #bootstrapIdentity(), now awaiting #performBootstrap()", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
-    const captureSites = [...classBody.matchAll(/const descriptor = await this\.#describeIdentity\(\);/g)];
+    const captureSites = [...classBody.matchAll(/const descriptor = await this\.#performBootstrap\(\);/g)];
     expect(captureSites.length).toBe(1);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
-    expect(body).toMatch(/const descriptor = await this\.#describeIdentity\(\);/);
+    expect(body).toMatch(/const descriptor = await this\.#performBootstrap\(\);/);
   });
 
-  it("16. RIPPLE (Secure Runtime Alpha 072): #bootstrapIdentity()'s own body was EXACTLY the five statements, guard/return/close-brace/await/completeBootstrap, in that order, byte-for-byte identical to Alpha 070's own recorded shape, AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition from 'if (this.#bootstrapped)' to 'if (this.#isBootstrapped())' -- reconfirmed here as the CURRENT five statements, in the same order, with the updated guard condition", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 074): #bootstrapIdentity()'s own body was EXACTLY the five statements, guard/return/close-brace/await/completeBootstrap, in that order, byte-for-byte identical to Alpha 070's own recorded shape, AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition from 'if (this.#bootstrapped)' to 'if (this.#isBootstrapped())', and Alpha 074 (Identity Bootstrap Flow Consolidation) rewired the descriptor-capturing call from 'this.#describeIdentity()' to 'this.#performBootstrap()' -- reconfirmed here as the CURRENT five statements, in the same order, with the updated guard condition and Flow call", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -268,12 +271,12 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
       "if (this.#isBootstrapped()) {",
       "return;",
       "}",
-      "const descriptor = await this.#describeIdentity();",
+      "const descriptor = await this.#performBootstrap();",
       "this.#completeBootstrap(descriptor);",
     ]);
   });
 
-  it("17. RIPPLE (Secure Runtime Alpha 073): the class had exactly FIVE public methods and THREE private methods AS OF this Stage's own scope -- no new API of any kind was added by this review; Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth private method, #isBootstrapped(), and Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth, #currentIdentity() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside FIVE private methods", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 074): the class had exactly FIVE public methods and THREE private methods AS OF this Stage's own scope -- no new API of any kind was added by this review; Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth private method, #isBootstrapped(), Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth, #currentIdentity(), and Alpha 074 (Identity Bootstrap Flow Consolidation) added a sixth, #performBootstrap() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside SIX private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -286,7 +289,7 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "bootstrapIdentity"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "performBootstrap", "bootstrapIdentity"]));
   });
 
   it("18. no new private FIELD exists -- still exactly five fields (three readonly, two not)", () => {

@@ -438,6 +438,46 @@
  *     `return this.#currentIdentity();`, nothing more.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 074 ("Identity Bootstrap Flow Consolidation")
+ * adds a private, ASYNC method,
+ * `#performBootstrap(): Promise<FedosIdentityDescriptor | null>`,
+ * whose own entire body is `return this.#describeIdentity();` — and
+ * NOTHING else: no `if`, no `try`/`catch`, no synchronous processing,
+ * no State update, no `#completeBootstrap()` call, no direct
+ * Provider/Registry/Resolver/Storage reference. `#bootstrapIdentity()`'s
+ * own descriptor-capturing statement is rewritten from
+ * `const descriptor = await this.#describeIdentity();` to
+ * `const descriptor = await this.#performBootstrap();` — the ONLY
+ * other change this Stage makes; the guard, the guard's own position,
+ * and the trailing `this.#completeBootstrap(descriptor);` call are
+ * otherwise byte-for-byte unchanged. `#describeIdentity()` now has
+ * EXACTLY ONE caller in this file — `#performBootstrap()`'s own single
+ * statement — in place of `#bootstrapIdentity()`; `#completeBootstrap()`
+ * remains the ONLY place in this file that ever writes
+ * `#descriptor`/`#bootstrapped`, completely unaffected by this Stage.
+ * `#bootstrapIdentity()` itself is now a pure orchestrator: guard, then
+ * delegate the Bootstrap Flow to `#performBootstrap()`, then hand the
+ * result to `#completeBootstrap()` — it no longer reaches
+ * `#describeIdentity()` directly. This Stage adds NO new field, NO new
+ * public API, and changes NO observable behavior of any kind. See
+ * `docs/secure_runtime_alpha_074_identity_bootstrap_flow_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#performBootstrap()` (Alpha 074) is the Bootstrap FLOW itself,
+ *     as its own named, isolated unit — its own entire body is
+ *     `return this.#describeIdentity();`, nothing more. It is ASYNC,
+ *     performs no synchronous processing, no State update, no
+ *     `#completeBootstrap()` call, and no direct Provider/Registry/
+ *     Resolver/Storage reference of its own — it delegates entirely to
+ *     `#describeIdentity()`. It has EXACTLY ONE caller anywhere in
+ *     this file: `#bootstrapIdentity()`'s own descriptor-capturing
+ *     statement.
+ *   - `#describeIdentity()` (Alpha 074) has EXACTLY ONE caller
+ *     anywhere in this file: `#performBootstrap()`'s own single
+ *     statement.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
@@ -479,11 +519,15 @@ export class FedosRuntimeIdentity {
     return this.#descriptor;
   }
 
+  async #performBootstrap(): Promise<FedosIdentityDescriptor | null> {
+    return this.#describeIdentity();
+  }
+
   async #bootstrapIdentity(): Promise<void> {
     if (this.#isBootstrapped()) {
       return;
     }
-    const descriptor = await this.#describeIdentity();
+    const descriptor = await this.#performBootstrap();
     this.#completeBootstrap(descriptor);
   }
 
