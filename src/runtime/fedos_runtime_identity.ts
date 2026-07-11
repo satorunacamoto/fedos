@@ -540,6 +540,30 @@
  *     `#completeBootstrap()` call.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 077 ("Identity Bootstrap Observation Contract",
+ * review only, NO code change) formally fixes what `#observeBootstrap()`
+ * IS and is not, as a contract binding every future implementation of
+ * it: it is a Bootstrap-observation-ONLY Hook — synchronous, void
+ * return, never throwing, never reading or writing `#descriptor`/
+ * `#bootstrapped`, never touching the Registry, and never altering
+ * Bootstrap semantics in any way. Its future permitted uses are
+ * limited to Metrics, Tracing, Audit, Logging, and Telemetry — nothing
+ * else. This Stage changes no field, no method body, and no
+ * observable behavior of any kind; it is a formal confirmation of a
+ * contract Alpha 076's own empty implementation already satisfies. See
+ * `docs/secure_runtime_alpha_077_identity_bootstrap_observation_contract.md`
+ * for the full review record.
+ *
+ *   - `#observeBootstrap()` (Alpha 077 Contract) MUST remain: a pure
+ *     observation Hook (Metrics/Tracing/Audit/Logging/Telemetry ONLY);
+ *     synchronous (no `async`, no `await`); `void`-returning; never
+ *     throwing; never reading OR writing `#descriptor`/`#bootstrapped`;
+ *     never referencing `#registry`/`#service`/`#resolver`; and never
+ *     altering Bootstrap semantics (Registry registration, the
+ *     Descriptor Cache, or the `#bootstrapped` flag) in any way.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
