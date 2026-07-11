@@ -214,14 +214,14 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
     expect(classBody).toMatch(/async #performBootstrap\(\): Promise<FedosIdentityDescriptor \| null> \{/);
   });
 
-  it("12. #performBootstrap()'s own body is EXACTLY one statement: return this.#describeIdentity(); -- no await keyword of its own", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 075): #performBootstrap()'s own body was EXACTLY one statement, 'return this.#describeIdentity();', with no await keyword of its own, AS OF this Stage's own scope; Alpha 075 (Identity Descriptor Acquisition Consolidation) rewired that single statement to 'return this.#acquireDescriptor();' -- reconfirmed here that #performBootstrap()'s own body is still exactly one statement, now delegating to #acquireDescriptor(), with no await keyword of its own", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const body = (classBody.match(/async #performBootstrap\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toEqual(["return this.#describeIdentity();"]);
+    expect(lines).toEqual(["return this.#acquireDescriptor();"]);
     expect(body).not.toMatch(/\bawait\b/);
   });
 
@@ -250,12 +250,14 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
     expect(body).toMatch(/const descriptor = await this\.#performBootstrap\(\);/);
   });
 
-  it("15. #describeIdentity() has EXACTLY ONE caller anywhere in the class body: #performBootstrap()'s own single statement -- NOT #bootstrapIdentity() anymore", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 075): #describeIdentity() had EXACTLY ONE caller anywhere in the class body -- #performBootstrap()'s own single statement -- AS OF this Stage's own scope, NOT #bootstrapIdentity() anymore; Alpha 075 (Identity Descriptor Acquisition Consolidation) rewired that call site to a new private #acquireDescriptor() method -- reconfirmed here that #describeIdentity() still has EXACTLY ONE caller, now inside #acquireDescriptor(), and neither #performBootstrap() nor #bootstrapIdentity() reference it directly", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const callSites = [...classBody.matchAll(/this\.#describeIdentity\(\)/g)];
     expect(callSites.length).toBe(1);
+    const acquireDescriptorBody = (classBody.match(/async #acquireDescriptor\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(acquireDescriptorBody).toMatch(/this\.#describeIdentity\(\)/);
     const performBootstrapBody = (classBody.match(/async #performBootstrap\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
-    expect(performBootstrapBody).toMatch(/this\.#describeIdentity\(\)/);
+    expect(performBootstrapBody).not.toMatch(/this\.#describeIdentity\(\)/);
     const bootstrapIdentityBody = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(bootstrapIdentityBody).not.toMatch(/this\.#describeIdentity\(\)/);
   });
@@ -289,7 +291,7 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
     expect(callSites.length).toBe(1);
   });
 
-  it("18. the class now has exactly FIVE public methods and SIX private methods", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 075): the class had exactly FIVE public methods and SIX private methods AS OF this Stage's own scope; Alpha 075 (Identity Descriptor Acquisition Consolidation) added a seventh private method, #acquireDescriptor() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside SEVEN private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -303,7 +305,7 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
     expect(new Set(privateMethodNames)).toEqual(
-      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "performBootstrap", "bootstrapIdentity"]),
+      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "acquireDescriptor", "performBootstrap", "bootstrapIdentity"]),
     );
   });
 

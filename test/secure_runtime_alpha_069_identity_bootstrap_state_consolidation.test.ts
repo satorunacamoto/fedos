@@ -269,7 +269,7 @@ describe("Secure Runtime Alpha 069 -- Identity Bootstrap State Consolidation", (
     expect(callSites.length).toBe(1);
   });
 
-  it("16. RIPPLE (Secure Runtime Alpha 074): the class had exactly FIVE public methods and TWO private methods AS OF this Stage's own scope; Alpha 070 (Identity Bootstrap Entry Consolidation) added a third private method, #bootstrapIdentity(), Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth, #isBootstrapped(), Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth, #currentIdentity(), and Alpha 074 (Identity Bootstrap Flow Consolidation) added a sixth, #performBootstrap() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside SIX private methods", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 075): the class had exactly FIVE public methods and TWO private methods AS OF this Stage's own scope; Alpha 070 (Identity Bootstrap Entry Consolidation) added a third private method, #bootstrapIdentity(), Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth, #isBootstrapped(), Alpha 073 (Identity Descriptor Reader Consolidation) added a fifth, #currentIdentity(), Alpha 074 (Identity Bootstrap Flow Consolidation) added a sixth, #performBootstrap(), and Alpha 075 (Identity Descriptor Acquisition Consolidation) added a seventh, #acquireDescriptor() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside SEVEN private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -282,7 +282,7 @@ describe("Secure Runtime Alpha 069 -- Identity Bootstrap State Consolidation", (
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "performBootstrap", "bootstrapIdentity"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "acquireDescriptor", "performBootstrap", "bootstrapIdentity"]));
   });
 
   it("17. no new private FIELD was added -- still exactly five fields (three readonly, two not)", () => {

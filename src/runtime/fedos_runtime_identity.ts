@@ -478,6 +478,42 @@
  *     statement.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 075 ("Identity Descriptor Acquisition
+ * Consolidation") adds a private, ASYNC method,
+ * `#acquireDescriptor(): Promise<FedosIdentityDescriptor | null>`,
+ * whose own entire body is `return this.#describeIdentity();` — a bare
+ * Promise pass-through with NO `await` keyword, no `if`, no
+ * `try`/`catch`, no direct Provider/Registry/Resolver/Storage
+ * reference, and no State update of any kind. `#performBootstrap()`'s
+ * own single statement is rewritten from
+ * `return this.#describeIdentity();` to
+ * `return this.#acquireDescriptor();` — the ONLY other change this
+ * Stage makes. `#describeIdentity()` now has EXACTLY ONE caller in
+ * this file — `#acquireDescriptor()`'s own single statement — in place
+ * of `#performBootstrap()`. `#performBootstrap()` itself now holds NO
+ * Descriptor-acquisition logic of its own; it delegates entirely to
+ * `#acquireDescriptor()`. The full chain is now
+ * `#bootstrapIdentity()` → `#performBootstrap()` →
+ * `#acquireDescriptor()` → `#describeIdentity()` →
+ * `FedosIdentityService`, with each link reached by exactly one
+ * caller. This Stage adds NO new field, NO new public API, and changes
+ * NO observable behavior of any kind. See
+ * `docs/secure_runtime_alpha_075_identity_descriptor_acquisition_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#acquireDescriptor()` (Alpha 075) is a pure Promise pass-through
+ *     to `#describeIdentity()` — its own entire body is
+ *     `return this.#describeIdentity();`, nothing more. It has NO
+ *     `await`, NO `if`, NO `try`/`catch`, and performs no direct
+ *     Provider/Registry/Resolver/Storage reference and no State update
+ *     of any kind. It has EXACTLY ONE caller anywhere in this file:
+ *     `#performBootstrap()`'s own single statement.
+ *   - `#describeIdentity()` (Alpha 075) has EXACTLY ONE caller
+ *     anywhere in this file: `#acquireDescriptor()`'s own single
+ *     statement.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
@@ -519,8 +555,12 @@ export class FedosRuntimeIdentity {
     return this.#descriptor;
   }
 
-  async #performBootstrap(): Promise<FedosIdentityDescriptor | null> {
+  async #acquireDescriptor(): Promise<FedosIdentityDescriptor | null> {
     return this.#describeIdentity();
+  }
+
+  async #performBootstrap(): Promise<FedosIdentityDescriptor | null> {
+    return this.#acquireDescriptor();
   }
 
   async #bootstrapIdentity(): Promise<void> {

@@ -244,7 +244,7 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
     expect(body.trim()).toBe("return this.#service.describeIdentity();");
   });
 
-  it("16. RIPPLE (Secure Runtime Alpha 074): bootstrapIdentity()'s own body called this.#service.describeIdentity() DIRECTLY, never this.describeIdentity(), AS OF this Stage's own scope, confirming zero internal callers of the public wrapper; Alpha 068 rewired bootstrapIdentity() to call the new private this.#describeIdentity() instead, Alpha 070 (Identity Bootstrap Entry Consolidation) moved that call site itself into a new private #bootstrapIdentity() method, and Alpha 074 (Identity Bootstrap Flow Consolidation) rewired #bootstrapIdentity() to route through a new private #performBootstrap() method instead of #describeIdentity() directly -- reconfirmed here that #bootstrapIdentity() now routes through #performBootstrap(), which itself routes through #describeIdentity(), which itself still reaches this.#service internally", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 075): bootstrapIdentity()'s own body called this.#service.describeIdentity() DIRECTLY, never this.describeIdentity(), AS OF this Stage's own scope, confirming zero internal callers of the public wrapper; Alpha 068 rewired bootstrapIdentity() to call the new private this.#describeIdentity() instead, Alpha 070 (Identity Bootstrap Entry Consolidation) moved that call site itself into a new private #bootstrapIdentity() method, Alpha 074 (Identity Bootstrap Flow Consolidation) rewired #bootstrapIdentity() to route through a new private #performBootstrap() method instead of #describeIdentity() directly, and Alpha 075 (Identity Descriptor Acquisition Consolidation) rewired #performBootstrap() to route through a new private #acquireDescriptor() method instead of #describeIdentity() directly -- reconfirmed here that #bootstrapIdentity() now routes through #performBootstrap() → #acquireDescriptor() → #describeIdentity(), which itself still reaches this.#service internally", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
@@ -252,7 +252,10 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
     expect(body).not.toMatch(/this\.#describeIdentity\(\)/);
     expect(body).toMatch(/this\.#performBootstrap\(\)/);
     const performBootstrapBody = (classBody.match(/async #performBootstrap\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
-    expect(performBootstrapBody).toMatch(/this\.#describeIdentity\(\)/);
+    expect(performBootstrapBody).not.toMatch(/this\.#describeIdentity\(\)/);
+    expect(performBootstrapBody).toMatch(/this\.#acquireDescriptor\(\)/);
+    const acquireDescriptorBody = (classBody.match(/async #acquireDescriptor\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(acquireDescriptorBody).toMatch(/this\.#describeIdentity\(\)/);
     const describeBody = (classBody.match(/async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(describeBody).toMatch(/this\.#service\.describeIdentity\(\)/);
   });
