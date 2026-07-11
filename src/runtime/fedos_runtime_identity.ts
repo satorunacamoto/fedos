@@ -353,6 +353,22 @@
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 071 (review only, no functional code change)
+ * formally confirms that the Public Bootstrap API is now consolidated
+ * to exactly ONE place: PUBLIC `bootstrapIdentity(): Promise<void>`
+ * remains a PURE WRAPPER — its own entire body is
+ * `return this.#bootstrapIdentity();`, with no `if`, no `await`, no
+ * `try`/`catch`, and no reference to `#service`/`#registry`/`#resolver`
+ * of its own — and that the guard (Alpha 061), the `#describeIdentity()`
+ * call (Alpha 068), the `#completeBootstrap()` call (Alpha 069), the
+ * `await`, and the Descriptor capture all exist in EXACTLY ONE place:
+ * private `#bootstrapIdentity()` (Alpha 070). This Stage changes no
+ * field, no method body, and no observable behavior of any kind — it
+ * is a formal confirmation of a property Alpha 070 already established.
+ * See
+ * `docs/secure_runtime_alpha_071_identity_bootstrap_public_api_consolidation.md`
+ * for the full review record.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
