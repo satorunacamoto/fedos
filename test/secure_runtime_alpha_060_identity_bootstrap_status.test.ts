@@ -136,10 +136,10 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     );
   });
 
-  it("3. the design doc's recorded implementation matches the ACTUAL current fedos_runtime_identity.ts source verbatim", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 061): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard to bootstrapIdentity() -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside the guarded body, and isBootstrapped() itself is untouched", () => {
     expect(fedosRuntimeIdentitySource).toMatch(/#bootstrapped: boolean = false;/);
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /isBootstrapped\(\): boolean \{\s*\n\s*return this\.#bootstrapped;\s*\n\s*\}/,
@@ -236,14 +236,14 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     expect(body).not.toMatch(/await /);
   });
 
-  it("17. bootstrapIdentity()'s own body sets #bootstrapped to true AFTER the await, as its own second and final statement", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 061): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard -- reconfirmed here that the await/assignment pair still appears in order, as the body's own FINAL two statements, now preceded by the guard", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toEqual([
+    expect(lines.slice(-2)).toEqual([
       "await this.#service.describeIdentity();",
       "this.#bootstrapped = true;",
     ]);

@@ -84,6 +84,22 @@
  * full design rationale, including why a `boolean` was chosen over an
  * `enum`/`Promise`/timestamp/counter.
  *
+ * Secure Runtime Alpha 061 ("Identity Bootstrap Idempotency") adds ONE
+ * guard statement, `if (this.#bootstrapped) { return; }`, as
+ * `bootstrapIdentity()`'s own new FIRST statement — a repeat call on an
+ * instance that has already bootstrapped successfully returns
+ * immediately, without a second `describeIdentity()` call, without a
+ * second Registry `register()` attempt (Alpha 042's own responsibility,
+ * never reached a second time), and without a second read of the
+ * injected Provider. A FAILED attempt leaves `#bootstrapped` at `false`
+ * (unchanged from Alpha 060), so the guard does NOT trigger next time —
+ * the very next `bootstrapIdentity()` call retries `describeIdentity()`
+ * for real; there is no permanent lock-out on failure. See
+ * `docs/secure_runtime_alpha_061_identity_bootstrap_idempotency.md` for
+ * the full design rationale, including why Option B (idempotent,
+ * first-success-only) was adopted over running every time, retry-only-
+ * on-failure, a fresh Registry per attempt, or an explicit `reset()`.
+ *
  * This file defines a SINGLE CLASS and nothing else — no function, no
  * module-scoped singleton, no environment read, no Worker reference,
  * no Storage reference, no Rust reference, and no wiring into
@@ -130,6 +146,15 @@
  *     NEVER throws. Bootstrap-not-yet-attempted and Bootstrap-failed
  *     both report `false` — Fail Closed by construction, not by any
  *     `try`/`catch` this file adds.
+ *   - `bootstrapIdentity()` (Alpha 061) is IDEMPOTENT after a successful
+ *     completion: its own new FIRST statement,
+ *     `if (this.#bootstrapped) { return; }`, makes every call after the
+ *     first successful one a synchronous no-op — no second
+ *     `describeIdentity()` call, no second Provider read, no second
+ *     Registry `register()` attempt. A FAILED attempt does NOT set the
+ *     guard — `#bootstrapped` stays `false`, so the very next call
+ *     retries for real. NO permanent lock-out on failure exists
+ *     anywhere in this file.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -170,6 +195,9 @@ export class FedosRuntimeIdentity {
   }
 
   async bootstrapIdentity(): Promise<void> {
+    if (this.#bootstrapped) {
+      return;
+    }
     await this.#service.describeIdentity();
     this.#bootstrapped = true;
   }

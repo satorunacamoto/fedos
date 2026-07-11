@@ -133,9 +133,9 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 060): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 060 appended a `this.#bootstrapped = true;` line after the pre-existing one -- reconfirmed here that this Stage's own recorded body is still a PREFIX of the CURRENT source", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 061): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 060 appended a `this.#bootstrapped = true;` line and Alpha 061 later prepended an idempotency guard -- reconfirmed here that this Stage's own recorded core sequence (`await this.#service.describeIdentity();`) still appears, now inside the guarded body", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*await this\.#service\.describeIdentity\(\);/,
+      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#service\.describeIdentity\(\);/,
     );
   });
 
@@ -197,14 +197,16 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     expect(fedosRuntimeIdentitySource).toMatch(/async bootstrapIdentity\(\): Promise<void> \{/);
   });
 
-  it("14. RIPPLE (Secure Runtime Alpha 060): bootstrapIdentity()'s own body was EXACTLY 'await this.#service.describeIdentity();' AS OF this Stage's own scope; Alpha 060 appended 'this.#bootstrapped = true;' after it -- reconfirmed here that the pre-existing line remains the body's own FIRST statement, unmodified", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 061): bootstrapIdentity()'s own body was EXACTLY 'await this.#service.describeIdentity();' AS OF this Stage's own scope; Alpha 060 appended 'this.#bootstrapped = true;' after it and Alpha 061 prepended an idempotency guard -- reconfirmed here that the pre-existing describeIdentity() call still appears, now as the body's own FIRST statement AFTER the guard", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines[0]).toBe("await this.#service.describeIdentity();");
+    expect(lines).toContain("await this.#service.describeIdentity();");
+    const awaitIndex = lines.indexOf("await this.#service.describeIdentity();");
+    expect(lines.slice(0, awaitIndex)).toEqual(["if (this.#bootstrapped) {", "return;", "}"]);
   });
 
   it("15. bootstrapIdentity() calls describeIdentity() on the Service exactly once", () => {
