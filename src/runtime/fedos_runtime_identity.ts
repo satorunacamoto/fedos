@@ -598,6 +598,38 @@
  *     or run the two concurrently.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 079 ("Identity Bootstrap Observation Scope
+ * Review", review only, NO code change) formally fixes the SCOPE of
+ * information any future `#observeBootstrap()` implementation may
+ * ever observe. ALLOWED: that a Bootstrap started, that it ended, the
+ * bare fact of whether the resolved Descriptor was `null` or
+ * non-`null`, elapsed processing time, invocation count, and
+ * success/failure outcome. FORBIDDEN, permanently: the Descriptor's
+ * own contents (`publicIdentifier`, `displayName`, `avatar`, or any
+ * other field), Provider internal state, Registry internal state,
+ * Storage, Runtime Mode, Runtime Platform, or any secret material.
+ * `#observeBootstrap()`'s own current EMPTY body trivially satisfies
+ * this Scope — it reads nothing, so it cannot exceed it — and its own
+ * `descriptor: FedosIdentityDescriptor | null` parameter, while
+ * technically reachable, must never have its own fields read by any
+ * future implementation. This Stage changes no field, no method body,
+ * and no observable behavior of any kind; it is a formal boundary a
+ * future Metrics/Tracing/Audit/Logging/Telemetry implementation (per
+ * the Alpha 077 Contract) must never cross. See
+ * `docs/secure_runtime_alpha_079_identity_bootstrap_observation_scope_review.md`
+ * for the full review record.
+ *
+ *   - `#observeBootstrap()`'s own Observation SCOPE (Alpha 079) is
+ *     PERMANENTLY fixed: ALLOWED to observe Bootstrap start/end, the
+ *     null-vs-non-null fact about the resolved Descriptor, elapsed
+ *     time, invocation count, and success/failure; FORBIDDEN from
+ *     ever reading the Descriptor's own field contents, Provider/
+ *     Registry/Storage internal state, Runtime Mode/Platform, or any
+ *     secret material — regardless of what future Stage implements
+ *     inside it.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
