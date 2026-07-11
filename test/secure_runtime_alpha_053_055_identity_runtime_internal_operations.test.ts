@@ -876,7 +876,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     expect(listIndex).toBeGreaterThan(findIndex);
   });
 
-  it("84. RIPPLE (Secure Runtime Alpha 068): FedosRuntimeIdentity's own class had exactly three PUBLIC methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 added a fourth (bootstrapIdentity()), Alpha 060 added a fifth (isBootstrapped()), Alpha 063 added a sixth (currentIdentity()), Alpha 064 added a seventh (identityVersion()), Alpha 066 removed that seventh again, and Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that findIdentity()/listIdentities() (this Arc's own original two, describeIdentity now excluded since it is no longer public) remain present and unchanged, alongside the three still-current newer PUBLIC methods (bootstrapIdentity/isBootstrapped/currentIdentity)", () => {
+  it("84. RIPPLE (Secure Runtime Alpha 069): FedosRuntimeIdentity's own class had exactly three PUBLIC methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 added a fourth (bootstrapIdentity()), Alpha 060 added a fifth (isBootstrapped()), Alpha 063 added a sixth (currentIdentity()), Alpha 064 added a seventh (identityVersion()), Alpha 066 removed that seventh again, Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method, and Alpha 069 (implementing Bootstrap State Consolidation) added a second private method, #completeBootstrap() -- reconfirmed here that findIdentity()/listIdentities() (this Arc's own original two, describeIdentity now excluded since it is no longer public) remain present and unchanged, alongside the three still-current newer PUBLIC methods (bootstrapIdentity/isBootstrapped/currentIdentity)", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -896,7 +896,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap"]));
   });
 
   it("85. RIPPLE (Secure Runtime Alpha 068): findIdentity() called before AND after describeIdentity() both still resolved null AS OF this Stage's own scope, confirming no hidden state mutation between the two; Alpha 068 made describeIdentity() private -- reconfirmed here via bootstrapIdentity()", async () => {

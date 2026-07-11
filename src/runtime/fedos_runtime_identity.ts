@@ -288,6 +288,37 @@
  *     `return this.#service.describeIdentity();`. It has EXACTLY ONE
  *     caller anywhere in this file: `bootstrapIdentity()`'s own second
  *     statement.
+ *
+ * Secure Runtime Alpha 069 ("Identity Bootstrap State Consolidation")
+ * adds a private, SYNCHRONOUS method,
+ * `#completeBootstrap(descriptor: FedosIdentityDescriptor | null): void`,
+ * whose own body is EXACTLY two statements —
+ * `this.#descriptor = descriptor; this.#bootstrapped = true;` — and
+ * NOTHING else: no branching, no Provider/Registry/Resolver/Storage
+ * access, no `try`/`catch`, no `await`. `bootstrapIdentity()`'s own
+ * guarded body is rewritten to
+ * `const descriptor = await this.#describeIdentity(); this.#completeBootstrap(descriptor);`
+ * — the SAME two effects (`#descriptor` assignment, then
+ * `#bootstrapped` assignment), in the SAME order, now performed by ONE
+ * dedicated method instead of two separate statements inline.
+ * `#descriptor` and `#bootstrapped` are now EACH assigned in exactly
+ * ONE place in the entire file: inside `#completeBootstrap()`, and
+ * nowhere else. This Stage adds NO new field, NO new public API, and
+ * changes NO observable behavior — idempotency, Fail Closed, Registry
+ * registration (still entirely `FedosIdentityService`'s own
+ * responsibility, reached identically through `#describeIdentity()`),
+ * Provider call count, and Bootstrap semantics are all completely
+ * UNCHANGED. See
+ * `docs/secure_runtime_alpha_069_identity_bootstrap_state_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#completeBootstrap()` (Alpha 069) is the ONLY place in this
+ *     file that ever assigns to `#descriptor` or `#bootstrapped`. It
+ *     is SYNCHRONOUS (no `async`, no `await`), takes exactly one
+ *     parameter (`descriptor: FedosIdentityDescriptor | null`),
+ *     returns `void`, and performs no I/O, no branching, and no error
+ *     handling of any kind. It has EXACTLY ONE caller anywhere in this
+ *     file: `bootstrapIdentity()`'s own second statement.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -320,6 +351,11 @@ export class FedosRuntimeIdentity {
     return this.#service.describeIdentity();
   }
 
+  #completeBootstrap(descriptor: FedosIdentityDescriptor | null): void {
+    this.#descriptor = descriptor;
+    this.#bootstrapped = true;
+  }
+
   findIdentity(id: string): FedosIdentityRecord | null {
     return this.#resolver.findIdentity(id);
   }
@@ -332,8 +368,8 @@ export class FedosRuntimeIdentity {
     if (this.#bootstrapped) {
       return;
     }
-    this.#descriptor = await this.#describeIdentity();
-    this.#bootstrapped = true;
+    const descriptor = await this.#describeIdentity();
+    this.#completeBootstrap(descriptor);
   }
 
   isBootstrapped(): boolean {

@@ -232,12 +232,12 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     expect(classBody).not.toMatch(/#identityVersion/);
   });
 
-  it("11. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body ended with 'this.#identityVersion += 1;' AS OF this Stage's own scope; Alpha 066 removed that final statement, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that the CURRENT body is EXACTLY the guard, the descriptor-capturing await (now via #describeIdentity()), and the bootstrapped assignment", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body ended with 'this.#identityVersion += 1;' AS OF this Stage's own scope; Alpha 066 removed that final statement, Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call -- reconfirmed here that the CURRENT body is EXACTLY the guard, the descriptor-capturing await (via #describeIdentity()), and the completeBootstrap call", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     expect(classBody).not.toMatch(/this\.#identityVersion \+= 1;/);
     expect(classBody).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*const descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#completeBootstrap\(descriptor\);\s*\n\s*\}/,
     );
   });
 

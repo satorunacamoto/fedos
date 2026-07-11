@@ -136,10 +136,10 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 068): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard to bootstrapIdentity(), Alpha 063 changed the discarded await into an assignment capturing into #descriptor, Alpha 064 appended a version-increment as the body's own new final statement, Alpha 066 (implementing the Alpha 065 Decision) removed that increment again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the call to reach the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside the guarded body and routed through #describeIdentity(), and isBootstrapped() itself is untouched", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 069): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard to bootstrapIdentity(), Alpha 063 changed the discarded await into an assignment capturing into #descriptor, Alpha 064 appended a version-increment as the body's own new final statement, Alpha 066 removed that increment again, Alpha 068 rewired the call to reach the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a dedicated #completeBootstrap() call -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside the guarded body and routed through #describeIdentity()/#completeBootstrap(), and isBootstrapped() itself is untouched", () => {
     expect(fedosRuntimeIdentitySource).toMatch(/#bootstrapped: boolean = false;/);
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#describeIdentity\(\);\s*\n\s*this\.#completeBootstrap\(descriptor\);\s*\n\s*\}/,
     );
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
@@ -239,7 +239,7 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     expect(body).not.toMatch(/await /);
   });
 
-  it("17. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard, Alpha 063 changed the discarded await into 'this.#descriptor = await this.#service.describeIdentity();', Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement, Alpha 066 removed that statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that the await/assignment pair still appears in order, as the body's own FINAL two statements, now preceded by the guard", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard, Alpha 063 changed the discarded await into 'this.#descriptor = await this.#service.describeIdentity();', Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement, Alpha 066 removed that statement again, Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing statement into a local 'const descriptor' assignment followed by a dedicated '#completeBootstrap(descriptor)' call, which itself performs the #descriptor/#bootstrapped assignments -- reconfirmed here that the await/completeBootstrap pair still appears in order, as the body's own FINAL two statements, now preceded by the guard", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -247,8 +247,8 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
     expect(lines.slice(-2)).toEqual([
-      "this.#descriptor = await this.#describeIdentity();",
-      "this.#bootstrapped = true;",
+      "const descriptor = await this.#describeIdentity();",
+      "this.#completeBootstrap(descriptor);",
     ]);
   });
 

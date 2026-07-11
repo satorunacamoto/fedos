@@ -228,9 +228,9 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     expect(fedosRuntimeIdentitySource).not.toMatch(/readonly #descriptor/);
   });
 
-  it("11. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body was EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, in that order, AS OF this Stage's own scope; Alpha 064 appended a version-increment as a new final statement, Alpha 066 (implementing the Alpha 065 Decision) removed that statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that the CURRENT body has come full circle in shape, still exactly the guard/await/assignment", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body was EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, in that order, AS OF this Stage's own scope; Alpha 064 appended a version-increment as a new final statement, Alpha 066 removed that statement again, Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call -- reconfirmed here that the CURRENT body is still exactly guard/await/completeBootstrap, in shape", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*const descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#completeBootstrap\(descriptor\);\s*\n\s*\}/,
     );
   });
 
@@ -275,12 +275,15 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     );
   });
 
-  it("15. RIPPLE (Secure Runtime Alpha 068): only ONE assignment to #descriptor existed in the class BODY (comments excluded) AS OF this Stage's own scope, inside bootstrapIdentity()'s own guarded body; Alpha 068 rewired that assignment to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that exactly one assignment still exists in the class body, now via #describeIdentity()", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 069): only ONE assignment to #descriptor existed in the class BODY (comments excluded) AS OF this Stage's own scope, inside bootstrapIdentity()'s own guarded body; Alpha 068 rewired the capturing call to the new private #describeIdentity() method, and Alpha 069 (Identity Bootstrap State Consolidation) moved the #descriptor assignment itself into a new dedicated private method, #completeBootstrap() -- reconfirmed here that exactly one assignment to #descriptor still exists in the class body, now inside #completeBootstrap()", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const assignments = [...classBody.matchAll(/#descriptor\s*=/g)];
     expect(assignments.length).toBe(1);
-    expect(classBody).toMatch(/this\.#descriptor = await this\.#describeIdentity\(\);/);
+    expect(classBody).toMatch(/this\.#descriptor = descriptor;/);
+    const bootstrapBody = (classBody.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(bootstrapBody).not.toMatch(/#descriptor\s*=/);
+    expect(bootstrapBody).toMatch(/const descriptor = await this\.#describeIdentity\(\);/);
   });
 
   // ---------------------------------------------------------------------

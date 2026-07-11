@@ -132,9 +132,9 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 068): the design doc's own recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 063 changed the discarded 'await this.#service.describeIdentity();' call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value, guard/return-flip unaffected), Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement, Alpha 066 removed that statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here against the CURRENT source", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 069): the design doc's own recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 063 changed the discarded 'await this.#service.describeIdentity();' call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value, guard/return-flip unaffected), Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement, Alpha 066 removed that statement again, Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a dedicated #completeBootstrap() call -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*const descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#completeBootstrap\(descriptor\);\s*\n\s*\}/,
     );
   });
 
@@ -189,7 +189,7 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
   // Structural: the guard itself, confirmed via literal extraction
   // ---------------------------------------------------------------------
 
-  it("10. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body was EXACTLY the four statements, in order (guard-if, return, await, assignment), AS OF this Stage's own scope; Alpha 063 changed the discarded await into an assignment capturing its return value into #descriptor, Alpha 064 appended a version-increment as a new fifth statement, Alpha 066 removed that fifth statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here as the CURRENT four statements, in the same order", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body was EXACTLY the four statements, in order (guard-if, return, await, assignment), AS OF this Stage's own scope; Alpha 063 changed the discarded await into an assignment capturing its return value into #descriptor, Alpha 064 appended a version-increment as a new fifth statement, Alpha 066 removed that fifth statement again, Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call -- reconfirmed here as the CURRENT four statements, in the same order", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -200,8 +200,8 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
       "if (this.#bootstrapped) {",
       "return;",
       "}",
-      "this.#descriptor = await this.#describeIdentity();",
-      "this.#bootstrapped = true;",
+      "const descriptor = await this.#describeIdentity();",
+      "this.#completeBootstrap(descriptor);",
     ]);
   });
 
