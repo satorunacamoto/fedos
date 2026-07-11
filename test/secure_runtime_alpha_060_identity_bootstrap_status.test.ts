@@ -236,7 +236,7 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     expect(body).not.toMatch(/await /);
   });
 
-  it("17. RIPPLE (Secure Runtime Alpha 061): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard -- reconfirmed here that the await/assignment pair still appears in order, as the body's own FINAL two statements, now preceded by the guard", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 063): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard, and Alpha 063 changed the discarded await into 'this.#descriptor = await this.#service.describeIdentity();' -- reconfirmed here that the await/assignment pair still appears in order, as the body's own FINAL two statements, now preceded by the guard, with the await now capturing into #descriptor", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -244,12 +244,12 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
     expect(lines.slice(-2)).toEqual([
-      "await this.#service.describeIdentity();",
+      "this.#descriptor = await this.#service.describeIdentity();",
       "this.#bootstrapped = true;",
     ]);
   });
 
-  it("18. FedosRuntimeIdentity's own class now has exactly FIVE public methods", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 063): FedosRuntimeIdentity's own class had exactly FIVE public methods AS OF this Stage's own scope; Alpha 063 added a sixth, currentIdentity() -- reconfirmed here that all five of this Stage's own methods remain present, alongside the newer sixth", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -258,7 +258,14 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
-      new Set(["describeIdentity", "findIdentity", "listIdentities", "bootstrapIdentity", "isBootstrapped"]),
+      new Set([
+        "describeIdentity",
+        "findIdentity",
+        "listIdentities",
+        "bootstrapIdentity",
+        "isBootstrapped",
+        "currentIdentity",
+      ]),
     );
   });
 

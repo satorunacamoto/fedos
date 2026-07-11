@@ -260,7 +260,7 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(body).toMatch(/#bootstrapped = true;/);
   });
 
-  it("18. the class still has exactly FIVE public methods -- no sixth method (e.g. reset/shutdown) added by this Stage", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 063): the class had exactly FIVE public methods AS OF this Stage's own scope -- no sixth method (e.g. reset/shutdown) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity() (a Descriptor cache read, not a reset/shutdown of any kind) -- reconfirmed here that all five of this Stage's own methods remain present, alongside the newer sixth", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -275,7 +275,14 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
-      new Set(["describeIdentity", "findIdentity", "listIdentities", "bootstrapIdentity", "isBootstrapped"]),
+      new Set([
+        "describeIdentity",
+        "findIdentity",
+        "listIdentities",
+        "bootstrapIdentity",
+        "isBootstrapped",
+        "currentIdentity",
+      ]),
     );
   });
 
@@ -351,8 +358,8 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
   // Regression: no implementation file touched by this review Stage
   // ---------------------------------------------------------------------
 
-  it("27. Regression: fedos_runtime_identity.ts does not reference this Stage's own review doc -- confirming this Stage touched no code, only documentation", () => {
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_062/);
+  it("27. RIPPLE (Secure Runtime Alpha 063): fedos_runtime_identity.ts did not reference this Stage's own review doc AS OF this Stage's own review-only scope, confirming this Stage itself touched no code, only documentation; Alpha 063 (a LATER, separate Stage that adds currentIdentity()) legitimately references it in fedos_runtime_identity.ts's own header comment while recording this arc's history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own no-code-change mandate", () => {
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_062/);
   });
 
   it("28. Regression: create_runtime.ts does not reference this Stage's own review doc", () => {
@@ -463,9 +470,9 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(b.listIdentities()).toEqual([]);
   });
 
-  it("42. final sanity: this Stage's own net effect touched zero src/ files -- create_runtime.ts/types.ts/worker.ts/fedos_runtime_identity.ts all confirmed to never reference this Stage's own doc", () => {
+  it("42. RIPPLE (Secure Runtime Alpha 063): final sanity -- this Stage's OWN net effect touched zero src/ files AS OF its own scope; reconfirmed here that create_runtime.ts/types.ts/worker.ts still never reference this Stage's own doc, while fedos_runtime_identity.ts (Alpha 063's own header-comment history, added by a LATER Stage) now legitimately does", () => {
     expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_062/);
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_062/);
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_062/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_062/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_062/);
   });

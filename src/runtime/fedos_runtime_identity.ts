@@ -155,6 +155,50 @@
  *     guard — `#bootstrapped` stays `false`, so the very next call
  *     retries for real. NO permanent lock-out on failure exists
  *     anywhere in this file.
+ *
+ * Secure Runtime Alpha 062 (review only, no code change) formally
+ * compared five approaches to resetting Bootstrap state and adopted
+ * "treat `FedosRuntimeIdentity` as a short-lived object; Identity
+ * switching means constructing a new instance" — explicitly rejecting
+ * an in-place `resetIdentityBootstrap()`/`Registry.clear()`/
+ * `shutdown()` of any kind. See
+ * `docs/secure_runtime_alpha_062_identity_bootstrap_reset_review.md`.
+ * No field or method in this file changed as a result of that Stage.
+ *
+ * Secure Runtime Alpha 063 ("Runtime Identity Descriptor Cache") adds a
+ * private `#descriptor: FedosIdentityDescriptor | null` field (initial
+ * `null`) and a SIXTH method, `currentIdentity(): FedosIdentityDescriptor | null`
+ * — a synchronous, side-effect-free, never-throwing read of that field.
+ * `bootstrapIdentity()`'s own pre-existing `await
+ * this.#service.describeIdentity();` statement now captures its return
+ * value into `this.#descriptor` instead of discarding it — the ONLY
+ * change to that method's own body; the guard, the `await` itself, and
+ * the trailing `this.#bootstrapped = true;` assignment are otherwise
+ * byte-for-byte unchanged, in the same order. `#descriptor` therefore
+ * changes ONLY on a successful `bootstrapIdentity()` completion — same
+ * as `#bootstrapped` — and takes on EXACTLY what
+ * `FedosIdentityService.describeIdentity()` returned: `null` when the
+ * Provider has no identity to report, or a real `FedosIdentityDescriptor`
+ * otherwise. A REJECTED `describeIdentity()` call leaves `#descriptor`
+ * completely untouched (the assignment sits after the `await`, so it is
+ * never reached), matching `#bootstrapped`'s own Alpha 060 Fail-Closed
+ * behavior exactly. `currentIdentity()` returns the held reference
+ * AS-IS — no clone, no defensive copy, no re-derivation — since
+ * `FedosIdentityDescriptor`'s own fields (Alpha 028/045) are already
+ * `readonly` and this file never mutates a Descriptor it receives. See
+ * `docs/secure_runtime_alpha_063_runtime_identity_descriptor_cache.md`
+ * for the full design rationale, including why caching (Option A) was
+ * adopted over re-querying the Service/Registry/Resolver on every call
+ * or holding the in-flight `Promise` itself.
+ *
+ *   - `#descriptor`/`currentIdentity()` (Alpha 063) track ONLY the
+ *     Descriptor from the MOST RECENT successful `bootstrapIdentity()`
+ *     completion — initial `null`, reassigned ONLY inside
+ *     `bootstrapIdentity()`'s own guarded body, to EXACTLY
+ *     `this.#service.describeIdentity()`'s own return value.
+ *     `currentIdentity()` itself is SYNCHRONOUS, performs NO I/O, NEVER
+ *     throws, and returns the held reference unchanged — no clone, no
+ *     copy, no transformation.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -174,6 +218,7 @@ export class FedosRuntimeIdentity {
   readonly #service: FedosIdentityService;
   readonly #resolver: FedosIdentityResolver;
   #bootstrapped: boolean = false;
+  #descriptor: FedosIdentityDescriptor | null = null;
 
   constructor() {
     this.#registry = new FedosIdentityRegistry();
@@ -198,11 +243,15 @@ export class FedosRuntimeIdentity {
     if (this.#bootstrapped) {
       return;
     }
-    await this.#service.describeIdentity();
+    this.#descriptor = await this.#service.describeIdentity();
     this.#bootstrapped = true;
   }
 
   isBootstrapped(): boolean {
     return this.#bootstrapped;
+  }
+
+  currentIdentity(): FedosIdentityDescriptor | null {
+    return this.#descriptor;
   }
 }

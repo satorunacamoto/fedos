@@ -197,15 +197,15 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     expect(fedosRuntimeIdentitySource).toMatch(/async bootstrapIdentity\(\): Promise<void> \{/);
   });
 
-  it("14. RIPPLE (Secure Runtime Alpha 061): bootstrapIdentity()'s own body was EXACTLY 'await this.#service.describeIdentity();' AS OF this Stage's own scope; Alpha 060 appended 'this.#bootstrapped = true;' after it and Alpha 061 prepended an idempotency guard -- reconfirmed here that the pre-existing describeIdentity() call still appears, now as the body's own FIRST statement AFTER the guard", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 063): bootstrapIdentity()'s own body was EXACTLY 'await this.#service.describeIdentity();' AS OF this Stage's own scope; Alpha 060 appended 'this.#bootstrapped = true;' after it, Alpha 061 prepended an idempotency guard, and Alpha 063 changed the discarded 'await this.#service.describeIdentity();' call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value instead of discarding it) -- reconfirmed here that the pre-existing describeIdentity() call still appears, now capturing into #descriptor, as the body's own FIRST statement AFTER the guard", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toContain("await this.#service.describeIdentity();");
-    const awaitIndex = lines.indexOf("await this.#service.describeIdentity();");
+    expect(lines).toContain("this.#descriptor = await this.#service.describeIdentity();");
+    const awaitIndex = lines.indexOf("this.#descriptor = await this.#service.describeIdentity();");
     expect(lines.slice(0, awaitIndex)).toEqual(["if (this.#bootstrapped) {", "return;", "}"]);
   });
 
@@ -251,7 +251,7 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     );
   });
 
-  it("21. RIPPLE (Secure Runtime Alpha 060): FedosRuntimeIdentity's own class had exactly FOUR public methods AS OF this Stage's own scope; Alpha 060 added a fifth, isBootstrapped() -- reconfirmed here that all four of THIS Stage's own methods remain present, alongside the newer fifth", () => {
+  it("21. RIPPLE (Secure Runtime Alpha 063): FedosRuntimeIdentity's own class had exactly FOUR public methods AS OF this Stage's own scope; Alpha 060 added a fifth, isBootstrapped(), and Alpha 063 added a sixth, currentIdentity() -- reconfirmed here that all four of THIS Stage's own methods remain present, alongside both newer methods", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -260,7 +260,14 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
-      new Set(["describeIdentity", "findIdentity", "listIdentities", "bootstrapIdentity", "isBootstrapped"]),
+      new Set([
+        "describeIdentity",
+        "findIdentity",
+        "listIdentities",
+        "bootstrapIdentity",
+        "isBootstrapped",
+        "currentIdentity",
+      ]),
     );
   });
 
