@@ -200,40 +200,44 @@
  *     throws, and returns the held reference unchanged — no clone, no
  *     copy, no transformation.
  *
- * Secure Runtime Alpha 064 ("Identity Change Detection") adds a private
+ * Secure Runtime Alpha 064 ("Identity Change Detection") added a private
  * `#identityVersion: number` field (initial `0`) and a SEVENTH method,
- * `identityVersion(): number` — a synchronous, side-effect-free,
- * never-throwing read of that field. `bootstrapIdentity()`'s own
- * guarded body gains ONE new final statement, `this.#identityVersion +=
- * 1;`, placed strictly AFTER `this.#bootstrapped = true;` — every other
- * statement (the guard, the descriptor-capturing `await`, the
- * `#bootstrapped` assignment) is byte-for-byte unchanged, in the same
- * order. The increment fires on EVERY successful completion of that
- * guarded body, regardless of whether the resolved Descriptor is `null`
- * or real — Bootstrap succeeding is itself the signal this method
- * tracks, not what the Descriptor happened to contain. A REJECTED
- * `describeIdentity()` call leaves `#identityVersion` completely
- * untouched (the assignment sits after the `await`, unreached on a
- * throw), matching `#bootstrapped`/`#descriptor`'s own established
- * Fail-Closed shape exactly. Because the increment lives INSIDE the
- * Alpha 061 idempotency guard, a repeat `bootstrapIdentity()` call on an
- * already-bootstrapped instance short-circuits before reaching it —
- * `identityVersion()` can therefore only ever read `0` or `1` for any
- * SINGLE instance, by construction; a caller that wants to observe a
- * DIFFERENT identity relies on Alpha 062's own established pattern
- * (construct a new `FedosRuntimeIdentity`), not on this counter
- * advancing past `1` on the same instance. See
- * `docs/secure_runtime_alpha_064_identity_change_detection.md` for the
- * full design rationale, including why a plain incrementing counter
- * (Option A) was adopted over a timestamp, a UUID, a content hash, or
- * comparing the previous and next Descriptor by value.
+ * `identityVersion(): number`, plus one final statement in
+ * `bootstrapIdentity()`'s own guarded body, `this.#identityVersion +=
+ * 1;` — both SINCE REMOVED, see Alpha 065/066 below. See
+ * `docs/secure_runtime_alpha_064_identity_change_detection.md` for that
+ * Stage's own original design rationale, preserved for history.
  *
- *   - `#identityVersion`/`identityVersion()` (Alpha 064) track ONLY how
- *     many times `bootstrapIdentity()`'s own guarded body has completed
- *     SUCCESSFULLY on THIS instance — initial `0`, incremented by
- *     EXACTLY `1` on each such completion, regardless of the resolved
- *     Descriptor's own value. `identityVersion()` itself is
- *     SYNCHRONOUS, performs NO I/O, and NEVER throws.
+ * Secure Runtime Alpha 065 (review only, no code change) formally
+ * proved, as a structural property of the actual source rather than an
+ * estimate, that `identityVersion()` could only ever read `0` or `1`
+ * per instance, could never observe a Descriptor change on a single
+ * instance, carried no cross-instance comparison value, and was
+ * informationally IDENTICAL to `isBootstrapped()` for every reachable
+ * state — `identityVersion() === (isBootstrapped() ? 1 : 0)`, always,
+ * because both fields were written in the same guarded branch, in
+ * adjacent statements, with no code path capable of setting one
+ * without the other. That Stage adopted Option D — consolidate onto
+ * `isBootstrapped()` as the sole Bootstrap-state reader, delete
+ * `identityVersion()`/`#identityVersion` — as its own formal Decision.
+ * See
+ * `docs/secure_runtime_alpha_065_identity_runtime_internal_contract_review.md`.
+ *
+ * Secure Runtime Alpha 066 ("Identity Version Removal") implements that
+ * Decision, and ONLY that Decision: `#identityVersion` and
+ * `identityVersion()` are REMOVED from this file, and
+ * `bootstrapIdentity()`'s own guarded body loses its own final
+ * statement, `this.#identityVersion += 1;` — the guard, the
+ * descriptor-capturing `await`, and the `this.#bootstrapped = true;`
+ * assignment are otherwise byte-for-byte unchanged, in the same order.
+ * `describeIdentity()`/`findIdentity()`/`listIdentities()`/
+ * `isBootstrapped()`/`currentIdentity()` are all byte-for-byte
+ * unchanged. This file now defines SIX public methods, not seven — the
+ * class had exactly this same six-method shape once before, between
+ * Alpha 063 and Alpha 064; this Stage returns it there. See
+ * `docs/secure_runtime_alpha_066_identity_version_removal.md` for the
+ * full removal rationale.
+ *
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -254,7 +258,6 @@ export class FedosRuntimeIdentity {
   readonly #resolver: FedosIdentityResolver;
   #bootstrapped: boolean = false;
   #descriptor: FedosIdentityDescriptor | null = null;
-  #identityVersion: number = 0;
 
   constructor() {
     this.#registry = new FedosIdentityRegistry();
@@ -281,7 +284,6 @@ export class FedosRuntimeIdentity {
     }
     this.#descriptor = await this.#service.describeIdentity();
     this.#bootstrapped = true;
-    this.#identityVersion += 1;
   }
 
   isBootstrapped(): boolean {
@@ -290,9 +292,5 @@ export class FedosRuntimeIdentity {
 
   currentIdentity(): FedosIdentityDescriptor | null {
     return this.#descriptor;
-  }
-
-  identityVersion(): number {
-    return this.#identityVersion;
   }
 }

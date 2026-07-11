@@ -868,7 +868,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     expect(listIndex).toBeGreaterThan(findIndex);
   });
 
-  it("84. RIPPLE (Secure Runtime Alpha 064): FedosRuntimeIdentity's own class had exactly three public methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 added a fourth method (bootstrapIdentity()), Alpha 060 added a fifth (isBootstrapped()), Alpha 063 added a sixth (currentIdentity()), and Alpha 064 added a seventh (identityVersion()) -- reconfirmed here that the original three (describeIdentity/findIdentity/listIdentities) remain present and unchanged, alongside all four newer methods", () => {
+  it("84. RIPPLE (Secure Runtime Alpha 066): FedosRuntimeIdentity's own class had exactly three public methods AS OF this Arc's own scope -- no fourth method was added by THIS Arc; Alpha 058 added a fourth method (bootstrapIdentity()), Alpha 060 added a fifth (isBootstrapped()), Alpha 063 added a sixth (currentIdentity()), Alpha 064 added a seventh (identityVersion()), and Alpha 066 (implementing the Alpha 065 Decision) removed that seventh again -- reconfirmed here that the original three (describeIdentity/findIdentity/listIdentities) remain present and unchanged, alongside the three still-current newer methods (bootstrapIdentity/isBootstrapped/currentIdentity)", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -884,7 +884,6 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
-        "identityVersion",
       ]),
     );
   });

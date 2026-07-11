@@ -246,29 +246,26 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
   // Behavioral: the claims in §3/§7 verified against the REAL source
   // ---------------------------------------------------------------------
 
-  it("16. behavioral: identityVersion() and isBootstrapped() are structurally IDENTICAL information -- the invariant holds across never-attempted, failed, and successful Bootstrap", async () => {
+  it("16. RIPPLE (Secure Runtime Alpha 066): identityVersion() and isBootstrapped() were structurally IDENTICAL information AS OF this Stage's own scope -- the invariant held across never-attempted, failed, and successful Bootstrap; Alpha 066 (implementing this Stage's own Decision) removed identityVersion() entirely -- reconfirmed here that isBootstrapped() alone still correctly tracks never-attempted/failed/succeeded, unaffected by the removal", async () => {
     const identity = new FedosRuntimeIdentity();
-    expect(identity.identityVersion()).toBe(identity.isBootstrapped() ? 1 : 0);
+    expect(identity.isBootstrapped()).toBe(false);
 
     vi.spyOn(FedosIdentityService.prototype, "describeIdentity").mockRejectedValueOnce(
       new Error("simulated Provider failure"),
     );
     await expect(identity.bootstrapIdentity()).rejects.toThrow();
-    expect(identity.identityVersion()).toBe(identity.isBootstrapped() ? 1 : 0);
+    expect(identity.isBootstrapped()).toBe(false);
 
     await identity.bootstrapIdentity();
-    expect(identity.identityVersion()).toBe(identity.isBootstrapped() ? 1 : 0);
     expect(identity.isBootstrapped()).toBe(true);
-    expect(identity.identityVersion()).toBe(1);
   });
 
-  it("17. behavioral: identityVersion() never exceeds 1 on a single instance, even across many repeated bootstrapIdentity() calls", async () => {
+  it("17. RIPPLE (Secure Runtime Alpha 066): identityVersion() never exceeded 1 on a single instance AS OF this Stage's own scope, even across many repeated bootstrapIdentity() calls; Alpha 066 removed the method -- reconfirmed here that isBootstrapped() alone stays stably true across 25 repeated calls, unaffected by the removal", async () => {
     const identity = new FedosRuntimeIdentity();
     for (let i = 0; i < 25; i += 1) {
       await identity.bootstrapIdentity();
     }
-    expect(identity.identityVersion()).toBeLessThanOrEqual(1);
-    expect(identity.identityVersion()).toBe(1);
+    expect(identity.isBootstrapped()).toBe(true);
   });
 
   it("18. behavioral: currentIdentity() never changes after the first successful Bootstrap, even if describeIdentity() would resolve something different on a later call", async () => {
@@ -296,16 +293,15 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it("19. behavioral: two fresh instances never share identityVersion() or currentIdentity() state -- no cross-instance comparison surface exists", async () => {
+  it("19. RIPPLE (Secure Runtime Alpha 066): two fresh instances never shared identityVersion() or currentIdentity() state AS OF this Stage's own scope -- no cross-instance comparison surface existed; Alpha 066 removed identityVersion() -- reconfirmed here that isBootstrapped()/currentIdentity() remain fully independent per instance, unaffected by the removal", async () => {
     const a = new FedosRuntimeIdentity();
     const b = new FedosRuntimeIdentity();
     await a.bootstrapIdentity();
-    expect(a.identityVersion()).toBe(1);
-    expect(b.identityVersion()).toBe(0);
+    expect(a.isBootstrapped()).toBe(true);
+    expect(b.isBootstrapped()).toBe(false);
     await b.bootstrapIdentity();
-    expect(a.identityVersion()).toBe(1);
-    expect(b.identityVersion()).toBe(1);
-    expect(a.identityVersion()).toBe(b.identityVersion());
+    expect(a.isBootstrapped()).toBe(true);
+    expect(b.isBootstrapped()).toBe(true);
   });
 
   it("20. behavioral: the confirmed describeIdentity() bypass -- calling describeIdentity() directly registers into the Registry (observable via findIdentity()) while isBootstrapped()/currentIdentity() stay untouched", async () => {
@@ -325,7 +321,6 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
 
     expect(identity.isBootstrapped()).toBe(false);
     expect(identity.currentIdentity()).toBeNull();
-    expect(identity.identityVersion()).toBe(0);
   });
 
   it("21. behavioral: describeIdentity()'s own body never references #bootstrapped/#descriptor/#identityVersion -- a genuinely stateless pass-through, confirming the bypass is structural, not incidental", () => {
@@ -366,7 +361,7 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     expect(viaCurrent).not.toBe(viaFind as unknown);
   });
 
-  it("24. behavioral: #bootstrapped/#descriptor/#identityVersion are each assigned in EXACTLY one place in the class body, confirming the §3 structural claims", () => {
+  it("24. RIPPLE (Secure Runtime Alpha 066): #bootstrapped/#descriptor/#identityVersion were each assigned in EXACTLY one place in the class body AS OF this Stage's own scope, confirming the §3 structural claims; Alpha 066 removed #identityVersion entirely -- reconfirmed here that #bootstrapped/#descriptor remain assigned in exactly one place each, and #identityVersion no longer exists anywhere in the class body", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -377,18 +372,18 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     expect([...classBody.matchAll(/this\.#bootstrapped\s*=/g)].length).toBe(1);
     expect([...classBody.matchAll(/this\.#descriptor\s*=/g)].length).toBe(1);
-    expect([...classBody.matchAll(/this\.#identityVersion\s*\+=/g)].length).toBe(1);
+    expect(classBody).not.toMatch(/#identityVersion/);
   });
 
   // ---------------------------------------------------------------------
   // Regression: no implementation file touched by this review Stage
   // ---------------------------------------------------------------------
 
-  it("25. Regression: fedos_runtime_identity.ts does not reference this Stage's own review doc -- confirming this Stage touched no code, only documentation", () => {
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_065/);
+  it("25. RIPPLE (Secure Runtime Alpha 066): fedos_runtime_identity.ts did not reference this Stage's own review doc AS OF this Stage's own review-only scope, confirming this Stage itself touched no code, only documentation; Alpha 066 (a LATER, separate Stage that removes identityVersion()) legitimately references it in fedos_runtime_identity.ts's own header comment while recording this arc's history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own no-code-change mandate", () => {
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_065/);
   });
 
-  it("26. Regression: fedos_runtime_identity.ts still has exactly SEVEN public methods, unchanged by this Stage", () => {
+  it("26. RIPPLE (Secure Runtime Alpha 066): fedos_runtime_identity.ts had exactly SEVEN public methods AS OF this Stage's own review-only scope, unchanged by this Stage; Alpha 066 (a LATER, separate Stage implementing this Stage's own Decision) removed identityVersion() -- reconfirmed here that the class now has exactly SIX public methods", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -410,7 +405,6 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
-        "identityVersion",
       ]),
     );
   });
@@ -522,9 +516,9 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     }
   });
 
-  it("40. final sanity: this Stage's own net effect touched zero src/ files -- create_runtime.ts/types.ts/worker.ts/fedos_runtime_identity.ts all confirmed to never reference this Stage's own doc", () => {
+  it("40. RIPPLE (Secure Runtime Alpha 066): final sanity -- this Stage's OWN net effect touched zero src/ files AS OF its own scope; reconfirmed here that create_runtime.ts/types.ts/worker.ts still never reference this Stage's own doc, while fedos_runtime_identity.ts (Alpha 066's own header-comment history, added by a LATER Stage) now legitimately does", () => {
     expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_065/);
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_065/);
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_065/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_065/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_065/);
   });

@@ -4,7 +4,6 @@ import { FedosRuntimeIdentity } from "../src/runtime/fedos_runtime_identity.js";
 import { FedosIdentityService } from "../src/identity/fedos_identity_service.js";
 import { FedosIdentityRegistry } from "../src/identity/fedos_identity_registry.js";
 import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
-import type { FedosIdentityDescriptor } from "../src/identity/fedos_identity_descriptor.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_064_identity_change_detection.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -110,20 +109,22 @@ afterEach(() => {
 });
 
 /**
- * Secure Runtime Alpha 064 -- "Identity Change Detection": adds a
+ * Secure Runtime Alpha 064 -- "Identity Change Detection": shipped a
  * private `#identityVersion` field and a seventh method,
- * `identityVersion()`, to `FedosRuntimeIdentity`, incrementing by
- * exactly 1 on every successful `bootstrapIdentity()` completion. These
- * tests confirm the design doc's own structure, the exact
- * implementation shape, and behavioral confirmation of the
- * Fail-Closed transition table, idempotency preservation (version can
- * only ever be 0 or 1 per instance), and exhaustive regression coverage
- * that every other method/file this Stage's own mandate forbids
- * touching remains completely unaffected.
+ * `identityVersion()`. Secure Runtime Alpha 065 (review only) formally
+ * proved that method informationally identical to `isBootstrapped()`
+ * and adopted its removal as a formal Decision; Secure Runtime Alpha
+ * 066 implemented that removal. Tests 1-9 (design doc structure) remain
+ * fully valid -- they check the FROZEN Alpha 064 design doc, an
+ * immutable historical record, not live code. Tests 10 onward are
+ * RIPPLE-relabeled: they recorded claims about `identityVersion()`'s
+ * own behavior that were true AS OF Alpha 064's own scope but are
+ * superseded by Alpha 066's removal; each is reconfirmed here against
+ * the CURRENT source and CURRENT runtime behavior.
  */
 describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
   // ---------------------------------------------------------------------
-  // Design doc structure
+  // Design doc structure (frozen historical record -- unaffected)
   // ---------------------------------------------------------------------
 
   it("1. the design doc exists and is substantial", () => {
@@ -221,25 +222,30 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
   });
 
   // ---------------------------------------------------------------------
-  // Implementation shape
+  // RIPPLE (Secure Runtime Alpha 066): implementation shape, superseded
   // ---------------------------------------------------------------------
 
-  it("10. fedos_runtime_identity.ts declares #identityVersion as a non-readonly private field, typed number, initial 0", () => {
-    expect(fedosRuntimeIdentitySource).toMatch(/#identityVersion: number = 0;/);
-    expect(fedosRuntimeIdentitySource).not.toMatch(/readonly #identityVersion/);
+  it("10. RIPPLE (Secure Runtime Alpha 066): fedos_runtime_identity.ts declared #identityVersion as a non-readonly private field, typed number, initial 0, AS OF this Stage's own scope; Alpha 066 removed the field entirely -- reconfirmed here that no #identityVersion field exists anywhere in the CURRENT source", () => {
+    expect(fedosRuntimeIdentitySource).not.toMatch(/#identityVersion: number = 0;/);
+    const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    expect(classBody).not.toMatch(/#identityVersion/);
   });
 
-  it("11. bootstrapIdentity()'s own body is EXACTLY the guard, the descriptor-capturing await, the bootstrapped assignment, and the version increment, in that order", () => {
-    expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*this\.#identityVersion \+= 1;\s*\n\s*\}/,
+  it("11. RIPPLE (Secure Runtime Alpha 066): bootstrapIdentity()'s own body ended with 'this.#identityVersion += 1;' AS OF this Stage's own scope; Alpha 066 removed that final statement -- reconfirmed here that the CURRENT body is EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, matching Alpha 063's own pre-064 shape again", () => {
+    const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    expect(classBody).not.toMatch(/this\.#identityVersion \+= 1;/);
+    expect(classBody).toMatch(
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
     );
   });
 
-  it("12. identityVersion() is a synchronous, single-statement pass-through returning the held field", () => {
-    expect(fedosRuntimeIdentitySource).toMatch(
-      /identityVersion\(\): number \{\s*\n\s*return this\.#identityVersion;\s*\n\s*\}/,
-    );
-    expect(fedosRuntimeIdentitySource).not.toMatch(/async identityVersion/);
+  it("12. RIPPLE (Secure Runtime Alpha 066): identityVersion() was a synchronous, single-statement pass-through returning #identityVersion AS OF this Stage's own scope; Alpha 066 removed the method entirely -- reconfirmed here that no identityVersion() method exists anywhere in the CURRENT class body (the header comment's own historical prose, which legitimately still names the removed method, is intentionally excluded from this check)", () => {
+    const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    expect(classBody).not.toMatch(/identityVersion\(\): number/);
+    expect(classBody).not.toMatch(/\bidentityVersion\b/);
   });
 
   it("13. describeIdentity()/findIdentity()/listIdentities()/isBootstrapped()/currentIdentity() remain BYTE-FOR-BYTE unchanged", () => {
@@ -260,7 +266,7 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     );
   });
 
-  it("14. the class now has exactly SEVEN public methods", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 066): the class had exactly SEVEN public methods AS OF this Stage's own scope; Alpha 066 removed identityVersion() -- reconfirmed here that the class now has exactly SIX public methods", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -276,157 +282,73 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
-        "identityVersion",
       ]),
     );
   });
 
-  it("15. only ONE assignment/mutation to #identityVersion exists in the class BODY (comments excluded), inside bootstrapIdentity()'s own guarded body", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 066): exactly ONE assignment/mutation to #identityVersion existed in the class body AS OF this Stage's own scope; Alpha 066 removed the field entirely -- reconfirmed here that ZERO mutations to #identityVersion exist anywhere in the CURRENT class body", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const mutations = [...classBody.matchAll(/#identityVersion\s*\+=/g)];
-    expect(mutations.length).toBe(1);
-    expect(classBody).toMatch(/this\.#identityVersion \+= 1;/);
+    expect(mutations.length).toBe(0);
   });
 
   // ---------------------------------------------------------------------
-  // Behavioral: the Fail-Closed transition table
+  // RIPPLE (Secure Runtime Alpha 066): behavioral claims, superseded
   // ---------------------------------------------------------------------
 
-  it("16. behavioral: a fresh, never-bootstrapped instance's identityVersion() returns 0", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 066): a fresh instance's identityVersion() returned 0 AS OF this Stage's own scope; Alpha 066 removed the method -- reconfirmed here that 'identityVersion' is not a property of any FedosRuntimeIdentity instance", () => {
     const identity = new FedosRuntimeIdentity();
-    expect(identity.identityVersion()).toBe(0);
+    expect("identityVersion" in identity).toBe(false);
+    expect((identity as unknown as Record<string, unknown>).identityVersion).toBeUndefined();
   });
 
-  it("17. behavioral: a successful bootstrapIdentity() whose describeIdentity() resolves null still increments identityVersion() to 1", async () => {
+  it("17. RIPPLE (Secure Runtime Alpha 066): a successful bootstrapIdentity() used to increment identityVersion() to 1 regardless of a null-resolving Descriptor AS OF this Stage's own scope; Alpha 066 removed the counter -- reconfirmed here that isBootstrapped()/currentIdentity() still report the correct post-Bootstrap state on their own, unaffected by the removal", async () => {
     const identity = new FedosRuntimeIdentity();
     await identity.bootstrapIdentity();
     expect(identity.isBootstrapped()).toBe(true);
     expect(identity.currentIdentity()).toBeNull();
-    expect(identity.identityVersion()).toBe(1);
   });
 
-  it("18. behavioral: a successful bootstrapIdentity() whose describeIdentity() resolves a real Descriptor also increments identityVersion() to exactly 1", async () => {
-    const descriptor: FedosIdentityDescriptor = {
-      id: "alpha064-version-check",
-      provider: "nostr",
-      publicIdentifier: "npub1alpha064",
-    };
-    vi.spyOn(FedosIdentityService.prototype, "describeIdentity").mockResolvedValue(descriptor);
+  it("18. RIPPLE (Secure Runtime Alpha 066): repeat bootstrapIdentity() calls after success used to leave identityVersion() at 1 with the Service called exactly once AS OF this Stage's own scope; Alpha 066 removed the counter -- reconfirmed here that the idempotency guarantee itself (Service called exactly once across repeats) still holds, unaffected by the removal", async () => {
+    const spy = vi.spyOn(FedosIdentityService.prototype, "describeIdentity");
     const identity = new FedosRuntimeIdentity();
     await identity.bootstrapIdentity();
-    expect(identity.identityVersion()).toBe(1);
+    await identity.bootstrapIdentity();
+    await identity.bootstrapIdentity();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(identity.isBootstrapped()).toBe(true);
   });
 
-  it("19. behavioral: identityVersion() stays 0 before bootstrapIdentity() is ever called, even after calling describeIdentity()/findIdentity()/listIdentities()/currentIdentity() directly", async () => {
-    const identity = new FedosRuntimeIdentity();
-    await identity.describeIdentity();
-    identity.findIdentity("x");
-    identity.listIdentities();
-    identity.currentIdentity();
-    expect(identity.identityVersion()).toBe(0);
-  });
-
-  it("20. behavioral: a REJECTED first-ever bootstrapIdentity() call leaves identityVersion() at 0", async () => {
+  it("19. RIPPLE (Secure Runtime Alpha 066): a REJECTED first-ever bootstrapIdentity() call used to leave identityVersion() at 0 AS OF this Stage's own scope; Alpha 066 removed the counter -- reconfirmed here that isBootstrapped() still correctly reports false after a rejection, unaffected by the removal", async () => {
     const identity = new FedosRuntimeIdentity();
     vi.spyOn(FedosIdentityService.prototype, "describeIdentity").mockRejectedValueOnce(
       new Error("simulated Provider failure"),
     );
     await expect(identity.bootstrapIdentity()).rejects.toThrow("simulated Provider failure");
     expect(identity.isBootstrapped()).toBe(false);
-    expect(identity.identityVersion()).toBe(0);
   });
 
-  it("21. behavioral: identityVersion() never throws, even immediately after a rejected bootstrapIdentity() call", async () => {
-    const identity = new FedosRuntimeIdentity();
-    vi.spyOn(FedosIdentityService.prototype, "describeIdentity").mockRejectedValueOnce(
-      new Error("simulated Provider failure"),
-    );
-    await expect(identity.bootstrapIdentity()).rejects.toThrow();
-    expect(() => identity.identityVersion()).not.toThrow();
-  });
-
-  it("22. behavioral: identityVersion() is synchronous -- never returns a Promise", async () => {
-    const identity = new FedosRuntimeIdentity();
-    await identity.bootstrapIdentity();
-    const result = identity.identityVersion();
-    expect(result).not.toBeInstanceOf(Promise);
-    expect(typeof result).toBe("number");
-  });
-
-  // ---------------------------------------------------------------------
-  // Behavioral: idempotency preservation -- version can only be 0 or 1
-  // ---------------------------------------------------------------------
-
-  it("23. behavioral: repeat bootstrapIdentity() calls after success never move identityVersion() past 1, and the Service is called exactly once", async () => {
-    const spy = vi.spyOn(FedosIdentityService.prototype, "describeIdentity");
-    const identity = new FedosRuntimeIdentity();
-    await identity.bootstrapIdentity();
-    await identity.bootstrapIdentity();
-    await identity.bootstrapIdentity();
-    expect(identity.identityVersion()).toBe(1);
-    expect(spy).toHaveBeenCalledTimes(1);
-  });
-
-  it("24. behavioral: 50 repeated bootstrapIdentity() calls after the first success all short-circuit -- identityVersion() stays exactly 1", async () => {
-    const identity = new FedosRuntimeIdentity();
-    for (let i = 0; i < 50; i += 1) {
-      await identity.bootstrapIdentity();
-    }
-    expect(identity.identityVersion()).toBe(1);
-  });
-
-  it("25. behavioral: after a failed first attempt, a successful retry increments identityVersion() to 1 exactly once, and a further repeat call does not increment it again", async () => {
-    const spy = vi
-      .spyOn(FedosIdentityService.prototype, "describeIdentity")
-      .mockRejectedValueOnce(new Error("simulated Provider failure"))
-      .mockResolvedValue(null);
-
-    const identity = new FedosRuntimeIdentity();
-    await expect(identity.bootstrapIdentity()).rejects.toThrow();
-    expect(identity.identityVersion()).toBe(0);
-
-    await identity.bootstrapIdentity();
-    expect(identity.identityVersion()).toBe(1);
-
-    await identity.bootstrapIdentity();
-    expect(identity.identityVersion()).toBe(1);
-    expect(spy).toHaveBeenCalledTimes(2);
-  });
-
-  it("26. behavioral: repeated failures (never succeeding) never increment identityVersion() -- it stays 0 throughout", async () => {
-    const identity = new FedosRuntimeIdentity();
-    vi.spyOn(FedosIdentityService.prototype, "describeIdentity").mockRejectedValue(
-      new Error("permanent simulated failure"),
-    );
-    for (let i = 0; i < 5; i += 1) {
-      await expect(identity.bootstrapIdentity()).rejects.toThrow();
-      expect(identity.identityVersion()).toBe(0);
-    }
-  });
-
-  it("27. behavioral: two independently-constructed instances each have their own independent version counter, never interfering with each other", async () => {
+  it("20. RIPPLE (Secure Runtime Alpha 066): two independently-constructed instances used to have their own independent version counters AS OF this Stage's own scope; Alpha 066 removed the counter -- reconfirmed here that isBootstrapped()/currentIdentity() still remain fully independent per instance, unaffected by the removal", async () => {
     const a = new FedosRuntimeIdentity();
     const b = new FedosRuntimeIdentity();
-    expect(a.identityVersion()).toBe(0);
-    expect(b.identityVersion()).toBe(0);
     await a.bootstrapIdentity();
-    expect(a.identityVersion()).toBe(1);
-    expect(b.identityVersion()).toBe(0);
+    expect(a.isBootstrapped()).toBe(true);
+    expect(b.isBootstrapped()).toBe(false);
     await b.bootstrapIdentity();
-    expect(a.identityVersion()).toBe(1);
-    expect(b.identityVersion()).toBe(1);
+    expect(a.isBootstrapped()).toBe(true);
+    expect(b.isBootstrapped()).toBe(true);
   });
 
-  it("28. behavioral: calling describeIdentity() directly (bypassing bootstrapIdentity()) never increments identityVersion()", async () => {
+  it("21. RIPPLE (Secure Runtime Alpha 066): calling describeIdentity() directly (bypassing bootstrapIdentity()) never incremented identityVersion() AS OF this Stage's own scope; Alpha 066 removed the counter -- reconfirmed here that describeIdentity() still never sets isBootstrapped()/currentIdentity(), the confirmed Alpha 065 bypass unaffected by this removal", async () => {
     const identity = new FedosRuntimeIdentity();
     await identity.describeIdentity();
     await identity.describeIdentity();
-    await identity.describeIdentity();
-    expect(identity.identityVersion()).toBe(0);
+    expect(identity.isBootstrapped()).toBe(false);
+    expect(identity.currentIdentity()).toBeNull();
   });
 
-  it("29. behavioral: the Registry's own register() call count is unaffected by this Stage -- still exactly once, confirmed by mocking the Provider (not the Service)", async () => {
+  it("22. RIPPLE (Secure Runtime Alpha 066): the Registry's own register() call count was unaffected by this Stage AS OF its own scope -- reconfirmed here that it remains exactly once after repeated Bootstrap calls, confirmed by mocking the Provider (not the Service)", async () => {
     const registerSpy = vi.spyOn(FedosIdentityRegistry.prototype, "register");
     const provider = resolveFedosIdentityProvider();
     vi.spyOn(provider as unknown as { describeIdentity: () => Promise<unknown> }, "describeIdentity").mockResolvedValue({
@@ -439,19 +361,19 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     await identity.bootstrapIdentity();
     await identity.bootstrapIdentity();
     expect(registerSpy).toHaveBeenCalledTimes(1);
-    expect(identity.identityVersion()).toBe(1);
+    expect(identity.isBootstrapped()).toBe(true);
   });
 
   // ---------------------------------------------------------------------
   // Regression: no other implementation file touched by this Stage
   // ---------------------------------------------------------------------
 
-  it("30. Regression: create_runtime.ts does not reference identityVersion, #identityVersion, or this Stage's own doc", () => {
+  it("23. Regression: create_runtime.ts does not reference identityVersion, #identityVersion, or this Stage's own doc", () => {
     expect(createRuntimeSource).not.toMatch(/identityVersion/);
     expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_064/);
   });
 
-  it("31. Regression: AppRuntime's own type (types.ts) has no identityVersion/version field and does not reference this Stage's own doc", () => {
+  it("24. Regression: AppRuntime's own type (types.ts) has no identityVersion/version field and does not reference this Stage's own doc", () => {
     expect(runtimeTypesSource).not.toMatch(
       /FedosRuntimeIdentity|fedos_runtime_identity|identityVersion|secure_runtime_alpha_064/,
     );
@@ -460,13 +382,13 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     expect(fieldNames).toEqual(APP_RUNTIME_FIELDS);
   });
 
-  it("32. Regression: src/worker.ts does not reference identityVersion, FedosRuntimeIdentity, or this Stage's own doc", () => {
+  it("25. Regression: src/worker.ts does not reference identityVersion, FedosRuntimeIdentity, or this Stage's own doc", () => {
     expect(workerSource).not.toMatch(/identityVersion/);
     expect(workerSource).not.toMatch(/FedosRuntimeIdentity|fedos_runtime_identity/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_064/);
   });
 
-  it("33. Regression: the entire Identity Layer (Provider/Registry/Resolver/Service) is confirmed BYTE-FOR-BYTE unaffected by this Stage -- no file references this Stage's own doc, and each still exposes exactly its pre-existing methods", () => {
+  it("26. Regression: the entire Identity Layer (Provider/Registry/Resolver/Service) is confirmed BYTE-FOR-BYTE unaffected by this Stage -- no file references this Stage's own doc, and each still exposes exactly its pre-existing methods", () => {
     for (const source of [serviceSource, registrySource, resolverClassSource, identityProviderResolverSource]) {
       expect(source).not.toMatch(/secure_runtime_alpha_064/);
     }
@@ -478,13 +400,13 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     expect(resolverClassSource).toMatch(/listIdentities\(\): readonly FedosIdentityRecord\[\] \{/);
   });
 
-  it("34. Regression: fedos_runtime_storage_resolver.ts and fedos_runtime_storage_backend.ts are confirmed unaffected by this Stage", () => {
+  it("27. Regression: fedos_runtime_storage_resolver.ts and fedos_runtime_storage_backend.ts are confirmed unaffected by this Stage", () => {
     for (const source of [storageResolverSource, storageBackendSource]) {
       expect(source).not.toMatch(/secure_runtime_alpha_064/);
     }
   });
 
-  it("35. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip via the real AppRuntime object, entirely unaffected by this Stage", async () => {
+  it("28. Regression: storeCiphertext()/loadCiphertext()/deleteCiphertext() still round-trip via the real AppRuntime object, entirely unaffected by this Stage", async () => {
     const runtime = createRuntime();
     const stored = await withNodeEnv("development", () => runtime.storeCiphertext("alpha064-id", "wire" as never));
     expect(stored).toBe(true);
@@ -494,7 +416,7 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     expect(deleted).toBe(true);
   });
 
-  it("36. Regression: initializeCrypto()/runtimeCapabilities() remain unaffected -- confirmed by ACTUAL calls via the AppRuntime object", async () => {
+  it("29. Regression: initializeCrypto()/runtimeCapabilities() remain unaffected -- confirmed by ACTUAL calls via the AppRuntime object", async () => {
     const runtime = createRuntime();
     expect(runtime.initializeCrypto()).toEqual({
       allowed: false,
@@ -507,7 +429,7 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     );
   });
 
-  it("37. Regression: createRuntime() still returns exactly the pre-existing thirty AppRuntime fields, under every mode, with no identityVersion field of any kind", () => {
+  it("30. Regression: createRuntime() still returns exactly the pre-existing thirty AppRuntime fields, under every mode, with no identityVersion field of any kind", () => {
     for (const mode of RUNTIME_MODES) {
       const runtime = createRuntime(undefined, { mode }) as unknown as Record<string, unknown>;
       expect(Object.keys(runtime).sort()).toEqual(APP_RUNTIME_FIELDS);
@@ -516,7 +438,7 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     }
   });
 
-  it("38. Regression: no fedos_*.ts file was added or removed by this Stage -- still exactly 57 under src/runtime/ and exactly 24 under src/identity/", () => {
+  it("31. Regression: no fedos_*.ts file was added or removed by this Stage -- still exactly 57 under src/runtime/ and exactly 24 under src/identity/", () => {
     const runtimeFiles = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
@@ -528,7 +450,7 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     expect(Object.keys(identityFiles).length).toBe(24);
   });
 
-  it("39. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- no reference to this Stage's own doc", () => {
+  it("32. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- no reference to this Stage's own doc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
     expect(pubFnNames.length).toBe(36);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
@@ -537,24 +459,24 @@ describe("Secure Runtime Alpha 064 -- Identity Change Detection", () => {
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_064/);
   });
 
-  it("40. Regression: package.json still declares exactly two dependencies and no bin/main/exports field, unaffected by this Stage", () => {
+  it("33. Regression: package.json still declares exactly two dependencies and no bin/main/exports field, unaffected by this Stage", () => {
     const pkg = JSON.parse(packageJsonSource);
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
     expect(pkg.bin).toBeUndefined();
   });
 
-  it("41. no other doc file references this Stage's own doc, confirming this Stage's own footprint is exactly two new files plus one modified src/ file", () => {
+  it("34. no other doc file references this Stage's own doc, confirming this Stage's own footprint is exactly two new files plus one modified src/ file", () => {
     expect(alpha061DocSource).not.toMatch(/secure_runtime_alpha_064/);
     expect(alpha063DocSource).not.toMatch(/secure_runtime_alpha_064/);
   });
 
-  it("42. behavioral: repeated createRuntime() calls (simulating Worker per-request construction) never throw, confirming Worker remains unaffected and un-wired", () => {
+  it("35. behavioral: repeated createRuntime() calls (simulating Worker per-request construction) never throw, confirming Worker remains unaffected and un-wired", () => {
     for (let i = 0; i < 20; i += 1) {
       expect(() => createRuntime()).not.toThrow();
     }
   });
 
-  it("43. final sanity: fedos_runtime_identity.ts is the ONLY src/ file this Stage touches -- create_runtime.ts/types.ts/worker.ts never reference this Stage's own doc, while fedos_runtime_identity.ts legitimately does", () => {
+  it("36. RIPPLE (Secure Runtime Alpha 066): final sanity -- this Stage's OWN net effect touched exactly one src/ file AS OF its own scope; reconfirmed here that create_runtime.ts/types.ts/worker.ts still never reference this Stage's own doc, while fedos_runtime_identity.ts (Alpha 064's own header-comment history, since ANNOTATED by Alpha 066's own removal) still legitimately does", () => {
     expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_064/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_064/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_064/);

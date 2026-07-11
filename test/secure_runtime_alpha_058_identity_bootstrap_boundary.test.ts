@@ -251,7 +251,7 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     );
   });
 
-  it("21. RIPPLE (Secure Runtime Alpha 064): FedosRuntimeIdentity's own class had exactly FOUR public methods AS OF this Stage's own scope; Alpha 060 added a fifth, isBootstrapped(), Alpha 063 added a sixth, currentIdentity(), and Alpha 064 added a seventh, identityVersion() -- reconfirmed here that all four of THIS Stage's own methods remain present, alongside all three newer methods", () => {
+  it("21. RIPPLE (Secure Runtime Alpha 066): FedosRuntimeIdentity's own class had exactly FOUR public methods AS OF this Stage's own scope; Alpha 060 added a fifth, isBootstrapped(), Alpha 063 added a sixth, currentIdentity(), Alpha 064 added a seventh, identityVersion(), and Alpha 066 (implementing the Alpha 065 Decision) removed that seventh again -- reconfirmed here that all four of THIS Stage's own methods remain present, alongside the two still-current newer methods (isBootstrapped/currentIdentity)", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -267,7 +267,6 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
-        "identityVersion",
       ]),
     );
   });
