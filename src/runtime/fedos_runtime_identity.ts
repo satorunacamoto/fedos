@@ -630,6 +630,41 @@
  *     inside it.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 080 ("Identity Bootstrap Observation
+ * Vocabulary Review", review only, NO code change) formally fixes the
+ * VOCABULARY — a closed set of five named tokens, not values or free
+ * text — any future `#observeBootstrap()` implementation may ever
+ * emit: `BOOTSTRAP_STARTED`, `BOOTSTRAP_COMPLETED`, `BOOTSTRAP_FAILED`,
+ * `DESCRIPTOR_PRESENT`, `DESCRIPTOR_ABSENT`. These are FACTS ONLY —
+ * no inference, no evaluation, no ranking, no severity assignment.
+ * `BOOTSTRAP_COMPLETED`/`BOOTSTRAP_FAILED` describe ONLY whether the
+ * Bootstrap Promise itself settled successfully or rejected — entirely
+ * independent of whether the resolved Descriptor was `null`; a `null`
+ * Descriptor from a successfully resolved Promise is still
+ * `BOOTSTRAP_COMPLETED`. The Descriptor itself never becomes
+ * Vocabulary — only the bare fact of its presence or absence
+ * (`DESCRIPTOR_PRESENT`/`DESCRIPTOR_ABSENT`) may ever be expressed,
+ * consistent with the Alpha 079 Scope. Free-form strings, exception
+ * message bodies, and stack traces are explicitly OUT of this
+ * Vocabulary, permanently — every future Metrics/Tracing/Audit/
+ * Logging/Telemetry implementation (per the Alpha 077 Contract) must
+ * draw exclusively from this closed five-token set. This Stage
+ * changes no field, no method body, and no observable behavior of any
+ * kind. See
+ * `docs/secure_runtime_alpha_080_identity_bootstrap_observation_vocabulary_review.md`
+ * for the full review record.
+ *
+ *   - `#observeBootstrap()`'s own Observation VOCABULARY (Alpha 080)
+ *     is PERMANENTLY fixed to exactly five tokens:
+ *     `BOOTSTRAP_STARTED`, `BOOTSTRAP_COMPLETED`, `BOOTSTRAP_FAILED`,
+ *     `DESCRIPTOR_PRESENT`, `DESCRIPTOR_ABSENT` — facts only, no
+ *     inference/evaluation/ranking/severity, no free-form strings, no
+ *     exception message bodies, no stack traces, and no Descriptor
+ *     content of any kind, regardless of what future Stage implements
+ *     inside it.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
