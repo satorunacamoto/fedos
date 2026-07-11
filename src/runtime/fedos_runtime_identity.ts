@@ -731,6 +731,40 @@
  *     semantics must never depend on an Event's own existence.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 083 ("Identity Bootstrap Observation Delivery
+ * Review", review only, NO code change, NO implementation) formally
+ * fixes WHO carries the responsibility to deliver an Observation
+ * Event anywhere external. This class MAY generate the Event and MAY
+ * synchronously notify a Consumer of it — and that is ALL it may ever
+ * do. Delivery itself — Logging, sending Telemetry, sending Metrics,
+ * saving an Audit record, any Network transmission, any Storage
+ * persistence, inserting into a Queue, or Retrying a failed send — is
+ * PERMANENTLY the responsibility of the external Consumer, never of
+ * this Runtime. This class must never know HOW an Event is delivered,
+ * WHERE it is delivered to, or WHETHER any Consumer is even present —
+ * `#observeBootstrap()` may be implemented to notify synchronously
+ * without presupposing a Consumer exists at all, exactly as an empty
+ * implementation trivially satisfies that today. Every future
+ * Logging/Metrics/Tracing/Telemetry/Audit implementation (per the
+ * Alpha 077 Contract) carries its OWN delivery responsibility,
+ * entirely on the Consumer side; this Runtime must never learn a
+ * delivery destination of any kind. This Stage changes no field, no
+ * method body, and no observable behavior of any kind. See
+ * `docs/secure_runtime_alpha_083_identity_bootstrap_observation_delivery_review.md`
+ * for the full review record.
+ *
+ *   - Observation DELIVERY responsibility (Alpha 083 Decision) is
+ *     PERMANENTLY fixed to the external Consumer, never to this
+ *     Runtime: this class MAY generate an Observation Event and MAY
+ *     synchronously notify a Consumer of it — nothing more. Logging,
+ *     Telemetry/Metrics transmission, Audit persistence, Network
+ *     transmission, Storage persistence, Queueing, and Retrying are
+ *     ALL permanently forbidden inside this Runtime, in any future
+ *     implementation, for any purpose. This Runtime never knows a
+ *     delivery destination and never presupposes a Consumer exists.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
