@@ -765,6 +765,39 @@
  *     delivery destination and never presupposes a Consumer exists.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 084 ("Identity Bootstrap Observation Consumer
+ * Boundary Review", review only, NO code change, NO implementation)
+ * formally fixes what influence an Observation Consumer may ever have
+ * back on this Runtime: NONE. A Consumer may only READ an Observation
+ * Event; it may never re-run Bootstrap, change the Descriptor, change
+ * the Registry, change the Provider, change the Resolver, change
+ * Storage, change Runtime state, or change Worker state. A Consumer
+ * may Log it, Trace it, send it as Telemetry, send it as a Metric,
+ * Audit it, or discard it — nothing more, and nothing that reaches
+ * back into this class. Observation is strictly one-way: Runtime →
+ * Observation Event → Consumer, with NO reverse flow of any kind ever
+ * permitted from Consumer back to Runtime. This Runtime must never
+ * know a Consumer's own implementation, and a Consumer must never
+ * know this Runtime's own internal implementation — the Observation
+ * Event is the ONLY thing the two sides ever share. This Stage
+ * changes no field, no method body, and no observable behavior of any
+ * kind. See
+ * `docs/secure_runtime_alpha_084_identity_bootstrap_observation_consumer_boundary_review.md`
+ * for the full review record.
+ *
+ *   - Observation CONSUMER BOUNDARY (Alpha 084 Decision) is
+ *     PERMANENTLY fixed: a Consumer may only read an Observation
+ *     Event and may Log/Trace/Telemetry/Metrics/Audit/discard it --
+ *     it may NEVER re-run Bootstrap, change the Descriptor, change
+ *     the Registry, change the Provider, change the Resolver, change
+ *     Storage, change Runtime state, or change Worker state, in any
+ *     future implementation, for any purpose. Observation flows
+ *     ONE-WAY, Runtime to Consumer, with NO reverse flow ever
+ *     permitted; neither side ever knows the other's own internal
+ *     implementation.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
