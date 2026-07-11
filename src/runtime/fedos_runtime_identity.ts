@@ -665,6 +665,39 @@
  *     inside it.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 081 ("Identity Bootstrap Observation Event
+ * Review", review only, NO code change, NO implementation) formally
+ * fixes the SHAPE any future Observation Event — should
+ * `#observeBootstrap()` ever notify an external sink — is permitted to
+ * have: EXACTLY three fields, `event` (a fixed name), `timestamp` (the
+ * observation instant), and the Alpha 080 Vocabulary token itself —
+ * and NOTHING else. REJECTED, permanently, as Event fields: Descriptor,
+ * Provider, Registry, Storage, Runtime, Platform, `displayName`,
+ * `avatar`, `publicIdentifier`, Error Message, Stack Trace, Severity,
+ * Category, Metadata, Attributes, Payload, or any free-form string.
+ * The Event's own entire purpose is to CARRY the Vocabulary token
+ * (Alpha 080) — it adds NO meaning of its own beyond the token, the
+ * fixed event name, and the timestamp. Every future
+ * Logging/Tracing/Audit/Telemetry/Metrics implementation (per the
+ * Alpha 077 Contract) MUST use this SAME three-field Event shape — no
+ * purpose-specific Payload of any kind is permitted. This Stage
+ * implements nothing — `#observeBootstrap()`'s own body remains
+ * exactly the empty implementation Alpha 076 left it — and changes no
+ * field, no method body, and no observable behavior of any kind. See
+ * `docs/secure_runtime_alpha_081_identity_bootstrap_observation_event_review.md`
+ * for the full review record.
+ *
+ *   - Any future Observation Event (Alpha 081 Decision) emitted from
+ *     `#observeBootstrap()` is PERMANENTLY fixed to EXACTLY three
+ *     fields — `event`, `timestamp`, and the Alpha 080 Vocabulary
+ *     token — and NOTHING else: no Descriptor, Provider, Registry,
+ *     Storage, Runtime, Platform, `displayName`, `avatar`,
+ *     `publicIdentifier`, Error Message, Stack Trace, Severity,
+ *     Category, Metadata, Attributes, Payload, or free-form string, in
+ *     any future implementation, for any purpose.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
