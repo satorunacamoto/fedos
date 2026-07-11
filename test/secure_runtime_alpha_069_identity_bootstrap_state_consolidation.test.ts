@@ -220,9 +220,9 @@ describe("Secure Runtime Alpha 069 -- Identity Bootstrap State Consolidation", (
     expect(body).not.toMatch(/await/);
   });
 
-  it("11. bootstrapIdentity()'s own body is EXACTLY three statements: the guard-if/return/close-brace, the descriptor-capturing await into a local, and the completeBootstrap call", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity()'s own body was EXACTLY three statements: the guard-if/return/close-brace, the descriptor-capturing await into a local, and the completeBootstrap call, AS OF this Stage's own scope; Alpha 070 (Identity Bootstrap Entry Consolidation) moved this ENTIRE body into a new private #bootstrapIdentity() method, with the PUBLIC bootstrapIdentity() reduced to a pure one-line wrapper -- reconfirmed here that the same three statements still appear, now inside #bootstrapIdentity()", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
-    const body = (classBody.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
@@ -269,7 +269,7 @@ describe("Secure Runtime Alpha 069 -- Identity Bootstrap State Consolidation", (
     expect(callSites.length).toBe(1);
   });
 
-  it("16. the class now has exactly FIVE public methods and TWO private methods", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 070): the class had exactly FIVE public methods and TWO private methods AS OF this Stage's own scope; Alpha 070 (Identity Bootstrap Entry Consolidation) added a third private method, #bootstrapIdentity() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside THREE private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -282,7 +282,7 @@ describe("Secure Runtime Alpha 069 -- Identity Bootstrap State Consolidation", (
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "bootstrapIdentity"]));
   });
 
   it("17. no new private FIELD was added -- still exactly five fields (three readonly, two not)", () => {

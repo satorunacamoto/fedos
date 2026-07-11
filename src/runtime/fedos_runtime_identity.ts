@@ -318,7 +318,37 @@
  *     parameter (`descriptor: FedosIdentityDescriptor | null`),
  *     returns `void`, and performs no I/O, no branching, and no error
  *     handling of any kind. It has EXACTLY ONE caller anywhere in this
- *     file: `bootstrapIdentity()`'s own second statement.
+ *     file: `#bootstrapIdentity()`'s own second statement.
+ *
+ * Secure Runtime Alpha 070 ("Identity Bootstrap Entry Consolidation")
+ * moves `bootstrapIdentity()`'s own entire guarded body — the guard,
+ * the `#describeIdentity()` call, and the `#completeBootstrap()` call,
+ * in that EXACT order, byte-for-byte unchanged — into a new private
+ * method, `#bootstrapIdentity(): Promise<void>`. The PUBLIC
+ * `bootstrapIdentity()` becomes a pure one-line wrapper,
+ * `return this.#bootstrapIdentity();`, and performs NOTHING else — no
+ * guard of its own, no state read or write, no error handling. This
+ * Stage adds NO new field, NO new public API, and changes NO
+ * observable behavior of any kind — the guard/`#describeIdentity()`/
+ * `#completeBootstrap()` sequence Alpha 061/068/069 each built is
+ * relocated, not altered. `bootstrapIdentity()`'s own Bootstrap BODY
+ * now exists in exactly ONE place — `#bootstrapIdentity()` — matching
+ * the single-write-site/single-reader-site discipline Alpha 069/068
+ * already established for Bootstrap STATE and the Identity Service
+ * READ path, respectively. See
+ * `docs/secure_runtime_alpha_070_identity_bootstrap_entry_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#bootstrapIdentity()` (Alpha 070) holds the ENTIRE Bootstrap
+ *     body — the guard (Alpha 061), the `#describeIdentity()` call
+ *     (Alpha 068), and the `#completeBootstrap()` call (Alpha 069), in
+ *     that exact order, byte-for-byte identical to what
+ *     `bootstrapIdentity()`'s own body was immediately before this
+ *     Stage. It has EXACTLY ONE caller anywhere in this file: the
+ *     PUBLIC `bootstrapIdentity()`'s own single statement.
+ *   - PUBLIC `bootstrapIdentity(): Promise<void>` (Alpha 070) is a
+ *     PURE WRAPPER — its own entire body is
+ *     `return this.#bootstrapIdentity();`, nothing more.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -356,6 +386,14 @@ export class FedosRuntimeIdentity {
     this.#bootstrapped = true;
   }
 
+  async #bootstrapIdentity(): Promise<void> {
+    if (this.#bootstrapped) {
+      return;
+    }
+    const descriptor = await this.#describeIdentity();
+    this.#completeBootstrap(descriptor);
+  }
+
   findIdentity(id: string): FedosIdentityRecord | null {
     return this.#resolver.findIdentity(id);
   }
@@ -365,11 +403,7 @@ export class FedosRuntimeIdentity {
   }
 
   async bootstrapIdentity(): Promise<void> {
-    if (this.#bootstrapped) {
-      return;
-    }
-    const descriptor = await this.#describeIdentity();
-    this.#completeBootstrap(descriptor);
+    return this.#bootstrapIdentity();
   }
 
   isBootstrapped(): boolean {

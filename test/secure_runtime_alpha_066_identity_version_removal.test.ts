@@ -190,9 +190,10 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(identity))).not.toContain("identityVersion");
   });
 
-  it("10. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body no longer contained the version-increment statement AS OF this Stage's own scope -- it was EXACTLY the guard-if/return/close-brace, the descriptor-capturing await, and the bootstrapped assignment; Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call -- reconfirmed here that the body shape is unchanged in spirit, now routed through #describeIdentity()/#completeBootstrap()", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity()'s own body no longer contained the version-increment statement AS OF this Stage's own scope -- it was EXACTLY the guard-if/return/close-brace, the descriptor-capturing await, and the bootstrapped assignment; Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call, and Alpha 070 (Identity Bootstrap Entry Consolidation) moved this ENTIRE body into a new private #bootstrapIdentity() method -- reconfirmed here that the body shape is unchanged in spirit, now routed through #describeIdentity()/#completeBootstrap(), inside #bootstrapIdentity()", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
-    const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())

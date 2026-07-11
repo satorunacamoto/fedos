@@ -253,14 +253,16 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(fedosRuntimeIdentitySource).toMatch(/readonly #resolver: FedosIdentityResolver;/);
   });
 
-  it("17. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body had exactly one assignment to #bootstrapped AS OF this Stage's own scope -- no reset path existed; Alpha 069 (Identity Bootstrap State Consolidation) moved that assignment into a new dedicated private method, #completeBootstrap(), called once from bootstrapIdentity()'s own body -- reconfirmed here that the class BODY as a whole still has exactly one assignment to #bootstrapped, now inside #completeBootstrap(), with no reset path anywhere", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity()'s own body had exactly one assignment to #bootstrapped AS OF this Stage's own scope -- no reset path existed; Alpha 069 (Identity Bootstrap State Consolidation) moved that assignment into a new dedicated private method, #completeBootstrap(), called once from bootstrapIdentity()'s own body, and Alpha 070 (Identity Bootstrap Entry Consolidation) moved that call site itself into a new private #bootstrapIdentity() method, with the PUBLIC bootstrapIdentity() reduced to a pure one-line wrapper -- reconfirmed here that the class BODY as a whole still has exactly one assignment to #bootstrapped, now inside #completeBootstrap(), with no reset path anywhere", () => {
     const classBody = (fedosRuntimeIdentitySource.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const assignments = [...classBody.matchAll(/#bootstrapped\s*=/g)];
     expect(assignments.length).toBe(1);
     expect(classBody).toMatch(/#bootstrapped = true;/);
-    const bootstrapBody = (fedosRuntimeIdentitySource.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
+    const bootstrapBody = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
     expect(bootstrapBody).not.toMatch(/#bootstrapped\s*=/);
     expect(bootstrapBody).toMatch(/this\.#completeBootstrap\(descriptor\);/);
+    const publicBody = (classBody.match(/\n  async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
+    expect(publicBody.trim()).toBe("return this.#bootstrapIdentity();");
   });
 
   it("18. RIPPLE (Secure Runtime Alpha 068): the class had exactly FIVE PUBLIC methods AS OF this Stage's own scope -- no sixth method (e.g. reset/shutdown) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity() (a Descriptor cache read, not a reset/shutdown of any kind), Alpha 064 added a seventh, identityVersion(), Alpha 066 removed that seventh again, and Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that bootstrapIdentity() (this Stage's own method) remains present, alongside the still-current sixth (currentIdentity), with describeIdentity() now excluded from the PUBLIC set", () => {

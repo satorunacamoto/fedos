@@ -244,10 +244,10 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
     expect(body.trim()).toBe("return this.#service.describeIdentity();");
   });
 
-  it("16. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body called this.#service.describeIdentity() DIRECTLY, never this.describeIdentity(), AS OF this Stage's own scope, confirming zero internal callers of the public wrapper; Alpha 068 rewired bootstrapIdentity() to call the new private this.#describeIdentity() instead -- reconfirmed here that bootstrapIdentity() now routes through the private method, which itself still reaches this.#service internally", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity()'s own body called this.#service.describeIdentity() DIRECTLY, never this.describeIdentity(), AS OF this Stage's own scope, confirming zero internal callers of the public wrapper; Alpha 068 rewired bootstrapIdentity() to call the new private this.#describeIdentity() instead, and Alpha 070 (Identity Bootstrap Entry Consolidation) moved that call site itself into a new private #bootstrapIdentity() method -- reconfirmed here that #bootstrapIdentity() now routes through #describeIdentity(), which itself still reaches this.#service internally", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
-    const body = (classBody.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(body).not.toMatch(/this\.#service\.describeIdentity\(\)/);
     expect(body).toMatch(/this\.#describeIdentity\(\)/);
     const describeBody = (classBody.match(/async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";

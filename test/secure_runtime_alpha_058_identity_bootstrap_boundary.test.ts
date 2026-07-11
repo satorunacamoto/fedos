@@ -133,9 +133,11 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 068): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 060 appended a `this.#bootstrapped = true;` line, Alpha 061 later prepended an idempotency guard, and Alpha 068 (implementing the Alpha 067 Decision) rewired the call to reach the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside the guarded body and routed through #describeIdentity()", () => {
-    expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#describeIdentity\(\);/,
+  it("3. RIPPLE (Secure Runtime Alpha 070): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 060 appended a `this.#bootstrapped = true;` line, Alpha 061 later prepended an idempotency guard, Alpha 068 rewired the call to reach the new private #describeIdentity() method instead of this.#service directly, and Alpha 070 (Identity Bootstrap Entry Consolidation) moved the ENTIRE guarded body into a new private #bootstrapIdentity() method, leaving PUBLIC bootstrapIdentity() a pure wrapper -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside #bootstrapIdentity()'s own guarded body, routed through #describeIdentity()", () => {
+    const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    expect(classBody).toMatch(
+      /async #bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#describeIdentity\(\);/,
     );
   });
 
@@ -197,9 +199,10 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     expect(fedosRuntimeIdentitySource).toMatch(/async bootstrapIdentity\(\): Promise<void> \{/);
   });
 
-  it("14. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity()'s own body was EXACTLY 'await this.#service.describeIdentity();' AS OF this Stage's own scope; Alpha 060 appended 'this.#bootstrapped = true;' after it, Alpha 061 prepended an idempotency guard, Alpha 063 changed the discarded call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value instead of discarding it), Alpha 068 rewired that same statement to call the new private 'this.#describeIdentity()' instead of reaching the Service directly, and Alpha 069 (Identity Bootstrap State Consolidation) split the statement into 'const descriptor = await this.#describeIdentity();' followed by 'this.#completeBootstrap(descriptor);' -- reconfirmed here that the pre-existing call still appears, now capturing into a local, as the body's own FIRST statement AFTER the guard", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity()'s own body was EXACTLY 'await this.#service.describeIdentity();' AS OF this Stage's own scope; Alpha 060 appended 'this.#bootstrapped = true;' after it, Alpha 061 prepended an idempotency guard, Alpha 063 changed the discarded call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value instead of discarding it), Alpha 068 rewired that same statement to call the new private 'this.#describeIdentity()' instead of reaching the Service directly, Alpha 069 split the statement into 'const descriptor = await this.#describeIdentity();' followed by 'this.#completeBootstrap(descriptor);', and Alpha 070 (Identity Bootstrap Entry Consolidation) moved that ENTIRE sequence into a new private #bootstrapIdentity() method, leaving PUBLIC bootstrapIdentity() a pure wrapper -- reconfirmed here that the pre-existing call still appears, now inside #bootstrapIdentity()'s own guarded body, as the body's own FIRST statement AFTER the guard", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
-    const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
@@ -209,34 +212,37 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
     expect(lines.slice(0, awaitIndex)).toEqual(["if (this.#bootstrapped) {", "return;", "}"]);
   });
 
-  it("15. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity() called describeIdentity() on the Service exactly once AS OF this Stage's own scope; Alpha 068 rewired that call through the new private #describeIdentity() method -- reconfirmed here that the substring 'describeIdentity()' still appears exactly once in the body (now as part of 'this.#describeIdentity()')", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity() called describeIdentity() on the Service exactly once AS OF this Stage's own scope; Alpha 068 rewired that call through the new private #describeIdentity() method, and Alpha 070 moved the entire sequence into a new private #bootstrapIdentity() method -- reconfirmed here that the substring 'describeIdentity()' still appears exactly once in #bootstrapIdentity()'s own body (as part of 'this.#describeIdentity()')", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
-    const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect([...body.matchAll(/describeIdentity\(\)/g)].length).toBe(1);
     expect(body).toMatch(/this\.#describeIdentity\(\)/);
     expect(body).not.toMatch(/this\.#service\.describeIdentity\(\)/);
   });
 
-  it("16. RIPPLE (Secure Runtime Alpha 069): bootstrapIdentity() routed through the Service (this.#service) directly, not the Resolver or Registry, AS OF this Stage's own scope; Alpha 068 rewired it to route through the new private #describeIdentity() method instead, which itself still routes through this.#service internally, and Alpha 069 additionally routes the #descriptor/#bootstrapped assignment through #completeBootstrap() -- reconfirmed here that bootstrapIdentity()'s own body no longer references this.#service directly, and never references this.#resolver/this.#registry", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity() routed through the Service (this.#service) directly, not the Resolver or Registry, AS OF this Stage's own scope; Alpha 068/069 rewired it to route through #describeIdentity()/#completeBootstrap() instead, and Alpha 070 moved that entire sequence into a new private #bootstrapIdentity() method -- reconfirmed here that #bootstrapIdentity()'s own body no longer references this.#service directly, and never references this.#resolver/this.#registry", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
-    const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(body).not.toMatch(/this\.#service/);
     expect(body).toMatch(/this\.#describeIdentity\(\)/);
     expect(body).toMatch(/this\.#completeBootstrap\(/);
     expect(body).not.toMatch(/this\.#resolver/);
     expect(body).not.toMatch(/this\.#registry/);
-    const codeOnlyClass = codeOnly;
-    const classBody = (codeOnlyClass.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const describeBody = (classBody.match(/async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(describeBody).toMatch(/this\.#service/);
   });
 
-  it("17. bootstrapIdentity() awaits the call -- no bare fire-and-forget inside its own body", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 070): bootstrapIdentity() awaited the call -- no bare fire-and-forget inside its own body -- AS OF this Stage's own scope; Alpha 070 moved the await into a new private #bootstrapIdentity() method -- reconfirmed here that #bootstrapIdentity() still awaits, with no bare fire-and-forget, and that the PUBLIC bootstrapIdentity() is now a pure one-line wrapper delegating to it", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
-    const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(body).toMatch(/await /);
     expect(body).not.toMatch(/void /);
     expect(body).not.toMatch(/\.catch\(/);
+    const publicBody = (classBody.match(/\n {2}async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(publicBody.trim()).toBe("return this.#bootstrapIdentity();");
   });
 
   it("18. bootstrapIdentity()'s own declared return type is Promise<void>", () => {
