@@ -369,6 +369,41 @@
  * See
  * `docs/secure_runtime_alpha_071_identity_bootstrap_public_api_consolidation.md`
  * for the full review record.
+ *
+ * Secure Runtime Alpha 072 ("Identity Bootstrap State Reader
+ * Consolidation") adds a private, SYNCHRONOUS method,
+ * `#isBootstrapped(): boolean`, whose own entire body is
+ * `return this.#bootstrapped;` — and NOTHING else: no `if`, no
+ * `try`/`catch`, no `await`, no Provider/Registry/Storage/Resolver
+ * reference. The PUBLIC `isBootstrapped(): boolean` becomes a pure
+ * one-line wrapper, `return this.#isBootstrapped();`, and performs
+ * NOTHING else. `#bootstrapIdentity()`'s own guard is rewritten from
+ * `if (this.#bootstrapped) {` to `if (this.#isBootstrapped()) {` —
+ * the ONLY other change this Stage makes; the guard's own position
+ * (first statement), its own body (`return;`), and the rest of
+ * `#bootstrapIdentity()` are otherwise byte-for-byte unchanged. `#bootstrapped`
+ * is now READ in exactly ONE place in this file — inside
+ * `#isBootstrapped()` — matching the single-reader-site/
+ * single-writer-site/single-entry-site discipline Alpha 068/069/070
+ * already established for the Identity Service READ path, Bootstrap
+ * STATE writes, and the Bootstrap ENTRY point, respectively. This
+ * Stage adds NO new field, NO new public API, and changes NO
+ * observable behavior of any kind. See
+ * `docs/secure_runtime_alpha_072_identity_bootstrap_state_reader_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#isBootstrapped()` (Alpha 072) is the ONLY place in this file
+ *     that ever READS `#bootstrapped`. It is SYNCHRONOUS (no `async`,
+ *     no `await`), takes no parameters, returns `boolean`, and
+ *     performs no I/O, no branching, and no error handling of any
+ *     kind. It has exactly TWO callers anywhere in this file: the
+ *     PUBLIC `isBootstrapped()`'s own single statement, and
+ *     `#bootstrapIdentity()`'s own guard condition.
+ *   - PUBLIC `isBootstrapped(): boolean` (Alpha 072) is a PURE
+ *     WRAPPER — its own entire body is
+ *     `return this.#isBootstrapped();`, nothing more.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
@@ -402,8 +437,12 @@ export class FedosRuntimeIdentity {
     this.#bootstrapped = true;
   }
 
+  #isBootstrapped(): boolean {
+    return this.#bootstrapped;
+  }
+
   async #bootstrapIdentity(): Promise<void> {
-    if (this.#bootstrapped) {
+    if (this.#isBootstrapped()) {
       return;
     }
     const descriptor = await this.#describeIdentity();
@@ -423,7 +462,7 @@ export class FedosRuntimeIdentity {
   }
 
   isBootstrapped(): boolean {
-    return this.#bootstrapped;
+    return this.#isBootstrapped();
   }
 
   currentIdentity(): FedosIdentityDescriptor | null {

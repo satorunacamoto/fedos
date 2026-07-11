@@ -199,7 +199,7 @@ describe("Secure Runtime Alpha 070 -- Identity Bootstrap Entry Consolidation", (
     expect(classBody).toMatch(/async #bootstrapIdentity\(\): Promise<void> \{/);
   });
 
-  it("10. #bootstrapIdentity()'s own body is EXACTLY the five statements: guard-if, return, close-brace, descriptor-capturing await, and completeBootstrap call, in that order", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 072): #bootstrapIdentity()'s own body was EXACTLY the five statements, guard-if/return/close-brace/descriptor-capturing await/completeBootstrap call, in that order, AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition from 'if (this.#bootstrapped)' to 'if (this.#isBootstrapped())' -- reconfirmed here as the CURRENT five statements, in the same order, with the updated guard condition", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -207,7 +207,7 @@ describe("Secure Runtime Alpha 070 -- Identity Bootstrap Entry Consolidation", (
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
     expect(lines).toEqual([
-      "if (this.#bootstrapped) {",
+      "if (this.#isBootstrapped()) {",
       "return;",
       "}",
       "const descriptor = await this.#describeIdentity();",
@@ -246,10 +246,10 @@ describe("Secure Runtime Alpha 070 -- Identity Bootstrap Entry Consolidation", (
   // レビュー事項: guard / #describeIdentity() / #completeBootstrap() order
   // ---------------------------------------------------------------------
 
-  it("14. guard/#describeIdentity()/#completeBootstrap() order is EXACTLY preserved inside #bootstrapIdentity()", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 072): guard/#describeIdentity()/#completeBootstrap() order was EXACTLY preserved inside #bootstrapIdentity() AS OF this Stage's own scope, with the guard reading 'this.#bootstrapped' directly; Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition to 'this.#isBootstrapped()' -- reconfirmed here that the order is still exactly preserved, with the updated guard condition", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     expect(classBody).toMatch(
-      /async #bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*const descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#completeBootstrap\(descriptor\);\s*\n\s*\}/,
+      /async #bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#isBootstrapped\(\)\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*const descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#completeBootstrap\(descriptor\);\s*\n\s*\}/,
     );
   });
 
@@ -286,7 +286,7 @@ describe("Secure Runtime Alpha 070 -- Identity Bootstrap Entry Consolidation", (
     expect(bootstrappedAssignments.length).toBe(1);
   });
 
-  it("19. the class now has exactly FIVE public methods and THREE private methods", () => {
+  it("19. RIPPLE (Secure Runtime Alpha 072): the class had exactly FIVE public methods and THREE private methods AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth private method, #isBootstrapped() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside FOUR private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -299,7 +299,7 @@ describe("Secure Runtime Alpha 070 -- Identity Bootstrap Entry Consolidation", (
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "bootstrapIdentity"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "bootstrapIdentity"]));
   });
 
   it("20. no new private FIELD was added -- still exactly five fields (three readonly, two not)", () => {

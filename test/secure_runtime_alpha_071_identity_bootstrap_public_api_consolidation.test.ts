@@ -217,12 +217,12 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
   // #bootstrapIdentity() sole-holder confirmation
   // ---------------------------------------------------------------------
 
-  it("11. the guard exists in EXACTLY ONE place anywhere in the class body: inside #bootstrapIdentity()", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 072): the guard's own condition was 'this.#bootstrapped', existing in EXACTLY ONE place anywhere in the class body, inside #bootstrapIdentity(), AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition to 'this.#isBootstrapped()' -- reconfirmed here that the guard (now reading via #isBootstrapped()) still exists in EXACTLY ONE place, inside #bootstrapIdentity()", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
-    const guardSites = [...classBody.matchAll(/if \(this\.#bootstrapped\) \{/g)];
+    const guardSites = [...classBody.matchAll(/if \(this\.#isBootstrapped\(\)\) \{/g)];
     expect(guardSites.length).toBe(1);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
-    expect(body).toMatch(/if \(this\.#bootstrapped\) \{/);
+    expect(body).toMatch(/if \(this\.#isBootstrapped\(\)\) \{/);
   });
 
   it("12. the #describeIdentity() call exists in EXACTLY ONE place anywhere in the class body: inside #bootstrapIdentity()", () => {
@@ -257,7 +257,7 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
     expect(body).toMatch(/const descriptor = await this\.#describeIdentity\(\);/);
   });
 
-  it("16. #bootstrapIdentity()'s own body is EXACTLY the five statements, guard/return/close-brace/await/completeBootstrap, in that order -- reconfirmed byte-for-byte identical to Alpha 070's own recorded shape", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 072): #bootstrapIdentity()'s own body was EXACTLY the five statements, guard/return/close-brace/await/completeBootstrap, in that order, byte-for-byte identical to Alpha 070's own recorded shape, AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition from 'if (this.#bootstrapped)' to 'if (this.#isBootstrapped())' -- reconfirmed here as the CURRENT five statements, in the same order, with the updated guard condition", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -265,7 +265,7 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
     expect(lines).toEqual([
-      "if (this.#bootstrapped) {",
+      "if (this.#isBootstrapped()) {",
       "return;",
       "}",
       "const descriptor = await this.#describeIdentity();",
@@ -273,7 +273,7 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
     ]);
   });
 
-  it("17. the class still has exactly FIVE public methods and THREE private methods -- no new API of any kind added by this review", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 072): the class had exactly FIVE public methods and THREE private methods AS OF this Stage's own scope -- no new API of any kind was added by this review; Alpha 072 (Identity Bootstrap State Reader Consolidation) added a fourth private method, #isBootstrapped() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside FOUR private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -286,7 +286,7 @@ describe("Secure Runtime Alpha 071 -- Identity Bootstrap Public API Consolidatio
     const privateMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
-    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "bootstrapIdentity"]));
+    expect(new Set(privateMethodNames)).toEqual(new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "bootstrapIdentity"]));
   });
 
   it("18. no new private FIELD exists -- still exactly five fields (three readonly, two not)", () => {

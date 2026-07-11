@@ -272,12 +272,13 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     );
   });
 
-  it("19. isBootstrapped() is declared AFTER bootstrapIdentity(), in source order", () => {
+  it("19. RIPPLE (Secure Runtime Alpha 072): isBootstrapped() was declared AFTER bootstrapIdentity(), in source order, AS OF this Stage's own scope; Alpha 072 (Identity Bootstrap State Reader Consolidation) added a new private #isBootstrapped() ahead of both, so this check is now scoped to the PUBLIC (non-#) isBootstrapped() only -- reconfirmed here that the PUBLIC isBootstrapped() still appears after the PUBLIC bootstrapIdentity(), in the same order", () => {
     const classBody = (fedosRuntimeIdentitySource.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const bootstrapIndex = classBody.indexOf("async bootstrapIdentity(): Promise<void> {");
-    const isBootstrappedIndex = classBody.indexOf("isBootstrapped(): boolean {");
+    const isBootstrappedMatch = classBody.match(/(?<!#)isBootstrapped\(\): boolean \{/);
     expect(bootstrapIndex).toBeGreaterThan(-1);
-    expect(isBootstrappedIndex).toBeGreaterThan(bootstrapIndex);
+    expect(isBootstrappedMatch).not.toBeNull();
+    expect(isBootstrappedMatch!.index).toBeGreaterThan(bootstrapIndex);
   });
 
   it("20. FedosRuntimeIdentity's own readonly private field set is confirmed unchanged -- still exactly three readonly fields, plus one new non-readonly field", () => {
