@@ -564,6 +564,40 @@
  *     Descriptor Cache, or the `#bootstrapped` flag) in any way.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 078 ("Identity Bootstrap Observation Ordering
+ * Review", review only, NO code change) formally fixes the ORDER
+ * guarantee `#observeBootstrap()` operates under, confirmed directly
+ * against the actual source: `#bootstrapIdentity()` →
+ * `#performBootstrap()` → `#acquireDescriptor()` →
+ * `#describeIdentity()` → `#observeBootstrap()` →
+ * `#completeBootstrap()`. `#observeBootstrap()` is ALWAYS called
+ * strictly BEFORE `#completeBootstrap()` — never after, never
+ * concurrently — so at the moment `#observeBootstrap()` runs,
+ * `#descriptor` has NOT yet been updated with the current attempt's
+ * result and `#bootstrapped` is still `false` (the guard's own
+ * unmodified pre-attempt value): `#observeBootstrap()` observes ONLY
+ * the state BEFORE the write, never the state AFTER it.
+ * `#completeBootstrap()` (Alpha 069) remains the ONLY place in this
+ * file that ever performs a state update — this Stage's own review
+ * guarantees that no future Observation implementation (Logging,
+ * Tracing, Audit, Metrics, or Telemetry, per the Alpha 077 Contract)
+ * may ever change this write ORDER. This Stage changes no field, no
+ * method body, and no observable behavior of any kind; it is a formal
+ * confirmation of an ordering property the actual source already
+ * guarantees. See
+ * `docs/secure_runtime_alpha_078_identity_bootstrap_observation_ordering_review.md`
+ * for the full review record.
+ *
+ *   - The Bootstrap Flow's own call chain (Alpha 078) is FIXED, in
+ *     this EXACT order, permanently: `#bootstrapIdentity()` →
+ *     `#performBootstrap()` → `#acquireDescriptor()` →
+ *     `#describeIdentity()` → `#observeBootstrap()` →
+ *     `#completeBootstrap()`. No future Stage may reorder this chain,
+ *     move `#observeBootstrap()` to run after `#completeBootstrap()`,
+ *     or run the two concurrently.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
