@@ -514,6 +514,32 @@
  *     statement.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 076 ("Identity Bootstrap Observation Boundary")
+ * adds a private method,
+ * `#observeBootstrap(descriptor: FedosIdentityDescriptor | null): void`,
+ * called exactly once, immediately before `#completeBootstrap()`, from
+ * `#bootstrapIdentity()`'s own body — the ONLY other change this Stage
+ * makes. `#observeBootstrap()` is, as of this Stage, an EMPTY
+ * implementation — no statement of any kind in its own body beyond a
+ * comment. It performs NO Provider/Registry/Resolver/Storage
+ * reference and mutates NO Runtime state; it exists purely as a named
+ * observation BOUNDARY, not yet an observer. Bootstrap semantics,
+ * Registry registration, the Descriptor Cache, and the `#bootstrapped`
+ * flag are all completely UNCHANGED by this Stage — calling a no-op
+ * immediately before the existing State Writer alters nothing
+ * observable. This Stage adds NO new field, NO new public API, and
+ * changes NO observable behavior of any kind. See
+ * `docs/secure_runtime_alpha_076_identity_bootstrap_observation_boundary.md`
+ * for the full implementation record.
+ *
+ *   - `#observeBootstrap()` (Alpha 076) is an EMPTY implementation —
+ *     its own body contains no statement, only a comment. It has
+ *     EXACTLY ONE caller anywhere in this file:
+ *     `#bootstrapIdentity()`'s own statement immediately before the
+ *     `#completeBootstrap()` call.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
@@ -547,6 +573,10 @@ export class FedosRuntimeIdentity {
     this.#bootstrapped = true;
   }
 
+  #observeBootstrap(descriptor: FedosIdentityDescriptor | null): void {
+    // Intentionally empty — Bootstrap Observation Boundary (Alpha 076); no observer implementation yet.
+  }
+
   #isBootstrapped(): boolean {
     return this.#bootstrapped;
   }
@@ -568,6 +598,7 @@ export class FedosRuntimeIdentity {
       return;
     }
     const descriptor = await this.#performBootstrap();
+    this.#observeBootstrap(descriptor);
     this.#completeBootstrap(descriptor);
   }
 

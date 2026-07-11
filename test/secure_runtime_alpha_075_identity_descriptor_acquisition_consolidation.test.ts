@@ -277,7 +277,7 @@ describe("Secure Runtime Alpha 075 -- Identity Descriptor Acquisition Consolidat
     expect(describeIdentityBody).toMatch(/this\.#service\.describeIdentity\(\)/);
   });
 
-  it("18. #bootstrapIdentity()'s own body remains EXACTLY the same five statements it has had since Alpha 072 -- guard/return/close-brace, the Flow-delegating await, and the completeBootstrap call, unaffected by this Stage", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 076): #bootstrapIdentity()'s own body remained EXACTLY the same five statements it had had since Alpha 072 -- guard/return/close-brace, the Flow-delegating await, and the completeBootstrap call -- AS OF this Stage's own scope, unaffected by this Stage; Alpha 076 (Identity Bootstrap Observation Boundary) inserted a single '#observeBootstrap(descriptor)' call immediately before the '#completeBootstrap(descriptor)' call -- reconfirmed here that the body is now these same statements plus the observation call", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -289,6 +289,7 @@ describe("Secure Runtime Alpha 075 -- Identity Descriptor Acquisition Consolidat
       "return;",
       "}",
       "const descriptor = await this.#performBootstrap();",
+      "this.#observeBootstrap(descriptor);",
       "this.#completeBootstrap(descriptor);",
     ]);
   });
@@ -304,7 +305,7 @@ describe("Secure Runtime Alpha 075 -- Identity Descriptor Acquisition Consolidat
     );
   });
 
-  it("20. the class now has exactly FIVE public methods and SEVEN private methods", () => {
+  it("20. RIPPLE (Secure Runtime Alpha 076): the class had exactly FIVE public methods and SEVEN private methods AS OF this Stage's own scope; Alpha 076 (Identity Bootstrap Observation Boundary) added an eighth private method, #observeBootstrap() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside EIGHT private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -318,7 +319,7 @@ describe("Secure Runtime Alpha 075 -- Identity Descriptor Acquisition Consolidat
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
     expect(new Set(privateMethodNames)).toEqual(
-      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "acquireDescriptor", "performBootstrap", "bootstrapIdentity"]),
+      new Set(["describeIdentity", "completeBootstrap", "observeBootstrap", "isBootstrapped", "currentIdentity", "acquireDescriptor", "performBootstrap", "bootstrapIdentity"]),
     );
   });
 

@@ -190,7 +190,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(identity))).not.toContain("identityVersion");
   });
 
-  it("10. RIPPLE (Secure Runtime Alpha 074): bootstrapIdentity()'s own body no longer contained the version-increment statement AS OF this Stage's own scope -- it was EXACTLY the guard-if/return/close-brace, the descriptor-capturing await, and the bootstrapped assignment; Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call, Alpha 070 (Identity Bootstrap Entry Consolidation) moved this ENTIRE body into a new private #bootstrapIdentity() method, Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition from 'if (this.#bootstrapped)' to 'if (this.#isBootstrapped())', and Alpha 074 (Identity Bootstrap Flow Consolidation) rewired the descriptor-capturing call from 'this.#describeIdentity()' to 'this.#performBootstrap()' -- reconfirmed here that the body shape is unchanged in spirit, now routed through #performBootstrap()/#completeBootstrap(), inside #bootstrapIdentity()", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 076): bootstrapIdentity()'s own body no longer contained the version-increment statement AS OF this Stage's own scope -- it was EXACTLY the guard-if/return/close-brace, the descriptor-capturing await, and the bootstrapped assignment; Alpha 068 rewired the await to call the new private #describeIdentity() method instead of this.#service directly, Alpha 069 (Identity Bootstrap State Consolidation) split the trailing assignment into a local 'const descriptor' capture followed by a dedicated '#completeBootstrap(descriptor)' call, Alpha 070 (Identity Bootstrap Entry Consolidation) moved this ENTIRE body into a new private #bootstrapIdentity() method, Alpha 072 (Identity Bootstrap State Reader Consolidation) rewrote the guard condition from 'if (this.#bootstrapped)' to 'if (this.#isBootstrapped())', Alpha 074 (Identity Bootstrap Flow Consolidation) rewired the descriptor-capturing call from 'this.#describeIdentity()' to 'this.#performBootstrap()', and Alpha 076 (Identity Bootstrap Observation Boundary) inserted a single '#observeBootstrap(descriptor)' call immediately before the '#completeBootstrap(descriptor)' call -- reconfirmed here that the body shape is unchanged in spirit, now routed through #performBootstrap()/#observeBootstrap()/#completeBootstrap(), inside #bootstrapIdentity()", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
@@ -203,6 +203,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
       "return;",
       "}",
       "const descriptor = await this.#performBootstrap();",
+      "this.#observeBootstrap(descriptor);",
       "this.#completeBootstrap(descriptor);",
     ]);
     expect(body).not.toMatch(/identityVersion/);

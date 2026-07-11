@@ -262,7 +262,7 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
     expect(bootstrapIdentityBody).not.toMatch(/this\.#describeIdentity\(\)/);
   });
 
-  it("16. #bootstrapIdentity() is a pure orchestrator -- its own body is EXACTLY guard/return/close-brace, the Flow-delegating await, and the completeBootstrap call, in that order, unchanged from Alpha 072's own recorded shape except for the awaited expression", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 076): #bootstrapIdentity() was a pure orchestrator AS OF this Stage's own scope -- its own body was EXACTLY guard/return/close-brace, the Flow-delegating await, and the completeBootstrap call, in that order; Alpha 076 (Identity Bootstrap Observation Boundary) inserted a single '#observeBootstrap(descriptor)' call immediately before the '#completeBootstrap(descriptor)' call -- reconfirmed here that #bootstrapIdentity() remains a pure orchestrator, now also delegating to the (empty) observation boundary", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const body = (classBody.match(/async #bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -274,6 +274,7 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
       "return;",
       "}",
       "const descriptor = await this.#performBootstrap();",
+      "this.#observeBootstrap(descriptor);",
       "this.#completeBootstrap(descriptor);",
     ]);
   });
@@ -291,7 +292,7 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
     expect(callSites.length).toBe(1);
   });
 
-  it("18. RIPPLE (Secure Runtime Alpha 075): the class had exactly FIVE public methods and SIX private methods AS OF this Stage's own scope; Alpha 075 (Identity Descriptor Acquisition Consolidation) added a seventh private method, #acquireDescriptor() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside SEVEN private methods", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 076): the class had exactly FIVE public methods and SIX private methods AS OF this Stage's own scope; Alpha 075 (Identity Descriptor Acquisition Consolidation) added a seventh private method, #acquireDescriptor(), and Alpha 076 (Identity Bootstrap Observation Boundary) added an eighth, #observeBootstrap() -- reconfirmed here that the class still has exactly FIVE public methods, now alongside EIGHT private methods", () => {
     const classBody = classBodyOf(fedosRuntimeIdentitySource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -305,7 +306,7 @@ describe("Secure Runtime Alpha 074 -- Identity Bootstrap Flow Consolidation", ()
       ...classBody.matchAll(/^\s{2}(?:async\s+)?#(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ].map((m: RegExpMatchArray) => m[1] ?? "");
     expect(new Set(privateMethodNames)).toEqual(
-      new Set(["describeIdentity", "completeBootstrap", "isBootstrapped", "currentIdentity", "acquireDescriptor", "performBootstrap", "bootstrapIdentity"]),
+      new Set(["describeIdentity", "completeBootstrap", "observeBootstrap", "isBootstrapped", "currentIdentity", "acquireDescriptor", "performBootstrap", "bootstrapIdentity"]),
     );
   });
 
