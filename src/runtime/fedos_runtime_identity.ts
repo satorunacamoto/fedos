@@ -698,6 +698,39 @@
  *     any future implementation, for any purpose.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
+ *
+ * Secure Runtime Alpha 082 ("Identity Bootstrap Observation Event
+ * Lifecycle Review", review only, NO code change, NO implementation)
+ * formally adopts a ONE-WAY Event lifecycle for any hypothetical
+ * future Observation Event: generated → optionally consumed →
+ * NEVER retained → NEVER resent → end. PERMANENTLY FORBIDDEN, as a
+ * consequence: an Observation Queue, an Observation History, an
+ * Observation Cache, an Observation Registry, Observation Replay, a
+ * Retry Queue, or a Dead Letter Queue of any kind. Observation is NOT
+ * State — it carries no history-retention responsibility of its own,
+ * and this class must never be turned into a state-management system
+ * by a future Observation implementation. A future Event MAY be
+ * discarded immediately after generation, and Bootstrap's own
+ * semantics — idempotency, Fail Closed, the Descriptor Cache, the
+ * `#bootstrapped` flag — must NEVER change based on whether an Event
+ * was ever generated, consumed, retained, or discarded. Every future
+ * Logging/Metrics/Tracing/Audit/Telemetry implementation (per the
+ * Alpha 077 Contract) merely CONSUMES the Event this class emits; this
+ * Runtime itself must never carry a persistence responsibility for
+ * it. This Stage changes no field, no method body, and no observable
+ * behavior of any kind. See
+ * `docs/secure_runtime_alpha_082_identity_bootstrap_observation_event_lifecycle_review.md`
+ * for the full review record.
+ *
+ *   - Any future Observation Event's own LIFECYCLE (Alpha 082
+ *     Decision) is PERMANENTLY fixed to exactly one direction:
+ *     generated → optionally consumed → discarded, end — NEVER
+ *     retained (no Queue/History/Cache/Registry of Observation Events)
+ *     and NEVER resent (no Replay/Retry Queue/Dead Letter Queue), in
+ *     any future implementation, for any purpose. Bootstrap's own
+ *     semantics must never depend on an Event's own existence.
+ *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
+ *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
 import { FedosIdentityService } from "../identity/fedos_identity_service.js";
