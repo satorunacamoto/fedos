@@ -1099,8 +1099,8 @@ describe("Secure Runtime Alpha 050-052 -- Identity Runtime Integration Arc, inte
     expect(sectionHeaders.length).toBeGreaterThanOrEqual(9);
   });
 
-  it("115. RIPPLE (Secure Runtime Alpha 063): fedos_runtime_identity.ts's own file did not exceed 6000 bytes AS OF this Stage's own scope, confirming THIS Stage stayed minimal; later Stages' own header-comment history (Alpha 056-063) and the new bootstrapIdentity()/isBootstrapped()/currentIdentity() methods grew the file -- reconfirmed here with a generous, updated bound that still catches any unreasonable growth", () => {
-    expect(fedosRuntimeIdentitySource.length).toBeLessThan(16000);
+  it("115. RIPPLE (Secure Runtime Alpha 064): fedos_runtime_identity.ts's own file did not exceed 6000 bytes AS OF this Stage's own scope, confirming THIS Stage stayed minimal; later Stages' own header-comment history (Alpha 056-064) and the new bootstrapIdentity()/isBootstrapped()/currentIdentity()/identityVersion() methods grew the file -- reconfirmed here with a generous, updated bound that still catches any unreasonable growth", () => {
+    expect(fedosRuntimeIdentitySource.length).toBeLessThan(20000);
   });
 
   it("116. RIPPLE (Secure Runtime Alpha 057): create_runtime.ts's own construction block was exactly two statements -- the const declaration immediately followed by a bare `void runtimeIdentity;` -- AS OF Alpha 050-052's own scope; Alpha 055 replaced the bare void statement with an actual, discarded, rejection-swallowed describeIdentity() call, and Alpha 057 (implementing the Alpha 056 Decision) REMOVED that call, restoring the bare `void runtimeIdentity;` shape -- reconfirmed here as the CURRENT two-statement block within createRuntime()'s own function body (the header comment's own historical prose, which legitimately still names the removed Alpha 055 call, is intentionally excluded from this check), per this arc's own established ripple convention", () => {

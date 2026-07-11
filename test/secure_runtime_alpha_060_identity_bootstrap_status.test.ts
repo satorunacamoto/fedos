@@ -136,10 +136,10 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 061): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard to bootstrapIdentity() -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside the guarded body, and isBootstrapped() itself is untouched", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 064): the design doc's recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard to bootstrapIdentity(), Alpha 063 changed the discarded await into an assignment capturing into #descriptor, and Alpha 064 appended a version-increment as the body's own new final statement -- reconfirmed here that this Stage's own recorded core sequence still appears, now inside the guarded body and followed by the increment, and isBootstrapped() itself is untouched", () => {
     expect(fedosRuntimeIdentitySource).toMatch(/#bootstrapped: boolean = false;/);
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{[\s\S]*?await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*this\.#identityVersion \+= 1;\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /isBootstrapped\(\): boolean \{\s*\n\s*return this\.#bootstrapped;\s*\n\s*\}/,
@@ -236,20 +236,21 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
     expect(body).not.toMatch(/await /);
   });
 
-  it("17. RIPPLE (Secure Runtime Alpha 063): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard, and Alpha 063 changed the discarded await into 'this.#descriptor = await this.#service.describeIdentity();' -- reconfirmed here that the await/assignment pair still appears in order, as the body's own FINAL two statements, now preceded by the guard, with the await now capturing into #descriptor", () => {
+  it("17. RIPPLE (Secure Runtime Alpha 064): bootstrapIdentity()'s own body set #bootstrapped to true AFTER the await, as its own second and final statement, AS OF this Stage's own scope; Alpha 061 later prepended an idempotency guard, Alpha 063 changed the discarded await into 'this.#descriptor = await this.#service.describeIdentity();', and Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement -- reconfirmed here that the await/assignment/increment trio still appears in order, as the body's own FINAL three statements, now preceded by the guard, with the await capturing into #descriptor", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines.slice(-2)).toEqual([
+    expect(lines.slice(-3)).toEqual([
       "this.#descriptor = await this.#service.describeIdentity();",
       "this.#bootstrapped = true;",
+      "this.#identityVersion += 1;",
     ]);
   });
 
-  it("18. RIPPLE (Secure Runtime Alpha 063): FedosRuntimeIdentity's own class had exactly FIVE public methods AS OF this Stage's own scope; Alpha 063 added a sixth, currentIdentity() -- reconfirmed here that all five of this Stage's own methods remain present, alongside the newer sixth", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 064): FedosRuntimeIdentity's own class had exactly FIVE public methods AS OF this Stage's own scope; Alpha 063 added a sixth, currentIdentity(), and Alpha 064 added a seventh, identityVersion() -- reconfirmed here that all five of this Stage's own methods remain present, alongside both newer methods", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -265,6 +266,7 @@ describe("Secure Runtime Alpha 060 -- Identity Bootstrap Status, fedos_runtime_i
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
+        "identityVersion",
       ]),
     );
   });

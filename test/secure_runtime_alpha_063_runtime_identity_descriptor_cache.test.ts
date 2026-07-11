@@ -228,9 +228,9 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     expect(fedosRuntimeIdentitySource).not.toMatch(/readonly #descriptor/);
   });
 
-  it("11. bootstrapIdentity()'s own body is EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, in that order", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 064): bootstrapIdentity()'s own body was EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, in that order, AS OF this Stage's own scope; Alpha 064 appended a version-increment as a new final statement -- reconfirmed here as a PREFIX of the CURRENT body", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*this\.#identityVersion \+= 1;\s*\n\s*\}/,
     );
   });
 
@@ -256,7 +256,7 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     );
   });
 
-  it("14. the class now has exactly SIX public methods", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 064): the class had exactly SIX public methods AS OF this Stage's own scope; Alpha 064 added a seventh, identityVersion() -- reconfirmed here that all six of this Stage's own methods remain present, alongside the newer seventh", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -272,6 +272,7 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
+        "identityVersion",
       ]),
     );
   });

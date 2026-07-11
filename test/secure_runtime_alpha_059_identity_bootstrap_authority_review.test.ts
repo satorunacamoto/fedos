@@ -293,7 +293,7 @@ describe("Secure Runtime Alpha 059 -- Identity Bootstrap Authority Review, revie
     expect(identity.listIdentities()).toEqual([]);
   });
 
-  it("26. RIPPLE (Secure Runtime Alpha 063): FedosRuntimeIdentity had exactly four public methods (Alpha 058's own bootstrapIdentity() included) AS OF this Stage's own review-only scope; Alpha 060 (a LATER, separate Stage) added a fifth, isBootstrapped(), and Alpha 063 (a LATER, separate Stage) added a sixth, currentIdentity() -- reconfirmed here that all four of this Stage's own methods remain present, alongside both newer methods", () => {
+  it("26. RIPPLE (Secure Runtime Alpha 064): FedosRuntimeIdentity had exactly four public methods (Alpha 058's own bootstrapIdentity() included) AS OF this Stage's own review-only scope; Alpha 060 (a LATER, separate Stage) added a fifth, isBootstrapped(), Alpha 063 (a LATER, separate Stage) added a sixth, currentIdentity(), and Alpha 064 (a LATER, separate Stage) added a seventh, identityVersion() -- reconfirmed here that all four of this Stage's own methods remain present, alongside all three newer methods", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -315,6 +315,7 @@ describe("Secure Runtime Alpha 059 -- Identity Bootstrap Authority Review, revie
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
+        "identityVersion",
       ]),
     );
   });

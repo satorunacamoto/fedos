@@ -260,7 +260,7 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(body).toMatch(/#bootstrapped = true;/);
   });
 
-  it("18. RIPPLE (Secure Runtime Alpha 063): the class had exactly FIVE public methods AS OF this Stage's own scope -- no sixth method (e.g. reset/shutdown) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity() (a Descriptor cache read, not a reset/shutdown of any kind) -- reconfirmed here that all five of this Stage's own methods remain present, alongside the newer sixth", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 064): the class had exactly FIVE public methods AS OF this Stage's own scope -- no sixth method (e.g. reset/shutdown) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity() (a Descriptor cache read, not a reset/shutdown of any kind), and Alpha 064 added a seventh, identityVersion() -- reconfirmed here that all five of this Stage's own methods remain present, alongside both newer methods", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -282,6 +282,7 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
         "bootstrapIdentity",
         "isBootstrapped",
         "currentIdentity",
+        "identityVersion",
       ]),
     );
   });
