@@ -58,6 +58,32 @@
  * `docs/secure_runtime_alpha_058_identity_bootstrap_boundary.md` for
  * the full design rationale.
  *
+ * Secure Runtime Alpha 059 (review only, no code change) compared five
+ * candidate Bootstrap Authorities and adopted Desktop Application
+ * startup as the designated caller of `bootstrapIdentity()`, rejecting
+ * Worker on a concrete structural flaw (per-request `createRuntime()`
+ * construction). See
+ * `docs/secure_runtime_alpha_059_identity_bootstrap_authority_review.md`.
+ *
+ * Secure Runtime Alpha 060 ("Identity Bootstrap Status") adds a
+ * private `#bootstrapped: boolean` field (initial `false`) and a FIFTH
+ * method, `isBootstrapped(): boolean` — a synchronous, side-effect-free
+ * read of that field, never throwing. `#bootstrapped` becomes `true`
+ * ONLY on `bootstrapIdentity()`'s own successful completion — the
+ * assignment sits AFTER the `await`, so a rejection from
+ * `describeIdentity()` propagates (unchanged from Alpha 058) and
+ * `#bootstrapped` stays `false`; Bootstrap-never-attempted and
+ * Bootstrap-failed are therefore indistinguishable through
+ * `isBootstrapped()` alone, a deliberate Fail-Closed choice. No
+ * Authority is added by this Stage — it does not call
+ * `bootstrapIdentity()` from anywhere, and does not wire Desktop or
+ * any other caller; it only makes an already-callable method's own
+ * outcome observable to whatever caller a future Stage eventually
+ * wires in. See
+ * `docs/secure_runtime_alpha_060_identity_bootstrap_status.md` for the
+ * full design rationale, including why a `boolean` was chosen over an
+ * `enum`/`Promise`/timestamp/counter.
+ *
  * This file defines a SINGLE CLASS and nothing else — no function, no
  * module-scoped singleton, no environment read, no Worker reference,
  * no Storage reference, no Rust reference, and no wiring into
@@ -96,6 +122,14 @@
  *     — a rejection from `describeIdentity()` propagates unmodified.
  *     It is NEVER called from anywhere in this file or from
  *     `create_runtime.ts`.
+ *   - `#bootstrapped`/`isBootstrapped()` (Alpha 060) track ONLY whether
+ *     `bootstrapIdentity()` has EVER completed successfully — initial
+ *     `false`, flips to `true` ONLY after that method's own internal
+ *     `await` resolves without throwing. `isBootstrapped()` itself is
+ *     SYNCHRONOUS, reads only the private field, performs no I/O, and
+ *     NEVER throws. Bootstrap-not-yet-attempted and Bootstrap-failed
+ *     both report `false` — Fail Closed by construction, not by any
+ *     `try`/`catch` this file adds.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -114,6 +148,7 @@ export class FedosRuntimeIdentity {
   readonly #registry: FedosIdentityRegistry;
   readonly #service: FedosIdentityService;
   readonly #resolver: FedosIdentityResolver;
+  #bootstrapped: boolean = false;
 
   constructor() {
     this.#registry = new FedosIdentityRegistry();
@@ -136,5 +171,10 @@ export class FedosRuntimeIdentity {
 
   async bootstrapIdentity(): Promise<void> {
     await this.#service.describeIdentity();
+    this.#bootstrapped = true;
+  }
+
+  isBootstrapped(): boolean {
+    return this.#bootstrapped;
   }
 }
