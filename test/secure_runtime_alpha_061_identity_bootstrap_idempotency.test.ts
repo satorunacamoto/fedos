@@ -132,9 +132,9 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 066): the design doc's own recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 063 changed the discarded 'await this.#service.describeIdentity();' call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value, guard/return-flip unaffected), Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement, and Alpha 066 (implementing the Alpha 065 Decision) removed that statement again -- reconfirmed here against the CURRENT source", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 068): the design doc's own recorded implementation matched the ACTUAL fedos_runtime_identity.ts source verbatim AS OF this Stage's own scope; Alpha 063 changed the discarded 'await this.#service.describeIdentity();' call into 'this.#descriptor = await this.#service.describeIdentity();' (capturing the return value, guard/return-flip unaffected), Alpha 064 appended 'this.#identityVersion += 1;' as a new final statement, Alpha 066 removed that statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
     );
   });
 
@@ -189,7 +189,7 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
   // Structural: the guard itself, confirmed via literal extraction
   // ---------------------------------------------------------------------
 
-  it("10. RIPPLE (Secure Runtime Alpha 066): bootstrapIdentity()'s own body was EXACTLY the four statements, in order (guard-if, return, await, assignment), AS OF this Stage's own scope; Alpha 063 changed the discarded await into an assignment capturing its return value into #descriptor, Alpha 064 appended a version-increment as a new fifth statement, and Alpha 066 (implementing the Alpha 065 Decision) removed that fifth statement again -- reconfirmed here as the CURRENT four statements, in the same order", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body was EXACTLY the four statements, in order (guard-if, return, await, assignment), AS OF this Stage's own scope; Alpha 063 changed the discarded await into an assignment capturing its return value into #descriptor, Alpha 064 appended a version-increment as a new fifth statement, Alpha 066 removed that fifth statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here as the CURRENT four statements, in the same order", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -200,7 +200,7 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
       "if (this.#bootstrapped) {",
       "return;",
       "}",
-      "this.#descriptor = await this.#service.describeIdentity();",
+      "this.#descriptor = await this.#describeIdentity();",
       "this.#bootstrapped = true;",
     ]);
   });
@@ -215,9 +215,9 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
     expect(guardBody.trim()).toBe("return;");
   });
 
-  it("13. describeIdentity()/findIdentity()/listIdentities()/isBootstrapped() remain BYTE-FOR-BYTE unchanged", () => {
+  it("13. RIPPLE (Secure Runtime Alpha 068): describeIdentity()/findIdentity()/listIdentities()/isBootstrapped() remained BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 068 renamed describeIdentity() to a private #describeIdentity() with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
+      /async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /findIdentity\(id: string\): FedosIdentityRecord \| null \{\s*\n\s*return this\.#resolver\.findIdentity\(id\);\s*\n\s*\}/,
@@ -230,7 +230,7 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
     );
   });
 
-  it("14. RIPPLE (Secure Runtime Alpha 066): FedosRuntimeIdentity's own class had exactly FIVE public methods AS OF this Stage's own scope -- no sixth method (e.g. reset()) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity(), Alpha 064 added a seventh, identityVersion(), and Alpha 066 (implementing the Alpha 065 Decision) removed that seventh again -- reconfirmed here that all five of this Stage's own methods remain present, alongside the still-current sixth", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 068): FedosRuntimeIdentity's own class had exactly FIVE PUBLIC methods AS OF this Stage's own scope -- no sixth method (e.g. reset()) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity(), Alpha 064 added a seventh, identityVersion(), Alpha 066 removed that seventh again, and Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that bootstrapIdentity() (this Stage's own method) remains present, alongside the still-current sixth (currentIdentity), with describeIdentity() now excluded from the PUBLIC set", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -240,7 +240,6 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",
@@ -408,23 +407,24 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
     expect(identity.listIdentities()).toEqual([]);
   });
 
-  it("29. behavioral: describeIdentity() called independently of bootstrapIdentity() still performs a real read every time (idempotency applies ONLY to bootstrapIdentity(), not describeIdentity())", async () => {
+  it("29. RIPPLE (Secure Runtime Alpha 068): describeIdentity() called independently of bootstrapIdentity() used to perform a real read every time AS OF this Stage's own scope (idempotency applied ONLY to bootstrapIdentity(), not describeIdentity()); Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() private, closing that independent path entirely -- reconfirmed here that 'describeIdentity' is not an accessible property on a FedosRuntimeIdentity instance, and that bootstrapIdentity() remains the ONLY way to reach the Service, still idempotent", async () => {
     const spy = vi.spyOn(FedosIdentityService.prototype, "describeIdentity");
     const identity = new FedosRuntimeIdentity();
-    await identity.describeIdentity();
-    await identity.describeIdentity();
-    await identity.describeIdentity();
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect((identity as unknown as Record<string, unknown>).describeIdentity).toBeUndefined();
+    await identity.bootstrapIdentity();
+    await identity.bootstrapIdentity();
+    await identity.bootstrapIdentity();
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it("30. behavioral: calling describeIdentity() directly does NOT set the guard -- a subsequent bootstrapIdentity() call still performs its own real read", async () => {
+  it("30. RIPPLE (Secure Runtime Alpha 068): calling describeIdentity() directly used to NOT set the guard AS OF this Stage's own scope, confirming a subsequent bootstrapIdentity() call still performed its own real read; Alpha 068 made describeIdentity() private, so it can no longer be called directly at all -- reconfirmed here that bootstrapIdentity() alone still sets the guard exactly once, on its own first successful call", async () => {
     const spy = vi.spyOn(FedosIdentityService.prototype, "describeIdentity");
     const identity = new FedosRuntimeIdentity();
-    await identity.describeIdentity();
     expect(identity.isBootstrapped()).toBe(false);
     await identity.bootstrapIdentity();
     expect(identity.isBootstrapped()).toBe(true);
-    expect(spy).toHaveBeenCalledTimes(2);
+    await identity.bootstrapIdentity();
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("31. behavioral: concurrent bootstrapIdentity() calls on the SAME instance (fired without awaiting the first) do not each independently complete a full read -- the guard reads a stable field after the first await settles", async () => {

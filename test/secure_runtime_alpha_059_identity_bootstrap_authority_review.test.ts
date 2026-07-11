@@ -286,14 +286,15 @@ describe("Secure Runtime Alpha 059 -- Identity Bootstrap Authority Review, revie
     await expect(identity.bootstrapIdentity()).resolves.toBeUndefined();
   });
 
-  it("25. behavioral: describeIdentity()/findIdentity()/listIdentities() remain fully functional and unaffected by this review", async () => {
+  it("25. RIPPLE (Secure Runtime Alpha 068): describeIdentity()/findIdentity()/listIdentities() remained fully functional and unaffected by this review AS OF this Stage's own scope; Alpha 068 made describeIdentity() private -- reconfirmed here via bootstrapIdentity()/currentIdentity()", async () => {
     const identity = new FedosRuntimeIdentity();
-    expect(await identity.describeIdentity()).toBeNull();
+    await identity.bootstrapIdentity();
+    expect(identity.currentIdentity()).toBeNull();
     expect(identity.findIdentity("x")).toBeNull();
     expect(identity.listIdentities()).toEqual([]);
   });
 
-  it("26. RIPPLE (Secure Runtime Alpha 066): FedosRuntimeIdentity had exactly four public methods (Alpha 058's own bootstrapIdentity() included) AS OF this Stage's own review-only scope; Alpha 060 (a LATER, separate Stage) added a fifth, isBootstrapped(), Alpha 063 (a LATER, separate Stage) added a sixth, currentIdentity(), Alpha 064 (a LATER, separate Stage) added a seventh, identityVersion(), and Alpha 066 (a LATER, separate Stage implementing the Alpha 065 Decision) removed that seventh again -- reconfirmed here that all four of this Stage's own methods remain present, alongside the two still-current newer methods (isBootstrapped/currentIdentity)", () => {
+  it("26. RIPPLE (Secure Runtime Alpha 068): FedosRuntimeIdentity had exactly four PUBLIC methods (Alpha 058's own bootstrapIdentity() included) AS OF this Stage's own review-only scope; Alpha 060 added a fifth, isBootstrapped(), Alpha 063 added a sixth, currentIdentity(), Alpha 064 added a seventh, identityVersion(), Alpha 066 removed that seventh again, and Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that bootstrapIdentity() (this Stage's own method) remains present, alongside the two still-current newer PUBLIC methods (isBootstrapped/currentIdentity), with describeIdentity() now excluded from the PUBLIC set", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -309,7 +310,6 @@ describe("Secure Runtime Alpha 059 -- Identity Bootstrap Authority Review, revie
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",

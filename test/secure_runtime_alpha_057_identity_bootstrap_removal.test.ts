@@ -330,9 +330,10 @@ describe("Secure Runtime Alpha 057 -- Identity Bootstrap Removal, create_runtime
   // Behavioral: FedosRuntimeIdentity itself is unaffected and still callable
   // ---------------------------------------------------------------------
 
-  it("31. behavioral: a directly-constructed FedosRuntimeIdentity's describeIdentity() still resolves null -- the class itself is untouched, only createRuntime()'s own auto-call is gone", async () => {
+  it("31. RIPPLE (Secure Runtime Alpha 068): a directly-constructed FedosRuntimeIdentity's describeIdentity() still resolved null AS OF this Stage's own scope -- the class itself was untouched, only createRuntime()'s own auto-call was gone; Alpha 068 made describeIdentity() private -- reconfirmed here via bootstrapIdentity()/currentIdentity()", async () => {
     const identity = new FedosRuntimeIdentity();
-    expect(await identity.describeIdentity()).toBeNull();
+    await identity.bootstrapIdentity();
+    expect(identity.currentIdentity()).toBeNull();
   });
 
   it("32. behavioral: a directly-constructed FedosRuntimeIdentity's findIdentity()/listIdentities() still behave exactly as before", () => {
@@ -341,9 +342,10 @@ describe("Secure Runtime Alpha 057 -- Identity Bootstrap Removal, create_runtime
     expect(identity.listIdentities()).toEqual([]);
   });
 
-  it("33. behavioral: FedosRuntimeIdentity instances constructed via createRuntime() (indirectly) and directly behave identically -- both remain callable and inert", async () => {
+  it("33. RIPPLE (Secure Runtime Alpha 068): FedosRuntimeIdentity instances constructed via createRuntime() (indirectly) and directly behaved identically AS OF this Stage's own scope -- both remained callable and inert; Alpha 068 made describeIdentity() private -- reconfirmed here via bootstrapIdentity()/currentIdentity()", async () => {
     const direct = new FedosRuntimeIdentity();
-    expect(await direct.describeIdentity()).toBeNull();
+    await direct.bootstrapIdentity();
+    expect(direct.currentIdentity()).toBeNull();
     const runtime = createRuntime();
     expect(runtime.mode).toBeDefined();
   });
@@ -352,9 +354,9 @@ describe("Secure Runtime Alpha 057 -- Identity Bootstrap Removal, create_runtime
   // Regression: only create_runtime.ts changed; everything else byte-for-byte
   // ---------------------------------------------------------------------
 
-  it("34. RIPPLE (Secure Runtime Alpha 058): fedos_runtime_identity.ts's three Alpha 050/053/054 methods remain exact pass-throughs; this Stage itself did not reference the Alpha 057 doc, but a LATER Stage (Alpha 058, adding bootstrapIdentity()) legitimately does in its own header-comment history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own scope", () => {
+  it("34. RIPPLE (Secure Runtime Alpha 068): fedos_runtime_identity.ts's three Alpha 050/053/054 methods remained exact pass-throughs; this Stage itself did not reference the Alpha 057 doc, but a LATER Stage (Alpha 058, adding bootstrapIdentity()) legitimately does in its own header-comment history; Alpha 068 renamed describeIdentity() to a private #describeIdentity() with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
+      /async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /findIdentity\(id: string\): FedosIdentityRecord \| null \{\s*\n\s*return this\.#resolver\.findIdentity\(id\);\s*\n\s*\}/,

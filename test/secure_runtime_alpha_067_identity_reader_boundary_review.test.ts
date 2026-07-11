@@ -235,35 +235,36 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
   // Behavioral: the §3/§4 claims verified against the REAL source
   // ---------------------------------------------------------------------
 
-  it("15. behavioral: describeIdentity()'s own body never references #descriptor or #bootstrapped -- confirmed via literal extraction against the CURRENT source", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 068): describeIdentity()'s own body never referenced #descriptor or #bootstrapped, confirmed via literal extraction AS OF this Stage's own scope; Alpha 068 (implementing this Stage's own Decision) renamed it to a private #describeIdentity() method with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
-    const body = (classBody.match(/async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(body).not.toMatch(/#descriptor/);
     expect(body).not.toMatch(/#bootstrapped/);
     expect(body.trim()).toBe("return this.#service.describeIdentity();");
   });
 
-  it("16. behavioral: bootstrapIdentity()'s own body calls this.#service.describeIdentity() DIRECTLY, never this.describeIdentity() -- confirming zero internal callers of the public wrapper", () => {
+  it("16. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body called this.#service.describeIdentity() DIRECTLY, never this.describeIdentity(), AS OF this Stage's own scope, confirming zero internal callers of the public wrapper; Alpha 068 rewired bootstrapIdentity() to call the new private this.#describeIdentity() instead -- reconfirmed here that bootstrapIdentity() now routes through the private method, which itself still reaches this.#service internally", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const body = (classBody.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
-    expect(body).toMatch(/this\.#service\.describeIdentity\(\)/);
-    expect(body).not.toMatch(/this\.describeIdentity\(\)/);
-    const internalCalls = [...classBody.matchAll(/this\.describeIdentity\(\)/g)];
-    expect(internalCalls.length).toBe(0);
+    expect(body).not.toMatch(/this\.#service\.describeIdentity\(\)/);
+    expect(body).toMatch(/this\.#describeIdentity\(\)/);
+    const describeBody = (classBody.match(/async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    expect(describeBody).toMatch(/this\.#service\.describeIdentity\(\)/);
   });
 
-  it("17. behavioral: no idempotency guard exists on describeIdentity() -- repeated direct calls each re-invoke the Provider, with no short-circuit", async () => {
+  it("17. RIPPLE (Secure Runtime Alpha 068): no idempotency guard existed on describeIdentity() AS OF this Stage's own scope -- repeated direct calls each re-invoked the Provider, with no short-circuit; Alpha 068 made describeIdentity() private, closing that direct path entirely -- reconfirmed here that 'describeIdentity' is not an accessible property, and that bootstrapIdentity() (the only remaining path) IS idempotent, calling the Service exactly once across repeats", async () => {
     const spy = vi.spyOn(FedosIdentityService.prototype, "describeIdentity");
     const identity = new FedosRuntimeIdentity();
-    await identity.describeIdentity();
-    await identity.describeIdentity();
-    await identity.describeIdentity();
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect((identity as unknown as Record<string, unknown>).describeIdentity).toBeUndefined();
+    await identity.bootstrapIdentity();
+    await identity.bootstrapIdentity();
+    await identity.bootstrapIdentity();
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it("18. behavioral: the confirmed bypass -- calling describeIdentity() directly registers into the Registry (observable via findIdentity()) while isBootstrapped()/currentIdentity() stay at their initial values, even across repeated calls", async () => {
+  it("18. RIPPLE (Secure Runtime Alpha 068): the confirmed bypass used to be reachable -- calling describeIdentity() directly registered into the Registry (observable via findIdentity()) while isBootstrapped()/currentIdentity() stayed at their initial values, even across repeated calls, AS OF this Stage's own scope; Alpha 068 (implementing this Stage's own Decision) made describeIdentity() private, closing this exact bypass -- reconfirmed here that the only remaining path (bootstrapIdentity()) keeps Registry/isBootstrapped()/currentIdentity() consistent", async () => {
     const registerSpy = vi.spyOn(FedosIdentityRegistry.prototype, "register");
     const provider = resolveFedosIdentityProvider();
     vi.spyOn(provider as unknown as { describeIdentity: () => Promise<unknown> }, "describeIdentity").mockResolvedValue({
@@ -273,13 +274,13 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
     });
 
     const identity = new FedosRuntimeIdentity();
-    await identity.describeIdentity();
-    await identity.describeIdentity();
-    expect(registerSpy).toHaveBeenCalledTimes(2);
+    await identity.bootstrapIdentity();
+    await identity.bootstrapIdentity();
+    expect(registerSpy).toHaveBeenCalledTimes(1);
     expect(identity.findIdentity("alpha067-bypass-check")).not.toBeNull();
 
-    expect(identity.isBootstrapped()).toBe(false);
-    expect(identity.currentIdentity()).toBeNull();
+    expect(identity.isBootstrapped()).toBe(true);
+    expect(identity.currentIdentity()).not.toBeNull();
   });
 
   it("19. behavioral: bootstrapIdentity() itself remains idempotent and fully accounted -- Service called exactly once, isBootstrapped()/currentIdentity() correctly updated, unaffected by this review", async () => {
@@ -335,7 +336,7 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
     });
   });
 
-  it("24. Regression: the class still has exactly SIX public methods, unchanged by this review", () => {
+  it("24. RIPPLE (Secure Runtime Alpha 068): the class had exactly SIX public methods, unchanged by this review, AS OF this Stage's own scope; Alpha 068 (implementing this Stage's own Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that the class now has exactly FIVE public methods", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -345,7 +346,6 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",
@@ -359,8 +359,8 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
   // Regression: no implementation file touched by this review Stage
   // ---------------------------------------------------------------------
 
-  it("25. Regression: fedos_runtime_identity.ts does not reference this Stage's own review doc -- confirming this Stage touched no code, only documentation", () => {
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_067/);
+  it("25. RIPPLE (Secure Runtime Alpha 068): fedos_runtime_identity.ts did not reference this Stage's own review doc AS OF this Stage's own review-only scope, confirming this Stage itself touched no code, only documentation; Alpha 068 (a LATER, separate Stage implementing this Stage's own Decision) legitimately references it in fedos_runtime_identity.ts's own header comment while recording this arc's history -- reconfirmed here as an expected, intentional reference, not a violation of this Stage's own no-code-change mandate", () => {
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_067/);
   });
 
   it("26. Regression: create_runtime.ts does not reference this Stage's own review doc, and remains Construct Only", () => {
@@ -468,9 +468,9 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
     }
   });
 
-  it("39. final sanity: this Stage's own net effect touched zero src/ files -- create_runtime.ts/types.ts/worker.ts/fedos_runtime_identity.ts all confirmed to never reference this Stage's own doc", () => {
+  it("39. RIPPLE (Secure Runtime Alpha 068): final sanity -- this Stage's OWN net effect touched zero src/ files AS OF its own scope; reconfirmed here that create_runtime.ts/types.ts/worker.ts still never reference this Stage's own doc, while fedos_runtime_identity.ts (Alpha 068's own header-comment history, added by a LATER Stage) now legitimately does", () => {
     expect(createRuntimeSource).not.toMatch(/secure_runtime_alpha_067/);
-    expect(fedosRuntimeIdentitySource).not.toMatch(/secure_runtime_alpha_067/);
+    expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_067/);
     expect(runtimeTypesSource).not.toMatch(/secure_runtime_alpha_067/);
     expect(workerSource).not.toMatch(/secure_runtime_alpha_067/);
   });

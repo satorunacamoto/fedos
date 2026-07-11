@@ -244,9 +244,10 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
-  it("22. behavioral: describeIdentity() on a directly-constructed FedosRuntimeIdentity resolves null (the same call createRuntime() fires and discards)", async () => {
+  it("22. RIPPLE (Secure Runtime Alpha 068): describeIdentity() on a directly-constructed FedosRuntimeIdentity resolved null AS OF this Stage's own scope (the same call createRuntime() fires and discards); Alpha 068 made describeIdentity() private -- reconfirmed here via bootstrapIdentity()/currentIdentity()", async () => {
     const identity = new FedosRuntimeIdentity();
-    expect(await identity.describeIdentity()).toBeNull();
+    await identity.bootstrapIdentity();
+    expect(identity.currentIdentity()).toBeNull();
   });
 
   it("23. behavioral: Identity Registry registration timing is asynchronous and not sequenced against createRuntime()'s own synchronous return -- confirmed by findIdentity() immediately after construction never blocking or throwing", () => {
@@ -292,9 +293,9 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
     expect(body).not.toMatch(/\.describeIdentity\(\)/);
   });
 
-  it("28. Regression: fedos_runtime_identity.ts's own three methods are confirmed BYTE-FOR-BYTE unchanged", () => {
+  it("28. RIPPLE (Secure Runtime Alpha 068): fedos_runtime_identity.ts's own three methods were confirmed BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 068 renamed describeIdentity() to a private #describeIdentity() with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
+      /async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /findIdentity\(id: string\): FedosIdentityRecord \| null \{\s*\n\s*return this\.#resolver\.findIdentity\(id\);\s*\n\s*\}/,

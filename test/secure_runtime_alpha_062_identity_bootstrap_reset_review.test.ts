@@ -260,7 +260,7 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(body).toMatch(/#bootstrapped = true;/);
   });
 
-  it("18. RIPPLE (Secure Runtime Alpha 066): the class had exactly FIVE public methods AS OF this Stage's own scope -- no sixth method (e.g. reset/shutdown) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity() (a Descriptor cache read, not a reset/shutdown of any kind), Alpha 064 added a seventh, identityVersion(), and Alpha 066 (implementing the Alpha 065 Decision) removed that seventh again -- reconfirmed here that all five of this Stage's own methods remain present, alongside the still-current sixth", () => {
+  it("18. RIPPLE (Secure Runtime Alpha 068): the class had exactly FIVE PUBLIC methods AS OF this Stage's own scope -- no sixth method (e.g. reset/shutdown) had been added by THIS Stage; Alpha 063 later added a real sixth, currentIdentity() (a Descriptor cache read, not a reset/shutdown of any kind), Alpha 064 added a seventh, identityVersion(), Alpha 066 removed that seventh again, and Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that bootstrapIdentity() (this Stage's own method) remains present, alongside the still-current sixth (currentIdentity), with describeIdentity() now excluded from the PUBLIC set", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -276,7 +276,6 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",
@@ -332,12 +331,12 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(newIdentity.listIdentities()).toEqual([]);
   });
 
-  it("25. behavioral: a bootstrapped instance's own #bootstrapped never reverts to false through any public method call, including repeated calls to every other method", async () => {
+  it("25. RIPPLE (Secure Runtime Alpha 068): a bootstrapped instance's own #bootstrapped never reverted to false through any public method call, including repeated calls to every other method, AS OF this Stage's own scope; Alpha 068 made describeIdentity() private -- reconfirmed here via the remaining public methods (currentIdentity()/findIdentity()/listIdentities()/bootstrapIdentity())", async () => {
     const identity = new FedosRuntimeIdentity();
     await identity.bootstrapIdentity();
     expect(identity.isBootstrapped()).toBe(true);
 
-    await identity.describeIdentity();
+    identity.currentIdentity();
     identity.findIdentity("x");
     identity.listIdentities();
     await identity.bootstrapIdentity();
@@ -345,13 +344,14 @@ describe("Secure Runtime Alpha 062 -- Identity Bootstrap Reset Review, review/de
     expect(identity.isBootstrapped()).toBe(true);
   });
 
-  it("26. behavioral: no public method on FedosRuntimeIdentity accepts arguments that could plausibly force a reset -- every method is either zero-argument or takes a single lookup id", () => {
+  it("26. RIPPLE (Secure Runtime Alpha 068): no public method on FedosRuntimeIdentity accepted arguments that could plausibly force a reset AS OF this Stage's own scope -- every method was either zero-argument or took a single lookup id; Alpha 068 made describeIdentity() private, removing it from the PUBLIC surface entirely -- reconfirmed here that every REMAINING public method is either zero-argument or takes a single lookup id", () => {
     const identity = new FedosRuntimeIdentity();
     expect(identity.bootstrapIdentity.length).toBe(0);
     expect(identity.isBootstrapped.length).toBe(0);
-    expect(identity.describeIdentity.length).toBe(0);
+    expect(identity.currentIdentity.length).toBe(0);
     expect(identity.listIdentities.length).toBe(0);
     expect(identity.findIdentity.length).toBe(1);
+    expect((identity as unknown as Record<string, unknown>).describeIdentity).toBeUndefined();
   });
 
   // ---------------------------------------------------------------------

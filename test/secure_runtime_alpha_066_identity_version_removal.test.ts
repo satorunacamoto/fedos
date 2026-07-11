@@ -190,7 +190,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(identity))).not.toContain("identityVersion");
   });
 
-  it("10. bootstrapIdentity()'s own body no longer contains the version-increment statement -- it is EXACTLY three statements after the opening brace: guard-if, return, close-brace, the descriptor-capturing await, and the bootstrapped assignment", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body no longer contained the version-increment statement AS OF this Stage's own scope -- it was EXACTLY the guard-if/return/close-brace, the descriptor-capturing await, and the bootstrapped assignment; Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that the body shape is unchanged, now routed through #describeIdentity()", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const body = (codeOnly.match(/async bootstrapIdentity\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -201,13 +201,13 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
       "if (this.#bootstrapped) {",
       "return;",
       "}",
-      "this.#descriptor = await this.#service.describeIdentity();",
+      "this.#descriptor = await this.#describeIdentity();",
       "this.#bootstrapped = true;",
     ]);
     expect(body).not.toMatch(/identityVersion/);
   });
 
-  it("11. isBootstrapped()/currentIdentity()/describeIdentity()/findIdentity()/listIdentities() remain BYTE-FOR-BYTE unchanged", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 068): isBootstrapped()/currentIdentity()/describeIdentity()/findIdentity()/listIdentities() remained BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 068 renamed describeIdentity() to a private #describeIdentity() with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
       /isBootstrapped\(\): boolean \{\s*\n\s*return this\.#bootstrapped;\s*\n\s*\}/,
     );
@@ -215,7 +215,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
       /currentIdentity\(\): FedosIdentityDescriptor \| null \{\s*\n\s*return this\.#descriptor;\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
+      /async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /findIdentity\(id: string\): FedosIdentityRecord \| null \{\s*\n\s*return this\.#resolver\.findIdentity\(id\);\s*\n\s*\}/,
@@ -225,7 +225,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
     );
   });
 
-  it("12. the class now has exactly SIX public methods -- not seven", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 068): the class had exactly SIX public methods -- not seven -- AS OF this Stage's own scope; Alpha 068 made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that the class now has exactly FIVE public methods", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -235,7 +235,6 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",
@@ -243,7 +242,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
         "currentIdentity",
       ]),
     );
-    expect(methodNames.length).toBe(6);
+    expect(methodNames.length).toBe(5);
   });
 
   it("13. the three readonly constructor-assigned fields (#registry/#service/#resolver) and #bootstrapped/#descriptor remain the ONLY fields -- exactly five, not six", () => {
@@ -330,9 +329,11 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
     expect(identity.listIdentities().length).toBe(1);
   });
 
-  it("20. behavioral: describeIdentity() remains directly callable and fully functional, unaffected by the removal", async () => {
+  it("20. RIPPLE (Secure Runtime Alpha 068): describeIdentity() remained directly callable and fully functional AS OF this Stage's own scope, unaffected by the identityVersion() removal; Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private method, no longer directly callable from outside the class -- reconfirmed here via bootstrapIdentity()/currentIdentity(), the only remaining public path", async () => {
     const identity = new FedosRuntimeIdentity();
-    expect(await identity.describeIdentity()).toBeNull();
+    expect((identity as unknown as Record<string, unknown>).describeIdentity).toBeUndefined();
+    await identity.bootstrapIdentity();
+    expect(identity.currentIdentity()).toBeNull();
   });
 
   it("21. behavioral: two independently-constructed instances remain fully independent -- no shared Bootstrap state of any kind", async () => {

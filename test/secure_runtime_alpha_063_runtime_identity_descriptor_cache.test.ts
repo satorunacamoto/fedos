@@ -228,9 +228,9 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     expect(fedosRuntimeIdentitySource).not.toMatch(/readonly #descriptor/);
   });
 
-  it("11. RIPPLE (Secure Runtime Alpha 066): bootstrapIdentity()'s own body was EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, in that order, AS OF this Stage's own scope; Alpha 064 appended a version-increment as a new final statement, and Alpha 066 (implementing the Alpha 065 Decision) removed that statement again -- reconfirmed here that the CURRENT body has come full circle, EXACTLY matching this Stage's own original claim", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 068): bootstrapIdentity()'s own body was EXACTLY the guard, the descriptor-capturing await, and the bootstrapped assignment, in that order, AS OF this Stage's own scope; Alpha 064 appended a version-increment as a new final statement, Alpha 066 (implementing the Alpha 065 Decision) removed that statement again, and Alpha 068 (implementing the Alpha 067 Decision) rewired the await to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that the CURRENT body has come full circle in shape, still exactly the guard/await/assignment", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#service\.describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
+      /async bootstrapIdentity\(\): Promise<void> \{\s*\n\s*if \(this\.#bootstrapped\) \{\s*\n\s*return;\s*\n\s*\}\s*\n\s*this\.#descriptor = await this\.#describeIdentity\(\);\s*\n\s*this\.#bootstrapped = true;\s*\n\s*\}/,
     );
   });
 
@@ -241,9 +241,9 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     expect(fedosRuntimeIdentitySource).not.toMatch(/async currentIdentity/);
   });
 
-  it("13. describeIdentity()/findIdentity()/listIdentities()/isBootstrapped() remain BYTE-FOR-BYTE unchanged", () => {
+  it("13. RIPPLE (Secure Runtime Alpha 068): describeIdentity()/findIdentity()/listIdentities()/isBootstrapped() remained BYTE-FOR-BYTE unchanged AS OF this Stage's own scope; Alpha 068 renamed describeIdentity() to a private #describeIdentity() with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
     expect(fedosRuntimeIdentitySource).toMatch(
-      /async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
+      /async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{\s*\n\s*return this\.#service\.describeIdentity\(\);\s*\n\s*\}/,
     );
     expect(fedosRuntimeIdentitySource).toMatch(
       /findIdentity\(id: string\): FedosIdentityRecord \| null \{\s*\n\s*return this\.#resolver\.findIdentity\(id\);\s*\n\s*\}/,
@@ -256,7 +256,7 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     );
   });
 
-  it("14. RIPPLE (Secure Runtime Alpha 066): the class had exactly SIX public methods AS OF this Stage's own scope; Alpha 064 added a seventh, identityVersion(), and Alpha 066 (implementing the Alpha 065 Decision) removed it again -- reconfirmed here that the class has come full circle, with exactly this Stage's own original six methods present", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 068): the class had exactly SIX PUBLIC methods AS OF this Stage's own scope; Alpha 064 added a seventh, identityVersion(), Alpha 066 removed it again, and Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that the class now has exactly FIVE public methods (currentIdentity() this Stage's own method, included), with describeIdentity() excluded from the PUBLIC set but present as a private method", () => {
     const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
     const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const methodNames = [
@@ -266,7 +266,6 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",
@@ -276,10 +275,12 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     );
   });
 
-  it("15. only ONE assignment to #descriptor exists anywhere in the file, inside bootstrapIdentity()'s own guarded body (the field declaration itself uses ':', not a tracked '=' assignment)", () => {
-    const assignments = [...fedosRuntimeIdentitySource.matchAll(/#descriptor\s*=/g)];
+  it("15. RIPPLE (Secure Runtime Alpha 068): only ONE assignment to #descriptor existed in the class BODY (comments excluded) AS OF this Stage's own scope, inside bootstrapIdentity()'s own guarded body; Alpha 068 rewired that assignment to call the new private #describeIdentity() method instead of this.#service directly -- reconfirmed here that exactly one assignment still exists in the class body, now via #describeIdentity()", () => {
+    const codeOnly = codeOnlyLines(fedosRuntimeIdentitySource);
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const assignments = [...classBody.matchAll(/#descriptor\s*=/g)];
     expect(assignments.length).toBe(1);
-    expect(fedosRuntimeIdentitySource).toMatch(/this\.#descriptor = await this\.#service\.describeIdentity\(\);/);
+    expect(classBody).toMatch(/this\.#descriptor = await this\.#describeIdentity\(\);/);
   });
 
   // ---------------------------------------------------------------------
@@ -298,9 +299,8 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     expect(identity.currentIdentity()).toBeNull();
   });
 
-  it("18. behavioral: currentIdentity() is null before bootstrapIdentity() is ever called, even after calling describeIdentity()/findIdentity()/listIdentities() directly", async () => {
+  it("18. RIPPLE (Secure Runtime Alpha 068): currentIdentity() was null before bootstrapIdentity() was ever called, even after calling describeIdentity()/findIdentity()/listIdentities() directly, AS OF this Stage's own scope; Alpha 068 made describeIdentity() private, so it can no longer be called directly at all -- reconfirmed here via the remaining directly-callable reads (findIdentity()/listIdentities())", () => {
     const identity = new FedosRuntimeIdentity();
-    await identity.describeIdentity();
     identity.findIdentity("x");
     identity.listIdentities();
     expect(identity.currentIdentity()).toBeNull();
@@ -431,17 +431,13 @@ describe("Secure Runtime Alpha 063 -- Runtime Identity Descriptor Cache", () => 
     expect(b.currentIdentity()).toBe(descriptorB);
   });
 
-  it("27. behavioral: calling describeIdentity() directly (bypassing bootstrapIdentity()) never changes currentIdentity()'s own cached value", async () => {
+  it("27. RIPPLE (Secure Runtime Alpha 068): calling describeIdentity() directly (bypassing bootstrapIdentity()) used to never change currentIdentity()'s own cached value, AS OF this Stage's own scope; Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() private, closing that bypass entirely -- reconfirmed here that 'describeIdentity' is not an accessible property on the instance, and repeat bootstrapIdentity() calls leave currentIdentity() unchanged", async () => {
     const identity = new FedosRuntimeIdentity();
     await identity.bootstrapIdentity();
     expect(identity.currentIdentity()).toBeNull();
+    expect((identity as unknown as Record<string, unknown>).describeIdentity).toBeUndefined();
 
-    vi.spyOn(FedosIdentityService.prototype, "describeIdentity").mockResolvedValueOnce({
-      id: "alpha063-direct-call",
-      provider: "nostr",
-      publicIdentifier: "npub1direct",
-    });
-    await identity.describeIdentity();
+    await identity.bootstrapIdentity();
     expect(identity.currentIdentity()).toBeNull();
   });
 

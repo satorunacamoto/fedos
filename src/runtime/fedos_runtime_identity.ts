@@ -238,6 +238,56 @@
  * `docs/secure_runtime_alpha_066_identity_version_removal.md` for the
  * full removal rationale.
  *
+ * Secure Runtime Alpha 067 (review only, no code change) confirmed,
+ * from the code, that PUBLIC `describeIdentity()` was a genuine
+ * Bootstrap-lifecycle bypass — it reached the SAME
+ * `FedosIdentityService.describeIdentity()` `bootstrapIdentity()`
+ * reaches, including the SAME conditional `registry.register()` write,
+ * but updated NEITHER `#descriptor` NOR `#bootstrapped`, and carried NO
+ * idempotency guard of its own. It also confirmed `bootstrapIdentity()`
+ * itself never called `this.describeIdentity()` — the two reached the
+ * Service through two INDEPENDENT code paths. That Stage adopted
+ * Option D: make `describeIdentity()` a true private method AND rewire
+ * `bootstrapIdentity()` to call it, consolidating to ONE internal path.
+ * See
+ * `docs/secure_runtime_alpha_067_identity_reader_boundary_review.md`.
+ *
+ * Secure Runtime Alpha 068 ("Identity Reader Boundary Consolidation")
+ * implements that Decision, and ONLY that Decision: PUBLIC
+ * `describeIdentity(): Promise<FedosIdentityDescriptor | null>` is
+ * REMOVED and replaced by a true private
+ * `#describeIdentity(): Promise<FedosIdentityDescriptor | null>` with
+ * the IDENTICAL one-line body, `return this.#service.describeIdentity();`
+ * — and `bootstrapIdentity()`'s own second statement now reads
+ * `this.#descriptor = await this.#describeIdentity();` in place of its
+ * previous `this.#descriptor = await this.#service.describeIdentity();`
+ * — the ONLY two changes in this file. The guard (Alpha 061), the
+ * `#descriptor`/`#bootstrapped` assignments and their own order (Alpha
+ * 060/063), Registry registration (still entirely
+ * `FedosIdentityService`'s own responsibility, Alpha 042, reached
+ * identically through `#describeIdentity()` → `this.#service.describeIdentity()`),
+ * and every Fail-Closed guarantee this file has ever established are
+ * completely UNCHANGED — this Stage narrows WHO can reach the Service's
+ * own `describeIdentity()` through this class (only `bootstrapIdentity()`,
+ * now), not WHAT happens when it is reached. `findIdentity()`/
+ * `listIdentities()`/`isBootstrapped()`/`currentIdentity()` are all
+ * byte-for-byte unchanged. `bootstrapIdentity()` is now the ONLY public
+ * method on this class that ever reaches `this.#service` — no external
+ * caller, and as of this Stage no OTHER internal caller, can trigger a
+ * Provider read or Registry write through this class without also
+ * going through the idempotency guard and the `#descriptor`/
+ * `#bootstrapped` accounting `bootstrapIdentity()` performs. See
+ * `docs/secure_runtime_alpha_068_identity_reader_boundary_consolidation.md`
+ * for the full implementation record.
+ *
+ *   - `#describeIdentity()` (Alpha 068) is a true JavaScript private
+ *     method — unreachable from outside this class by any means,
+ *     including from `test/*.test.ts` files, which is the intended,
+ *     enforced effect of this Stage. Its own body is BYTE-FOR-BYTE the
+ *     same single statement the former public `describeIdentity()` had:
+ *     `return this.#service.describeIdentity();`. It has EXACTLY ONE
+ *     caller anywhere in this file: `bootstrapIdentity()`'s own second
+ *     statement.
  *   - NO Relay, event, signing, secret-key, Authentication, Credential,
  *     or Session reference of any kind.
  *   - NO reference to `src/worker.ts`, any `src/storage/*` file, any
@@ -266,7 +316,7 @@ export class FedosRuntimeIdentity {
     this.#resolver = new FedosIdentityResolver(this.#registry);
   }
 
-  async describeIdentity(): Promise<FedosIdentityDescriptor | null> {
+  async #describeIdentity(): Promise<FedosIdentityDescriptor | null> {
     return this.#service.describeIdentity();
   }
 
@@ -282,7 +332,7 @@ export class FedosRuntimeIdentity {
     if (this.#bootstrapped) {
       return;
     }
-    this.#descriptor = await this.#service.describeIdentity();
+    this.#descriptor = await this.#describeIdentity();
     this.#bootstrapped = true;
   }
 

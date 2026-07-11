@@ -304,7 +304,7 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     expect(b.isBootstrapped()).toBe(true);
   });
 
-  it("20. behavioral: the confirmed describeIdentity() bypass -- calling describeIdentity() directly registers into the Registry (observable via findIdentity()) while isBootstrapped()/currentIdentity() stay untouched", async () => {
+  it("20. RIPPLE (Secure Runtime Alpha 068): the confirmed describeIdentity() bypass used to be reachable directly -- calling it registered into the Registry (observable via findIdentity()) while isBootstrapped()/currentIdentity() stayed untouched, AS OF this Stage's own scope; Alpha 068 (implementing the Alpha 067 Decision) made describeIdentity() a true private method, closing this exact bypass -- reconfirmed here that 'describeIdentity' is no longer an accessible property on a FedosRuntimeIdentity instance, and that the only remaining path to the Service (bootstrapIdentity()) keeps Registry/isBootstrapped()/currentIdentity() consistent", async () => {
     const registerSpy = vi.spyOn(FedosIdentityRegistry.prototype, "register");
     const provider = resolveFedosIdentityProvider();
     vi.spyOn(provider as unknown as { describeIdentity: () => Promise<unknown> }, "describeIdentity").mockResolvedValueOnce({
@@ -314,17 +314,25 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     });
 
     const identity = new FedosRuntimeIdentity();
-    const directResult = await identity.describeIdentity();
-    expect(directResult).not.toBeNull();
+    expect((identity as unknown as Record<string, unknown>).describeIdentity).toBeUndefined();
+    await identity.bootstrapIdentity();
     expect(registerSpy).toHaveBeenCalledTimes(1);
     expect(identity.findIdentity("alpha065-bypass-check")).not.toBeNull();
 
-    expect(identity.isBootstrapped()).toBe(false);
-    expect(identity.currentIdentity()).toBeNull();
+    expect(identity.isBootstrapped()).toBe(true);
+    expect(identity.currentIdentity()).not.toBeNull();
   });
 
-  it("21. behavioral: describeIdentity()'s own body never references #bootstrapped/#descriptor/#identityVersion -- a genuinely stateless pass-through, confirming the bypass is structural, not incidental", () => {
-    const body = (fedosRuntimeIdentitySource.match(/async describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+  it("21. RIPPLE (Secure Runtime Alpha 068): describeIdentity()'s own body never referenced #bootstrapped/#descriptor/#identityVersion AS OF this Stage's own scope -- a genuinely stateless pass-through, confirming the bypass was structural, not incidental; Alpha 068 renamed it to a private #describeIdentity() method with the IDENTICAL body -- reconfirmed here against the CURRENT source", () => {
+    const codeOnly = fedosRuntimeIdentitySource
+      .split("\n")
+      .filter((line: string) => {
+        const trimmed = line.trim();
+        return !trimmed.startsWith("//") && !trimmed.startsWith("*") && !trimmed.startsWith("/*");
+      })
+      .join("\n");
+    const classBody = (codeOnly.match(/export class FedosRuntimeIdentity \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/async #describeIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     expect(body).not.toMatch(/#bootstrapped/);
     expect(body).not.toMatch(/#descriptor/);
     expect(body).not.toMatch(/#identityVersion/);
@@ -383,7 +391,7 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
     expect(fedosRuntimeIdentitySource).toMatch(/secure_runtime_alpha_065/);
   });
 
-  it("26. RIPPLE (Secure Runtime Alpha 066): fedos_runtime_identity.ts had exactly SEVEN public methods AS OF this Stage's own review-only scope, unchanged by this Stage; Alpha 066 (a LATER, separate Stage implementing this Stage's own Decision) removed identityVersion() -- reconfirmed here that the class now has exactly SIX public methods", () => {
+  it("26. RIPPLE (Secure Runtime Alpha 068): fedos_runtime_identity.ts had exactly SEVEN public methods AS OF this Stage's own review-only scope, unchanged by this Stage; Alpha 066 removed identityVersion(), and Alpha 068 (a LATER, separate Stage implementing the Alpha 067 Decision) made describeIdentity() a true private #describeIdentity() method -- reconfirmed here that the class now has exactly FIVE public methods", () => {
     const codeOnly = fedosRuntimeIdentitySource
       .split("\n")
       .filter((line: string) => {
@@ -399,7 +407,6 @@ describe("Secure Runtime Alpha 065 -- Identity Runtime Internal Contract Review,
       .filter((name: string) => name !== "constructor");
     expect(new Set(methodNames)).toEqual(
       new Set([
-        "describeIdentity",
         "findIdentity",
         "listIdentities",
         "bootstrapIdentity",
