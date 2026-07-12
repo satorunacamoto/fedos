@@ -91,7 +91,7 @@ describe("Secure Runtime Alpha 160 -- Integration Completion", () => {
     expect(libRsSource).not.toMatch(/^pub fn derive_nostr_root_internal/m);
   });
 
-  it("8. structural: SecretHandleKind and HkdfDomain gained ZERO new variants across the whole Alpha 156-160 Arc", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 163): SecretHandleKind and HkdfDomain gained ZERO new variants across the whole Alpha 156-160 Arc's own scope; Stage 1020 (Secure Runtime Alpha 163) legitimately added a further SecretHandleKind variant, NostrSecretKeyMaterial, in the LATER Alpha 161-165 Arc, reconfirmed here as the CURRENT state", () => {
     const kindBody = (libRsSource.match(/pub\(crate\) enum SecretHandleKind \{([\s\S]*?)\n {4}\}/) ?? [])[1] ?? "";
     const kindVariants = [...kindBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(kindVariants).toEqual([
@@ -106,6 +106,7 @@ describe("Secure Runtime Alpha 160 -- Integration Completion", () => {
       "IdentityRootMaterial",
       "ApplicationRootMaterial",
       "ProtocolRootMaterial",
+      "NostrSecretKeyMaterial",
       "TestOnlySecretMaterial",
     ]);
 

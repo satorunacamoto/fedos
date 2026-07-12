@@ -1797,6 +1797,18 @@ mod secret_handle {
         /// not in this label, mirroring `HkdfOutputMaterial`'s own
         /// single-kind-many-domains shape.
         ProtocolRootMaterial,
+        /// Stage 1020 (Secure Runtime Alpha 163) — a FedOS Nostr Secret Key
+        /// (`master_root::FedosNostrSecretKeyHandle`'s own internal payload
+        /// label), derived from `ProtocolRootMaterial` (the Nostr Root
+        /// instance specifically) via a direct, fixed-salt key-derivation
+        /// call, Account-Index-separated (Stage 1021, Secure Runtime Alpha
+        /// 164). Deliberately a SEPARATE label from the pre-existing
+        /// `NostrKeyMaterial` variant above, which classifies EXTERNALLY
+        /// SUPPLIED Nostr key material fed into `crypto::conversation_key`'s
+        /// ECDH pipeline — never Root-derived, never Account-indexed. This
+        /// variant is reserved exclusively for a Handle constructed by
+        /// `derive_nostr_secret_key_internal`.
+        NostrSecretKeyMaterial,
         /// A test-fixture-only secret — never real production material.
         TestOnlySecretMaterial,
     }
@@ -3042,6 +3054,9 @@ mod kdf_core {
 mod master_root {
     use crate::kdf_core::{derive_secret_handle_internal, HkdfDomain, HkdfStatus};
     use crate::secret_handle::{SecretHandle, SecretHandleKind};
+    use hkdf::Hkdf;
+    use k256::SecretKey;
+    use sha2::Sha256;
     use subtle::ConstantTimeEq;
     use zeroize::Zeroize;
 
@@ -3292,6 +3307,19 @@ mod master_root {
             right.zeroize();
             equal
         }
+
+        /// Stage 1021 (Secure Runtime Alpha 164) — the ONE narrowly-scoped
+        /// internal accessor exposing a COPY of the real 32-byte Protocol
+        /// Root — private to this module, for the sole reviewed use of
+        /// [`derive_nostr_secret_key_internal`] below. Returns `None` after
+        /// `clear()`. Callable for a Protocol Root Handle derived under ANY
+        /// `HkdfDomain` (Nostr/Session/ATProto/Wallet) — it is
+        /// `derive_nostr_secret_key_internal`'s own caller discipline, not
+        /// this accessor, that restricts real production use to a Nostr
+        /// Root instance specifically.
+        fn expose_bytes_for_internal_nostr_secret_key_derivation(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
     }
 
     /// The result of a [`derive_protocol_root_internal`] call (and of
@@ -3397,6 +3425,219 @@ mod master_root {
         application_root: &FedosApplicationRootHandle,
     ) -> ProtocolRootDecision {
         derive_protocol_root_internal(application_root, HkdfDomain::Wallet)
+    }
+
+    /// Stage 1020 (Secure Runtime Alpha 163) — an INTERNAL-ONLY handle for
+    /// a FedOS Nostr Secret Key, the first Account-indexed secp256k1
+    /// signing-key material this crate derives. See this Stage's own
+    /// design record for the full record. Deliberately a SEPARATE Rust type from
+    /// `FedosProtocolRootHandle` — a Root and the secret key derived FROM
+    /// it are never the same type, even though both currently wrap a
+    /// single `SecretHandle`. No `Clone`, no `Copy`, no `Debug`, no
+    /// `Display`, no `Serialize`, no `PartialEq`/`Eq` derive, no
+    /// WASM-export attribute (wasm_bindgen) — the same prohibitions binding
+    /// every other Root Handle in this module, per
+    /// `docs/secret_lifecycle_implementation_plan.md`.
+    pub(crate) struct FedosNostrSecretKeyHandle {
+        inner: SecretHandle,
+    }
+
+    impl FedosNostrSecretKeyHandle {
+        /// Private to this module — the only production caller is
+        /// [`derive_nostr_secret_key_internal`] below, and only once its
+        /// HKDF candidate bytes have already been confirmed a valid
+        /// secp256k1 scalar.
+        fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
+            Self {
+                inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::NostrSecretKeyMaterial,
+                    bytes,
+                ),
+            }
+        }
+
+        /// The non-sensitive classification label fixed at construction.
+        pub(crate) fn kind(&self) -> SecretHandleKind {
+            self.inner.kind()
+        }
+
+        /// Whether [`FedosNostrSecretKeyHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.inner.is_cleared()
+        }
+
+        /// Zeroizes the held secret-key bytes. Safe to call more than once.
+        pub(crate) fn clear(&mut self) {
+            self.inner.clear();
+        }
+
+        /// Same shape and guarantees as
+        /// [`FedosProtocolRootHandle::matches_for_internal_verification`]
+        /// above — the ONLY comparison operation this type exposes.
+        /// Constant-time (`subtle::ConstantTimeEq`), Handle-only, never a
+        /// raw byte returned, logged, or compared with a plain `==`.
+        pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
+            let mut left = match self.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => return false,
+            };
+            let mut right = match other.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => {
+                    left.zeroize();
+                    return false;
+                }
+            };
+            let equal = bool::from(left.ct_eq(&right));
+            left.zeroize();
+            right.zeroize();
+            equal
+        }
+    }
+
+    /// Coarse observable outcome of a [`derive_nostr_secret_key_internal`]
+    /// call. Crate-private only. No secret byte is exposed through this
+    /// label itself — only through [`NostrSecretKeyDecision::output`] on
+    /// `Success`, and even then only as an opaque
+    /// [`FedosNostrSecretKeyHandle`], never a raw byte.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NostrSecretKeyStatus {
+        /// Derivation succeeded; `NostrSecretKeyDecision::output` is
+        /// `Some`.
+        Success,
+        /// `nostr_root` held no real bytes (already `clear()`-ed) —
+        /// `output` is `None`.
+        InvalidInput,
+        /// The HKDF-expand candidate bytes were rejected by `k256` as an
+        /// invalid secp256k1 scalar (zero, or out of the curve order's
+        /// range) — astronomically unlikely (probability ~1/2^128 per
+        /// Account Index) but matched exhaustively, never a panic, never a
+        /// silent retry, and never a hand-rolled modular reduction. See
+        /// Secure Runtime Alpha 164's own design record §4 for the full
+        /// comparison of alternatives this Stage rejected.
+        InvalidScalar,
+        /// The underlying `hkdf` crate's `expand` step failed (RFC 5869
+        /// section 2.3's `255 * HashLen` output-length ceiling) —
+        /// unreachable in practice at this function's fixed 32-byte
+        /// output, matched exhaustively rather than assumed infallible,
+        /// mirroring `kdf_core::HkdfStatus::InternalFailure`.
+        InternalFailure,
+    }
+
+    /// The result of a [`derive_nostr_secret_key_internal`] call.
+    /// Crate-private only.
+    pub(crate) struct NostrSecretKeyDecision {
+        pub(crate) status: NostrSecretKeyStatus,
+        pub(crate) output: Option<FedosNostrSecretKeyHandle>,
+    }
+
+    /// The fixed, compile-time HKDF-SHA256 salt for Nostr Secret Key
+    /// derivation — never caller-supplied, never random. Follows this
+    /// crate's own EXISTING `HkdfDomain` label convention
+    /// (`b"fedos-hkdf-salt-{domain}-v1"`) exactly, one level deeper than
+    /// `HkdfDomain::Nostr` itself (Secure Runtime Alpha 143's own §3
+    /// composition rule, applied without inventing a new format).
+    const NOSTR_SECRET_KEY_SALT: &[u8] = b"fedos-hkdf-salt-nostr-secret-key-v1";
+
+    /// The fixed, compile-time HKDF-SHA256 info LABEL PREFIX for Nostr
+    /// Secret Key derivation. The Account Index is APPENDED to this
+    /// prefix as 4 fixed-width big-endian bytes (Secure Runtime Alpha 143's
+    /// own §3) — never embedded as a decimal string, never variable-length. See
+    /// [`derive_nostr_secret_key_internal`] for where this prefix is
+    /// combined with the caller's own `account_index`.
+    const NOSTR_SECRET_KEY_INFO_PREFIX: &[u8] = b"fedos-hkdf-info-nostr-secret-key-v1";
+
+    /// The fixed total length of the HKDF-expand `info` context this
+    /// function builds: the label prefix above, plus exactly 4 bytes for
+    /// the big-endian `u32` Account Index.
+    const NOSTR_SECRET_KEY_INFO_LEN: usize = NOSTR_SECRET_KEY_INFO_PREFIX.len() + 4;
+
+    /// Stage 1021 (Secure Runtime Alpha 164) — derive a NEW
+    /// [`FedosNostrSecretKeyHandle`] from an existing, real Nostr Root
+    /// (`nostr_root`, a [`FedosProtocolRootHandle`] produced by
+    /// [`derive_nostr_root_internal`]) and an `account_index`, via a
+    /// direct HKDF-SHA256 call using ONLY this crate's already-adopted
+    /// `hkdf`/`sha2` dependencies — the SAME primitive
+    /// `kdf_core::derive_secret_handle_internal` and
+    /// `crypto::conversation_key`'s own direct `Hkdf::<Sha256>` call both
+    /// already use, no second KDF implementation. Deliberately does NOT go
+    /// through `kdf_core::derive_secret_handle_internal`/`HkdfDomain`:
+    /// that shared bridge's `info()` is a FIXED compile-time constant with
+    /// no parameter slot for a caller-varying Account Index, so this
+    /// function instead builds its own fixed-salt, Account-Index-appended
+    /// `info` context directly — the same "bypass the fixed-domain bridge
+    /// for a context shape it cannot express" precedent
+    /// `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`
+    /// already set for NIP-44's own fixed `"nip44-v2"` salt.
+    ///
+    /// `account_index` is encoded as exactly 4 fixed-width big-endian
+    /// bytes (`u32::to_be_bytes`), appended after
+    /// [`NOSTR_SECRET_KEY_INFO_PREFIX`] — never ASCII decimal, never
+    /// variable-length, per Secure Runtime Alpha 143's own §3.
+    /// Every `u32` value, including `0` and `u32::MAX`, is a valid input —
+    /// no reserved or forbidden index.
+    ///
+    /// The 32-byte HKDF-expand output is validated as a secp256k1 scalar
+    /// via `k256::SecretKey::from_slice` — the SAME constant-time
+    /// validation `crypto::conversation_key` already uses for its own
+    /// `sec1` input — before ever being wrapped in a
+    /// [`FedosNostrSecretKeyHandle`]. An invalid candidate (astronomically
+    /// unlikely) is rejected with [`NostrSecretKeyStatus::InvalidScalar`]
+    /// and `output: None` — never a panic, never a silent retry with a
+    /// counter, never a hand-rolled modular reduction.
+    ///
+    /// Does not mutate `nostr_root` — it is borrowed, never consumed, and
+    /// is left exactly as it was after this call returns, so the same
+    /// Nostr Root can be derived from again under a different
+    /// `account_index`. Never derives or returns a public counterpart, a
+    /// bech32-encoded form, or a cryptographic proof of any kind — this
+    /// function's own sole output is an opaque
+    /// [`FedosNostrSecretKeyHandle`].
+    pub(crate) fn derive_nostr_secret_key_internal(
+        nostr_root: &FedosProtocolRootHandle,
+        account_index: u32,
+    ) -> NostrSecretKeyDecision {
+        let mut root_bytes = match nostr_root.expose_bytes_for_internal_nostr_secret_key_derivation()
+        {
+            Some(bytes) => bytes,
+            None => {
+                return NostrSecretKeyDecision {
+                    status: NostrSecretKeyStatus::InvalidInput,
+                    output: None,
+                }
+            }
+        };
+
+        let hk = Hkdf::<Sha256>::new(Some(NOSTR_SECRET_KEY_SALT), &root_bytes);
+        root_bytes.zeroize();
+
+        let mut info = [0u8; NOSTR_SECRET_KEY_INFO_LEN];
+        info[..NOSTR_SECRET_KEY_INFO_PREFIX.len()].copy_from_slice(NOSTR_SECRET_KEY_INFO_PREFIX);
+        info[NOSTR_SECRET_KEY_INFO_PREFIX.len()..].copy_from_slice(&account_index.to_be_bytes());
+
+        let mut candidate = [0u8; 32];
+        let expand_result = hk.expand(&info, &mut candidate);
+
+        let decision = match expand_result {
+            Err(_) => NostrSecretKeyDecision {
+                status: NostrSecretKeyStatus::InternalFailure,
+                output: None,
+            },
+            Ok(()) => match SecretKey::from_slice(&candidate) {
+                Ok(_) => NostrSecretKeyDecision {
+                    status: NostrSecretKeyStatus::Success,
+                    output: Some(FedosNostrSecretKeyHandle::new_from_32_bytes_for_internal_use(
+                        candidate,
+                    )),
+                },
+                Err(_) => NostrSecretKeyDecision {
+                    status: NostrSecretKeyStatus::InvalidScalar,
+                    output: None,
+                },
+            },
+        };
+        candidate.zeroize();
+        decision
     }
 
     /// The result of a [`derive_application_root_internal`] call.
@@ -4026,6 +4267,134 @@ mod master_root {
             assert!(first_root.matches_for_internal_verification(&second_root));
             first_root.clear();
             assert!(!first_root.matches_for_internal_verification(&second_root));
+        }
+
+        // -----------------------------------------------------------------
+        // Secure Runtime Alpha 163/164 — Nostr Secret Key derivation
+        // -----------------------------------------------------------------
+
+        fn real_nostr_root() -> FedosProtocolRootHandle {
+            let application_root = real_application_root();
+            derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root")
+        }
+
+        #[test]
+        fn derive_nostr_secret_key_internal_succeeds_for_a_real_nostr_root() {
+            let nostr_root = real_nostr_root();
+            let decision = derive_nostr_secret_key_internal(&nostr_root, 0);
+            assert_eq!(decision.status, NostrSecretKeyStatus::Success);
+            let handle = decision.output.expect("expected a real secret key");
+            assert_eq!(handle.kind(), SecretHandleKind::NostrSecretKeyMaterial);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn derive_nostr_secret_key_internal_rejects_a_cleared_nostr_root() {
+            let mut nostr_root = real_nostr_root();
+            nostr_root.clear();
+            let decision = derive_nostr_secret_key_internal(&nostr_root, 0);
+            assert_eq!(decision.status, NostrSecretKeyStatus::InvalidInput);
+            assert!(decision.output.is_none());
+        }
+
+        #[test]
+        fn derive_nostr_secret_key_internal_does_not_mutate_the_input_nostr_root() {
+            let nostr_root = real_nostr_root();
+            let _ = derive_nostr_secret_key_internal(&nostr_root, 7);
+            assert!(!nostr_root.is_cleared());
+        }
+
+        #[test]
+        fn same_nostr_root_and_same_account_index_derive_matching_secret_keys() {
+            let nostr_root = real_nostr_root();
+            let first = derive_nostr_secret_key_internal(&nostr_root, 42)
+                .output
+                .expect("expected Success");
+            let second = derive_nostr_secret_key_internal(&nostr_root, 42)
+                .output
+                .expect("expected Success");
+            assert!(first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn same_nostr_root_and_different_account_indices_derive_non_matching_secret_keys() {
+            let nostr_root = real_nostr_root();
+            let first = derive_nostr_secret_key_internal(&nostr_root, 0)
+                .output
+                .expect("expected Success");
+            let second = derive_nostr_secret_key_internal(&nostr_root, 1)
+                .output
+                .expect("expected Success");
+            assert!(!first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn different_nostr_roots_and_same_account_index_derive_non_matching_secret_keys() {
+            let first_nostr_root = {
+                let seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xAA; 32]);
+                let identity_root = derive_identity_root_internal(&seed)
+                    .output
+                    .expect("expected a real Identity Root");
+                let application_root = derive_application_root_internal(&identity_root)
+                    .output
+                    .expect("expected a real Application Root");
+                derive_nostr_root_internal(&application_root)
+                    .output
+                    .expect("expected a real Nostr Root")
+            };
+            let second_nostr_root = real_nostr_root();
+            let first = derive_nostr_secret_key_internal(&first_nostr_root, 0)
+                .output
+                .expect("expected Success");
+            let second = derive_nostr_secret_key_internal(&second_nostr_root, 0)
+                .output
+                .expect("expected Success");
+            assert!(!first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn account_index_zero_one_and_u32_max_all_derive_successfully_and_distinctly() {
+            let nostr_root = real_nostr_root();
+            let zero = derive_nostr_secret_key_internal(&nostr_root, 0)
+                .output
+                .expect("expected Success for account 0");
+            let one = derive_nostr_secret_key_internal(&nostr_root, 1)
+                .output
+                .expect("expected Success for account 1");
+            let max = derive_nostr_secret_key_internal(&nostr_root, u32::MAX)
+                .output
+                .expect("expected Success for account u32::MAX");
+            assert!(!zero.matches_for_internal_verification(&one));
+            assert!(!zero.matches_for_internal_verification(&max));
+            assert!(!one.matches_for_internal_verification(&max));
+        }
+
+        #[test]
+        fn nostr_secret_key_matches_for_internal_verification_returns_false_after_either_side_is_cleared(
+        ) {
+            let nostr_root = real_nostr_root();
+            let mut first = derive_nostr_secret_key_internal(&nostr_root, 3)
+                .output
+                .expect("expected Success");
+            let second = derive_nostr_secret_key_internal(&nostr_root, 3)
+                .output
+                .expect("expected Success");
+            assert!(first.matches_for_internal_verification(&second));
+            first.clear();
+            assert!(!first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn nostr_secret_key_status_has_exactly_four_variants() {
+            let status = NostrSecretKeyStatus::Success;
+            match status {
+                NostrSecretKeyStatus::Success => {}
+                NostrSecretKeyStatus::InvalidInput => {}
+                NostrSecretKeyStatus::InvalidScalar => {}
+                NostrSecretKeyStatus::InternalFailure => {}
+            }
         }
     }
 }
