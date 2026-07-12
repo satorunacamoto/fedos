@@ -66,14 +66,16 @@ describe("Secure Runtime Alpha 117 -- Desktop Bootstrap State", () => {
     expect(body).not.toMatch(/#publicIdentity/);
   });
 
-  it("5. structural: the class still has exactly four public methods and four private fields -- no #bootstrapped field was added", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 121): the class had exactly four public methods AS OF this Stage's own scope and four private fields -- no #bootstrapped field was added; Alpha 121 added readPublicIdentity(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
-    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped"]));
+    expect(new Set(publicMethodNames)).toEqual(
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+    );
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
     expect(fieldNames).not.toContain("bootstrapped");

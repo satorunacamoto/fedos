@@ -77,14 +77,16 @@ describe("Secure Runtime Alpha 119 -- Desktop API Verification", () => {
     expect(exportNames).toEqual(["DesktopApplication"]);
   });
 
-  it("7. structural: the class exposes exactly four public methods, matching the Decision precisely", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 121): the class exposed exactly four public methods AS OF this Stage's own scope, matching the Decision precisely; Alpha 121 added a FIFTH, readPublicIdentity() -- superseded by Alpha 124's own restated Decision -- reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
-    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped"]));
+    expect(new Set(publicMethodNames)).toEqual(
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+    );
   });
 
   it("8. structural: no public method returns #reader, #identity, or #publicIdentity by reference", () => {

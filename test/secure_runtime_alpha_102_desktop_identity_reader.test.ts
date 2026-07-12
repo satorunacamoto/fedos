@@ -85,7 +85,7 @@ describe("Secure Runtime Alpha 102 -- Desktop Identity Reader", () => {
     expect(desktopApplicationSource).toMatch(/PERMANENTLY owned by `DesktopApplication`\s*\n\s*\*\s*alone/);
   });
 
-  it("8. RIPPLE (Secure Runtime Alpha 117): DesktopApplication's own class shape was BYTE-FOR-BYTE unchanged from Alpha 098 AS OF this Stage's own scope -- exactly two fields, two public methods, and a one-statement constructor; Alpha 103 added #reader, Alpha 107 added #publicIdentity, Alpha 116 added currentIdentity(), and Alpha 117 added isBootstrapped(), reconfirmed here as the CURRENT state", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 121): DesktopApplication's own class shape was BYTE-FOR-BYTE unchanged from Alpha 098 AS OF this Stage's own scope -- exactly two fields, two public methods, and a one-statement constructor; Alpha 103 added #reader, Alpha 107 added #publicIdentity, Alpha 116 added currentIdentity(), Alpha 117 added isBootstrapped(), and Alpha 121 added readPublicIdentity(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
@@ -95,7 +95,9 @@ describe("Secure Runtime Alpha 102 -- Desktop Identity Reader", () => {
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
-    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped"]));
+    expect(new Set(publicMethodNames)).toEqual(
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+    );
 
     const ctorBody = (classBody.match(/constructor\([\s\S]*?\) \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const ctorLines = ctorBody

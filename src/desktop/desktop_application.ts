@@ -98,6 +98,17 @@
  * never derives this value from `#started` or from `currentIdentity()`
  * — it is read fresh from `#identity` on every call.
  *
+ * Secure Runtime Alpha 121 ("Desktop Reader Access") adds a new public
+ * method, `readPublicIdentity(): Promise<FedosIdentityDescriptor | null>`,
+ * whose own entire body is `return this.#reader.readPublicIdentity();`
+ * — a PURE delegation to the held Reader (Alpha 103) — the ONLY change
+ * this Stage makes. `#reader` had been held, unread, since Alpha 103;
+ * this is the FIRST method on this class to read it. No processing, no
+ * transformation, no caching, and NO reference to `#identity` of any
+ * kind — this method NEVER touches Identity Runtime, exactly
+ * symmetrically to how `currentIdentity()`/`isBootstrapped()` never
+ * touch `#reader`.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
  *   - The constructor performs NO async work of any kind — it only
@@ -114,8 +125,8 @@
  *     it does NOT silently no-op.
  *   - `#reader` (Alpha 103) is PERMANENTLY owned by `DesktopApplication`
  *     alone — `FedosRuntimeIdentity` must NEVER hold one, in any
- *     future implementation, for any purpose. No method on this class
- *     reads `#reader` yet.
+ *     future implementation, for any purpose. `readPublicIdentity()`
+ *     (Alpha 121) is the ONLY method on this class that reads `#reader`.
  *   - `#publicIdentity` (Alpha 107) defaults to `undefined` — no
  *     public identity is configured unless explicitly supplied. No
  *     method on this class reads `#publicIdentity` yet, and this
@@ -133,6 +144,14 @@
  *     and this method NEVER derives its answer from `#started` or from
  *     `currentIdentity()` — Identity Authority (Alpha 111) is consulted
  *     exclusively through `#identity`.
+ *   - `readPublicIdentity()` (Alpha 121) is a PURE WRAPPER — its own
+ *     entire body is `return this.#reader.readPublicIdentity();`,
+ *     nothing more. It performs NO caching, NO transformation, and NO
+ *     access to `#identity`, `#publicIdentity`, or `#started` of any
+ *     kind — it NEVER touches Identity Runtime. This is the sole
+ *     read boundary for `#reader`, symmetrically opposite
+ *     `currentIdentity()`/`isBootstrapped()`, which are the sole read
+ *     boundary for `#identity` — the two paths never cross.
  *   - NO GUI, NO Nostr/Relay connection, NO Observation implementation
  *     of any kind exists anywhere in this file.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
@@ -179,5 +198,9 @@ export class DesktopApplication {
 
   isBootstrapped(): boolean {
     return this.#identity.isBootstrapped();
+  }
+
+  readPublicIdentity(): Promise<FedosIdentityDescriptor | null> {
+    return this.#reader.readPublicIdentity();
   }
 }

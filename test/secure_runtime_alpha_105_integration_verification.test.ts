@@ -182,9 +182,9 @@ describe("Secure Runtime Alpha 105 -- Integration Verification", () => {
   // Structural: Observation/Nostr Relay/GUI unconnected, #reader unread
   // ---------------------------------------------------------------------
 
-  it("14. structural: no method on DesktopApplication ever calls this.#reader.readPublicIdentity() -- confirmed against the actual, unchanged class body", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 121): no method on DesktopApplication ever called this.#reader.readPublicIdentity() AS OF this Stage's own scope, since #reader was held but unread since Alpha 103; Alpha 121 legitimately added readPublicIdentity(), the class's own FIRST reader of #reader, reconfirmed here as the CURRENT state", () => {
     const classBody = (desktopApplicationSource.match(/export class DesktopApplication[^{]*\{([\s\S]*)\n\}/) ?? [])[1] ?? "";
-    expect(classBody).not.toMatch(/#reader\.readPublicIdentity/);
+    expect(classBody).toMatch(/#reader\.readPublicIdentity/);
   });
 
   it("15. structural: no file under src/desktop/ opens a Relay/WebSocket connection or references Observation IN CODE", () => {
