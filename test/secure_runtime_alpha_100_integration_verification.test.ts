@@ -172,15 +172,16 @@ describe("Secure Runtime Alpha 100 -- Integration Verification", () => {
   // Structural: Observation/Nostr/GUI unconnected
   // ---------------------------------------------------------------------
 
-  it("12. structural: no file under src/desktop/ references Observation, Nostr/Relay, or any GUI construct IN CODE (comments legitimately name these as forbidden guardrails)", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 103): no file under src/desktop/ referenced Observation, Nostr/Relay, or any GUI construct IN CODE AS OF this Stage's own scope; Alpha 103 legitimately introduced NostrPublicIdentityReader/resolveNostrPublicIdentitySource, reconfirmed here as the CURRENT state -- Relay/WebSocket/GUI/Observation remain forbidden", () => {
     for (const source of [desktopApplicationSource, createDesktopApplicationSource]) {
       const codeOnly = source
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
         .join("\n");
       expect(codeOnly).not.toMatch(/observeBootstrap|Observation/i);
-      expect(codeOnly).not.toMatch(/Relay|WebSocket|nostr/i);
+      expect(codeOnly).not.toMatch(/Relay|WebSocket/i);
       expect(codeOnly).not.toMatch(/window|document|React|Electron|Tauri/i);
+      expect(codeOnly).toMatch(/NostrPublicIdentityReader/);
     }
   });
 

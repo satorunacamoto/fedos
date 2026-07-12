@@ -46,7 +46,7 @@ describe("Secure Runtime Alpha 099 -- Desktop Factory", () => {
     expect(exportNames).toEqual(["createDesktopApplication"]);
   });
 
-  it("4. createDesktopApplication()'s own entire body is a pure construction and return, nothing else", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 103): createDesktopApplication()'s own entire body was a pure construction and return AS OF this Stage's own scope; Alpha 103 updated it to explicitly construct the Source and Reader, reconfirmed here as the CURRENT state", () => {
     const body = (createDesktopApplicationSource.match(
       /export function createDesktopApplication\(\): DesktopApplication \{([\s\S]*?)\n\}/,
     ) ?? [])[1] ?? "";
@@ -54,7 +54,11 @@ describe("Secure Runtime Alpha 099 -- Desktop Factory", () => {
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toEqual(["return new DesktopApplication();"]);
+    expect(lines).toEqual([
+      "const source = resolveNostrPublicIdentitySource();",
+      "const reader = new NostrPublicIdentityReader(source);",
+      "return new DesktopApplication(reader);",
+    ]);
   });
 
   it("5. createDesktopApplication() never calls bootstrap() or start() on the instance it constructs", () => {
@@ -63,9 +67,9 @@ describe("Secure Runtime Alpha 099 -- Desktop Factory", () => {
     expect(createDesktopApplicationSource).not.toMatch(/\basync function/);
   });
 
-  it("6. desktop_application.ts remains byte-for-byte unchanged -- no reference to this Stage's own doc", () => {
+  it("6. RIPPLE (Secure Runtime Alpha 103): desktop_application.ts never referenced createDesktopApplication AS OF this Stage's own scope; Alpha 103's own header comment now legitimately mentions it, reconfirmed here as the CURRENT state -- this Stage's own doc reference is still absent", () => {
     expect(desktopApplicationSource).not.toMatch(/secure_runtime_alpha_099/);
-    expect(desktopApplicationSource).not.toMatch(/createDesktopApplication/);
+    expect(desktopApplicationSource).toMatch(/createDesktopApplication/);
   });
 
   it("7. the design doc's own 'does NOT do' list confirms bootstrap()/start() are never called and no parameter is accepted", () => {

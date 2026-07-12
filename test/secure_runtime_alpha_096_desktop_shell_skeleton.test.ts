@@ -53,21 +53,21 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
     expect(exportNames).toEqual(["DesktopApplication"]);
   });
 
-  it("4. RIPPLE (Secure Runtime Alpha 098): the class held exactly one readonly #identity field and no other AS OF Alpha 096's own scope; Alpha 098 added #started, reconfirmed here as the CURRENT state", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 103): the class held exactly one readonly #identity field and no other AS OF Alpha 096's own scope; Alpha 098 added #started and Alpha 103 added #reader, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "started"]);
     expect(classBody).toMatch(/readonly #identity: FedosRuntimeIdentity;/);
   });
 
-  it("5. the constructor's own entire body is the single synchronous FedosRuntimeIdentity construction, nothing else", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 103): the constructor's own entire body was the single synchronous FedosRuntimeIdentity construction AS OF Alpha 096's own scope; Alpha 103 added a Reader parameter and a second statement storing it, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
-    const body = (classBody.match(/constructor\(\) \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const body = (classBody.match(/constructor\([\s\S]*?\) \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toEqual(["this.#identity = new FedosRuntimeIdentity();"]);
+    expect(lines).toEqual(["this.#identity = new FedosRuntimeIdentity();", "this.#reader = reader;"]);
     expect(body).not.toMatch(/await/);
   });
 
@@ -107,11 +107,12 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
     expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start"]));
   });
 
-  it("9. no GUI, Nostr, Relay, or Observation reference exists in the CODE (comments legitimately name these as forbidden guardrails)", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 103): no GUI, Relay/WebSocket, or Observation reference exists in the CODE; Alpha 103 legitimately introduced NostrPublicIdentityReader/resolveNostrPublicIdentitySource (the Public Identity Source Foundation this Arc exists to build), reconfirmed here as the CURRENT, still-forbidden set", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     expect(classBody).not.toMatch(/window|document|DOM|React|Electron|Tauri/i);
-    expect(classBody).not.toMatch(/Relay|WebSocket|nostr/i);
+    expect(classBody).not.toMatch(/Relay|WebSocket/i);
     expect(classBody).not.toMatch(/observeBootstrap|Observation/i);
+    expect(classBody).toMatch(/NostrPublicIdentityReader/);
   });
 
   it("10. no CODE reference to create_runtime.ts, types.ts, AppRuntime, or worker.ts exists (comments legitimately name these as forbidden guardrails)", () => {

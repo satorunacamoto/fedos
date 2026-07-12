@@ -39,11 +39,36 @@
  * `#started` and may still be called directly, any number of times,
  * relying entirely on `FedosRuntimeIdentity`'s own idempotency.
  *
+ * Secure Runtime Alpha 102 ("Desktop Identity Reader", review/design
+ * only, NO code change) formally decided that `DesktopApplication` —
+ * NOT `FedosRuntimeIdentity` — owns a future `FedosPublicIdentityReader`
+ * (`fedos_public_identity_reader.ts`, Alpha 101) instance.
+ * `FedosRuntimeIdentity` itself is permanently EXCLUDED from ever
+ * holding a Reader of its own.
+ *
+ * Secure Runtime Alpha 103 ("Source Injection") implements that
+ * Decision: a new `readonly #reader: FedosPublicIdentityReader` field,
+ * set via a new constructor parameter,
+ * `reader: FedosPublicIdentityReader = new NostrPublicIdentityReader(resolveNostrPublicIdentitySource())`.
+ * The default value mirrors `NostrIdentityProvider`'s own Alpha 049
+ * default-parameter pattern exactly — every EXISTING no-argument
+ * `new DesktopApplication()` call site (including every prior Stage's
+ * own test suite) continues to work unchanged, since the default
+ * resolves through the SAME `resolveNostrPublicIdentitySource()`
+ * singleton (Alpha 048) that today always yields
+ * `NullNostrPublicIdentitySource` — behaviorally IDENTICAL to before
+ * this Stage. `createDesktopApplication()` is updated to construct the
+ * Source and Reader explicitly and pass them through, matching this
+ * Stage's own Source Injection diagram precisely, though it remains
+ * functionally equivalent to relying on the default. `#reader` is
+ * held but not yet read by any method on this class — no new public
+ * API is added.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
- *   - The constructor takes NO arguments and performs NO async work of
- *     any kind — it only constructs the one `FedosRuntimeIdentity`
- *     instance this class holds.
+ *   - The constructor performs NO async work of any kind — it only
+ *     constructs the one `FedosRuntimeIdentity` instance this class
+ *     holds and stores the injected (or defaulted) Reader.
  *   - `bootstrap()` performs NO Registry/Provider/Resolver access of
  *     its own — it delegates entirely to
  *     `this.#identity.bootstrapIdentity()`.
@@ -52,6 +77,10 @@
  *     this.bootstrap();` resolves without throwing. A SECOND `start()`
  *     call on an instance where `#started` is already `true` THROWS —
  *     it does NOT silently no-op.
+ *   - `#reader` (Alpha 103) is PERMANENTLY owned by `DesktopApplication`
+ *     alone — `FedosRuntimeIdentity` must NEVER hold one, in any
+ *     future implementation, for any purpose. No method on this class
+ *     reads `#reader` yet.
  *   - NO GUI, NO Nostr/Relay connection, NO Observation implementation
  *     of any kind exists anywhere in this file.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
@@ -59,13 +88,20 @@
  */
 
 import { FedosRuntimeIdentity } from "../runtime/fedos_runtime_identity.js";
+import { resolveNostrPublicIdentitySource } from "../identity/fedos_nostr_public_identity_source_resolver.js";
+import type { FedosPublicIdentityReader } from "./fedos_public_identity_reader.js";
+import { NostrPublicIdentityReader } from "./nostr_public_identity_reader.js";
 
 export class DesktopApplication {
   readonly #identity: FedosRuntimeIdentity;
+  readonly #reader: FedosPublicIdentityReader;
   #started: boolean = false;
 
-  constructor() {
+  constructor(
+    reader: FedosPublicIdentityReader = new NostrPublicIdentityReader(resolveNostrPublicIdentitySource()),
+  ) {
     this.#identity = new FedosRuntimeIdentity();
+    this.#reader = reader;
   }
 
   async bootstrap(): Promise<void> {
