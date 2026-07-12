@@ -83,7 +83,7 @@ describe("Secure Runtime Alpha 130 -- Integration Completion", () => {
   // Structural: the final, complete class shape
   // ---------------------------------------------------------------------
 
-  it("6. structural: DesktopApplication is the ONLY export, with exactly six public methods and five private fields", () => {
+  it("6. RIPPLE (Secure Runtime Alpha 131): DesktopApplication was the ONLY export, with exactly six public methods and five private fields, AS OF this Stage's own scope -- the Arc's own closing class shape; Alpha 131 added a SEVENTH public method, refreshPublicIdentity(), opening the next Arc, reconfirmed here as the CURRENT state", () => {
     const exportNames = [...desktopApplicationSource.matchAll(/^export (?:class|function|const) (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -96,7 +96,15 @@ describe("Secure Runtime Alpha 130 -- Integration Completion", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
+      new Set([
+        "bootstrap",
+        "start",
+        "currentIdentity",
+        "isBootstrapped",
+        "readPublicIdentity",
+        "currentPublicIdentity",
+        "refreshPublicIdentity",
+      ]),
     );
 
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);

@@ -82,7 +82,7 @@ describe("Secure Runtime Alpha 125 -- Integration Completion", () => {
   // Structural: the final, complete class shape
   // ---------------------------------------------------------------------
 
-  it("6. RIPPLE (Secure Runtime Alpha 128): DesktopApplication was the ONLY export, with exactly five public methods and four private fields, AS OF this Stage's own scope -- the Arc's own closing class shape; Alpha 126 added a FIFTH private field, #currentPublicIdentity, and Alpha 128 added a SIXTH public method, currentPublicIdentity(), opening later Arcs, reconfirmed here as the CURRENT state", () => {
+  it("6. RIPPLE (Secure Runtime Alpha 131): DesktopApplication was the ONLY export, with exactly five public methods and four private fields, AS OF this Stage's own scope -- the Arc's own closing class shape; Alpha 126 added a FIFTH private field, #currentPublicIdentity, Alpha 128 added a SIXTH public method, currentPublicIdentity(), and Alpha 131 added a SEVENTH public method, refreshPublicIdentity(), opening later Arcs, reconfirmed here as the CURRENT state", () => {
     const exportNames = [...desktopApplicationSource.matchAll(/^export (?:class|function|const) (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -95,14 +95,22 @@ describe("Secure Runtime Alpha 125 -- Integration Completion", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
+      new Set([
+        "bootstrap",
+        "start",
+        "currentIdentity",
+        "isBootstrapped",
+        "readPublicIdentity",
+        "currentPublicIdentity",
+        "refreshPublicIdentity",
+      ]),
     );
 
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
   });
 
-  it("7. RIPPLE (Secure Runtime Alpha 128): the Runtime Identity path delegated only to #identity, and the Reader path delegated only to #reader, AS OF this Stage's own scope; Alpha 128 added currentPublicIdentity(), a synchronous read of #currentPublicIdentity (the Reader path's own persisted state, never #identity), reconfirmed here as the CURRENT state", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 131): the Runtime Identity path delegated only to #identity, and the Reader path delegated only to #reader, AS OF this Stage's own scope; Alpha 128 added currentPublicIdentity(), a synchronous read of #currentPublicIdentity (the Reader path's own persisted state, never #identity), and Alpha 131 added refreshPublicIdentity(), a PURE delegation to readPublicIdentity() itself, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     expect(classBody).toMatch(/return this\.#identity\.currentIdentity\(\);/);
     expect(classBody).toMatch(/return this\.#identity\.isBootstrapped\(\);/);

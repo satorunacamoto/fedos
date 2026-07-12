@@ -145,6 +145,19 @@
  * counterpart to `currentIdentity()` (Alpha 116) for the Reader path,
  * symmetrically named and symmetrically synchronous.
  *
+ * Secure Runtime Alpha 131 ("Desktop Refresh API") adds a new public
+ * method, `refreshPublicIdentity(): Promise<FedosIdentityDescriptor | null>`,
+ * whose own entire body is `return this.readPublicIdentity();` — a
+ * PURE delegation to this class's OWN `readPublicIdentity()` (Alpha
+ * 121/127), not to `#reader` directly — the ONLY change this Stage
+ * makes. "Refresh" names an explicit, intentional re-fetch for
+ * callers who want to state their intent clearly; it adds NO new
+ * behavior of its own — `readPublicIdentity()` already re-invokes the
+ * Reader fresh on every call (Alpha 121's own no-caching guarantee)
+ * and already persists into `#currentPublicIdentity` on success
+ * (Alpha 127) — `refreshPublicIdentity()` inherits both, automatically,
+ * by calling through the SAME method, not by duplicating its body.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
  *   - The constructor performs NO async work of any kind — it only
@@ -200,6 +213,15 @@
  *     `return this.#currentPublicIdentity;`, nothing more. It NEVER
  *     throws, NEVER awaits, and performs NO access to `#identity`,
  *     `#reader`, `#publicIdentity`, or `#started` of any kind.
+ *   - `refreshPublicIdentity()` (Alpha 131) is a PURE WRAPPER — its own
+ *     entire body is `return this.readPublicIdentity();`, nothing
+ *     more. It calls NO method other than `readPublicIdentity()` —
+ *     NOT `this.#reader.readPublicIdentity()` directly, NOT
+ *     `this.bootstrap()`/`this.start()`, NOT any `#identity` method of
+ *     any kind. It performs NO processing of its own and touches NO
+ *     Identity Runtime, Registry, Provider, Storage, or Worker
+ *     concept, directly or transitively — its ONLY effect is whatever
+ *     `readPublicIdentity()` itself already does.
  *   - NO GUI, NO Nostr/Relay connection, NO Observation implementation
  *     of any kind exists anywhere in this file.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
@@ -257,5 +279,9 @@ export class DesktopApplication {
 
   currentPublicIdentity(): FedosIdentityDescriptor | null {
     return this.#currentPublicIdentity;
+  }
+
+  refreshPublicIdentity(): Promise<FedosIdentityDescriptor | null> {
+    return this.readPublicIdentity();
   }
 }

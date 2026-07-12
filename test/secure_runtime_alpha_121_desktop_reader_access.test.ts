@@ -70,7 +70,7 @@ describe("Secure Runtime Alpha 121 -- Desktop Reader Access", () => {
     expect(body).not.toMatch(/#started/);
   });
 
-  it("5. RIPPLE (Secure Runtime Alpha 128): the class had exactly five public methods and four private fields AS OF this Stage's own scope; Alpha 126 added a FIFTH private field, #currentPublicIdentity, and Alpha 128 added a SIXTH public method, currentPublicIdentity(), reconfirmed here as the CURRENT state", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 131): the class had exactly five public methods and four private fields AS OF this Stage's own scope; Alpha 126 added a FIFTH private field, #currentPublicIdentity, Alpha 128 added a SIXTH public method, currentPublicIdentity(), and Alpha 131 added a SEVENTH public method, refreshPublicIdentity(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -78,7 +78,15 @@ describe("Secure Runtime Alpha 121 -- Desktop Reader Access", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
+      new Set([
+        "bootstrap",
+        "start",
+        "currentIdentity",
+        "isBootstrapped",
+        "readPublicIdentity",
+        "currentPublicIdentity",
+        "refreshPublicIdentity",
+      ]),
     );
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);

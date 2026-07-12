@@ -101,7 +101,7 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
     ]);
   });
 
-  it("8. RIPPLE (Secure Runtime Alpha 128): the class exposed exactly two public methods -- bootstrap and start -- and no other AS OF Alpha 096's own scope; Alpha 116 added currentIdentity(), Alpha 117 added isBootstrapped(), Alpha 121 added readPublicIdentity(), and Alpha 128 added currentPublicIdentity(), reconfirmed here as the CURRENT state", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 131): the class exposed exactly two public methods -- bootstrap and start -- and no other AS OF Alpha 096's own scope; Alpha 116 added currentIdentity(), Alpha 117 added isBootstrapped(), Alpha 121 added readPublicIdentity(), Alpha 128 added currentPublicIdentity(), and Alpha 131 added refreshPublicIdentity(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -109,7 +109,15 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
+      new Set([
+        "bootstrap",
+        "start",
+        "currentIdentity",
+        "isBootstrapped",
+        "readPublicIdentity",
+        "currentPublicIdentity",
+        "refreshPublicIdentity",
+      ]),
     );
   });
 

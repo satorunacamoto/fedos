@@ -66,7 +66,7 @@ describe("Secure Runtime Alpha 117 -- Desktop Bootstrap State", () => {
     expect(body).not.toMatch(/#publicIdentity/);
   });
 
-  it("5. RIPPLE (Secure Runtime Alpha 128): the class had exactly four public methods AS OF this Stage's own scope and four private fields -- no #bootstrapped field was added; Alpha 121 added readPublicIdentity(), Alpha 126 added #currentPublicIdentity, and Alpha 128 added currentPublicIdentity(), reconfirmed here as the CURRENT state", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 131): the class had exactly four public methods AS OF this Stage's own scope and four private fields -- no #bootstrapped field was added; Alpha 121 added readPublicIdentity(), Alpha 126 added #currentPublicIdentity, Alpha 128 added currentPublicIdentity(), and Alpha 131 added refreshPublicIdentity(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -74,7 +74,15 @@ describe("Secure Runtime Alpha 117 -- Desktop Bootstrap State", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
+      new Set([
+        "bootstrap",
+        "start",
+        "currentIdentity",
+        "isBootstrapped",
+        "readPublicIdentity",
+        "currentPublicIdentity",
+        "refreshPublicIdentity",
+      ]),
     );
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
