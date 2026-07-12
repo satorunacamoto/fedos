@@ -46,7 +46,7 @@ describe("Secure Runtime Alpha 097 -- Bootstrap Wiring", () => {
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 098): start()'s own entire body was a pure delegation to bootstrap() AS OF this Stage's own scope; Alpha 098 rewrote it to a guarded sequence, reconfirmed here as the CURRENT state", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 136): start()'s own entire body was a pure delegation to bootstrap() AS OF this Stage's own scope; Alpha 098 rewrote it to a guarded sequence, and Alpha 136 inserted refreshPublicIdentity() between bootstrap() and marking #started true, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const body = (classBody.match(/async start\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -58,6 +58,7 @@ describe("Secure Runtime Alpha 097 -- Bootstrap Wiring", () => {
       'throw new Error("DesktopApplication.start() was already called.");',
       "}",
       "await this.bootstrap();",
+      "await this.refreshPublicIdentity();",
       "this.#started = true;",
     ]);
   });

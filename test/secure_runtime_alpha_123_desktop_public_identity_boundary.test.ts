@@ -114,14 +114,16 @@ describe("Secure Runtime Alpha 123 -- Desktop Public Identity Boundary", () => {
     expect(app.currentIdentity()).not.toEqual(snapshot);
   });
 
-  it("11. behavioral: readPublicIdentity() triggers zero Identity Service calls, and bootstrap()/start() trigger zero Reader calls", async () => {
+  it("11. RIPPLE (Secure Runtime Alpha 136): readPublicIdentity() triggered zero Identity Service calls, and bootstrap()/start() triggered zero Reader calls, AS OF this Stage's own scope; Alpha 136 made start() itself call refreshPublicIdentity() as part of its own fixed Startup Sequence, so start() now DELIBERATELY triggers exactly one Reader call of its own -- the READER path independence from Identity Service still holds (serviceSpy stays uncalled throughout), reconfirmed here as the CURRENT state", async () => {
     const serviceSpy = vi.spyOn(FedosIdentityService.prototype, "describeIdentity");
     const readerSpy = vi.fn().mockResolvedValue(null);
     const app = new DesktopApplication({ readPublicIdentity: readerSpy }, undefined);
     await app.readPublicIdentity();
     expect(serviceSpy).not.toHaveBeenCalled();
-    await app.start();
     expect(readerSpy).toHaveBeenCalledTimes(1);
+    await app.start();
+    expect(serviceSpy).toHaveBeenCalledTimes(1);
+    expect(readerSpy).toHaveBeenCalledTimes(2);
     serviceSpy.mockRestore();
   });
 

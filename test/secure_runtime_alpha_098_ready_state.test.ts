@@ -58,7 +58,7 @@ describe("Secure Runtime Alpha 098 -- Ready State", () => {
     expect(classBody).toMatch(/#started: boolean = false;/);
   });
 
-  it("5. start()'s own entire body is the guard, then bootstrap(), then mark #started true -- exactly four statements", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 136): start()'s own entire body was the guard, then bootstrap(), then mark #started true -- exactly four statements -- AS OF this Stage's own scope; Alpha 136 inserted refreshPublicIdentity() between bootstrap() and marking #started true, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const body = (classBody.match(/async start\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -70,6 +70,7 @@ describe("Secure Runtime Alpha 098 -- Ready State", () => {
       'throw new Error("DesktopApplication.start() was already called.");',
       "}",
       "await this.bootstrap();",
+      "await this.refreshPublicIdentity();",
       "this.#started = true;",
     ]);
   });

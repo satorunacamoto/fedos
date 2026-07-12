@@ -158,6 +158,18 @@
  * (Alpha 127) — `refreshPublicIdentity()` inherits both, automatically,
  * by calling through the SAME method, not by duplicating its body.
  *
+ * Secure Runtime Alpha 136 ("Startup Sequence") rewrites `start()`'s
+ * own body to run `bootstrap()`, then `refreshPublicIdentity()`, in
+ * that fixed order, both `await`ed sequentially, BEFORE
+ * `this.#started = true;` — the ONLY change this Stage makes. No
+ * processing of either call's own result occurs in between: the
+ * `refreshPublicIdentity()` call's own resolved value is discarded by
+ * `start()` (which returns `Promise<void>`), exactly as `bootstrap()`'s
+ * own resolved value already was. This fixes the Desktop Startup Flow
+ * as `construct → bootstrap → refreshPublicIdentity → Desktop Ready`
+ * — the SAME order the Objective names, and the SAME order Alpha 140
+ * will formally declare complete.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
  *   - The constructor performs NO async work of any kind — it only
@@ -167,11 +179,14 @@
  *   - `bootstrap()` performs NO Registry/Provider/Resolver access of
  *     its own — it delegates entirely to
  *     `this.#identity.bootstrapIdentity()`.
- *   - `#started`/`start()` (Alpha 098): `#started` starts `false` and
- *     flips to `true` ONLY after `start()`'s own `await
- *     this.bootstrap();` resolves without throwing. A SECOND `start()`
- *     call on an instance where `#started` is already `true` THROWS —
- *     it does NOT silently no-op.
+ *   - `#started`/`start()` (Alpha 098/136): `#started` starts `false`
+ *     and flips to `true` ONLY after `start()`'s own `await
+ *     this.bootstrap();` AND `await this.refreshPublicIdentity();`
+ *     BOTH resolve without throwing, in that fixed order. A SECOND
+ *     `start()` call on an instance where `#started` is already `true`
+ *     THROWS — it does NOT silently no-op. If `bootstrap()` rejects,
+ *     `refreshPublicIdentity()` is NEVER called, and `#started` stays
+ *     `false`.
  *   - `#reader` (Alpha 103) is PERMANENTLY owned by `DesktopApplication`
  *     alone — `FedosRuntimeIdentity` must NEVER hold one, in any
  *     future implementation, for any purpose. `readPublicIdentity()`
@@ -260,6 +275,7 @@ export class DesktopApplication {
       throw new Error("DesktopApplication.start() was already called.");
     }
     await this.bootstrap();
+    await this.refreshPublicIdentity();
     this.#started = true;
   }
 

@@ -85,7 +85,7 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
     expect(lines).toEqual(["return this.#identity.bootstrapIdentity();"]);
   });
 
-  it("7. RIPPLE (Secure Runtime Alpha 098): start()'s own body contained NO statement of any kind AS OF Alpha 096's own scope, then became a pure delegation AS OF Alpha 097's own scope; Alpha 098 rewrote it to a guarded, bootstrap-then-mark-started sequence, reconfirmed here as the CURRENT state", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 136): start()'s own body contained NO statement of any kind AS OF Alpha 096's own scope, then became a pure delegation AS OF Alpha 097's own scope; Alpha 098 rewrote it to a guarded, bootstrap-then-mark-started sequence, and Alpha 136 inserted refreshPublicIdentity() between bootstrap() and marking #started true, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const body = (classBody.match(/async start\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
@@ -97,6 +97,7 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
       'throw new Error("DesktopApplication.start() was already called.");',
       "}",
       "await this.bootstrap();",
+      "await this.refreshPublicIdentity();",
       "this.#started = true;",
     ]);
   });
