@@ -62,14 +62,18 @@ describe("Secure Runtime Alpha 097 -- Bootstrap Wiring", () => {
     ]);
   });
 
-  it("4. RIPPLE (Secure Runtime Alpha 103): the constructor and bootstrap() remained byte-for-byte unchanged from Alpha 096 AS OF this Stage's own scope; Alpha 103 gave the constructor a Reader parameter and a second statement, reconfirmed here as the CURRENT state", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 107): the constructor and bootstrap() remained byte-for-byte unchanged from Alpha 096 AS OF this Stage's own scope; Alpha 103 gave the constructor a Reader parameter/statement and Alpha 107 added a publicIdentity parameter/statement, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const ctorBody = (classBody.match(/constructor\([\s\S]*?\) \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const ctorLines = ctorBody
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(ctorLines).toEqual(["this.#identity = new FedosRuntimeIdentity();", "this.#reader = reader;"]);
+    expect(ctorLines).toEqual([
+      "this.#identity = new FedosRuntimeIdentity();",
+      "this.#reader = reader;",
+      "this.#publicIdentity = publicIdentity;",
+    ]);
 
     const bootstrapBody = (classBody.match(/async bootstrap\(\): Promise<void> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const bootstrapLines = bootstrapBody
@@ -79,7 +83,7 @@ describe("Secure Runtime Alpha 097 -- Bootstrap Wiring", () => {
     expect(bootstrapLines).toEqual(["return this.#identity.bootstrapIdentity();"]);
   });
 
-  it("5. RIPPLE (Secure Runtime Alpha 103): the class exposed exactly two public methods and one private field AS OF this Stage's own scope; Alpha 098 added #started and Alpha 103 added #reader, reconfirmed here as the CURRENT state", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 107): the class exposed exactly two public methods and one private field AS OF this Stage's own scope; Alpha 098 added #started, Alpha 103 added #reader, and Alpha 107 added #publicIdentity, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -88,7 +92,7 @@ describe("Secure Runtime Alpha 097 -- Bootstrap Wiring", () => {
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start"]));
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
   });
 
   it("6. the design doc's own 'does NOT do' list confirms no #started guard or factory function is added", () => {

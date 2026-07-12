@@ -91,24 +91,26 @@ describe("Secure Runtime Alpha 103 -- Source Injection", () => {
     );
   });
 
-  it("7. DesktopApplication's own constructor has the exact default-parameter signature, mirroring NostrIdentityProvider's own Alpha 049 pattern", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 107): DesktopApplication's own constructor had reader as its ONLY parameter AS OF this Stage's own scope, with the exact default-parameter signature mirroring NostrIdentityProvider's own Alpha 049 pattern; Alpha 107 added a second, trailing publicIdentity parameter, reconfirmed here as the CURRENT state", () => {
     expect(desktopApplicationSource).toMatch(
-      /constructor\(\s*\n\s*reader: FedosPublicIdentityReader = new NostrPublicIdentityReader\(resolveNostrPublicIdentitySource\(\)\),\s*\n\s*\) \{/,
+      /constructor\(\s*\n\s*reader: FedosPublicIdentityReader = new NostrPublicIdentityReader\(resolveNostrPublicIdentitySource\(\)\),\s*\n\s*publicIdentity: FedosNostrPublicIdentitySnapshot \| undefined = undefined,\s*\n\s*\) \{/,
     );
   });
 
-  it("8. createDesktopApplication()'s own body explicitly constructs the Source and Reader before constructing DesktopApplication", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 109): createDesktopApplication()'s own body explicitly constructed the Source and Reader before constructing DesktopApplication AS OF this Stage's own scope; Alpha 109 made the Source construction conditional on an optional publicIdentity parameter, reconfirmed here as the CURRENT state", () => {
     const body = (createDesktopApplicationSource.match(
-      /export function createDesktopApplication\(\): DesktopApplication \{([\s\S]*?)\n\}/,
+      /export function createDesktopApplication\([\s\S]*?\): DesktopApplication \{([\s\S]*?)\n\}/,
     ) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
     expect(lines).toEqual([
-      "const source = resolveNostrPublicIdentitySource();",
+      "const source = publicIdentity",
+      "? new StaticNostrPublicIdentitySource(publicIdentity)",
+      ": resolveNostrPublicIdentitySource();",
       "const reader = new NostrPublicIdentityReader(source);",
-      "return new DesktopApplication(reader);",
+      "return new DesktopApplication(reader, publicIdentity);",
     ]);
   });
 

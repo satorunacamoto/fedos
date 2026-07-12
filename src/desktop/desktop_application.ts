@@ -64,11 +64,28 @@
  * held but not yet read by any method on this class — no new public
  * API is added.
  *
+ * Secure Runtime Alpha 107 ("Desktop Public Identity Configuration")
+ * adds a new, SECOND, optional constructor parameter,
+ * `publicIdentity: FedosNostrPublicIdentitySnapshot | undefined =
+ * undefined`, and a new `readonly #publicIdentity` field storing it —
+ * the ONLY change this Stage makes. The pre-existing `reader`
+ * parameter (Alpha 103) stays FIRST, with its own default value
+ * completely unchanged — this Stage is purely additive, so EVERY
+ * existing call site (`new DesktopApplication()`,
+ * `new DesktopApplication(customReader)`) continues to work
+ * unchanged. `#publicIdentity` is held but read by nothing yet — Alpha
+ * 109's own deliverable is wiring `createDesktopApplication()` to use
+ * a configuration value of this SAME shape to construct the `reader`
+ * it passes in; this class's own constructor never derives `reader`
+ * from `publicIdentity` itself, since a later parameter cannot appear
+ * in an earlier parameter's own default-value expression.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
  *   - The constructor performs NO async work of any kind — it only
  *     constructs the one `FedosRuntimeIdentity` instance this class
- *     holds and stores the injected (or defaulted) Reader.
+ *     holds and stores the injected (or defaulted) Reader and the
+ *     injected (or defaulted) public identity configuration.
  *   - `bootstrap()` performs NO Registry/Provider/Resolver access of
  *     its own — it delegates entirely to
  *     `this.#identity.bootstrapIdentity()`.
@@ -81,6 +98,11 @@
  *     alone — `FedosRuntimeIdentity` must NEVER hold one, in any
  *     future implementation, for any purpose. No method on this class
  *     reads `#reader` yet.
+ *   - `#publicIdentity` (Alpha 107) defaults to `undefined` — no
+ *     public identity is configured unless explicitly supplied. No
+ *     method on this class reads `#publicIdentity` yet, and this
+ *     class's own constructor never uses it to compute `reader`'s own
+ *     default value.
  *   - NO GUI, NO Nostr/Relay connection, NO Observation implementation
  *     of any kind exists anywhere in this file.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
@@ -89,19 +111,23 @@
 
 import { FedosRuntimeIdentity } from "../runtime/fedos_runtime_identity.js";
 import { resolveNostrPublicIdentitySource } from "../identity/fedos_nostr_public_identity_source_resolver.js";
+import type { FedosNostrPublicIdentitySnapshot } from "../identity/fedos_nostr_public_identity_source.js";
 import type { FedosPublicIdentityReader } from "./fedos_public_identity_reader.js";
 import { NostrPublicIdentityReader } from "./nostr_public_identity_reader.js";
 
 export class DesktopApplication {
   readonly #identity: FedosRuntimeIdentity;
   readonly #reader: FedosPublicIdentityReader;
+  readonly #publicIdentity: FedosNostrPublicIdentitySnapshot | undefined;
   #started: boolean = false;
 
   constructor(
     reader: FedosPublicIdentityReader = new NostrPublicIdentityReader(resolveNostrPublicIdentitySource()),
+    publicIdentity: FedosNostrPublicIdentitySnapshot | undefined = undefined,
   ) {
     this.#identity = new FedosRuntimeIdentity();
     this.#reader = reader;
+    this.#publicIdentity = publicIdentity;
   }
 
   async bootstrap(): Promise<void> {

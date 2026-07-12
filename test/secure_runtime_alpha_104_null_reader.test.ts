@@ -127,9 +127,9 @@ describe("Secure Runtime Alpha 104 -- Null Reader", () => {
     expect(() => new NullPublicIdentityReader()).not.toThrow();
   });
 
-  it("14. behavioral: createDesktopApplication() still constructs a NostrPublicIdentityReader-backed instance, NOT a NullPublicIdentityReader -- confirming zero wiring change from Alpha 103", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 109): createDesktopApplication() still constructs a NostrPublicIdentityReader-backed instance by default, NOT a NullPublicIdentityReader -- confirming zero wiring change of the DEFAULT path even after Alpha 109 added an optional publicIdentity parameter", () => {
     const body = (createDesktopApplicationSource.match(
-      /export function createDesktopApplication\(\): DesktopApplication \{([\s\S]*?)\n\}/,
+      /export function createDesktopApplication\([\s\S]*?\): DesktopApplication \{([\s\S]*?)\n\}/,
     ) ?? [])[1] ?? "";
     expect(body).toMatch(/NostrPublicIdentityReader/);
     expect(body).not.toMatch(/NullPublicIdentityReader/);

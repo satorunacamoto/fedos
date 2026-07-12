@@ -80,14 +80,18 @@ describe("Secure Runtime Alpha 098 -- Ready State", () => {
     expect(body).not.toMatch(/#started/);
   });
 
-  it("7. RIPPLE (Secure Runtime Alpha 103): the constructor remained byte-for-byte unchanged from Alpha 096 AS OF this Stage's own scope; Alpha 103 gave it a Reader parameter and a second statement, reconfirmed here as the CURRENT state", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 107): the constructor remained byte-for-byte unchanged from Alpha 096 AS OF this Stage's own scope; Alpha 103 gave it a Reader parameter/statement and Alpha 107 added a publicIdentity parameter/statement, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const ctorBody = (classBody.match(/constructor\([\s\S]*?\) \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const ctorLines = ctorBody
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(ctorLines).toEqual(["this.#identity = new FedosRuntimeIdentity();", "this.#reader = reader;"]);
+    expect(ctorLines).toEqual([
+      "this.#identity = new FedosRuntimeIdentity();",
+      "this.#reader = reader;",
+      "this.#publicIdentity = publicIdentity;",
+    ]);
   });
 
   it("8. #started is written in exactly ONE place -- inside start()'s own guarded body", () => {

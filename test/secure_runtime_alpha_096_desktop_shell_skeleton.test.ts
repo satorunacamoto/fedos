@@ -53,21 +53,25 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
     expect(exportNames).toEqual(["DesktopApplication"]);
   });
 
-  it("4. RIPPLE (Secure Runtime Alpha 103): the class held exactly one readonly #identity field and no other AS OF Alpha 096's own scope; Alpha 098 added #started and Alpha 103 added #reader, reconfirmed here as the CURRENT state", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 107): the class held exactly one readonly #identity field and no other AS OF Alpha 096's own scope; Alpha 098 added #started, Alpha 103 added #reader, and Alpha 107 added #publicIdentity, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
     expect(classBody).toMatch(/readonly #identity: FedosRuntimeIdentity;/);
   });
 
-  it("5. RIPPLE (Secure Runtime Alpha 103): the constructor's own entire body was the single synchronous FedosRuntimeIdentity construction AS OF Alpha 096's own scope; Alpha 103 added a Reader parameter and a second statement storing it, reconfirmed here as the CURRENT state", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 107): the constructor's own entire body was the single synchronous FedosRuntimeIdentity construction AS OF Alpha 096's own scope; Alpha 103 added a Reader parameter/statement and Alpha 107 added a publicIdentity parameter/statement, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const body = (classBody.match(/constructor\([\s\S]*?\) \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toEqual(["this.#identity = new FedosRuntimeIdentity();", "this.#reader = reader;"]);
+    expect(lines).toEqual([
+      "this.#identity = new FedosRuntimeIdentity();",
+      "this.#reader = reader;",
+      "this.#publicIdentity = publicIdentity;",
+    ]);
     expect(body).not.toMatch(/await/);
   });
 

@@ -85,10 +85,10 @@ describe("Secure Runtime Alpha 102 -- Desktop Identity Reader", () => {
     expect(desktopApplicationSource).toMatch(/PERMANENTLY owned by `DesktopApplication`\s*\n\s*\*\s*alone/);
   });
 
-  it("8. RIPPLE (Secure Runtime Alpha 103): DesktopApplication's own class shape was BYTE-FOR-BYTE unchanged from Alpha 098 AS OF this Stage's own scope -- exactly two fields, two public methods, and a one-statement constructor; Alpha 103 added a third field (#reader) and a Reader constructor parameter, reconfirmed here as the CURRENT state", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 107): DesktopApplication's own class shape was BYTE-FOR-BYTE unchanged from Alpha 098 AS OF this Stage's own scope -- exactly two fields, two public methods, and a one-statement constructor; Alpha 103 added #reader and Alpha 107 added #publicIdentity, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
 
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -102,7 +102,11 @@ describe("Secure Runtime Alpha 102 -- Desktop Identity Reader", () => {
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(ctorLines).toEqual(["this.#identity = new FedosRuntimeIdentity();", "this.#reader = reader;"]);
+    expect(ctorLines).toEqual([
+      "this.#identity = new FedosRuntimeIdentity();",
+      "this.#reader = reader;",
+      "this.#publicIdentity = publicIdentity;",
+    ]);
   });
 
   it("9. RIPPLE (Secure Runtime Alpha 103): DesktopApplication's own code contained no reference to FedosPublicIdentityReader outside the header comment AS OF this Stage's own scope; Alpha 103 legitimately added #reader and a real reference, reconfirmed here as the CURRENT state", () => {

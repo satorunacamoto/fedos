@@ -46,18 +46,20 @@ describe("Secure Runtime Alpha 099 -- Desktop Factory", () => {
     expect(exportNames).toEqual(["createDesktopApplication"]);
   });
 
-  it("4. RIPPLE (Secure Runtime Alpha 103): createDesktopApplication()'s own entire body was a pure construction and return AS OF this Stage's own scope; Alpha 103 updated it to explicitly construct the Source and Reader, reconfirmed here as the CURRENT state", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 109): createDesktopApplication()'s own entire body was a pure construction and return AS OF this Stage's own scope; Alpha 103 updated it to explicitly construct the Source and Reader, and Alpha 109 added a publicIdentity parameter with a conditional Source, reconfirmed here as the CURRENT state", () => {
     const body = (createDesktopApplicationSource.match(
-      /export function createDesktopApplication\(\): DesktopApplication \{([\s\S]*?)\n\}/,
+      /export function createDesktopApplication\(\s*\n\s*publicIdentity\?: FedosNostrPublicIdentitySnapshot,\s*\n\s*\): DesktopApplication \{([\s\S]*?)\n\}/,
     ) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
     expect(lines).toEqual([
-      "const source = resolveNostrPublicIdentitySource();",
+      "const source = publicIdentity",
+      "? new StaticNostrPublicIdentitySource(publicIdentity)",
+      ": resolveNostrPublicIdentitySource();",
       "const reader = new NostrPublicIdentityReader(source);",
-      "return new DesktopApplication(reader);",
+      "return new DesktopApplication(reader, publicIdentity);",
     ]);
   });
 

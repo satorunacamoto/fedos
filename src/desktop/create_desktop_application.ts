@@ -21,6 +21,23 @@
  * is supplied — this Stage makes the construction explicit here
  * rather than relying on that default silently.
  *
+ * Secure Runtime Alpha 109 ("Desktop Wiring") adds an optional
+ * parameter, `publicIdentity?: FedosNostrPublicIdentitySnapshot`, and
+ * rewrites this function's own body to branch on it: when supplied,
+ * construct a `StaticNostrPublicIdentitySource` (Alpha 108) from it
+ * instead of calling `resolveNostrPublicIdentitySource()` (Alpha
+ * 048); either way, wrap the resulting Source in a
+ * `NostrPublicIdentityReader` (Alpha 103) exactly as before, and pass
+ * BOTH the Reader and the original `publicIdentity` value into
+ * `new DesktopApplication(reader, publicIdentity)` — matching this
+ * Stage's own `createDesktopApplication() → StaticNostrPublicIdentitySource
+ * → NostrPublicIdentityReader → DesktopApplication` diagram precisely.
+ * Calling `createDesktopApplication()` with NO argument — every
+ * existing call site across Alpha 096–108's own test suites —
+ * continues to resolve through `resolveNostrPublicIdentitySource()`
+ * exactly as before, keeping the default configuration's own
+ * behavior (always `null`) completely unchanged.
+ *
  * HARD GUARDRAILS:
  *   - `createDesktopApplication` is the ONLY export.
  *   - This function performs NO async work of any kind — it only
@@ -30,16 +47,29 @@
  *     returns.
  *   - It does NOT call `readPublicIdentity()` on the Reader or Source
  *     it constructs.
+ *   - `publicIdentity` (Alpha 109), when omitted, resolves through
+ *     `resolveNostrPublicIdentitySource()` exactly as Alpha 103 left
+ *     it — the default configuration's own behavior is unchanged.
+ *   - `publicIdentity`, when supplied, is passed to
+ *     `StaticNostrPublicIdentitySource`'s own constructor verbatim,
+ *     with no validation or transformation of any kind performed
+ *     here.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
  *     any `AppRuntime` field.
  */
 
 import { DesktopApplication } from "./desktop_application.js";
 import { NostrPublicIdentityReader } from "./nostr_public_identity_reader.js";
+import { StaticNostrPublicIdentitySource } from "./static_nostr_public_identity_source.js";
 import { resolveNostrPublicIdentitySource } from "../identity/fedos_nostr_public_identity_source_resolver.js";
+import type { FedosNostrPublicIdentitySnapshot } from "../identity/fedos_nostr_public_identity_source.js";
 
-export function createDesktopApplication(): DesktopApplication {
-  const source = resolveNostrPublicIdentitySource();
+export function createDesktopApplication(
+  publicIdentity?: FedosNostrPublicIdentitySnapshot,
+): DesktopApplication {
+  const source = publicIdentity
+    ? new StaticNostrPublicIdentitySource(publicIdentity)
+    : resolveNostrPublicIdentitySource();
   const reader = new NostrPublicIdentityReader(source);
-  return new DesktopApplication(reader);
+  return new DesktopApplication(reader, publicIdentity);
 }
