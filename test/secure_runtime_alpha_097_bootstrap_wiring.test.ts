@@ -83,14 +83,14 @@ describe("Secure Runtime Alpha 097 -- Bootstrap Wiring", () => {
     expect(bootstrapLines).toEqual(["return this.#identity.bootstrapIdentity();"]);
   });
 
-  it("5. RIPPLE (Secure Runtime Alpha 107): the class exposed exactly two public methods and one private field AS OF this Stage's own scope; Alpha 098 added #started, Alpha 103 added #reader, and Alpha 107 added #publicIdentity, reconfirmed here as the CURRENT state", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 117): the class exposed exactly two public methods and one private field AS OF this Stage's own scope; Alpha 098 added #started, Alpha 103 added #reader, Alpha 107 added #publicIdentity, Alpha 116 added currentIdentity(), and Alpha 117 added isBootstrapped(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
-    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start"]));
+    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped"]));
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
   });

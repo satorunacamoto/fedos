@@ -139,15 +139,26 @@ describe("Secure Runtime Alpha 110 -- Integration Verification", () => {
   // Behavioral: what does NOT work -- currentIdentity() stays null
   // ---------------------------------------------------------------------
 
-  it("10. structural: DesktopApplication exposes no currentIdentity()/isBootstrapped() method of its own -- confirmed against the actual class body", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 117): DesktopApplication exposed no currentIdentity()/isBootstrapped() method of its own AS OF this Stage's own scope, supporting the Reader/Bootstrap independence finding above; Alpha 116 added currentIdentity() and Alpha 117 added isBootstrapped(), both as PURE delegations to #identity (never to #reader), reconfirmed here as the CURRENT state", () => {
     const classBody = (desktopApplicationSource.match(/export class DesktopApplication\b[^{]*\{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor" && !name.startsWith("//") && !name.startsWith("*"));
-    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start"]));
-    expect(publicMethodNames).not.toContain("currentIdentity");
+    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped"]));
+    const currentIdentityBody = (classBody.match(/currentIdentity\(\): FedosIdentityDescriptor \| null \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const currentIdentityLines = currentIdentityBody
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0);
+    expect(currentIdentityLines).toEqual(["return this.#identity.currentIdentity();"]);
+    const isBootstrappedBody = (classBody.match(/isBootstrapped\(\): boolean \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
+    const isBootstrappedLines = isBootstrappedBody
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0);
+    expect(isBootstrappedLines).toEqual(["return this.#identity.isBootstrapped();"]);
   });
 
   it("11. behavioral: FedosRuntimeIdentity constructed and bootstrapped directly (simulating DesktopApplication's own internal #identity) ALWAYS resolves currentIdentity() to null, regardless of any Reader-level publicIdentity configuration", async () => {

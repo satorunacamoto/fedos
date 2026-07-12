@@ -101,14 +101,14 @@ describe("Secure Runtime Alpha 096 -- Desktop Shell Skeleton", () => {
     ]);
   });
 
-  it("8. the class exposes exactly two public methods -- bootstrap and start -- and no other", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 117): the class exposed exactly two public methods -- bootstrap and start -- and no other AS OF Alpha 096's own scope; Alpha 116 added currentIdentity() and Alpha 117 added isBootstrapped(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
     ]
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
-    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start"]));
+    expect(new Set(publicMethodNames)).toEqual(new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped"]));
   });
 
   it("9. RIPPLE (Secure Runtime Alpha 103): no GUI, Relay/WebSocket, or Observation reference exists in the CODE; Alpha 103 legitimately introduced NostrPublicIdentityReader/resolveNostrPublicIdentitySource (the Public Identity Source Foundation this Arc exists to build), reconfirmed here as the CURRENT, still-forbidden set", () => {

@@ -80,6 +80,24 @@
  * from `publicIdentity` itself, since a later parameter cannot appear
  * in an earlier parameter's own default-value expression.
  *
+ * Secure Runtime Alpha 116 ("Desktop Identity Access") adds a new
+ * public method, `currentIdentity(): FedosIdentityDescriptor | null`,
+ * whose own entire body is `return this.#identity.currentIdentity();`
+ * — a PURE delegation to the sole Identity Authority
+ * (`FedosRuntimeIdentity`, Alpha 111) — the ONLY change this Stage
+ * makes. No processing, no transformation, no caching of any kind:
+ * this method reads `#identity`'s own current value fresh on every
+ * call and returns exactly what it returns, unmodified.
+ *
+ * Secure Runtime Alpha 117 ("Desktop Bootstrap State") adds a new
+ * public method, `isBootstrapped(): boolean`, whose own entire body
+ * is `return this.#identity.isBootstrapped();` — a PURE delegation to
+ * the sole Identity Authority's own existing method (Alpha 072) — the
+ * ONLY change this Stage makes. No Desktop-independent state of any
+ * kind: this class holds no `#bootstrapped` field of its own, and
+ * never derives this value from `#started` or from `currentIdentity()`
+ * — it is read fresh from `#identity` on every call.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
  *   - The constructor performs NO async work of any kind — it only
@@ -103,6 +121,18 @@
  *     method on this class reads `#publicIdentity` yet, and this
  *     class's own constructor never uses it to compute `reader`'s own
  *     default value.
+ *   - `currentIdentity()` (Alpha 116) is a PURE WRAPPER — its own
+ *     entire body is `return this.#identity.currentIdentity();`,
+ *     nothing more. It performs NO caching, NO transformation, and NO
+ *     access to `#reader`, `#publicIdentity`, or any Provider/Source
+ *     of any kind — Identity Authority (Alpha 111) is consulted
+ *     exclusively through `#identity`.
+ *   - `isBootstrapped()` (Alpha 117) is a PURE WRAPPER — its own entire
+ *     body is `return this.#identity.isBootstrapped();`, nothing more.
+ *     `DesktopApplication` holds NO `#bootstrapped` field of its own,
+ *     and this method NEVER derives its answer from `#started` or from
+ *     `currentIdentity()` — Identity Authority (Alpha 111) is consulted
+ *     exclusively through `#identity`.
  *   - NO GUI, NO Nostr/Relay connection, NO Observation implementation
  *     of any kind exists anywhere in this file.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
@@ -112,6 +142,7 @@
 import { FedosRuntimeIdentity } from "../runtime/fedos_runtime_identity.js";
 import { resolveNostrPublicIdentitySource } from "../identity/fedos_nostr_public_identity_source_resolver.js";
 import type { FedosNostrPublicIdentitySnapshot } from "../identity/fedos_nostr_public_identity_source.js";
+import type { FedosIdentityDescriptor } from "../identity/fedos_identity_descriptor.js";
 import type { FedosPublicIdentityReader } from "./fedos_public_identity_reader.js";
 import { NostrPublicIdentityReader } from "./nostr_public_identity_reader.js";
 
@@ -140,5 +171,13 @@ export class DesktopApplication {
     }
     await this.bootstrap();
     this.#started = true;
+  }
+
+  currentIdentity(): FedosIdentityDescriptor | null {
+    return this.#identity.currentIdentity();
+  }
+
+  isBootstrapped(): boolean {
+    return this.#identity.isBootstrapped();
   }
 }
