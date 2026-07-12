@@ -38,16 +38,16 @@ describe("Secure Runtime Alpha 149 -- Root Handle Verification", () => {
     );
   });
 
-  it("3. RIPPLE (Secure Runtime Alpha 154, 163): matches_for_internal_verification existed on exactly TWO types (FedosIdentityRootHandle/FedosApplicationRootHandle) AS OF this Stage's own closing state; Stage 1019 (Secure Runtime Alpha 154) legitimately added a THIRD, on FedosProtocolRootHandle, and Stage 1020 (Secure Runtime Alpha 163) legitimately added a FOURTH, on FedosNostrSecretKeyHandle, reconfirmed here as the CURRENT state", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 154, 163, 168): matches_for_internal_verification existed on exactly TWO types (FedosIdentityRootHandle/FedosApplicationRootHandle) AS OF this Stage's own closing state; Stage 1019 (Secure Runtime Alpha 154) legitimately added a THIRD, on FedosProtocolRootHandle, Stage 1020 (Secure Runtime Alpha 163) legitimately added a FOURTH, on FedosNostrSecretKeyHandle, and Stage 1024 (Secure Runtime Alpha 168) legitimately added a FIFTH, on FedosNostrPublicKeyHandle, reconfirmed here as the CURRENT state", () => {
     const matches = [...libRsSource.matchAll(/pub\(crate\) fn matches_for_internal_verification\(&self, other: &Self\) -> bool \{/g)];
-    expect(matches.length).toBe(4);
+    expect(matches.length).toBe(5);
   });
 
-  it("4. RIPPLE (Secure Runtime Alpha 154, 163): matches_for_internal_verification used subtle::ConstantTimeEq via .ct_eq( exactly TWICE AS OF this Stage's own closing state, never a plain == comparison; Stage 1019 (Secure Runtime Alpha 154) legitimately added a THIRD .ct_eq( call, on FedosProtocolRootHandle, and Stage 1020 (Secure Runtime Alpha 163) legitimately added a FOURTH, on FedosNostrSecretKeyHandle, reconfirmed here as the CURRENT state", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 154, 163, 168): matches_for_internal_verification used subtle::ConstantTimeEq via .ct_eq( exactly TWICE AS OF this Stage's own closing state, never a plain == comparison; Stage 1019 (Secure Runtime Alpha 154) legitimately added a THIRD .ct_eq( call, on FedosProtocolRootHandle, Stage 1020 (Secure Runtime Alpha 163) legitimately added a FOURTH, on FedosNostrSecretKeyHandle, and Stage 1024 (Secure Runtime Alpha 168) legitimately added a FIFTH, on FedosNostrPublicKeyHandle, reconfirmed here as the CURRENT state", () => {
     const moduleText = masterRootModuleText();
     expect(moduleText).toMatch(/use subtle::ConstantTimeEq;/);
     const ctEqCount = [...moduleText.matchAll(/\.ct_eq\(/g)].length;
-    expect(ctEqCount).toBe(4);
+    expect(ctEqCount).toBe(5);
   });
 
   it("5. structural: neither Root Handle type derives PartialEq/Eq", () => {

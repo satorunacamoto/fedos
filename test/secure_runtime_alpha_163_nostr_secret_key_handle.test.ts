@@ -48,7 +48,7 @@ describe("Secure Runtime Alpha 163 -- Nostr Secret Key Handle", () => {
     expect(new Set(variants).size).toBe(variants.length);
   });
 
-  it("5. structural: FedosNostrSecretKeyHandle exposes kind/is_cleared/clear/matches_for_internal_verification only, no public byte getter", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 169): FedosNostrSecretKeyHandle exposed kind/is_cleared/clear/matches_for_internal_verification with NO byte-returning accessor of any kind AS OF this Stage's own closing state; Stage 1023 (Secure Runtime Alpha 169) legitimately added ONE private (never pub(crate)), single-caller accessor, expose_bytes_for_internal_public_key_derivation, reconfirmed here as the CURRENT state -- still no PUBLIC(crate) byte getter", () => {
     const structMatch = libRsSource.match(
       /impl FedosNostrSecretKeyHandle \{([\s\S]*?)\r?\n {4}\}\r?\n\r?\n {4}\/\/\/ Coarse observable outcome of a \[`derive_nostr_secret_key_internal`\]/,
     );
@@ -59,8 +59,14 @@ describe("Secure Runtime Alpha 163 -- Nostr Secret Key Handle", () => {
     expect(implBody).toMatch(/pub\(crate\) fn is_cleared\(&self\)/);
     expect(implBody).toMatch(/pub\(crate\) fn clear\(&mut self\)/);
     expect(implBody).toMatch(/pub\(crate\) fn matches_for_internal_verification\(&self, other: &Self\)/);
-    expect(implBody).not.toMatch(/-> \[u8; 32\]/);
-    expect(implBody).not.toMatch(/-> Option<\[u8; 32\]>/);
+    // The Alpha 169 accessor is private (`fn`, never `pub(crate) fn`) -- confirm
+    // no PUBLIC(crate)-visible byte getter exists, which is this test's own claim.
+    expect(implBody).not.toMatch(/pub\(crate\) fn [a-zA-Z0-9_]+\([^)]*\) -> \[u8; 32\]/);
+    expect(implBody).not.toMatch(/pub\(crate\) fn [a-zA-Z0-9_]+\([^)]*\) -> Option<\[u8; 32\]>/);
+    expect(implBody).toMatch(
+      /fn expose_bytes_for_internal_public_key_derivation\(&self\) -> Option<\[u8; 32\]> \{/,
+    );
+    expect(implBody).not.toMatch(/pub\(crate\) fn expose_bytes_for_internal_public_key_derivation/);
   });
 
   it("6. structural: FedosNostrSecretKeyHandle derives no Clone/Copy/Debug/PartialEq/Eq/Serialize", () => {

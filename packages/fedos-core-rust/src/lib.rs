@@ -3055,6 +3055,7 @@ mod master_root {
     use crate::kdf_core::{derive_secret_handle_internal, HkdfDomain, HkdfStatus};
     use crate::secret_handle::{SecretHandle, SecretHandleKind};
     use hkdf::Hkdf;
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
     use k256::SecretKey;
     use sha2::Sha256;
     use subtle::ConstantTimeEq;
@@ -3493,6 +3494,18 @@ mod master_root {
             right.zeroize();
             equal
         }
+
+        /// Stage 1023 (Secure Runtime Alpha 169) — the ONE narrowly-scoped
+        /// internal accessor exposing a COPY of the real 32-byte secret
+        /// scalar — private to this module, for the sole reviewed use of
+        /// [`derive_nostr_public_key_internal`] below (its ONLY caller).
+        /// Not a byte-export accessor: the caller uses the copy solely to
+        /// reconstruct a transient `k256::SecretKey` for one
+        /// `.public_key()` call, then zeroizes it. Returns `None` after
+        /// `clear()`.
+        fn expose_bytes_for_internal_public_key_derivation(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
     }
 
     /// Coarse observable outcome of a [`derive_nostr_secret_key_internal`]
@@ -3638,6 +3651,87 @@ mod master_root {
         };
         candidate.zeroize();
         decision
+    }
+
+    /// Stage 1024 (Secure Runtime Alpha 168) — an INTERNAL-ONLY handle for
+    /// a FedOS Nostr Public Key, holding the 32-byte x-only representation
+    /// Nostr itself requires (BIP-340's own x-coordinate-only convention;
+    /// see this Stage's own design record for the full record) —
+    /// deliberately NOT a `k256::PublicKey`/`k256::AffinePoint`/SEC1
+    /// compressed-point value, none of which matches Nostr's own required
+    /// shape without an extra conversion step. A public key is not secret
+    /// material, so this type does NOT wrap a `SecretHandle` — it holds a
+    /// plain `[u8; 32]` directly, no `secrecy`/`zeroize` involved — but
+    /// stays Opaque for boundary-design consistency with every other
+    /// Handle in this module, per this Arc's own explicit instruction: no
+    /// public raw-byte getter, no `Clone` (no caller needs to duplicate
+    /// one within this Arc's own scope), no `Debug`, no `Serialize`, no
+    /// WASM-export attribute (wasm_bindgen), no `PartialEq`/`Eq` derive —
+    /// `matches_for_internal_verification` is the ONLY comparison this
+    /// type exposes, the SAME constant-time-only discipline as every
+    /// secret-holding Handle, even though timing does not protect any
+    /// secret here — kept for one uniform comparison convention
+    /// crate-wide, not because this specific value needs it.
+    pub(crate) struct FedosNostrPublicKeyHandle {
+        x_only_bytes: [u8; 32],
+    }
+
+    impl FedosNostrPublicKeyHandle {
+        /// Private to this module — the only production caller is
+        /// [`derive_nostr_public_key_internal`] below.
+        fn new_from_32_bytes_for_internal_use(x_only_bytes: [u8; 32]) -> Self {
+            Self { x_only_bytes }
+        }
+
+        /// Same shape and guarantees as
+        /// [`FedosNostrSecretKeyHandle::matches_for_internal_verification`]
+        /// above — the ONLY comparison operation this type exposes.
+        /// Constant-time (`subtle::ConstantTimeEq`), Handle-only, never a
+        /// raw byte returned, logged, or compared with a plain `==`.
+        pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
+            bool::from(self.x_only_bytes.ct_eq(&other.x_only_bytes))
+        }
+    }
+
+    /// Derive a NEW [`FedosNostrPublicKeyHandle`] from an existing, real
+    /// [`FedosNostrSecretKeyHandle`], via `k256`'s own existing
+    /// `SecretKey::public_key()` — the SAME "scalar times the curve
+    /// generator point" operation this crate's `k256` `arithmetic` feature
+    /// already provides, no new cryptographic algorithm, no new `k256`
+    /// Cargo feature. The resulting SEC1 point is compressed
+    /// (`to_encoded_point(true)`) and its X coordinate extracted — the
+    /// 32-byte x-only value Nostr itself requires (this Stage's own design
+    /// record, following the SAME even-Y/x-only convention
+    /// `crypto::conversation_key`'s own `pub2` handling already uses for
+    /// NIP-44) — never the Y coordinate, never the SEC1 parity-tag byte.
+    ///
+    /// Returns `None` if `secret_key` holds no real bytes (already
+    /// `clear()`-ed) or — unreachable in practice, since
+    /// [`FedosNostrSecretKeyHandle`] can only ever hold an
+    /// already-`k256`-validated scalar — if reconstructing a `SecretKey`
+    /// from those bytes is ever rejected; both paths return `None`, never
+    /// panic. Does not mutate `secret_key` — it is borrowed, never
+    /// consumed. The transient copy of the secret scalar this function
+    /// draws is zeroized before returning on every path.
+    pub(crate) fn derive_nostr_public_key_internal(
+        secret_key: &FedosNostrSecretKeyHandle,
+    ) -> Option<FedosNostrPublicKeyHandle> {
+        let mut secret_bytes = secret_key.expose_bytes_for_internal_public_key_derivation()?;
+
+        let x_only_bytes = match SecretKey::from_slice(&secret_bytes) {
+            Ok(sk) => {
+                let encoded = sk.public_key().to_encoded_point(true);
+                encoded.x().map(|x| {
+                    let mut bytes = [0u8; 32];
+                    bytes.copy_from_slice(x.as_slice());
+                    bytes
+                })
+            }
+            Err(_) => None,
+        };
+        secret_bytes.zeroize();
+
+        x_only_bytes.map(FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use)
     }
 
     /// The result of a [`derive_application_root_internal`] call.
@@ -4395,6 +4489,130 @@ mod master_root {
                 NostrSecretKeyStatus::InvalidScalar => {}
                 NostrSecretKeyStatus::InternalFailure => {}
             }
+        }
+
+        // -----------------------------------------------------------------
+        // Secure Runtime Alpha 168/169 — Nostr Public Key derivation
+        // -----------------------------------------------------------------
+
+        fn real_nostr_secret_key(account_index: u32) -> FedosNostrSecretKeyHandle {
+            let nostr_root = real_nostr_root();
+            derive_nostr_secret_key_internal(&nostr_root, account_index)
+                .output
+                .expect("expected a real Nostr Secret Key")
+        }
+
+        #[test]
+        fn derive_nostr_public_key_internal_succeeds_for_a_real_secret_key() {
+            let secret_key = real_nostr_secret_key(0);
+            let public_key = derive_nostr_public_key_internal(&secret_key);
+            assert!(public_key.is_some());
+        }
+
+        #[test]
+        fn derive_nostr_public_key_internal_rejects_a_cleared_secret_key() {
+            let mut secret_key = real_nostr_secret_key(0);
+            secret_key.clear();
+            let public_key = derive_nostr_public_key_internal(&secret_key);
+            assert!(public_key.is_none());
+        }
+
+        #[test]
+        fn derive_nostr_public_key_internal_does_not_mutate_the_input_secret_key() {
+            let secret_key = real_nostr_secret_key(0);
+            let _ = derive_nostr_public_key_internal(&secret_key);
+            assert!(!secret_key.is_cleared());
+        }
+
+        #[test]
+        fn same_secret_key_content_derives_matching_public_keys() {
+            let nostr_root = real_nostr_root();
+            let first_secret = derive_nostr_secret_key_internal(&nostr_root, 9)
+                .output
+                .expect("expected Success");
+            let second_secret = derive_nostr_secret_key_internal(&nostr_root, 9)
+                .output
+                .expect("expected Success");
+            let first_public = derive_nostr_public_key_internal(&first_secret)
+                .expect("expected a real public key");
+            let second_public = derive_nostr_public_key_internal(&second_secret)
+                .expect("expected a real public key");
+            assert!(first_public.matches_for_internal_verification(&second_public));
+        }
+
+        #[test]
+        fn different_account_indices_derive_non_matching_public_keys() {
+            let nostr_root = real_nostr_root();
+            let first_secret = derive_nostr_secret_key_internal(&nostr_root, 0)
+                .output
+                .expect("expected Success");
+            let second_secret = derive_nostr_secret_key_internal(&nostr_root, 1)
+                .output
+                .expect("expected Success");
+            let first_public = derive_nostr_public_key_internal(&first_secret)
+                .expect("expected a real public key");
+            let second_public = derive_nostr_public_key_internal(&second_secret)
+                .expect("expected a real public key");
+            assert!(!first_public.matches_for_internal_verification(&second_public));
+        }
+
+        #[test]
+        fn different_master_seeds_and_same_account_index_derive_non_matching_public_keys() {
+            let first_secret = {
+                let seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xBB; 32]);
+                let identity_root = derive_identity_root_internal(&seed)
+                    .output
+                    .expect("expected a real Identity Root");
+                let application_root = derive_application_root_internal(&identity_root)
+                    .output
+                    .expect("expected a real Application Root");
+                let nostr_root = derive_nostr_root_internal(&application_root)
+                    .output
+                    .expect("expected a real Nostr Root");
+                derive_nostr_secret_key_internal(&nostr_root, 0)
+                    .output
+                    .expect("expected Success")
+            };
+            let second_secret = real_nostr_secret_key(0);
+            let first_public =
+                derive_nostr_public_key_internal(&first_secret).expect("expected a real public key");
+            let second_public = derive_nostr_public_key_internal(&second_secret)
+                .expect("expected a real public key");
+            assert!(!first_public.matches_for_internal_verification(&second_public));
+        }
+
+        #[test]
+        fn account_index_zero_one_and_u32_max_all_derive_public_keys_successfully_and_distinctly() {
+            let nostr_root = real_nostr_root();
+            let zero = derive_nostr_public_key_internal(
+                &derive_nostr_secret_key_internal(&nostr_root, 0)
+                    .output
+                    .expect("expected Success for account 0"),
+            )
+            .expect("expected a real public key for account 0");
+            let one = derive_nostr_public_key_internal(
+                &derive_nostr_secret_key_internal(&nostr_root, 1)
+                    .output
+                    .expect("expected Success for account 1"),
+            )
+            .expect("expected a real public key for account 1");
+            let max = derive_nostr_public_key_internal(
+                &derive_nostr_secret_key_internal(&nostr_root, u32::MAX)
+                    .output
+                    .expect("expected Success for account u32::MAX"),
+            )
+            .expect("expected a real public key for account u32::MAX");
+            assert!(!zero.matches_for_internal_verification(&one));
+            assert!(!zero.matches_for_internal_verification(&max));
+            assert!(!one.matches_for_internal_verification(&max));
+        }
+
+        #[test]
+        fn public_key_matches_for_internal_verification_returns_true_only_for_equal_bytes() {
+            let secret_key = real_nostr_secret_key(5);
+            let first = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let second = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            assert!(first.matches_for_internal_verification(&second));
         }
     }
 }
