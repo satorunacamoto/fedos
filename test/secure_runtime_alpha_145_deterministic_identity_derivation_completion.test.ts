@@ -150,10 +150,21 @@ describe("Secure Runtime Alpha 145 -- Deterministic Identity Derivation Completi
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_142/);
   });
 
-  it("15. RIPPLE (Secure Runtime Alpha 148): HkdfDomain held the exact same five variants across this Arc's own scope -- no new variant was added AS OF Alpha 145's own closing state; Stage 1014 (Secure Runtime Alpha 148) legitimately added a SIXTH, `Application`, implementing exactly the Application Root derivation this Arc's own design named as future work (Alpha 141 §3 answer 2), reconfirmed here as the CURRENT state", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 153): HkdfDomain held the exact same five variants across this Arc's own scope -- no new variant was added AS OF Alpha 145's own closing state; Stage 1014 (Secure Runtime Alpha 148) legitimately added a SIXTH, `Application`, implementing exactly the Application Root derivation this Arc's own design named as future work (Alpha 141 §3 answer 2); Stage 1017/1018 (Secure Runtime Alpha 152/153) added four more -- `Nostr`/`Session`/`ATProto`/`Wallet` -- for TEN total, reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum HkdfDomain \{([\s\S]*?)\n\s{4}\}/) ?? [])[1] ?? "";
     const variants = [...enumBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "Application", "TestOnly"]);
+    expect(variants).toEqual([
+      "RootKey",
+      "Identity",
+      "Storage",
+      "Conversation",
+      "Application",
+      "Nostr",
+      "Session",
+      "ATProto",
+      "Wallet",
+      "TestOnly",
+    ]);
   });
 
   it("16. Regression: package.json still declares exactly two dependencies and no bin field, unaffected by this Arc", () => {

@@ -59,11 +59,22 @@ describe("Secure Runtime Alpha 148 -- Application Root Derivation", () => {
     expect(libRsSource).toMatch(/HkdfDomain::Application => b"fedos-hkdf-info-application-v1"/);
   });
 
-  it("7. structural: HkdfDomain now has exactly six variants -- the exhaustive match test was updated to match", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 153): HkdfDomain had exactly six variants AS OF this Stage's own closing state; Stage 1017/1018 (Secure Runtime Alpha 152/153) legitimately added four more -- `Nostr`/`Session`/`ATProto`/`Wallet` -- for TEN total, and the exhaustive match test was renamed accordingly, reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum HkdfDomain \{([\s\S]*?)\n {4}\}/) ?? [])[1] ?? "";
     const variants = [...enumBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "Application", "TestOnly"]);
-    expect(libRsSource).toMatch(/fn hkdf_domain_has_no_variant_other_than_the_six_specified/);
+    expect(variants).toEqual([
+      "RootKey",
+      "Identity",
+      "Storage",
+      "Conversation",
+      "Application",
+      "Nostr",
+      "Session",
+      "ATProto",
+      "Wallet",
+      "TestOnly",
+    ]);
+    expect(libRsSource).toMatch(/fn hkdf_domain_has_no_variant_other_than_the_ten_specified/);
   });
 
   it("8. the design doc explicitly records the hierarchy divergence from Alpha 142's own sibling diagram", () => {

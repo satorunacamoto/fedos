@@ -38,16 +38,16 @@ describe("Secure Runtime Alpha 149 -- Root Handle Verification", () => {
     );
   });
 
-  it("3. structural: matches_for_internal_verification exists on both FedosIdentityRootHandle and FedosApplicationRootHandle", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 154): matches_for_internal_verification existed on exactly TWO types (FedosIdentityRootHandle/FedosApplicationRootHandle) AS OF this Stage's own closing state; Stage 1019 (Secure Runtime Alpha 154) legitimately added a THIRD, on FedosProtocolRootHandle, reconfirmed here as the CURRENT state", () => {
     const matches = [...libRsSource.matchAll(/pub\(crate\) fn matches_for_internal_verification\(&self, other: &Self\) -> bool \{/g)];
-    expect(matches.length).toBe(2);
+    expect(matches.length).toBe(3);
   });
 
-  it("4. structural: matches_for_internal_verification uses subtle::ConstantTimeEq via .ct_eq(, never a plain == comparison", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 154): matches_for_internal_verification used subtle::ConstantTimeEq via .ct_eq( exactly TWICE AS OF this Stage's own closing state, never a plain == comparison; Stage 1019 (Secure Runtime Alpha 154) legitimately added a THIRD .ct_eq( call, on FedosProtocolRootHandle, reconfirmed here as the CURRENT state", () => {
     const moduleText = masterRootModuleText();
     expect(moduleText).toMatch(/use subtle::ConstantTimeEq;/);
     const ctEqCount = [...moduleText.matchAll(/\.ct_eq\(/g)].length;
-    expect(ctEqCount).toBe(2);
+    expect(ctEqCount).toBe(3);
   });
 
   it("5. structural: neither Root Handle type derives PartialEq/Eq", () => {

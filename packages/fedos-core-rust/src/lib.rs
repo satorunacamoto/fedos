@@ -1786,6 +1786,17 @@ mod secret_handle {
         /// `kdf_core::derive_secret_handle_internal` under
         /// `HkdfDomain::Application`.
         ApplicationRootMaterial,
+        /// Stage 1016 (Secure Runtime Alpha 151) — a FedOS Protocol Root
+        /// (`master_root::FedosProtocolRootHandle`'s own internal payload
+        /// label), derived from `ApplicationRootMaterial` via
+        /// `kdf_core::derive_secret_handle_internal` under a
+        /// protocol-specific `HkdfDomain` variant (`Nostr`/`Session`/
+        /// `ATProto`/`Wallet`). ONE kind label covers every protocol
+        /// instance at this level — domain separation lives in each fixed
+        /// `HkdfDomain` variant's own salt/info (Stage 147's own rule),
+        /// not in this label, mirroring `HkdfOutputMaterial`'s own
+        /// single-kind-many-domains shape.
+        ProtocolRootMaterial,
         /// A test-fixture-only secret — never real production material.
         TestOnlySecretMaterial,
     }
@@ -2526,6 +2537,25 @@ mod kdf_core {
         /// `docs/secure_runtime_alpha_142_root_hierarchy_decision.md`'s
         /// own adopted hierarchy.
         Application,
+        /// Stage 1017 (Secure Runtime Alpha 152) — the Nostr Root
+        /// derivation (Application Root → Nostr Root), the FIRST Protocol
+        /// Root this crate derives, per
+        /// `docs/secure_runtime_alpha_142_root_hierarchy_decision.md`'s
+        /// own adopted hierarchy.
+        Nostr,
+        /// Stage 1018 (Secure Runtime Alpha 153) — the Session Root
+        /// derivation (Application Root → Session Root).
+        Session,
+        /// Stage 1018 (Secure Runtime Alpha 153) — the ATProto Root
+        /// derivation (Application Root → ATProto Root).
+        ATProto,
+        /// Stage 1018 (Secure Runtime Alpha 153) — the Wallet Root
+        /// derivation (Application Root → Wallet Root). See
+        /// `docs/secure_runtime_alpha_153_session_atproto_wallet_root.md`
+        /// for a recorded divergence: Alpha 142's own diagram drew
+        /// `Wallet Root` as a Master-Seed-direct sibling of `Application
+        /// Root`, not a Protocol Root nested under it.
+        Wallet,
         /// Reserved for this module's own tests / future test-only fixtures
         /// — never used by production call sites.
         TestOnly,
@@ -2545,6 +2575,10 @@ mod kdf_core {
                 HkdfDomain::Storage => b"fedos-hkdf-salt-storage-v1",
                 HkdfDomain::Conversation => b"fedos-hkdf-salt-conversation-v1",
                 HkdfDomain::Application => b"fedos-hkdf-salt-application-v1",
+                HkdfDomain::Nostr => b"fedos-hkdf-salt-nostr-v1",
+                HkdfDomain::Session => b"fedos-hkdf-salt-session-v1",
+                HkdfDomain::ATProto => b"fedos-hkdf-salt-atproto-v1",
+                HkdfDomain::Wallet => b"fedos-hkdf-salt-wallet-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-salt-test-only-v1",
             }
         }
@@ -2558,6 +2592,10 @@ mod kdf_core {
                 HkdfDomain::Storage => b"fedos-hkdf-info-storage-v1",
                 HkdfDomain::Conversation => b"fedos-hkdf-info-conversation-v1",
                 HkdfDomain::Application => b"fedos-hkdf-info-application-v1",
+                HkdfDomain::Nostr => b"fedos-hkdf-info-nostr-v1",
+                HkdfDomain::Session => b"fedos-hkdf-info-session-v1",
+                HkdfDomain::ATProto => b"fedos-hkdf-info-atproto-v1",
+                HkdfDomain::Wallet => b"fedos-hkdf-info-wallet-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-info-test-only-v1",
             }
         }
@@ -2738,6 +2776,10 @@ mod kdf_core {
                 HkdfDomain::Storage,
                 HkdfDomain::Conversation,
                 HkdfDomain::Application,
+                HkdfDomain::Nostr,
+                HkdfDomain::Session,
+                HkdfDomain::ATProto,
+                HkdfDomain::Wallet,
                 HkdfDomain::TestOnly,
             ] {
                 let decision = derive_secret_handle_internal(&input, domain);
@@ -2819,8 +2861,14 @@ mod kdf_core {
         /// 148) added a SIXTH, `Application`, reconfirmed here as the
         /// CURRENT state — an exhaustive match with no wildcard arm
         /// compiles only because no other variant exists to add one for.
+        ///
+        /// RIPPLE (Secure Runtime Alpha 153): as of Alpha 148 this test
+        /// named itself "...the_six_specified"; Alpha 152 added `Nostr`
+        /// (a seventh variant, briefly) and this Stage adds `Session`,
+        /// `ATProto`, and `Wallet` (three more), for TEN variants total —
+        /// renamed and re-verified against the CURRENT state.
         #[test]
-        fn hkdf_domain_has_no_variant_other_than_the_six_specified() {
+        fn hkdf_domain_has_no_variant_other_than_the_ten_specified() {
             let domain = HkdfDomain::TestOnly;
             match domain {
                 HkdfDomain::RootKey => {}
@@ -2828,6 +2876,10 @@ mod kdf_core {
                 HkdfDomain::Storage => {}
                 HkdfDomain::Conversation => {}
                 HkdfDomain::Application => {}
+                HkdfDomain::Nostr => {}
+                HkdfDomain::Session => {}
+                HkdfDomain::ATProto => {}
+                HkdfDomain::Wallet => {}
                 HkdfDomain::TestOnly => {}
             }
         }
@@ -2926,6 +2978,66 @@ mod kdf_core {
 /// the payload some other, less controlled way), mirroring
 /// `SecretHandle`'s own "no `Eq`/`PartialEq` over the payload" rule
 /// (Stage 144–146's own module doc comment) exactly.
+///
+/// Stage 1016 (Secure Runtime Alpha 151) opens the Protocol Root
+/// Derivation Arc, adding [`FedosProtocolRootHandle`] — a SINGLE opaque
+/// Handle type representing every Protocol Root INSTANCE (Nostr/
+/// Session/ATProto/Wallet), rather than one Rust type per protocol.
+/// This differs deliberately from `FedosMasterSeedHandle`/
+/// `FedosIdentityRootHandle`/`FedosApplicationRootHandle` (one type per
+/// hierarchy LEVEL): at the Protocol Root level, every instance shares
+/// an identical shape and differs only in which `HkdfDomain` variant
+/// derived it, mirroring `SecretHandleKind::HkdfOutputMaterial`'s own
+/// existing single-kind-many-domains precedent. `FedosApplicationRootHandle`
+/// gains ONE new private accessor,
+/// `expose_bytes_for_internal_protocol_root_derivation`, named for its
+/// own sole reviewed caller — [`derive_protocol_root_internal`] below
+/// (Stage 1017).
+///
+/// Stage 1017 (Secure Runtime Alpha 152) adds the private helper
+/// [`derive_protocol_root_internal`] and its first fixed-domain wrapper,
+/// [`derive_nostr_root_internal`], deriving a NEW
+/// `SecretHandle(ProtocolRootMaterial)`-backed handle from a
+/// `FedosApplicationRootHandle`, via the SAME `derive_secret_handle_internal`
+/// bridge, under a NEW fixed domain, `HkdfDomain::Nostr` — again a fixed
+/// label selecting among the EXISTING, unchanged HKDF-SHA256
+/// implementation, not a new algorithm. `derive_protocol_root_internal`
+/// itself is deliberately NEVER `pub(crate)` — only its fixed-domain
+/// wrapper functions are — so no caller anywhere in this crate can pass
+/// an arbitrary `HkdfDomain` into a Protocol Root derivation.
+///
+/// Stage 1018 (Secure Runtime Alpha 153) adds three more fixed-domain
+/// wrappers over the SAME Stage 1017 helper —
+/// [`derive_session_root_internal`], [`derive_atproto_root_internal`],
+/// [`derive_wallet_root_internal`] — under three more NEW fixed domains,
+/// `HkdfDomain::Session`/`HkdfDomain::ATProto`/`HkdfDomain::Wallet`. The
+/// first two wire `docs/secure_runtime_alpha_142_root_hierarchy_decision.md`'s
+/// own adopted hierarchy exactly (Session Root/ATProto Root were already
+/// drawn as children of Application Root). `Wallet Root` is a SECOND
+/// recorded divergence from that same diagram: Alpha 142 drew it as a
+/// Master-Seed-direct SIBLING of `Application Root`, alongside `Identity
+/// Root`/`Storage Root`; THIS Arc's own instructions instead group it
+/// with Session/ATProto Root as a Protocol Root, a child of Application
+/// Root. This Stage implements exactly what this Arc specifies and
+/// RECORDS — rather than silently resolves — the divergence, resolving
+/// Alpha 148 §3's own open question for `Wallet Root` specifically
+/// (`Storage Root`, still unimplemented, remains an open question).
+///
+/// Stage 1019 (Secure Runtime Alpha 154) adds
+/// [`FedosProtocolRootHandle::matches_for_internal_verification`] — the
+/// SAME shape and guarantees as Stage 1015's own comparison methods,
+/// for the Protocol Root level. Comparing two roots derived under
+/// DIFFERENT `HkdfDomain` variants (e.g. a Nostr Root against a Session
+/// Root) is a well-defined call, not a type error — it simply returns
+/// `false`, since domain-separated HKDF output never collides. This
+/// Stage's own tests confirm, by real execution, all three of this
+/// Arc's own required properties: the same Master Seed and the same
+/// protocol domain reconstruct the same Protocol Root; different
+/// protocol domains derived from the SAME Application Root never match,
+/// pairwise, across all four protocols; and re-deriving the same
+/// Protocol Root twice matches exactly — every comparison via
+/// `matches_for_internal_verification`, never a raw secret byte
+/// comparison.
 #[allow(dead_code)]
 mod master_root {
     use crate::kdf_core::{derive_secret_handle_internal, HkdfDomain, HkdfStatus};
@@ -3106,6 +3218,185 @@ mod master_root {
             right.zeroize();
             equal
         }
+
+        /// The ONE narrowly-scoped internal accessor exposing a COPY of
+        /// the real 32-byte Application Root — private to this module, for
+        /// the sole reviewed use of [`derive_protocol_root_internal`]
+        /// below (Stage 1016/1017, Secure Runtime Alpha 151/152). Returns
+        /// `None` after `clear()`.
+        fn expose_bytes_for_internal_protocol_root_derivation(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
+    }
+
+    /// Stage 1016 (Secure Runtime Alpha 151) — an INTERNAL-ONLY handle for
+    /// a FedOS Protocol Root. See this module's own top-level doc comment
+    /// for the full design record. Unlike `FedosMasterSeedHandle`/
+    /// `FedosIdentityRootHandle`/`FedosApplicationRootHandle` (one Rust
+    /// type per hierarchy LEVEL), this ONE type represents every Protocol
+    /// Root INSTANCE at this level — Nostr/Session/ATProto/Wallet — since
+    /// they share an identical shape and differ only in which
+    /// `HkdfDomain` variant derived them (Stage 1017/1018).
+    pub(crate) struct FedosProtocolRootHandle {
+        inner: SecretHandle,
+    }
+
+    impl FedosProtocolRootHandle {
+        fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
+            Self {
+                inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::ProtocolRootMaterial,
+                    bytes,
+                ),
+            }
+        }
+
+        /// The non-sensitive classification label fixed at construction.
+        pub(crate) fn kind(&self) -> SecretHandleKind {
+            self.inner.kind()
+        }
+
+        /// Whether [`FedosProtocolRootHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.inner.is_cleared()
+        }
+
+        /// Zeroizes the held Protocol Root bytes. Safe to call more than
+        /// once.
+        pub(crate) fn clear(&mut self) {
+            self.inner.clear();
+        }
+
+        /// Stage 1019 (Secure Runtime Alpha 154) — same shape and
+        /// guarantees as
+        /// [`FedosIdentityRootHandle::matches_for_internal_verification`]
+        /// above, for the Protocol Root level. Comparing two handles
+        /// derived under DIFFERENT `HkdfDomain` variants (e.g. a Nostr
+        /// Root against a Session Root) is a valid call — it simply
+        /// returns `false`, since domain-separated HKDF output never
+        /// collides.
+        pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
+            let mut left = match self.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => return false,
+            };
+            let mut right = match other.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => {
+                    left.zeroize();
+                    return false;
+                }
+            };
+            let equal = bool::from(left.ct_eq(&right));
+            left.zeroize();
+            right.zeroize();
+            equal
+        }
+    }
+
+    /// The result of a [`derive_protocol_root_internal`] call (and of
+    /// every fixed-domain wrapper built on it —
+    /// [`derive_nostr_root_internal`], [`derive_session_root_internal`],
+    /// [`derive_atproto_root_internal`], [`derive_wallet_root_internal`]).
+    /// Crate-private only.
+    pub(crate) struct ProtocolRootDecision {
+        pub(crate) status: RootDerivationStatus,
+        pub(crate) output: Option<FedosProtocolRootHandle>,
+    }
+
+    /// Derive a NEW [`FedosProtocolRootHandle`] from an existing, real
+    /// [`FedosApplicationRootHandle`], via
+    /// `kdf_core::derive_secret_handle_internal` under the caller-fixed
+    /// `domain`. Private to this module — never `pub(crate)` — so a
+    /// caller can never pass an arbitrary `HkdfDomain` (e.g.
+    /// `HkdfDomain::TestOnly`); the only way to reach this function is
+    /// through one of the FIXED-domain wrapper functions below, exactly
+    /// as [`derive_identity_root_internal`]/[`derive_application_root_internal`]
+    /// never accept a caller-chosen domain either. Does not mutate
+    /// `application_root` — it is borrowed, never consumed.
+    fn derive_protocol_root_internal(
+        application_root: &FedosApplicationRootHandle,
+        domain: HkdfDomain,
+    ) -> ProtocolRootDecision {
+        let bytes = match application_root.expose_bytes_for_internal_protocol_root_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                return ProtocolRootDecision {
+                    status: RootDerivationStatus::InvalidInput,
+                    output: None,
+                }
+            }
+        };
+
+        let mut transient_input = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::HkdfInputMaterial,
+            bytes,
+        );
+        let decision = derive_secret_handle_internal(&transient_input, domain);
+        transient_input.clear();
+
+        match decision.status {
+            HkdfStatus::Ready => {
+                let output_handle = decision
+                    .output
+                    .expect("Ready HkdfDecision must carry output");
+                let output_bytes = output_handle
+                    .expose_bytes_for_internal_derivation()
+                    .expect("freshly-derived HkdfOutputMaterial handle must expose bytes");
+                ProtocolRootDecision {
+                    status: RootDerivationStatus::Success,
+                    output: Some(FedosProtocolRootHandle::new_from_32_bytes_for_internal_use(
+                        output_bytes,
+                    )),
+                }
+            }
+            HkdfStatus::InvalidInput | HkdfStatus::InternalFailure => ProtocolRootDecision {
+                status: RootDerivationStatus::InternalFailure,
+                output: None,
+            },
+        }
+    }
+
+    /// Stage 1017 (Secure Runtime Alpha 152) — derive the Nostr Root
+    /// (Application Root → Nostr Root) under the fixed, NEW
+    /// `HkdfDomain::Nostr` — the ONLY domain this function ever requests.
+    pub(crate) fn derive_nostr_root_internal(
+        application_root: &FedosApplicationRootHandle,
+    ) -> ProtocolRootDecision {
+        derive_protocol_root_internal(application_root, HkdfDomain::Nostr)
+    }
+
+    /// Stage 1018 (Secure Runtime Alpha 153) — derive the Session Root
+    /// (Application Root → Session Root) under the fixed, NEW
+    /// `HkdfDomain::Session` — the ONLY domain this function ever
+    /// requests.
+    pub(crate) fn derive_session_root_internal(
+        application_root: &FedosApplicationRootHandle,
+    ) -> ProtocolRootDecision {
+        derive_protocol_root_internal(application_root, HkdfDomain::Session)
+    }
+
+    /// Stage 1018 (Secure Runtime Alpha 153) — derive the ATProto Root
+    /// (Application Root → ATProto Root) under the fixed, NEW
+    /// `HkdfDomain::ATProto` — the ONLY domain this function ever
+    /// requests.
+    pub(crate) fn derive_atproto_root_internal(
+        application_root: &FedosApplicationRootHandle,
+    ) -> ProtocolRootDecision {
+        derive_protocol_root_internal(application_root, HkdfDomain::ATProto)
+    }
+
+    /// Stage 1018 (Secure Runtime Alpha 153) — derive the Wallet Root
+    /// (Application Root → Wallet Root) under the fixed, NEW
+    /// `HkdfDomain::Wallet` — the ONLY domain this function ever
+    /// requests. See this module's own top-level doc comment for the
+    /// recorded divergence from Alpha 142's own diagram (which drew
+    /// `Wallet Root` as a Master-Seed-direct sibling of `Application
+    /// Root`, not a Protocol Root nested under it).
+    pub(crate) fn derive_wallet_root_internal(
+        application_root: &FedosApplicationRootHandle,
+    ) -> ProtocolRootDecision {
+        derive_protocol_root_internal(application_root, HkdfDomain::Wallet)
     }
 
     /// The result of a [`derive_application_root_internal`] call.
@@ -3481,6 +3772,257 @@ mod master_root {
             let second_root = derive_identity_root_internal(&master_seed)
                 .output
                 .expect("expected a real Identity Root");
+            assert!(first_root.matches_for_internal_verification(&second_root));
+            first_root.clear();
+            assert!(!first_root.matches_for_internal_verification(&second_root));
+        }
+
+        // ---- Alpha 151: Protocol Root Handle ----
+
+        const TEST_PROTOCOL_ROOT_BYTES: [u8; 32] = [0x77; 32];
+
+        #[test]
+        fn protocol_root_handle_holds_protocol_root_material_kind() {
+            let handle =
+                FedosProtocolRootHandle::new_from_32_bytes_for_internal_use(TEST_PROTOCOL_ROOT_BYTES);
+            assert_eq!(handle.kind(), SecretHandleKind::ProtocolRootMaterial);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn protocol_root_handle_clear_zeroizes_and_is_idempotent() {
+            let mut handle =
+                FedosProtocolRootHandle::new_from_32_bytes_for_internal_use(TEST_PROTOCOL_ROOT_BYTES);
+            handle.clear();
+            assert!(handle.is_cleared());
+            handle.clear();
+            assert!(handle.is_cleared());
+        }
+
+        fn real_application_root() -> FedosApplicationRootHandle {
+            let identity_root = real_identity_root();
+            derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root")
+        }
+
+        // ---- Alpha 152: Nostr Root Derivation ----
+
+        #[test]
+        fn derives_a_real_nostr_root_from_a_holding_application_root() {
+            let application_root = real_application_root();
+            let decision = derive_nostr_root_internal(&application_root);
+            assert_eq!(decision.status, RootDerivationStatus::Success);
+            let nostr_root = decision.output.expect("Success must carry output");
+            assert_eq!(nostr_root.kind(), SecretHandleKind::ProtocolRootMaterial);
+            assert!(!nostr_root.is_cleared());
+        }
+
+        #[test]
+        fn nostr_root_derivation_rejects_a_cleared_application_root() {
+            let mut application_root = real_application_root();
+            application_root.clear();
+            let decision = derive_nostr_root_internal(&application_root);
+            assert_eq!(decision.status, RootDerivationStatus::InvalidInput);
+            assert!(decision.output.is_none());
+        }
+
+        #[test]
+        fn nostr_root_derivation_does_not_mutate_or_clear_the_application_root() {
+            let application_root = real_application_root();
+            let _ = derive_nostr_root_internal(&application_root);
+            assert!(!application_root.is_cleared());
+            assert_eq!(
+                application_root.kind(),
+                SecretHandleKind::ApplicationRootMaterial
+            );
+        }
+
+        #[test]
+        fn nostr_root_derivation_is_deterministic_for_the_same_application_root() {
+            let application_root = real_application_root();
+            let first = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            let second = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            assert_eq!(
+                first.inner.expose_bytes_for_internal_derivation(),
+                second.inner.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        // ---- Alpha 153: Session / ATProto / Wallet Root ----
+
+        type ProtocolRootDeriveFn = fn(&FedosApplicationRootHandle) -> ProtocolRootDecision;
+
+        const SESSION_ATPROTO_WALLET_DERIVE_FNS: [ProtocolRootDeriveFn; 3] = [
+            derive_session_root_internal,
+            derive_atproto_root_internal,
+            derive_wallet_root_internal,
+        ];
+
+        #[test]
+        fn derives_real_session_atproto_and_wallet_roots_from_a_holding_application_root() {
+            let application_root = real_application_root();
+            for derive_fn in SESSION_ATPROTO_WALLET_DERIVE_FNS {
+                let decision = derive_fn(&application_root);
+                assert_eq!(decision.status, RootDerivationStatus::Success);
+                let root = decision.output.expect("Success must carry output");
+                assert_eq!(root.kind(), SecretHandleKind::ProtocolRootMaterial);
+                assert!(!root.is_cleared());
+            }
+        }
+
+        #[test]
+        fn session_atproto_wallet_root_derivation_rejects_a_cleared_application_root() {
+            let mut application_root = real_application_root();
+            application_root.clear();
+            for derive_fn in SESSION_ATPROTO_WALLET_DERIVE_FNS {
+                let decision = derive_fn(&application_root);
+                assert_eq!(decision.status, RootDerivationStatus::InvalidInput);
+                assert!(decision.output.is_none());
+            }
+        }
+
+        #[test]
+        fn session_atproto_wallet_root_derivation_does_not_mutate_or_clear_the_application_root() {
+            let application_root = real_application_root();
+            for derive_fn in SESSION_ATPROTO_WALLET_DERIVE_FNS {
+                let _ = derive_fn(&application_root);
+            }
+            assert!(!application_root.is_cleared());
+            assert_eq!(
+                application_root.kind(),
+                SecretHandleKind::ApplicationRootMaterial
+            );
+        }
+
+        #[test]
+        fn session_atproto_wallet_root_derivation_is_deterministic_for_the_same_application_root() {
+            let application_root = real_application_root();
+            for derive_fn in SESSION_ATPROTO_WALLET_DERIVE_FNS {
+                let first = derive_fn(&application_root)
+                    .output
+                    .expect("expected a real Protocol Root");
+                let second = derive_fn(&application_root)
+                    .output
+                    .expect("expected a real Protocol Root");
+                assert_eq!(
+                    first.inner.expose_bytes_for_internal_derivation(),
+                    second.inner.expose_bytes_for_internal_derivation()
+                );
+            }
+        }
+
+        // ---- Alpha 154: Protocol Separation Verification ----
+        //
+        // Every assertion below compares exclusively via
+        // `matches_for_internal_verification` (Handle comparison) — never
+        // a raw secret byte comparison — per this Stage's own explicit
+        // requirement.
+
+        const ALL_PROTOCOL_ROOT_DERIVE_FNS: [ProtocolRootDeriveFn; 4] = [
+            derive_nostr_root_internal,
+            derive_session_root_internal,
+            derive_atproto_root_internal,
+            derive_wallet_root_internal,
+        ];
+
+        #[test]
+        fn same_master_seed_and_same_protocol_domain_yields_matching_protocol_roots_across_two_independent_derivations(
+        ) {
+            let first_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let second_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let first_app_root = derive_application_root_internal(
+                &derive_identity_root_internal(&first_seed)
+                    .output
+                    .expect("expected a real Identity Root"),
+            )
+            .output
+            .expect("expected a real Application Root");
+            let second_app_root = derive_application_root_internal(
+                &derive_identity_root_internal(&second_seed)
+                    .output
+                    .expect("expected a real Identity Root"),
+            )
+            .output
+            .expect("expected a real Application Root");
+            for derive_fn in ALL_PROTOCOL_ROOT_DERIVE_FNS {
+                let first_root = derive_fn(&first_app_root)
+                    .output
+                    .expect("expected a real Protocol Root");
+                let second_root = derive_fn(&second_app_root)
+                    .output
+                    .expect("expected a real Protocol Root");
+                assert!(first_root.matches_for_internal_verification(&second_root));
+            }
+        }
+
+        #[test]
+        fn different_protocol_domains_from_the_same_application_root_never_match() {
+            let application_root = real_application_root();
+            let roots: Vec<FedosProtocolRootHandle> = ALL_PROTOCOL_ROOT_DERIVE_FNS
+                .iter()
+                .map(|derive_fn| {
+                    derive_fn(&application_root)
+                        .output
+                        .expect("expected a real Protocol Root")
+                })
+                .collect();
+            for i in 0..roots.len() {
+                for j in (i + 1)..roots.len() {
+                    assert!(!roots[i].matches_for_internal_verification(&roots[j]));
+                }
+            }
+        }
+
+        #[test]
+        fn same_protocol_root_rederived_twice_matches_exactly_via_handle_comparison() {
+            let application_root = real_application_root();
+            let first = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            let second = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            assert!(first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn different_application_roots_yield_non_matching_protocol_roots_for_the_same_domain() {
+            let first_application_root = real_application_root();
+            let second_application_root = {
+                let seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xAA; 32]);
+                let identity_root = derive_identity_root_internal(&seed)
+                    .output
+                    .expect("expected a real Identity Root");
+                derive_application_root_internal(&identity_root)
+                    .output
+                    .expect("expected a real Application Root")
+            };
+            let first_root = derive_nostr_root_internal(&first_application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            let second_root = derive_nostr_root_internal(&second_application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            assert!(!first_root.matches_for_internal_verification(&second_root));
+        }
+
+        #[test]
+        fn protocol_root_matches_for_internal_verification_returns_false_after_either_side_is_cleared(
+        ) {
+            let application_root = real_application_root();
+            let mut first_root = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            let second_root = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
             assert!(first_root.matches_for_internal_verification(&second_root));
             first_root.clear();
             assert!(!first_root.matches_for_internal_verification(&second_root));

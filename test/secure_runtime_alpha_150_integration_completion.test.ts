@@ -95,7 +95,7 @@ describe("Secure Runtime Alpha 150 -- Integration Completion", () => {
     expect(pubFnNames.length).toBe(36);
   });
 
-  it("8. structural: SecretHandleKind gained exactly three new variants across the whole Arc -- MasterSeedMaterial, IdentityRootMaterial, ApplicationRootMaterial", () => {
+  it("8. RIPPLE (Secure Runtime Alpha 151): SecretHandleKind gained exactly three new variants across the Alpha 146-150 Arc's own scope -- MasterSeedMaterial, IdentityRootMaterial, ApplicationRootMaterial; Stage 1016 (Secure Runtime Alpha 151) legitimately added a FOURTH, ProtocolRootMaterial, reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum SecretHandleKind \{([\s\S]*?)\n {4}\}/) ?? [])[1] ?? "";
     const variants = [...enumBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(variants).toEqual([
@@ -109,14 +109,26 @@ describe("Secure Runtime Alpha 150 -- Integration Completion", () => {
       "MasterSeedMaterial",
       "IdentityRootMaterial",
       "ApplicationRootMaterial",
+      "ProtocolRootMaterial",
       "TestOnlySecretMaterial",
     ]);
   });
 
-  it("9. structural: HkdfDomain gained exactly one new variant across the whole Arc -- Application", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 153): HkdfDomain gained exactly one new variant across the Alpha 146-150 Arc's own scope -- Application; Stage 1017/1018 (Secure Runtime Alpha 152/153) legitimately added four more -- Nostr/Session/ATProto/Wallet -- for TEN total, reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum HkdfDomain \{([\s\S]*?)\n {4}\}/) ?? [])[1] ?? "";
     const variants = [...enumBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "Application", "TestOnly"]);
+    expect(variants).toEqual([
+      "RootKey",
+      "Identity",
+      "Storage",
+      "Conversation",
+      "Application",
+      "Nostr",
+      "Session",
+      "ATProto",
+      "Wallet",
+      "TestOnly",
+    ]);
   });
 
   it("10. structural: no Nostr secret-key generation, npub, or signature reference exists anywhere in the master_root module", () => {
