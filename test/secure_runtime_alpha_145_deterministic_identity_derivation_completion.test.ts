@@ -129,22 +129,31 @@ describe("Secure Runtime Alpha 145 -- Deterministic Identity Derivation Completi
     }
   });
 
-  it("14. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED across the whole Arc", () => {
+  it("14. RIPPLE (Secure Runtime Alpha 146): Rust and Cargo/package sources were BYTE-FOR-BYTE UNCHANGED across this Arc's own scope; a LATER Arc (Alpha 146-150) legitimately touched Rust, so this count is now measured with a line-anchored regex (a later doc comment can otherwise mention the literal string `#[wasm_bindgen]` in prose without adding a real annotation) -- the real annotation count remains 13, reconfirmed here as the CURRENT state", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
     expect(pubFnNames.length).toBe(36);
-    const wasmBindgenCount = [...libRsSource.matchAll(/#\[wasm_bindgen\]/g)].length;
+    const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(13);
-    for (const stage of ["141", "142", "143", "144", "145"]) {
+    // RIPPLE (Secure Runtime Alpha 148): lib.rs carried no reference to
+    // ANY of this Arc's own five docs AS OF this Stage's own review-only
+    // scope; Stage 1014 (Secure Runtime Alpha 148) legitimately cites
+    // Alpha 142's own adopted hierarchy as its design justification for
+    // the Application Root derivation -- 141/143/144/145 remain
+    // unreferenced, reconfirmed here as the CURRENT state.
+    for (const stage of ["141", "143", "144", "145"]) {
       expect(libRsSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
       expect(cargoTomlSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
+    expect(libRsSource).toMatch(/secure_runtime_alpha_142_root_hierarchy_decision\.md/);
+    expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_142/);
+    expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_142/);
   });
 
-  it("15. Regression: HkdfDomain remains the exact same five variants across the whole Arc -- no new variant was added", () => {
+  it("15. RIPPLE (Secure Runtime Alpha 148): HkdfDomain held the exact same five variants across this Arc's own scope -- no new variant was added AS OF Alpha 145's own closing state; Stage 1014 (Secure Runtime Alpha 148) legitimately added a SIXTH, `Application`, implementing exactly the Application Root derivation this Arc's own design named as future work (Alpha 141 §3 answer 2), reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum HkdfDomain \{([\s\S]*?)\n\s{4}\}/) ?? [])[1] ?? "";
     const variants = [...enumBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "TestOnly"]);
+    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "Application", "TestOnly"]);
   });
 
   it("16. Regression: package.json still declares exactly two dependencies and no bin field, unaffected by this Arc", () => {

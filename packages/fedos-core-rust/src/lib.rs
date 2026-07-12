@@ -1770,6 +1770,22 @@ mod secret_handle {
         /// derived FROM a `ConversationKeyMaterial` handle via
         /// `crypto::hkdf_bridge` (Stage 201).
         MessageKeyMaterial,
+        /// Stage 1012 (Secure Runtime Alpha 146) — the FedOS Master Seed
+        /// (`master_root::FedosMasterSeedHandle`'s own internal payload
+        /// label).
+        MasterSeedMaterial,
+        /// Stage 1013 (Secure Runtime Alpha 147) — the FedOS Identity Root
+        /// (`master_root::FedosIdentityRootHandle`'s own internal payload
+        /// label), derived from `MasterSeedMaterial` via
+        /// `kdf_core::derive_secret_handle_internal` under
+        /// `HkdfDomain::Identity`.
+        IdentityRootMaterial,
+        /// Stage 1014 (Secure Runtime Alpha 148) — the FedOS Application
+        /// Root (`master_root::FedosApplicationRootHandle`'s own internal
+        /// payload label), derived from `IdentityRootMaterial` via
+        /// `kdf_core::derive_secret_handle_internal` under
+        /// `HkdfDomain::Application`.
+        ApplicationRootMaterial,
         /// A test-fixture-only secret — never real production material.
         TestOnlySecretMaterial,
     }
@@ -2504,6 +2520,12 @@ mod kdf_core {
         Storage,
         /// A conversation/messaging-key derivation.
         Conversation,
+        /// Stage 1014 (Secure Runtime Alpha 148) — the Application Root
+        /// derivation (Identity Root → Application Root), the parent of
+        /// every future Protocol Root (Nostr/Session/ATProto/etc.) per
+        /// `docs/secure_runtime_alpha_142_root_hierarchy_decision.md`'s
+        /// own adopted hierarchy.
+        Application,
         /// Reserved for this module's own tests / future test-only fixtures
         /// — never used by production call sites.
         TestOnly,
@@ -2522,6 +2544,7 @@ mod kdf_core {
                 HkdfDomain::Identity => b"fedos-hkdf-salt-identity-v1",
                 HkdfDomain::Storage => b"fedos-hkdf-salt-storage-v1",
                 HkdfDomain::Conversation => b"fedos-hkdf-salt-conversation-v1",
+                HkdfDomain::Application => b"fedos-hkdf-salt-application-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-salt-test-only-v1",
             }
         }
@@ -2534,6 +2557,7 @@ mod kdf_core {
                 HkdfDomain::Identity => b"fedos-hkdf-info-identity-v1",
                 HkdfDomain::Storage => b"fedos-hkdf-info-storage-v1",
                 HkdfDomain::Conversation => b"fedos-hkdf-info-conversation-v1",
+                HkdfDomain::Application => b"fedos-hkdf-info-application-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-info-test-only-v1",
             }
         }
@@ -2713,6 +2737,7 @@ mod kdf_core {
                 HkdfDomain::Identity,
                 HkdfDomain::Storage,
                 HkdfDomain::Conversation,
+                HkdfDomain::Application,
                 HkdfDomain::TestOnly,
             ] {
                 let decision = derive_secret_handle_internal(&input, domain);
@@ -2788,19 +2813,677 @@ mod kdf_core {
             );
         }
 
-        /// `HkdfDomain` supports exactly the five specified variants — an
-        /// exhaustive match with no wildcard arm compiles only because no
-        /// other variant exists to add one for.
+        /// RIPPLE (Secure Runtime Alpha 148): `HkdfDomain` supported
+        /// exactly the five originally-specified variants AS OF this
+        /// test's own original scope; Stage 1014 (Secure Runtime Alpha
+        /// 148) added a SIXTH, `Application`, reconfirmed here as the
+        /// CURRENT state — an exhaustive match with no wildcard arm
+        /// compiles only because no other variant exists to add one for.
         #[test]
-        fn hkdf_domain_has_no_variant_other_than_the_five_specified() {
+        fn hkdf_domain_has_no_variant_other_than_the_six_specified() {
             let domain = HkdfDomain::TestOnly;
             match domain {
                 HkdfDomain::RootKey => {}
                 HkdfDomain::Identity => {}
                 HkdfDomain::Storage => {}
                 HkdfDomain::Conversation => {}
+                HkdfDomain::Application => {}
                 HkdfDomain::TestOnly => {}
             }
+        }
+    }
+}
+
+/// Stage 1012 (Secure Runtime Alpha 146) — opens the Master Root
+/// Derivation Foundation: an INTERNAL-ONLY chain of opaque root handles
+/// implementing the hierarchy
+/// `docs/secure_runtime_alpha_142_root_hierarchy_decision.md` adopted.
+/// This module is this crate's FIRST connection between
+/// `kdf_core::derive_secret_handle_internal` (Stage 147) and a NAMED
+/// identity concept — every prior `kdf_core` consumer
+/// (`crypto::hkdf_bridge`, Stage 201) served the separate NIP-44
+/// message-key pipeline.
+///
+/// NOT part of this crate's public API: every item below is `pub(crate)`
+/// at most (never `pub`), nothing is re-exported from the crate root, and
+/// none of this crate's `pub fn` functions constructs, holds, or returns
+/// any type in this module. No WASM-export attribute (wasm_bindgen) is
+/// applied anywhere in this module — the crate's own total count of such
+/// annotations stays fixed at 13 (Stage 1009/1010, Secure Runtime Alpha
+/// 014/015).
+///
+/// This Stage adds [`FedosMasterSeedHandle`], wrapping a
+/// `SecretHandle(MasterSeedMaterial)`. Its own constructor,
+/// [`FedosMasterSeedHandle::new_from_32_bytes_for_internal_use`], takes an
+/// already-drawn, fixed-size `[u8; 32]` — mirroring `SecretHandle`'s own
+/// discipline exactly, this type does NOT, and must not, generate its own
+/// bytes (it never calls `fedos_random_bytes_32`/`fedos_aead_nonce_96`
+/// itself). No raw byte ever leaves this module: the ONE accessor that
+/// reads bytes out of a `FedosMasterSeedHandle`,
+/// `expose_bytes_for_internal_root_derivation`, is private to this module
+/// and named for its own sole reviewed caller — [`derive_identity_root_internal`]
+/// below (Stage 1013). This satisfies the Master Root Derivation
+/// Foundation's own three exposure prohibitions in full: no WASM boundary
+/// crossing (no WASM-export attribute references this module at all), no
+/// Desktop access (`src/desktop/*` is untouched by this whole Arc), and no
+/// Identity Layer access (`src/identity/*` is untouched by this whole
+/// Arc).
+///
+/// Stage 1013 (Secure Runtime Alpha 147) adds [`FedosIdentityRootHandle`]
+/// and [`derive_identity_root_internal`], deriving a NEW
+/// `SecretHandle(IdentityRootMaterial)`-backed handle from a
+/// `FedosMasterSeedHandle`, via `kdf_core::derive_secret_handle_internal`
+/// under the EXISTING, unchanged `HkdfDomain::Identity` — the SAME
+/// generic domain-separated HKDF-SHA256 bridge
+/// `crypto::hkdf_bridge::derive_message_key_from_conversation_key_internal`
+/// (Stage 201) already uses for its own, separate NIP-44 purpose. NO new
+/// cryptographic algorithm and NO new HKDF implementation are added by
+/// this Stage — `HkdfDomain::Identity`'s own fixed salt/info
+/// (`b"fedos-hkdf-salt-identity-v1"`/`b"fedos-hkdf-info-identity-v1"`,
+/// Stage 147) are reused byte-for-byte, unchanged. Chaining follows
+/// `crypto::hkdf_bridge`'s own exact precedent: the Master Seed's own
+/// bytes are exposed via the one narrow accessor above, copied into a
+/// TRANSIENT `SecretHandle(HkdfInputMaterial)` for the sole duration of
+/// one `derive_secret_handle_internal` call, immediately `clear()`-ed,
+/// and the derivation's own output bytes are copied ONE more time into
+/// the final `FedosIdentityRootHandle`'s own dedicated
+/// `IdentityRootMaterial`-kinded `SecretHandle` — never aliased, never
+/// re-used storage.
+///
+/// Stage 1014 (Secure Runtime Alpha 148) adds
+/// [`FedosApplicationRootHandle`] and
+/// [`derive_application_root_internal`], deriving a NEW
+/// `SecretHandle(ApplicationRootMaterial)`-backed handle from a
+/// `FedosIdentityRootHandle`, via the SAME `derive_secret_handle_internal`
+/// bridge, under a NEW fixed domain, `HkdfDomain::Application` (this
+/// Stage's own ONLY new domain — a fixed label selecting among the
+/// EXISTING, unchanged HKDF-SHA256 implementation, not a new algorithm).
+/// This wires `docs/secure_runtime_alpha_142_root_hierarchy_decision.md`'s
+/// own adopted hierarchy with ONE deliberate, explicitly-recorded
+/// refinement: that design's own diagram drew `Application Root` as a
+/// Master-Seed-direct SIBLING of `Identity Root`; THIS Arc's own
+/// instructions instead derive Application Root AS A CHILD of Identity
+/// Root (`Identity Root → Application Root`). This Stage implements
+/// exactly what this Arc specifies, and RECORDS — rather than silently
+/// resolves — the divergence from the earlier sibling diagram; a future
+/// Stage may revisit whether `Storage Root`/`Wallet Root` (still
+/// unimplemented — neither exists anywhere in this crate yet) should also
+/// become children of `Identity Root`, or remain independent
+/// Master-Seed-direct siblings as originally drawn.
+///
+/// Stage 1015 (Secure Runtime Alpha 149) adds
+/// [`FedosIdentityRootHandle::matches_for_internal_verification`] and
+/// [`FedosApplicationRootHandle::matches_for_internal_verification`] — the
+/// ONLY comparison operation either Root Handle type supports. Neither
+/// method returns, exposes, or logs a byte: each exposes both operands'
+/// own bytes via its own existing narrow accessor into two transient
+/// local arrays, compares them with `subtle::ConstantTimeEq` (this
+/// crate's own established constant-time-comparison discipline,
+/// `crypto::nip44_hmac::verify_hmac_internal`, Stage 194), immediately
+/// zeroizes both transient arrays, and returns ONLY a `bool`. This is
+/// deliberately the ONLY equality operation these types expose — neither
+/// derives `PartialEq`/`Eq` (which would require exposing or comparing
+/// the payload some other, less controlled way), mirroring
+/// `SecretHandle`'s own "no `Eq`/`PartialEq` over the payload" rule
+/// (Stage 144–146's own module doc comment) exactly.
+#[allow(dead_code)]
+mod master_root {
+    use crate::kdf_core::{derive_secret_handle_internal, HkdfDomain, HkdfStatus};
+    use crate::secret_handle::{SecretHandle, SecretHandleKind};
+    use subtle::ConstantTimeEq;
+    use zeroize::Zeroize;
+
+    /// Stage 1012 (Secure Runtime Alpha 146) — an INTERNAL-ONLY handle for
+    /// the FedOS Master Seed. See this module's own top-level doc comment
+    /// for the full design record.
+    pub(crate) struct FedosMasterSeedHandle {
+        inner: SecretHandle,
+    }
+
+    impl FedosMasterSeedHandle {
+        /// Construct a handle holding the REAL 32-byte Master Seed. Takes
+        /// ownership of a fixed-size `[u8; 32]` (never a slice, `Vec<u8>`,
+        /// or `String`) — this constructor does NOT, and must not,
+        /// generate its own bytes; the caller draws them first, mirroring
+        /// `SecretHandle::new_from_32_bytes_for_internal_use`'s own
+        /// discipline exactly.
+        pub(crate) fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
+            Self {
+                inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::MasterSeedMaterial,
+                    bytes,
+                ),
+            }
+        }
+
+        /// The non-sensitive classification label fixed at construction.
+        pub(crate) fn kind(&self) -> SecretHandleKind {
+            self.inner.kind()
+        }
+
+        /// Whether [`FedosMasterSeedHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.inner.is_cleared()
+        }
+
+        /// Zeroizes the held Master Seed bytes. Safe to call more than
+        /// once.
+        pub(crate) fn clear(&mut self) {
+            self.inner.clear();
+        }
+
+        /// The ONE narrowly-scoped internal accessor exposing a COPY of
+        /// the real 32-byte Master Seed — private to this module, for the
+        /// sole reviewed use of [`derive_identity_root_internal`] below
+        /// (Stage 1013). Returns `None` after `clear()`. Never
+        /// `pub(crate)`, never re-exported, never reachable from this
+        /// crate's public API.
+        fn expose_bytes_for_internal_root_derivation(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
+    }
+
+    /// Stage 1013 (Secure Runtime Alpha 147) — an INTERNAL-ONLY handle for
+    /// the FedOS Identity Root. See this module's own top-level doc
+    /// comment for the full design record.
+    pub(crate) struct FedosIdentityRootHandle {
+        inner: SecretHandle,
+    }
+
+    impl FedosIdentityRootHandle {
+        fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
+            Self {
+                inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::IdentityRootMaterial,
+                    bytes,
+                ),
+            }
+        }
+
+        /// The non-sensitive classification label fixed at construction.
+        pub(crate) fn kind(&self) -> SecretHandleKind {
+            self.inner.kind()
+        }
+
+        /// Whether [`FedosIdentityRootHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.inner.is_cleared()
+        }
+
+        /// Zeroizes the held Identity Root bytes. Safe to call more than
+        /// once.
+        pub(crate) fn clear(&mut self) {
+            self.inner.clear();
+        }
+
+        /// The ONE narrowly-scoped internal accessor exposing a COPY of
+        /// the real 32-byte Identity Root — private to this module, for
+        /// the sole reviewed use of [`derive_application_root_internal`]
+        /// below (Stage 1014). Returns `None` after `clear()`.
+        fn expose_bytes_for_internal_application_root_derivation(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
+
+        /// Stage 1015 (Secure Runtime Alpha 149) — compares this handle's
+        /// own Identity Root bytes against `other`'s, in constant time,
+        /// via `subtle::ConstantTimeEq`. Returns ONLY a `bool` — never the
+        /// bytes themselves, and never via a plain `==`/`Eq`/`PartialEq`
+        /// derive. Returns `false` if either handle has been `clear()`-ed
+        /// (there is no payload left to compare).
+        pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
+            let mut left = match self.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => return false,
+            };
+            let mut right = match other.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => {
+                    left.zeroize();
+                    return false;
+                }
+            };
+            let equal = bool::from(left.ct_eq(&right));
+            left.zeroize();
+            right.zeroize();
+            equal
+        }
+    }
+
+    /// Stage 1014 (Secure Runtime Alpha 148) — an INTERNAL-ONLY handle for
+    /// the FedOS Application Root. See this module's own top-level doc
+    /// comment for the full design record, including the recorded
+    /// divergence from
+    /// `docs/secure_runtime_alpha_142_root_hierarchy_decision.md`'s own
+    /// sibling diagram.
+    pub(crate) struct FedosApplicationRootHandle {
+        inner: SecretHandle,
+    }
+
+    impl FedosApplicationRootHandle {
+        fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
+            Self {
+                inner: SecretHandle::new_from_32_bytes_for_internal_use(
+                    SecretHandleKind::ApplicationRootMaterial,
+                    bytes,
+                ),
+            }
+        }
+
+        /// The non-sensitive classification label fixed at construction.
+        pub(crate) fn kind(&self) -> SecretHandleKind {
+            self.inner.kind()
+        }
+
+        /// Whether [`FedosApplicationRootHandle::clear`] has been called.
+        pub(crate) fn is_cleared(&self) -> bool {
+            self.inner.is_cleared()
+        }
+
+        /// Zeroizes the held Application Root bytes. Safe to call more
+        /// than once.
+        pub(crate) fn clear(&mut self) {
+            self.inner.clear();
+        }
+
+        /// Stage 1015 (Secure Runtime Alpha 149) — same shape and
+        /// guarantees as
+        /// [`FedosIdentityRootHandle::matches_for_internal_verification`]
+        /// above, for the Application Root level.
+        pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
+            let mut left = match self.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => return false,
+            };
+            let mut right = match other.inner.expose_bytes_for_internal_derivation() {
+                Some(bytes) => bytes,
+                None => {
+                    left.zeroize();
+                    return false;
+                }
+            };
+            let equal = bool::from(left.ct_eq(&right));
+            left.zeroize();
+            right.zeroize();
+            equal
+        }
+    }
+
+    /// The result of a [`derive_application_root_internal`] call.
+    /// Crate-private only.
+    pub(crate) struct ApplicationRootDecision {
+        pub(crate) status: RootDerivationStatus,
+        pub(crate) output: Option<FedosApplicationRootHandle>,
+    }
+
+    /// Derive a NEW [`FedosApplicationRootHandle`] from an existing, real
+    /// [`FedosIdentityRootHandle`], via
+    /// `kdf_core::derive_secret_handle_internal` under the fixed, NEW
+    /// `HkdfDomain::Application` — the ONLY domain this function ever
+    /// requests. Does not mutate `identity_root` — it is borrowed, never
+    /// consumed, and is left exactly as it was after this call returns.
+    pub(crate) fn derive_application_root_internal(
+        identity_root: &FedosIdentityRootHandle,
+    ) -> ApplicationRootDecision {
+        let bytes = match identity_root.expose_bytes_for_internal_application_root_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                return ApplicationRootDecision {
+                    status: RootDerivationStatus::InvalidInput,
+                    output: None,
+                }
+            }
+        };
+
+        let mut transient_input = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::HkdfInputMaterial,
+            bytes,
+        );
+        let decision = derive_secret_handle_internal(&transient_input, HkdfDomain::Application);
+        transient_input.clear();
+
+        match decision.status {
+            HkdfStatus::Ready => {
+                let output_handle = decision
+                    .output
+                    .expect("Ready HkdfDecision must carry output");
+                let output_bytes = output_handle
+                    .expose_bytes_for_internal_derivation()
+                    .expect("freshly-derived HkdfOutputMaterial handle must expose bytes");
+                ApplicationRootDecision {
+                    status: RootDerivationStatus::Success,
+                    output: Some(
+                        FedosApplicationRootHandle::new_from_32_bytes_for_internal_use(output_bytes),
+                    ),
+                }
+            }
+            HkdfStatus::InvalidInput | HkdfStatus::InternalFailure => ApplicationRootDecision {
+                status: RootDerivationStatus::InternalFailure,
+                output: None,
+            },
+        }
+    }
+
+    /// Coarse observable outcome of [`derive_identity_root_internal`].
+    /// Crate-private only. No secret byte is exposed through this label
+    /// itself.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum RootDerivationStatus {
+        /// Derivation succeeded; the decision's own `output` is `Some`.
+        Success,
+        /// The input handle held no real bytes (already `clear()`-ed) —
+        /// `output` is `None`.
+        InvalidInput,
+        /// The underlying `kdf_core::derive_secret_handle_internal` call
+        /// itself reported `HkdfStatus::InternalFailure` — unreachable in
+        /// practice (see `kdf_core::HkdfStatus::InternalFailure`'s own
+        /// doc comment), matched exhaustively rather than assumed
+        /// infallible.
+        InternalFailure,
+    }
+
+    /// The result of a [`derive_identity_root_internal`] call.
+    /// Crate-private only.
+    pub(crate) struct IdentityRootDecision {
+        pub(crate) status: RootDerivationStatus,
+        pub(crate) output: Option<FedosIdentityRootHandle>,
+    }
+
+    /// Derive a NEW [`FedosIdentityRootHandle`] from an existing, real
+    /// [`FedosMasterSeedHandle`], via
+    /// `kdf_core::derive_secret_handle_internal` under the fixed,
+    /// EXISTING `HkdfDomain::Identity` — the ONLY domain this function
+    /// ever requests. Does not mutate `master_seed` — it is borrowed,
+    /// never consumed, and is left exactly as it was after this call
+    /// returns.
+    pub(crate) fn derive_identity_root_internal(
+        master_seed: &FedosMasterSeedHandle,
+    ) -> IdentityRootDecision {
+        let bytes = match master_seed.expose_bytes_for_internal_root_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                return IdentityRootDecision {
+                    status: RootDerivationStatus::InvalidInput,
+                    output: None,
+                }
+            }
+        };
+
+        let mut transient_input = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::HkdfInputMaterial,
+            bytes,
+        );
+        let decision = derive_secret_handle_internal(&transient_input, HkdfDomain::Identity);
+        transient_input.clear();
+
+        match decision.status {
+            HkdfStatus::Ready => {
+                let output_handle = decision
+                    .output
+                    .expect("Ready HkdfDecision must carry output");
+                let output_bytes = output_handle
+                    .expose_bytes_for_internal_derivation()
+                    .expect("freshly-derived HkdfOutputMaterial handle must expose bytes");
+                IdentityRootDecision {
+                    status: RootDerivationStatus::Success,
+                    output: Some(FedosIdentityRootHandle::new_from_32_bytes_for_internal_use(
+                        output_bytes,
+                    )),
+                }
+            }
+            HkdfStatus::InvalidInput | HkdfStatus::InternalFailure => IdentityRootDecision {
+                status: RootDerivationStatus::InternalFailure,
+                output: None,
+            },
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        const TEST_MASTER_SEED: [u8; 32] = [0xEE; 32];
+
+        #[test]
+        fn master_seed_handle_holds_master_seed_material_kind() {
+            let handle = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            assert_eq!(handle.kind(), SecretHandleKind::MasterSeedMaterial);
+            assert!(!handle.is_cleared());
+        }
+
+        #[test]
+        fn master_seed_handle_clear_zeroizes_and_is_idempotent() {
+            let mut handle = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            handle.clear();
+            assert!(handle.is_cleared());
+            handle.clear();
+            assert!(handle.is_cleared());
+        }
+
+        #[test]
+        fn expose_bytes_for_internal_root_derivation_returns_none_after_clear() {
+            let mut handle = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            assert!(handle
+                .expose_bytes_for_internal_root_derivation()
+                .is_some());
+            handle.clear();
+            assert!(handle
+                .expose_bytes_for_internal_root_derivation()
+                .is_none());
+        }
+
+        #[test]
+        fn derives_a_real_identity_root_from_a_holding_master_seed() {
+            let master_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let decision = derive_identity_root_internal(&master_seed);
+            assert_eq!(decision.status, RootDerivationStatus::Success);
+            let identity_root = decision.output.expect("Success must carry output");
+            assert_eq!(identity_root.kind(), SecretHandleKind::IdentityRootMaterial);
+            assert!(!identity_root.is_cleared());
+        }
+
+        #[test]
+        fn identity_root_derivation_rejects_a_cleared_master_seed() {
+            let mut master_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            master_seed.clear();
+            let decision = derive_identity_root_internal(&master_seed);
+            assert_eq!(decision.status, RootDerivationStatus::InvalidInput);
+            assert!(decision.output.is_none());
+        }
+
+        #[test]
+        fn identity_root_derivation_does_not_mutate_or_clear_the_master_seed() {
+            let master_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let _ = derive_identity_root_internal(&master_seed);
+            assert!(!master_seed.is_cleared());
+            assert_eq!(master_seed.kind(), SecretHandleKind::MasterSeedMaterial);
+        }
+
+        #[test]
+        fn identity_root_derivation_is_deterministic_for_the_same_master_seed() {
+            let first_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let second_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let first_root = derive_identity_root_internal(&first_seed)
+                .output
+                .expect("expected a real Identity Root");
+            let second_root = derive_identity_root_internal(&second_seed)
+                .output
+                .expect("expected a real Identity Root");
+            assert_eq!(
+                first_root.inner.expose_bytes_for_internal_derivation(),
+                second_root.inner.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        fn real_identity_root() -> FedosIdentityRootHandle {
+            let master_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            derive_identity_root_internal(&master_seed)
+                .output
+                .expect("expected a real Identity Root")
+        }
+
+        #[test]
+        fn derives_a_real_application_root_from_a_holding_identity_root() {
+            let identity_root = real_identity_root();
+            let decision = derive_application_root_internal(&identity_root);
+            assert_eq!(decision.status, RootDerivationStatus::Success);
+            let application_root = decision.output.expect("Success must carry output");
+            assert_eq!(
+                application_root.kind(),
+                SecretHandleKind::ApplicationRootMaterial
+            );
+            assert!(!application_root.is_cleared());
+        }
+
+        #[test]
+        fn application_root_derivation_rejects_a_cleared_identity_root() {
+            let mut identity_root = real_identity_root();
+            identity_root.clear();
+            let decision = derive_application_root_internal(&identity_root);
+            assert_eq!(decision.status, RootDerivationStatus::InvalidInput);
+            assert!(decision.output.is_none());
+        }
+
+        #[test]
+        fn application_root_derivation_does_not_mutate_or_clear_the_identity_root() {
+            let identity_root = real_identity_root();
+            let _ = derive_application_root_internal(&identity_root);
+            assert!(!identity_root.is_cleared());
+            assert_eq!(identity_root.kind(), SecretHandleKind::IdentityRootMaterial);
+        }
+
+        #[test]
+        fn application_root_derivation_is_deterministic_for_the_same_identity_root() {
+            let identity_root = real_identity_root();
+            let first = derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root");
+            let second = derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root");
+            assert_eq!(
+                first.inner.expose_bytes_for_internal_derivation(),
+                second.inner.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        #[test]
+        fn application_root_differs_from_the_identity_root_it_was_derived_from() {
+            let identity_root = real_identity_root();
+            let application_root = derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root");
+            assert_ne!(
+                identity_root.inner.expose_bytes_for_internal_derivation(),
+                application_root.inner.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        #[test]
+        fn different_identity_roots_yield_different_application_roots() {
+            let first_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let second_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xAA; 32]);
+            let first_identity_root = derive_identity_root_internal(&first_seed)
+                .output
+                .expect("expected a real Identity Root");
+            let second_identity_root = derive_identity_root_internal(&second_seed)
+                .output
+                .expect("expected a real Identity Root");
+            let first_app_root = derive_application_root_internal(&first_identity_root)
+                .output
+                .expect("expected a real Application Root");
+            let second_app_root = derive_application_root_internal(&second_identity_root)
+                .output
+                .expect("expected a real Application Root");
+            assert_ne!(
+                first_app_root.inner.expose_bytes_for_internal_derivation(),
+                second_app_root.inner.expose_bytes_for_internal_derivation()
+            );
+        }
+
+        // ---- Alpha 149: Root Handle Verification ----
+
+        #[test]
+        fn same_master_seed_yields_matching_identity_roots_across_two_independent_derivations() {
+            let first_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let second_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let first_root = derive_identity_root_internal(&first_seed)
+                .output
+                .expect("expected a real Identity Root");
+            let second_root = derive_identity_root_internal(&second_seed)
+                .output
+                .expect("expected a real Identity Root");
+            assert!(first_root.matches_for_internal_verification(&second_root));
+        }
+
+        #[test]
+        fn same_identity_root_yields_matching_application_roots_across_two_independent_derivations()
+        {
+            let identity_root = real_identity_root();
+            let first_app_root = derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root");
+            let second_app_root = derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root");
+            assert!(first_app_root.matches_for_internal_verification(&second_app_root));
+        }
+
+        #[test]
+        fn different_master_seeds_yield_non_matching_identity_roots() {
+            let first_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let second_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xAA; 32]);
+            let first_root = derive_identity_root_internal(&first_seed)
+                .output
+                .expect("expected a real Identity Root");
+            let second_root = derive_identity_root_internal(&second_seed)
+                .output
+                .expect("expected a real Identity Root");
+            assert!(!first_root.matches_for_internal_verification(&second_root));
+        }
+
+        #[test]
+        fn different_identity_roots_yield_non_matching_application_roots_via_handle_comparison() {
+            let first_identity_root = real_identity_root();
+            let second_identity_root = {
+                let seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xAA; 32]);
+                derive_identity_root_internal(&seed)
+                    .output
+                    .expect("expected a real Identity Root")
+            };
+            let first_app_root = derive_application_root_internal(&first_identity_root)
+                .output
+                .expect("expected a real Application Root");
+            let second_app_root = derive_application_root_internal(&second_identity_root)
+                .output
+                .expect("expected a real Application Root");
+            assert!(!first_app_root.matches_for_internal_verification(&second_app_root));
+        }
+
+        #[test]
+        fn matches_for_internal_verification_returns_false_after_either_side_is_cleared() {
+            let master_seed =
+                FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(TEST_MASTER_SEED);
+            let mut first_root = derive_identity_root_internal(&master_seed)
+                .output
+                .expect("expected a real Identity Root");
+            let second_root = derive_identity_root_internal(&master_seed)
+                .output
+                .expect("expected a real Identity Root");
+            assert!(first_root.matches_for_internal_verification(&second_root));
+            first_root.clear();
+            assert!(!first_root.matches_for_internal_verification(&second_root));
         }
     }
 }

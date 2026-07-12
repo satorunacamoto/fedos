@@ -147,8 +147,8 @@ describe("Secure Runtime Alpha 142 -- Root Hierarchy Decision", () => {
     }
   });
 
-  it("14. Regression: Rust/Cargo/package sources carry no reference to this Stage's own doc", () => {
-    expect(libRsSource).not.toMatch(/secure_runtime_alpha_142/);
+  it("14. RIPPLE (Secure Runtime Alpha 148): Rust/Cargo/package sources carried no reference to this Stage's own doc AS OF this Stage's own review-only scope (zero code change); Stage 1014 (Secure Runtime Alpha 148) legitimately cites this doc's own adopted hierarchy as the design justification for the Application Root derivation it implements -- Cargo.toml/package.json remain untouched, and lib.rs's own reference is confirmed to be a doc-comment CITATION, never an executable code change, reconfirmed here as the CURRENT state", () => {
+    expect(libRsSource).toMatch(/secure_runtime_alpha_142_root_hierarchy_decision\.md/);
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_142/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_142/);
   });

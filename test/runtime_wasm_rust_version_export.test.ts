@@ -85,9 +85,15 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     // Stage 1011 (Secure Runtime Alpha 018) legitimately added TWO more
     // (serialize_aead_ciphertext()/deserialize_aead_ciphertext()) -- see
     // test/secure_runtime_alpha_018_ciphertext_wire_export_import_api.test.ts.
+    // Stage 1012-1015 (Secure Runtime Alpha 146-149) added ZERO new
+    // #[wasm_bindgen] annotations, but DID add doc comments that mention
+    // the literal string `#[wasm_bindgen]` in prose (never as a real
+    // annotation) -- see test/secure_runtime_alpha_146_master_seed_handle.test.ts.
+    // This count is therefore now measured with a line-anchored regex, so
+    // a future prose mention elsewhere in the file cannot inflate it.
     // This test's own title still reflects Stage 986's original,
     // now-historical scope.
-    const matches = [...libRsSource.matchAll(/#\[wasm_bindgen\]/g)];
+    const matches = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)];
     expect(matches.length).toBe(13);
   });
 

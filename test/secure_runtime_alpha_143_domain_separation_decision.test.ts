@@ -113,10 +113,10 @@ describe("Secure Runtime Alpha 143 -- Domain Separation Decision", () => {
   // Regression: zero code change anywhere, including zero HkdfDomain change
   // ---------------------------------------------------------------------
 
-  it("12. Regression: HkdfDomain remains the exact same five variants -- confirmed no new variant was added to the actual Rust source", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 148): HkdfDomain held the exact same five variants AS OF this Stage's own review-only scope -- no new variant was added by THIS Stage; Stage 1014 (Secure Runtime Alpha 148) legitimately added a SIXTH, `Application`, following exactly this Stage's own composition rule (§3), reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum HkdfDomain \{([\s\S]*?)\n\s{4}\}/) ?? [])[1] ?? "";
     const variants = [...enumBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "TestOnly"]);
+    expect(variants).toEqual(["RootKey", "Identity", "Storage", "Conversation", "Application", "TestOnly"]);
   });
 
   it("13. Regression: desktop_application.ts and create_desktop_application.ts carry no reference to this Stage's own doc", () => {

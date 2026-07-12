@@ -295,12 +295,17 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     // placeholder helper — see test 17 below for its exact body assertion.
   });
 
-  it("15. production lib.rs has no ConstantTimeEq/subtle usage", () => {
-    expect(libRsSource).not.toMatch(/\buse\s+subtle\b/);
-    expect(libRsSource).not.toMatch(/\bsubtle::/);
-    expect(libRsSource).not.toMatch(/\bConstantTimeEq\b/);
-    expect(libRsSource).not.toMatch(/\bChoice::/);
-    expect(libRsSource).not.toMatch(/\.ct_eq\s*\(/);
+  it("15. RIPPLE (Secure Runtime Alpha 149): production lib.rs had no ConstantTimeEq/subtle usage AS OF this Stage's own dependency-adoption scope (subtle was adopted but not yet consumed anywhere inside lib.rs itself, though crypto/nip44_hmac.rs already used it in a separate file -- see that file's own test); Stage 1015 (Secure Runtime Alpha 149) legitimately adds lib.rs's own FIRST subtle usage, inside the crate-private master_root module's own constant-time Root Handle comparison, mirroring crypto::nip44_hmac::verify_hmac_internal's own established discipline exactly -- reconfirmed here as the CURRENT state: subtle is used, but ONLY inside master_root, and ONLY for a boolean-returning comparison, never to expose a byte", () => {
+    const masterRootBody = (libRsSource.match(/\/\/\/ Stage 1012 \(Secure Runtime Alpha 146\)[\s\S]*?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";
+    expect(masterRootBody.length).toBeGreaterThan(0);
+    const outsideMasterRoot = libRsSource.replace(masterRootBody, "");
+    expect(outsideMasterRoot).not.toMatch(/\buse\s+subtle\b/);
+    expect(outsideMasterRoot).not.toMatch(/\bsubtle::/);
+    expect(outsideMasterRoot).not.toMatch(/\bConstantTimeEq\b/);
+    expect(outsideMasterRoot).not.toMatch(/\bChoice::/);
+    expect(outsideMasterRoot).not.toMatch(/\.ct_eq\s*\(/);
+    expect(masterRootBody).toMatch(/use subtle::ConstantTimeEq;/);
+    expect(masterRootBody).toMatch(/\.ct_eq\(/);
   });
 
   it("16. lib.rs's production code implements neither AEAD nor Argon2 anywhere, and implements HKDF ONLY inside the reviewed kdf_core module (Stage 147)", () => {
