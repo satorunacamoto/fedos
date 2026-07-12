@@ -133,10 +133,14 @@ describe("Secure Runtime Alpha 160 -- Integration Completion", () => {
     expect(pubFnNames.length).toBe(36);
   });
 
-  it("10. structural: no Nostr secret-key generation, npub, nsec, or signature reference exists anywhere in the master_root module", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 164, 173): no Nostr secret-key generation, npub, nsec, or signature CODE existed anywhere in the master_root module AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1021 (Secure Runtime Alpha 164) legitimately added secret-key derivation and Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding in LATER Arcs -- nsec/signature CODE remain absent, reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/\/\/\/ Stage 1012 \(Secure Runtime Alpha 146\)[\s\S]*?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";
     expect(moduleText.length).toBeGreaterThan(0);
-    expect(moduleText).not.toMatch(/generateSecretKey|npub|nsec|signature|sign\(/i);
+    const codeOnly = moduleText
+      .split(/\r?\n/)
+      .filter((line: string) => !line.trim().startsWith("///") && !line.trim().startsWith("//"))
+      .join("\n");
+    expect(codeOnly).not.toMatch(/generateSecretKey|nsec|signature|sign\(/i);
   });
 
   // ---------------------------------------------------------------------

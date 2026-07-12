@@ -3691,6 +3691,23 @@ mod master_root {
         pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
             bool::from(self.x_only_bytes.ct_eq(&other.x_only_bytes))
         }
+
+        /// Stage 1026 (Secure Runtime Alpha 173) — the ONE accessor
+        /// exposing a COPY of the 32-byte x-only public key — private to
+        /// this module, for the sole reviewed use of the nested
+        /// `nostr_identifier_encoding` Encoder Boundary below (its ONLY
+        /// caller). NOT a generic raw-byte export API: this is the ONE
+        /// deliberate, documented exception this crate's "no raw byte
+        /// getter" discipline makes, justified ONLY because a Nostr public
+        /// key is not secret material (Alpha 166 §2.9) — this accessor
+        /// exists on `FedosNostrPublicKeyHandle` ONLY, is unreachable from
+        /// `FedosNostrSecretKeyHandle` or any other secret-holding Handle
+        /// in this module, and returns a value that was never wrapped in
+        /// `SecretHandle`/`secrecy`/`zeroize` machinery in the first place
+        /// (Alpha 168 §4) — copying it is not a new exposure.
+        fn expose_bytes_for_internal_public_identifier_encoding(&self) -> [u8; 32] {
+            self.x_only_bytes
+        }
     }
 
     /// Derive a NEW [`FedosNostrPublicKeyHandle`] from an existing, real
@@ -3732,6 +3749,321 @@ mod master_root {
         secret_bytes.zeroize();
 
         x_only_bytes.map(FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use)
+    }
+
+    /// Stage 1025–1027 (Secure Runtime Alpha 173) — the Nostr Public
+    /// Identifier ENCODER BOUNDARY this Arc's own instruction requires:
+    /// the ONE place in this crate permitted to turn a
+    /// [`FedosNostrPublicKeyHandle`] into a public, user/protocol-facing
+    /// string form. Nested INSIDE `master_root` (rather than a sibling
+    /// `crypto::` file) so its own sole accessor onto
+    /// `FedosNostrPublicKeyHandle` (above) can stay genuinely PRIVATE —
+    /// never `pub(crate)` — reachable only because Rust's own privacy
+    /// model already grants a descendant module visibility into its
+    /// ancestor's private items; no broader accessor visibility was
+    /// introduced to make this module possible.
+    ///
+    /// Implements BOTH canonical forms hand-written against the STANDARD
+    /// LIBRARY ONLY — no new Cargo dependency, matching
+    /// `crypto::ciphertext_serialization`'s own established "hand-written
+    /// codec, closed input shape, no new crate" precedent (Stage 186)
+    /// exactly:
+    ///
+    /// - **hex** ([`hex_encoding::encode_lowercase_hex_32`]): the
+    ///   trivial byte→two-nibble→ASCII mapping — no library needed at
+    ///   any input size, let alone this fixed 32-byte one. `hex` (the
+    ///   crate) stays `[dev-dependencies]`-only, unchanged (Alpha 171
+    ///   §2.4).
+    /// - **npub** ([`bech32_encoding::bech32_encode`]): BIP-173 Bech32
+    ///   (NEVER Bech32m — NIP-19 itself specifies classic Bech32
+    ///   throughout, Alpha 171 §2.6), a fixed, public, non-cryptographic
+    ///   checksum/bit-regrouping algorithm with no external primitive
+    ///   dependency of its own — the SAME category of "closed,
+    ///   well-specified, safely hand-implementable" encoding this crate
+    ///   already trusts itself to hand-write for NIP-44's own wire
+    ///   base64 (`crypto::nip44_wire_encoding`, Stage 234) and HMAC-SHA256
+    ///   (`crypto::nip44_hmac`, Stage 231).
+    mod nostr_identifier_encoding {
+        use super::FedosNostrPublicKeyHandle;
+
+        /// An opaque, type-safe wrapper for a canonical lowercase hex
+        /// Nostr public key — deliberately a DISTINCT type from
+        /// [`FedosNostrNpub`] (Alpha 172's own Option C decision: never
+        /// mix hex and npub behind one free-form `String`). Derives
+        /// `Debug`/`Clone`/`PartialEq`/`Eq` freely — UNLIKE every
+        /// secret-adjacent Handle in this crate, this value is
+        /// definitionally public (Alpha 166 §2.9), so none of the
+        /// Opaque-Handle/`ConstantTimeEq`-only discipline applies to it;
+        /// only the SHAPE (hex vs. npub) is protected against accidental
+        /// mixing, not the VALUE against exposure.
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        pub(crate) struct FedosNostrPublicKeyHex {
+            value: String,
+        }
+
+        impl FedosNostrPublicKeyHex {
+            fn new(value: String) -> Self {
+                Self { value }
+            }
+
+            /// The canonical lowercase hex string — public information,
+            /// intentionally readable; this is the ONE artifact this
+            /// type exists to produce.
+            pub(crate) fn as_str(&self) -> &str {
+                &self.value
+            }
+        }
+
+        /// An opaque, type-safe wrapper for a NIP-19 `npub1...` Bech32
+        /// public identifier — see [`FedosNostrPublicKeyHex`]'s own doc
+        /// comment for why this is a separate type and why it freely
+        /// derives `Debug`/`Clone`/`PartialEq`/`Eq`.
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        pub(crate) struct FedosNostrNpub {
+            value: String,
+        }
+
+        impl FedosNostrNpub {
+            fn new(value: String) -> Self {
+                Self { value }
+            }
+
+            /// The canonical lowercase `npub1...` string — public
+            /// information, intentionally readable.
+            pub(crate) fn as_str(&self) -> &str {
+                &self.value
+            }
+        }
+
+        /// Hand-written lowercase hex — no `hex` crate promotion, no
+        /// `Cargo.toml` change (`hex` stays `[dev-dependencies]`-only,
+        /// Alpha 171 §2.4). Infallible for any byte slice.
+        mod hex_encoding {
+            const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+
+            pub(super) fn encode_lowercase_hex_32(bytes: &[u8; 32]) -> String {
+                let mut out = String::with_capacity(64);
+                for byte in bytes {
+                    out.push(HEX_CHARS[(byte >> 4) as usize] as char);
+                    out.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+                }
+                out
+            }
+        }
+
+        /// Hand-written BIP-173 Bech32 (classic, NEVER Bech32m) — no new
+        /// Cargo dependency, per this module's own top-level doc comment.
+        /// Only ENCODING is implemented (Alpha 171 §7: a Decoder is this
+        /// Arc's own explicit non-goal); every function here is
+        /// `pub(super)`-at-most, reachable only from
+        /// `nostr_identifier_encoding` itself.
+        mod bech32_encoding {
+            const CHARSET: &[u8; 32] = b"qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+            /// The classic Bech32 checksum constant (BIP-173) —
+            /// deliberately NOT Bech32m's `0x2bc830a3` (BIP-350); NIP-19
+            /// specifies classic Bech32 for every one of its own prefixes,
+            /// `npub` included (Alpha 171 §2.6).
+            const BECH32_CONST: u32 = 1;
+            const GENERATOR: [u32; 5] = [
+                0x3b6a_57b2,
+                0x2650_8e6d,
+                0x1ea1_19fa,
+                0x3d42_33dd,
+                0x2a14_62b3,
+            ];
+
+            fn polymod(values: &[u8]) -> u32 {
+                let mut chk: u32 = 1;
+                for &v in values {
+                    let top = (chk >> 25) as u8;
+                    chk = ((chk & 0x01ff_ffff) << 5) ^ (v as u32);
+                    for (i, gen) in GENERATOR.iter().enumerate() {
+                        if (top >> i) & 1 == 1 {
+                            chk ^= gen;
+                        }
+                    }
+                }
+                chk
+            }
+
+            /// BIP-173's own HRP expansion: high 3 bits of every HRP
+            /// byte, then a zero separator, then the low 5 bits of every
+            /// HRP byte — binds the checksum to the HRP, not just the
+            /// data.
+            fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
+                let mut expanded = Vec::with_capacity(hrp.len() * 2 + 1);
+                for &b in hrp {
+                    expanded.push(b >> 5);
+                }
+                expanded.push(0);
+                for &b in hrp {
+                    expanded.push(b & 0x1f);
+                }
+                expanded
+            }
+
+            /// Regroups 8-bit bytes into 5-bit words (BIP-173's own
+            /// `convertbits(data, 8, 5, true)`), zero-padding the final
+            /// partial group — the standard, lossless bit-regrouping every
+            /// Bech32 payload uses.
+            fn convert_bits_8_to_5(data: &[u8]) -> Vec<u8> {
+                let mut acc: u32 = 0;
+                let mut bits: u32 = 0;
+                let mut out = Vec::with_capacity(data.len().div_ceil(5) * 8);
+                for &value in data {
+                    acc = (acc << 8) | (value as u32);
+                    bits += 8;
+                    while bits >= 5 {
+                        bits -= 5;
+                        out.push(((acc >> bits) & 0x1f) as u8);
+                    }
+                }
+                if bits > 0 {
+                    out.push(((acc << (5 - bits)) & 0x1f) as u8);
+                }
+                out
+            }
+
+            /// The full BIP-173 Bech32 encode: HRP + `"1"` + data words +
+            /// a 6-word checksum, every word mapped through
+            /// [`CHARSET`]. `hrp` MUST be lowercase ASCII (this module's
+            /// own only caller always passes the fixed literal `"npub"` —
+            /// never caller-supplied free text). Infallible for any
+            /// `data` length this crate actually calls it with (a fixed
+            /// 32-byte public key).
+            pub(super) fn bech32_encode(hrp: &str, data: &[u8]) -> String {
+                let hrp_bytes = hrp.as_bytes();
+                let five_bit = convert_bits_8_to_5(data);
+
+                let mut combined = hrp_expand(hrp_bytes);
+                combined.extend_from_slice(&five_bit);
+                combined.extend_from_slice(&[0u8; 6]);
+                let checksum_mod = polymod(&combined) ^ BECH32_CONST;
+
+                let mut out = String::with_capacity(hrp.len() + 1 + five_bit.len() + 6);
+                out.push_str(hrp);
+                out.push('1');
+                for &word in &five_bit {
+                    out.push(CHARSET[word as usize] as char);
+                }
+                for i in 0..6 {
+                    let word = (checksum_mod >> (5 * (5 - i))) & 0x1f;
+                    out.push(CHARSET[word as usize] as char);
+                }
+                out
+            }
+        }
+
+        /// Stage 1026 (Secure Runtime Alpha 173) — encode a
+        /// [`FedosNostrPublicKeyHandle`] as its canonical lowercase hex
+        /// string (exactly 64 `[0-9a-f]` characters, never uppercase,
+        /// never an `0x` prefix). `Option` mirrors this crate's own
+        /// pervasive Handle-accessor convention; in practice this is
+        /// ALWAYS `Some` today, since `FedosNostrPublicKeyHandle` has no
+        /// cleared/placeholder state to fail on (Alpha 168 — unlike every
+        /// secret-holding Handle, it is never `clear()`-ed). Never
+        /// panics. Never touches a secret byte — its own sole input type
+        /// cannot hold one (Alpha 168 §4).
+        pub(crate) fn encode_nostr_public_key_hex_internal(
+            public_key: &FedosNostrPublicKeyHandle,
+        ) -> Option<FedosNostrPublicKeyHex> {
+            let bytes = public_key.expose_bytes_for_internal_public_identifier_encoding();
+            Some(FedosNostrPublicKeyHex::new(
+                hex_encoding::encode_lowercase_hex_32(&bytes),
+            ))
+        }
+
+        /// Stage 1027 (Secure Runtime Alpha 173) — encode a
+        /// [`FedosNostrPublicKeyHandle`] as its canonical `npub1...`
+        /// NIP-19 Bech32 public identifier, HRP `"npub"`, payload the
+        /// SAME 32-byte x-only public key
+        /// [`encode_nostr_public_key_hex_internal`] encodes — never a
+        /// TLV-wrapped `nprofile`, never `nsec`. See
+        /// [`encode_nostr_public_key_hex_internal`]'s own doc comment for
+        /// why this returns `Option` (always `Some` today) and its own
+        /// panic/secret-exposure guarantees, which apply identically
+        /// here.
+        pub(crate) fn encode_nostr_npub_internal(
+            public_key: &FedosNostrPublicKeyHandle,
+        ) -> Option<FedosNostrNpub> {
+            let bytes = public_key.expose_bytes_for_internal_public_identifier_encoding();
+            Some(FedosNostrNpub::new(bech32_encoding::bech32_encode(
+                "npub", &bytes,
+            )))
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            /// BIP-173's own canonical test vector: encoding HRP `"a"`
+            /// with an EMPTY data payload must produce exactly
+            /// `"a12uel5l"` — this repository's only available trusted,
+            /// offline Bech32 known-answer vector (Alpha 171 §2.11/§2.12;
+            /// no NIP-19-specific vector file exists in this repository,
+            /// and this Arc's own instruction forbids network access).
+            /// Exercises `bech32_encoding::bech32_encode` directly,
+            /// independent of any Nostr-specific HRP/payload, proving the
+            /// checksum/charset implementation itself matches the
+            /// published specification exactly.
+            #[test]
+            fn bech32_encode_matches_the_published_bip173_a_empty_vector() {
+                assert_eq!(bech32_encoding::bech32_encode("a", &[]), "a12uel5l");
+            }
+
+            #[test]
+            fn encode_nostr_public_key_hex_internal_produces_exactly_64_lowercase_hex_chars() {
+                let handle = FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use([0xAB; 32]);
+                let hex = encode_nostr_public_key_hex_internal(&handle)
+                    .expect("expected Some")
+                    .as_str()
+                    .to_string();
+                assert_eq!(hex.len(), 64);
+                assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+                assert_eq!(hex, "ab".repeat(32));
+            }
+
+            #[test]
+            fn encode_nostr_npub_internal_starts_with_npub1_and_has_the_fixed_length() {
+                let handle = FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use([0x00; 32]);
+                let npub = encode_nostr_npub_internal(&handle)
+                    .expect("expected Some")
+                    .as_str()
+                    .to_string();
+                assert!(npub.starts_with("npub1"));
+                // "npub" (4) + "1" (1) + 52 data quintets (ceil(32*8/5)) + 6 checksum quintets = 63.
+                assert_eq!(npub.len(), 63);
+                assert!(npub.chars().all(|c| !c.is_ascii_uppercase()));
+            }
+
+            #[test]
+            fn same_public_key_content_encodes_identical_hex_and_npub() {
+                let first = FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use([0x42; 32]);
+                let second = FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use([0x42; 32]);
+                assert_eq!(
+                    encode_nostr_public_key_hex_internal(&first).unwrap().as_str(),
+                    encode_nostr_public_key_hex_internal(&second).unwrap().as_str(),
+                );
+                assert_eq!(
+                    encode_nostr_npub_internal(&first).unwrap().as_str(),
+                    encode_nostr_npub_internal(&second).unwrap().as_str(),
+                );
+            }
+
+            #[test]
+            fn different_public_key_content_encodes_different_hex_and_npub() {
+                let first = FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use([0x11; 32]);
+                let second = FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use([0x22; 32]);
+                assert_ne!(
+                    encode_nostr_public_key_hex_internal(&first).unwrap().as_str(),
+                    encode_nostr_public_key_hex_internal(&second).unwrap().as_str(),
+                );
+                assert_ne!(
+                    encode_nostr_npub_internal(&first).unwrap().as_str(),
+                    encode_nostr_npub_internal(&second).unwrap().as_str(),
+                );
+            }
+        }
     }
 
     /// The result of a [`derive_application_root_internal`] call.
@@ -4613,6 +4945,173 @@ mod master_root {
             let first = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
             let second = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
             assert!(first.matches_for_internal_verification(&second));
+        }
+
+        // -----------------------------------------------------------------
+        // Secure Runtime Alpha 174 — end-to-end encoding determinism/
+        // separation, Master Seed through hex/npub
+        // -----------------------------------------------------------------
+
+        fn nostr_public_key_for(master_seed_bytes: [u8; 32], account_index: u32) -> FedosNostrPublicKeyHandle {
+            let seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(master_seed_bytes);
+            let identity_root = derive_identity_root_internal(&seed)
+                .output
+                .expect("expected a real Identity Root");
+            let application_root = derive_application_root_internal(&identity_root)
+                .output
+                .expect("expected a real Application Root");
+            let nostr_root = derive_nostr_root_internal(&application_root)
+                .output
+                .expect("expected a real Nostr Root");
+            let secret_key = derive_nostr_secret_key_internal(&nostr_root, account_index)
+                .output
+                .expect("expected a real Nostr Secret Key");
+            derive_nostr_public_key_internal(&secret_key).expect("expected a real Nostr Public Key")
+        }
+
+        #[test]
+        fn same_master_seed_and_same_account_index_encode_identical_hex_and_npub() {
+            let first = nostr_public_key_for([0x55; 32], 3);
+            let second = nostr_public_key_for([0x55; 32], 3);
+            assert_eq!(
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&first)
+                    .unwrap()
+                    .as_str(),
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&second)
+                    .unwrap()
+                    .as_str(),
+            );
+            assert_eq!(
+                nostr_identifier_encoding::encode_nostr_npub_internal(&first)
+                    .unwrap()
+                    .as_str(),
+                nostr_identifier_encoding::encode_nostr_npub_internal(&second)
+                    .unwrap()
+                    .as_str(),
+            );
+        }
+
+        #[test]
+        fn same_master_seed_and_different_account_index_encode_different_hex_and_npub() {
+            let first = nostr_public_key_for([0x66; 32], 0);
+            let second = nostr_public_key_for([0x66; 32], 1);
+            assert_ne!(
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&first)
+                    .unwrap()
+                    .as_str(),
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&second)
+                    .unwrap()
+                    .as_str(),
+            );
+            assert_ne!(
+                nostr_identifier_encoding::encode_nostr_npub_internal(&first)
+                    .unwrap()
+                    .as_str(),
+                nostr_identifier_encoding::encode_nostr_npub_internal(&second)
+                    .unwrap()
+                    .as_str(),
+            );
+        }
+
+        #[test]
+        fn different_master_seed_and_same_account_index_encode_different_hex_and_npub() {
+            let first = nostr_public_key_for([0x77; 32], 0);
+            let second = nostr_public_key_for([0x88; 32], 0);
+            assert_ne!(
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&first)
+                    .unwrap()
+                    .as_str(),
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&second)
+                    .unwrap()
+                    .as_str(),
+            );
+            assert_ne!(
+                nostr_identifier_encoding::encode_nostr_npub_internal(&first)
+                    .unwrap()
+                    .as_str(),
+                nostr_identifier_encoding::encode_nostr_npub_internal(&second)
+                    .unwrap()
+                    .as_str(),
+            );
+        }
+
+        #[test]
+        fn account_index_zero_one_and_u32_max_all_encode_successfully_and_distinctly() {
+            let zero = nostr_public_key_for([0x99; 32], 0);
+            let one = nostr_public_key_for([0x99; 32], 1);
+            let max = nostr_public_key_for([0x99; 32], u32::MAX);
+            let hex_zero = nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&zero)
+                .unwrap()
+                .as_str()
+                .to_string();
+            let hex_one = nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&one)
+                .unwrap()
+                .as_str()
+                .to_string();
+            let hex_max = nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&max)
+                .unwrap()
+                .as_str()
+                .to_string();
+            assert_ne!(hex_zero, hex_one);
+            assert_ne!(hex_zero, hex_max);
+            assert_ne!(hex_one, hex_max);
+            for hex in [&hex_zero, &hex_one, &hex_max] {
+                assert_eq!(hex.len(), 64);
+                assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+            }
+            let npub_zero = nostr_identifier_encoding::encode_nostr_npub_internal(&zero)
+                .unwrap()
+                .as_str()
+                .to_string();
+            let npub_one = nostr_identifier_encoding::encode_nostr_npub_internal(&one)
+                .unwrap()
+                .as_str()
+                .to_string();
+            let npub_max = nostr_identifier_encoding::encode_nostr_npub_internal(&max)
+                .unwrap()
+                .as_str()
+                .to_string();
+            assert_ne!(npub_zero, npub_one);
+            assert_ne!(npub_zero, npub_max);
+            assert_ne!(npub_one, npub_max);
+            for npub in [&npub_zero, &npub_one, &npub_max] {
+                assert!(npub.starts_with("npub1"));
+                assert_eq!(npub.len(), 63);
+            }
+        }
+
+        #[test]
+        fn hex_and_npub_encode_the_same_underlying_32_byte_public_key() {
+            // Cross-check against this module's own hand-rolled convertbits:
+            // decoding the npub's own 5-bit data words back to 8-bit bytes
+            // (a minimal, test-only, non-published-API reversal -- never a
+            // production Decoder) must reproduce the exact hex bytes.
+            let public_key = nostr_public_key_for([0xCD; 32], 7);
+            let hex = nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&public_key)
+                .unwrap()
+                .as_str()
+                .to_string();
+            let npub = nostr_identifier_encoding::encode_nostr_npub_internal(&public_key)
+                .unwrap()
+                .as_str()
+                .to_string();
+
+            const CHARSET: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+            let data_part = &npub["npub1".len()..npub.len() - 6];
+            let mut acc: u32 = 0;
+            let mut bits: u32 = 0;
+            let mut recovered = Vec::with_capacity(32);
+            for c in data_part.chars() {
+                let word = CHARSET.find(c).expect("valid bech32 charset character") as u32;
+                acc = (acc << 5) | word;
+                bits += 5;
+                if bits >= 8 {
+                    bits -= 8;
+                    recovered.push(((acc >> bits) & 0xff) as u8);
+                }
+            }
+            let recovered_hex: String = recovered.iter().map(|b| format!("{:02x}", b)).collect();
+            assert_eq!(recovered_hex, hex);
         }
     }
 }

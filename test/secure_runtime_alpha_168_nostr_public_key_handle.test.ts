@@ -40,7 +40,7 @@ describe("Secure Runtime Alpha 168 -- Nostr Public Key Handle", () => {
     expect(libRsSource).not.toMatch(/^pub struct FedosNostrPublicKeyHandle/m);
   });
 
-  it("4. structural: FedosNostrPublicKeyHandle exposes only matches_for_internal_verification (plus its private constructor) -- no kind/is_cleared/clear, no raw byte getter", () => {
+  it("4. RIPPLE (Secure Runtime Alpha 173): FedosNostrPublicKeyHandle exposed only matches_for_internal_verification (plus its private constructor) AS OF this Stage's own closing state -- no kind/is_cleared/clear, no PUBLIC(crate) raw byte getter; Stage 1026 (Secure Runtime Alpha 173) legitimately added ONE private (never pub(crate)), single-caller accessor, expose_bytes_for_internal_public_identifier_encoding, in a LATER Arc, reconfirmed here as the CURRENT state", () => {
     const implMatch = libRsSource.match(
       /impl FedosNostrPublicKeyHandle \{([\s\S]*?)\r?\n {4}\}\r?\n\r?\n {4}\/\/\/ Derive a NEW \[`FedosNostrPublicKeyHandle`\]/,
     );
@@ -51,8 +51,13 @@ describe("Secure Runtime Alpha 168 -- Nostr Public Key Handle", () => {
     expect(implBody).not.toMatch(/pub\(crate\) fn kind\(/);
     expect(implBody).not.toMatch(/pub\(crate\) fn is_cleared\(/);
     expect(implBody).not.toMatch(/pub\(crate\) fn clear\(/);
-    expect(implBody).not.toMatch(/-> \[u8; 32\]/);
-    expect(implBody).not.toMatch(/-> Option<\[u8; 32\]>/);
+    // No PUBLIC(crate)-visible byte getter -- this test's own actual claim.
+    expect(implBody).not.toMatch(/pub\(crate\) fn [a-zA-Z0-9_]+\([^)]*\) -> \[u8; 32\]/);
+    expect(implBody).not.toMatch(/pub\(crate\) fn [a-zA-Z0-9_]+\([^)]*\) -> Option<\[u8; 32\]>/);
+    expect(implBody).toMatch(
+      /fn expose_bytes_for_internal_public_identifier_encoding\(&self\) -> \[u8; 32\] \{/,
+    );
+    expect(implBody).not.toMatch(/pub\(crate\) fn expose_bytes_for_internal_public_identifier_encoding/);
   });
 
   it("5. structural: FedosNostrPublicKeyHandle derives no Clone/Copy/Debug/PartialEq/Eq/Serialize", () => {
