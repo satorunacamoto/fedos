@@ -129,14 +129,14 @@ describe("Secure Runtime Alpha 111 -- Identity Authority Review", () => {
     expect(fieldNames).toEqual(["source"]);
   });
 
-  it("13. structural: DesktopApplication holds only reference/configuration fields (#identity/#reader/#publicIdentity/#started), confirming it is an owner/orchestrator, not an identity-state holder of its own", () => {
+  it("13. RIPPLE (Secure Runtime Alpha 126): DesktopApplication held only reference/configuration fields (#identity/#reader/#publicIdentity/#started) AS OF this Stage's own scope, confirming it was an owner/orchestrator, not an identity-state holder of its own; Alpha 126 deliberately added #currentPublicIdentity, Desktop's own FIRST genuinely computed, mutable identity-shaped state (Desktop Public State, per Alpha 130), which does NOT reopen this Stage's own Identity Authority question -- #currentPublicIdentity is fed exclusively by the Reader path (Alpha 121), never by #identity, so FedosRuntimeIdentity remains the sole Identity Authority unchanged -- reconfirmed here as the CURRENT field set", () => {
     const classBody = (desktopApplicationSource.match(/export class DesktopApplication\b[^{]*\{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const codeOnly = classBody
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const fieldNames = [...codeOnly.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
   });
 
   // ---------------------------------------------------------------------

@@ -82,7 +82,7 @@ describe("Secure Runtime Alpha 120 -- Integration Completion", () => {
   // Structural: the final, complete class shape
   // ---------------------------------------------------------------------
 
-  it("6. RIPPLE (Secure Runtime Alpha 121): DesktopApplication was the ONLY export, with exactly four public methods and four private fields, AS OF this Stage's own scope -- the Arc's own closing class shape; Alpha 121 added a FIFTH public method, readPublicIdentity(), opening the next Arc, reconfirmed here as the CURRENT state", () => {
+  it("6. RIPPLE (Secure Runtime Alpha 128): DesktopApplication was the ONLY export, with exactly four public methods and four private fields, AS OF this Stage's own scope -- the Arc's own closing class shape; Alpha 121 added a FIFTH public method, readPublicIdentity(), Alpha 126 added a FIFTH private field, #currentPublicIdentity, and Alpha 128 added a SIXTH public method, currentPublicIdentity(), opening later Arcs, reconfirmed here as the CURRENT state", () => {
     const exportNames = [...desktopApplicationSource.matchAll(/^export (?:class|function|const) (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
@@ -95,11 +95,11 @@ describe("Secure Runtime Alpha 120 -- Integration Completion", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
     );
 
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
   });
 
   it("7. structural: every read/drive method delegates to #identity -- currentIdentity()/isBootstrapped() directly, bootstrap()/start() transitively", () => {

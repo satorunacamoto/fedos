@@ -133,7 +133,7 @@ describe("Secure Runtime Alpha 115 -- Identity Authority Completion", () => {
     );
   });
 
-  it("10. Regression: DesktopApplication and createDesktopApplication() are byte-for-byte unchanged from Alpha 106-110's own final state -- no reference to any Arc-stage doc", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 126): DesktopApplication and createDesktopApplication() were byte-for-byte unchanged from Alpha 106-110's own final state AS OF this Stage's own scope -- no reference to any Alpha 111-115 Arc-stage doc; Alpha 116/117/121/126 legitimately added fields/methods in LATER, separate Arcs, reconfirmed here as the CURRENT field set, with the no-Arc-111-115-doc-reference regression still intact", () => {
     for (const source of [desktopApplicationSource, createDesktopApplicationSource]) {
       for (const stage of ARC_STAGES) {
         expect(source).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
@@ -145,7 +145,7 @@ describe("Secure Runtime Alpha 115 -- Identity Authority Completion", () => {
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const fieldNames = [...codeOnly.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
   });
 
   it("11. Regression: the entire Identity Layer and both Storage-resolver files are confirmed unaffected across the whole Arc", () => {

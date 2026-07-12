@@ -130,14 +130,14 @@ describe("Secure Runtime Alpha 114 -- Single Source of Truth Review", () => {
     expect(nostrPublicIdentitySourceSource).toMatch(/export interface FedosNostrPublicIdentitySnapshot \{/);
   });
 
-  it("12. structural: DesktopApplication holds only reference/configuration fields, never a computed identity value of its own -- confirming NOT-a-state-holder classification", () => {
+  it("12. RIPPLE (Secure Runtime Alpha 126): DesktopApplication held only reference/configuration fields, never a computed identity value of its own, AS OF this Stage's own scope, confirming a NOT-a-state-holder classification for Desktop as a whole; Alpha 126 deliberately added #currentPublicIdentity, a computed value fed exclusively by the Reader path (Alpha 121), which does NOT compete with `FedosRuntimeIdentity.#descriptor` (this Stage's own Single Source of Truth for RUNTIME identity, Alpha 069) -- #descriptor remains the sole Single Source of Truth for Runtime Identity specifically; #currentPublicIdentity is a separate, independent cache for the separate, independent Reader path, per Alpha 130's own three-layer structure, reconfirmed here as the CURRENT field set", () => {
     const classBody = (desktopApplicationSource.match(/export class DesktopApplication\b[^{]*\{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const codeOnly = classBody
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const fieldNames = [...codeOnly.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
   });
 
   // ---------------------------------------------------------------------

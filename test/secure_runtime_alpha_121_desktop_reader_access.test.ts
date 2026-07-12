@@ -48,14 +48,18 @@ describe("Secure Runtime Alpha 121 -- Desktop Reader Access", () => {
     );
   });
 
-  it("3. structural: readPublicIdentity()'s own entire body is a single delegation to #reader.readPublicIdentity()", () => {
+  it("3. RIPPLE (Secure Runtime Alpha 127): readPublicIdentity()'s own entire body was a single delegation to #reader.readPublicIdentity() AS OF this Stage's own scope; Alpha 127 rewrote it to also persist the resolved value into #currentPublicIdentity, still calling through to #reader.readPublicIdentity() as its own first and only Reader access, reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const body = (classBody.match(/readPublicIdentity\(\): Promise<FedosIdentityDescriptor \| null> \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const lines = body
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(lines).toEqual(["return this.#reader.readPublicIdentity();"]);
+    expect(lines).toEqual([
+      "const result = await this.#reader.readPublicIdentity();",
+      "this.#currentPublicIdentity = result;",
+      "return result;",
+    ]);
   });
 
   it("4. structural: readPublicIdentity()'s own body never references #identity, #publicIdentity, or #started", () => {
@@ -66,7 +70,7 @@ describe("Secure Runtime Alpha 121 -- Desktop Reader Access", () => {
     expect(body).not.toMatch(/#started/);
   });
 
-  it("5. structural: the class now has exactly five public methods and four private fields", () => {
+  it("5. RIPPLE (Secure Runtime Alpha 128): the class had exactly five public methods and four private fields AS OF this Stage's own scope; Alpha 126 added a FIFTH private field, #currentPublicIdentity, and Alpha 128 added a SIXTH public method, currentPublicIdentity(), reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -74,10 +78,10 @@ describe("Secure Runtime Alpha 121 -- Desktop Reader Access", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
     );
     const fieldNames = [...classBody.matchAll(/^\s{2}(?:readonly )?#(\w+)(?::|\s*=)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started"]);
+    expect(fieldNames).toEqual(["identity", "reader", "publicIdentity", "started", "currentPublicIdentity"]);
   });
 
   it("6. the design doc's own purity section confirms no processing, no caching, no Identity Runtime access", () => {

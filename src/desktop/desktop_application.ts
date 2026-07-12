@@ -109,6 +109,42 @@
  * symmetrically to how `currentIdentity()`/`isBootstrapped()` never
  * touch `#reader`.
  *
+ * Secure Runtime Alpha 126 ("Desktop Public Identity State") adds a
+ * new private field, `#currentPublicIdentity: FedosIdentityDescriptor | null`,
+ * initialized to `null` — the ONLY change this Stage makes. Unlike
+ * `#reader`/`#publicIdentity` (references/configuration held since
+ * construction), this is Desktop's own FIRST piece of genuinely
+ * computed, mutable state outside `#started`. No method reads or
+ * writes it yet — `readPublicIdentity()` (Alpha 121) remains
+ * byte-for-byte unchanged by this Stage; wiring is Alpha 127's own
+ * deliverable.
+ *
+ * Secure Runtime Alpha 127 ("Reader Result Persistence") rewrites
+ * `readPublicIdentity()`'s own body: `async`, `await`s the Reader's
+ * own result into a local `const result`, assigns
+ * `this.#currentPublicIdentity = result;`, then `return result;` — the
+ * ONLY change this Stage makes. The assignment happens ONLY on
+ * success, in the plain JavaScript `Promise` sense: if
+ * `this.#reader.readPublicIdentity()` were ever to reject, the `await`
+ * throws before the assignment line is ever reached, and
+ * `#currentPublicIdentity` is left unchanged — no `try`/`catch` of any
+ * kind is added, so this Stage adds NO new error-handling behavior.
+ * "Success" per Alpha 101's own interface includes a resolved `null`
+ * (no identity found) — a resolved `null` IS persisted, exactly as
+ * received. `result` is stored and returned BY REFERENCE — no clone,
+ * no spread, no property copy of any kind.
+ *
+ * Secure Runtime Alpha 128 ("Desktop Public Identity Reader") adds a
+ * new public method, `currentPublicIdentity(): FedosIdentityDescriptor | null`,
+ * whose own entire body is `return this.#currentPublicIdentity;` — the
+ * ONLY change this Stage makes. SYNCHRONOUS — no `async`, no
+ * `Promise`, unlike `readPublicIdentity()`. NEVER throws — a plain
+ * field read can only ever return `#currentPublicIdentity`'s own
+ * current value (`null` until Alpha 127's own `readPublicIdentity()`
+ * has resolved at least once), never raise. This is the public
+ * counterpart to `currentIdentity()` (Alpha 116) for the Reader path,
+ * symmetrically named and symmetrically synchronous.
+ *
  * HARD GUARDRAILS:
  *   - `DesktopApplication` is the ONLY export.
  *   - The constructor performs NO async work of any kind — it only
@@ -144,14 +180,26 @@
  *     and this method NEVER derives its answer from `#started` or from
  *     `currentIdentity()` — Identity Authority (Alpha 111) is consulted
  *     exclusively through `#identity`.
- *   - `readPublicIdentity()` (Alpha 121) is a PURE WRAPPER — its own
- *     entire body is `return this.#reader.readPublicIdentity();`,
- *     nothing more. It performs NO caching, NO transformation, and NO
- *     access to `#identity`, `#publicIdentity`, or `#started` of any
- *     kind — it NEVER touches Identity Runtime. This is the sole
- *     read boundary for `#reader`, symmetrically opposite
+ *   - `readPublicIdentity()` (Alpha 121/127) delegates to
+ *     `this.#reader.readPublicIdentity()` and, on successful
+ *     resolution ONLY, persists the exact resolved value (by
+ *     reference, no clone) into `#currentPublicIdentity` before
+ *     returning it. It performs NO transformation of the resolved
+ *     value, and NO access to `#identity`, `#publicIdentity`, or
+ *     `#started` of any kind — it NEVER touches Identity Runtime.
+ *     This is the sole read-AND-write boundary for `#reader`/
+ *     `#currentPublicIdentity`, symmetrically opposite
  *     `currentIdentity()`/`isBootstrapped()`, which are the sole read
  *     boundary for `#identity` — the two paths never cross.
+ *   - `#currentPublicIdentity` (Alpha 126/127) starts `null` and is
+ *     written ONLY by `readPublicIdentity()`, ONLY on successful
+ *     resolution. `currentPublicIdentity()` (Alpha 128) is the ONLY
+ *     method that reads it besides `readPublicIdentity()` itself.
+ *   - `currentPublicIdentity()` (Alpha 128) is a PURE, SYNCHRONOUS
+ *     WRAPPER — its own entire body is
+ *     `return this.#currentPublicIdentity;`, nothing more. It NEVER
+ *     throws, NEVER awaits, and performs NO access to `#identity`,
+ *     `#reader`, `#publicIdentity`, or `#started` of any kind.
  *   - NO GUI, NO Nostr/Relay connection, NO Observation implementation
  *     of any kind exists anywhere in this file.
  *   - NO reference to `create_runtime.ts`, `types.ts`, `worker.ts`, or
@@ -170,6 +218,7 @@ export class DesktopApplication {
   readonly #reader: FedosPublicIdentityReader;
   readonly #publicIdentity: FedosNostrPublicIdentitySnapshot | undefined;
   #started: boolean = false;
+  #currentPublicIdentity: FedosIdentityDescriptor | null = null;
 
   constructor(
     reader: FedosPublicIdentityReader = new NostrPublicIdentityReader(resolveNostrPublicIdentitySource()),
@@ -200,7 +249,13 @@ export class DesktopApplication {
     return this.#identity.isBootstrapped();
   }
 
-  readPublicIdentity(): Promise<FedosIdentityDescriptor | null> {
-    return this.#reader.readPublicIdentity();
+  async readPublicIdentity(): Promise<FedosIdentityDescriptor | null> {
+    const result = await this.#reader.readPublicIdentity();
+    this.#currentPublicIdentity = result;
+    return result;
+  }
+
+  currentPublicIdentity(): FedosIdentityDescriptor | null {
+    return this.#currentPublicIdentity;
   }
 }

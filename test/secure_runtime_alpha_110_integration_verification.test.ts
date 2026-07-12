@@ -139,7 +139,7 @@ describe("Secure Runtime Alpha 110 -- Integration Verification", () => {
   // Behavioral: what does NOT work -- currentIdentity() stays null
   // ---------------------------------------------------------------------
 
-  it("10. RIPPLE (Secure Runtime Alpha 121): DesktopApplication exposed no currentIdentity()/isBootstrapped()/readPublicIdentity() method of its own AS OF this Stage's own scope, supporting the Reader/Bootstrap independence finding above; Alpha 116 added currentIdentity() and Alpha 117 added isBootstrapped(), both as PURE delegations to #identity (never to #reader), and Alpha 121 added readPublicIdentity() as a PURE delegation to #reader (never to #identity), reconfirmed here as the CURRENT state", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 128): DesktopApplication exposed no currentIdentity()/isBootstrapped()/readPublicIdentity() method of its own AS OF this Stage's own scope, supporting the Reader/Bootstrap independence finding above; Alpha 116 added currentIdentity() and Alpha 117 added isBootstrapped(), both as PURE delegations to #identity (never to #reader), Alpha 121 added readPublicIdentity() as a PURE delegation to #reader (never to #identity), Alpha 127 extended readPublicIdentity() to also persist into #currentPublicIdentity, and Alpha 128 added currentPublicIdentity(), a synchronous read of #currentPublicIdentity, still never touching #identity, reconfirmed here as the CURRENT state", () => {
     const classBody = (desktopApplicationSource.match(/export class DesktopApplication\b[^{]*\{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -147,7 +147,7 @@ describe("Secure Runtime Alpha 110 -- Integration Verification", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor" && !name.startsWith("//") && !name.startsWith("*"));
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
     );
     const currentIdentityBody = (classBody.match(/currentIdentity\(\): FedosIdentityDescriptor \| null \{([\s\S]*?)\n {2}\}/) ?? [])[1] ?? "";
     const currentIdentityLines = currentIdentityBody
@@ -166,7 +166,12 @@ describe("Secure Runtime Alpha 110 -- Integration Verification", () => {
       .split("\n")
       .map((line: string) => line.trim())
       .filter((line: string) => line.length > 0);
-    expect(readPublicIdentityLines).toEqual(["return this.#reader.readPublicIdentity();"]);
+    expect(readPublicIdentityLines).toEqual([
+      "const result = await this.#reader.readPublicIdentity();",
+      "this.#currentPublicIdentity = result;",
+      "return result;",
+    ]);
+    expect(readPublicIdentityBody).not.toMatch(/#identity/);
   });
 
   it("11. behavioral: FedosRuntimeIdentity constructed and bootstrapped directly (simulating DesktopApplication's own internal #identity) ALWAYS resolves currentIdentity() to null, regardless of any Reader-level publicIdentity configuration", async () => {

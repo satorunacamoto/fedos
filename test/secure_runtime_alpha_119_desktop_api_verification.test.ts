@@ -77,7 +77,7 @@ describe("Secure Runtime Alpha 119 -- Desktop API Verification", () => {
     expect(exportNames).toEqual(["DesktopApplication"]);
   });
 
-  it("7. RIPPLE (Secure Runtime Alpha 121): the class exposed exactly four public methods AS OF this Stage's own scope, matching the Decision precisely; Alpha 121 added a FIFTH, readPublicIdentity() -- superseded by Alpha 124's own restated Decision -- reconfirmed here as the CURRENT state", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 128): the class exposed exactly four public methods AS OF this Stage's own scope, matching the Decision precisely; Alpha 121 added a FIFTH, readPublicIdentity(), and Alpha 128 added a SIXTH, currentPublicIdentity() -- both superseded by later Arcs' own restated Decisions -- reconfirmed here as the CURRENT state", () => {
     const classBody = classBodyOf(desktopApplicationSource);
     const publicMethodNames = [
       ...classBody.matchAll(/^\s{2}(?:async\s+)?(\w+)\([^)]*\)(?::\s*[^{]+)?\s*\{/gm),
@@ -85,7 +85,7 @@ describe("Secure Runtime Alpha 119 -- Desktop API Verification", () => {
       .map((m: RegExpMatchArray) => m[1] ?? "")
       .filter((name: string) => name !== "constructor");
     expect(new Set(publicMethodNames)).toEqual(
-      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity"]),
+      new Set(["bootstrap", "start", "currentIdentity", "isBootstrapped", "readPublicIdentity", "currentPublicIdentity"]),
     );
   });
 
