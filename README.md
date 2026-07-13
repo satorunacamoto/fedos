@@ -8,6 +8,68 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 291–300 — Session Canonical Board
+> Gateway Adapter Arc.** Implements the FOURTH and FINAL Protocol
+> Adapter: a pure, one-way, fail-closed translation from an
+> already-Gateway-verified, already-normalized `FedosValidatedSessionPost`
+> into a `FedosBoardPost` (Alpha 255), closing out the four-Arc Canonical
+> Board Adapter series (Alpha 261–300). This Arc has NO responsibility
+> before the Gateway (Session network, Oxen connection, private keys,
+> encryption/decryption, DM retrieval, and storage sync are all
+> explicitly out of scope and prohibited) and NO responsibility after
+> the Board. Two new files under the new
+> [`src/board/session/`](src/board/session/) directory:
+> [`fedos_validated_session_post.ts`](src/board/session/fedos_validated_session_post.ts)
+> (`FedosValidatedSessionPost` — `messageId`/`sessionId`/`authorId`/
+> `body`/`createdAt`/`replyTo`, exactly six fields, no Attachment/Group/
+> Reaction/Voice/Typing field; `sessionId` names the Gateway's own
+> ingestion-session context — distinct from `authorId`, retained on the
+> input type only, mirroring AT Protocol's `cid` treatment) and
+> [`fedos_session_board_adapter.ts`](src/board/session/fedos_session_board_adapter.ts)
+> (`validateSessionBoardPost` + `mapValidatedSessionPostToBoardPostInput`
+> — `authorId` → `author.publicIdentifier` verbatim, never `sessionId`
+> (no identity resolution, no profile fetch, no network); `body` → `body`
+> verbatim, no processing/Markdown/HTML/Emoji conversion, no markup
+> guard needed; `replyTo` → `threadId`/`replyTo` via the ADOPTED Gateway
+> CONTRACT — no `replyTo` means root (`threadId` = own id), a present
+> `replyTo` means `threadId = replyTo` (the direct parent, with NO
+> inference beyond it — an honestly-documented limitation versus the
+> other three protocols' root-preserving `threadId`, since Session
+> carries no root concept at all); `messageId` → `source.reference`,
+> `source.protocol` fixed to `"session"`; composes with, never
+> duplicates, `validateFedosBoardPost`, Alpha 257, unmodified — the ONLY
+> existing validator this Arc's own instruction permits it to use).
+> Flags and excludes `src/identity/session_boundary.ts` explicitly: a
+> same-named but entirely unrelated web/app SESSION-lifecycle boundary
+> (login/logout/refresh), not the Session messenger. Verified against
+> the full required fixture matrix (root, reply, nested-reply
+> `threadId` divergence, Unicode, long text, empty body, malformed
+> author/message-id rejection, determinism), confirmed shape-identical
+> to Nostr-, ActivityPub-, and AT-Protocol-produced `FedosBoardPost`,
+> and confirmed all three existing adapters have zero functional
+> coupling to Session.
+>
+> **Still NOT implemented**: Session network/Oxen connection, private
+> keys, encryption/decryption, DM retrieval, storage sync, a Board
+> Repository, Board Index, Board Feed, persistence, moderation
+> enforcement, GUI, and any wiring of this adapter into a live path
+> (`boardId` remains a required, caller-supplied parameter).
+> `package.json`'s own `dependencies` count stays fixed at 2 — zero new
+> Cargo/npm dependency, zero Rust/wasm change of any kind. `npm run
+> typecheck`/`npm test` GREEN (pre-existing, unrelated Rust-structural
+> test failures excluded — see
+> `docs/secure_runtime_alpha_300_session_board_adapter_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_291_existing_session_inventory.md`
+> through `docs/secure_runtime_alpha_300_session_board_adapter_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 281–290 — AT Protocol Canonical Board
 > Adapter Arc.** Implements the THIRD Protocol Adapter: a pure, one-way,
 > fail-closed translation from an already-validated, already-normalized
