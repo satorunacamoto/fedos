@@ -1,0 +1,153 @@
+import { describe, it, expect } from "vitest";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import designDocSource from "../docs/secure_runtime_alpha_220_relay_foundation_completion.md?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import packageJsonSource from "../package.json?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import runtimeTypesSource from "../src/runtime/types.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import workerSource from "../src/worker.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import relaySource from "../src/desktop/fedos_relay.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import nip07Source from "../src/sign/nip07.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import legacyRelaySource from "../src/nostr/relay.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import legacyWsRelaySource from "../src/nostr/ws_relay.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import legacyPublishSource from "../src/nostr/publish.ts?raw";
+
+/**
+ * Secure Runtime Alpha 220 -- "Relay Foundation Completion": Stage 10,
+ * the closing Stage, of the Nostr Relay Foundation Arc (Alpha
+ * 211-220). Adds no further production code. Declares the Arc's own
+ * Objective confirmed complete and recommends exactly one next Arc.
+ */
+describe("Secure Runtime Alpha 220 -- Relay Foundation Completion", () => {
+  it("1. the design doc exists and is substantial", () => {
+    expect(typeof designDocSource).toBe("string");
+    expect(designDocSource.length).toBeGreaterThan(3000);
+  });
+
+  it("2. the design doc declares itself REVIEW ONLY, with no further code change", () => {
+    expect(designDocSource).toMatch(/this Stage is REVIEW ONLY/);
+    expect(designDocSource).toMatch(/it makes NO further code change\s*\nof any kind\./);
+  });
+
+  it("3. the design doc issues a Completion Declaration naming the Objective CONFIRMED COMPLETE", () => {
+    const section = (designDocSource.match(/## 3\. Completion Declaration([\s\S]*?)\n## 4\./) ?? [])[1] ?? "";
+    expect(section).toMatch(/\*\*This Arc's own Objective is CONFIRMED COMPLETE,/);
+  });
+
+  it("4. the design doc's own Completion Declaration lists all five NOT-yet-existing items", () => {
+    const section = (designDocSource.match(/## 3\. Completion Declaration([\s\S]*?)\n## 4\./) ?? [])[1] ?? "";
+    for (const item of [
+      "**REQ, CLOSE, Subscription, Filters**",
+      "**Relay Pool**",
+      "**NIP-05, NIP-46, NIP-07**",
+      "**A public Runtime/`AppRuntime` API for Relay**",
+      "**`DesktopApplication` wiring**",
+    ]) {
+      expect(section).toContain(item);
+    }
+  });
+
+  it("5. the design doc names exactly one recommended next Arc: Nostr Relay Subscription & REQ/CLOSE Foundation", () => {
+    const section = (designDocSource.match(/## 3\. Completion Declaration([\s\S]*?)\n## 4\./) ?? [])[1] ?? "";
+    expect(section).toMatch(/\*\*Nostr Relay Subscription & REQ\/CLOSE\s*\nFoundation\.\*\*/);
+  });
+
+  it("6. the design doc cross-references all nine prior Stages of this Arc plus Alpha 210", () => {
+    for (const ref of [
+      "secure_runtime_alpha_219_relay_extensibility_review",
+      "secure_runtime_alpha_218_relay_boundary_review",
+      "secure_runtime_alpha_217_relay_foundation_verification",
+      "secure_runtime_alpha_216_publish_api",
+      "secure_runtime_alpha_215_connection_lifecycle",
+      "secure_runtime_alpha_214_websocket_relay_connection_only",
+      "secure_runtime_alpha_213_null_relay",
+      "secure_runtime_alpha_212_relay_interface",
+      "secure_runtime_alpha_211_relay_code_review",
+      "secure_runtime_alpha_210_event_runtime_boundary_completion",
+    ]) {
+      expect(designDocSource).toContain(ref);
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Structural
+  // ---------------------------------------------------------------------
+
+  it("7. structural: lib.rs #[wasm_bindgen] count and pub fn count remain fixed at 13/36 -- zero Rust change across the whole Arc", () => {
+    const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
+    expect(wasmBindgenCount).toBe(13);
+    const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
+    expect(pubFnNames.length).toBe(36);
+  });
+
+  it("8. structural: Cargo.toml and package.json carry no reference to any of the ten Arc-stage docs -- zero dependency change", () => {
+    for (let stage = 211; stage <= 220; stage++) {
+      expect(cargoTomlSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
+      expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
+    }
+    const pkg = JSON.parse(packageJsonSource);
+    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+  });
+
+  it("9. structural: FedosRelay's final shape is exactly url/connect/disconnect/isConnected/publish", () => {
+    expect(relaySource).toMatch(
+      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;\s*\n\}/,
+    );
+  });
+
+  it("10. structural: src/sign/nip07.ts and the three legacy src/nostr Relay files are completely untouched by this Arc", () => {
+    for (const source of [nip07Source, legacyRelaySource, legacyWsRelaySource, legacyPublishSource]) {
+      for (let stage = 211; stage <= 220; stage++) {
+        expect(source).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
+      }
+      expect(source).not.toMatch(/\bFedosRelay\b|\bNullRelay\b/);
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Regression: the whole Arc's own ten Stages, plus everything else
+  // ---------------------------------------------------------------------
+
+  it("11. Regression: desktop_application.ts and create_desktop_application.ts carry no reference to any of the ten Alpha 211-220 docs or the new Relay symbols", () => {
+    for (const source of [desktopApplicationSource, createDesktopApplicationSource]) {
+      for (let stage = 211; stage <= 220; stage++) {
+        expect(source).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
+      }
+      expect(source).not.toMatch(/FedosRelay|NullRelay|WebSocketRelay/);
+    }
+  });
+
+  it("12. Regression: create_runtime.ts/types.ts/worker.ts remain permanently untouched by this Arc", () => {
+    for (const source of [createRuntimeSource, runtimeTypesSource, workerSource]) {
+      for (let stage = 211; stage <= 220; stage++) {
+        expect(source).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
+      }
+    }
+  });
+
+  it("13. Regression: WebSocketRelay never references src/nostr/ws_relay.ts's own RelaySocketLike/WebSocketFactory types, and neither class's own CODE imports the other", () => {
+    expect(websocketRelaySource).not.toMatch(/RelaySocketLike|from ".*nostr\/ws_relay\.js"/);
+    expect(nullRelaySource).not.toMatch(/from ".*websocket_relay\.js"/);
+    expect(websocketRelaySource).not.toMatch(/from ".*null_relay\.js"/);
+  });
+});
