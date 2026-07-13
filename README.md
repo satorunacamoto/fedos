@@ -8,6 +8,69 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 271–280 — ActivityPub Canonical Board
+> Adapter Arc.** Implements the SECOND Protocol Adapter: a pure,
+> one-way, fail-closed translation from an already-normalized,
+> already-authenticated `FedosValidatedActivityPubPost` into a
+> `FedosBoardPost` (Alpha 255), following the Nostr Adapter's own
+> pattern (Alpha 261–270) exactly. Three new files under the new
+> [`src/board/activitypub/`](src/board/activitypub/) directory:
+> [`fedos_validated_activitypub_post.ts`](src/board/activitypub/fedos_validated_activitypub_post.ts)
+> (`FedosValidatedActivityPubPost` — `objectId`/`actorId`/`content`/
+> `published`/`inReplyTo`/`conversationRoot`, six fields, `content`
+> contractually **sanitized plain text** — the only option consistent
+> with `FedosBoardPost.body`'s existing plain-text-only contract and
+> this Arc's own prohibition on adding an HTML parser/sanitizer; no raw
+> Activity object, no HTTP headers, no HTTP Signature, no OAuth/access
+> token, no `@context`/JSON-LD graph, no metadata bag),
+> [`fedos_activitypub_board_adapter.ts`](src/board/activitypub/fedos_activitypub_board_adapter.ts)
+> (`validateActivityPubBoardPost` + `mapValidatedActivityPubPostToBoardPostInput`
+> — `objectId` → `id`/`source.reference` (Object id, not the Create
+> Activity id), `actorId` → `author.publicIdentifier` verbatim (no
+> profile resolution, no network calls), `content` → `body` verbatim
+> with ONE minimal non-parsing fail-closed guard rejecting any raw
+> `<`/`>` character since no safe upstream HTML-to-plain-text
+> normalizer exists yet, `inReplyTo`/`conversationRoot` → `replyTo`/
+> `threadId` — a reply with no resolved `conversationRoot` is rejected
+> outright, "Option C": an upstream resolver's job, never the adapter's
+> own network resolution; composes with, never duplicates,
+> `validateFedosBoardPost`, Alpha 257, unmodified), and
+> [`fedos_activitypub_mutation_boundary.ts`](src/board/activitypub/fedos_activitypub_mutation_boundary.ts)
+> (`FedosActivityPubMutationObservation`, a minimal INERT type formally
+> separating `Update`/`Delete` from `FedosBoardPost` — no boolean
+> `deleted`/`updated` field is ever added to it, never wired into the
+> adapter; `Announce`/`Like`/`Follow`/`Undo` stay entirely out of
+> scope). Verified against a 12-case required fixture matrix (Mastodon-
+> and generic-ActivityPub-shaped Create(Note), root/reply/reply-without-
+> root, Unicode, empty/oversized-body rejection, malformed actor/object
+> id rejection, self-reply rejection reused from `validateFedosBoardPost`
+> not duplicated, deterministic repeated mapping), confirmed shape-
+> identical to a Nostr-produced `FedosBoardPost`, and confirmed the
+> Nostr Board Adapter (Alpha 266) has zero functional coupling to
+> ActivityPub.
+>
+> **Still NOT implemented**: an ActivityPub HTTP server, inbox, outbox,
+> WebFinger, NodeInfo, Actor hosting/discovery, HTTP Signatures, profile
+> resolution, attachment fetching, `Update`/`Delete` application,
+> federation delivery, Mastodon OAuth, AT Protocol/Session Protocol
+> Adapters, Relay Pool, persistence, moderation enforcement, GUI, and any
+> wiring of this adapter into a live path (`boardId` remains a required,
+> caller-supplied parameter). `package.json`'s own `dependencies` count
+> stays fixed at 2 — zero new Cargo/npm dependency, zero Rust/wasm
+> change of any kind. `npm run typecheck`/`npm test` GREEN (pre-existing,
+> unrelated Rust-structural test failures excluded — see
+> `docs/secure_runtime_alpha_280_activitypub_board_adapter_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_271_existing_activitypub_inventory.md`
+> through `docs/secure_runtime_alpha_280_activitypub_board_adapter_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 261–270 — Nostr Canonical Board
 > Adapter Arc.** Implements the FIRST Protocol Adapter: a pure, one-way,
 > fail-closed translation from an already-verified
