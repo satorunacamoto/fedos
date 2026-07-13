@@ -52,6 +52,28 @@
  * 103) was legitimately Nostr-specific internally while conforming to
  * a protocol-neutral interface.
  *
+ * Secure Runtime Alpha 226 ("Subscription Lifecycle") adds a new
+ * private field, `#subscriptionCounter: number` (initial `0`), and two
+ * new public methods, `subscribe(filters: readonly
+ * FedosSubscriptionFilter[]): Promise<FedosSubscription>` and
+ * `unsubscribe(subscription: FedosSubscription): Promise<void>` -- the
+ * ONLY change this Stage makes. `subscribe()` rejects when
+ * `!#connected` (the SAME "transport requires an open connection"
+ * contract `publish()`, Alpha 216, already enforces); on success it
+ * generates a fresh per-instance opaque id (`fedos-sub-${n}`), sends
+ * the `buildReqMessage` (Alpha 224) wire string exactly once via
+ * `this.#socket.send(...)`, and resolves with the new
+ * `FedosSubscription` -- it does NOT register a `"message"` listener
+ * of any kind, matching Alpha 224's own "Transport only. No event
+ * processing." instruction: this class never receives or processes an
+ * `EVENT`/`EOSE` reply to its own REQ. `unsubscribe()` rejects when
+ * `!#connected`, and otherwise sends the `buildCloseMessage` (Alpha
+ * 225) wire string exactly once -- it performs no local bookkeeping of
+ * which ids were previously subscribed (the SAME "transport only,
+ * no validation" discipline `publish()` already applies to the events
+ * it sends), trusting the relay itself to ignore a CLOSE for an unknown
+ * or already-closed subscription id, exactly as NIP-01 permits.
+ *
  * HARD GUARDRAILS:
  *   - `WebSocketRelay`, `FedosRelaySocket`, and `FedosRelaySocketFactory`
  *     are the ONLY exports.
@@ -77,7 +99,17 @@
  *     (`import type`) — this file performs no Event construction,
  *     signing, or transformation beyond the one wire-shape mapping
  *     `publish()` itself performs.
- *   - NO REQ, CLOSE, Subscription, or Filter vocabulary of any kind.
+ *   - `subscribe()`/`unsubscribe()` (Alpha 226) call `socket.send(...)`
+ *     EXACTLY ONCE on their own success path each, and register NO
+ *     `"message"` listener of any kind — no `EVENT`/`EOSE` reply is
+ *     ever awaited or processed.
+ *   - `subscribe()`/`unsubscribe()` throw (via Promise rejection) when
+ *     `!#connected` — neither silently no-ops and neither attempts to
+ *     auto-reconnect.
+ *   - `buildReqMessage`/`buildCloseMessage` (Alpha 224/225) are the
+ *     ONLY source of REQ/CLOSE wire strings in this file — no inline
+ *     `JSON.stringify(["REQ"` or `JSON.stringify(["CLOSE"` of any kind
+ *     appears here.
  *   - NO reference to `src/nostr/relay.ts`, `src/nostr/ws_relay.ts`,
  *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
  *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
@@ -86,6 +118,9 @@
 
 import type { FedosEventDescriptor } from "./fedos_event_descriptor.js";
 import type { FedosRelay } from "./fedos_relay.js";
+import type { FedosSubscription } from "./fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "./fedos_subscription_filter.js";
+import { buildCloseMessage, buildReqMessage } from "./subscription_messages.js";
 
 /** The minimal socket surface this Relay needs — a subset of `WebSocket`. */
 export interface FedosRelaySocket {
@@ -104,6 +139,7 @@ export class WebSocketRelay implements FedosRelay {
   readonly #factory: FedosRelaySocketFactory;
   #socket: FedosRelaySocket | undefined;
   #connected: boolean = false;
+  #subscriptionCounter = 0;
 
   constructor(url: string, factory: FedosRelaySocketFactory) {
     this.url = url;
@@ -156,5 +192,21 @@ export class WebSocketRelay implements FedosRelay {
       sig: event.signature,
     };
     this.#socket.send(JSON.stringify(["EVENT", wireEvent]));
+  }
+
+  async subscribe(filters: readonly FedosSubscriptionFilter[]): Promise<FedosSubscription> {
+    if (!this.#connected || this.#socket === undefined) {
+      throw new Error("FedosRelay.subscribe() called while not connected.");
+    }
+    const subscription: FedosSubscription = { id: `fedos-sub-${++this.#subscriptionCounter}` };
+    this.#socket.send(buildReqMessage(subscription.id, filters));
+    return subscription;
+  }
+
+  async unsubscribe(subscription: FedosSubscription): Promise<void> {
+    if (!this.#connected || this.#socket === undefined) {
+      throw new Error("FedosRelay.unsubscribe() called while not connected.");
+    }
+    this.#socket.send(buildCloseMessage(subscription.id));
   }
 }

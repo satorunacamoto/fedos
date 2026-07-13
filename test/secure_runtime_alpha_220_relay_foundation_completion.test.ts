@@ -109,9 +109,9 @@ describe("Secure Runtime Alpha 220 -- Relay Foundation Completion", () => {
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
   });
 
-  it("9. structural: FedosRelay's final shape is exactly url/connect/disconnect/isConnected/publish", () => {
+  it("9. structural: FedosRelay's shape at this Arc's own closing state contains url/connect/disconnect/isConnected/publish, in that order (Alpha 226, a later Arc, additively appends subscribe/unsubscribe exactly as this Stage's own §3 next-Arc recommendation anticipated)", () => {
     expect(relaySource).toMatch(
-      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;\s*\n\}/,
+      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;/,
     );
   });
 

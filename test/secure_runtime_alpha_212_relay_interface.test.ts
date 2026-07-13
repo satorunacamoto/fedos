@@ -50,12 +50,12 @@ describe("Secure Runtime Alpha 212 -- Relay Interface", () => {
     expect(relaySource).not.toMatch(/from ".*\/(nostr|sign)\//);
   });
 
-  it("5. no REQ/CLOSE/Subscription/Filter/ACK vocabulary exists IN CODE (comments legitimately name these as forbidden guardrails)", () => {
+  it("5. no ACK vocabulary exists IN CODE (comments legitimately name these as forbidden guardrails); REQ/CLOSE/Subscription/Filter were, as this Stage's own scope anticipated, legitimately added by Alpha 226, a later Arc", () => {
     const codeOnly = relaySource
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
-    expect(codeOnly).not.toMatch(/REQ|CLOSE|Subscription|Filter|accepted|acknowledgement/i);
+    expect(codeOnly).not.toMatch(/accepted|acknowledgement/i);
   });
 
   it("6. the design doc cross-references Alpha 211, Alpha 101, and Alpha 202", () => {

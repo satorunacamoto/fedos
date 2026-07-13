@@ -61,13 +61,45 @@
  *     (Alpha 214), and `disconnect(): Promise<void>`/
  *     `isConnected(): boolean` (Alpha 215) are UNCHANGED.
  *   - `publish(event: FedosEventDescriptor): Promise<void>` (Alpha
- *     216) is the ONLY method added by this Stage. Its own return
+ *     216) is UNCHANGED by this Arc. Its own return
  *     type is `Promise<void>` — NEVER a result object, NEVER an
  *     `accepted`/`ok`/`message` field of any kind.
  *   - `FedosEventDescriptor` is imported as a TYPE ONLY
  *     (`import type`) — this file performs no Event construction,
  *     signing, or transformation of any kind.
- *   - NO REQ, CLOSE, Subscription, or Filter vocabulary of any kind.
+ *
+ * Secure Runtime Alpha 226 ("Subscription Lifecycle") — the first
+ * Stage of the Alpha 221-230 Nostr Subscription Foundation Arc to
+ * change this file — adds TWO new methods,
+ * `subscribe(filters: readonly FedosSubscriptionFilter[]): Promise<FedosSubscription>`
+ * and `unsubscribe(subscription: FedosSubscription): Promise<void>` —
+ * the ONLY change this Stage makes, and the LAST two methods this Arc's
+ * own Goals list names ("Subscription lifecycle"). This is exactly the
+ * ADDITIVE extension Alpha 219 Section 3 (Relay Foundation Arc) already
+ * previewed: a new method pair on `FedosRelay`, never a reshaping of
+ * `connect`/`disconnect`/`isConnected`/`publish`'s own already-shipped
+ * shapes. `FedosSubscription` (Alpha 222) and `FedosSubscriptionFilter`
+ * (Alpha 223) are REUSED, not redesigned. `subscribe()` returns a
+ * `Promise` of the OPAQUE `FedosSubscription` handle (never a raw
+ * string, never the filters echoed back); `unsubscribe()` takes that
+ * SAME handle back. `WebSocketRelay` (`websocket_relay.ts`, Alpha 226)
+ * gives both methods real behavior, sending the `buildReqMessage`/
+ * `buildCloseMessage` (Alpha 224/225) wire strings; `NullRelay`
+ * (`null_relay.ts`, Alpha 226) tracks subscriptions in an in-memory
+ * list, still with zero real networking.
+ *
+ * HARD GUARDRAILS (Alpha 226 additions):
+ *   - `subscribe()`/`unsubscribe()` are the ONLY methods added by this
+ *     Arc. Neither returns nor accepts a raw filter/id echo of any kind
+ *     beyond the opaque `FedosSubscription` handle itself.
+ *   - `FedosSubscription`/`FedosSubscriptionFilter` are imported as
+ *     TYPE ONLY (`import type`) — this file performs no subscription
+ *     construction, id generation, or wire encoding of any kind; that
+ *     is exclusively `WebSocketRelay`'s/`NullRelay`'s own concern.
+ *   - This interface registers NO `"message"` listener and processes NO
+ *     incoming `EVENT`/`EOSE`/`NOTICE` of any kind — `subscribe()`/
+ *     `unsubscribe()` are OUTBOUND-only, matching Alpha 224's own
+ *     "Transport only. No event processing." instruction.
  *   - NO reference to `src/nostr/relay.ts`, `src/nostr/ws_relay.ts`,
  *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
  *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
@@ -75,6 +107,8 @@
  */
 
 import type { FedosEventDescriptor } from "./fedos_event_descriptor.js";
+import type { FedosSubscription } from "./fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "./fedos_subscription_filter.js";
 
 export interface FedosRelay {
   readonly url: string;
@@ -82,4 +116,6 @@ export interface FedosRelay {
   disconnect(): Promise<void>;
   isConnected(): boolean;
   publish(event: FedosEventDescriptor): Promise<void>;
+  subscribe(filters: readonly FedosSubscriptionFilter[]): Promise<FedosSubscription>;
+  unsubscribe(subscription: FedosSubscription): Promise<void>;
 }

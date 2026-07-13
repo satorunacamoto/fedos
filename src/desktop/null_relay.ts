@@ -41,6 +41,28 @@
  * resolves with no value, matching `FedosRelay.publish()`'s own
  * `Promise<void>` contract exactly (no ACK, no result object).
  *
+ * Secure Runtime Alpha 226 ("Subscription Lifecycle") adds two new
+ * private fields, `#subscriptions: FedosSubscription[]` (initial `[]`)
+ * and `#subscriptionCounter: number` (initial `0`), a new public
+ * getter, `subscriptions: readonly FedosSubscription[]`, and two new
+ * public methods, `subscribe(filters: readonly FedosSubscriptionFilter[]):
+ * Promise<FedosSubscription>` and `unsubscribe(subscription:
+ * FedosSubscription): Promise<void>` -- the ONLY change this Stage
+ * makes. `subscribe()` REJECTS (throws) when `#connected` is `false` --
+ * the SAME "transport requires an open connection" contract
+ * `publish()` (Alpha 216) already enforces, so all three transport
+ * methods (`publish`/`subscribe`/`unsubscribe`) share one discipline.
+ * On success, `subscribe()` generates a fresh opaque id, appends a new
+ * `FedosSubscription` to `#subscriptions`, and returns it -- plain
+ * in-memory bookkeeping, never a network send of any kind. `filters`
+ * is accepted (to satisfy `FedosRelay`'s own shape) but never inspected
+ * or stored -- `NullRelay` never validates or matches filters, the SAME
+ * "records without judging content" discipline `publish()` already
+ * applies to the events it records. `unsubscribe()` REJECTS when
+ * `!#connected`, and otherwise removes the matching subscription (by
+ * `id`) from `#subscriptions` -- removing an id that is not present is
+ * a silent no-op, never a throw.
+ *
  * HARD GUARDRAILS:
  *   - `NullRelay` is the ONLY export.
  *   - The constructor takes exactly ONE argument, `url: string`, and
@@ -61,16 +83,26 @@
  *   - `published` (Alpha 216) is a `readonly` getter — no method on
  *     this class allows external code to clear or splice the recorded
  *     list.
+ *   - `subscribe()`/`unsubscribe()` (Alpha 226) throw when `!#connected`,
+ *     and otherwise ONLY mutate `#subscriptions` — no network I/O, no
+ *     REQ/CLOSE wire string of any kind is ever constructed here.
+ *   - `subscriptions` (Alpha 226) is a `readonly` getter — no method on
+ *     this class allows external code to clear or splice the tracked
+ *     list directly.
  *   - NO `WebSocket`, `fetch`, or network reference of any kind.
  */
 
 import type { FedosEventDescriptor } from "./fedos_event_descriptor.js";
 import type { FedosRelay } from "./fedos_relay.js";
+import type { FedosSubscription } from "./fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "./fedos_subscription_filter.js";
 
 export class NullRelay implements FedosRelay {
   readonly url: string;
   #connected: boolean = false;
   #published: FedosEventDescriptor[] = [];
+  #subscriptions: FedosSubscription[] = [];
+  #subscriptionCounter = 0;
 
   constructor(url: string) {
     this.url = url;
@@ -97,5 +129,26 @@ export class NullRelay implements FedosRelay {
       throw new Error("FedosRelay.publish() called while not connected.");
     }
     this.#published.push(event);
+  }
+
+  get subscriptions(): readonly FedosSubscription[] {
+    return this.#subscriptions;
+  }
+
+  async subscribe(filters: readonly FedosSubscriptionFilter[]): Promise<FedosSubscription> {
+    if (!this.#connected) {
+      throw new Error("FedosRelay.subscribe() called while not connected.");
+    }
+    void filters;
+    const subscription: FedosSubscription = { id: `fedos-sub-${++this.#subscriptionCounter}` };
+    this.#subscriptions.push(subscription);
+    return subscription;
+  }
+
+  async unsubscribe(subscription: FedosSubscription): Promise<void> {
+    if (!this.#connected) {
+      throw new Error("FedosRelay.unsubscribe() called while not connected.");
+    }
+    this.#subscriptions = this.#subscriptions.filter((s) => s.id !== subscription.id);
   }
 }

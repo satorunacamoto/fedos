@@ -41,15 +41,15 @@ describe("Secure Runtime Alpha 219 -- Relay Future Extensibility Review", () => 
     expect(designDocSource).toMatch(/## 5\. CLOSE/);
   });
 
-  it("4. structural: zero reference to REQ/CLOSE/Subscription/Filter/Pool in any of the three Relay files' own CODE", () => {
+  it("4. structural: zero reference to Pool in any of the three Relay files' own CODE (REQ/CLOSE/Subscription/Filter were, as this Stage's own §3 anticipated, legitimately added by Alpha 226, a later Arc -- Pool remains out of scope for both)", () => {
     for (const source of [relaySource, nullRelaySource, websocketRelaySource]) {
-      expect(codeOnly(source)).not.toMatch(/\bREQ\b|\bCLOSE\b|Subscription|Filter|Pool/);
+      expect(codeOnly(source)).not.toMatch(/Pool/);
     }
   });
 
-  it("5. structural: FedosRelay's own final method set is unchanged from Alpha 216's own closing state -- connect/disconnect/isConnected/publish, plus url", () => {
+  it("5. structural: FedosRelay's own method set AS OF this Arc's closing state contains connect/disconnect/isConnected/publish, plus url (Alpha 226, a later Arc, additively appends subscribe/unsubscribe exactly as this Stage's own §3 anticipated)", () => {
     expect(relaySource).toMatch(
-      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;\s*\n\}/,
+      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;/,
     );
   });
 

@@ -62,9 +62,9 @@ describe("Secure Runtime Alpha 216 -- Publish API", () => {
   // Structural: the FINAL, complete shape of all three files
   // ---------------------------------------------------------------------
 
-  it("3. structural: FedosRelay's final shape is exactly url, connect, disconnect, isConnected, publish", () => {
+  it("3. structural: FedosRelay's shape AS OF this Arc contains url, connect, disconnect, isConnected, publish, in that order (Alpha 226, a later Arc, additively appends subscribe/unsubscribe after publish -- see secure_runtime_alpha_226_subscription_lifecycle.test.ts for that Arc's own closing shape)", () => {
     expect(relaySource).toMatch(
-      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;\s*\n\}/,
+      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;/,
     );
   });
 
@@ -74,25 +74,29 @@ describe("Secure Runtime Alpha 216 -- Publish API", () => {
     );
   });
 
-  it("5. structural: NullRelay's final public method set is exactly connect/disconnect/isConnected/publish, plus a published getter", () => {
+  it("5. structural: NullRelay's public method set AS OF this Arc contains connect/disconnect/isConnected/publish, plus a published getter (Alpha 226, a later Arc, additively appends subscriptions/subscribe/unsubscribe)", () => {
     const classBody = (nullRelaySource.match(/export class NullRelay implements FedosRelay \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const codeOnly = classBody
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const methodNames = [...codeOnly.matchAll(/^\s{2}(?:async\s+)?(?:get\s+)?(\w+)\(/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(new Set(methodNames)).toEqual(new Set(["constructor", "connect", "disconnect", "isConnected", "published", "publish"]));
+    for (const expected of ["constructor", "connect", "disconnect", "isConnected", "published", "publish"]) {
+      expect(methodNames).toContain(expected);
+    }
     expect(nullRelaySource).toMatch(/get published\(\): readonly FedosEventDescriptor\[\] \{/);
   });
 
-  it("6. structural: WebSocketRelay's final public method set is exactly connect/disconnect/isConnected/publish", () => {
+  it("6. structural: WebSocketRelay's public method set AS OF this Arc contains connect/disconnect/isConnected/publish (Alpha 226, a later Arc, additively appends subscribe/unsubscribe)", () => {
     const classBody = (websocketRelaySource.match(/export class WebSocketRelay implements FedosRelay \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const codeOnly = classBody
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const methodNames = [...codeOnly.matchAll(/^\s{2}(?:async\s+)?(\w+)\(/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(new Set(methodNames)).toEqual(new Set(["constructor", "connect", "disconnect", "isConnected", "publish"]));
+    for (const expected of ["constructor", "connect", "disconnect", "isConnected", "publish"]) {
+      expect(methodNames).toContain(expected);
+    }
   });
 
   it("7. structural: WebSocketRelay.publish() calls socket.send exactly once and registers no 'message' listener anywhere in the file's own CODE", () => {
