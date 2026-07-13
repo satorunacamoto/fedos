@@ -8,6 +8,66 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 251–260 — Canonical Board Model
+> Foundation Arc.** Defines a protocol-independent Canonical Board
+> Model — NOT a Nostr Event wrapper — the shared application model a
+> future Nostr/ActivityPub/ATProto/Session Protocol Adapter will map
+> into, before any adapter is built. Six new files under the new
+> [`src/board/`](src/board/) directory:
+> [`fedos_board_identifiers.ts`](src/board/fedos_board_identifiers.ts)
+> (four branded, mutually non-interchangeable identifier types —
+> `FedosBoardId`/`FedosThreadId`/`FedosBoardPostId`/
+> `FedosExternalReference` — "Option C": application-generated ids, no
+> random generation, no protocol parsing),
+> [`fedos_board_source.ts`](src/board/fedos_board_source.ts)
+> (`FedosBoardSourceReference`, explicit provenance — a closed
+> five-protocol union plus an opaque reference string, no secret/token/
+> credential field),
+> [`fedos_board_author.ts`](src/board/fedos_board_author.ts)
+> (`FedosBoardAuthorReference`, "Option D" — `identityId`/`protocol`/
+> `publicIdentifier` only; `displayName`/`avatar` deliberately EXCLUDED
+> to avoid a stale profile snapshot on an immutable post),
+> [`fedos_board_post.ts`](src/board/fedos_board_post.ts)
+> (`FedosBoardPost`, eight `readonly` fields — `id`/`boardId`/
+> `threadId`/`replyTo`/`author`/`body`/`createdAt`/`source` — no
+> transport object embedded, plain-text `body` only, no title/
+> attachments this Arc),
+> [`fedos_board_post_validator.ts`](src/board/fedos_board_post_validator.ts)
+> (`validateFedosBoardPost`, a typed-builder, fail-closed boundary — the
+> ONLY place a `FedosBoardPost` is constructed; non-empty ids, a
+> seconds-domain `createdAt` check that also rejects an accidental
+> milliseconds value, a 10,000-character body cap, self-reply rejection,
+> deep-copy + `Object.freeze`), and
+> [`fedos_board_moderation.ts`](src/board/fedos_board_moderation.ts)
+> (`FedosBoardModerationRecord`, "Option B" — kept entirely separate
+> from `FedosBoardPost`, no `deleted` boolean, types + label constants
+> only, zero enforcement logic). `threadId` (root identity) +
+> `replyTo` (direct parent) — "Option C" — give nested-reply structure
+> with O(1) thread lookup; same-board/cycle/missing-parent invariants
+> are explicitly assigned to a future Board Application Logic layer, not
+> built here. Verified honest for all four target protocols by real
+> fixture construction (Nostr/ActivityPub/AT Protocol/Session, two root
+> + two reply fixtures, no adapter module, no real network call).
+>
+> **Still NOT implemented**: Nostr/ActivityPub/ATProto/Session Protocol
+> Adapters, Relay Pool, persistence, moderation enforcement, ranking,
+> notifications, DM, attachments, HTML/Markdown rendering, GUI. `package.json`'s
+> own `dependencies` count stays fixed at 2 — zero new Cargo/npm
+> dependency, zero Rust/wasm change of any kind. `npm run typecheck`/
+> `npm test` GREEN (pre-existing, unrelated Rust-structural test
+> failures excluded — see
+> `docs/secure_runtime_alpha_260_canonical_board_model_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_251_existing_board_model_inventory.md`
+> through `docs/secure_runtime_alpha_260_canonical_board_model_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 241–250 — Nostr Inbound Event
 > Validation Arc.** Adds cryptographic validation for inbound NIP-01
 > Events received through the single-Relay transport (Alpha 211–240).
