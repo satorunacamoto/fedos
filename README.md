@@ -8,6 +8,71 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 301–310 — Canonical Board Repository,
+> Index & Feed Foundation Arc.** Implements the first protocol-independent
+> Board Application layer on top of the Canonical Board Model and all
+> four completed Protocol Adapters. Six new files under the new
+> [`src/board/repository/`](src/board/repository/) directory:
+> [`fedos_board_repository.ts`](src/board/repository/fedos_board_repository.ts)
+> (`FedosBoardRepository` contract — `register`/`findPost`/`listPosts`
+> only, deliberately no `removePost` this Arc; `FedosBoardRepositoryWriteResult`
+> — `"inserted"`/`"already-present"`/`"conflict"`, no boolean hides the
+> reason; `fedosBoardPostsAreStructurallyEqual` decides idempotent
+> re-registration),
+> [`in_memory_fedos_board_repository.ts`](src/board/repository/in_memory_fedos_board_repository.ts)
+> (`InMemoryFedosBoardRepository` — stores by reference, relying on
+> `validateFedosBoardPost`'s own already-verified frozen boundary, Alpha
+> 257, rather than re-copying),
+> [`fedos_board_source_index.ts`](src/board/repository/fedos_board_source_index.ts)
+> (`FedosBoardSourceIndex` — keyed by `fedosBoardSourceKey`, Alpha 253,
+> reused unmodified; recognizes the same upstream object re-imported
+> under a different registration, independent of Repository ID conflict),
+> [`fedos_board_index.ts`](src/board/repository/fedos_board_index.ts)
+> (`FedosBoardIndex` — ID-only board/thread index, composite
+> `(boardId, threadId)` keying rules out cross-board contamination),
+> [`fedos_board_service.ts`](src/board/repository/fedos_board_service.ts)
+> (`FedosBoardService.registerPost` — the one write boundary coordinating
+> all three components; closes the thread-integrity gap Alpha 256 left
+> open: root `threadId === id`, parent existence — missing parent
+> rejected, Option A — same-board/same-thread reply, self-reply
+> inherited for free from `validateFedosBoardPost`, cycles structurally
+> impossible by the insertion rule; seven-outcome
+> `FedosBoardRegistrationResult`, no transaction framework needed since
+> the check order itself guarantees atomicity), and
+> [`fedos_board_feed.ts`](src/board/repository/fedos_board_feed.ts)
+> (`FedosBoardFeed.listRecentPosts` — `createdAt` DESC, `id` ASC
+> tie-break, `[1, 100]` clamped limit policy, zero ranking of any kind,
+> deliberately NOT reusing `src/query/thread_query.ts`'s own existing
+> ranked Nostr-specific feed). Verified against all four real,
+> unmodified Board Adapters registering through one shared
+> `FedosBoardService` and appearing correctly in one `FedosBoardFeed`,
+> with source/post-ID conflict, missing-parent, and cross-board-reply
+> rejection all confirmed fail-closed. The pre-existing root-level
+> `p2p/` directory is confirmed, at the boundary level only, to be a
+> wholly unrelated, independent repository ("Global Imbalance Radar," a
+> crypto market-microstructure analysis platform) — not staged, not
+> modified, not imported, not inspected beyond a top-level confirmation.
+>
+> **Still NOT implemented**: persistence (SQLite/D1/IndexedDB),
+> distributed synchronization, P2P Ontology Engine integration, semantic
+> relationships, search, full-text indexing, pagination cursors,
+> ranking, recommendations, likes, reposts, notifications, moderation
+> execution, Relay Pool, GUI. `package.json`'s own `dependencies` count
+> stays fixed at 2 — zero new Cargo/npm dependency, zero Rust/wasm
+> change of any kind. `npm run typecheck`/`npm test` GREEN (pre-existing,
+> unrelated Rust-structural test failures excluded — see
+> `docs/secure_runtime_alpha_310_board_repository_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_301_existing_board_repository_inventory.md`
+> through `docs/secure_runtime_alpha_310_board_repository_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 291–300 — Session Canonical Board
 > Gateway Adapter Arc.** Implements the FOURTH and FINAL Protocol
 > Adapter: a pure, one-way, fail-closed translation from an
