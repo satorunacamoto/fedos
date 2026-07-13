@@ -8,6 +8,54 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 241–250 — Nostr Inbound Event
+> Validation Arc.** Adds cryptographic validation for inbound NIP-01
+> Events received through the single-Relay transport (Alpha 211–240).
+> `parseRelayInboundMessage` (Alpha 233) only ever validated STRUCTURE —
+> a parsed `FedosNostrWireEvent` was not yet trusted. Five new files
+> under `src/desktop/` close that gap:
+> [`fedos_validated_nostr_event.ts`](src/desktop/fedos_validated_nostr_event.ts)
+> (`FedosValidatedNostrEvent`, the SAME seven NIP-01 wire fields,
+> verbatim, construction-restricted to the validator module by
+> convention — no `valid`/`status` field, no metadata bag),
+> [`nostr_event_id_verifier.ts`](src/desktop/nostr_event_id_verifier.ts)
+> (`verifyNostrEventId`, a pure, fail-closed NIP-01 canonical-serializer
+> + SHA-256 check — a NEW, independent implementation reconciling the
+> `JSON.stringify` escaping divergence Alpha 191/241 found in the legacy
+> `src/nostr/event.ts`'s own `verifyEventId`),
+> [`nostr_signature_verifier.ts`](src/desktop/nostr_signature_verifier.ts)
+> (`verifyNostrEventSignature`, calling `@noble/curves`'s own
+> `schnorr.verify` directly — the SAME BIP-340 primitive
+> `NobleSignatureVerifier` itself already uses, reused, not redesigned),
+> [`combined_inbound_event_validator.ts`](src/desktop/combined_inbound_event_validator.ts)
+> (`validateInboundNostrEvent`, the single entry point: id verification
+> FIRST, signature verification SECOND, `null` for every failure with
+> no distinction exposed, a deep-cloned + `Object.freeze`d output), and
+> [`validated_subscription_adapter.ts`](src/desktop/validated_subscription_adapter.ts)
+> (`createValidatedEventListener`, an EXTERNAL adapter over the existing
+> `onSubscriptionMessage()` — zero change to
+> `FedosRelay`/`WebSocketRelay`/`NullRelay`). All eight NIP-01 failure
+> causes (wrong/malformed id, wrong/malformed signature, malformed
+> pubkey, unsupported key encoding, canonicalization mismatch,
+> cryptographic-verifier exception) collapse to the SAME `null`/dropped
+> outcome — fail-closed, coarse, no oracle, no NOTICE, no disconnect, no
+> retry, no logging.
+>
+> **Still NOT implemented**: Relay Pool, cross-relay deduplication,
+> persistent storage, moderation, deletion/replaceable/addressable-event
+> semantics, DM, NIP-42, NIP-05, NIP-46, automatic reconnect, GUI,
+> Worker/AppRuntime/Observation changes. `package.json`'s own
+> `dependencies` count stays fixed at 2 — zero new Cargo/npm dependency,
+> zero Rust/wasm change of any kind. `npm run typecheck`/`npm test`
+> GREEN. `cargo check`/`cargo test` GREEN (pre-existing, unrelated
+> failures excluded — see `docs/secure_runtime_alpha_250_inbound_validation_completion.md`).
+>
+> See `docs/secure_runtime_alpha_241_existing_inbound_validation_inventory.md`
+> through `docs/secure_runtime_alpha_250_inbound_validation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 231–240 — Nostr Relay Message
 > Reception Arc.** Completes the INBOUND half of the single-Relay
 > transport `FedosRelay`/`WebSocketRelay` (`src/desktop/`) already
@@ -44,8 +92,6 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > See `docs/secure_runtime_alpha_231_existing_relay_inbound_inventory.md`
 > through `docs/secure_runtime_alpha_240_relay_reception_completion.md`
 > for the full, per-Stage design record.
->
-> Prior status:
 >
 > **Stage 157–160 — Ciphertext envelope skeleton + public API
 > planning.** A new `src/crypto/ciphertext_envelope.rs` turns
