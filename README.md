@@ -8,6 +8,68 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 311–320 — Canonical Board Persistence
+> Boundary Arc.** Implements a protocol-independent persistence SEAM
+> (not a real database) for the Canonical Board Application built in
+> Alpha 301–310. Six new files under the new
+> [`src/board/persistence/`](src/board/persistence/) directory:
+> [`fedos_persisted_board_post_v1.ts`](src/board/persistence/fedos_persisted_board_post_v1.ts)
+> (`FedosPersistedBoardPostRecordV1` — `schemaVersion: 1`, plain
+> serializable data only, no branded types/Map/Set/functions/class
+> instances; moderation persistence deliberately deferred, never
+> embedded casually),
+> [`fedos_board_post_codec.ts`](src/board/persistence/fedos_board_post_codec.ts)
+> (`serializeFedosBoardPost`/`deserializeFedosBoardPost` — fail closed,
+> exact `schemaVersion` check, unknown top-level AND nested fields
+> rejected, `validateFedosBoardPost` (Alpha 257) reused unmodified on
+> every read, round-trip equality, no thrown exceptions),
+> [`fedos_board_persistence.ts`](src/board/persistence/fedos_board_persistence.ts)
+> (`FedosBoardPersistence` port — `putPost`/`getPost`/`listPosts`, no
+> `delete` this Arc; `FedosBoardPersistenceWriteResult` —
+> `"inserted"`/`"already-present"`/`"conflict"`/`"failed"`),
+> [`in_memory_fedos_board_persistence.ts`](src/board/persistence/in_memory_fedos_board_persistence.ts)
+> (`InMemoryFedosBoardPersistence` — structurally distinct from
+> `InMemoryFedosBoardRepository`: persisted plain records, not validated
+> application objects),
+> [`persisted_fedos_board_repository.ts`](src/board/persistence/persisted_fedos_board_repository.ts)
+> (`PersistedFedosBoardRepository` — satisfies the already-frozen
+> `FedosBoardRepository` contract (Alpha 302) unmodified; Option B
+> strict `listPosts()` plus an Option C `listPostsDiagnostic()`
+> supplement), and
+> [`fedos_board_hydration.ts`](src/board/persistence/fedos_board_hydration.ts)
+> (`hydrateFedosBoardService` — a bounded, deterministic topological
+> pass, roots first then replies as parents become available,
+> rebuilding a fresh in-memory `FedosBoardService` with Source/Board/
+> Thread Index rebuilt entirely as a side effect of its own unmodified
+> `registerPost`; no partial service on corruption or unresolvable
+> thread integrity). Verified end-to-end against all four real,
+> unmodified Board Adapters: round-trip equality, provenance/author
+> preservation, thread grouping preservation, feed-order preservation,
+> idempotent writes, ID/source-conflict detection surviving hydration,
+> and corrupt-record rejection all confirmed. The pre-existing
+> root-level `p2p/` directory remains completely untouched — not
+> staged, not imported, not used as persisted canonical state.
+>
+> **Still NOT implemented**: a real durable backend (SQLite/D1/
+> IndexedDB/filesystem), encryption at rest, database migration
+> execution, moderation/delete persistence, search, full-text indexing,
+> P2P Ontology Engine integration, pagination cursors, ranking,
+> recommendations, Relay Pool, GUI. `package.json`'s own `dependencies`
+> count stays fixed at 2 — zero new Cargo/npm dependency, zero Rust/wasm
+> change of any kind. `npm run typecheck`/`npm test` GREEN (pre-existing,
+> unrelated Rust-structural test failures excluded — see
+> `docs/secure_runtime_alpha_320_board_persistence_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_311_existing_board_persistence_inventory.md`
+> through `docs/secure_runtime_alpha_320_board_persistence_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 301–310 — Canonical Board Repository,
 > Index & Feed Foundation Arc.** Implements the first protocol-independent
 > Board Application layer on top of the Canonical Board Model and all
