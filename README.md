@@ -8,6 +8,74 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 281–290 — AT Protocol Canonical Board
+> Adapter Arc.** Implements the THIRD Protocol Adapter: a pure, one-way,
+> fail-closed translation from an already-validated, already-normalized
+> `FedosValidatedAtprotoPost` into a `FedosBoardPost` (Alpha 255),
+> following both prior adapters' own shared two-step pattern exactly.
+> Three new files under the new
+> [`src/board/atproto/`](src/board/atproto/) directory:
+> [`fedos_validated_atproto_post.ts`](src/board/atproto/fedos_validated_atproto_post.ts)
+> (`FedosValidatedAtprotoPost` — `uri`/`cid`/`authorDid`/`text`/
+> `createdAt`/`replyRootUri`/`replyParentUri`, seven fields, `text`
+> plain UTF-8 by Lexicon schema design — no HTML-normalization concern,
+> unlike ActivityPub; no raw Lexicon object, no XRPC response, no CAR
+> block, no auth/refresh token, no app password, no PDS session, no
+> metadata bag),
+> [`fedos_atproto_board_adapter.ts`](src/board/atproto/fedos_atproto_board_adapter.ts)
+> (`validateAtprotoBoardPost` + `mapValidatedAtprotoPostToBoardPostInput`
+> — "Option C": AT URI → `id`/`source.reference` (record identity), CID
+> retained on the input type only, read for a non-emptiness check but
+> NEVER copied onto `FedosBoardPost` (future `Update` handling won't
+> confuse identity with content version); `authorDid` →
+> `author.publicIdentifier` verbatim (the STABLE DID, never the mutable
+> handle — no profile resolution, no network calls); `text` → `body`
+> verbatim with NO markup guard needed, unlike ActivityPub;
+> `replyRootUri`/`replyParentUri` → `threadId`/`replyTo` — AT Protocol
+> supplies both explicitly (no upstream-resolver deferral needed, unlike
+> ActivityPub), invalid combinations (root-without-parent, parent-
+> without-root, self-root contradiction) rejected fail-closed at the
+> adapter, self-parent reused from `validateFedosBoardPost` not
+> duplicated; composes with, never duplicates, `validateFedosBoardPost`,
+> Alpha 257, unmodified), and
+> [`fedos_atproto_mutation_boundary.ts`](src/board/atproto/fedos_atproto_mutation_boundary.ts)
+> (`FedosAtprotoRecordObservation`, a minimal INERT type — carrying both
+> `uri` and `cid`, unlike ActivityPub's `objectId`-only equivalent —
+> formally separating updated/deleted records from `FedosBoardPost`; no
+> boolean `deleted`/`updated`/`repost` field is ever added to it, never
+> wired into the adapter; repost/like/follow/profile records stay
+> entirely out of scope). Verified against a 17-case required fixture
+> matrix (Bluesky- and generic-AT-Protocol-shaped posts, root/reply/
+> direct-reply-to-root, missing-root/missing-parent/self-parent
+> rejection, Unicode, empty/oversized-body rejection, malformed DID/URI/
+> CID rejection, deterministic repeated mapping, same-URI-different-CID
+> identity, different-URI separation), confirmed shape-identical to
+> BOTH a Nostr- and an ActivityPub-produced `FedosBoardPost`, and
+> confirmed BOTH existing adapters (Alpha 266, Alpha 277) have zero
+> functional coupling to AT Protocol.
+>
+> **Still NOT implemented**: an XRPC client, OAuth, app passwords, PDS
+> login, repository writes, firehose/Jetstream, Relay/App View
+> integration, DID/handle resolution, blob fetching, rich-text
+> rendering, facets, embeds, record updates/deletion, a Session Gateway
+> Adapter, persistence, moderation enforcement, GUI, and any wiring of
+> this adapter into a live path (`boardId` remains a required, caller-
+> supplied parameter). `package.json`'s own `dependencies` count stays
+> fixed at 2 — zero new Cargo/npm dependency, zero Rust/wasm change of
+> any kind. `npm run typecheck`/`npm test` GREEN (pre-existing,
+> unrelated Rust-structural test failures excluded — see
+> `docs/secure_runtime_alpha_290_atproto_board_adapter_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_281_existing_atproto_inventory.md`
+> through `docs/secure_runtime_alpha_290_atproto_board_adapter_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 271–280 — ActivityPub Canonical Board
 > Adapter Arc.** Implements the SECOND Protocol Adapter: a pure,
 > one-way, fail-closed translation from an already-normalized,
