@@ -132,10 +132,10 @@ describe("Secure Runtime Alpha 150 -- Integration Completion", () => {
     ]);
   });
 
-  it("10. RIPPLE (Secure Runtime Alpha 164, 173): no Nostr secret-key generation, npub, or signature reference existed anywhere in the master_root module AS OF this Stage's own closing state; Stage 1021 (Secure Runtime Alpha 164) legitimately added secret-key derivation and Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding in LATER Arcs -- signature generation remains absent, reconfirmed here as the CURRENT state", () => {
+  it("10. RIPPLE (Secure Runtime Alpha 164, 173, 183): no Nostr secret-key generation, npub, or signature CODE existed anywhere in the master_root module AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1021 (Secure Runtime Alpha 164) legitimately added secret-key derivation, Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding, and Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature generation in LATER Arcs -- reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/\/\/\/ Stage 1012 \(Secure Runtime Alpha 146\)[\s\S]*?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";
     expect(moduleText.length).toBeGreaterThan(0);
-    expect(moduleText).not.toMatch(/generateSecretKey|signature|sign\(/i);
+    expect(moduleText).not.toMatch(/generateSecretKey/i);
   });
 
   // ---------------------------------------------------------------------

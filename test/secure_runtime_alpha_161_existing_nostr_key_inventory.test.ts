@@ -67,10 +67,11 @@ describe("Secure Runtime Alpha 161 -- Existing secp256k1 / Nostr Key Inventory",
     expect(conversationKeySource).toMatch(/SecretKey::from_slice\(&sec1_bytes\)/);
   });
 
-  it("6. structural: k256 remains arithmetic-only, no ecdsa/schnorr feature enabled", () => {
+  it("6. RIPPLE (Secure Runtime Alpha 181): k256 was arithmetic-only, no ecdsa/schnorr feature enabled, AS OF this Stage's own closing state; Stage 1029 (Secure Runtime Alpha 181) legitimately added the schnorr feature in a LATER Arc for real Schnorr signing -- ecdsa remains excluded, reconfirmed here as the CURRENT state", () => {
     expect(cargoTomlSource).toMatch(
-      /k256 = \{ version = "0\.13", default-features = false, features = \["arithmetic"\] \}/,
+      /k256 = \{ version = "0\.13", default-features = false, features = \["arithmetic", "schnorr"\] \}/,
     );
+    expect(cargoTomlSource).not.toMatch(/features = \["arithmetic", "schnorr", "ecdsa"/);
   });
 
   it("7. structural: src/nostr/crypto.ts hashes and compares only -- no keygen, no signing", () => {

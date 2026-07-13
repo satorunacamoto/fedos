@@ -26,7 +26,12 @@ import federationTypesSource from "../src/federation/types.ts?raw";
 
 /**
  * Stage 194–197 — "secp256k1 dependency adoption + capability/diagnostics
- * update + guards + documentation."
+ * update + guards + documentation." Updated by Secure Runtime Alpha 181
+ * (the Nostr Schnorr Signing Foundation Arc) — see
+ * `docs/secure_runtime_alpha_181_k256_schnorr_api_inventory.md` for why
+ * `schnorr` moved from the forbidden list (item 3) to the expected list
+ * (item 2) below; every other guarantee this file made at Stage 196 is
+ * UNCHANGED.
  *
  * `docs/nip44_dependency_adoption.md`'s (Stage 192) two candidates are
  * resolved: Stage 194 adopts `k256` (minimal `arithmetic`-only feature —
@@ -61,20 +66,20 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
     expect(depLines.some((line: string) => /^\s*k256\s*=/.test(line))).toBe(true);
   });
 
-  it("2. k256 is declared with default-features = false and ONLY the arithmetic feature", () => {
+  it("2. k256 is declared with default-features = false and exactly the arithmetic+schnorr features (schnorr added by Secure Runtime Alpha 181)", () => {
     const k256Line = productionDepsSection()
       .split("\n")
       .find((line: string) => line.trim().startsWith("k256"));
     expect(k256Line, "expected a k256 dependency line").toBeDefined();
     expect(k256Line).toContain("default-features = false");
-    expect(k256Line).toMatch(/features\s*=\s*\[\s*"arithmetic"\s*\]/);
+    expect(k256Line).toMatch(/features\s*=\s*\[\s*"arithmetic",\s*"schnorr"\s*\]/);
   });
 
-  it("3. k256 does NOT enable ecdsa/schnorr/serde/pem/pkcs8/std/alloc/rand features", () => {
+  it("3. k256 does NOT enable ecdsa/serde/pem/pkcs8/std/alloc/rand features", () => {
     const k256Line = productionDepsSection()
       .split("\n")
       .find((line: string) => line.trim().startsWith("k256"))!;
-    for (const forbidden of ["ecdsa", "schnorr", "serde", "pem", "pkcs8", "rand", '"std"', '"alloc"']) {
+    for (const forbidden of ["ecdsa", "serde", "pem", "pkcs8", "rand", '"std"', '"alloc"']) {
       expect(k256Line, `expected k256 line to not contain ${forbidden}`).not.toContain(forbidden);
     }
   });

@@ -202,14 +202,30 @@ sha2 = "0.11.0"
 # open question in favor of `k256` — same RustCrypto organization, same
 # Apache-2.0 OR MIT license, same pure-Rust/no-FFI/`no_std`-friendly shape
 # as every dependency already listed above). `default-features = false` +
-# `features = ["arithmetic"]` enables ONLY field/group arithmetic — the
-# minimum needed for a FUTURE ECDH stage to build on — and explicitly
-# excludes `ecdsa` (signing/verification, not needed for NIP-44's ECDH-only
-# usage), `schnorr` (BIP-340, a separate future Nostr-signing candidate,
-# not this one), `serde` (this crate has never enabled `serde` in a
-# PRODUCTION dependency — `docs/ciphertext_serialization_format_decision.md`),
-# and `pem`/`pkcs8` (key-file-format encoding, not needed for an in-memory
-# ECDH shared-secret computation).
+# `features = ["arithmetic"]` originally enabled ONLY field/group
+# arithmetic — the minimum needed for a FUTURE ECDH stage to build on —
+# and explicitly excluded `ecdsa` (signing/verification, not needed for
+# NIP-44's ECDH-only usage), `schnorr` (BIP-340, a separate future
+# Nostr-signing candidate, not that one), `serde` (this crate has never
+# enabled `serde` in a PRODUCTION dependency —
+# `docs/ciphertext_serialization_format_decision.md`), and `pem`/`pkcs8`
+# (key-file-format encoding, not needed for an in-memory ECDH
+# shared-secret computation).
+#
+# Secure Runtime Alpha 181–190 (the Nostr Schnorr Signing Foundation
+# Arc) is the "separate future Nostr-signing candidate" the paragraph
+# above named — this is that Stage, and it ADDS `"schnorr"` to the
+# `features` list below. This is a Cargo FEATURE-FLAG change on the
+# ALREADY-PRESENT `k256` dependency line, not a new `[dependencies]`
+# entry — no new crate name is introduced. `k256::schnorr` (RustCrypto's
+# own audited BIP-340 Taproot Schnorr implementation) is the ONLY
+# reviewed alternative to hand-writing BIP-340's scalar/tagged-hash math
+# by hand, which Secure Runtime Alpha 183 explicitly forbids ("No manual
+# signing implementation"). `ecdsa`, `serde`, `pem`, `pkcs8`, `std`,
+# `alloc`, and `rand` all remain excluded, unchanged from Stage 194's own
+# original decision — see `docs/secure_runtime_alpha_181_k256_schnorr_api_inventory.md`
+# for this Stage's own full record, and `src/crypto/secp256k1_dependency_guard.rs`
+# for the updated, still-passing dependency-shape guard.
 #
 # REVIEWED EXCEPTION to `docs/rust_dependency_adoption.md` §12's "no
 # `rand`/`rand_core` anywhere in the resolved graph" rule: `rand_core`
@@ -235,7 +251,7 @@ sha2 = "0.11.0"
 # first-adoption stage. No ECDH function, no conversation-key derivation,
 # no NIP-44 code of any kind exists yet — see
 # `docs/nip44_dependency_adoption.md` (updated) for the full record.
-k256 = { version = "0.13", default-features = false, features = ["arithmetic"] }
+k256 = { version = "0.13", default-features = false, features = ["arithmetic", "schnorr"] }
 
 # `wasm-bindgen` (rustwasm project, MIT OR Apache-2.0) — Prototype EXECUTION
 # Phase 009's own, single, explicitly-reviewed adoption, per

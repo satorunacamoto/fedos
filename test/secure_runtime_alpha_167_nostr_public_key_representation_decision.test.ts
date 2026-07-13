@@ -78,9 +78,13 @@ describe("Secure Runtime Alpha 167 -- Nostr Public Key Representation Decision",
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_167/);
   });
 
-  it("9. Regression: no FedosNostrVerifyingKeyHandle-shaped type exists -- Option B was rejected, not silently implemented", () => {
+  it("9. RIPPLE (Secure Runtime Alpha 181): Option B (representing the PUBLIC KEY itself via k256::schnorr::VerifyingKey) was rejected, not silently implemented -- no k256::schnorr reference existed anywhere in lib.rs AS OF this Stage's own closing state; Stage 1029 (Secure Runtime Alpha 181) legitimately imports k256::schnorr in a LATER Arc, but for an ENTIRELY DIFFERENT purpose (real Schnorr SIGNING, Alpha 183) than this Stage's own rejected Option B (public key REPRESENTATION) -- derive_nostr_public_key_internal itself still never references k256::schnorr, and no FedosNostrVerifyingKeyHandle-shaped type exists, both reconfirmed here as the CURRENT state", () => {
     expect(libRsSource).not.toMatch(/struct\s+FedosNostrVerifyingKeyHandle/);
-    expect(libRsSource).not.toMatch(/k256::schnorr/);
+    const publicKeyFnMatch = libRsSource.match(
+      /pub\(crate\) fn derive_nostr_public_key_internal\([\s\S]*?\r?\n {4}\}\r?\n/,
+    );
+    expect(publicKeyFnMatch).not.toBeNull();
+    expect(publicKeyFnMatch?.[0] ?? "").not.toMatch(/k256::schnorr/);
   });
 
   it("10. Regression: desktop_application.ts and worker.ts carry no reference to this Stage's own doc", () => {

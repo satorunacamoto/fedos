@@ -1,20 +1,26 @@
 //! Stage 196 — secp256k1 dependency PRE-IMPLEMENTATION guard,
-//! `#[cfg(test)]` ONLY.
+//! `#[cfg(test)]` ONLY. Updated by Secure Runtime Alpha 181 (the Nostr
+//! Schnorr Signing Foundation Arc) — see that Stage's own record,
+//! `docs/secure_runtime_alpha_181_k256_schnorr_api_inventory.md`, for
+//! why `schnorr` moved from the forbidden list to the expected one
+//! below; every other guarantee this module made at Stage 196 is
+//! UNCHANGED.
 //!
-//! Confirms, from the ACTUAL resolved build (not just prose), that Stage
-//! 194's `k256` adoption stayed exactly as minimal as
-//! `docs/nip44_dependency_adoption.md`/`Cargo.toml`'s own comment record:
-//! exactly one new production dependency, exactly the `arithmetic`
-//! feature (no `ecdsa`/`schnorr`/`serde`/`pem`/`pkcs8`/`std`/`alloc`
-//! feature enabled), and the resolved `Cargo.lock` graph contains no
-//! FULL `rand` crate (only `rand_core`, the reviewed, unavoidable
-//! transitive-trait-only exception `Cargo.toml`'s own comment documents).
+//! Confirms, from the ACTUAL resolved build (not just prose), that
+//! `k256`'s adopted feature set stays exactly as minimal as
+//! `docs/nip44_dependency_adoption.md`/`Cargo.toml`'s own comment record
+//! now describes: exactly one production dependency line for `k256`,
+//! exactly the `arithmetic` + `schnorr` features (no
+//! `ecdsa`/`serde`/`pem`/`pkcs8`/`std`/`alloc` feature enabled), and the
+//! resolved `Cargo.lock` graph contains no FULL `rand` crate (only
+//! `rand_core`, the reviewed, unavoidable transitive-trait-only
+//! exception `Cargo.toml`'s own comment documents).
 //!
 //! **Performs no cryptography of any kind** — no ECDH, no
 //! conversation-key/message-key derivation, no padding, no encrypt/
-//! decrypt. This module exists ONLY to guard the DEPENDENCY shape stays
-//! fixed until a future, separate, explicitly-reviewed stage builds real
-//! ECDH code on top of it.
+//! decrypt, no Schnorr signing. This module exists ONLY to guard the
+//! DEPENDENCY shape stays fixed at exactly this feature set until a
+//! future, separate, explicitly-reviewed stage needs more.
 #![cfg(test)]
 
 /// This crate's own `Cargo.toml`, read at compile time — the SAME
@@ -73,7 +79,7 @@ fn cargo_toml_has_exactly_ten_production_dependencies_after_k256_adoption() {
 }
 
 #[test]
-fn k256_is_declared_with_default_features_false_and_only_the_arithmetic_feature() {
+fn k256_is_declared_with_default_features_false_and_only_arithmetic_and_schnorr_features() {
     let cleaned = strip_toml_comments(CARGO_TOML);
     let section = production_dependencies_section(&cleaned);
     let k256_line = section
@@ -81,8 +87,8 @@ fn k256_is_declared_with_default_features_false_and_only_the_arithmetic_feature(
         .find(|line| line.trim_start().starts_with("k256"))
         .expect("expected a k256 dependency line in [dependencies]");
     assert!(k256_line.contains("default-features = false"));
-    assert!(k256_line.contains(r#"features = ["arithmetic"]"#));
-    for forbidden in ["ecdsa", "schnorr", "serde", "pem", "pkcs8", "rand", "\"std\"", "\"alloc\""] {
+    assert!(k256_line.contains(r#"features = ["arithmetic", "schnorr"]"#));
+    for forbidden in ["ecdsa", "serde", "pem", "pkcs8", "rand", "\"std\"", "\"alloc\""] {
         assert!(
             !k256_line.contains(forbidden),
             "k256 dependency line must not enable `{forbidden}`: {k256_line}"

@@ -140,14 +140,14 @@ describe("Secure Runtime Alpha 165 -- Nostr Secret Key Derivation Completion", (
     expect(pubFnNames.length).toBe(36);
   });
 
-  it("11. RIPPLE (Secure Runtime Alpha 173): no public-key derivation, npub/nsec codec, signature, or Relay CODE existed anywhere in master_root AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding CODE in a LATER Arc -- nsec/signature/Relay remain absent, reconfirmed here as the CURRENT state", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 173, 183): no public-key derivation, npub/nsec codec, signature, or Relay CODE existed anywhere in master_root AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding CODE and Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature CODE in LATER Arcs -- nsec/WebSocket/Relay remain absent, reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/mod master_root \{([\s\S]*?)\r?\n\}\r?\n\r?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";
     expect(moduleText.length).toBeGreaterThan(0);
     const codeOnly = moduleText
       .split(/\r?\n/)
       .filter((line: string) => !line.trim().startsWith("///") && !line.trim().startsWith("//"))
       .join("\n");
-    expect(codeOnly).not.toMatch(/nsec|schnorr|WebSocket|Relay|fn\s+\w*sign\w*\(/i);
+    expect(codeOnly).not.toMatch(/nsec|WebSocket|Relay/i);
   });
 
   // ---------------------------------------------------------------------

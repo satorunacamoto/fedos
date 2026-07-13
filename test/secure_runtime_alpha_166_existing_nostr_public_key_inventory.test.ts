@@ -72,10 +72,11 @@ describe("Secure Runtime Alpha 166 -- Existing Nostr Public Key Inventory", () =
     );
   });
 
-  it("7. structural: k256 remains arithmetic-only -- no schnorr/ecdsa feature enabled, matching the inventory's own finding", () => {
+  it("7. RIPPLE (Secure Runtime Alpha 181): k256 was arithmetic-only -- no schnorr/ecdsa feature enabled -- AS OF this Stage's own closing state, matching the inventory's own finding at that time; Stage 1029 (Secure Runtime Alpha 181) legitimately added the schnorr feature in a LATER Arc for real Schnorr signing -- ecdsa remains excluded, reconfirmed here as the CURRENT state", () => {
     expect(cargoTomlSource).toMatch(
-      /k256 = \{ version = "0\.13", default-features = false, features = \["arithmetic"\] \}/,
+      /k256 = \{ version = "0\.13", default-features = false, features = \["arithmetic", "schnorr"\] \}/,
     );
+    expect(cargoTomlSource).not.toMatch(/features = \["arithmetic", "schnorr", "ecdsa"/);
   });
 
   it("8. structural: k256::PublicKey was not imported by conversation_key.rs -- the ONLY pre-existing k256-consuming file this inventory examined, confirming it is a genuinely NEW use introduced by a LATER Stage in this Arc, not something already present", () => {

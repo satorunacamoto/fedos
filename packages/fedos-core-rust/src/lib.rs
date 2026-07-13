@@ -3056,6 +3056,8 @@ mod master_root {
     use crate::secret_handle::{SecretHandle, SecretHandleKind};
     use hkdf::Hkdf;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
+    use k256::schnorr::signature::hazmat::PrehashSigner;
+    use k256::schnorr::SigningKey as SchnorrSigningKey;
     use k256::SecretKey;
     use sha2::Sha256;
     use subtle::ConstantTimeEq;
@@ -3506,6 +3508,27 @@ mod master_root {
         fn expose_bytes_for_internal_public_key_derivation(&self) -> Option<[u8; 32]> {
             self.inner.expose_bytes_for_internal_derivation()
         }
+
+        /// Stage 1029 (Secure Runtime Alpha 183) — a SECOND, separately
+        /// named, narrowly-scoped internal accessor exposing a COPY of the
+        /// real 32-byte secret scalar — private to this module, for the
+        /// sole reviewed use of [`derive_nostr_signature_internal`] below
+        /// (its ONLY caller). Deliberately a DISTINCT method from
+        /// [`FedosNostrSecretKeyHandle::expose_bytes_for_internal_public_key_derivation`]
+        /// above, even though both call the SAME underlying
+        /// `SecretHandle::expose_bytes_for_internal_derivation` — this
+        /// crate's own established convention gives every internal
+        /// consumer of secret bytes its OWN named accessor (see e.g.
+        /// [`FedosProtocolRootHandle::expose_bytes_for_internal_nostr_secret_key_derivation`]),
+        /// so a future reviewer can grep for "who reads this Handle's
+        /// bytes" and get an exhaustive, self-documenting answer without
+        /// tracing call sites. Not a byte-export accessor: the caller uses
+        /// the copy solely to reconstruct a transient
+        /// `k256::schnorr::SigningKey` for one `.sign_prehash()` call,
+        /// then zeroizes it. Returns `None` after `clear()`.
+        fn expose_bytes_for_internal_signing(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
     }
 
     /// Coarse observable outcome of a [`derive_nostr_secret_key_internal`]
@@ -3749,6 +3772,108 @@ mod master_root {
         secret_bytes.zeroize();
 
         x_only_bytes.map(FedosNostrPublicKeyHandle::new_from_32_bytes_for_internal_use)
+    }
+
+    /// Stage 1028 (Secure Runtime Alpha 182) — an INTERNAL-ONLY handle for
+    /// a FedOS Nostr Schnorr Signature, the Alpha 181–190 Nostr Schnorr
+    /// Signing Foundation Arc's own sole output type. A BIP-340 Taproot
+    /// Schnorr signature is 64 PUBLIC bytes (`r` || `s`) — meant to
+    /// travel alongside the event it signs — so, exactly like
+    /// [`FedosNostrPublicKeyHandle`] above and unlike every secret-
+    /// holding Handle in this module, this type does NOT wrap a
+    /// `SecretHandle`: it holds a plain `[u8; 64]` directly, no
+    /// `secrecy`/`zeroize` involved. Stays Opaque for boundary-design
+    /// consistency with every other Handle in this module, per this
+    /// Arc's own explicit Alpha 182 requirements: no `Clone`, no
+    /// `Debug`, no `Serialize`, no WASM-export attribute
+    /// (`wasm_bindgen`), and — stricter than
+    /// `FedosNostrPublicKeyHandle`, which has exactly ONE narrowly-
+    /// scoped byte accessor for its own reviewed Encoder Boundary
+    /// (Alpha 173) — NO raw-byte export accessor of any kind: no future
+    /// Event Builder, Encoder, or Runtime Boundary exists yet for this
+    /// type to serve (Alpha 187/189, both review-only this Arc), so no
+    /// accessor is added ahead of a real, reviewed need. No
+    /// `PartialEq`/`Eq` derive either — `matches_for_internal_verification`
+    /// below is the ONLY comparison this type exposes, the same
+    /// constant-time-only discipline as every other Handle in this
+    /// module.
+    pub(crate) struct FedosNostrSignatureHandle {
+        bytes: [u8; 64],
+    }
+
+    impl FedosNostrSignatureHandle {
+        /// Private to this module — the only production caller is
+        /// [`derive_nostr_signature_internal`] below.
+        fn new_from_64_bytes_for_internal_use(bytes: [u8; 64]) -> Self {
+            Self { bytes }
+        }
+
+        /// Same shape and guarantees as
+        /// [`FedosNostrPublicKeyHandle::matches_for_internal_verification`]
+        /// above — the ONLY comparison operation this type exposes.
+        /// Constant-time (`subtle::ConstantTimeEq`), Handle-only, never a
+        /// raw byte returned, logged, or compared with a plain `==`. This
+        /// is the ONLY way Alpha 184's own determinism/separation
+        /// properties are verified — no byte-level accessor is needed, or
+        /// added, to prove "same signature" / "different signature".
+        pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
+            bool::from(self.bytes.ct_eq(&other.bytes))
+        }
+    }
+
+    /// Stage 1029 (Secure Runtime Alpha 183) — derive a NEW
+    /// [`FedosNostrSignatureHandle`] from an existing, real
+    /// [`FedosNostrSecretKeyHandle`] and a 32-byte message digest (the
+    /// SAME "sha256 hash of the serialized event" shape NIP-01 already
+    /// requires for `NostrEvent.id`/`NostrEvent.sig` — Alpha 161 §2.5's
+    /// own `computeEventId`, unrelated and unchanged, already produces
+    /// exactly this shape on the TypeScript side), via `k256::schnorr`'s
+    /// own existing `SigningKey::from_bytes` +
+    /// `PrehashSigner::sign_prehash` — RustCrypto's own audited BIP-340
+    /// Taproot Schnorr implementation (Alpha 181's own inventory), never
+    /// a hand-written scalar/tagged-hash implementation of any kind. No
+    /// new cryptographic algorithm: BIP-340 Schnorr over secp256k1 is the
+    /// SAME curve this crate's `k256` `arithmetic` feature already uses
+    /// throughout `master_root`; only the SIGNING operation itself is new.
+    ///
+    /// Deterministic by construction: `sign_prehash` (the
+    /// `signature::hazmat::PrehashSigner` trait method) forwards to
+    /// `SigningKey::sign_raw(prehash, &Default::default())` internally —
+    /// `[u8; 32]::default()` is thirty-two zero bytes, so the BIP-340
+    /// "auxiliary randomness" input is FIXED at all-zeros, never drawn
+    /// from an RNG. BIP-340 itself states all-zero auxiliary randomness
+    /// is an explicitly acceptable, secure choice for signers that do not
+    /// want to depend on an external entropy source — this crate has
+    /// never added `rand`/`getrandom`-backed signing randomness anywhere,
+    /// and this function does not start now. The SAME secret key and the
+    /// SAME message digest therefore ALWAYS produce the SAME 64-byte
+    /// signature, verified by real execution in Alpha 184 below.
+    ///
+    /// Returns `None` — Fail Closed, never a panic — if `secret_key`
+    /// holds no real bytes (already `clear()`-ed) or if reconstructing a
+    /// `k256::schnorr::SigningKey` or computing the signature is ever
+    /// rejected (both unreachable in practice, since
+    /// [`FedosNostrSecretKeyHandle`] can only ever hold an
+    /// already-`k256`-validated scalar, but matched exhaustively rather
+    /// than assumed infallible). Does not mutate `secret_key` — it is
+    /// borrowed, never consumed. The transient copy of the secret scalar
+    /// this function draws is zeroized before returning on every path.
+    pub(crate) fn derive_nostr_signature_internal(
+        secret_key: &FedosNostrSecretKeyHandle,
+        message: &[u8; 32],
+    ) -> Option<FedosNostrSignatureHandle> {
+        let mut secret_bytes = secret_key.expose_bytes_for_internal_signing()?;
+
+        let signature_bytes = match SchnorrSigningKey::from_bytes(&secret_bytes) {
+            Ok(signing_key) => signing_key
+                .sign_prehash(message)
+                .ok()
+                .map(|signature| signature.to_bytes()),
+            Err(_) => None,
+        };
+        secret_bytes.zeroize();
+
+        signature_bytes.map(FedosNostrSignatureHandle::new_from_64_bytes_for_internal_use)
     }
 
     /// Stage 1025–1027 (Secure Runtime Alpha 173) — the Nostr Public
@@ -5112,6 +5237,200 @@ mod master_root {
             }
             let recovered_hex: String = recovered.iter().map(|b| format!("{:02x}", b)).collect();
             assert_eq!(recovered_hex, hex);
+        }
+
+        // -----------------------------------------------------------------
+        // Secure Runtime Alpha 183/184/186 — Nostr Schnorr Signature
+        // derivation: Fail Closed, determinism, separation, and real
+        // cryptographic cross-verification against
+        // FedosNostrPublicKeyHandle (Alpha 186's own Interoperability
+        // Review, proven by execution here, not merely asserted by prose)
+        // -----------------------------------------------------------------
+
+        #[test]
+        fn derive_nostr_signature_internal_succeeds_for_a_real_secret_key() {
+            let secret_key = real_nostr_secret_key(0);
+            let signature = derive_nostr_signature_internal(&secret_key, &[0x01; 32]);
+            assert!(signature.is_some());
+        }
+
+        #[test]
+        fn derive_nostr_signature_internal_rejects_a_cleared_secret_key() {
+            let mut secret_key = real_nostr_secret_key(0);
+            secret_key.clear();
+            let signature = derive_nostr_signature_internal(&secret_key, &[0x01; 32]);
+            assert!(signature.is_none());
+        }
+
+        #[test]
+        fn derive_nostr_signature_internal_does_not_mutate_the_input_secret_key() {
+            let secret_key = real_nostr_secret_key(0);
+            let _ = derive_nostr_signature_internal(&secret_key, &[0x01; 32]);
+            assert!(!secret_key.is_cleared());
+        }
+
+        #[test]
+        fn same_secret_key_and_same_message_derive_identical_signatures() {
+            let secret_key = real_nostr_secret_key(3);
+            let first = derive_nostr_signature_internal(&secret_key, &[0xAB; 32])
+                .expect("expected a real signature");
+            let second = derive_nostr_signature_internal(&secret_key, &[0xAB; 32])
+                .expect("expected a real signature");
+            assert!(first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn same_secret_key_and_different_message_derive_non_matching_signatures() {
+            let secret_key = real_nostr_secret_key(3);
+            let first = derive_nostr_signature_internal(&secret_key, &[0x01; 32])
+                .expect("expected a real signature");
+            let second = derive_nostr_signature_internal(&secret_key, &[0x02; 32])
+                .expect("expected a real signature");
+            assert!(!first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn different_account_indices_derive_non_matching_signatures_for_the_same_message() {
+            let nostr_root = real_nostr_root();
+            let first_secret = derive_nostr_secret_key_internal(&nostr_root, 0)
+                .output
+                .expect("expected Success");
+            let second_secret = derive_nostr_secret_key_internal(&nostr_root, 1)
+                .output
+                .expect("expected Success");
+            let message = [0x42; 32];
+            let first = derive_nostr_signature_internal(&first_secret, &message)
+                .expect("expected a real signature");
+            let second = derive_nostr_signature_internal(&second_secret, &message)
+                .expect("expected a real signature");
+            assert!(!first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn different_master_seeds_and_same_account_index_derive_non_matching_signatures() {
+            let first_secret = {
+                let seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use([0xCC; 32]);
+                let identity_root = derive_identity_root_internal(&seed)
+                    .output
+                    .expect("expected a real Identity Root");
+                let application_root = derive_application_root_internal(&identity_root)
+                    .output
+                    .expect("expected a real Application Root");
+                let nostr_root = derive_nostr_root_internal(&application_root)
+                    .output
+                    .expect("expected a real Nostr Root");
+                derive_nostr_secret_key_internal(&nostr_root, 0)
+                    .output
+                    .expect("expected Success")
+            };
+            let second_secret = real_nostr_secret_key(0);
+            let message = [0x99; 32];
+            let first = derive_nostr_signature_internal(&first_secret, &message)
+                .expect("expected a real signature");
+            let second = derive_nostr_signature_internal(&second_secret, &message)
+                .expect("expected a real signature");
+            assert!(!first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn account_index_zero_one_and_u32_max_all_sign_successfully_and_distinctly_for_the_same_message(
+        ) {
+            let nostr_root = real_nostr_root();
+            let message = [0x55; 32];
+            let zero = derive_nostr_signature_internal(
+                &derive_nostr_secret_key_internal(&nostr_root, 0)
+                    .output
+                    .expect("expected Success for account 0"),
+                &message,
+            )
+            .expect("expected a real signature for account 0");
+            let one = derive_nostr_signature_internal(
+                &derive_nostr_secret_key_internal(&nostr_root, 1)
+                    .output
+                    .expect("expected Success for account 1"),
+                &message,
+            )
+            .expect("expected a real signature for account 1");
+            let max = derive_nostr_signature_internal(
+                &derive_nostr_secret_key_internal(&nostr_root, u32::MAX)
+                    .output
+                    .expect("expected Success for account u32::MAX"),
+                &message,
+            )
+            .expect("expected a real signature for account u32::MAX");
+            assert!(!zero.matches_for_internal_verification(&one));
+            assert!(!zero.matches_for_internal_verification(&max));
+            assert!(!one.matches_for_internal_verification(&max));
+        }
+
+        #[test]
+        fn signature_matches_for_internal_verification_returns_true_only_for_equal_bytes() {
+            let secret_key = real_nostr_secret_key(6);
+            let message = [0x11; 32];
+            let first =
+                derive_nostr_signature_internal(&secret_key, &message).expect("expected Success");
+            let second =
+                derive_nostr_signature_internal(&secret_key, &message).expect("expected Success");
+            assert!(first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn derived_signature_cryptographically_verifies_against_the_independently_derived_public_key(
+        ) {
+            // Secure Runtime Alpha 186 -- Interoperability with
+            // FedosNostrPublicKeyHandle: real, end-to-end BIP-340
+            // verification, not merely internal self-consistency. Builds
+            // the public key via the EXISTING, unmodified
+            // `derive_nostr_public_key_internal` (Alpha 169) and the
+            // signature via the NEW `derive_nostr_signature_internal`
+            // (Alpha 183), from the SAME secret key, then reconstructs a
+            // `k256::schnorr::VerifyingKey` from the public key's own
+            // x-only bytes and confirms `verify_prehash` succeeds --
+            // proving the two derivations agree on the SAME x-only
+            // convention.
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let secret_key = real_nostr_secret_key(11);
+            let public_key =
+                derive_nostr_public_key_internal(&secret_key).expect("expected a real public key");
+            let message = [0x24; 32];
+            let signature = derive_nostr_signature_internal(&secret_key, &message)
+                .expect("expected a real signature");
+
+            let verifying_key = SchnorrVerifyingKey::from_bytes(
+                &public_key.expose_bytes_for_internal_public_identifier_encoding(),
+            )
+            .expect("expected a valid x-only public key");
+            let schnorr_signature = SchnorrSignature::try_from(signature.bytes.as_slice())
+                .expect("expected a well-formed 64-byte signature");
+            assert!(verifying_key.verify_prehash(&message, &schnorr_signature).is_ok());
+        }
+
+        #[test]
+        fn derived_signature_does_not_verify_against_a_different_message() {
+            // Alpha 184's own "Fail Closed" spirit extended to
+            // verification: a signature over one message must NOT verify
+            // against a different one -- the negative counterpart to the
+            // cross-verification test directly above.
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let secret_key = real_nostr_secret_key(12);
+            let public_key =
+                derive_nostr_public_key_internal(&secret_key).expect("expected a real public key");
+            let signature = derive_nostr_signature_internal(&secret_key, &[0x66; 32])
+                .expect("expected a real signature");
+
+            let verifying_key = SchnorrVerifyingKey::from_bytes(
+                &public_key.expose_bytes_for_internal_public_identifier_encoding(),
+            )
+            .expect("expected a valid x-only public key");
+            let schnorr_signature = SchnorrSignature::try_from(signature.bytes.as_slice())
+                .expect("expected a well-formed 64-byte signature");
+            assert!(verifying_key
+                .verify_prehash(&[0x77; 32], &schnorr_signature)
+                .is_err());
         }
     }
 }

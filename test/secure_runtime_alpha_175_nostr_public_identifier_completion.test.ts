@@ -150,14 +150,14 @@ describe("Secure Runtime Alpha 175 -- Nostr Public Identifier Completion", () =>
     expect(pubFnNames.length).toBe(36);
   });
 
-  it("11. structural: no nsec/schnorr/Event/Relay/WebSocket CODE exists anywhere in master_root -- doc-comment mentions of what does NOT exist yet are expected and excluded", () => {
+  it("11. RIPPLE (Secure Runtime Alpha 183): no nsec/schnorr/Event/Relay/WebSocket CODE existed anywhere in master_root AS OF this Stage's own closing state -- doc-comment mentions of what does NOT exist yet are expected and excluded; Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature CODE in a LATER Arc -- nsec/Event/Relay/WebSocket remain absent, reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/mod master_root \{([\s\S]*?)\r?\n\}\r?\n\r?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";
     expect(moduleText.length).toBeGreaterThan(0);
     const codeOnly = moduleText
       .split(/\r?\n/)
       .filter((line: string) => !line.trim().startsWith("///") && !line.trim().startsWith("//"))
       .join("\n");
-    expect(codeOnly).not.toMatch(/nsec|schnorr|WebSocket|Relay|\bEvent\b|fn\s+\w*sign\w*\(/i);
+    expect(codeOnly).not.toMatch(/nsec|WebSocket|Relay|\bEvent\b/i);
   });
 
   it("12. structural: FedosIdentityDescriptor.publicIdentifier remains externally sourced, untouched by this Arc", () => {
