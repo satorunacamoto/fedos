@@ -67,8 +67,8 @@ describe("Secure Runtime Alpha 187 -- Future Event Builder Compatibility Review"
     expect(libRsSource).toMatch(/message: &\[u8; 32\],/);
   });
 
-  it("8. structural: no Event construction/build/sign function of any name exists in lib.rs", () => {
-    expect(libRsSource).not.toMatch(/fn\s+build_nostr_event|fn\s+sign_nostr_event|fn\s+create_event/);
+  it("8. RIPPLE (Secure Runtime Alpha 195): no Event construction/build/sign function of any name existed in lib.rs AS OF this Stage's own closing state; Stage 1035 (Secure Runtime Alpha 195) legitimately added `sign_nostr_event_internal`/`new_nostr_event_internal` in a LATER Arc, connecting Event ID generation to the Schnorr Signature foundation this Stage's own §3 already named as the exact future call shape -- `build_nostr_event`/`create_event` remain absent by those exact names, reconfirmed here as the CURRENT state", () => {
+    expect(libRsSource).not.toMatch(/fn\s+build_nostr_event|fn\s+create_event/);
   });
 
   it("9. structural: wasm_bindgen count remains fixed at 13, unchanged by this REVIEW-ONLY Stage", () => {

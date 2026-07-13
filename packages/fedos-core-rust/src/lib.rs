@@ -3059,7 +3059,7 @@ mod master_root {
     use k256::schnorr::signature::hazmat::PrehashSigner;
     use k256::schnorr::SigningKey as SchnorrSigningKey;
     use k256::SecretKey;
-    use sha2::Sha256;
+    use sha2::{Digest, Sha256};
     use subtle::ConstantTimeEq;
     use zeroize::Zeroize;
 
@@ -4189,6 +4189,278 @@ mod master_root {
                 );
             }
         }
+    }
+
+    /// Stage 1032 (Secure Runtime Alpha 192) — an INTERNAL-ONLY handle
+    /// for a FedOS Nostr Event core: the five NIP-01 fields that
+    /// participate in Event ID computation
+    /// (`pubkey`/`created_at`/`kind`/`tags`/`content` — Alpha 191 §5's
+    /// own decision). `id` and `sig` are NEVER fields of this type —
+    /// both are COMPUTED outputs
+    /// ([`derive_nostr_event_id_internal`]/[`sign_nostr_event_internal`]
+    /// below), never caller-supplied, keeping this type fully
+    /// immutable: no field ever changes after construction, and no
+    /// `&mut self` method exists anywhere on it (Alpha 197's own
+    /// Boundary Review confirms this by direct inspection). Stays
+    /// Opaque for the same boundary-design consistency reason every
+    /// other Handle in this module already follows: no `Clone`, no
+    /// `Debug`, no `Serialize`, no WASM-export attribute
+    /// (`wasm_bindgen`), no `PartialEq`/`Eq` derive, and — per this
+    /// Arc's own explicit Alpha 192 requirement — no raw JSON export
+    /// accessor of any kind.
+    pub(crate) struct FedosNostrEventHandle {
+        pubkey: nostr_identifier_encoding::FedosNostrPublicKeyHex,
+        created_at: u64,
+        kind: u64,
+        tags: Vec<Vec<String>>,
+        content: String,
+    }
+
+    impl FedosNostrEventHandle {
+        /// Private to this module — the only production caller is
+        /// [`new_nostr_event_internal`] below. Takes ownership of all
+        /// five fields verbatim — no validation, no reformatting, no
+        /// derivation of any kind, mirroring every other Handle
+        /// constructor's own `new_from_..._for_internal_use`
+        /// discipline.
+        fn new_for_internal_use(
+            pubkey: nostr_identifier_encoding::FedosNostrPublicKeyHex,
+            created_at: u64,
+            kind: u64,
+            tags: Vec<Vec<String>>,
+            content: String,
+        ) -> Self {
+            Self {
+                pubkey,
+                created_at,
+                kind,
+                tags,
+                content,
+            }
+        }
+
+        /// The ONE accessor exposing this Handle's own fields —
+        /// private to this module, for the sole reviewed use of
+        /// [`nostr_event_encoding::serialize_nostr_event_canonical_internal`]
+        /// below (its ONLY caller). Returns BORROWED references — no
+        /// clone, no ownership transfer, no `String`/`Vec` copy of any
+        /// kind — since the caller only ever reads these values once,
+        /// to build a serialized `String`, never stores them. Not a
+        /// raw JSON export: this method returns Rust VALUES, not a
+        /// JSON string of any kind — [`nostr_event_encoding`] below is
+        /// the ONLY place those values are ever turned into JSON text.
+        fn expose_fields_for_internal_canonical_serialization(
+            &self,
+        ) -> (
+            &nostr_identifier_encoding::FedosNostrPublicKeyHex,
+            u64,
+            u64,
+            &[Vec<String>],
+            &str,
+        ) {
+            (&self.pubkey, self.created_at, self.kind, &self.tags, &self.content)
+        }
+    }
+
+    /// Stage 1032 (Secure Runtime Alpha 192) — construct a NEW
+    /// [`FedosNostrEventHandle`] from an existing, real
+    /// [`FedosNostrPublicKeyHandle`] and the four remaining NIP-01
+    /// core fields, via `nostr_identifier_encoding::encode_nostr_public_key_hex_internal`
+    /// (Alpha 173, REUSED, never re-derived) — the SAME "reuse the
+    /// existing Encoder Boundary rather than duplicating hex-encoding
+    /// logic" discipline Alpha 191 §5 named as this Arc's own decision.
+    /// `created_at`/`kind` are taken verbatim as `u64` — no range
+    /// validation of any kind, matching TypeScript's own unbounded
+    /// `number` fields (Alpha 191 §5) — and `tags`/`content` are taken
+    /// verbatim as owned `Vec<Vec<String>>`/`String` — no NIP-01
+    /// semantic validation (e.g. tag-shape rules specific to
+    /// individual NIPs) is performed here or anywhere in this Arc; this
+    /// function's own sole responsibility is ASSEMBLING the five
+    /// core fields into an Opaque Handle, not judging their content.
+    ///
+    /// Returns `None` — Fail Closed, never a panic — if encoding
+    /// `pubkey` ever fails; ALWAYS `Some` today, since
+    /// `encode_nostr_public_key_hex_internal` (Alpha 173) is itself
+    /// documented `ALWAYS Some today` — matched exhaustively here
+    /// rather than assumed infallible, the SAME discipline this
+    /// crate's own `derive_*_internal` functions apply throughout. Does
+    /// not mutate `pubkey` — it is borrowed, never consumed.
+    pub(crate) fn new_nostr_event_internal(
+        pubkey: &FedosNostrPublicKeyHandle,
+        created_at: u64,
+        kind: u64,
+        tags: Vec<Vec<String>>,
+        content: String,
+    ) -> Option<FedosNostrEventHandle> {
+        let pubkey_hex = nostr_identifier_encoding::encode_nostr_public_key_hex_internal(pubkey)?;
+        Some(FedosNostrEventHandle::new_for_internal_use(
+            pubkey_hex, created_at, kind, tags, content,
+        ))
+    }
+
+    /// Stage 1033 (Secure Runtime Alpha 193) — the Nostr Event
+    /// Canonical Serialization ENCODER BOUNDARY this Arc's own
+    /// instruction requires: the ONE place in this crate permitted to
+    /// turn a [`FedosNostrEventHandle`] into NIP-01's own canonical
+    /// pre-image text — `[0,<pubkey>,<created_at>,<kind>,<tags>,<content>]`
+    /// (Alpha 191 §2, quoted from the spec directly). Nested INSIDE
+    /// `master_root` (rather than a sibling `crypto::` file) for the
+    /// SAME reason `nostr_identifier_encoding` (Alpha 173) already is:
+    /// its own sole accessor onto `FedosNostrEventHandle` (above) can
+    /// stay genuinely PRIVATE — never `pub(crate)` — reachable only
+    /// because Rust's own privacy model already grants a descendant
+    /// module visibility into its ancestor's private items.
+    ///
+    /// Hand-written against the STANDARD LIBRARY ONLY — no new Cargo
+    /// dependency, `serde_json` stays `[dev-dependencies]`-only
+    /// (Alpha 191 §4, unchanged) — matching `nostr_identifier_encoding`/
+    /// `crypto::ciphertext_serialization`/`crypto::nip44_wire_encoding`'s
+    /// own established "hand-written codec, closed input shape, no new
+    /// crate" precedent exactly. Implements ONLY NIP-01's own six-
+    /// character content-escaping rule (Alpha 191 §2) — no custom
+    /// escaping, no `\uXXXX` control-character escaping beyond those
+    /// six (a DELIBERATE divergence from generic JSON libraries,
+    /// including this repository's own TypeScript-side
+    /// `JSON.stringify`-based `serializeForId`, Alpha 191 §3 — NIP-01's
+    /// own rule, not a generic one, is what this boundary implements).
+    mod nostr_event_encoding {
+        use super::FedosNostrEventHandle;
+
+        /// Escapes a single JSON string value per NIP-01's own SIX-
+        /// character rule, and ONLY those six characters — every other
+        /// `char`, including every non-ASCII UTF-8 code point, passes
+        /// through verbatim, matching NIP-01's own "all other
+        /// characters must be included verbatim" instruction exactly
+        /// (Alpha 191 §2). Wraps the result in a leading/trailing `"`.
+        /// Used for EVERY string field this module serializes —
+        /// `pubkey`, every tag element, and `content` alike — never a
+        /// field-specific escaping rule of any kind.
+        fn escape_json_string_internal(value: &str) -> String {
+            let mut out = String::with_capacity(value.len() + 2);
+            out.push('"');
+            for c in value.chars() {
+                match c {
+                    '\n' => out.push_str("\\n"),
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    '\u{08}' => out.push_str("\\b"),
+                    '\u{0C}' => out.push_str("\\f"),
+                    other => out.push(other),
+                }
+            }
+            out.push('"');
+            out
+        }
+
+        /// Serializes `tags` as NIP-01's own "array of arrays of
+        /// strings" — `[["a","b"],["c"]]`, no whitespace, every string
+        /// element escaped via [`escape_json_string_internal`] above.
+        fn serialize_tags_internal(tags: &[Vec<String>]) -> String {
+            let mut out = String::from("[");
+            for (i, tag) in tags.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push('[');
+                for (j, item) in tag.iter().enumerate() {
+                    if j > 0 {
+                        out.push(',');
+                    }
+                    out.push_str(&escape_json_string_internal(item));
+                }
+                out.push(']');
+            }
+            out.push(']');
+            out
+        }
+
+        /// The Nostr Event Canonical Serialization Boundary's own
+        /// single entry point: turns a [`FedosNostrEventHandle`] into
+        /// NIP-01's own fixed five-element pre-image array, with the
+        /// literal `0` version marker NIP-01 itself requires (Alpha 191
+        /// §2) — never any other value. `created_at`/`kind` serialize
+        /// via `u64`'s own `Display` impl — plain decimal, no leading
+        /// zeros, no floating point, matching JSON's own number
+        /// grammar exactly with zero extra logic needed. No whitespace
+        /// or line break appears anywhere in the output, matching
+        /// NIP-01's own "no unnecessary formatting" rule.
+        pub(crate) fn serialize_nostr_event_canonical_internal(event: &FedosNostrEventHandle) -> String {
+            let (pubkey, created_at, kind, tags, content) =
+                event.expose_fields_for_internal_canonical_serialization();
+            format!(
+                "[0,{},{},{},{},{}]",
+                escape_json_string_internal(pubkey.as_str()),
+                created_at,
+                kind,
+                serialize_tags_internal(tags),
+                escape_json_string_internal(content),
+            )
+        }
+    }
+
+    /// Stage 1034 (Secure Runtime Alpha 194) — derive the deterministic
+    /// NIP-01 Event ID for a [`FedosNostrEventHandle`]: the lowercase-
+    /// hex-equivalent sha256 digest of ITS OWN canonical serialization
+    /// (`nostr_event_encoding::serialize_nostr_event_canonical_internal`,
+    /// Alpha 193) — hashing ONLY that canonical byte sequence, nothing
+    /// else, matching NIP-01's own "id is the sha256 of the
+    /// serialized event data" rule exactly (Alpha 191 §2). Uses
+    /// `sha2::{Digest, Sha256}::digest`, the SAME call shape
+    /// `crypto::nip44_hmac` (Stage 231) already established — no new
+    /// cryptographic algorithm, no new Cargo dependency.
+    ///
+    /// Returns `Option<[u8; 32]>` — Fail Closed, matched exhaustively,
+    /// never a panic — following this crate's own established
+    /// convention EVERY `derive_*_internal` function in this module
+    /// applies, even where (as here) no currently-reachable failure
+    /// path exists: canonical serialization is a pure, total function
+    /// over any valid `FedosNostrEventHandle` (Alpha 193), and
+    /// `Sha256::digest` never fails for any input length. This is the
+    /// SAME "ALWAYS `Some` today, matched exhaustively rather than
+    /// assumed infallible" shape
+    /// `nostr_identifier_encoding::encode_nostr_public_key_hex_internal`
+    /// (Alpha 173) already set as this crate's own precedent — the
+    /// `Option` return preserves this function's own Fail-Closed
+    /// discipline for any future change that reintroduces a real
+    /// failure path, rather than silently becoming infallible and
+    /// losing that guarantee. Does not mutate `event` — it is
+    /// borrowed, never consumed, so the SAME event can have its own ID
+    /// recomputed any number of times, always identically (Alpha 196).
+    pub(crate) fn derive_nostr_event_id_internal(event: &FedosNostrEventHandle) -> Option<[u8; 32]> {
+        let canonical = nostr_event_encoding::serialize_nostr_event_canonical_internal(event);
+        let digest = Sha256::digest(canonical.as_bytes());
+        let mut id = [0u8; 32];
+        id.copy_from_slice(&digest);
+        Some(id)
+    }
+
+    /// Stage 1035 (Secure Runtime Alpha 195) — connect Event ID
+    /// generation (Alpha 194) to the EXISTING, UNCHANGED Schnorr
+    /// Signature foundation (`derive_nostr_signature_internal`, Alpha
+    /// 183) — this function's ENTIRE body is exactly that connection,
+    /// nothing more: derive the Event ID, then sign it, using the SAME
+    /// `message: &[u8; 32]` contract `derive_nostr_signature_internal`
+    /// has always taken (NIP-01's own `sig = schnorr_sign(sha256(...), ...)`
+    /// rule, Alpha 187 §2, restated here as this Arc's own closing
+    /// connection). No Relay logic, no event publishing, no Event
+    /// mutation of any kind — `event`/`secret_key` are both borrowed,
+    /// never consumed, and `FedosNostrEventHandle` gains no new field
+    /// or method from this function's own existence (Alpha 197
+    /// confirms this by direct inspection).
+    ///
+    /// Returns `None` — Fail Closed — if EITHER Event ID derivation OR
+    /// signing fails; both underlying functions already apply this
+    /// crate's own Fail-Closed discipline independently, and this
+    /// function adds no new failure path of its own, only propagates
+    /// theirs via `?`.
+    pub(crate) fn sign_nostr_event_internal(
+        event: &FedosNostrEventHandle,
+        secret_key: &FedosNostrSecretKeyHandle,
+    ) -> Option<FedosNostrSignatureHandle> {
+        let event_id = derive_nostr_event_id_internal(event)?;
+        derive_nostr_signature_internal(secret_key, &event_id)
     }
 
     /// The result of a [`derive_application_root_internal`] call.
@@ -5430,6 +5702,281 @@ mod master_root {
                 .expect("expected a well-formed 64-byte signature");
             assert!(verifying_key
                 .verify_prehash(&[0x77; 32], &schnorr_signature)
+                .is_err());
+        }
+
+        // -----------------------------------------------------------------
+        // Secure Runtime Alpha 192/193/194/195/196 -- Nostr Event
+        // Foundation: construction, canonical serialization, Event ID
+        // determinism/separation, Fail Closed, connection to Schnorr
+        // signing, and real end-to-end cryptographic verification
+        // -----------------------------------------------------------------
+
+        fn real_nostr_event(public_key: &FedosNostrPublicKeyHandle) -> FedosNostrEventHandle {
+            new_nostr_event_internal(
+                public_key,
+                1_700_000_000,
+                1,
+                vec![vec!["e".to_string(), "f".repeat(64)]],
+                "hello nostr".to_string(),
+            )
+            .expect("expected a real event")
+        }
+
+        #[test]
+        fn new_nostr_event_internal_succeeds_for_a_real_public_key() {
+            let secret_key = real_nostr_secret_key(40);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = new_nostr_event_internal(
+                &public_key,
+                1_700_000_000,
+                1,
+                vec![],
+                "hello".to_string(),
+            );
+            assert!(event.is_some());
+        }
+
+        #[test]
+        fn canonical_serialization_matches_the_nip01_five_element_array_shape() {
+            let secret_key = real_nostr_secret_key(41);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let pubkey_hex =
+                nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&public_key)
+                    .expect("expected Success")
+                    .as_str()
+                    .to_string();
+            let event = new_nostr_event_internal(
+                &public_key,
+                1_700_000_000,
+                1,
+                vec![vec!["e".to_string(), "f".repeat(64)], vec!["p".to_string()]],
+                "hello".to_string(),
+            )
+            .expect("expected a real event");
+            let canonical = nostr_event_encoding::serialize_nostr_event_canonical_internal(&event);
+            let expected = format!(
+                "[0,\"{}\",1700000000,1,[[\"e\",\"{}\"],[\"p\"]],\"hello\"]",
+                pubkey_hex,
+                "f".repeat(64),
+            );
+            assert_eq!(canonical, expected);
+            assert!(!canonical.contains(' '));
+            assert!(!canonical.contains('\n'));
+        }
+
+        #[test]
+        fn canonical_content_escapes_exactly_the_six_nip01_characters() {
+            let secret_key = real_nostr_secret_key(42);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let content = "a\nb\"c\\d\re\tf\u{08}g\u{0C}h";
+            let event = new_nostr_event_internal(&public_key, 1, 1, vec![], content.to_string())
+                .expect("expected a real event");
+            let canonical = nostr_event_encoding::serialize_nostr_event_canonical_internal(&event);
+            assert!(canonical.contains("a\\nb\\\"c\\\\d\\re\\tf\\bg\\fh"));
+        }
+
+        #[test]
+        fn canonical_content_passes_non_ascii_utf8_through_verbatim() {
+            let secret_key = real_nostr_secret_key(43);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = new_nostr_event_internal(&public_key, 1, 1, vec![], "café 日本語".to_string())
+                .expect("expected a real event");
+            let canonical = nostr_event_encoding::serialize_nostr_event_canonical_internal(&event);
+            assert!(canonical.contains("café 日本語"));
+            assert!(!canonical.contains("\\u"));
+        }
+
+        #[test]
+        fn derive_nostr_event_id_internal_succeeds_for_a_real_event() {
+            let secret_key = real_nostr_secret_key(44);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+            assert!(derive_nostr_event_id_internal(&event).is_some());
+        }
+
+        #[test]
+        fn same_event_fields_derive_identical_event_ids() {
+            let secret_key = real_nostr_secret_key(45);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let first = real_nostr_event(&public_key);
+            let second = real_nostr_event(&public_key);
+            let first_id = derive_nostr_event_id_internal(&first).expect("expected a real id");
+            let second_id = derive_nostr_event_id_internal(&second).expect("expected a real id");
+            assert_eq!(first_id, second_id);
+        }
+
+        #[test]
+        fn different_content_derives_different_event_id() {
+            let secret_key = real_nostr_secret_key(46);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let first = new_nostr_event_internal(&public_key, 1_700_000_000, 1, vec![], "hello".to_string())
+                .expect("expected a real event");
+            let second = new_nostr_event_internal(&public_key, 1_700_000_000, 1, vec![], "world".to_string())
+                .expect("expected a real event");
+            let first_id = derive_nostr_event_id_internal(&first).expect("expected a real id");
+            let second_id = derive_nostr_event_id_internal(&second).expect("expected a real id");
+            assert_ne!(first_id, second_id);
+        }
+
+        #[test]
+        fn different_created_at_derives_different_event_id() {
+            let secret_key = real_nostr_secret_key(47);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let first = new_nostr_event_internal(&public_key, 1_700_000_000, 1, vec![], "hello".to_string())
+                .expect("expected a real event");
+            let second = new_nostr_event_internal(&public_key, 1_700_000_001, 1, vec![], "hello".to_string())
+                .expect("expected a real event");
+            let first_id = derive_nostr_event_id_internal(&first).expect("expected a real id");
+            let second_id = derive_nostr_event_id_internal(&second).expect("expected a real id");
+            assert_ne!(first_id, second_id);
+        }
+
+        #[test]
+        fn different_kind_derives_different_event_id() {
+            let secret_key = real_nostr_secret_key(48);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let first = new_nostr_event_internal(&public_key, 1_700_000_000, 1, vec![], "hello".to_string())
+                .expect("expected a real event");
+            let second = new_nostr_event_internal(&public_key, 1_700_000_000, 2, vec![], "hello".to_string())
+                .expect("expected a real event");
+            let first_id = derive_nostr_event_id_internal(&first).expect("expected a real id");
+            let second_id = derive_nostr_event_id_internal(&second).expect("expected a real id");
+            assert_ne!(first_id, second_id);
+        }
+
+        #[test]
+        fn different_tags_derives_different_event_id() {
+            let secret_key = real_nostr_secret_key(49);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let first = new_nostr_event_internal(
+                &public_key,
+                1_700_000_000,
+                1,
+                vec![vec!["e".to_string(), "a".repeat(64)]],
+                "hello".to_string(),
+            )
+            .expect("expected a real event");
+            let second = new_nostr_event_internal(
+                &public_key,
+                1_700_000_000,
+                1,
+                vec![vec!["e".to_string(), "b".repeat(64)]],
+                "hello".to_string(),
+            )
+            .expect("expected a real event");
+            let first_id = derive_nostr_event_id_internal(&first).expect("expected a real id");
+            let second_id = derive_nostr_event_id_internal(&second).expect("expected a real id");
+            assert_ne!(first_id, second_id);
+        }
+
+        #[test]
+        fn different_pubkey_derives_different_event_id() {
+            let first_secret = real_nostr_secret_key(50);
+            let second_secret = real_nostr_secret_key(51);
+            let first_public =
+                derive_nostr_public_key_internal(&first_secret).expect("expected Success");
+            let second_public =
+                derive_nostr_public_key_internal(&second_secret).expect("expected Success");
+            let first_event = real_nostr_event(&first_public);
+            let second_event = real_nostr_event(&second_public);
+            let first_id = derive_nostr_event_id_internal(&first_event).expect("expected a real id");
+            let second_id = derive_nostr_event_id_internal(&second_event).expect("expected a real id");
+            assert_ne!(first_id, second_id);
+        }
+
+        #[test]
+        fn sign_nostr_event_internal_succeeds_for_a_real_event() {
+            let secret_key = real_nostr_secret_key(52);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+            assert!(sign_nostr_event_internal(&event, &secret_key).is_some());
+        }
+
+        #[test]
+        fn sign_nostr_event_internal_rejects_a_cleared_secret_key() {
+            let mut secret_key = real_nostr_secret_key(53);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+            secret_key.clear();
+            assert!(sign_nostr_event_internal(&event, &secret_key).is_none());
+        }
+
+        #[test]
+        fn sign_nostr_event_internal_does_not_mutate_the_input_secret_key() {
+            let secret_key = real_nostr_secret_key(54);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+            let _ = sign_nostr_event_internal(&event, &secret_key);
+            assert!(!secret_key.is_cleared());
+        }
+
+        #[test]
+        fn sign_nostr_event_internal_produces_identical_signatures_for_the_same_event() {
+            let secret_key = real_nostr_secret_key(55);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+            let first = sign_nostr_event_internal(&event, &secret_key).expect("expected Success");
+            let second = sign_nostr_event_internal(&event, &secret_key).expect("expected Success");
+            assert!(first.matches_for_internal_verification(&second));
+        }
+
+        #[test]
+        fn signed_nostr_event_cryptographically_verifies_end_to_end() {
+            // Secure Runtime Alpha 196 -- the strongest available proof
+            // this Arc's own pipeline is correct: build a real event,
+            // derive its own Event ID (Alpha 194) via canonical
+            // serialization (Alpha 193), sign that ID via the EXISTING
+            // Schnorr foundation (Alpha 195), and confirm a real
+            // k256::schnorr::VerifyingKey -- reconstructed from the
+            // SAME public key the event itself carries -- accepts the
+            // signature against the SAME event id. Real, executed
+            // BIP-340 verification, not internal self-consistency alone.
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let secret_key = real_nostr_secret_key(56);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+
+            let event_id = derive_nostr_event_id_internal(&event).expect("expected a real id");
+            let signature =
+                sign_nostr_event_internal(&event, &secret_key).expect("expected a real signature");
+
+            let verifying_key = SchnorrVerifyingKey::from_bytes(
+                &public_key.expose_bytes_for_internal_public_identifier_encoding(),
+            )
+            .expect("expected a valid x-only public key");
+            let schnorr_signature = SchnorrSignature::try_from(signature.bytes.as_slice())
+                .expect("expected a well-formed 64-byte signature");
+            assert!(verifying_key.verify_prehash(&event_id, &schnorr_signature).is_ok());
+        }
+
+        #[test]
+        fn signed_nostr_event_does_not_verify_against_a_different_events_id() {
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let secret_key = real_nostr_secret_key(57);
+            let public_key = derive_nostr_public_key_internal(&secret_key).expect("expected Success");
+            let event = real_nostr_event(&public_key);
+            let other_event =
+                new_nostr_event_internal(&public_key, 1_700_000_000, 1, vec![], "tampered".to_string())
+                    .expect("expected a real event");
+
+            let other_event_id =
+                derive_nostr_event_id_internal(&other_event).expect("expected a real id");
+            let signature =
+                sign_nostr_event_internal(&event, &secret_key).expect("expected a real signature");
+
+            let verifying_key = SchnorrVerifyingKey::from_bytes(
+                &public_key.expose_bytes_for_internal_public_identifier_encoding(),
+            )
+            .expect("expected a valid x-only public key");
+            let schnorr_signature = SchnorrSignature::try_from(signature.bytes.as_slice())
+                .expect("expected a well-formed 64-byte signature");
+            assert!(verifying_key
+                .verify_prehash(&other_event_id, &schnorr_signature)
                 .is_err());
         }
     }
