@@ -8,6 +8,61 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 261–270 — Nostr Canonical Board
+> Adapter Arc.** Implements the FIRST Protocol Adapter: a pure, one-way,
+> fail-closed translation from an already-verified
+> `FedosValidatedNostrEvent` (Alpha 242) into a `FedosBoardPost` (Alpha
+> 255), treating the Canonical Board Model (Alpha 251–260) as the Single
+> Source of Truth. One new file,
+> [`fedos_board_nostr_adapter.ts`](src/board/fedos_board_nostr_adapter.ts),
+> exports `validateNostrBoardPost(event, boardId)` and
+> `mapValidatedNostrEventToBoardPostInput(event, boardId)`. Field
+> mapping (frozen, Alpha 261–265): `id` → `FedosBoardPost.id` AND
+> `source.reference`; `pubkey` → `author.publicIdentifier` (verbatim
+> hex, no npub re-encoding, no display-name derivation, no profile
+> resolution, no relay access); `created_at` → `createdAt`; `content` →
+> `body` (verbatim, no Markdown/HTML/rendering); `kind` gates acceptance
+> to `1` only (any other kind rejected — the only kind this repository
+> has established real thread semantics for) and is never carried
+> forward; `sig` is never carried forward (already consumed by upstream
+> verification); `tags` are interpreted (NIP-10 root/reply resolution,
+> mirroring `src/thread/thread.ts`'s own established rule exactly, never
+> imported) into `threadId`/`replyTo`, never embedded raw; `boardId` is
+> supplied by the caller (Nostr has no native board concept — Board
+> Application Logic's own job, out of scope); `author.identityId` is
+> always `null` this Arc (no local-identity linking exists yet). Two
+> thread-mapping edge cases are named as explicit deferred boundaries
+> rather than invented around (a lone `root`-marked tag with no `reply`
+> marker; a lone `reply`-marked tag with no `root` marker). Verified
+> deterministic by real repeated calls (Alpha 267), verified to import
+> nothing but a type-only `FedosValidatedNostrEvent` reference plus the
+> Board model's own validator — zero Relay/Runtime/Storage/GUI/Worker/
+> Desktop-state reference (Alpha 268) — and verified to produce a
+> `FedosBoardPost` carrying no Nostr-specific key outside
+> `author.protocol`/`source.protocol` (Alpha 269).
+>
+> **Still NOT implemented**: ActivityPub/AT Protocol/Session Protocol
+> Adapters, Relay Pool, persistence, moderation enforcement, ranking,
+> notifications, DM, attachments, HTML/Markdown rendering, GUI, and any
+> wiring of this adapter into a live Subscription/Relay/Runtime path
+> (`boardId` remains a required, caller-supplied parameter — no
+> subscription-to-board policy exists yet). `package.json`'s own
+> `dependencies` count stays fixed at 2 — zero new Cargo/npm dependency,
+> zero Rust/wasm change of any kind. `npm run typecheck`/`npm test`
+> GREEN (pre-existing, unrelated Rust-structural test failures excluded
+> — see
+> `docs/secure_runtime_alpha_270_nostr_board_adapter_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline.
+>
+> See `docs/secure_runtime_alpha_261_nostr_board_field_inventory.md`
+> through `docs/secure_runtime_alpha_270_nostr_board_adapter_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 251–260 — Canonical Board Model
 > Foundation Arc.** Defines a protocol-independent Canonical Board
 > Model — NOT a Nostr Event wrapper — the shared application model a
