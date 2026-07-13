@@ -8,7 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Stage 157–160 — Ciphertext envelope skeleton + public API
+> **Status: Secure Runtime Alpha 231–240 — Nostr Relay Message
+> Reception Arc.** Completes the INBOUND half of the single-Relay
+> transport `FedosRelay`/`WebSocketRelay` (`src/desktop/`) already
+> established (Alpha 211–230: connect/disconnect/publish/subscribe/
+> unsubscribe). Four new files —
+> [`fedos_relay_inbound_message.ts`](src/desktop/fedos_relay_inbound_message.ts)
+> (a closed, four-member, fully-`readonly` EVENT/EOSE/OK/NOTICE union),
+> [`fedos_nostr_wire_event.ts`](src/desktop/fedos_nostr_wire_event.ts)
+> (a dedicated `FedosNostrWireEvent`, preserving all seven NIP-01 wire
+> field names verbatim — no rename, no synthesized `provider` field),
+> [`relay_inbound_parser.ts`](src/desktop/relay_inbound_parser.ts)
+> (`parseRelayInboundMessage`, a pure, total, never-throwing structural
+> parser — **zero cryptographic verification**, deliberately deferred),
+> and [`fedos_relay_listeners.ts`](src/desktop/fedos_relay_listeners.ts)
+> (`FedosSubscriptionListener`/`FedosRelayMessageListener`) — plus two
+> ADDITIVE methods on `FedosRelay`, `onSubscriptionMessage()` (EVENT/EOSE
+> routed by subscription id, EOSE never auto-unsubscribes) and
+> `onRelayMessage()` (one relay-wide OK/NOTICE listener). Every listener
+> invocation is isolated in its own `try`/`catch`; a stale socket left
+> over from a prior `connect()` can never deliver again after
+> reconnect. `connect`/`disconnect`/`publish`/`subscribe`/`unsubscribe`
+> are all UNCHANGED in their own public contracts.
+>
+> **Still NOT implemented**: cryptographic validation of a received
+> Event (a real, reusable Schnorr verifier already exists in
+> `src/nostr/noble_signature.ts`, but is deliberately not wired in this
+> Arc — recommended as the next Arc), Relay Pool, multi-relay routing,
+> automatic reconnect, persistent subscriptions, storage, DM, GUI,
+> Worker/AppRuntime/Observation changes. `package.json`'s own
+> `dependencies` count stays fixed at 2. `npm run typecheck`/`npm test`
+> GREEN. `cargo check`/`cargo test` GREEN (pre-existing, unrelated
+> failures excluded — see `docs/secure_runtime_alpha_240_relay_reception_completion.md`).
+>
+> See `docs/secure_runtime_alpha_231_existing_relay_inbound_inventory.md`
+> through `docs/secure_runtime_alpha_240_relay_reception_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
+> **Stage 157–160 — Ciphertext envelope skeleton + public API
 > planning.** A new `src/crypto/ciphertext_envelope.rs` turns
 > `docs/ciphertext_envelope_plan.md`'s six planned fields into a concrete,
 > `pub(crate)`-only skeleton: `AeadCiphertextEnvelope` holds `version:

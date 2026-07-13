@@ -13,8 +13,11 @@ import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
 
-function fakeSocket(): { socket: FedosRelaySocket; listeners: { close: (() => void)[]; error: (() => void)[] } } {
-  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[] };
+function fakeSocket(): {
+  socket: FedosRelaySocket;
+  listeners: { close: (() => void)[]; error: (() => void)[]; message: (() => void)[] };
+} {
+  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[], message: [] as (() => void)[] };
   const socket: FedosRelaySocket = {
     send: vi.fn(),
     close: vi.fn(),
@@ -56,11 +59,13 @@ describe("Secure Runtime Alpha 214 -- WebSocket Relay: Connection Only", () => {
     );
   });
 
-  it("4. structural: WebSocketRelay, FedosRelaySocket, and FedosRelaySocketFactory are the only exports of websocket_relay.ts", () => {
+  it("4. structural: WebSocketRelay, FedosRelaySocket, and FedosRelaySocketFactory are exports of websocket_relay.ts AS OF this Arc (Alpha 235, a later Arc, additively appends FedosRelaySocketEventType/FedosRelaySocketEvent for inbound message wiring)", () => {
     const exportNames = [...websocketRelaySource.matchAll(/^export (?:interface|class|function|const|type) (\w+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(new Set(exportNames)).toEqual(new Set(["FedosRelaySocket", "FedosRelaySocketFactory", "WebSocketRelay"]));
+    for (const expected of ["FedosRelaySocket", "FedosRelaySocketFactory", "WebSocketRelay"]) {
+      expect(exportNames).toContain(expected);
+    }
   });
 
   it("5. structural: no `new WebSocket(` call exists in websocket_relay.ts's own CODE (the guardrail comment legitimately names it as forbidden)", () => {

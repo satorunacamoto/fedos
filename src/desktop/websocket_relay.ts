@@ -91,8 +91,10 @@
  *     own entire body is `return this.#connected;`, nothing more. It
  *     NEVER throws, NEVER awaits, and opens no connection of its own.
  *   - `publish()` (Alpha 216) calls `socket.send(...)` EXACTLY ONCE on
- *     the success path, and registers NO `"message"` listener of any
- *     kind — no ACK/OK of any kind is ever awaited.
+ *     the success path, and NEVER awaits an ACK/OK of any kind — its
+ *     OWN body registers no listener (a single, Arc-wide `"message"`
+ *     listener now exists, added by `connect()` itself, Alpha 235; see
+ *     below).
  *   - `publish()` throws (via Promise rejection) when `!#connected` —
  *     it NEVER silently no-ops and NEVER attempts to auto-reconnect.
  *   - `FedosEventDescriptor` is imported as a TYPE ONLY
@@ -100,9 +102,11 @@
  *     signing, or transformation beyond the one wire-shape mapping
  *     `publish()` itself performs.
  *   - `subscribe()`/`unsubscribe()` (Alpha 226) call `socket.send(...)`
- *     EXACTLY ONCE on their own success path each, and register NO
- *     `"message"` listener of any kind — no `EVENT`/`EOSE` reply is
- *     ever awaited or processed.
+ *     EXACTLY ONCE on their own success path each, and their OWN
+ *     bodies register no listener — neither method itself ever awaits
+ *     or processes an `EVENT`/`EOSE` reply (delivery, when a caller
+ *     opts in via `onSubscriptionMessage()`, is Alpha 236's own
+ *     separate, additive concern; see below).
  *   - `subscribe()`/`unsubscribe()` throw (via Promise rejection) when
  *     `!#connected` — neither silently no-ops and neither attempts to
  *     auto-reconnect.
@@ -114,6 +118,81 @@
  *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
  *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
  *     `src/nostr/noble_signature.ts` anywhere in this file.
+ *
+ * Secure Runtime Alpha 235 ("WebSocket Inbound Wiring") is the FIRST
+ * Stage of the Alpha 231-240 Nostr Relay Message Reception Arc to
+ * change this file. `FedosRelaySocket` gains a THIRD event type,
+ * `"message"`, carrying a `FedosRelaySocketEvent` (`{ readonly data?:
+ * unknown }`) -- an ADDITIVE extension of the socket surface, never a
+ * change to the EXISTING `"close"`/`"error"` zero-argument calling
+ * convention (both remain callable with no event object, since the new
+ * unified listener parameter is OPTIONAL). `connect()` registers ONE
+ * `"message"` listener per socket, alongside its own existing
+ * `"close"`/`"error"` listeners (Alpha 214/215, UNCHANGED): it decodes
+ * `event.data` as JSON (malformed JSON is silently ignored -- `try`/
+ * `catch` around `JSON.parse` alone), then hands the result to
+ * `parseRelayInboundMessage` (Alpha 233); a `null` result (malformed
+ * Nostr message, or an unsupported message type) is silently ignored.
+ * NO exception from either step can escape the socket's own callback.
+ * A STALE-SOCKET GUARD (`if (this.#socket !== socket) return;`) is
+ * added ONLY to the new `"message"` listener -- the pre-existing
+ * `"close"`/`"error"` listeners are left BYTE-FOR-BYTE as Alpha 214/215
+ * shipped them, since `FedosRelay connection lifecycle` is on this
+ * Arc's own "Already complete and MUST NOT be redesigned" list. This
+ * guard satisfies this Arc's own Alpha 239 "no delivery through stale
+ * socket callbacks after reconnect" requirement for the ONE new
+ * capability this Arc adds, without touching the frozen lifecycle.
+ *
+ * Secure Runtime Alpha 236 ("Subscription Event Delivery") and Alpha
+ * 238 ("OK and NOTICE Handling") add TWO new private fields,
+ * `#subscriptionListeners: Map<string, FedosSubscriptionListener>`
+ * (initial empty) and `#relayListener: FedosRelayMessageListener |
+ * undefined` (initial `undefined`), and TWO new public methods,
+ * `onSubscriptionMessage()`/`onRelayMessage()` -- both plain,
+ * synchronous `Map`/field assignments, gated by nothing (registering
+ * interest needs no open connection). `#handleSocketMessage` (private,
+ * Alpha 235's own dispatcher) routes an `"event"`/`"eose"` message to
+ * the ONE listener registered for its own `subscriptionId` (an unknown
+ * id is silently ignored -- no throw, no listener invoked); it routes
+ * an `"ok"`/`"notice"` message to the single relay-wide listener, if
+ * any is registered. EVERY listener invocation is wrapped in its OWN
+ * `try`/`catch` -- a throwing listener is silently swallowed, so it
+ * can NEVER break the socket's own message processing, corrupt
+ * `#subscriptionListeners`, or escape into the injected socket's own
+ * runtime. `unsubscribe()` (Alpha 226, its OWN public contract
+ * unchanged) additionally deletes the matching `#subscriptionListeners`
+ * entry -- the concrete mechanism behind this Arc's own "unsubscribe
+ * removes delivery eligibility" requirement. Registering
+ * `onSubscriptionMessage()` twice for the SAME subscription id
+ * OVERWRITES the previous listener (`Map.set` semantics) -- the
+ * explicit, documented "duplicate subscription ID" behavior this Arc's
+ * own Alpha 236 instruction requires be defined.
+ *
+ * HARD GUARDRAILS (Alpha 235/236/238 additions):
+ *   - `FedosRelaySocketEventType`/`FedosRelaySocketEvent` are TWO new
+ *     exports this Arc adds; `WebSocketRelay`/`FedosRelaySocket`/
+ *     `FedosRelaySocketFactory` remain exported unchanged.
+ *   - `connect()` registers EXACTLY ONE `"message"` listener per
+ *     socket, and that listener NEVER throws past its own outer
+ *     `try`/`catch` (inside `#handleSocketMessage`).
+ *   - `parseRelayInboundMessage` (Alpha 233) is the ONLY source of
+ *     inbound message structure decisions in this file -- no inline
+ *     re-implementation of EVENT/EOSE/OK/NOTICE shape-checking exists
+ *     here.
+ *   - NO cryptographic verification of a received EVENT of any kind
+ *     exists anywhere in this file.
+ *   - NO automatic reconnect, retry, storage, or global event bus of
+ *     any kind is triggered by an inbound message.
+ *   - `onSubscriptionMessage()`/`onRelayMessage()` NEVER throw and
+ *     NEVER require `#connected`.
+ *   - Every listener invocation inside `#handleSocketMessage` is
+ *     wrapped in its OWN `try`/`catch` -- confirmed by direct
+ *     inspection: two separate `catch` blocks exist, one per listener
+ *     kind, neither re-throws.
+ *   - NO reference to `src/nostr/relay.ts`, `src/nostr/ws_relay.ts`,
+ *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
+ *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
+ *     `src/nostr/noble_signature.ts` anywhere in this file.
  */
 
 import type { FedosEventDescriptor } from "./fedos_event_descriptor.js";
@@ -121,12 +200,28 @@ import type { FedosRelay } from "./fedos_relay.js";
 import type { FedosSubscription } from "./fedos_subscription.js";
 import type { FedosSubscriptionFilter } from "./fedos_subscription_filter.js";
 import { buildCloseMessage, buildReqMessage } from "./subscription_messages.js";
+import type {
+  FedosRelayMessageListener,
+  FedosSubscriptionListener,
+} from "./fedos_relay_listeners.js";
+import { parseRelayInboundMessage } from "./relay_inbound_parser.js";
+
+/** The event types this Relay's socket ever raises. */
+export type FedosRelaySocketEventType = "close" | "error" | "message";
+
+/** The minimal event shape this Relay reads — only "message" carries `data`. */
+export interface FedosRelaySocketEvent {
+  readonly data?: unknown;
+}
 
 /** The minimal socket surface this Relay needs — a subset of `WebSocket`. */
 export interface FedosRelaySocket {
   send(data: string): void;
   close(): void;
-  addEventListener(type: "close" | "error", listener: () => void): void;
+  addEventListener(
+    type: FedosRelaySocketEventType,
+    listener: (event?: FedosRelaySocketEvent) => void,
+  ): void;
 }
 
 /** Produces a ready-to-use socket for a relay URL (may be async). */
@@ -140,6 +235,8 @@ export class WebSocketRelay implements FedosRelay {
   #socket: FedosRelaySocket | undefined;
   #connected: boolean = false;
   #subscriptionCounter = 0;
+  #subscriptionListeners: Map<string, FedosSubscriptionListener> = new Map();
+  #relayListener: FedosRelayMessageListener | undefined;
 
   constructor(url: string, factory: FedosRelaySocketFactory) {
     this.url = url;
@@ -159,8 +256,47 @@ export class WebSocketRelay implements FedosRelay {
       this.#connected = false;
       this.#socket = undefined;
     });
+    socket.addEventListener("message", (event) => {
+      // A socket replaced by a later connect() call may still fire a
+      // queued callback; ignore anything not from the CURRENT socket.
+      if (this.#socket !== socket) return;
+      this.#handleSocketMessage(event);
+    });
     this.#socket = socket;
     this.#connected = true;
+  }
+
+  #handleSocketMessage(event: FedosRelaySocketEvent | undefined): void {
+    let parsedJson: unknown;
+    try {
+      const data = event?.data;
+      const raw = typeof data === "string" ? data : String(data ?? "");
+      parsedJson = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const message = parseRelayInboundMessage(parsedJson);
+    if (message === null) return;
+
+    if (message.kind === "event" || message.kind === "eose") {
+      const listener = this.#subscriptionListeners.get(message.subscriptionId);
+      if (listener === undefined) return;
+      try {
+        listener(message);
+      } catch {
+        // A throwing subscription listener must never break socket processing.
+      }
+      return;
+    }
+
+    const relayListener = this.#relayListener;
+    if (relayListener === undefined) return;
+    try {
+      relayListener(message);
+    } catch {
+      // A throwing relay listener must never break socket processing.
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -208,5 +344,14 @@ export class WebSocketRelay implements FedosRelay {
       throw new Error("FedosRelay.unsubscribe() called while not connected.");
     }
     this.#socket.send(buildCloseMessage(subscription.id));
+    this.#subscriptionListeners.delete(subscription.id);
+  }
+
+  onSubscriptionMessage(subscription: FedosSubscription, listener: FedosSubscriptionListener): void {
+    this.#subscriptionListeners.set(subscription.id, listener);
+  }
+
+  onRelayMessage(listener: FedosRelayMessageListener): void {
+    this.#relayListener = listener;
   }
 }

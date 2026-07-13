@@ -14,8 +14,11 @@ import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
 
-function fakeSocket(): { socket: FedosRelaySocket; listeners: { close: (() => void)[]; error: (() => void)[] } } {
-  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[] };
+function fakeSocket(): {
+  socket: FedosRelaySocket;
+  listeners: { close: (() => void)[]; error: (() => void)[]; message: (() => void)[] };
+} {
+  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[], message: [] as (() => void)[] };
   const socket: FedosRelaySocket = {
     send: vi.fn(),
     close: vi.fn(),
@@ -51,9 +54,9 @@ describe("Secure Runtime Alpha 226 -- Subscription Lifecycle", () => {
   // Structural: the FINAL, complete shape of all three files
   // ---------------------------------------------------------------------
 
-  it("3. structural: FedosRelay's final shape is exactly url, connect, disconnect, isConnected, publish, subscribe, unsubscribe", () => {
+  it("3. structural: FedosRelay's shape AS OF this Arc's closing state contains url, connect, disconnect, isConnected, publish, subscribe, unsubscribe, in that order (Alpha 236/238, a later Arc, additively appends onSubscriptionMessage/onRelayMessage)", () => {
     expect(relaySource).toMatch(
-      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;\s*\n\s*subscribe\(filters: readonly FedosSubscriptionFilter\[\]\): Promise<FedosSubscription>;\s*\n\s*unsubscribe\(subscription: FedosSubscription\): Promise<void>;\s*\n\}/,
+      /export interface FedosRelay \{\s*\n\s*readonly url: string;\s*\n\s*connect\(\): Promise<void>;\s*\n\s*disconnect\(\): Promise<void>;\s*\n\s*isConnected\(\): boolean;\s*\n\s*publish\(event: FedosEventDescriptor\): Promise<void>;\s*\n\s*subscribe\(filters: readonly FedosSubscriptionFilter\[\]\): Promise<FedosSubscription>;\s*\n\s*unsubscribe\(subscription: FedosSubscription\): Promise<void>;/,
     );
   });
 
@@ -64,39 +67,40 @@ describe("Secure Runtime Alpha 226 -- Subscription Lifecycle", () => {
     );
   });
 
-  it("5. structural: NullRelay's final public method/getter set is connect/disconnect/isConnected/published/publish/subscriptions/subscribe/unsubscribe", () => {
+  it("5. structural: NullRelay's public method/getter set AS OF this Arc contains connect/disconnect/isConnected/published/publish/subscriptions/subscribe/unsubscribe (Alpha 236/238, a later Arc, additively appends onSubscriptionMessage/onRelayMessage)", () => {
     const classBody = (nullRelaySource.match(/export class NullRelay implements FedosRelay \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const codeOnly = classBody
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const methodNames = [...codeOnly.matchAll(/^\s{2}(?:async\s+)?(?:get\s+)?(\w+)\(/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(new Set(methodNames)).toEqual(
-      new Set(["constructor", "connect", "disconnect", "isConnected", "published", "publish", "subscriptions", "subscribe", "unsubscribe"]),
-    );
+    for (const expected of ["constructor", "connect", "disconnect", "isConnected", "published", "publish", "subscriptions", "subscribe", "unsubscribe"]) {
+      expect(methodNames).toContain(expected);
+    }
     expect(nullRelaySource).toMatch(/get subscriptions\(\): readonly FedosSubscription\[\] \{/);
   });
 
-  it("6. structural: WebSocketRelay's final public method set is connect/disconnect/isConnected/publish/subscribe/unsubscribe", () => {
+  it("6. structural: WebSocketRelay's public method set AS OF this Arc contains connect/disconnect/isConnected/publish/subscribe/unsubscribe (Alpha 236/238, a later Arc, additively appends onSubscriptionMessage/onRelayMessage)", () => {
     const classBody = (websocketRelaySource.match(/export class WebSocketRelay implements FedosRelay \{([\s\S]*)\n\}/) ?? [])[1] ?? "";
     const codeOnly = classBody
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
       .join("\n");
     const methodNames = [...codeOnly.matchAll(/^\s{2}(?:async\s+)?(\w+)\(/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(new Set(methodNames)).toEqual(
-      new Set(["constructor", "connect", "disconnect", "isConnected", "publish", "subscribe", "unsubscribe"]),
-    );
+    for (const expected of ["constructor", "connect", "disconnect", "isConnected", "publish", "subscribe", "unsubscribe"]) {
+      expect(methodNames).toContain(expected);
+    }
   });
 
-  it("7. structural: WebSocketRelay.subscribe()/unsubscribe() each call socket.send exactly once and register no 'message' listener anywhere in the file's own CODE", () => {
+  it("7. structural: WebSocketRelay.subscribe()/unsubscribe() each call socket.send exactly once, and their OWN method bodies register no 'message' listener (Alpha 235, a later Arc, additively registers ONE 'message' listener inside connect() for inbound reception)", () => {
     expect(websocketRelaySource).toMatch(/this\.#socket\.send\(buildReqMessage\(subscription\.id, filters\)\);/);
     expect(websocketRelaySource).toMatch(/this\.#socket\.send\(buildCloseMessage\(subscription\.id\)\);/);
-    const codeOnly = websocketRelaySource
-      .split("\n")
-      .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
-      .join("\n");
-    expect(codeOnly).not.toMatch(/"message"/);
+    const subscribeBody = (websocketRelaySource.match(/async subscribe\(filters: readonly FedosSubscriptionFilter\[\]\): Promise<FedosSubscription> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
+    const unsubscribeBody = (websocketRelaySource.match(/async unsubscribe\(subscription: FedosSubscription\): Promise<void> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
+    expect(subscribeBody.length).toBeGreaterThan(0);
+    expect(unsubscribeBody.length).toBeGreaterThan(0);
+    expect(subscribeBody).not.toMatch(/"message"/);
+    expect(unsubscribeBody).not.toMatch(/"message"/);
   });
 
   it("8. structural: no ACK/result-object vocabulary and no EVENT/EOSE/NOTICE parsing exists IN CODE across all three files", () => {

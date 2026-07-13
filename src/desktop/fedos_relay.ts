@@ -104,11 +104,56 @@
  *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
  *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
  *     `src/nostr/noble_signature.ts` anywhere in this file.
+ *
+ * Secure Runtime Alpha 236 ("Subscription Event Delivery") and Alpha
+ * 238 ("OK and NOTICE Handling") — the Alpha 231-240 Nostr Relay
+ * Message Reception Arc's own two Stages to change this file — add TWO
+ * new methods, `onSubscriptionMessage(subscription: FedosSubscription,
+ * listener: FedosSubscriptionListener): void` (Alpha 236) and
+ * `onRelayMessage(listener: FedosRelayMessageListener): void` (Alpha
+ * 238). Both are ADDITIVE listener-REGISTRATION methods, never a
+ * reshaping of `connect`/`disconnect`/`isConnected`/`publish`/
+ * `subscribe`/`unsubscribe`'s own already-shipped, frozen shapes (this
+ * Arc's own "Already complete and MUST NOT be redesigned" list names
+ * `subscribe()`/`unsubscribe()` explicitly). `onSubscriptionMessage()`
+ * registers interest in the EVENT/EOSE traffic belonging to ONE
+ * `FedosSubscription` (obtained separately from `subscribe()`, Alpha
+ * 226, unchanged); `onRelayMessage()` registers ONE relay-wide listener
+ * for OK/NOTICE, which are never subscription-scoped on the wire
+ * (`fedos_relay_listeners.ts`, Alpha 236/238, explains the Option-A
+ * "one Relay-level listener" decision in full). `WebSocketRelay`
+ * (`websocket_relay.ts`, Alpha 235/236/238) gives both methods real
+ * delivery, parsing every inbound socket frame and dispatching it;
+ * `NullRelay` (`null_relay.ts`, Alpha 236/238) accepts registrations as
+ * plain bookkeeping and never invokes them, since it has no real
+ * transport to receive a message from.
+ *
+ * HARD GUARDRAILS (Alpha 236/238 additions):
+ *   - `onSubscriptionMessage()`/`onRelayMessage()` are the ONLY methods
+ *     added by this Arc. Both return `void` — registration is
+ *     synchronous, local bookkeeping, never a network operation of any
+ *     kind, and never requires an open connection.
+ *   - `FedosSubscriptionListener`/`FedosRelayMessageListener`
+ *     (`fedos_relay_listeners.ts`) are imported as TYPE ONLY (`import
+ *     type`) — this file performs no dispatch, parsing, or socket
+ *     wiring of any kind; that is exclusively `WebSocketRelay`'s own
+ *     concern (Alpha 235).
+ *   - NO `Promise`-returning listener contract of any kind — a listener
+ *     is fire-and-forget, matching this Arc's own "listener exception
+ *     does not break socket processing" requirement.
+ *   - NO reference to `src/nostr/relay.ts`, `src/nostr/ws_relay.ts`,
+ *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
+ *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
+ *     `src/nostr/noble_signature.ts` anywhere in this file.
  */
 
 import type { FedosEventDescriptor } from "./fedos_event_descriptor.js";
 import type { FedosSubscription } from "./fedos_subscription.js";
 import type { FedosSubscriptionFilter } from "./fedos_subscription_filter.js";
+import type {
+  FedosRelayMessageListener,
+  FedosSubscriptionListener,
+} from "./fedos_relay_listeners.js";
 
 export interface FedosRelay {
   readonly url: string;
@@ -118,4 +163,6 @@ export interface FedosRelay {
   publish(event: FedosEventDescriptor): Promise<void>;
   subscribe(filters: readonly FedosSubscriptionFilter[]): Promise<FedosSubscription>;
   unsubscribe(subscription: FedosSubscription): Promise<void>;
+  onSubscriptionMessage(subscription: FedosSubscription, listener: FedosSubscriptionListener): void;
+  onRelayMessage(listener: FedosRelayMessageListener): void;
 }

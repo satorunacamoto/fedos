@@ -16,8 +16,11 @@ import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import publishSource from "../src/nostr/publish.ts?raw";
 
-function fakeSocket(): { socket: FedosRelaySocket; listeners: { close: (() => void)[]; error: (() => void)[] } } {
-  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[] };
+function fakeSocket(): {
+  socket: FedosRelaySocket;
+  listeners: { close: (() => void)[]; error: (() => void)[]; message: (() => void)[] };
+} {
+  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[], message: [] as (() => void)[] };
   const socket: FedosRelaySocket = {
     send: vi.fn(),
     close: vi.fn(),
@@ -99,13 +102,11 @@ describe("Secure Runtime Alpha 216 -- Publish API", () => {
     }
   });
 
-  it("7. structural: WebSocketRelay.publish() calls socket.send exactly once and registers no 'message' listener anywhere in the file's own CODE", () => {
+  it("7. structural: WebSocketRelay.publish() calls socket.send exactly once and its OWN method body registers no 'message' listener (Alpha 235, a later Arc, additively registers ONE 'message' listener inside connect() for inbound reception -- publish() itself remains untouched)", () => {
     expect(websocketRelaySource).toMatch(/this\.#socket\.send\(JSON\.stringify\(\["EVENT", wireEvent\]\)\);/);
-    const codeOnly = websocketRelaySource
-      .split("\n")
-      .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
-      .join("\n");
-    expect(codeOnly).not.toMatch(/"message"/);
+    const publishBody = (websocketRelaySource.match(/async publish\(event: FedosEventDescriptor\): Promise<void> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
+    expect(publishBody.length).toBeGreaterThan(0);
+    expect(publishBody).not.toMatch(/"message"/);
   });
 
   it("8. structural: the wire mapping renames author/createdAt/signature to pubkey/created_at/sig, and drops provider", () => {

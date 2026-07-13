@@ -11,8 +11,11 @@ import nullRelaySource from "../src/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 
-function fakeSocket(): { socket: FedosRelaySocket; listeners: { close: (() => void)[]; error: (() => void)[] } } {
-  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[] };
+function fakeSocket(): {
+  socket: FedosRelaySocket;
+  listeners: { close: (() => void)[]; error: (() => void)[]; message: (() => void)[] };
+} {
+  const listeners = { close: [] as (() => void)[], error: [] as (() => void)[], message: [] as (() => void)[] };
   const socket: FedosRelaySocket = {
     send: vi.fn(),
     close: vi.fn(),

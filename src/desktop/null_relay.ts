@@ -89,6 +89,34 @@
  *   - `subscriptions` (Alpha 226) is a `readonly` getter — no method on
  *     this class allows external code to clear or splice the tracked
  *     list directly.
+ *
+ * Secure Runtime Alpha 236 ("Subscription Event Delivery") and Alpha
+ * 238 ("OK and NOTICE Handling") add two new private fields,
+ * `#subscriptionListeners: Map<string, FedosSubscriptionListener>`
+ * (initial empty) and `#relayListener: FedosRelayMessageListener |
+ * undefined` (initial `undefined`), and two new public methods,
+ * `onSubscriptionMessage()` and `onRelayMessage()` -- the ONLY change
+ * these Stages make. Both registration methods are UNGATED by
+ * `#connected` (registering interest is local bookkeeping, never a
+ * network operation) and NEVER throw. `NullRelay` has no real
+ * transport to receive a message from, so neither listener is EVER
+ * invoked by this class -- registration is honest bookkeeping only,
+ * the SAME "record without pretending to deliver" discipline this
+ * class already applies to `#published`/`#subscriptions`.
+ * `unsubscribe()` (Alpha 226, unchanged in its own public contract) is
+ * extended to ALSO delete the corresponding `#subscriptionListeners`
+ * entry -- an internal side effect required by this Arc's own
+ * "unsubscribe removes delivery eligibility" instruction (Alpha 236),
+ * never a change to `unsubscribe()`'s own signature or connected-gate
+ * behavior.
+ *
+ * HARD GUARDRAILS (Alpha 236/238 additions):
+ *   - `onSubscriptionMessage()`/`onRelayMessage()` NEVER throw and
+ *     NEVER require `#connected` -- both are plain `Map`/field
+ *     assignments.
+ *   - Neither listener is ever CALLED anywhere in this file -- `grep`
+ *     for an invocation (`listener(` / `relayListener(`) inside
+ *     `null_relay.ts` finds none; only assignment/deletion exists.
  *   - NO `WebSocket`, `fetch`, or network reference of any kind.
  */
 
@@ -96,6 +124,10 @@ import type { FedosEventDescriptor } from "./fedos_event_descriptor.js";
 import type { FedosRelay } from "./fedos_relay.js";
 import type { FedosSubscription } from "./fedos_subscription.js";
 import type { FedosSubscriptionFilter } from "./fedos_subscription_filter.js";
+import type {
+  FedosRelayMessageListener,
+  FedosSubscriptionListener,
+} from "./fedos_relay_listeners.js";
 
 export class NullRelay implements FedosRelay {
   readonly url: string;
@@ -103,6 +135,8 @@ export class NullRelay implements FedosRelay {
   #published: FedosEventDescriptor[] = [];
   #subscriptions: FedosSubscription[] = [];
   #subscriptionCounter = 0;
+  #subscriptionListeners: Map<string, FedosSubscriptionListener> = new Map();
+  #relayListener: FedosRelayMessageListener | undefined;
 
   constructor(url: string) {
     this.url = url;
@@ -150,5 +184,14 @@ export class NullRelay implements FedosRelay {
       throw new Error("FedosRelay.unsubscribe() called while not connected.");
     }
     this.#subscriptions = this.#subscriptions.filter((s) => s.id !== subscription.id);
+    this.#subscriptionListeners.delete(subscription.id);
+  }
+
+  onSubscriptionMessage(subscription: FedosSubscription, listener: FedosSubscriptionListener): void {
+    this.#subscriptionListeners.set(subscription.id, listener);
+  }
+
+  onRelayMessage(listener: FedosRelayMessageListener): void {
+    this.#relayListener = listener;
   }
 }
