@@ -8,6 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 321–330 — Board Durable Backend
+> Selection & Architecture Arc.** A Design/Selection Arc — no durable
+> backend is implemented. Inventories real deployment/runtime state
+> (`docs/secure_runtime_alpha_321_board_deployment_runtime_inventory.md`):
+> Cloudflare Workers (primary, real, deployed target) and Node
+> (test/dev harness) exist; no browser and no real Desktop shell exist;
+> Board persistence has no wiring into ANY production runtime today —
+> not the Worker's `fetch` handler, not `DesktopApplication`, not a
+> browser. Freezes durable backend requirements
+> (`docs/secure_runtime_alpha_322_durable_backend_requirements.md`,
+> MUST/SHOULD/NOT YET against the already-frozen
+> `FedosBoardPersistence` port) and reviews all four named candidates —
+> [SQLite](docs/secure_runtime_alpha_323_sqlite_backend_review.md),
+> [IndexedDB](docs/secure_runtime_alpha_324_indexeddb_backend_review.md),
+> [D1](docs/secure_runtime_alpha_325_d1_backend_review.md) (this
+> repository's most operationally proven backend, for an unrelated,
+> non-authoritative concern), and an
+> [append-only file](docs/secure_runtime_alpha_326_append_only_backend_review.md)
+> (zero new dependency, with an explicit warning against mistaking a
+> naive JSON-overwrite for genuine append-only durability) — each
+> requiring either a new, prohibited dependency or a real host process
+> that does not exist yet.
+> [Multi-environment strategy](docs/secure_runtime_alpha_327_multi_environment_backend_strategy.md)
+> adopts deferral over an early SQLite/D1/IndexedDB/file commitment;
+> [schema/migration architecture](docs/secure_runtime_alpha_328_board_schema_migration_architecture.md)
+> fixes persistence-layer ownership of `schemaVersion` checks ahead of
+> any future backend.
+> [**Selection: Option E — no backend yet**](docs/secure_runtime_alpha_329_first_durable_backend_selection.md),
+> because Board has no real caller in any production runtime, not
+> because any candidate is technically deficient. `package.json`'s own
+> `dependencies` count stays fixed at 2 — zero new Cargo/npm dependency
+> of any kind. `npm run typecheck`/`npm test` GREEN (pre-existing,
+> unrelated Rust-structural test failures excluded — see
+> `docs/secure_runtime_alpha_330_durable_backend_selection_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline. The pre-existing root-level
+> `p2p/` directory remains completely untouched. Next Arc recommended:
+> **Desktop Host Runtime Foundation Arc** (not Ontology integration).
+>
+> See `docs/secure_runtime_alpha_321_board_deployment_runtime_inventory.md`
+> through `docs/secure_runtime_alpha_330_durable_backend_selection_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 311–320 — Canonical Board Persistence
 > Boundary Arc.** Implements a protocol-independent persistence SEAM
 > (not a real database) for the Canonical Board Application built in
