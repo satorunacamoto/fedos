@@ -8,6 +8,61 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 351–360 — Append-only Durable Board
+> Backend Arc.** Implements the architecture Alpha 349 froze: the
+> FIRST real durable backend for `FedosBoardPersistence`. New
+> [`src/board/persistence/append_only_fedos_board_persistence.ts`](src/board/persistence/append_only_fedos_board_persistence.ts)
+> (`AppendOnlyFedosBoardPersistence` — `Fedos`-prefixed, matching
+> every other concrete port implementation) uses ONLY `node:fs`, zero
+> new dependency, reached the same untyped way
+> `fedos_windows_dpapi_helper.ts` already reaches `node:child_process`.
+> One JSON-serialized `FedosPersistedBoardPostRecordV1` per
+> `\n`-terminated line (JSON Lines); no binary format, no compression,
+> no batching; the no-`fsync` durability limitation explicitly
+> disclosed, not hidden
+> (`docs/secure_runtime_alpha_352_append_only_record_format.md`).
+> `putPost()` appends only — never rewrites, never truncates, never
+> reorders, writing to disk ONLY on a genuine new insert. `getPost()`/
+> `listPosts()` rebuild state by REPLAYING the log on every call — no
+> side index yet, a deliberate first-Arc simplicity choice. All four
+> `FedosBoardPersistenceWriteResult` outcomes verified, with
+> `"failed"` reachable for the first time in this repository's own
+> history — exactly the case `PersistedFedosBoardRepository`'s own
+> Alpha 317 comment anticipated two Arcs ago. **Fail closed, uniformly,
+> across every crash case reviewed** — resolving the one open design
+> question Alpha 345 §6 left from the prior Arc (a trailing
+> crash-truncated line is treated IDENTICALLY to any other malformed
+> line, never specially repaired). `hydrateFedosBoardService` works
+> against the new backend with ZERO modification, verified end to end
+> with real fixtures from all four Board Adapters (Nostr, ActivityPub,
+> AT Protocol, Session) across a genuine restart — identical feed,
+> thread grouping, source references, ordering, and duplicate
+> handling. Every existing public interface preserved; `FedosDesktopHost`/
+> `createFedosDesktopHost` untouched (the default remains
+> `InMemoryFedosBoardPersistence`, Alpha 334). **Remaining limitations,
+> named explicitly:** no `fsync`, no compaction, no Host wiring/path
+> resolution, no concurrent-writer support, and a newly-discovered,
+> reproduced, NOT-fixed gap in `FedosDesktopHost.start()` — it does not
+> catch a THROWN exception from hydration (only a RETURNED
+> non-`"hydrated"` outcome sets `state()` to `"failed"`), leaving
+> `state()` stuck at `"starting"` after a corrupt append-only log —
+> invisible before this Arc since `InMemoryFedosBoardPersistence` can
+> never throw
+> (`docs/secure_runtime_alpha_360_append_only_backend_completion.md`).
+> `package.json`'s own `dependencies` count stays fixed at 2 — zero new
+> Cargo/npm dependency of any kind. `npm run typecheck`/`npm test`
+> GREEN (pre-existing, unrelated Rust-structural test failures
+> excluded). `cargo check` GREEN. The pre-existing root-level `p2p/`
+> directory remains completely untouched. Next Arc recommended:
+> **Secure Runtime Alpha 361–370: Append-only Compaction & Integrity
+> Review**.
+>
+> See `docs/secure_runtime_alpha_351_existing_persistence_layer_inventory.md`
+> through `docs/secure_runtime_alpha_360_append_only_backend_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 341–350 — Board Durable Backend
 > Re-evaluation & Local Backend Selection Arc.** A Design/Selection
 > Arc — no durable backend is implemented. Re-evaluates Alpha 329's
