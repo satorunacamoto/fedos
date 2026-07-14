@@ -8,6 +8,69 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 361–370 — Board Recovery & Host
+> Robustness Arc.** A Review/Design Arc — no new storage format, no
+> production code change, strengthening the existing Append-only
+> backend and `FedosDesktopHost` purely through definition and
+> verification. Inventoried every Host/persistence failure path
+> (`docs/secure_runtime_alpha_361_host_failure_inventory.md`) and
+> reproduced the one confirmed gap: a THROWN exception from hydration
+> leaves `state()` stuck at `"starting"`, never `"failed"`. Fixed the
+> intended policy that gap falls short of
+> (`docs/secure_runtime_alpha_362_hydration_failure_policy.md`: any
+> startup failure, by ANY signaling mechanism, must reach
+> `state() === "failed"`), classified all seven corruption/non-corruption
+> categories
+> (`docs/secure_runtime_alpha_363_corruption_classification.md`), and
+> designed — WITHOUT implementing — a stop-at-first-failure salvage
+> recovery strategy
+> (`docs/secure_runtime_alpha_364_recovery_strategy.md`) and a
+> rename-based compaction architecture, finding compaction not yet
+> justified by real data need
+> (`docs/secure_runtime_alpha_366_compaction_architecture_review.md`).
+> Confirmed by real execution: embedded control characters in a post
+> body never break the JSON Lines log
+> (`docs/secure_runtime_alpha_365_append_integrity_review.md`);
+> `FedosDesktopHost` itself correctly survives multiple independent
+> restart cycles against a shared durable file, and a clean `stop()`
+> leaves on-disk state identical to a simulated crash
+> (`docs/secure_runtime_alpha_367_host_restart_verification.md` — this
+> Stage's own execution also confirmed a previously-undocumented fact:
+> `board().registerPost()` writes are IN-MEMORY ONLY, never durable —
+> callers must write through `FedosBoardPersistence` directly);
+> correctness holds at 1,000 records, with the already-known cost shape
+> now precisely characterized as O(N²) total write cost
+> (`docs/secure_runtime_alpha_368_large_dataset_scalability_review.md`).
+> Reviewed `fsync` in depth — confirmed technically addable without any
+> new dependency, format change, or interface change, but deliberately
+> NOT added, since the durability/performance trade-off it implies is
+> undecided
+> (`docs/secure_runtime_alpha_369_durability_fsync_review.md`).
+> **Special Focus, answered: the hydration-exception gap IS a true
+> architectural defect** — reachable with real inputs, observably
+> incorrect against `FedosDesktopHostState`'s own design, and
+> architectural (not incidental) in root cause. A minimal, one-`try`/`catch`
+> future fix is documented in full but explicitly NOT implemented this
+> Arc, per its own instruction
+> (`docs/secure_runtime_alpha_370_recovery_robustness_completion.md`).
+> Every public interface preserved; the current
+> `AppendOnlyFedosBoardPersistence` record format preserved exactly.
+> `package.json`'s own `dependencies` count stays fixed at 2 — zero new
+> Cargo/npm dependency of any kind. `npm run typecheck`/`npm test`
+> GREEN (pre-existing, unrelated Rust-structural test failures
+> excluded; one additional identity-runtime test flake observed in the
+> full run, confirmed flaky — not a regression — by an isolated re-run
+> that passed cleanly).
+> `cargo check` GREEN. The pre-existing root-level `p2p/` directory
+> remains completely untouched. Next Arc recommended: **Secure Runtime
+> Alpha 371–380: FedosDesktopHost Hydration Exception Handling Arc**.
+>
+> See `docs/secure_runtime_alpha_361_host_failure_inventory.md`
+> through `docs/secure_runtime_alpha_370_recovery_robustness_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 351–360 — Append-only Durable Board
 > Backend Arc.** Implements the architecture Alpha 349 froze: the
 > FIRST real durable backend for `FedosBoardPersistence`. New
