@@ -8,6 +8,57 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 341–350 — Board Durable Backend
+> Re-evaluation & Local Backend Selection Arc.** A Design/Selection
+> Arc — no durable backend is implemented. Re-evaluates Alpha 329's
+> own deferral now that `FedosDesktopHost` (Alpha 331–340) is a real
+> ownership boundary: re-confirms, by direct inspection, that the Host
+> can structurally own any `FedosBoardPersistence` implementation
+> (`docs/secure_runtime_alpha_341_host_capability_inventory.md`), and
+> freezes which persistence assumptions are genuinely
+> backend-independent — synchronous port, no database vocabulary, no
+> `delete`, hydration and the persisted-repository adapter already
+> requiring zero change for any future backend
+> (`docs/secure_runtime_alpha_342_current_persistence_review.md`).
+> Re-reviews
+> [SQLite](docs/secure_runtime_alpha_343_sqlite_review.md) (strongest
+> crash safety and query capability, but needs a new native dependency
+> or an undeclared Node-version floor) and
+> [append-only file](docs/secure_runtime_alpha_344_append_only_backend_review.md)
+> (zero new dependency, trivial migration, one real, named, unsolved
+> design gap: distinguishing a crash-truncated trailing record from
+> genuine corruption) against each other's own
+> [crash-recovery behavior](docs/secure_runtime_alpha_345_crash_recovery_review.md),
+> fixes an
+> [Offline, One-shot migration strategy](docs/secure_runtime_alpha_346_migration_strategy.md)
+> usable for any backend pair via the existing port alone, reviews a
+> [backend-agnostic storage layout](docs/secure_runtime_alpha_347_storage_layout_review.md)
+> without deciding an actual path, and confirms the
+> [Desktop Host is the only environment](docs/secure_runtime_alpha_348_deployment_review.md)
+> where either backend has a real caller.
+> [**Selection: Option A — append-only file, first**](docs/secure_runtime_alpha_349_backend_selection.md),
+> winning four of six named criteria outright (simplicity, dependency
+> footprint, future migration, FedOS architecture consistency), with
+> SQLite named as the anticipated future migration destination, not a
+> rejected dead end. `package.json`'s own `dependencies` count stays
+> fixed at 2 — zero new Cargo/npm dependency of any kind. `npm run
+> typecheck`/`npm test` GREEN (pre-existing, unrelated Rust-structural
+> test failures excluded — see
+> `docs/secure_runtime_alpha_350_backend_reevaluation_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline. The pre-existing root-level
+> `p2p/` directory remains completely untouched. Next Arc recommended:
+> **Secure Runtime Alpha 351–360: Append-only Durable Board Backend
+> Arc**.
+>
+> See `docs/secure_runtime_alpha_341_host_capability_inventory.md`
+> through `docs/secure_runtime_alpha_350_backend_reevaluation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 331–340 — Desktop Host Runtime
 > Foundation Arc.** Introduces the first real host-runtime boundary
 > capable of owning the existing `DesktopApplication` and Canonical
