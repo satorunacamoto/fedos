@@ -62,14 +62,17 @@ describe("Secure Runtime Alpha 370 -- Board Recovery & Host Robustness Completio
     expect(startMatch![0]).not.toMatch(/try \{\s*hydration = hydrateFedosBoardService/);
   });
 
-  it("5. behavioral: the confirmed defect still reproduces identically -- state stuck at starting, not failed", async () => {
+  it("5. behavioral: the confirmed defect is now FIXED by Alpha 382 (Arc 381-390) -- state correctly reaches failed, never stuck at starting", async () => {
     dir = mkdtempSync(join(tmpdir(), "a370-"));
     const filePath = join(dir, "board.jsonl");
     writeFileSync(filePath, '{"schemaVersion":1,"id":"trunc', "utf8");
     const persistence = new AppendOnlyFedosBoardPersistence(filePath);
     const host = new FedosDesktopHost({ desktopApplication: new DesktopApplication(), boardPersistence: persistence });
     await expect(host.start()).rejects.toThrow();
-    expect(host.state()).toBe("starting");
+    // At the time this Arc (361-370) shipped, this was the confirmed,
+    // disclosed gap -- state stuck at "starting". Alpha 382 (Arc 381-390)
+    // closed it; this test now documents the FIXED behavior.
+    expect(host.state()).toBe("failed");
   });
 
   it("6. the design doc names the second finding -- board() writes are not durable -- confirmed by Alpha 367's own execution", () => {

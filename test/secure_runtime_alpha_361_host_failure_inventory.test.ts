@@ -78,15 +78,17 @@ describe("Secure Runtime Alpha 361 -- Host Failure Inventory", () => {
     expect(host.state()).toBe("failed");
   });
 
-  it("4. row 3 CONFIRMED DEFECT: a THROWN hydration exception rejects start() but leaves state stuck at starting, not failed", async () => {
+  it("4. row 3, FIXED by Alpha 382 (Arc 381-390): a THROWN hydration exception rejects start() and correctly transitions state to failed", async () => {
     dir = mkdtempSync(join(tmpdir(), "a361-"));
     const filePath = join(dir, "board.jsonl");
     writeFileSync(filePath, '{"schemaVersion":1,"id":"trunc', "utf8");
     const p = new AppendOnlyFedosBoardPersistence(filePath);
     const host = new FedosDesktopHost({ desktopApplication: new DesktopApplication(new NullPublicIdentityReader()), boardPersistence: p });
     await expect(host.start()).rejects.toThrow();
-    expect(host.state()).toBe("starting");
-    expect(host.state()).not.toBe("failed");
+    // At the time this Arc (361-370) shipped, this was the confirmed defect --
+    // state stuck at "starting". Alpha 382 (Arc 381-390) closed it; this test
+    // now documents the FIXED behavior, not the original defect.
+    expect(host.state()).toBe("failed");
   });
 
   it("5. row 4: a putPost 'failed' outcome is a normal write-time token, never a thrown exception, and never touches Host state", async () => {

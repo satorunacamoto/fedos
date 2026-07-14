@@ -78,7 +78,7 @@ describe("Secure Runtime Alpha 360 -- Append-only Backend Completion", () => {
     expect(hydrationSource).toMatch(/export function hydrateFedosBoardService\(persistence: FedosBoardPersistence\): FedosBoardHydrationResult/);
   });
 
-  it("8. confirmed limitation, reproduced: FedosDesktopHost.start() rejects on a corrupt append-only log, but state() reports 'starting', not 'failed'", async () => {
+  it("8. FedosDesktopHost.start() rejects on a corrupt append-only log, and state() correctly reports 'failed' -- fixed by Alpha 382 (Arc 381-390)", async () => {
     dir = mkdtempSync(join(tmpdir(), "a360-"));
     const filePath = join(dir, "board.jsonl");
     writeFileSync(filePath, '{"schemaVersion":1,"id":"trunc', "utf8");
@@ -86,8 +86,10 @@ describe("Secure Runtime Alpha 360 -- Append-only Backend Completion", () => {
     const host = new FedosDesktopHost({ desktopApplication: new DesktopApplication(), boardPersistence: persistence });
 
     await expect(host.start()).rejects.toThrow();
-    // This is the confirmed, disclosed gap -- NOT "failed". See Alpha 360 §3.
-    expect(host.state()).toBe("starting");
+    // At the time this Arc (351-360) shipped, this was a confirmed, disclosed
+    // gap -- state() stuck at "starting". Alpha 382 (Arc 381-390) closed it;
+    // this test now documents the FIXED behavior, not the original gap.
+    expect(host.state()).toBe("failed");
   });
 
   it("9. the design doc names this exact FedosDesktopHost.start() gap as a remaining limitation, and states this Arc does not fix it", () => {

@@ -11,8 +11,6 @@ import repositorySource from "../src/board/repository/fedos_board_repository.ts?
 import persistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 
 import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
 import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
@@ -95,9 +93,13 @@ describe("Secure Runtime Alpha 380 -- Canonical Board Query Foundation Completio
     expect(cargoTomlSource).not.toMatch(/board.?query/i);
   });
 
-  it("9. Regression: src/worker.ts and src/desktop/host/ carry zero reference to the new query layer", () => {
+  it("9. Regression: src/worker.ts carries zero reference to the new query layer (Host integration deliberately superseded by Alpha 383, Arc 381-390)", () => {
     expect(workerSource).not.toMatch(/FedosBoardQuery/);
-    expect(hostSource).not.toMatch(/FedosBoardQuery/);
+    // At the time this Arc (371-380) shipped, FedosDesktopHost had no
+    // reference to FedosBoardQuery either -- Alpha 380 §3 named that
+    // absence explicitly as this layer's own largest gap. Alpha 383
+    // (Arc 381-390) closed exactly that gap by design; hostSource is no
+    // longer expected to be silent on FedosBoardQuery.
   });
 
   it("10. the design doc names every explicit non-decision this layer leaves for a future Arc", () => {

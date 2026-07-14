@@ -8,6 +8,62 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 381–390 — Canonical Board Query Host
+> Integration & Startup Failure Closure Arc.** Integrates the
+> completed Query layer into `FedosDesktopHost` and closes the
+> confirmed `FedosDesktopHost.start()` hydration-exception defect
+> (first found by Alpha 361, Arc 361–370). **The defect is FIXED**:
+> `start()` now wraps hydration, `FedosBoardQuery` construction, and
+> `DesktopApplication.start()` in exactly ONE `try`/`catch` — every
+> startup failure shape (a returned hydration outcome, a THROWN
+> hydration exception — e.g. from a corrupt
+> `AppendOnlyFedosBoardPersistence` log — or a Desktop startup
+> rejection) now transitions `state()` to `"failed"` before `start()`'s
+> own `Promise` settles, with the original error's own identity
+> preserved unmodified (no wrapping). Host now owns exactly one
+> `FedosBoardQuery`, constructed only after successful hydration, over
+> the already-hydrated `FedosBoardService` — never exposed until
+> `DesktopApplication.start()` also succeeds, discarded on any
+> failure. New `query(): FedosBoardQuery | null` accessor, matching
+> `desktop()`/`board()`'s own exact fail-closed shape — adopted because
+> `FedosBoardQuery` is confirmed to have zero mutating method.
+> `board()` remains completely UNCHANGED — the canonical WRITE
+> boundary (`registerPost()`); `query()` is the canonical READ boundary
+> (`recentFeed()`/`thread()`) — a frozen, permanent distinction, never
+> merged. No Host-level delegation methods added (`host.query()` is
+> the sole path) — reviewed and declined to avoid an unnecessary
+> maintenance ripple with no current caller requiring it. Verified end
+> to end: the in-memory default, a REAL, explicitly-injected
+> `AppendOnlyFedosBoardPersistence` (including the exact corruption
+> shape that originally exposed the defect), and real fixtures from
+> all four Board Adapters (Nostr, ActivityPub, AT Protocol, Session) —
+> zero adapter modification, independent Host isolation confirmed for
+> Query specifically. **Honestly re-documented, not solved:** a post
+> registered via `board()` is visible via `query()` immediately (both
+> read the SAME live `FedosBoardService`), but is NOT automatically
+> written to the underlying `FedosBoardPersistence` — confirmed
+> directly, matching Alpha 367's own original finding (Arc 361–370).
+> The Host factory's own default persistence remains
+> `InMemoryFedosBoardPersistence`, UNCHANGED — no storage-path
+> authority is introduced. `package.json`'s own `dependencies` count
+> stays fixed at 2 — zero new Cargo/npm dependency of any kind. `npm
+> run typecheck`/`npm test` GREEN (pre-existing, unrelated
+> Rust-structural test failures excluded; five existing test files
+> updated to assert the FIXED behavior in place of the now-resolved
+> confirmed defect they previously reproduced). `cargo check` GREEN;
+> `cargo test` fails to BUILD in this environment due to a
+> pre-existing, unrelated MinGW `dlltool` path issue, reproduced
+> identically on the pre-Arc baseline. The pre-existing root-level
+> `p2p/` directory remains completely untouched. Next Arc recommended:
+> **Desktop Host Durable Write Coordination Arc** (not Ontology
+> integration).
+>
+> See `docs/secure_runtime_alpha_381_host_query_integration_inventory.md`
+> through `docs/secure_runtime_alpha_390_host_query_integration_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 371–380 — Canonical Board Query
 > Foundation Arc.** Defines HOW clients READ Board data — the
 > Repository (`FedosBoardRepository`, Alpha 302) and Persistence

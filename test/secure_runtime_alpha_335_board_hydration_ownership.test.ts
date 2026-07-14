@@ -113,10 +113,15 @@ describe("Secure Runtime Alpha 335 -- Board Hydration Ownership", () => {
     expect(hydrateIndex).toBeLessThan(desktopStartIndex);
   });
 
-  it("7. structural: #boardService is assigned a non-null value in exactly one place -- start()'s own final two statements", () => {
+  it("7. structural: #boardService is assigned a non-null value in exactly one place -- start()'s own final statements, immediately before entering ready", () => {
+    // Updated by Alpha 383 (Arc 381-390): #boardQuery is now assigned between
+    // #boardService and the "ready" transition -- same single-assignment-site
+    // guarantee, one more statement in the fixed final sequence.
     const nonNullAssignments = hostSource.match(/this\.#boardService = (?!null)/g) ?? [];
     expect(nonNullAssignments).toHaveLength(1);
-    expect(hostSource).toMatch(/this\.#boardService = hydration\.service;\s*\n\s*this\.#state = "ready";/);
+    expect(hostSource).toMatch(
+      /this\.#boardService = hydration\.service;\s*\n\s*this\.#boardQuery = boardQuery;\s*\n\s*this\.#state = "ready";/,
+    );
   });
 
   it("8. structural: no setTimeout/setInterval/background task anywhere in this file", () => {
