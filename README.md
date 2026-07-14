@@ -8,6 +8,54 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 371–380 — Canonical Board Query
+> Foundation Arc.** Defines HOW clients READ Board data — the
+> Repository (`FedosBoardRepository`, Alpha 302) and Persistence
+> (`FedosBoardPersistence`, Alpha 315) both remain byte-for-byte
+> UNCHANGED, confirmed by regression test. New
+> [`src/board/query/`](src/board/query/) directory:
+> [`fedos_board_query_types.ts`](src/board/query/fedos_board_query_types.ts)
+> (the contract — `FedosBoardQueryFilter`/`FedosBoardQueryPageOptions`/
+> `FedosBoardQueryResult`/`FedosBoardQuerySource`, type-only, mirroring
+> `FedosBoardFeedSource`'s own Alpha 308 structural-typing pattern) and
+> [`fedos_board_query.ts`](src/board/query/fedos_board_query.ts)
+> (`FedosBoardQuery` — `recentFeed()`, `createdAt` DESC matching
+> `FedosBoardFeed`'s own established order, confirmed identical by
+> direct execution; `thread()`, `createdAt` ASC — a genuinely NEW
+> deterministic ordering guarantee this repository never had before,
+> since `listThreadPosts()` itself only ever returned undocumented
+> `Set` insertion order). Offset/limit pagination, no cursor
+> (`FedosBoardFeed`'s own Alpha 308 "no cursor" guardrail extended
+> here); a four-dimension AND-only filter model
+> (`protocol`/`authorPublicIdentifier`/`since`/`until`) — text search,
+> reply-count/engagement filtering, and an `identityId` filter all
+> explicitly reviewed and rejected. Deliberately does NOT reuse
+> `FedosBoardFeed`'s own implementation — a naive delegation would
+> silently cap any filtered query at 100 unfiltered candidates, a real
+> correctness bug this Arc's own independent comparator avoids.
+> O(k log k) per call, bounded by current board/thread size, never by
+> total write history — reviewed and confirmed sufficient without a
+> new index. Verified end to end with real fixtures from all four
+> Board Adapters (Nostr, ActivityPub, AT Protocol, Session), including
+> a cross-protocol thread and mixed-protocol pagination. **This layer
+> has no real caller yet** — `FedosDesktopHost`/`createFedosDesktopHost`
+> and `src/worker.ts` are both untouched, confirmed by regression test
+> — mirroring Alpha 341's own identical finding about Persistence
+> before `FedosDesktopHost` existed to call it.
+> `package.json`'s own `dependencies` count stays fixed at 2 — zero new
+> Cargo/npm dependency of any kind. `npm run typecheck`/`npm test`
+> GREEN (pre-existing, unrelated Rust-structural test failures
+> excluded). `cargo check` GREEN. The pre-existing root-level `p2p/`
+> directory remains completely untouched. Next Arc recommended:
+> **Secure Runtime Alpha 381–390: Canonical Board Query Host
+> Integration Arc**.
+>
+> See `docs/secure_runtime_alpha_371_existing_read_path_inventory.md`
+> through `docs/secure_runtime_alpha_380_query_foundation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 361–370 — Board Recovery & Host
 > Robustness Arc.** A Review/Design Arc — no new storage format, no
 > production code change, strengthening the existing Append-only
