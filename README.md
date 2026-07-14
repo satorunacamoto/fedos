@@ -8,6 +8,64 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 331–340 — Desktop Host Runtime
+> Foundation Arc.** Introduces the first real host-runtime boundary
+> capable of owning the existing `DesktopApplication` and Canonical
+> Board Application for a long-lived local process — the missing
+> prerequisite Alpha 330 named. Inventories the existing repository
+> (`docs/secure_runtime_alpha_331_existing_desktop_host_inventory.md`):
+> no local-process entry point, no `package.json` `bin`, no CLI, no
+> signal handling, and no disposable resource on `DesktopApplication`
+> exist anywhere today. Adopts a class-owned lifecycle
+> (`docs/secure_runtime_alpha_332_desktop_host_responsibility_decision.md`,
+> Option A) over free functions, extending `DesktopApplication`,
+> reusing `createRuntime()`, or reusing Worker startup. New
+> [`src/desktop/host/`](src/desktop/host/) directory, three files:
+> [`fedos_desktop_host_state.ts`](src/desktop/host/fedos_desktop_host_state.ts)
+> (`FedosDesktopHostState` — a closed six-token union, no error
+> payload),
+> [`fedos_desktop_host.ts`](src/desktop/host/fedos_desktop_host.ts)
+> (`FedosDesktopHostDependencies` + `FedosDesktopHost` — `start()`
+> hydrates Board state via the UNMODIFIED `hydrateFedosBoardService`
+> (Alpha 318) THEN starts `DesktopApplication`, fails closed on either
+> step, and never exposes a partially-hydrated or partially-started
+> Host; `desktop()`/`board()` return `null` unless `state() ===
+> "ready"`; `stop()` is `"ready"`-only and NOT idempotent), and
+> [`create_fedos_desktop_host.ts`](src/desktop/host/create_fedos_desktop_host.ts)
+> (`createFedosDesktopHost` — construction only, both dependencies
+> independently overridable, defaults to a fresh
+> `InMemoryFedosBoardPersistence`, Alpha 316, still Alpha 329's own
+> Option E deferral, completely unmodified). Verified end to end by
+> real execution with injected (never mocked) dependencies: successful
+> startup with real posts from all four Board Adapters, hydration
+> failure, `DesktopApplication` startup failure (hydrated Board
+> discarded, never exposed), no double-start, no restart after stop,
+> independent Host instances share no state. Reviewed and explicitly
+> DEFERRED adding a real executable entry point
+> (`docs/secure_runtime_alpha_338_local_process_entrypoint_review.md`,
+> Option B) — `package.json` is completely unchanged, no `bin`, no
+> signal handling, no automatic Host start anywhere. The pre-existing
+> root-level `p2p/` directory remains completely untouched.
+> `package.json`'s own `dependencies` count stays fixed at 2 — zero new
+> Cargo/npm dependency of any kind. `npm run typecheck`/`npm test`
+> GREEN (pre-existing, unrelated Rust-structural test failures
+> excluded — see
+> `docs/secure_runtime_alpha_340_desktop_host_foundation_completion.md`).
+> `cargo check` GREEN; `cargo test` fails to BUILD in this environment
+> due to a pre-existing, unrelated MinGW `dlltool` path issue (the
+> checkout path contains spaces and non-ASCII characters), reproduced
+> identically on the pre-Arc baseline. Next Arc recommended: **Board
+> Durable Backend Selection Re-evaluation Arc** (not Ontology
+> integration) — a real, Node-capable local Host caller now exists,
+> re-opening SQLite/append-only file as candidates Alpha 329 deferred
+> only for lack of exactly this caller.
+>
+> See `docs/secure_runtime_alpha_331_existing_desktop_host_inventory.md`
+> through `docs/secure_runtime_alpha_340_desktop_host_foundation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 321–330 — Board Durable Backend
 > Selection & Architecture Arc.** A Design/Selection Arc — no durable
 > backend is implemented. Inventories real deployment/runtime state
