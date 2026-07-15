@@ -8,6 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 461–470 — Canonical Delivery
+> Observation Arc (complete).** Builds a durable, standalone Delivery
+> Observation vocabulary — `FedosDeliveryObservation`
+> (`src/board/observation/fedos_delivery_observation.ts`), five states
+> (`queued`/`publishing`/`accepted`/`rejected`/`failed`), an opaque
+> caller-supplied `subjectId`, a deterministically derived id, immutable,
+> one fail-closed constructor — plus its own Codec
+> (`fedos_delivery_observation_codec.ts`), persistence port and
+> in-memory backend (`fedos_delivery_observation_persistence.ts`,
+> `in_memory_fedos_delivery_observation_persistence.ts`), Repository
+> (`fedos_delivery_observation_repository.ts`, the sole write-side
+> owner), and read-only Query
+> (`fedos_delivery_observation_query.ts`: `historyFor`/
+> `currentStateFor`/`listByState`). This Arc's own Stage 1 inventory
+> (`docs/secure_runtime_alpha_461_existing_observation_vocabulary_inventory.md`)
+> found the committed history realizes none of Alpha 415's own
+> six-candidate Observation vocabulary, and found TWO separate,
+> uncommitted, in-progress threads already producing DIFFERENT,
+> un-reconciled Observation-shaped types in this working tree (a
+> Nostr-specific `FedosNostrBoardPublisher` thread and a generic
+> `FedosBoardOutboxObservation`/`FedosPublishScheduler` thread) — this
+> Arc made an explicit, documented decision to build a THIRD, standalone
+> vocabulary alongside both, leaving both completely untouched, rather
+> than reconcile or extend either. No Publisher anywhere in this
+> repository — committed or uncommitted — currently produces a
+> `FedosDeliveryObservation`; that wiring is real, undone work for a
+> future Arc, named honestly rather than silently implied. Security
+> regression guards
+> (`docs/secure_runtime_alpha_468_security_regression_guards.md`)
+> mechanically re-verify, against real source text, that none of this
+> Arc's six files under `src/board/observation/` reference Publisher,
+> Retry, Pool, GUI, Nostr signing, Board, Ontology, or `p2p/`.
+> `npx vitest run` on this Arc's own 7 test files: **51/51 tests
+> GREEN**. Full-repository `npm run typecheck` carries exactly one
+> error, in an unrelated, concurrently-written, uncommitted file this
+> Arc neither created nor depends on — real, observed evidence that
+> another process was actively writing to this same working tree while
+> this Arc's own work was in progress (§2 of
+> `docs/secure_runtime_alpha_469_verification.md`). `p2p/` remains
+> completely untouched.
+> Next Arc: not recommended this Stage — two separate, uncommitted,
+> further-advanced threads already occupy the numeric space immediately
+> following this Arc and were explicitly out of its scope throughout;
+> see `docs/secure_runtime_alpha_470_canonical_delivery_observation_completion.md`
+> §4.
+>
+> See `docs/secure_runtime_alpha_461_existing_observation_vocabulary_inventory.md`
+> through `docs/secure_runtime_alpha_470_canonical_delivery_observation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 431–450 — Master Seed Authority,
 > Sealed Persistence & Nostr Signing Activation Arc (Phase A and Phase
 > B both complete).** This Arc resolves the blocker Alpha 422–430 left
