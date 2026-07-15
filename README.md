@@ -8,6 +8,91 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 422–430 — Nostr Outbound Signing
+> Boundary Decision & Foundation Arc (Phase A complete; Phase B
+> honestly blocked).** Phase A (Alpha 422–426) reviews the existing
+> Rust/WASM boundary end to end
+> (`docs/secure_runtime_alpha_422_nostr_signing_boundary_inventory.md`)
+> and finds the crate already has a proven, tested precedent for
+> exposing opaque secret-bearing handles across WASM with zero raw-byte
+> exposure and zero new dependency: `AeadKeyHandle`/`AeadCiphertextHandle`
+> (`packages/fedos-core-rust/src/lib.rs:9286`/`9335`) — zero derives,
+> one non-secret `kind()` getter, a `pub(crate)`-only inner accessor,
+> free-function constructors only. `wasm-bindgen 0.2.126` and `k256`'s
+> `schnorr` feature are both already production dependencies, so a
+> narrow Nostr signing export requires no `Cargo.toml` change. Six
+> boundary options are compared
+> (`docs/secure_runtime_alpha_423_nostr_signing_boundary_options.md`);
+> Option A (a narrow WASM wrapper around the existing, already-built
+> `master_root` derivation/signing pipeline) is adopted, matching this
+> Arc's own preferred candidate. The authority's scope is fixed narrow,
+> not generic (`docs/secure_runtime_alpha_424_nostr_signing_authority_scope.md`):
+> `kind = {1}` only, a deterministic `accountIndex`-derived pubkey only,
+> never a caller-supplied `pubkey`/`id`/`sig`, and no `FedosBoardPost`
+> coupling (kept protocol-generic, matching `master_root`'s own
+> existing layering). Input (`FedosNostrUnsignedEventRequest`) and
+> output models are specified
+> (`docs/secure_runtime_alpha_425_nostr_signing_input_model.md`,
+> `docs/secure_runtime_alpha_426_signed_nostr_event_output_model.md`);
+> the output model reuses the EXISTING `FedosNostrWireEvent` wire shape
+> (`src/desktop/fedos_nostr_wire_event.ts`) rather than introducing a
+> fourth duplicate signed-event type, since three prior TS types
+> already match `{id, pubkey, created_at, kind, tags, content, sig}`
+> field-for-field. Phase B (Alpha 427–430) was attempted starting at
+> its own required first Stage, Alpha 427, which found — by direct
+> inspection — that **no real 32-byte Master Seed material exists
+> anywhere reachable at runtime, in Rust or TypeScript, today**: every
+> use of `FedosMasterSeedHandle` is confined to `#[cfg(test)]` fixture
+> bytes, `src/vault/types.ts` is explicitly key-material-free by its
+> own header ("NO key generation, NO key derivation, NO seed storage"),
+> and Master Seed storage/import was explicitly deferred to "a future
+> Storage Review" at Alpha 144 and never since revisited. Generating a
+> fresh random seed inside the authority itself would produce a
+> different Nostr identity every session (useless for a persistent
+> Board identity); accepting raw seed bytes from TypeScript would
+> require JS-reachable memory to hold Master Seed bytes with no
+> existing protected source, straining Permanent Security Invariant 1
+> ("secret bytes remain inside Rust Secure Runtime") at its true
+> origin. Per this Stage's own binding instruction — "if no safe seed
+> authority exists, stop and report rather than improvising one" —
+> **Phase B (Alpha 427–430) is honestly NOT implemented**; no
+> `FedosNostrSigningAuthority` struct, no new `#[wasm_bindgen]` export,
+> no `Cargo.toml` change, no Alpha 428/429 doc fabricated for
+> unattempted work. `npm run typecheck` GREEN; `npm test` GREEN except
+> the SAME 17 pre-existing, unrelated structural test failures already
+> present at this Arc's own baseline, across the SAME 10 pre-existing
+> files (`fedos_core_rust_public_crypto_api`,
+> `fedos_core_rust_public_opaque_crypto_api`,
+> `fedos_core_rust_secret_handle_real_bytes`,
+> `secure_runtime_alpha_018_ciphertext_wire_export_import_api`,
+> `secure_runtime_alpha_147_identity_root_derivation`,
+> `secure_runtime_alpha_151_protocol_root_handle`,
+> `secure_runtime_alpha_154_protocol_separation_verification`,
+> `secure_runtime_alpha_155_integration_completion`,
+> `secure_runtime_alpha_156_nostr_root_handle`,
+> `secure_runtime_alpha_158_nostr_root_verification` — all Rust-source-drift
+> structural assertions, none touching Nostr signing or the Outbox),
+> byte-for-byte identical test names before and after this Arc's own
+> change. `cargo
+> check` GREEN; `cargo test` still fails to BUILD in this environment
+> due to the same pre-existing MinGW `dlltool` path issue every prior
+> Arc has documented identically (a non-ASCII/space-containing path,
+> unrelated to this Arc's own source changes). The pre-existing
+> root-level `p2p/` directory remains completely untouched. Next Arc
+> recommended: **Secure Runtime — Master Seed Authority Boundary Arc**
+> (the "future Storage Review" Alpha 144 already named and deferred,
+> now overdue) — decide and implement exactly one safe way for a real
+> Master Seed to exist and be held, neither regenerated randomly every
+> session nor sitting as raw bytes in unprotected JS memory, before
+> attempting Phase B (Alpha 427–430) again against this Arc's
+> already-complete Phase A design.
+>
+> See `docs/secure_runtime_alpha_422_nostr_signing_boundary_inventory.md`
+> through `docs/secure_runtime_alpha_430_nostr_signing_boundary_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 411–421 — Canonical Board Durable
 > Outbox Foundation Arc (Phase A complete; Phase B honestly blocked).**
 > Phase A (Alpha 411–420) implements the first durable,
