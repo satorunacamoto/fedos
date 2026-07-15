@@ -77,8 +77,8 @@ describe("Secure Runtime Alpha 381 -- Host Query Integration Inventory", () => {
     expect(designDocSource.replace(/\s+/g, " ")).toMatch(/No other file requires modification\./);
   });
 
-  it("8. structural: board() remains the Host's only write-capable accessor before this Arc's own changes are layered on", () => {
-    expect(hostSource).toMatch(/board\(\): FedosBoardService \| null/);
+  it("8. structural: board() was the Host's only write-capable accessor at the time of THIS Arc's own inventory -- since REWIRED to read-only by Alpha 404 (Arc 401-410)", () => {
+    expect(hostSource).toMatch(/board\(\): FedosBoardReader \| null/);
   });
 
   it("9. behavioral: independent hosts sharing no persistence produce isolated results, confirming a baseline for Query isolation", async () => {

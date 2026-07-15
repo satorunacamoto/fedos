@@ -58,8 +58,11 @@ describe("Secure Runtime Alpha 336 -- Desktop Host Access Boundary", () => {
   });
 
   it("5. structural: both accessors gate on state() === \"ready\" and never throw", () => {
+    // board()'s own return type was REWIRED by Alpha 404 (Arc 401-410) from
+    // FedosBoardService to FedosBoardReader -- the gating shape (return null
+    // unless ready) this test's own title names is unchanged.
     expect(hostSource).toMatch(/desktop\(\): DesktopApplication \| null \{\s*return this\.#state === "ready" \? this\.#desktopApplication : null;\s*\}/);
-    expect(hostSource).toMatch(/board\(\): FedosBoardService \| null \{\s*return this\.#state === "ready" \? this\.#boardService : null;\s*\}/);
+    expect(hostSource).toMatch(/board\(\): FedosBoardReader \| null \{\s*return this\.#state === "ready" \? this\.#boardReader : null;\s*\}/);
   });
 
   it("6. structural: no persistence, index, registry, provider, or secret-handle type is imported into src/desktop/host/", () => {

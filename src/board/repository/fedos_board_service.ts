@@ -4,7 +4,14 @@
  * Feed Foundation Arc. Alpha 395 ("Implement Host Write API") — Stage
  * 5 of the Alpha 391–400 Desktop Host Durable Write Coordination Arc —
  * adds `previewRegistration()` below, unmodified `registerPost()`
- * behavior otherwise.
+ * behavior otherwise. Alpha 403 ("Read-Only Board Access Model") —
+ * Stage 3 of the Alpha 401–410 Desktop Host Canonical Write Boundary
+ * Closure Arc — adds `implements FedosBoardReader`
+ * (`./fedos_board_reader.js`) to this class's own declaration ONLY —
+ * a purely additive, compile-time-checked confirmation that this
+ * class's existing `findPost`/`listBoardPosts`/`listThreadPosts`
+ * ALREADY satisfy that contract verbatim; zero behavior change, zero
+ * new method, zero new field.
  *
  * The ONE write boundary coordinating `FedosBoardRepository` (Alpha
  * 302/303), `FedosBoardSourceIndex` (Alpha 304), and `FedosBoardIndex`
@@ -44,6 +51,7 @@ import {
   fedosBoardPostsAreStructurallyEqual,
   type FedosBoardRepository,
 } from "./fedos_board_repository.js";
+import type { FedosBoardReader } from "./fedos_board_reader.js";
 import { FedosBoardSourceIndex } from "./fedos_board_source_index.js";
 import { FedosBoardIndex } from "./fedos_board_index.js";
 
@@ -56,7 +64,7 @@ export type FedosBoardRegistrationResult =
   | "invalid-thread"
   | "cross-board-reply";
 
-export class FedosBoardService {
+export class FedosBoardService implements FedosBoardReader {
   readonly #repository: FedosBoardRepository;
   readonly #sourceIndex: FedosBoardSourceIndex;
   readonly #boardIndex: FedosBoardIndex;

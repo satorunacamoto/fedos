@@ -167,7 +167,7 @@ describe("Secure Runtime Alpha 389 -- Four-Protocol Host Query Verification", ()
     expect(h2.query()!.recentFeed(nostrPost.boardId).total).toBe(0);
   });
 
-  it("12. board() still accepts valid canonical writes while ready, and query() observes them immediately, but they are NOT automatically persisted", async () => {
+  it("12. Alpha 404 (Arc 401-410) closed this test's own originally-demonstrated memory-only-write bypass -- board() is now READ-ONLY; submitPost() (Alpha 395) is the sole write path and DOES persist durably, observed immediately by both board() and query()", async () => {
     const persistence = new InMemoryFedosBoardPersistence();
     const host = new FedosDesktopHost({ desktopApplication: new DesktopApplication(new NullReader()), boardPersistence: persistence });
     await host.start();
@@ -178,20 +178,24 @@ describe("Secure Runtime Alpha 389 -- Four-Protocol Host Query Verification", ()
       threadId: "live-post",
       replyTo: null,
       author: { identityId: null, protocol: "nostr", publicIdentifier: "npub1live" },
-      body: "written live via board()",
+      body: "written live via submitPost()",
       createdAt: 1_700_002_000,
       source: { protocol: "nostr", reference: "live-ref" },
     };
     const post = validateFedosBoardPost(input)!;
-    expect(host.board()!.registerPost(post)).toBe("inserted");
+    // The bypass this test originally demonstrated no longer typechecks or
+    // exists at runtime: board() no longer has a registerPost method at all.
+    expect((host.board() as unknown as Record<string, unknown>).registerPost).toBeUndefined();
+    expect(host.submitPost(post)).toBe("inserted");
 
-    // query() observes the in-memory write immediately.
+    // Both board() and query() observe the write immediately.
     const boardId = post.boardId;
+    expect(host.board()!.findPost(post.id)?.id).toBe("live-post");
     expect(host.query()!.recentFeed(boardId).posts.map((p) => p.id)).toContain("live-post");
 
-    // The write is NOT automatically persisted -- the underlying persistence
-    // knows nothing about it.
-    expect(persistence.listPosts().some((r) => r.id === "live-post")).toBe(false);
+    // Unlike Alpha 389's own original finding, the write IS now durably
+    // persisted -- submitPost() (Alpha 395) writes Persistence first.
+    expect(persistence.listPosts().some((r) => r.id === "live-post")).toBe(true);
   });
 
   it("13. the design doc honestly documents the memory-only write limitation, without implementing autosave", () => {

@@ -38,15 +38,20 @@ describe("Secure Runtime Alpha 385 -- Board Service Access Review", () => {
     expect(designDocSource.length).toBeGreaterThan(2500);
   });
 
-  it("2. structural: board()'s own signature is byte-for-byte unchanged from Alpha 336", () => {
-    expect(hostSource).toMatch(/board\(\): FedosBoardService \| null \{\s*return this\.#state === "ready" \? this\.#boardService : null;\s*\}/);
+  it("2. structural: board()'s own signature at the time of THIS Arc (Alpha 381-390) returned FedosBoardService -- since REWIRED by Alpha 404 (Arc 401-410) to FedosBoardReader, closing the write bypass this test file's own §3 (below) originally demonstrated", () => {
+    expect(hostSource).toMatch(/board\(\): FedosBoardReader \| null \{\s*return this\.#state === "ready" \? this\.#boardReader : null;\s*\}/);
   });
 
-  it("3. behavioral: board() remains the only write path -- registerPost() works exactly as before", async () => {
+  it("3. behavioral: board() is now READ-ONLY (Alpha 404) -- registerPost() is no longer reachable through it; submitPost() is the sole write path", async () => {
     const host = new FedosDesktopHost({ desktopApplication: new DesktopApplication(), boardPersistence: new InMemoryFedosBoardPersistence() });
     await host.start();
     const post = validateFedosBoardPost(rootInput("post-1"))!;
-    expect(host.board()!.registerPost(post)).toBe("inserted");
+    // Alpha 404 closed the exact bypass this test originally demonstrated
+    // (`host.board()!.registerPost(post)`, which no longer typechecks or
+    // exists at runtime on the object board() now returns).
+    expect((host.board() as unknown as Record<string, unknown>).registerPost).toBeUndefined();
+    expect(host.submitPost(post)).toBe("inserted");
+    expect(host.board()!.findPost(post.id)?.id).toBe(post.id);
   });
 
   it("4. structural: FedosBoardQuery's own contract has no write method -- query() could never serve as a write façade", () => {

@@ -8,6 +8,65 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 401–410 — Desktop Host Canonical Write
+> Boundary Closure Arc.** Closes the LAST reachable
+> Persistence-bypassing Host write route: `board()?.registerPost(post)`.
+> `board()` is REWIRED from `FedosBoardService | null` to
+> `FedosBoardReader | null` (new `src/board/repository/fedos_board_reader.ts`)
+> — Option C, adopted directly (no transitional `readBoard()`, no
+> deprecated legacy accessor), because ZERO production caller anywhere
+> in `src/` ever called `host.board()` before this Arc. `FedosBoardReader`
+> is the smallest honest read-only contract — `findPost()`/
+> `listBoardPosts()`/`listThreadPosts()`, no `registerPost()`, no
+> `previewRegistration()`, no Repository/Index/Persistence exposure —
+> and `board()` now returns a REAL `FedosBoardServiceReader` wrapper
+> object, not `#boardService` merely re-typed: TypeScript's structural
+> typing erases nothing at runtime, so a type-level narrowing alone
+> would have left `registerPost` fully callable via an unsafe cast.
+> The returned wrapper's own ACTUAL public surface — inspected
+> directly, `Object.keys`/`"registerPost" in reader`, not merely its
+> declared type — has NO `registerPost` property at all, closing the
+> bypass at the object level. `FedosBoardService` gains one purely
+> additive `implements FedosBoardReader` declaration, zero behavior
+> change, zero new method. `submitPost()` (Alpha 395, Arc 391–400)
+> itself is completely UNCHANGED — this Arc closes the LAST alternative
+> route to it, it does not alter it; `#boardService` remains privately
+> held, used only internally by `submitPost()`, never exposed by any
+> public method. Standing structural regression guards now scan
+> production source for every named bypass shape, distinguishing
+> forbidden Host-reachable mutation exposure from legitimate direct
+> `FedosBoardService` unit testing. Verified end to end: real fixtures
+> from all four Board Adapters, submitted via `submitPost()`, observed
+> by BOTH `board()` and `query()`, surviving a genuine restart onto an
+> independent Host instance; every Host-state failure
+> (not-ready/failed/stopped/corrupt-startup) leaves `board()`/`query()`/
+> `submitPost()` all correctly denied, with no partial access. Reviewed
+> — without implementing — the future Outbound Publish order: Option C
+> (persist/register locally, then a future durable, protocol-independent
+> Outbox delivery record) adopted, since remote protocols cannot
+> participate in this repository's own local, synchronous append-only
+> transaction; zero Outbox code, schema, or API written. Exactly seven
+> pre-existing test files updated (two that demonstrated the
+> now-closed bypass, five asserting `board()`'s own exact return
+> type/body) — no test that only read through `board()` required any
+> change. `package.json`'s own `dependencies` count stays fixed at 2 —
+> zero new Cargo/npm dependency of any kind. `npm run typecheck`/`npm
+> test` GREEN (the SAME ten pre-existing, unrelated Rust-structural
+> test failures Alpha 400 already named, byte-for-byte identical,
+> reconfirmed via `git stash` against the pre-Arc baseline). `cargo
+> check` GREEN; `cargo test` fails to BUILD in this environment due to
+> the SAME pre-existing MinGW `dlltool` path issue every prior Arc has
+> documented identically. The pre-existing root-level `p2p/` directory
+> remains completely untouched. Next Arc recommended: **Secure Runtime
+> Alpha 411–420: Canonical Board Outbox Foundation Arc** (not direct
+> multi-protocol publish implementation without an Outbox).
+>
+> See `docs/secure_runtime_alpha_401_host_write_surface_inventory.md`
+> through `docs/secure_runtime_alpha_410_host_write_boundary_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 391–400 — Desktop Host Durable Write
 > Coordination Arc.** Makes `FedosDesktopHost` the single owner of all
 > Canonical Board WRITE coordination, closing the memory-only-write gap

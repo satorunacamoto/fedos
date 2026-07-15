@@ -117,10 +117,13 @@ describe("Secure Runtime Alpha 335 -- Board Hydration Ownership", () => {
     // Updated by Alpha 383 (Arc 381-390): #boardQuery is now assigned between
     // #boardService and the "ready" transition -- same single-assignment-site
     // guarantee, one more statement in the fixed final sequence.
+    // Updated again by Alpha 404 (Arc 401-410): #boardReader is now
+    // assigned between #boardQuery and the "ready" transition -- same
+    // guarantee, one more statement in the same fixed final sequence.
     const nonNullAssignments = hostSource.match(/this\.#boardService = (?!null)/g) ?? [];
     expect(nonNullAssignments).toHaveLength(1);
     expect(hostSource).toMatch(
-      /this\.#boardService = hydration\.service;\s*\n\s*this\.#boardQuery = boardQuery;\s*\n\s*this\.#state = "ready";/,
+      /this\.#boardService = hydration\.service;\s*\n\s*this\.#boardQuery = boardQuery;\s*\n\s*this\.#boardReader = new FedosBoardServiceReader\(hydration\.service\);\s*\n\s*this\.#state = "ready";/,
     );
   });
 

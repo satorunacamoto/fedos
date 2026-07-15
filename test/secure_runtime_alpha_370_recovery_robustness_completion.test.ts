@@ -104,7 +104,10 @@ describe("Secure Runtime Alpha 370 -- Board Recovery & Host Robustness Completio
     expect(hostSource).toMatch(/async start\(\): Promise<void>/);
     expect(hostSource).toMatch(/async stop\(\): Promise<void>/);
     expect(hostSource).toMatch(/desktop\(\): DesktopApplication \| null/);
-    expect(hostSource).toMatch(/board\(\): FedosBoardService \| null/);
+    // board()'s own return type was REWIRED by Alpha 404 (Arc 401-410) from
+    // FedosBoardService to FedosBoardReader -- board() as a NAMED accessor
+    // this Arc (337) shipped is unchanged; only its return type narrowed.
+    expect(hostSource).toMatch(/board\(\): FedosBoardReader \| null/);
   });
 
   it("11. the design doc issues a Completion Declaration and recommends exactly one next Arc", () => {

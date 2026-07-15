@@ -9,8 +9,32 @@
  * Stages 2–5 of the Alpha 381–390 Canonical Board Query Host
  * Integration & Startup Failure Closure Arc. Alpha 395 ("Implement
  * Host Write API") — Stage 5 of the Alpha 391–400 Desktop Host Durable
- * Write Coordination Arc.
+ * Write Coordination Arc. Alpha 404 ("Host Board Access Rewiring") —
+ * Stage 4 of the Alpha 401–410 Desktop Host Canonical Write Boundary
+ * Closure Arc.
  *
+ * `board()` (Alpha 404): REWIRED from `FedosBoardService | null` to
+ * `FedosBoardReader | null` (`../../board/repository/fedos_board_reader.js`,
+ * Alpha 403) — closing the LAST reachable Persistence-bypassing Board
+ * mutation route: `board()?.registerPost(post)` (Alpha 385's own
+ * frozen shape, Alpha 389 §12's own confirmed live example). Option C
+ * (`docs/secure_runtime_alpha_402_canonical_host_write_authority_decision.md`),
+ * adopted WITHOUT a transitional `readBoard()`/deprecated-`board()`
+ * split (Option D) because Alpha 401 §3 confirmed, by direct search,
+ * ZERO production caller anywhere in `src/` ever called `host.board()`
+ * — only this repository's OWN test suite did, making a clean,
+ * non-legacy replacement honest rather than a broken compatibility
+ * claim. `board()` returns a `FedosBoardServiceReader` instance
+ * (Alpha 403) — a REAL forwarding object, not `#boardService` merely
+ * re-typed — so the returned object's own actual public surface has NO
+ * `registerPost` property at all, closing the bypass even against an
+ * unsafe cast, not merely against TypeScript's own static checking.
+ * `#boardService` itself is UNCHANGED — still held privately, still
+ * the object `submitPost()` (Alpha 395) calls
+ * `previewRegistration()`/`registerPost()` on internally; only the
+ * PUBLIC `board()` accessor's own return value is narrowed.
+ *
+
  * `submitPost()` (Alpha 395): the Host becomes the single owner of
  * Canonical Board WRITE coordination — `Validate → Persistence →
  * Repository → Query visibility → Success` (Alpha 393's own adopted
@@ -119,22 +143,24 @@
  * the objects themselves. All three accessors return `null` UNLESS
  * `state() === "ready"` — fail closed both BEFORE `start()` resolves
  * and AFTER `stop()`/a failure completes, with no exception in
- * between. `board()` remains the canonical WRITE boundary
- * (`registerPost()`/`findPost()`); `query()` is the canonical READ
- * boundary (`recentFeed()`/`thread()`) — Alpha 385's own frozen
- * distinction; NEITHER is deprecated, removed, or merged into the
- * other. `stop()` is valid ONLY from `"ready"` — a second `stop()`
- * call, exactly like a second `start()` call (Alpha 098's own
- * `DesktopApplication` precedent), THROWS rather than silently
- * no-oping; per Alpha 337, NEITHER `DesktopApplication` nor
- * `FedosBoardService` nor `FedosBoardQuery` nor
- * `InMemoryFedosBoardPersistence` exposes a dispose/close method of
- * any kind today, so `stop()` performs ONLY lifecycle-state closure —
- * `state → "stopping" → "stopped"` and clearing BOTH the internal
- * `#boardService` AND `#boardQuery` references — never a fabricated
- * close call on an object that has none. No `process.exit()`, no
- * signal handling, and no global cleanup of any kind exists in this
- * file.
+ * between. `board()` (Alpha 404, REWIRED from its Alpha 385 shape) is
+ * now the canonical READ-ONLY direct-lookup boundary
+ * (`findPost()`/`listBoardPosts()`/`listThreadPosts()`, via
+ * `FedosBoardReader`); `submitPost()` (Alpha 395) is the sole canonical
+ * WRITE boundary; `query()` remains the canonical filtered/paginated
+ * READ boundary (`recentFeed()`/`thread()`) — three DISTINCT
+ * responsibilities, none merged into another. `stop()` is valid ONLY
+ * from `"ready"` — a second `stop()` call, exactly like a second
+ * `start()` call (Alpha 098's own `DesktopApplication` precedent),
+ * THROWS rather than silently no-oping; per Alpha 337, NEITHER
+ * `DesktopApplication` nor `FedosBoardService` nor `FedosBoardQuery`
+ * nor `FedosBoardServiceReader` nor `InMemoryFedosBoardPersistence`
+ * exposes a dispose/close method of any kind today, so `stop()`
+ * performs ONLY lifecycle-state closure — `state → "stopping" →
+ * "stopped"` and clearing the internal `#boardService`, `#boardQuery`,
+ * AND `#boardReader` references — never a fabricated close call on an
+ * object that has none. No `process.exit()`, no signal handling, and
+ * no global cleanup of any kind exists in this file.
  *
  * HARD GUARDRAILS:
  *   - `FedosDesktopHostDependencies` and `FedosDesktopHost` are the
@@ -147,15 +173,22 @@
  *   - `start()` may be called AT MOST ONCE per instance — a second
  *     call, from ANY state, throws synchronously before touching
  *     hydration, `FedosBoardQuery`, or `DesktopApplication` at all.
- *   - `#boardService`/`#boardQuery` are assigned a non-`null` value in
- *     EXACTLY ONE place in this file each — `start()`'s own final
- *     three statements, reached ONLY after hydration, Query
- *     construction, AND `DesktopApplication.start()` ALL succeed.
- *     `start()`'s own `catch` block and `stop()` (Alpha 337) are the
- *     only other assignment sites, and both only ever write `null`.
+ *   - `#boardService`/`#boardQuery`/`#boardReader` are assigned a
+ *     non-`null` value in EXACTLY ONE place in this file each —
+ *     `start()`'s own final four statements, reached ONLY after
+ *     hydration, Query construction, AND `DesktopApplication.start()`
+ *     ALL succeed. `start()`'s own `catch` block and `stop()` (Alpha
+ *     337) are the only other assignment sites, and both only ever
+ *     write `null`. `#boardReader` (Alpha 404) is constructed from
+ *     `hydration.service` directly — the SAME source `#boardService`
+ *     itself is assigned from — never from `#boardService` after the
+ *     fact, so no code path can construct a `#boardReader` wrapping a
+ *     DIFFERENT `FedosBoardService` instance than `#boardService`
+ *     itself observes.
  *   - `start()`'s own `catch` block NEVER swallows the caught value —
  *     it always ends with `throw error;`, unmodified, after clearing
- *     `#boardService`/`#boardQuery` and setting `state → "failed"`.
+ *     `#boardService`/`#boardQuery`/`#boardReader` and setting
+ *     `state → "failed"`.
  *     `start()` performs NO automatic retry and exposes NO reset API
  *     of any kind — a `"failed"` instance stays `"failed"` forever
  *     (Alpha 333's own forbidden-transition table, unmodified).
@@ -163,11 +196,17 @@
  *     when `state() === "ready"`; otherwise, ALWAYS `null` — never a
  *     partially-constructed or partially-hydrated reference, never an
  *     exception.
+ *   - `board()`'s own return value (Alpha 404) is a
+ *     `FedosBoardServiceReader` instance — its OWN actual public
+ *     surface, inspected directly, has NO `registerPost` property, NO
+ *     `previewRegistration` property, and NO reference to `#repository`/
+ *     `#sourceIndex`/`#boardIndex`/`FedosBoardPersistence` of any kind —
+ *     see `docs/secure_runtime_alpha_403_read_only_board_access_model.md`.
  *   - `stop()` is valid ONLY from `"ready"`; every other starting
  *     state throws. `stop()` calls NO method on `#desktopApplication`,
- *     `#boardService`, `#boardQuery`, or `#boardPersistence` — none of
- *     the four exposes a close/dispose method this Arc, and none is
- *     fabricated here.
+ *     `#boardService`, `#boardQuery`, `#boardReader`, or
+ *     `#boardPersistence` — none of the five exposes a close/dispose
+ *     method this Arc, and none is fabricated here.
  *   - `FedosBoardQuery` is constructed ONLY from the ALREADY-hydrated
  *     `FedosBoardService` (`hydration.service`) — never from
  *     `#boardPersistence` directly, and the Query implementation
@@ -203,6 +242,7 @@ import {
   type FedosBoardService,
   type FedosBoardRegistrationResult,
 } from "../../board/repository/fedos_board_service.js";
+import { FedosBoardServiceReader, type FedosBoardReader } from "../../board/repository/fedos_board_reader.js";
 import { hydrateFedosBoardService } from "../../board/persistence/fedos_board_hydration.js";
 import { FedosBoardQuery } from "../../board/query/fedos_board_query.js";
 import type { FedosDesktopHostState } from "./fedos_desktop_host_state.js";
@@ -229,6 +269,7 @@ export class FedosDesktopHost {
   #state: FedosDesktopHostState = "constructed";
   #boardService: FedosBoardService | null = null;
   #boardQuery: FedosBoardQuery | null = null;
+  #boardReader: FedosBoardReader | null = null;
 
   constructor(dependencies: FedosDesktopHostDependencies) {
     this.#desktopApplication = dependencies.desktopApplication;
@@ -256,10 +297,12 @@ export class FedosDesktopHost {
 
       this.#boardService = hydration.service;
       this.#boardQuery = boardQuery;
+      this.#boardReader = new FedosBoardServiceReader(hydration.service);
       this.#state = "ready";
     } catch (error) {
       this.#boardService = null;
       this.#boardQuery = null;
+      this.#boardReader = null;
       this.#state = "failed";
       throw error;
     }
@@ -272,6 +315,7 @@ export class FedosDesktopHost {
     this.#state = "stopping";
     this.#boardService = null;
     this.#boardQuery = null;
+    this.#boardReader = null;
     this.#state = "stopped";
   }
 
@@ -279,8 +323,8 @@ export class FedosDesktopHost {
     return this.#state === "ready" ? this.#desktopApplication : null;
   }
 
-  board(): FedosBoardService | null {
-    return this.#state === "ready" ? this.#boardService : null;
+  board(): FedosBoardReader | null {
+    return this.#state === "ready" ? this.#boardReader : null;
   }
 
   query(): FedosBoardQuery | null {

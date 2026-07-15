@@ -134,9 +134,12 @@ describe("Secure Runtime Alpha 382 -- Host Startup Failure Closure", () => {
     expect(catchCount).toBe(1);
   });
 
-  it("9. structural: the catch block unconditionally nulls both owned objects, sets failed, and rethrows unmodified", () => {
+  it("9. structural: the catch block unconditionally nulls every owned object, sets failed, and rethrows unmodified", () => {
+    // Updated by Alpha 404 (Arc 401-410): #boardReader is now nulled
+    // alongside #boardService/#boardQuery -- same unconditional-clearing
+    // guarantee, one more field in the same catch block.
     expect(hostSource).toMatch(
-      /catch \(error\) \{\s*this\.#boardService = null;\s*this\.#boardQuery = null;\s*this\.#state = "failed";\s*throw error;\s*\}/,
+      /catch \(error\) \{\s*this\.#boardService = null;\s*this\.#boardQuery = null;\s*this\.#boardReader = null;\s*this\.#state = "failed";\s*throw error;\s*\}/,
     );
   });
 
