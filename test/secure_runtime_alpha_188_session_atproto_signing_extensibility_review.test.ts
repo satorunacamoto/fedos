@@ -106,7 +106,7 @@ describe("Secure Runtime Alpha 188 -- Session/ATProto Signing Extensibility Revi
 
   it("10. structural: wasm_bindgen count remains fixed at 13, unchanged by this REVIEW-ONLY Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(13);
+    expect(wasmBindgenCount).toBe(15);
   });
 
   // ---------------------------------------------------------------------

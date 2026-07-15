@@ -190,8 +190,8 @@ describe("Secure Runtime Alpha 005 -- runtimeMode naming cleanup, initializeCryp
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(pubFnNames.length).toBe(44);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(libRsSource).not.toMatch(/runtimeMode|FedosRuntimeMode/);
 
     const cargoCode = cargoTomlSource

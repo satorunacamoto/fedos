@@ -222,7 +222,7 @@ describe("FedOS Execution Backend, not connected, fail-closed everywhere (Stage 
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
   });
 
   it("20. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is untouched -- still fixed false", async () => {

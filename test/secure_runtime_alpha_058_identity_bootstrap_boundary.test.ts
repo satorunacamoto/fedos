@@ -546,8 +546,8 @@ describe("Secure Runtime Alpha 058 -- Identity Bootstrap Boundary, fedos_runtime
 
   it("53. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- still 36 pub fn, thirteen #[wasm_bindgen], no reference to this Stage's own doc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(36);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(pubFnNames.length).toBe(44);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_058/);
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_058/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_058/);

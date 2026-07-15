@@ -8,6 +8,96 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 431–450 — Master Seed Authority,
+> Sealed Persistence & Nostr Signing Activation Arc (Phase A and Phase
+> B both complete).** This Arc resolves the blocker Alpha 422–430 left
+> honestly open: no real production Master Seed authority existed
+> anywhere before this Arc. Phase A (Alpha 431–440) builds one.
+> `FedosMasterSeedAuthority` (`packages/fedos-core-rust/src/lib.rs:10123`)
+> generates a real 32-byte Master Seed inside Rust via the existing
+> OS-CSPRNG call, holds it in an opaque, zero-derive struct (no
+> `Clone`/`Debug`/`Serialize`, no raw-byte getter), and moves through an
+> explicit `Empty → Available → Cleared` lifecycle where `clear()` is
+> irreversible and `generate()`/`restore_sealed()` never overwrite live
+> state. Persistent restart survival is real, not aspirational: `seal()`
+> wraps the held seed under a user-supplied passphrase via Argon2id (the
+> SAME already-adopted dependency this crate's own RFC 9106 vectors
+> verify) plus the existing, reviewed ChaCha20-Poly1305 AEAD primitive
+> (`crypto::aead_internal::seal_internal`, the SAME function
+> `fedos_encrypt` itself calls) under a new, dedicated
+> `AeadAadDomain::MasterSeedSealing` domain — six sealing-key options
+> were compared
+> (`docs/secure_runtime_alpha_433_sealing_key_authority_decision.md`);
+> a hardcoded key and device-metadata-derived key were rejected outright
+> per this Arc's own absolute prohibition, and OS-bound DPAPI was
+> deliberately deferred rather than claimed without a real native caller
+> to invoke it. The sealed envelope (Sealed Master Seed Envelope V1,
+> `docs/secure_runtime_alpha_435_sealed_master_seed_envelope_v1.md`)
+> carries no plaintext seed byte, rejects any unrecognized schema
+> version, and never panics on a malformed input. Phase A's own Phase
+> Gate (`docs/secure_runtime_alpha_440_master_seed_authority_phase_gate.md`)
+> verifies all sixteen required conditions by real execution, including
+> a second, fully independent `FedosMasterSeedAuthority` instance
+> restoring from the first's sealed envelope and deriving the identical
+> signing identity. Phase B (Alpha 441–450) activates the narrow Nostr
+> signing boundary Alpha 422–426 already designed against this real
+> authority: `FedosMasterSeedAuthority::sign_nostr_event`
+> (`packages/fedos-core-rust/src/lib.rs:10381`) reuses the complete,
+> unchanged Alpha 146–200 derivation/signing chain, fixed to `kind = 1`,
+> never a generic `sign(hash)` oracle, never touching a Relay, the
+> Outbox, or the Canonical Board. `FedosWasmMasterSeedAuthority`
+> (`src/runtime/master_seed/fedos_wasm_master_seed_authority.ts`) and
+> `FedosWasmNostrSigningAuthority`
+> (`src/nostr/sign/fedos_wasm_nostr_signing_authority.ts`) are the sole
+> TypeScript-side implementations, both calling WASM only and never
+> implementing cryptography themselves. Cryptographic verification is
+> real, not asserted: a real second authority instance, restored from a
+> sealed envelope under the same passphrase, reproduces a byte-for-byte
+> identical signed NIP-01 event, independently re-verified by both a
+> separate `k256::schnorr` verifier and this repository's own existing
+> `validateInboundNostrEvent()`
+> (`docs/secure_runtime_alpha_446_cryptographic_verification.md`,
+> `docs/secure_runtime_alpha_447_restart_and_recovery_signing_verification.md`).
+> `npm run typecheck` GREEN; `npm test` GREEN except the SAME 10
+> pre-existing structural-drift test files already present at every
+> recent Arc's own baseline (`fedos_core_rust_public_crypto_api`,
+> `fedos_core_rust_public_opaque_crypto_api`,
+> `fedos_core_rust_secret_handle_real_bytes`,
+> `secure_runtime_alpha_018_ciphertext_wire_export_import_api`,
+> `secure_runtime_alpha_147_identity_root_derivation`,
+> `secure_runtime_alpha_151_protocol_root_handle`,
+> `secure_runtime_alpha_154_protocol_separation_verification`,
+> `secure_runtime_alpha_155_integration_completion`,
+> `secure_runtime_alpha_156_nostr_root_handle`,
+> `secure_runtime_alpha_158_nostr_root_verification` — hardcoded
+> `pub fn`/`#[wasm_bindgen]`-count assertions over `lib.rs` source text,
+> none touching Master Seed, signing, Board, or Outbox code; confirmed
+> pre-existing via `git stash` of this Arc's own Rust/loader diff, not
+> asserted from memory), byte-for-byte identical failing test names
+> before and after this Arc's own change. `cargo check` GREEN; `cargo
+> test` (external `CARGO_TARGET_DIR`, avoiding this environment's own
+> non-ASCII/space-containing repository path) — 515 passed, 1
+> pre-existing, unrelated failure (a `Cargo.toml` dependency-count
+> guard; `Cargo.toml` itself carries an empty diff for this entire Arc).
+> This is the first Arc in this repository's own recorded history where
+> `cargo test` actually BUILDS and RUNS in this environment — every
+> prior Arc's own status entry reported a MinGW `dlltool` build failure
+> tied to this repository's own non-ASCII working-directory path. The
+> pre-existing root-level `p2p/` directory remains completely untouched.
+> Next Arc recommended: **Secure Runtime Alpha 451–460: Nostr Outbound
+> Board Publisher & Delivery Observation Arc** — wire
+> `Board Reader → Nostr Signing Authority → FedosRelay` into an actual
+> publish flow; this Arc's own Publisher-readiness review
+> (`docs/secure_runtime_alpha_448_outbox_publisher_readiness_adapter.md`)
+> found no missing dependency shape, so the next Arc can proceed
+> directly to the publish flow itself.
+>
+> See `docs/secure_runtime_alpha_431_existing_secret_authority_and_storage_inventory.md`
+> through `docs/secure_runtime_alpha_450_master_seed_authority_and_nostr_signing_activation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 422–430 — Nostr Outbound Signing
 > Boundary Decision & Foundation Arc (Phase A complete; Phase B
 > honestly blocked).** Phase A (Alpha 422–426) reviews the existing

@@ -356,6 +356,16 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
         "expose_bytes_for_internal_derivation",
         "expose_bytes_for_internal_aead",
         "expose_bytes_for_internal_ecdh",
+        // Secure Runtime Alpha 436 adds a FOURTH -- NOT a SecretHandle
+        // accessor (this Stage's own narrative concerns SecretHandle
+        // only): `FedosMasterSeedHandle::expose_bytes_for_internal_sealing`,
+        // `pub(crate)` (unlike the SAME struct's OWN private
+        // `expose_bytes_for_internal_root_derivation`, which this regex
+        // does not match) because its sole reviewed caller,
+        // `FedosMasterSeedAuthority::seal`, lives outside `mod
+        // master_root` at crate-root level. See
+        // docs/secure_runtime_alpha_436_rust_master_seed_authority_implementation.md.
+        "expose_bytes_for_internal_sealing",
       ]),
     );
     expect(libRsSource).not.toMatch(/expose_bytes_for_internal_wasm_export/);
@@ -365,10 +375,10 @@ describe("Secure Runtime Alpha 010 -- generateAeadKey() Public Runtime API, Fail
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     expect(pubFnNames).toContain("generate_aead_key_handle");
     expect(pubFnNames).not.toContain("generate_aead_key_32");
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
 
     const cargoCode = cargoTomlSource
       .split("\n")

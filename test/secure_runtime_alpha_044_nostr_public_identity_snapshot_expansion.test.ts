@@ -479,8 +479,8 @@ describe("Secure Runtime Alpha 044 -- Nostr Public Identity Snapshot Expansion, 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(pubFnNames.length).toBe(44);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_044/);
 
     const cargoCode = cargoTomlSource

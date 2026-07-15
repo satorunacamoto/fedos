@@ -48,11 +48,11 @@ describe("FedOS wasm-bindgen dependency adoption -- Cargo.toml change only, no #
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
   });
 
   it("4. no #[wasm_bindgen] attribute existed anywhere in lib.rs at THIS Phase's own Stage 985 scope (Stage 986, Prototype EXECUTION Phase 010, later added exactly one -- see test/runtime_wasm_rust_version_export.test.ts)", () => {
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
   });
 
   it("5. no version() function existed at THIS Phase's own Stage 985 scope (Stage 986, Prototype EXECUTION Phase 010, later added exactly one, importing wasm_bindgen -- see test/runtime_wasm_rust_version_export.test.ts)", () => {

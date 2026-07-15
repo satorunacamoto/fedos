@@ -95,9 +95,9 @@ describe("Secure Runtime Alpha 220 -- Relay Foundation Completion", () => {
 
   it("7. structural: lib.rs #[wasm_bindgen] count and pub fn count remain fixed at 13/36 -- zero Rust change across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(13);
+    expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
   });
 
   it("8. structural: Cargo.toml and package.json carry no reference to any of the ten Arc-stage docs -- zero dependency change", () => {

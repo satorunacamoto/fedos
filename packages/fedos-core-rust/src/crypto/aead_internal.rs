@@ -79,6 +79,14 @@ pub(crate) enum AeadAadDomain {
     Storage,
     Conversation,
     TestOnly,
+    /// Secure Runtime Alpha 433/436 — the Master Seed Authority's own
+    /// sealing domain: binds a sealed Master Seed ciphertext to exactly
+    /// this purpose, so it can never be swapped for, or confused with, a
+    /// ciphertext sealed under any OTHER domain even under an
+    /// (implausible) accidental key reuse. Deliberately its OWN domain,
+    /// not a reuse of `RootKey`/`Storage` — domain separation exists
+    /// precisely so each distinct secret CLASS gets its own label.
+    MasterSeedSealing,
 }
 
 impl AeadAadDomain {
@@ -96,6 +104,7 @@ impl AeadAadDomain {
             AeadAadDomain::Storage => b"fedos-aead-aad-storage-v1",
             AeadAadDomain::Conversation => b"fedos-aead-aad-conversation-v1",
             AeadAadDomain::TestOnly => b"fedos-aead-aad-test-only-v1",
+            AeadAadDomain::MasterSeedSealing => b"fedos-aead-aad-master-seed-sealing-v1",
         }
     }
 }

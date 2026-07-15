@@ -249,7 +249,7 @@ describe("FedOS Rust crate skeleton", () => {
     // that prose, so this checks actual CALL/import syntax instead.
     expect(libRsSource).not.toMatch(/\buse\s+getrandom\b/);
     const getrandomCallSites = libRsSource.match(/getrandom::fill\s*\(/g) ?? [];
-    expect(getrandomCallSites.length).toBe(3);
+    expect(getrandomCallSites.length).toBe(4);
     expect(libRsSource).not.toMatch(/\buse\s+rand\b/);
     expect(libRsSource).not.toMatch(/\brand::/);
     expect(libRsSource).not.toMatch(/\bthread_rng\s*\(/);

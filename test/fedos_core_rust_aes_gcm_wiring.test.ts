@@ -197,8 +197,16 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "decrypt_aead",
       "serialize_aead_ciphertext",
       "deserialize_aead_ciphertext",
+      "new",
+      "is_available",
+      "is_cleared",
+      "generate",
+      "seal",
+      "restore_sealed",
+      "clear",
+      "sign_nostr_event",
     ];
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -349,6 +357,25 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // or AEAD algorithm.
       "serialize_aead_ciphertext",
       "deserialize_aead_ciphertext",
+      // Secure Runtime Alpha 436/444's opaque FedosMasterSeedAuthority
+      // class -- one #[wasm_bindgen] impl block, eight methods, none of
+      // which implement a new AEAD/KDF algorithm: `new`/`is_available`/
+      // `is_cleared`/`clear` are lifecycle-only; `generate` calls the
+      // pre-existing fedos_random_bytes_32() entry point;
+      // `seal`/`restore_sealed` reuse the pre-existing
+      // crypto::aead_internal::seal_internal/open_internal (this file's
+      // own AES-256-GCM is untouched -- sealing uses the pre-existing
+      // ChaCha20-Poly1305 path); `sign_nostr_event` reuses the
+      // pre-existing Alpha 146-200 Nostr signing chain. See
+      // docs/secure_runtime_alpha_436_rust_master_seed_authority_implementation.md.
+      "new",
+      "is_available",
+      "is_cleared",
+      "generate",
+      "seal",
+      "restore_sealed",
+      "clear",
+      "sign_nostr_event",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

@@ -3111,6 +3111,23 @@ mod master_root {
         fn expose_bytes_for_internal_root_derivation(&self) -> Option<[u8; 32]> {
             self.inner.expose_bytes_for_internal_derivation()
         }
+
+        /// Secure Runtime Alpha 436 — a SECOND, separately-named,
+        /// narrowly-scoped internal accessor exposing a COPY of the real
+        /// 32-byte Master Seed — `pub(crate)`, for the sole reviewed use
+        /// of `master_seed_authority::FedosMasterSeedAuthority::seal`
+        /// (which lives OUTSIDE this module specifically so `master_root`
+        /// itself never needs a WASM-export attribute (wasm_bindgen)
+        /// anywhere in its own body — Alpha 422's own regression guard). Returns
+        /// `None` after `clear()`. This is a DIFFERENT accessor from
+        /// [`FedosMasterSeedHandle::expose_bytes_for_internal_root_derivation`]
+        /// above (that one stays private, single-purpose, for
+        /// [`derive_identity_root_internal`] only) — each distinct
+        /// reviewed caller gets its own narrowly-named accessor, per this
+        /// module's own established one-accessor-per-purpose discipline.
+        pub(crate) fn expose_bytes_for_internal_sealing(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
     }
 
     /// Stage 1013 (Secure Runtime Alpha 147) — an INTERNAL-ONLY handle for
@@ -3819,6 +3836,21 @@ mod master_root {
         pub(crate) fn matches_for_internal_verification(&self, other: &Self) -> bool {
             bool::from(self.bytes.ct_eq(&other.bytes))
         }
+
+        /// Secure Runtime Alpha 444 — the "real, reviewed need" this
+        /// type's own Alpha 182 doc comment (above) anticipated before
+        /// adding any raw-byte accessor: the Nostr Signing Authority's
+        /// own hex-encoding of a completed signed event, the ONE place
+        /// this crate assembles the final NIP-01 wire object
+        /// (`nostr_event_encoding::serialize_signed_nostr_event_internal`,
+        /// below). A signature is not secret material once produced (it
+        /// travels alongside its event, same as a public key) — returning
+        /// a copy here is not a raw-SECRET export, matching this type's
+        /// own "does NOT wrap a secret-bearing handle type" design
+        /// (Alpha 182's own doc comment above).
+        pub(crate) fn expose_bytes_for_internal_signature_encoding(&self) -> [u8; 64] {
+            self.bytes
+        }
     }
 
     /// Stage 1029 (Secure Runtime Alpha 183) — derive a NEW
@@ -4398,6 +4430,61 @@ mod master_root {
                 escape_json_string_internal(content),
             )
         }
+
+        /// Hand-written lowercase hex — the SAME algorithm
+        /// `nostr_identifier_encoding::hex_encoding::encode_lowercase_hex_32`
+        /// already implements (Alpha 173), reimplemented here, generically
+        /// over any byte-slice length, because that sibling module's own
+        /// helper is `pub(super)`-scoped to `nostr_identifier_encoding`
+        /// only — Rust module privacy does not let this module reach past
+        /// it, even though both are nested inside the same `master_root`.
+        /// No new Cargo dependency (`hex` stays `[dev-dependencies]`-only).
+        fn encode_lowercase_hex_internal(bytes: &[u8]) -> String {
+            const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+            let mut out = String::with_capacity(bytes.len() * 2);
+            for byte in bytes {
+                out.push(HEX_CHARS[(byte >> 4) as usize] as char);
+                out.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+            }
+            out
+        }
+
+        /// Secure Runtime Alpha 443/444 — serializes a COMPLETE signed
+        /// Nostr event (all seven NIP-01 wire fields, including `id`/`sig`)
+        /// as a JSON object — the Nostr Signing Authority's own output
+        /// shape, distinct from [`serialize_nostr_event_canonical_internal`]'s
+        /// five-element PRE-IMAGE array above (which never carries `id`/`sig`).
+        /// Reuses the SAME `escape_json_string_internal`/`serialize_tags_internal`
+        /// this module already established — no second escaping rule, no
+        /// new JSON-emission logic beyond field selection. `id`/`sig` are
+        /// hex-encoded here (via [`encode_lowercase_hex_internal`] above);
+        /// every other field is read straight off `event` via the SAME
+        /// accessor [`serialize_nostr_event_canonical_internal`] already
+        /// uses. Output field ORDER (`id`,`pubkey`,`created_at`,`kind`,
+        /// `tags`,`content`,`sig`) matches
+        /// `src/desktop/fedos_nostr_wire_event.ts`'s own
+        /// `FedosNostrWireEvent` shape exactly (Secure Runtime Alpha 426's
+        /// own reuse decision) so the existing, unmodified
+        /// `validateInboundNostrEvent` can verify this function's own
+        /// output with zero adapter/renaming step.
+        pub(crate) fn serialize_signed_nostr_event_internal(
+            event_id: &[u8; 32],
+            event: &FedosNostrEventHandle,
+            signature: &[u8; 64],
+        ) -> String {
+            let (pubkey, created_at, kind, tags, content) =
+                event.expose_fields_for_internal_canonical_serialization();
+            format!(
+                "{{\"id\":{},\"pubkey\":{},\"created_at\":{},\"kind\":{},\"tags\":{},\"content\":{},\"sig\":{}}}",
+                escape_json_string_internal(&encode_lowercase_hex_internal(event_id)),
+                escape_json_string_internal(pubkey.as_str()),
+                created_at,
+                kind,
+                serialize_tags_internal(tags),
+                escape_json_string_internal(content),
+                escape_json_string_internal(&encode_lowercase_hex_internal(signature)),
+            )
+        }
     }
 
     /// Stage 1034 (Secure Runtime Alpha 194) — derive the deterministic
@@ -4590,6 +4677,102 @@ mod master_root {
                 output: None,
             },
         }
+    }
+
+    /// Secure Runtime Alpha 444 — the Nostr Signing Authority's own
+    /// single orchestration entry point: walks the COMPLETE, EXISTING,
+    /// UNCHANGED chain (Master Seed -> Identity Root -> Application Root
+    /// -> Nostr Root -> Account Secret Key -> Public Key -> Event -> Event
+    /// ID -> BIP-340 Signature, every step Alpha 146-200 already built)
+    /// against a real, caller-supplied [`FedosMasterSeedHandle`], and
+    /// returns a COMPLETE signed NIP-01 event as a JSON string (via
+    /// [`nostr_event_encoding::serialize_signed_nostr_event_internal`]) —
+    /// or `None` on ANY failure at ANY step, fail closed, never a panic.
+    /// Defined HERE, inside `master_root`, specifically so it can reach
+    /// every `pub(crate)`/private accessor and sibling module this chain
+    /// already established, without widening ANY existing item's
+    /// visibility — `master_seed_authority::FedosMasterSeedAuthority`
+    /// (Secure Runtime Alpha 436, outside this module, the ONLY
+    /// WASM-export-annotated (wasm_bindgen) caller) is this function's sole
+    /// reviewed caller. Every intermediate Root/Key handle this function
+    /// itself derives is `clear()`-ed immediately after its own single
+    /// use, the SAME "borrow, derive, clear the derived intermediate"
+    /// discipline every `derive_*_internal` function in this module
+    /// already follows for ITS OWN inputs — `master_seed` itself is only
+    /// ever borrowed, never mutated or cleared by this function (the
+    /// caller, `FedosMasterSeedAuthority`, owns its own lifecycle).
+    pub(crate) fn sign_nostr_event_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+        created_at: u64,
+        kind: u64,
+        tags: Vec<Vec<String>>,
+        content: String,
+    ) -> Option<String> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let public_key = match derive_nostr_public_key_internal(&secret_key) {
+            Some(pk) => pk,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event = match new_nostr_event_internal(&public_key, created_at, kind, tags, content) {
+            Some(e) => e,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event_id = match derive_nostr_event_id_internal(&event) {
+            Some(id) => id,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let signature = sign_nostr_event_internal(&event, &secret_key);
+        secret_key.clear();
+        let signature = signature?;
+        let signature_bytes = signature.expose_bytes_for_internal_signature_encoding();
+
+        Some(nostr_event_encoding::serialize_signed_nostr_event_internal(
+            &event_id,
+            &event,
+            &signature_bytes,
+        ))
     }
 
     #[cfg(test)]
@@ -9601,6 +9784,1031 @@ pub fn deserialize_aead_ciphertext(serialized: &str) -> Option<AeadCiphertextHan
             })
         }
         _ => None,
+    }
+}
+
+// =====================================================================
+// Secure Runtime Alpha 431-450 — Master Seed Authority & Nostr Signing
+// Activation Arc
+// =====================================================================
+//
+// The narrowest opaque Rust/WASM authority owning a real, generated
+// Master Seed, its sealed (Argon2id + AEAD) restart-persistence, and
+// the Nostr Signing Authority decided at Alpha 422-426 — now
+// implementable because a real Master Seed source finally exists
+// (Alpha 431's own inventory confirmed none did before this Arc).
+//
+// Design record: `docs/secure_runtime_alpha_431_*.md` through
+// `docs/secure_runtime_alpha_450_*.md`.
+
+/// The fixed schema version this Arc's sealed envelope format starts
+/// at. An unrecognized version is REJECTED (fail closed), never
+/// silently migrated — matching
+/// `crypto::ciphertext_serialization`'s own established discipline for
+/// the (unrelated) AEAD ciphertext envelope format.
+const FEDOS_SEALED_MASTER_SEED_ENVELOPE_SCHEMA_VERSION: u32 = 1;
+
+/// Fixed Argon2id cost parameters this Arc seals NEW envelopes under —
+/// `argon2::Params::DEFAULT_M_COST`/`DEFAULT_T_COST`/`DEFAULT_P_COST`
+/// (19 MiB, 2 iterations, 1 lane), the crate's own built-in default,
+/// never a hand-picked value. Recorded explicitly INSIDE every sealed
+/// envelope (rather than assumed from the current build) so a restore
+/// always re-derives under the EXACT params that envelope was sealed
+/// with, even if a future version ever changes this default.
+const FEDOS_MASTER_SEED_ARGON2_M_COST: u32 = argon2::Params::DEFAULT_M_COST;
+const FEDOS_MASTER_SEED_ARGON2_T_COST: u32 = argon2::Params::DEFAULT_T_COST;
+const FEDOS_MASTER_SEED_ARGON2_P_COST: u32 = argon2::Params::DEFAULT_P_COST;
+
+/// The fixed salt length this Arc draws for every NEW seal —
+/// `argon2::RECOMMENDED_SALT_LEN` (16 bytes), the crate's own built-in
+/// recommendation, never a hand-picked value.
+const FEDOS_MASTER_SEED_ARGON2_SALT_LEN: usize = argon2::RECOMMENDED_SALT_LEN;
+
+/// The one fixed field separator this Arc's own WASM boundary uses to
+/// flatten a single Nostr tag's fields (`["p","abc"]`) into ONE
+/// `String` crossing `Vec<String>` (wasm-bindgen's own natively
+/// supported vector type — a nested `Vec<Vec<String>>` is NOT). U+0001
+/// (SOH) — a control character that can never appear in a legitimate
+/// Nostr tag field the caller-side adapter constructs; that same
+/// adapter (Secure Runtime Alpha 445,
+/// `src/nostr/sign/fedos_wasm_nostr_signing_authority.ts`) rejects any
+/// request whose tag field already contains this character BEFORE
+/// crossing the boundary, so this function never has to guess whether
+/// a split point was real content or the delimiter.
+const FEDOS_NOSTR_TAG_FIELD_SEPARATOR: char = '\u{1}';
+
+/// Hand-written base64url helpers — reimplemented here (rather than
+/// reused from `crypto::ciphertext_serialization`'s own base64url
+/// pair) because Rust module privacy does not let this crate-root-level
+/// code reach that sibling module's own private helpers — see this
+/// Arc's own Alpha 431 inventory. No new Cargo dependency; the SAME
+/// algorithm this crate already implements elsewhere.
+mod master_seed_sealed_envelope_codec {
+    const BASE64URL_ALPHABET: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+    /// RFC 4648 §5 base64url, NO padding. Infallible for any byte slice.
+    pub(super) fn base64url_encode(bytes: &[u8]) -> String {
+        let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+        for chunk in bytes.chunks(3) {
+            let b0 = chunk[0];
+            let b1 = *chunk.get(1).unwrap_or(&0);
+            let b2 = *chunk.get(2).unwrap_or(&0);
+            let n = ((b0 as u32) << 16) | ((b1 as u32) << 8) | (b2 as u32);
+            out.push(BASE64URL_ALPHABET[((n >> 18) & 0x3F) as usize] as char);
+            out.push(BASE64URL_ALPHABET[((n >> 12) & 0x3F) as usize] as char);
+            if chunk.len() > 1 {
+                out.push(BASE64URL_ALPHABET[((n >> 6) & 0x3F) as usize] as char);
+            }
+            if chunk.len() > 2 {
+                out.push(BASE64URL_ALPHABET[(n & 0x3F) as usize] as char);
+            }
+        }
+        out
+    }
+
+    fn base64url_decode_byte(byte: u8) -> Option<u8> {
+        match byte {
+            b'A'..=b'Z' => Some(byte - b'A'),
+            b'a'..=b'z' => Some(byte - b'a' + 26),
+            b'0'..=b'9' => Some(byte - b'0' + 52),
+            b'-' => Some(62),
+            b'_' => Some(63),
+            _ => None,
+        }
+    }
+
+    /// RFC 4648 §5 base64url decode, NO padding accepted. Never panics.
+    pub(super) fn base64url_decode(text: &str) -> Option<Vec<u8>> {
+        let bytes = text.as_bytes();
+        if bytes.len() % 4 == 1 {
+            return None;
+        }
+        let mut out = Vec::with_capacity(bytes.len() / 4 * 3 + 3);
+        let mut i = 0;
+        while i + 4 <= bytes.len() {
+            let c0 = base64url_decode_byte(bytes[i])?;
+            let c1 = base64url_decode_byte(bytes[i + 1])?;
+            let c2 = base64url_decode_byte(bytes[i + 2])?;
+            let c3 = base64url_decode_byte(bytes[i + 3])?;
+            let n = ((c0 as u32) << 18) | ((c1 as u32) << 12) | ((c2 as u32) << 6) | (c3 as u32);
+            out.push((n >> 16) as u8);
+            out.push((n >> 8) as u8);
+            out.push(n as u8);
+            i += 4;
+        }
+        match bytes.len() - i {
+            0 => {}
+            2 => {
+                let c0 = base64url_decode_byte(bytes[i])?;
+                let c1 = base64url_decode_byte(bytes[i + 1])?;
+                let n = ((c0 as u32) << 18) | ((c1 as u32) << 12);
+                out.push((n >> 16) as u8);
+            }
+            3 => {
+                let c0 = base64url_decode_byte(bytes[i])?;
+                let c1 = base64url_decode_byte(bytes[i + 1])?;
+                let c2 = base64url_decode_byte(bytes[i + 2])?;
+                let n = ((c0 as u32) << 18) | ((c1 as u32) << 12) | ((c2 as u32) << 6);
+                out.push((n >> 16) as u8);
+                out.push((n >> 8) as u8);
+            }
+            _ => return None,
+        }
+        Some(out)
+    }
+
+    /// A parsed, fully-validated Sealed Master Seed Envelope V1
+    /// candidate. Crate-private only.
+    pub(super) struct ParsedSealedMasterSeedEnvelope {
+        pub(super) m_cost: u32,
+        pub(super) t_cost: u32,
+        pub(super) p_cost: u32,
+        pub(super) salt: Vec<u8>,
+        pub(super) nonce: [u8; 12],
+        pub(super) ciphertext: Vec<u8>,
+    }
+
+    /// Serialize a Sealed Master Seed Envelope V1 — fixed key order
+    /// (`v`,`kdf`,`m`,`t`,`p`,`salt`,`alg`,`n`,`ct`), no whitespace, a
+    /// canonical, byte-for-byte-deterministic emission — mirroring
+    /// `crypto::ciphertext_serialization::encode_envelope_internal`'s own
+    /// established shape (Alpha 431's own precedent), for a DIFFERENT
+    /// purpose (sealing a Master Seed, never an arbitrary AEAD
+    /// ciphertext). `salt`/`nonce`/`ciphertext` (which already includes
+    /// its own trailing AEAD tag, per `aead_internal::seal_internal`'s
+    /// own `ciphertext‖tag` contract) are base64url-encoded; no plaintext
+    /// seed byte is ever a field here.
+    pub(super) fn encode(
+        m_cost: u32,
+        t_cost: u32,
+        p_cost: u32,
+        salt: &[u8],
+        nonce: &[u8; 12],
+        ciphertext: &[u8],
+    ) -> String {
+        format!(
+            "{{\"v\":{},\"kdf\":\"argon2id\",\"m\":{},\"t\":{},\"p\":{},\"salt\":\"{}\",\"alg\":\"chacha20poly1305\",\"n\":\"{}\",\"ct\":\"{}\"}}",
+            super::FEDOS_SEALED_MASTER_SEED_ENVELOPE_SCHEMA_VERSION,
+            m_cost,
+            t_cost,
+            p_cost,
+            base64url_encode(salt),
+            base64url_encode(nonce),
+            base64url_encode(ciphertext),
+        )
+    }
+
+    /// Parse `json` — an UNTRUSTED candidate string — against the fixed
+    /// Sealed Master Seed Envelope V1 shape, requiring keys in EXACTLY
+    /// the canonical order, rejecting an unrecognized schema version,
+    /// KDF label, or algorithm label, a missing/reordered/extra field, or
+    /// invalid base64url text — the SAME strict-sequential-scan
+    /// discipline `crypto::ciphertext_serialization::decode_envelope_internal`
+    /// already established. Never panics.
+    pub(super) fn decode(json: &str) -> Option<ParsedSealedMasterSeedEnvelope> {
+        let rest = json.strip_prefix("{\"v\":")?;
+
+        let digits_end = rest
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(rest.len());
+        let (v_digits, rest) = rest.split_at(digits_end);
+        if v_digits.is_empty() {
+            return None;
+        }
+        let version: u32 = v_digits.parse().ok()?;
+        if version != super::FEDOS_SEALED_MASTER_SEED_ENVELOPE_SCHEMA_VERSION {
+            return None;
+        }
+
+        let rest = rest.strip_prefix(",\"kdf\":\"")?;
+        let (kdf_str, rest) = rest.split_once('"')?;
+        if kdf_str != "argon2id" {
+            return None;
+        }
+
+        let rest = rest.strip_prefix(",\"m\":")?;
+        let digits_end = rest
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(rest.len());
+        let (m_digits, rest) = rest.split_at(digits_end);
+        let m_cost: u32 = m_digits.parse().ok()?;
+
+        let rest = rest.strip_prefix(",\"t\":")?;
+        let digits_end = rest
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(rest.len());
+        let (t_digits, rest) = rest.split_at(digits_end);
+        let t_cost: u32 = t_digits.parse().ok()?;
+
+        let rest = rest.strip_prefix(",\"p\":")?;
+        let digits_end = rest
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(rest.len());
+        let (p_digits, rest) = rest.split_at(digits_end);
+        let p_cost: u32 = p_digits.parse().ok()?;
+
+        let rest = rest.strip_prefix(",\"salt\":\"")?;
+        let (salt_str, rest) = rest.split_once('"')?;
+        let salt = base64url_decode(salt_str)?;
+
+        let rest = rest.strip_prefix(",\"alg\":\"")?;
+        let (alg_str, rest) = rest.split_once('"')?;
+        if alg_str != "chacha20poly1305" {
+            return None;
+        }
+
+        let rest = rest.strip_prefix(",\"n\":\"")?;
+        let (n_str, rest) = rest.split_once('"')?;
+        let nonce_bytes = base64url_decode(n_str)?;
+        let nonce: [u8; 12] = nonce_bytes.try_into().ok()?;
+
+        let rest = rest.strip_prefix(",\"ct\":\"")?;
+        let (ct_str, rest) = rest.split_once('"')?;
+        let ciphertext = base64url_decode(ct_str)?;
+
+        if rest != "}" {
+            return None;
+        }
+
+        Some(ParsedSealedMasterSeedEnvelope {
+            m_cost,
+            t_cost,
+            p_cost,
+            salt,
+            nonce,
+            ciphertext,
+        })
+    }
+}
+
+/// Derive a 32-byte wrapping key from `passphrase` via Argon2id
+/// (`argon2::Argon2::hash_password_into_with_memory`) — the crate's
+/// OWN, already-`[dependencies]`-adopted `argon2` crate (Cargo.toml,
+/// Stage 84, previously verified only against the RFC 9106 test vector
+/// under `#[cfg(test)]`; this Arc is its first PRODUCTION use), used
+/// with `default-features = false` unmodified: `hash_password_into_with_memory`
+/// takes a caller-supplied `memory_blocks` buffer, so this crate's own
+/// `std`/`alloc` availability supplies the working memory directly —
+/// NO Cargo.toml feature change of any kind. Returns `None` on any
+/// invalid parameter combination (fail closed, never a panic). The
+/// scratch `memory_blocks` buffer (which briefly holds Argon2's own
+/// internal working state) is explicitly zeroed before this function
+/// returns, on every path.
+fn fedos_derive_master_seed_wrapping_key_argon2id(
+    passphrase: &[u8],
+    salt: &[u8],
+    m_cost: u32,
+    t_cost: u32,
+    p_cost: u32,
+) -> Option<[u8; 32]> {
+    use argon2::{Algorithm, Argon2, Block, Params, Version};
+    let params = Params::new(m_cost, t_cost, p_cost, Some(32)).ok()?;
+    let block_count = params.block_count();
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    let mut memory_blocks: Vec<Block> = vec![Block::default(); block_count];
+    let mut out = [0u8; 32];
+    let result = argon2.hash_password_into_with_memory(passphrase, salt, &mut out, memory_blocks.as_mut_slice());
+    for block in memory_blocks.iter_mut() {
+        *block = Block::default();
+    }
+    result.ok()?;
+    Some(out)
+}
+
+/// Parses this Arc's own `Vec<String>` tag wire format (Secure Runtime
+/// Alpha 442) back into NIP-01's own `Vec<Vec<String>>` tag shape — each
+/// `String` element is one tag, its own fields joined by
+/// [`FEDOS_NOSTR_TAG_FIELD_SEPARATOR`]. Returns `None` (fail closed) if
+/// any element is empty (an empty tag is not a valid NIP-01 tag — every
+/// real tag has at least one field, its own name).
+fn fedos_parse_nostr_tags_wire_format(tags: &[String]) -> Option<Vec<Vec<String>>> {
+    let mut parsed = Vec::with_capacity(tags.len());
+    for tag in tags {
+        let fields: Vec<String> = tag
+            .split(FEDOS_NOSTR_TAG_FIELD_SEPARATOR)
+            .map(|field| field.to_string())
+            .collect();
+        if fields.is_empty() || fields.iter().all(|f| f.is_empty()) {
+            return None;
+        }
+        parsed.push(fields);
+    }
+    Some(parsed)
+}
+
+/// Coarse, opaque lifecycle state — never `Clone`/`Debug`/`Serialize`,
+/// so it can never be accidentally logged or duplicated wholesale.
+enum FedosMasterSeedAuthorityState {
+    /// Constructed, nothing generated or restored yet.
+    Empty,
+    /// A real Master Seed is held.
+    Available(crate::master_root::FedosMasterSeedHandle),
+    /// `clear()` was called — irreversible for this instance.
+    Cleared,
+}
+
+/// Secure Runtime Alpha 436 — the narrowest opaque Rust/WASM authority
+/// owning a real Master Seed. Follows this crate's OWN established
+/// `AeadKeyHandle`/`AeadCiphertextHandle` precedent (Alpha 431's own
+/// inventory, §4) exactly: an opaque wrapper struct, ZERO derives (no
+/// `Clone`/`Debug`/`Serialize`/`PartialEq`), no raw-byte getter of any
+/// kind, and every mutating operation fails closed rather than
+/// overwriting live state. Defined at crate-root level (matching the
+/// AEAD section's own placement), NEVER inside `mod master_root` — so
+/// `master_root` itself continues to carry NO `#[wasm_bindgen]`
+/// attribute anywhere in its own body (Alpha 422's own regression
+/// guard, unbroken by this Arc).
+#[wasm_bindgen]
+pub struct FedosMasterSeedAuthority {
+    state: FedosMasterSeedAuthorityState,
+}
+
+#[wasm_bindgen]
+impl FedosMasterSeedAuthority {
+    /// Constructs an EMPTY authority — no Master Seed is generated or
+    /// restored by this constructor itself (no hidden automatic
+    /// generation, no module-load generation). The caller must
+    /// explicitly call [`FedosMasterSeedAuthority::generate`] or
+    /// [`FedosMasterSeedAuthority::restore_sealed`] before any signing
+    /// operation can succeed.
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> FedosMasterSeedAuthority {
+        FedosMasterSeedAuthority {
+            state: FedosMasterSeedAuthorityState::Empty,
+        }
+    }
+
+    /// Whether a real Master Seed is currently held.
+    pub fn is_available(&self) -> bool {
+        matches!(self.state, FedosMasterSeedAuthorityState::Available(_))
+    }
+
+    /// Whether [`FedosMasterSeedAuthority::clear`] has been called.
+    pub fn is_cleared(&self) -> bool {
+        matches!(self.state, FedosMasterSeedAuthorityState::Cleared)
+    }
+
+    /// Generate a brand-new, CSPRNG-drawn Master Seed (via
+    /// [`fedos_random_bytes_32`]'s own OS-CSPRNG call, `getrandom::fill`
+    /// — the SAME, already-reviewed entropy source every other
+    /// generation boundary in this crate uses) and hold it. Fails
+    /// closed (`false`, no state change) if this authority is not
+    /// currently `Empty` — generation NEVER overwrites an `Available` or
+    /// `Cleared` authority; construct a NEW instance for a NEW Identity.
+    /// Also fails closed if the OS CSPRNG itself is unavailable. Never
+    /// panics.
+    pub fn generate(&mut self) -> bool {
+        if !matches!(self.state, FedosMasterSeedAuthorityState::Empty) {
+            return false;
+        }
+        let decision = fedos_random_bytes_32();
+        if decision.state != FedosRandomBytesState::Ready {
+            return false;
+        }
+        let mut bytes = match decision.bytes {
+            Some(bytes) => bytes,
+            None => return false,
+        };
+        let handle = crate::master_root::FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(bytes);
+        {
+            use zeroize::Zeroize;
+            bytes.zeroize();
+        }
+        self.state = FedosMasterSeedAuthorityState::Available(handle);
+        true
+    }
+
+    /// Seal the currently-held Master Seed under `passphrase`, via
+    /// Argon2id (a fresh random salt drawn every call) plus this crate's
+    /// EXISTING, reviewed ChaCha20-Poly1305 AEAD primitive
+    /// (`crypto::aead_internal::seal_internal`, the SAME function
+    /// `fedos_encrypt` itself calls — Alpha 431's own inventory, §3/§4),
+    /// under the NEW, dedicated `AeadAadDomain::MasterSeedSealing`
+    /// domain (never reusing `RootKey`/`Storage`). Returns the Sealed
+    /// Master Seed Envelope V1 as a JSON `String` on success, `None` on
+    /// ANY failure (no Master Seed currently held, CSPRNG failure, or an
+    /// internal AEAD failure) — fail closed, never a panic. The sealed
+    /// form alone reveals nothing about the Master Seed without
+    /// `passphrase` — it is authenticated-encrypted ciphertext, never
+    /// plaintext. `self` is only borrowed — sealing never mutates or
+    /// clears the held authority.
+    pub fn seal(&self, passphrase: &[u8]) -> Option<String> {
+        use zeroize::Zeroize;
+
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let mut seed_bytes = handle.expose_bytes_for_internal_sealing()?;
+
+        let mut salt = vec![0u8; FEDOS_MASTER_SEED_ARGON2_SALT_LEN];
+        if getrandom::fill(&mut salt).is_err() {
+            seed_bytes.zeroize();
+            return None;
+        }
+
+        let mut wrapping_key_bytes = match fedos_derive_master_seed_wrapping_key_argon2id(
+            passphrase,
+            &salt,
+            FEDOS_MASTER_SEED_ARGON2_M_COST,
+            FEDOS_MASTER_SEED_ARGON2_T_COST,
+            FEDOS_MASTER_SEED_ARGON2_P_COST,
+        ) {
+            Some(bytes) => bytes,
+            None => {
+                seed_bytes.zeroize();
+                return None;
+            }
+        };
+        let wrapping_key = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            crate::secret_handle::SecretHandleKind::AeadKeyMaterial,
+            wrapping_key_bytes,
+        );
+        wrapping_key_bytes.zeroize();
+
+        let nonce_decision = fedos_aead_nonce_96();
+        if nonce_decision.state != FedosNonceState::Ready {
+            seed_bytes.zeroize();
+            return None;
+        }
+        let nonce_bytes = match nonce_decision.nonce {
+            Some(bytes) => bytes,
+            None => {
+                seed_bytes.zeroize();
+                return None;
+            }
+        };
+
+        let seal_decision = crate::crypto::aead_internal::seal_internal(
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305,
+            &wrapping_key,
+            &nonce_decision,
+            crate::crypto::aead_internal::AeadAadDomain::MasterSeedSealing,
+            &seed_bytes,
+        );
+        seed_bytes.zeroize();
+
+        if seal_decision.status != crate::crypto::aead_internal::AeadStatus::Ready {
+            return None;
+        }
+        let ciphertext = seal_decision.ciphertext?;
+
+        Some(master_seed_sealed_envelope_codec::encode(
+            FEDOS_MASTER_SEED_ARGON2_M_COST,
+            FEDOS_MASTER_SEED_ARGON2_T_COST,
+            FEDOS_MASTER_SEED_ARGON2_P_COST,
+            &salt,
+            &nonce_bytes,
+            &ciphertext,
+        ))
+    }
+
+    /// Restore a Master Seed from a previously-sealed
+    /// [`FedosMasterSeedAuthority::seal`] envelope, given the SAME
+    /// `passphrase` it was sealed under. Fails closed (`false`, no state
+    /// change — this authority remains `Empty`) if this authority is not
+    /// currently `Empty` (restore NEVER overwrites an `Available` or
+    /// `Cleared` authority — construct a NEW instance to restore a
+    /// DIFFERENT Identity), if `envelope_json` fails to parse or names
+    /// an unrecognized schema version/KDF/algorithm, or if the derived
+    /// wrapping key fails AEAD authentication against the ciphertext
+    /// (the wrong passphrase, OR a corrupted/tampered envelope — AEAD
+    /// deliberately never distinguishes which, per RFC 8439/NIST AEAD
+    /// guidance). On ANY failure, NO partial authority is left behind —
+    /// this instance simply remains `Empty`, exactly as before the call,
+    /// and there is no automatic fallback to a freshly-generated
+    /// identity. Never panics.
+    pub fn restore_sealed(&mut self, envelope_json: &str, passphrase: &[u8]) -> bool {
+        use zeroize::Zeroize;
+
+        if !matches!(self.state, FedosMasterSeedAuthorityState::Empty) {
+            return false;
+        }
+        let parsed = match master_seed_sealed_envelope_codec::decode(envelope_json) {
+            Some(parsed) => parsed,
+            None => return false,
+        };
+
+        let mut wrapping_key_bytes = match fedos_derive_master_seed_wrapping_key_argon2id(
+            passphrase,
+            &parsed.salt,
+            parsed.m_cost,
+            parsed.t_cost,
+            parsed.p_cost,
+        ) {
+            Some(bytes) => bytes,
+            None => return false,
+        };
+        let wrapping_key = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            crate::secret_handle::SecretHandleKind::AeadKeyMaterial,
+            wrapping_key_bytes,
+        );
+        wrapping_key_bytes.zeroize();
+
+        let nonce_decision = FedosAeadNonceDecision {
+            kind: FedosAeadNonceKind::NinetySixBit,
+            state: FedosNonceState::Ready,
+            nonce: Some(parsed.nonce),
+        };
+        let open_decision = crate::crypto::aead_internal::open_internal(
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305,
+            &wrapping_key,
+            &nonce_decision,
+            crate::crypto::aead_internal::AeadAadDomain::MasterSeedSealing,
+            &parsed.ciphertext,
+        );
+        if open_decision.status != crate::crypto::aead_internal::AeadStatus::Ready {
+            return false;
+        }
+        let mut plaintext = match open_decision.plaintext {
+            Some(plaintext) => plaintext,
+            None => return false,
+        };
+        if plaintext.len() != 32 {
+            plaintext.zeroize();
+            return false;
+        }
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&plaintext);
+        plaintext.zeroize();
+
+        let handle = crate::master_root::FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(seed_bytes);
+        seed_bytes.zeroize();
+        self.state = FedosMasterSeedAuthorityState::Available(handle);
+        true
+    }
+
+    /// Zeroizes the held Master Seed (if any) and transitions this
+    /// authority to `Cleared` — irreversible for this instance: after
+    /// `clear()`, [`FedosMasterSeedAuthority::generate`],
+    /// [`FedosMasterSeedAuthority::restore_sealed`], and
+    /// [`FedosMasterSeedAuthority::sign_nostr_event`] all fail closed,
+    /// permanently, for the rest of this instance's lifetime — there is
+    /// no reset/reinitialize; construct a NEW instance instead. Safe to
+    /// call more than once (idempotent), and safe to call on an `Empty`
+    /// authority (transitions directly to `Cleared`).
+    pub fn clear(&mut self) {
+        let previous = std::mem::replace(&mut self.state, FedosMasterSeedAuthorityState::Cleared);
+        if let FedosMasterSeedAuthorityState::Available(mut handle) = previous {
+            handle.clear();
+        }
+    }
+
+    /// Sign ONE constrained Nostr event (Secure Runtime Alpha 424's own
+    /// scope decision: `kind` fixed to `1` only, `account_index`
+    /// selecting which deterministic sub-identity signs, no
+    /// caller-supplied `pubkey`/`id`/`sig` of any kind) against the
+    /// currently-held Master Seed, via
+    /// `master_root::sign_nostr_event_from_master_seed_internal` — the
+    /// COMPLETE, EXISTING, UNCHANGED Alpha 146-200 derivation/signing
+    /// chain, reused verbatim. `tags` is this Arc's own flattened wire
+    /// format (Secure Runtime Alpha 442) — each element is one NIP-01
+    /// tag, its own fields joined by U+0001; see
+    /// [`fedos_parse_nostr_tags_wire_format`]. `created_at` is Unix
+    /// seconds as an `f64` (matching this repository's own
+    /// `FedosNostrUnsignedEventRequest.createdAt: number` shape,
+    /// Secure Runtime Alpha 425) — rejected (fail closed) unless it is
+    /// finite, non-negative, and a whole number. Returns the complete
+    /// signed NIP-01 event as a JSON string (matching
+    /// `FedosNostrWireEvent`'s own seven-field shape, Secure Runtime
+    /// Alpha 426) on success, `None` on ANY failure — no Master Seed
+    /// held, an unsupported `kind`, malformed `tags`, an out-of-range
+    /// `created_at`, or any internal derivation/signing failure. Never
+    /// panics, never signs an arbitrary caller-supplied hash, never
+    /// touches a Relay, the Outbox, or the Canonical Board.
+    pub fn sign_nostr_event(
+        &self,
+        account_index: u32,
+        created_at: f64,
+        kind: u32,
+        tags: Vec<String>,
+        content: String,
+    ) -> Option<String> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        if kind != 1 {
+            return None;
+        }
+        if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
+            return None;
+        }
+        if created_at > 18_446_744_073_709_551_615.0 {
+            return None;
+        }
+        let created_at_u64 = created_at as u64;
+        let parsed_tags = fedos_parse_nostr_tags_wire_format(&tags)?;
+
+        crate::master_root::sign_nostr_event_from_master_seed_internal(
+            handle,
+            account_index,
+            created_at_u64,
+            u64::from(kind),
+            parsed_tags,
+            content,
+        )
+    }
+}
+
+#[cfg(test)]
+mod master_seed_authority_tests {
+    use super::*;
+
+    const TEST_PASSPHRASE: &[u8] = b"correct horse battery staple (test-only, never a real passphrase)";
+    const WRONG_PASSPHRASE: &[u8] = b"an entirely different test-only passphrase";
+
+    /// Extracts one top-level `"key":"value"` string field's VALUE from a
+    /// signed-event JSON string this test suite itself produced — test-only,
+    /// deliberately not general-purpose (the production
+    /// `master_seed_sealed_envelope_codec::decode` above is the real,
+    /// reviewed parser; this is just a test assertion helper).
+    fn extract_json_string_field(json: &str, key: &str) -> String {
+        let needle = format!("\"{key}\":\"");
+        let start = json.find(&needle).expect("field must be present") + needle.len();
+        let end = json[start..].find('"').expect("field must be terminated") + start;
+        json[start..end].to_string()
+    }
+
+    fn extract_json_number_field(json: &str, key: &str) -> String {
+        let needle = format!("\"{key}\":");
+        let start = json.find(&needle).expect("field must be present") + needle.len();
+        let end = json[start..]
+            .find(|c: char| c == ',' || c == '}')
+            .expect("field must be terminated")
+            + start;
+        json[start..end].to_string()
+    }
+
+    fn generated_authority() -> FedosMasterSeedAuthority {
+        let mut authority = FedosMasterSeedAuthority::new();
+        assert!(authority.generate());
+        authority
+    }
+
+    #[test]
+    fn new_authority_starts_empty_not_available_not_cleared() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(!authority.is_available());
+        assert!(!authority.is_cleared());
+    }
+
+    #[test]
+    fn generate_succeeds_once_and_transitions_to_available() {
+        let mut authority = FedosMasterSeedAuthority::new();
+        assert!(!authority.is_available());
+        assert!(authority.generate());
+        assert!(authority.is_available());
+        assert!(!authority.is_cleared());
+    }
+
+    #[test]
+    fn generate_fails_closed_on_an_already_available_authority() {
+        let mut authority = generated_authority();
+        assert!(!authority.generate());
+        assert!(authority.is_available());
+    }
+
+    #[test]
+    fn generate_fails_closed_on_a_cleared_authority() {
+        let mut authority = FedosMasterSeedAuthority::new();
+        authority.clear();
+        assert!(authority.is_cleared());
+        assert!(!authority.generate());
+        assert!(!authority.is_available());
+        assert!(authority.is_cleared());
+    }
+
+    #[test]
+    fn two_generated_authorities_sign_the_same_request_differently() {
+        let a = generated_authority();
+        let b = generated_authority();
+        let event_a = a
+            .sign_nostr_event(0, 1_700_000_000.0, 1, vec!["p\u{1}abc".to_string()], "hello".to_string())
+            .expect("a real authority must sign successfully");
+        let event_b = b
+            .sign_nostr_event(0, 1_700_000_000.0, 1, vec!["p\u{1}abc".to_string()], "hello".to_string())
+            .expect("a real authority must sign successfully");
+        assert_ne!(
+            extract_json_string_field(&event_a, "pubkey"),
+            extract_json_string_field(&event_b, "pubkey")
+        );
+        assert_ne!(
+            extract_json_string_field(&event_a, "sig"),
+            extract_json_string_field(&event_b, "sig")
+        );
+    }
+
+    #[test]
+    fn seal_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(authority.seal(TEST_PASSPHRASE).is_none());
+    }
+
+    #[test]
+    fn seal_fails_closed_on_a_cleared_authority() {
+        let mut authority = generated_authority();
+        authority.clear();
+        assert!(authority.seal(TEST_PASSPHRASE).is_none());
+    }
+
+    #[test]
+    fn seal_succeeds_on_an_available_authority_and_never_reveals_the_seed_in_plaintext() {
+        let authority = generated_authority();
+        let envelope = authority.seal(TEST_PASSPHRASE).expect("must seal");
+        assert!(envelope.starts_with("{\"v\":1,\"kdf\":\"argon2id\""));
+        assert!(!envelope.contains(std::str::from_utf8(TEST_PASSPHRASE).unwrap()));
+    }
+
+    #[test]
+    fn restore_sealed_round_trips_to_the_identical_signing_identity() {
+        let original = generated_authority();
+        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let original_event = original
+            .sign_nostr_event(7, 1_700_000_001.0, 1, vec![], "restart test".to_string())
+            .expect("must sign");
+
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(restored.restore_sealed(&envelope, TEST_PASSPHRASE));
+        assert!(restored.is_available());
+        let restored_event = restored
+            .sign_nostr_event(7, 1_700_000_001.0, 1, vec![], "restart test".to_string())
+            .expect("must sign");
+
+        assert_eq!(original_event, restored_event);
+    }
+
+    #[test]
+    fn restore_sealed_with_the_wrong_passphrase_fails_closed_and_leaves_authority_empty() {
+        let original = generated_authority();
+        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(!restored.restore_sealed(&envelope, WRONG_PASSPHRASE));
+        assert!(!restored.is_available());
+        assert!(!restored.is_cleared());
+    }
+
+    #[test]
+    fn restore_sealed_with_a_corrupted_ciphertext_fails_closed() {
+        let original = generated_authority();
+        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let ct_start = envelope.find("\"ct\":\"").unwrap() + "\"ct\":\"".len();
+        let flipped_char = if envelope.as_bytes()[ct_start] == b'A' { 'B' } else { 'A' };
+        let mut corrupted = envelope.clone();
+        corrupted.replace_range(ct_start..ct_start + 1, &flipped_char.to_string());
+
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE));
+        assert!(!restored.is_available());
+    }
+
+    #[test]
+    fn restore_sealed_with_an_unrecognized_schema_version_fails_closed() {
+        let original = generated_authority();
+        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let corrupted = envelope.replacen("\"v\":1", "\"v\":9", 1);
+
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE));
+        assert!(!restored.is_available());
+    }
+
+    #[test]
+    fn restore_sealed_with_a_malformed_json_envelope_fails_closed_and_does_not_panic() {
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(!restored.restore_sealed("not json at all", TEST_PASSPHRASE));
+        assert!(!restored.restore_sealed("", TEST_PASSPHRASE));
+        assert!(!restored.restore_sealed("{}", TEST_PASSPHRASE));
+        assert!(!restored.is_available());
+    }
+
+    #[test]
+    fn restore_sealed_never_overwrites_an_already_available_authority() {
+        let original = generated_authority();
+        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let event_before = original
+            .sign_nostr_event(0, 1_700_000_002.0, 1, vec![], "before".to_string())
+            .expect("must sign");
+
+        let mut other = generated_authority();
+        assert!(!other.restore_sealed(&envelope, TEST_PASSPHRASE));
+        let event_after = other
+            .sign_nostr_event(0, 1_700_000_002.0, 1, vec![], "before".to_string())
+            .expect("must sign");
+        assert_ne!(
+            extract_json_string_field(&event_before, "pubkey"),
+            extract_json_string_field(&event_after, "pubkey"),
+            "an authority that already had its own real seed must never be silently overwritten by restore_sealed"
+        );
+    }
+
+    #[test]
+    fn clear_on_an_available_authority_prevents_further_signing() {
+        let mut authority = generated_authority();
+        authority.clear();
+        assert!(authority.is_cleared());
+        assert!(!authority.is_available());
+        assert!(authority
+            .sign_nostr_event(0, 1_700_000_003.0, 1, vec![], "after clear".to_string())
+            .is_none());
+    }
+
+    #[test]
+    fn clear_is_idempotent() {
+        let mut authority = generated_authority();
+        authority.clear();
+        authority.clear();
+        assert!(authority.is_cleared());
+    }
+
+    #[test]
+    fn clear_on_an_empty_authority_transitions_directly_to_cleared() {
+        let mut authority = FedosMasterSeedAuthority::new();
+        authority.clear();
+        assert!(authority.is_cleared());
+        assert!(!authority.is_available());
+    }
+
+    #[test]
+    fn sign_nostr_event_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(authority
+            .sign_nostr_event(0, 1_700_000_004.0, 1, vec![], "no authority".to_string())
+            .is_none());
+    }
+
+    #[test]
+    fn sign_nostr_event_rejects_every_kind_other_than_one() {
+        let authority = generated_authority();
+        for kind in [0u32, 2, 3, 5, 7, 40, 10002] {
+            assert!(
+                authority
+                    .sign_nostr_event(0, 1_700_000_005.0, kind, vec![], "wrong kind".to_string())
+                    .is_none(),
+                "kind {kind} must be rejected"
+            );
+        }
+        assert!(authority
+            .sign_nostr_event(0, 1_700_000_005.0, 1, vec![], "right kind".to_string())
+            .is_some());
+    }
+
+    #[test]
+    fn sign_nostr_event_rejects_malformed_created_at() {
+        let authority = generated_authority();
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, 1.5] {
+            assert!(
+                authority
+                    .sign_nostr_event(0, bad, 1, vec![], "bad created_at".to_string())
+                    .is_none(),
+                "created_at {bad} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn sign_nostr_event_accounts_zero_one_and_u32_max_all_derive_different_pubkeys() {
+        let authority = generated_authority();
+        let zero = authority
+            .sign_nostr_event(0, 1_700_000_006.0, 1, vec![], "account test".to_string())
+            .expect("must sign");
+        let one = authority
+            .sign_nostr_event(1, 1_700_000_006.0, 1, vec![], "account test".to_string())
+            .expect("must sign");
+        let max = authority
+            .sign_nostr_event(u32::MAX, 1_700_000_006.0, 1, vec![], "account test".to_string())
+            .expect("must sign");
+        let pubkey_zero = extract_json_string_field(&zero, "pubkey");
+        let pubkey_one = extract_json_string_field(&one, "pubkey");
+        let pubkey_max = extract_json_string_field(&max, "pubkey");
+        assert_ne!(pubkey_zero, pubkey_one);
+        assert_ne!(pubkey_one, pubkey_max);
+        assert_ne!(pubkey_zero, pubkey_max);
+    }
+
+    #[test]
+    fn sign_nostr_event_same_account_is_deterministic_across_calls() {
+        let authority = generated_authority();
+        let first = authority
+            .sign_nostr_event(3, 1_700_000_007.0, 1, vec![], "deterministic".to_string())
+            .expect("must sign");
+        let second = authority
+            .sign_nostr_event(3, 1_700_000_007.0, 1, vec![], "deterministic".to_string())
+            .expect("must sign");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn sign_nostr_event_different_content_derives_different_id_and_signature() {
+        let authority = generated_authority();
+        let first = authority
+            .sign_nostr_event(0, 1_700_000_008.0, 1, vec![], "content A".to_string())
+            .expect("must sign");
+        let second = authority
+            .sign_nostr_event(0, 1_700_000_008.0, 1, vec![], "content B".to_string())
+            .expect("must sign");
+        assert_ne!(extract_json_string_field(&first, "id"), extract_json_string_field(&second, "id"));
+        assert_ne!(extract_json_string_field(&first, "sig"), extract_json_string_field(&second, "sig"));
+    }
+
+    #[test]
+    fn sign_nostr_event_different_created_at_derives_different_id_and_signature() {
+        let authority = generated_authority();
+        let first = authority
+            .sign_nostr_event(0, 1_700_000_009.0, 1, vec![], "same content".to_string())
+            .expect("must sign");
+        let second = authority
+            .sign_nostr_event(0, 1_700_000_010.0, 1, vec![], "same content".to_string())
+            .expect("must sign");
+        assert_ne!(extract_json_string_field(&first, "id"), extract_json_string_field(&second, "id"));
+    }
+
+    #[test]
+    fn sign_nostr_event_different_tags_derive_different_id_and_signature() {
+        let authority = generated_authority();
+        let first = authority
+            .sign_nostr_event(0, 1_700_000_011.0, 1, vec!["p\u{1}aaaa".to_string()], "same".to_string())
+            .expect("must sign");
+        let second = authority
+            .sign_nostr_event(0, 1_700_000_011.0, 1, vec!["p\u{1}bbbb".to_string()], "same".to_string())
+            .expect("must sign");
+        assert_ne!(extract_json_string_field(&first, "id"), extract_json_string_field(&second, "id"));
+    }
+
+    #[test]
+    fn sign_nostr_event_multi_field_tags_round_trip_through_the_wire_separator() {
+        let authority = generated_authority();
+        let event = authority
+            .sign_nostr_event(
+                0,
+                1_700_000_012.0,
+                1,
+                vec!["e\u{1}deadbeef\u{1}wss://relay.example".to_string()],
+                "tag round trip".to_string(),
+            )
+            .expect("must sign");
+        assert!(event.contains("\"tags\":[[\"e\",\"deadbeef\",\"wss://relay.example\"]]"));
+    }
+
+    #[test]
+    fn sign_nostr_event_output_matches_the_seven_field_nip01_wire_shape() {
+        let authority = generated_authority();
+        let event = authority
+            .sign_nostr_event(0, 1_700_000_013.0, 1, vec![], "shape check".to_string())
+            .expect("must sign");
+        for key in ["id", "pubkey", "created_at", "kind", "tags", "content", "sig"] {
+            assert!(event.contains(&format!("\"{key}\":")), "missing field {key}");
+        }
+        assert_eq!(extract_json_number_field(&event, "kind"), "1");
+        assert_eq!(extract_json_number_field(&event, "created_at"), "1700000013");
+        assert_eq!(extract_json_string_field(&event, "id").len(), 64);
+        assert_eq!(extract_json_string_field(&event, "pubkey").len(), 64);
+        assert_eq!(extract_json_string_field(&event, "sig").len(), 128);
+    }
+
+    #[test]
+    fn sign_nostr_event_produced_id_and_signature_independently_verify() {
+        use k256::schnorr::signature::hazmat::PrehashVerifier;
+        use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+        use sha2::{Digest, Sha256};
+
+        let authority = generated_authority();
+        let event = authority
+            .sign_nostr_event(0, 1_700_000_014.0, 1, vec![], "independent verification".to_string())
+            .expect("must sign");
+
+        let pubkey_hex = extract_json_string_field(&event, "pubkey");
+        let id_hex = extract_json_string_field(&event, "id");
+        let sig_hex = extract_json_string_field(&event, "sig");
+
+        fn decode_hex(hex: &str) -> Vec<u8> {
+            (0..hex.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("valid hex"))
+                .collect()
+        }
+
+        let pubkey_bytes = decode_hex(&pubkey_hex);
+        let id_bytes = decode_hex(&id_hex);
+        let sig_bytes = decode_hex(&sig_hex);
+
+        // Recompute the NIP-01 canonical pre-image independently and confirm
+        // its own sha256 digest matches the returned `id` — proves this
+        // Arc's own `serialize_signed_nostr_event_internal` output is
+        // consistent with `serialize_nostr_event_canonical_internal`'s own
+        // pre-image, not just internally self-consistent.
+        let canonical = format!(
+            "[0,\"{pubkey_hex}\",1700000014,1,[],\"independent verification\"]"
+        );
+        let expected_id = Sha256::digest(canonical.as_bytes());
+        assert_eq!(expected_id.as_slice(), id_bytes.as_slice());
+
+        let verifying_key = SchnorrVerifyingKey::from_bytes(&pubkey_bytes).expect("valid x-only pubkey");
+        let signature = SchnorrSignature::try_from(sig_bytes.as_slice()).expect("valid 64-byte signature");
+        assert!(verifying_key.verify_prehash(&id_bytes, &signature).is_ok());
     }
 }
 

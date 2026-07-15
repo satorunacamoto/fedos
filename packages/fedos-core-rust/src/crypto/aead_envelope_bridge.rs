@@ -54,13 +54,25 @@ fn envelope_algorithm_to_cipher(algorithm: AeadEnvelopeAlgorithm) -> AeadCipher 
     }
 }
 
-fn aad_domain_to_envelope_domain(aad_domain: AeadAadDomain) -> AeadEnvelopeAadDomain {
+/// Secure Runtime Alpha 436 — returns `None` for
+/// `AeadAadDomain::MasterSeedSealing`: that domain has, and needs, no
+/// `AeadEnvelopeAadDomain` counterpart, because the Master Seed
+/// Authority's own seal/restore path (`master_seed_authority`, outside
+/// this `crypto` tree) calls `aead_internal::seal_internal`/
+/// `open_internal` DIRECTLY — it never constructs, and never needs, a
+/// `FedosCiphertextEnvelope`/`AeadCiphertextEnvelope` at all. This
+/// function's return type widens from a bare `AeadEnvelopeAadDomain` to
+/// `Option<AeadEnvelopeAadDomain>` ONLY to keep this match exhaustive
+/// over `AeadAadDomain`'s now-six variants; every pre-existing domain's
+/// mapping is byte-for-byte unchanged.
+fn aad_domain_to_envelope_domain(aad_domain: AeadAadDomain) -> Option<AeadEnvelopeAadDomain> {
     match aad_domain {
-        AeadAadDomain::RootKey => AeadEnvelopeAadDomain::RootKey,
-        AeadAadDomain::Identity => AeadEnvelopeAadDomain::Identity,
-        AeadAadDomain::Storage => AeadEnvelopeAadDomain::Storage,
-        AeadAadDomain::Conversation => AeadEnvelopeAadDomain::Conversation,
-        AeadAadDomain::TestOnly => AeadEnvelopeAadDomain::TestOnly,
+        AeadAadDomain::RootKey => Some(AeadEnvelopeAadDomain::RootKey),
+        AeadAadDomain::Identity => Some(AeadEnvelopeAadDomain::Identity),
+        AeadAadDomain::Storage => Some(AeadEnvelopeAadDomain::Storage),
+        AeadAadDomain::Conversation => Some(AeadEnvelopeAadDomain::Conversation),
+        AeadAadDomain::TestOnly => Some(AeadEnvelopeAadDomain::TestOnly),
+        AeadAadDomain::MasterSeedSealing => None,
     }
 }
 
@@ -94,11 +106,12 @@ pub(crate) fn envelope_from_seal_decision_internal(
         Some(ciphertext) => ciphertext,
         None => return None,
     };
+    let envelope_domain = aad_domain_to_envelope_domain(aad_domain)?;
     Some(AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
         AeadEnvelopeVersion::V1,
         cipher_to_envelope_algorithm(decision.algorithm),
         nonce,
-        aad_domain_to_envelope_domain(aad_domain),
+        envelope_domain,
         ciphertext,
     ))
 }

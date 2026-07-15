@@ -94,7 +94,7 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     // This test's own title still reflects Stage 986's original,
     // now-historical scope.
     const matches = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)];
-    expect(matches.length).toBe(13);
+    expect(matches.length).toBe(15);
   });
 
   it("3. version() is declared, #[wasm_bindgen]-annotated, and returns a fixed String", () => {
@@ -111,7 +111,7 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     expect(pubFnNames).toContain("version");
     for (const name of PRE_EXISTING_PUB_FN_NAMES) {
       expect(pubFnNames).toContain(name);

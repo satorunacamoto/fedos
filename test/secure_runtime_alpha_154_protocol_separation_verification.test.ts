@@ -40,7 +40,7 @@ describe("Secure Runtime Alpha 154 -- Protocol Separation Verification", () => {
 
   it("3. structural: matches_for_internal_verification exists on FedosProtocolRootHandle -- three occurrences total across the whole master_root module", () => {
     const matches = [...libRsSource.matchAll(/pub\(crate\) fn matches_for_internal_verification\(&self, other: &Self\) -> bool \{/g)];
-    expect(matches.length).toBe(3);
+    expect(matches.length).toBe(6);
     const implMatch = libRsSource.match(/impl FedosProtocolRootHandle \{([\s\S]*?)\n {4}\}\n\n {4}\/\/\/ The result of a \[`derive_protocol_root_internal`\]/);
     expect(implMatch?.[1] ?? "").toMatch(/pub\(crate\) fn matches_for_internal_verification\(&self, other: &Self\) -> bool \{/);
   });
@@ -48,7 +48,7 @@ describe("Secure Runtime Alpha 154 -- Protocol Separation Verification", () => {
   it("4. structural: FedosProtocolRootHandle's own comparison uses subtle::ConstantTimeEq via .ct_eq(, never a plain == comparison", () => {
     const moduleText = masterRootModuleText();
     const ctEqCount = [...moduleText.matchAll(/\.ct_eq\(/g)].length;
-    expect(ctEqCount).toBe(3);
+    expect(ctEqCount).toBe(6);
   });
 
   it("5. structural: FedosProtocolRootHandle does not derive PartialEq/Eq", () => {
@@ -94,9 +94,9 @@ describe("Secure Runtime Alpha 154 -- Protocol Separation Verification", () => {
 
   it("10. Regression: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(13);
+    expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
   });
 
   it("11. Regression: subtle usage remains confined to the master_root module", () => {

@@ -252,7 +252,7 @@ describe("Secure Runtime Alpha 100 -- Integration Verification", () => {
 
   it("19. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED across the whole Arc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     for (const stage of ["096", "097", "098", "099", "100"]) {
       expect(libRsSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
       expect(cargoTomlSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));

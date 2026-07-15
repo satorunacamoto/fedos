@@ -352,8 +352,8 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
 
   it("36. Regression: still exactly 36 pub fn / thirteen #[wasm_bindgen] in lib.rs, entirely unaffected by this review Stage", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(36);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(pubFnNames.length).toBe(44);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
   });
 
   it("37. Regression: package.json still declares exactly two dependencies, unaffected by this review Stage", () => {

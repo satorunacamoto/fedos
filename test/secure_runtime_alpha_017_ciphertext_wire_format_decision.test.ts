@@ -299,8 +299,8 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(pubFnNames.length).toBe(44);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(libRsSource).toMatch(/secure_runtime_alpha_017_ciphertext_wire_format_decision/);
     expect(libRsSource).toMatch(/pub fn serialize_aead_ciphertext\b/);
     expect(libRsSource).toMatch(/pub fn deserialize_aead_ciphertext\b/);

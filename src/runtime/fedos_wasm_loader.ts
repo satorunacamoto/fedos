@@ -1603,6 +1603,132 @@ export interface FedosWasmLoaderImportCiphertextExecution {
 }
 
 /**
+ * Secure Runtime Alpha 436/438 — the opaque, PUBLIC shape a genuine
+ * `FedosMasterSeedAuthority` WASM instance is treated as satisfying.
+ * Unlike `AeadKeyHandle`/`AeadCiphertextHandle` above, the real Rust
+ * struct (`packages/fedos-core-rust/src/lib.rs`,
+ * `FedosMasterSeedAuthority`) deliberately carries NO `kind`
+ * discriminant field or any other non-secret metadata — Alpha 436's own
+ * design forbids adding any field/getter beyond its seven lifecycle
+ * methods (no raw-byte getter of any kind is permitted). So this file's
+ * own `isFedosMasterSeedAuthorityShape()` (below) validates by METHOD
+ * PRESENCE instead of a discriminant field — an honest duck-type check
+ * for a real wasm-bindgen class instance, not a synthetic marker this
+ * struct will never actually carry.
+ */
+export interface FedosMasterSeedAuthorityHandle {
+  readonly is_available: () => boolean;
+  readonly is_cleared: () => boolean;
+  readonly generate: () => boolean;
+  readonly seal: (passphrase: Uint8Array) => string | undefined;
+  readonly restore_sealed: (envelopeJson: string, passphrase: Uint8Array) => boolean;
+  readonly clear: () => void;
+  readonly sign_nostr_event: (
+    accountIndex: number,
+    createdAt: number,
+    kind: number,
+    tags: string[],
+    content: string,
+  ) => string | undefined;
+}
+
+/**
+ * PRIVATE — structural Fail-Closed validation for a candidate value
+ * returned by `new module.FedosMasterSeedAuthority()`. Returns `true`
+ * only when `value` is a non-null object exposing all seven lifecycle
+ * methods as functions. Never `instanceof` (this file never imports the
+ * generated JS glue's own class constructor statically).
+ */
+function isFedosMasterSeedAuthorityShape(value: unknown): value is FedosMasterSeedAuthorityHandle {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.is_available === "function" &&
+    typeof candidate.is_cleared === "function" &&
+    typeof candidate.generate === "function" &&
+    typeof candidate.seal === "function" &&
+    typeof candidate.restore_sealed === "function" &&
+    typeof candidate.clear === "function" &&
+    typeof candidate.sign_nostr_event === "function"
+  );
+}
+
+/** Secure Runtime Alpha 436 — `attemptDevOnlyMasterSeedAuthorityConstructCall()`'s own result. No secret material of any kind. */
+export interface FedosWasmLoaderMasterSeedAuthorityConstructExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly authority: FedosMasterSeedAuthorityHandle | null;
+  readonly reason:
+    | "Succeeded"
+    | "ConstructorUnavailable"
+    | "InvalidAuthorityShape"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 436 — `attemptDevOnlyMasterSeedGenerateCall()`'s own result. No secret material of any kind. */
+export interface FedosWasmLoaderMasterSeedGenerateExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly reason:
+    | "Succeeded"
+    | "GenerateFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 437 — `attemptDevOnlyMasterSeedSealCall()`'s own result. `envelope` is a sealed (Argon2id + AEAD) ciphertext, never plaintext seed material. */
+export interface FedosWasmLoaderMasterSeedSealExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly envelope: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "SealFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 437 — `attemptDevOnlyMasterSeedRestoreSealedCall()`'s own result. */
+export interface FedosWasmLoaderMasterSeedRestoreSealedExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly reason:
+    | "Succeeded"
+    | "RestoreFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 434 — `attemptDevOnlyMasterSeedClearCall()`'s own result. `clear()` itself is `void`/infallible on a genuine handle. */
+export interface FedosWasmLoaderMasterSeedClearExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly reason: "Succeeded" | "InvalidAuthorityHandle" | "NotInitialized" | "CallFailed" | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 444 — `attemptDevOnlyNostrSignEventCall()`'s own result. `signedEventJson` is the complete seven-field NIP-01 wire event as a JSON string, never a secret Handle. */
+export interface FedosWasmLoaderNostrSignEventExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly signedEventJson: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "SigningFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/**
  * Stage 945 (Prototype EXECUTION Phase 004) — optional constructor
  * options for `FedosWasmLoaderSkeleton`. `importGeneratedJsGlue` lets
  * a TEST observe `attemptDevOnlyJsGlueImport()`'s success/failure
@@ -1770,6 +1896,24 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    * does not reference this field at all.
    */
   #importCiphertextExecution: FedosWasmLoaderImportCiphertextExecution | null = null;
+
+  /** Secure Runtime Alpha 436 — most recent `attemptDevOnlyMasterSeedAuthorityConstructCall()` result, or `null` before it has ever been called. Read via `masterSeedAuthorityConstructExecution()`. */
+  #masterSeedAuthorityConstructExecution: FedosWasmLoaderMasterSeedAuthorityConstructExecution | null = null;
+
+  /** Secure Runtime Alpha 436 — most recent `attemptDevOnlyMasterSeedGenerateCall()` result, or `null` before it has ever been called. Read via `masterSeedGenerateExecution()`. */
+  #masterSeedGenerateExecution: FedosWasmLoaderMasterSeedGenerateExecution | null = null;
+
+  /** Secure Runtime Alpha 437 — most recent `attemptDevOnlyMasterSeedSealCall()` result, or `null` before it has ever been called. Read via `masterSeedSealExecution()`. */
+  #masterSeedSealExecution: FedosWasmLoaderMasterSeedSealExecution | null = null;
+
+  /** Secure Runtime Alpha 437 — most recent `attemptDevOnlyMasterSeedRestoreSealedCall()` result, or `null` before it has ever been called. Read via `masterSeedRestoreSealedExecution()`. */
+  #masterSeedRestoreSealedExecution: FedosWasmLoaderMasterSeedRestoreSealedExecution | null = null;
+
+  /** Secure Runtime Alpha 434 — most recent `attemptDevOnlyMasterSeedClearCall()` result, or `null` before it has ever been called. Read via `masterSeedClearExecution()`. */
+  #masterSeedClearExecution: FedosWasmLoaderMasterSeedClearExecution | null = null;
+
+  /** Secure Runtime Alpha 444 — most recent `attemptDevOnlyNostrSignEventCall()` result, or `null` before it has ever been called. Read via `nostrSignEventExecution()`. */
+  #nostrSignEventExecution: FedosWasmLoaderNostrSignEventExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -2158,6 +2302,36 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
    */
   importCiphertextExecution(): FedosWasmLoaderImportCiphertextExecution | null {
     return this.#importCiphertextExecution;
+  }
+
+  /** Secure Runtime Alpha 436 — read-only accessor for `#masterSeedAuthorityConstructExecution`. */
+  masterSeedAuthorityConstructExecution(): FedosWasmLoaderMasterSeedAuthorityConstructExecution | null {
+    return this.#masterSeedAuthorityConstructExecution;
+  }
+
+  /** Secure Runtime Alpha 436 — read-only accessor for `#masterSeedGenerateExecution`. */
+  masterSeedGenerateExecution(): FedosWasmLoaderMasterSeedGenerateExecution | null {
+    return this.#masterSeedGenerateExecution;
+  }
+
+  /** Secure Runtime Alpha 437 — read-only accessor for `#masterSeedSealExecution`. */
+  masterSeedSealExecution(): FedosWasmLoaderMasterSeedSealExecution | null {
+    return this.#masterSeedSealExecution;
+  }
+
+  /** Secure Runtime Alpha 437 — read-only accessor for `#masterSeedRestoreSealedExecution`. */
+  masterSeedRestoreSealedExecution(): FedosWasmLoaderMasterSeedRestoreSealedExecution | null {
+    return this.#masterSeedRestoreSealedExecution;
+  }
+
+  /** Secure Runtime Alpha 434 — read-only accessor for `#masterSeedClearExecution`. */
+  masterSeedClearExecution(): FedosWasmLoaderMasterSeedClearExecution | null {
+    return this.#masterSeedClearExecution;
+  }
+
+  /** Secure Runtime Alpha 444 — read-only accessor for `#nostrSignEventExecution`. */
+  nostrSignEventExecution(): FedosWasmLoaderNostrSignEventExecution | null {
+    return this.#nostrSignEventExecution;
   }
 
   /**
@@ -2928,6 +3102,291 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#importCiphertextExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 436 — PUBLIC, ASYNC. Constructs a new
+   * `FedosMasterSeedAuthority` WASM instance via
+   * `new module.FedosMasterSeedAuthority()`, gated on the SAME six
+   * previously-recorded conditions every other Rust Boundary reach
+   * method uses. Never generates or restores a seed itself — the
+   * returned handle starts `Empty` (Alpha 434's own lifecycle); the
+   * caller must follow up with `attemptDevOnlyMasterSeedGenerateCall()`
+   * or `attemptDevOnlyMasterSeedRestoreSealedCall()`.
+   */
+  async attemptDevOnlyMasterSeedAuthorityConstructCall(): Promise<FedosWasmLoaderMasterSeedAuthorityConstructExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderMasterSeedAuthorityConstructExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, authority: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, authority: null, reason: "NotInitialized" };
+    } else {
+      const candidate = module as { FedosMasterSeedAuthority?: unknown };
+      if (typeof candidate.FedosMasterSeedAuthority !== "function") {
+        result = { attempted: true, succeeded: false, authority: null, reason: "ConstructorUnavailable" };
+      } else {
+        try {
+          const Ctor = candidate.FedosMasterSeedAuthority as new () => unknown;
+          const value: unknown = new Ctor();
+          if (isFedosMasterSeedAuthorityShape(value)) {
+            result = { attempted: true, succeeded: true, authority: value, reason: "Succeeded" };
+          } else {
+            result = { attempted: true, succeeded: false, authority: null, reason: "InvalidAuthorityShape" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, authority: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#masterSeedAuthorityConstructExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 436 — PUBLIC, ASYNC. Calls `authority.generate()`
+   * on a previously-constructed, structurally-validated handle. `authority`
+   * is re-validated via `isFedosMasterSeedAuthorityShape()` before use —
+   * mirroring `attemptDevOnlyEncryptCall()`'s own `key` validation — so an
+   * obviously-wrong handle never reaches the WASM call.
+   */
+  async attemptDevOnlyMasterSeedGenerateCall(authority: unknown): Promise<FedosWasmLoaderMasterSeedGenerateExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderMasterSeedGenerateExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const succeeded = authority.generate();
+        result = { attempted: true, succeeded, reason: succeeded ? "Succeeded" : "GenerateFailed" };
+      } catch {
+        result = { attempted: true, succeeded: false, reason: "CallFailed" };
+      }
+    }
+    this.#masterSeedGenerateExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 437 — PUBLIC, ASYNC. Calls `authority.seal(passphrase)`.
+   * `passphrase` crosses the boundary as `Uint8Array` only — this file never
+   * accepts/stores a `string` passphrase, and never logs `passphrase` or the
+   * returned `envelope`. The returned `envelope` is a sealed (Argon2id +
+   * ChaCha20-Poly1305) ciphertext string, never plaintext seed material.
+   */
+  async attemptDevOnlyMasterSeedSealCall(
+    authority: unknown,
+    passphrase: Uint8Array,
+  ): Promise<FedosWasmLoaderMasterSeedSealExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderMasterSeedSealExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, envelope: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, envelope: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, envelope: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.seal(passphrase);
+        if (typeof value === "string") {
+          result = { attempted: true, succeeded: true, envelope: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, envelope: null, reason: "SealFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, envelope: null, reason: "CallFailed" };
+      }
+    }
+    this.#masterSeedSealExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 437 — PUBLIC, ASYNC. Calls
+   * `authority.restore_sealed(envelopeJson, passphrase)` on an `Empty`
+   * handle. Returns `succeeded: false` (never throws upward) on a wrong
+   * passphrase, a corrupted/tampered envelope, or an authority that is
+   * not currently `Empty` — Rust's own fail-closed `restore_sealed()`
+   * never distinguishes which, matching AEAD guidance already applied
+   * elsewhere in this file.
+   */
+  async attemptDevOnlyMasterSeedRestoreSealedCall(
+    authority: unknown,
+    envelopeJson: string,
+    passphrase: Uint8Array,
+  ): Promise<FedosWasmLoaderMasterSeedRestoreSealedExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderMasterSeedRestoreSealedExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const succeeded = authority.restore_sealed(envelopeJson, passphrase);
+        result = { attempted: true, succeeded, reason: succeeded ? "Succeeded" : "RestoreFailed" };
+      } catch {
+        result = { attempted: true, succeeded: false, reason: "CallFailed" };
+      }
+    }
+    this.#masterSeedRestoreSealedExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 434 — PUBLIC, ASYNC. Calls `authority.clear()` —
+   * `void`/infallible on a genuine handle, so `succeeded` is `true`
+   * whenever the call itself does not throw.
+   */
+  async attemptDevOnlyMasterSeedClearCall(authority: unknown): Promise<FedosWasmLoaderMasterSeedClearExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderMasterSeedClearExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        authority.clear();
+        result = { attempted: true, succeeded: true, reason: "Succeeded" };
+      } catch {
+        result = { attempted: true, succeeded: false, reason: "CallFailed" };
+      }
+    }
+    this.#masterSeedClearExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 444 — PUBLIC, ASYNC. Calls
+   * `authority.sign_nostr_event(accountIndex, createdAt, kind, tags, content)`.
+   * `tags` here is ALREADY this Arc's own flattened wire format (Secure
+   * Runtime Alpha 442, each element one NIP-01 tag with fields joined by
+   * U+0001) — flattening itself is `FedosWasmNostrSigningAuthority`'s own
+   * concern (`src/nostr/sign/fedos_wasm_nostr_signing_authority.ts`), kept
+   * out of this generic loader so this file stays free of Nostr-specific
+   * wire-format knowledge, matching its own existing `encrypt_aead`/
+   * `decrypt_aead` methods (which likewise receive already-translated
+   * arguments, never raw caller input). Returns the complete signed NIP-01
+   * event as a JSON string on success, never a secret Handle.
+   */
+  async attemptDevOnlyNostrSignEventCall(
+    authority: unknown,
+    accountIndex: number,
+    createdAt: number,
+    kind: number,
+    tags: string[],
+    content: string,
+  ): Promise<FedosWasmLoaderNostrSignEventExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderNostrSignEventExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, signedEventJson: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, signedEventJson: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, signedEventJson: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.sign_nostr_event(accountIndex, createdAt, kind, tags, content);
+        if (typeof value === "string") {
+          result = { attempted: true, succeeded: true, signedEventJson: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, signedEventJson: null, reason: "SigningFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, signedEventJson: null, reason: "CallFailed" };
+      }
+    }
+    this.#nostrSignEventExecution = result;
     return result;
   }
 

@@ -113,7 +113,7 @@ describe("FedOS Rust crate — internal HKDF-SHA256 implementation (Stage 147)",
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     expect(pubFnNames).not.toContain("derive_secret_handle_internal");
     expect(pubFnNames.map((n) => n.toLowerCase())).not.toContain("derivekey");
     expect(libRsSource).not.toMatch(/\bpub\s+fn\s+\w+\([^)]*\)\s*->\s*[^{;]*\bHkdfDecision\b/);

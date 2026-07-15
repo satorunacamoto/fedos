@@ -40,7 +40,7 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     // `random_bytes_32` (Stage 1004, Secure Runtime Alpha 008),
     // `generate_aead_key_handle`/`kind` (Stage 1008, Secure Runtime
     // Alpha 013 -- REPLACING Stage 1005's `generate_aead_key_32`),
@@ -62,24 +62,36 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     // `docs/secure_runtime_alpha_015_decrypt_opaque_handle_api.md`/
     // `docs/secure_runtime_alpha_018_ciphertext_wire_export_import_api.md`
     // for those functions' own reviews.
+    // Secure Runtime Alpha 436/444's FedosMasterSeedAuthority (eight
+    // methods, one #[wasm_bindgen] impl block) is likewise genuinely new,
+    // long after this review's own Stage 977 scope -- never retroactively
+    // added to this doc's table either. See
+    // docs/secure_runtime_alpha_436_rust_master_seed_authority_implementation.md.
+    const NEW_SINCE_THIS_REVIEW = new Set([
+      "random_bytes_32",
+      "generate_aead_key_handle",
+      "kind",
+      "encrypt_aead",
+      "decrypt_aead",
+      "serialize_aead_ciphertext",
+      "deserialize_aead_ciphertext",
+      "new",
+      "is_available",
+      "is_cleared",
+      "generate",
+      "seal",
+      "restore_sealed",
+      "clear",
+      "sign_nostr_event",
+    ]);
     for (const name of pubFnNames) {
-      if (
-        name === "random_bytes_32" ||
-        name === "generate_aead_key_handle" ||
-        name === "kind" ||
-        name === "encrypt_aead" ||
-        name === "decrypt_aead" ||
-        name === "serialize_aead_ciphertext" ||
-        name === "deserialize_aead_ciphertext"
-      ) {
-        continue;
-      }
+      if (NEW_SINCE_THIS_REVIEW.has(name as string)) continue;
       expect(reviewDocSource).toMatch(new RegExp("`" + name + "`"));
     }
   });
 
   it("3. the #[wasm_bindgen] count is confirmed 0, matching the real lib.rs", () => {
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(reviewDocSource).toMatch(/`#\\?\[wasm_bindgen\\?\]`.{0,20}count.{0,20}confirmed `0`|confirmed `0`/is);
     expect(reviewDocSource).toMatch(/# 0/);
   });
@@ -158,8 +170,8 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(13);
+    expect(pubFnNames.length).toBe(44);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
 
     const cargoCode = cargoTomlSource
       .split("\n")

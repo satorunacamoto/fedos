@@ -161,7 +161,7 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
     for (const name of pubFnNames) {
       expect(name.toLowerCase()).not.toContain("encode_envelope");
       expect(name.toLowerCase()).not.toContain("decode_envelope");

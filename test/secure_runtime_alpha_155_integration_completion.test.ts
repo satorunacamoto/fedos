@@ -90,9 +90,9 @@ describe("Secure Runtime Alpha 155 -- Integration Completion", () => {
 
   it("7. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(13);
+    expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(36);
+    expect(pubFnNames.length).toBe(44);
   });
 
   it("8. structural: SecretHandleKind gained exactly one new variant across the whole Arc -- ProtocolRootMaterial", () => {

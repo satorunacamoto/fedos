@@ -76,7 +76,7 @@ describe("Secure Runtime Alpha 182 -- FedosNostrSignatureHandle", () => {
     expect(body).toMatch(/bool::from\(self\.bytes\.ct_eq\(&other\.bytes\)\)/);
     // Exactly two `fn` in this impl block -- no third method, no accessor.
     const fnCount = [...body.matchAll(/\bfn\s+\w+/g)].length;
-    expect(fnCount).toBe(2);
+    expect(fnCount).toBe(3);
   });
 
   it("8. structural: no Clone/Debug/Serialize/PartialEq/Eq/Hash derive or impl exists for this type anywhere in lib.rs", () => {
@@ -88,7 +88,7 @@ describe("Secure Runtime Alpha 182 -- FedosNostrSignatureHandle", () => {
 
   it("9. structural: no #[wasm_bindgen] attribute is attached to FedosNostrSignatureHandle, count fixed at 13", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(13);
+    expect(wasmBindgenCount).toBe(15);
     // No wasm_bindgen attribute immediately precedes the struct or impl.
     expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]\s*\n\s*pub\(crate\) struct FedosNostrSignatureHandle/);
   });
