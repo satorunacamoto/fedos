@@ -8,6 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 481–490 — Publish Pipeline Integration
+> Review Arc (complete, review only — zero production code changed).**
+> Reviews the four pipeline components that now all exist in committed
+> form — Outbox (Alpha 411–420), Publisher (TWO coexisting
+> implementations: the generic `FedosBoardOutboxPublisher`, Alpha
+> 471–480, and the Nostr-specific `FedosNostrBoardPublisher`/
+> `FedosRelayNostrBoardPublisher`, Alpha 451–460), Delivery Observation
+> (TWO coexisting vocabularies: `FedosBoardOutboxObservation`, Alpha
+> 471–480, and this repository's own standalone `FedosDeliveryObservation`,
+> Alpha 461–470), and Scheduler (`FedosPublishScheduler`, Alpha
+> 471–480) — against ten review items, with no file under `src/`
+> touched anywhere in this Arc. Confirmed clean: neither Publisher
+> rewrites the Outbox; neither Observation vocabulary is aware of any
+> Publisher; the Scheduler contains zero protocol-specific processing;
+> the retry-policy vocabulary is defined exactly once; the full
+> dependency graph (Rust → WASM → Runtime → Desktop/Board core →
+> Outbox → { Publisher, Observation, Scheduler }) has no cycles and no
+> unexpected cross-layer reach
+> (`docs/secure_runtime_alpha_481_publish_pipeline_separation_of_concerns_review.md`
+> through
+> `docs/secure_runtime_alpha_489_publish_pipeline_boundary_dependency_audit.md`).
+> Real problems found, not previously named as a single set: three
+> unreconciled Observation vocabularies and two unreconciled Publisher
+> result contracts exist side by side with no adapter between them; the
+> Scheduler's own Observation log is in-memory only, not durable, despite
+> a fully durable Repository already existing unwired; the documented
+> `queued → publishing → { accepted | rejected | failed }` state graph
+> is convention only — no constructor or write path enforces it, and a
+> late-arriving stale fact can silently overwrite a derived "current
+> state"; and — the most consequential finding — **nothing in this
+> repository currently owns the Publisher, the Scheduler, or either
+> Observation vocabulary**: `FedosDesktopHost` owns the Outbox WRITE
+> side only, and a repository-wide search finds zero production caller
+> constructing a `FedosPublishScheduler` or a
+> `FedosRelayNostrBoardPublisher` anywhere outside their own tests
+> (`docs/secure_runtime_alpha_490_publish_pipeline_integration_review_completion.md`).
+> Four future Arc candidates are named, not started: Publisher/
+> Observation Reconciliation, Delivery Observation Durability Wiring,
+> Publish Pipeline Host Ownership, and a Nostr Publisher → Generic
+> Publisher Adapter — this Arc recommends reconciliation-and-ownership
+> work be sequenced before any additional protocol Publisher is built.
+> `npm run typecheck` carries exactly one pre-existing, unrelated error
+> this Arc did not introduce (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> a file this Arc never touched). This Arc's own 9 review test files:
+> **30/30 tests GREEN**. `p2p/` remains completely untouched.
+>
+> See `docs/secure_runtime_alpha_481_publish_pipeline_separation_of_concerns_review.md`
+> through `docs/secure_runtime_alpha_490_publish_pipeline_integration_review_completion.md`
+> for the full, per-Stage review record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 471–480 — Canonical Publish Scheduler
 > Foundation Arc (complete).** Builds `FedosPublishScheduler`
 > (`src/board/outbox/fedos_publish_scheduler.ts`) — `start()`/`stop()`/
