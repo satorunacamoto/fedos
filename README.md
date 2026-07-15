@@ -8,6 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 541–560 — Publish Runtime Operational
+> Review Arc (complete, review only — zero production code changed).**
+> Reviews the full stack now built — Host, Board, Persistence, Query,
+> Outbox, Publisher, Observation, Scheduler, Retry — across ten
+> confirmation items (Dependency Graph, Ownership, Lifecycle, Recovery,
+> Shutdown, Memory, Resource Leak, Thread Safety, Observation
+> Consistency, Retry Semantics) and six investigations (circular
+> dependency, responsibility duplication, unnecessary Adapter,
+> unnecessary Repository, unnecessary Host API, State Machine
+> contradiction), delivering 20 docs and 20 review tests, with no file
+> under `src/` touched anywhere in this Arc. Headline finding: **nothing
+> in this entire reviewed stack has a production caller** —
+> `FedosDesktopHost`/`createFedosDesktopHost` is referenced nowhere
+> outside its own directory and `test/`, and `src/worker.ts` (this
+> repository's one real deployed entry point) renders Board pages from
+> its own separate sample-data path, never from `FedosBoardService` or
+> any Persistence backend — extending the prior Arc's own "nothing owns
+> Publisher/Scheduler/Observation" finding one level further up. A real,
+> reproducible double-publish race was found and demonstrated by actual
+> execution in `FedosPublishScheduler.tick()` — two overlapping ticks
+> (triggered whenever one `Publisher.publish()` call outlives one
+> `intervalMs`) both attempt the SAME pending Outbox intent concurrently,
+> with no reentrancy guard anywhere in the Scheduler; a Publisher that
+> always throws is retried forever, with no abandonment-after-N-failures
+> policy. `PersistedFedosBoardRepository` (Alpha 317) was found built,
+> tested, and never wired into any real construction path — and would
+> silently skip the thread-integrity checks `FedosBoardService` enforces
+> if a future caller reached for it directly, bypassing `FedosBoardService`
+> entirely. No circular dependency and no Active (currently-observed)
+> defect was found anywhere — every finding is either Latent (reachable
+> only once more wiring lands) or Structural (a design observation); the
+> Scheduler's own concurrency-safety and abandonment-policy gaps are
+> recommended as the two highest-priority future Arcs, ahead of any
+> Host-ownership wiring, since fixing them first is strictly cheaper than
+> after. `npm run typecheck` carries exactly one pre-existing, unrelated
+> error this Arc did not introduce and does not touch. This Arc's own 20
+> test files: **52/52 tests GREEN**. `p2p/` remains completely untouched.
+>
+> See `docs/secure_runtime_alpha_541_publish_runtime_operational_review_inventory.md`
+> through `docs/secure_runtime_alpha_560_publish_runtime_operational_review_completion.md`
+> for the full, per-Stage review record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 481–490 — Publish Pipeline Integration
 > Review Arc (complete, review only — zero production code changed).**
 > Reviews the four pipeline components that now all exist in committed
