@@ -23,13 +23,20 @@ describe("Secure Runtime Alpha 386 -- Host Query Delegation Review", () => {
     expect(designDocSource.length).toBeGreaterThan(2000);
   });
 
-  it("2. structural: no delegation/convenience method exists on the Host -- exactly six public methods plus the constructor", () => {
+  it("2. structural: no READ delegation/convenience method exists on the Host -- exactly six read/lifecycle public methods, plus submitPost() (Alpha 395's own WRITE boundary, not a Query delegation method) and the constructor", () => {
     const code = codeOnly(hostSource);
     const publicMethodNames = (code.match(/^\s{2}(?:async )?(\w+)\(/gm) ?? [])
       .map((m: string) => m.replace(/^\s*(?:async )?/, "").replace("(", ""))
       .filter((name: string) => name !== "constructor");
+    // Alpha 395 (Arc 391-400) adds submitPost() -- the canonical Host-owned
+    // WRITE boundary. This is NOT a Query-delegation/convenience method (the
+    // kind this Stage's own Objective declined to add) -- it is this
+    // repository's own new write-coordination API, added by a later Arc for
+    // a different, unrelated reason. This Stage's own finding -- no
+    // recentBoardPosts()/threadPosts()/queryBoard() READ delegation method --
+    // still holds exactly, confirmed by test 3 below.
     expect(publicMethodNames.sort()).toEqual(
-      ["state", "start", "stop", "desktop", "board", "query"].sort(),
+      ["state", "start", "stop", "desktop", "board", "query", "submitPost"].sort(),
     );
   });
 

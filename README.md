@@ -8,6 +8,70 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 391–400 — Desktop Host Durable Write
+> Coordination Arc.** Makes `FedosDesktopHost` the single owner of all
+> Canonical Board WRITE coordination, closing the memory-only-write gap
+> Alpha 367/389/390 named honestly and left unsolved. New
+> `submitPost(post): FedosDesktopHostSubmitPostResult`, adopted directly
+> on the Host (Option A — the SAME class-owns-its-concerns shape Alpha
+> 332 already established, over a new `WriteCoordinator` class, Option
+> B, rejected for having no second use case). Implements the fixed
+> order `Validate → Persistence → Repository → Query visibility →
+> Success`: Persistence is written STRICTLY BEFORE Repository —
+> deliberately, not the reverse — because `FedosBoardPersistence` has
+> no delete method, so only this order keeps every reachable failure
+> recoverable by a future restart instead of a silent, permanent loss.
+> New `FedosBoardService.previewRegistration()` — a pure-read prediction
+> of `registerPost()`'s own outcome, factored out of `registerPost()`
+> itself with zero behavior change — lets the Host validate a post
+> BEFORE it ever reaches durable Persistence, preventing a
+> domain-invalid post from permanently poisoning every future
+> `hydrateFedosBoardService()` replay of that log (Persistence has no
+> delete/repair path). `FedosBoardService`, `FedosBoardRepository`, and
+> `FedosBoardPersistence` all keep their own frozen contracts —
+> `previewRegistration()` and `submitPost()` are both purely ADDITIVE.
+> Every failure shape is Fail Closed: duplicate/conflict behave exactly
+> like the pre-existing idempotent/conflict conventions those layers
+> already established; a thrown Persistence exception propagates
+> UNMODIFIED with the Host staying `"ready"` (a single failed write is
+> not a Host-lifecycle event); a returned Persistence I/O failure
+> (`"persistence-failed"`, one new token) stops the write before
+> Repository is ever reached; "Repository succeeds, Persistence fails"
+> and "Persistence succeeds, Repository fails" are BOTH structurally
+> unreachable by the adopted order, not merely handled. Query visibility
+> is automatic and immediate — no rebuild, no reload, no restart —
+> because `FedosBoardQuery` and the write path share the exact same live
+> `FedosBoardService` instance. Verified end to end: real fixtures from
+> all four Board Adapters (Nostr, ActivityPub, AT Protocol, Session)
+> submit through the identical `submitPost()` call with zero
+> protocol-specific branching; every named failure shape reproduced by
+> direct execution; and — the scenario that was IMPOSSIBLE before this
+> Arc — a post written via `submitPost()` by one Host instance, against
+> a REAL `AppendOnlyFedosBoardPersistence`, is fully preserved and
+> visible via a SECOND, independently-constructed Host instance after a
+> genuine restart. **Honestly left open:** the OLD
+> `host.board()?.registerPost(post)` path is completely UNCHANGED — it
+> still never reaches Persistence, exactly as Alpha 367 first found; a
+> caller that bypasses `submitPost()` still reproduces the original gap.
+> `package.json`'s own `dependencies` count stays fixed at 2 — zero new
+> Cargo/npm dependency of any kind. `npm run typecheck`/`npm test`
+> GREEN (pre-existing, unrelated Rust-structural test failures excluded;
+> one existing test file updated — Alpha 386's own six-public-method
+> assertion, now seven, with `submitPost` distinguished from the Query
+> delegation methods that Stage declined to add). `cargo check` GREEN;
+> `cargo test` fails to BUILD in this environment due to the SAME
+> pre-existing, unrelated MinGW `dlltool` path issue prior Arcs already
+> documented. The pre-existing root-level `p2p/` directory remains
+> completely untouched. Next Arc recommended: **Secure Runtime Alpha
+> 401–410: Outbound Publish Pipeline Foundation Arc** (not Relay Pool,
+> not Ontology, not P2P).
+>
+> See `docs/secure_runtime_alpha_391_desktop_host_write_coordination_inventory.md`
+> through `docs/secure_runtime_alpha_400_desktop_host_write_coordination_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 381–390 — Canonical Board Query Host
 > Integration & Startup Failure Closure Arc.** Integrates the
 > completed Query layer into `FedosDesktopHost` and closes the

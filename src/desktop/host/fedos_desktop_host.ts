@@ -7,7 +7,43 @@
  * 383 ("Host-Owned Query Construction") / Alpha 384 ("Host Query
  * Access Boundary") / Alpha 385 ("Board Service Access Review") —
  * Stages 2–5 of the Alpha 381–390 Canonical Board Query Host
- * Integration & Startup Failure Closure Arc.
+ * Integration & Startup Failure Closure Arc. Alpha 395 ("Implement
+ * Host Write API") — Stage 5 of the Alpha 391–400 Desktop Host Durable
+ * Write Coordination Arc.
+ *
+ * `submitPost()` (Alpha 395): the Host becomes the single owner of
+ * Canonical Board WRITE coordination — `Validate → Persistence →
+ * Repository → Query visibility → Success` (Alpha 393's own adopted
+ * order), closing the gap Alpha 389/390 named honestly and left open:
+ * `board().registerPost()` mutates `#boardService`'s in-memory
+ * Repository ONLY, never touching `#boardPersistence` at all.
+ * `submitPost()` writes Persistence FIRST, Repository SECOND —
+ * deliberately, NOT the reverse — because `FedosBoardPersistence`
+ * (Alpha 315) has NO delete method: a failure AFTER a successful
+ * Persistence write only delays Query visibility (recoverable on the
+ * next `hydrateFedosBoardService()` replay); a failure AFTER a
+ * successful Repository write would instead make Query show a post
+ * that silently DISAPPEARS on restart — data that was never durable in
+ * the first place. Step 1 (`FedosBoardService.previewRegistration()`,
+ * Alpha 395) is a PURE READ that predicts step 3's own outcome before
+ * step 2 ever runs — this is what prevents a domain-invalid post (a
+ * genuine `"missing-parent"`/`"invalid-thread"`/`"cross-board-reply"`/
+ * `"source-conflict"`/`"post-id-conflict"`) from EVER reaching durable
+ * Persistence, which would otherwise PERMANENTLY poison every future
+ * `hydrateFedosBoardService()` call for that log (an unresolvable post
+ * makes `registerPostsInDependencyOrder()`'s own `unresolvedCount`
+ * permanently `> 0`, and hydration has no delete/skip/repair path of
+ * any kind — see `docs/secure_runtime_alpha_394_write_failure_policy.md`
+ * §"the poisoning risk" for the full analysis). Because step 1 already
+ * predicts step 3's own outcome and this repository's execution model
+ * is single-threaded/synchronous with no `await` between steps 1 and
+ * 3, "Repository succeeds, Persistence fails" and "Persistence
+ * succeeds, Repository fails" are BOTH structurally unreachable by
+ * this ordering — not merely handled, eliminated. Query visibility
+ * (step 4) is NOT a separate step at all: `query()` reads the SAME
+ * `#boardService` instance `registerPost()` (step 3) just mutated, so
+ * visibility is automatic, immediate, with no rebuild/reload/restart
+ * (Alpha 396).
  *
  * `FedosDesktopHost` is the first real host-runtime boundary capable
  * of owning exactly ONE `DesktopApplication` (`../desktop_application.js`,
@@ -139,13 +175,34 @@
  *     altered by this Arc.
  *   - NO `process.exit()`, NO signal handler (`SIGINT`/`SIGTERM`/etc.)
  *     of any kind anywhere in this file.
+ *   - `submitPost()` (Alpha 395) throws ONLY for the `"ready"`-state
+ *     guard, exactly matching `start()`/`stop()`'s own convention;
+ *     every DOMAIN rejection (`"invalid-thread"`, `"missing-parent"`,
+ *     `"cross-board-reply"`, `"source-conflict"`, `"post-id-conflict"`,
+ *     `"persistence-failed"`) is a RETURNED token, matching
+ *     `FedosBoardService.registerPost()`'s own "no exceptions for
+ *     normal rejection" convention (Alpha 307).
+ *   - `submitPost()` calls `#boardPersistence.putPost()` BEFORE
+ *     `#boardService.registerPost()` — NEVER the reverse — and calls
+ *     `#boardService.previewRegistration()` BEFORE EITHER — see this
+ *     file's own header §"submitPost()" for why this exact order is
+ *     load-bearing, not stylistic.
+ *   - `submitPost()` performs NO retry, NO partial write, and NO
+ *     silent repair of any kind — an invariant violation (step 1's
+ *     prediction disagreeing with step 3's own outcome) throws rather
+ *     than proceeding.
  *   - NO reference to `src/worker.ts`, `src/runtime/create_runtime.ts`,
  *     any `AppRuntime` field, Relay Pool, `StorageBackend`, or `p2p/`.
  */
 
 import type { DesktopApplication } from "../desktop_application.js";
 import type { FedosBoardPersistence } from "../../board/persistence/fedos_board_persistence.js";
-import type { FedosBoardService } from "../../board/repository/fedos_board_service.js";
+import { serializeFedosBoardPost } from "../../board/persistence/fedos_board_post_codec.js";
+import type { FedosBoardPost } from "../../board/fedos_board_post.js";
+import {
+  type FedosBoardService,
+  type FedosBoardRegistrationResult,
+} from "../../board/repository/fedos_board_service.js";
 import { hydrateFedosBoardService } from "../../board/persistence/fedos_board_hydration.js";
 import { FedosBoardQuery } from "../../board/query/fedos_board_query.js";
 import type { FedosDesktopHostState } from "./fedos_desktop_host_state.js";
@@ -154,6 +211,17 @@ export interface FedosDesktopHostDependencies {
   readonly desktopApplication: DesktopApplication;
   readonly boardPersistence: FedosBoardPersistence;
 }
+
+/**
+ * Alpha 395 ("Implement Host Write API") -- Stage 5 of the Alpha
+ * 391–400 Desktop Host Durable Write Coordination Arc. Mirrors
+ * `FedosBoardRegistrationResult` (`../../board/repository/fedos_board_service.js`,
+ * Alpha 307) plus exactly one new outcome -- `"persistence-failed"` --
+ * the same additive-mirroring pattern `FedosBoardPersistenceWriteResult`
+ * (Alpha 315) already established over `FedosBoardRepositoryWriteResult`
+ * (Alpha 302).
+ */
+export type FedosDesktopHostSubmitPostResult = FedosBoardRegistrationResult | "persistence-failed";
 
 export class FedosDesktopHost {
   readonly #desktopApplication: DesktopApplication;
@@ -217,5 +285,48 @@ export class FedosDesktopHost {
 
   query(): FedosBoardQuery | null {
     return this.#state === "ready" ? this.#boardQuery : null;
+  }
+
+  /**
+   * Alpha 395: the canonical Host-owned write boundary --
+   * `Validate → Persistence → Repository → Query visibility → Success`
+   * (Alpha 393). See this file's own header §"submitPost()" for the
+   * full ordering rationale and why every step is a RETURNED token,
+   * never a thrown rejection, except the `"ready"`-state guard itself.
+   */
+  submitPost(post: FedosBoardPost): FedosDesktopHostSubmitPostResult {
+    if (this.#state !== "ready" || this.#boardService === null) {
+      throw new Error("FedosDesktopHost.submitPost() may only be called from the ready state.");
+    }
+    const boardService = this.#boardService;
+
+    // 1. Validate -- pure read, before Persistence is ever touched.
+    const preview = boardService.previewRegistration(post);
+    if (preview !== null) return preview;
+
+    // 2. Persistence -- the first mutating call.
+    const record = serializeFedosBoardPost(post);
+    const persistResult = this.#boardPersistence.putPost(record);
+    if (persistResult === "failed") return "persistence-failed";
+    if (persistResult === "conflict") return "post-id-conflict";
+
+    // 3. Repository -- guaranteed to accept `post`, by construction:
+    // step 1 already predicted this exact outcome, and no other write
+    // to `boardService` can interleave between step 1 and here in this
+    // repository's single-threaded, synchronous execution model.
+    const registerResult = boardService.registerPost(post);
+    if (registerResult !== "inserted" && registerResult !== "already-present") {
+      // Fail closed: never silently repair a state that step 1's own
+      // prediction says cannot happen. See design doc Alpha 394 §"the
+      // structurally unreachable case".
+      throw new Error(
+        `FedosDesktopHost.submitPost() invariant violated: previewRegistration() predicted acceptance but registerPost() returned "${registerResult}".`,
+      );
+    }
+
+    // 4. Query visibility -- automatic: query() reads the SAME
+    // #boardService instance registerPost() just mutated. No separate
+    // step, no rebuild, no reload.
+    return registerResult;
   }
 }
