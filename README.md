@@ -8,6 +8,59 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 471–480 — Canonical Publish Scheduler
+> Foundation Arc (complete).** Builds `FedosPublishScheduler`
+> (`src/board/outbox/fedos_publish_scheduler.ts`) — `start()`/`stop()`/
+> `tick()` — the first periodic-cadence consumer of
+> `FedosBoardOutboxPersistence.listIntents()` (Alpha 417) this
+> repository has ever shipped. This Arc's own Stage 1 inventory
+> (`docs/secure_runtime_alpha_471_existing_scheduler_and_publisher_inventory.md`)
+> found, in the working tree at the time, two SEPARATE, uncommitted,
+> in-progress threads already building Publisher/Observation-shaped code
+> — a Nostr-specific `FedosNostrBoardPublisher` (Alpha 451–460) and a
+> standalone `FedosDeliveryObservation` vocabulary (Alpha 461–470) — and
+> made an explicit, documented decision to depend on NEITHER: this Arc
+> defines its own generic `FedosBoardOutboxPublisher` port
+> (`fedos_board_outbox_publisher.ts`), typed exactly to the existing
+> `FedosPersistedBoardOutboxRecordV1`, and its own in-memory-only
+> `FedosBoardOutboxObservation` (`fedos_board_outbox_observation.ts`,
+> five of Alpha 415's own six named kinds), leaving both other threads
+> completely untouched. Retry is governed by a closed three-value
+> directive the Publisher itself returns —
+> `"immediate" | "later" | "never"`, no numeric delay field, no
+> exponential backoff anywhere — with one Scheduler-owned guardrail
+> (a same-tick `"immediate"` retry is downgraded to `"later"` on its
+> second consecutive occurrence) bounding every `tick()` call to at most
+> two `publish()` attempts per pending intent. No concrete,
+> protocol-wired Publisher implementation ships this Arc — only a
+> test-only `MockFedosBoardOutboxPublisher` — and no pre-existing file
+> anywhere in the repository is modified: every one of this Arc's ten
+> Stages adds new files only. Real execution, not restated: this Arc's
+> own ten `test/secure_runtime_alpha_47{1..0}_*.test.ts` files, **10
+> files / 78 tests, 100% GREEN**; `npx tsc --noEmit --strict` against
+> this Arc's own three new source files, clean; full-repository
+> `npm test -- --run` (708 files / 10767 tests at the time of this Arc's
+> own most recent full run) — 637 files / 10657 tests passed, 71 files /
+> 110 tests failed, every failure traced to either the same ~10
+> pre-existing hardcoded Rust structural-count assertions already
+> flagged unchanged since Alpha 450, or to the two separate,
+> concurrently in-progress Arcs named above — none to this Arc's own
+> diff (`docs/secure_runtime_alpha_479_scope_and_security_regression_guards.md`).
+> `p2p/` remains completely untouched.
+> Next Arc: **adapt, do not duplicate** — once a concrete
+> `FedosNostrBoardPublisher` (or equivalent) lands, the correct next Arc
+> is a thin adapter implementing `FedosBoardOutboxPublisher` by calling
+> it internally, never a modification to `FedosPublishScheduler` itself
+> and never a second, competing generic Publisher port
+> (`docs/secure_runtime_alpha_480_canonical_publish_scheduler_foundation_completion.md`
+> §6).
+>
+> See `docs/secure_runtime_alpha_471_existing_scheduler_and_publisher_inventory.md`
+> through `docs/secure_runtime_alpha_480_canonical_publish_scheduler_foundation_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 461–470 — Canonical Delivery
 > Observation Arc (complete).** Builds a durable, standalone Delivery
 > Observation vocabulary — `FedosDeliveryObservation`
@@ -56,6 +109,60 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > See `docs/secure_runtime_alpha_461_existing_observation_vocabulary_inventory.md`
 > through `docs/secure_runtime_alpha_470_canonical_delivery_observation_completion.md`
+> for the full, per-Stage design record.
+>
+> Note: the Arc below (Alpha 451–460) was written and verified against
+> the Alpha 431–450 commit above, filling the numeric gap immediately
+> following it, but landed in this repository's own commit log AFTER
+> Alpha 461–470 due to a real, local, concurrent-session timing
+> collision — see
+> `docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md`
+> §4/§6 for the honest account. It does not build on, and is not built
+> on by, Alpha 461–470.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 451–460 — Canonical Nostr Outbound
+> Publisher Foundation Arc (complete).** Builds a minimal, transport-only
+> Publisher: `FedosRelayNostrBoardPublisher`
+> (`src/board/publish/nostr/fedos_relay_nostr_board_publisher.ts`) takes
+> a `FedosBoardOutboxIntent` (Alpha 414, unchanged — routing identity
+> only, never a body) paired with an already-signed `FedosNostrWireEvent`
+> (Alpha 234, unchanged — produced upstream by
+> `FedosNostrSigningAuthority`, out of this Arc's own scope), converts it
+> via `nostrWireEventToFedosEventDescriptor`
+> (`fedos_nostr_wire_event_to_event_descriptor.ts`, the adapter Alpha
+> 234's own header anticipated but did not build) to the protocol-neutral
+> `FedosEventDescriptor` `FedosRelay.publish()` (Alpha 216, unchanged)
+> requires, and sends it. `FedosNostrBoardPublisher`
+> (`fedos_nostr_board_publisher.ts`) is the interface — the exact name
+> and path Alpha 448 reserved without building. `publishOne()`/
+> `publishBatch()` return a boolean success/failure signal ONLY — no
+> result object, no retry, no backoff, no delivery-observation field, no
+> ACK/OK correlation, no connection pool — `publishBatch()` is a plain
+> sequential loop, never `Promise.all`. This is deliberately narrower
+> than this repository's own prior "Next Arc" recommendation (delivery
+> observation + retry/backoff), a documented scope decision
+> (`docs/secure_runtime_alpha_452_publisher_scope_and_return_contract_decision.md`),
+> not an oversight. Four pre-existing tests
+> (`secure_runtime_alpha_420`/`421`/`423`/`448`) each carried one
+> `existsSync("src/board/publish"...)).toBe(false)` assertion, true as of
+> their own Stage and each one's own doc explicitly naming a future Arc
+> as the place it would be fulfilled — updated to `true` here, with no
+> other line touched, since this IS that Arc. This Arc's own 10 new test
+> files, plus all four updated pre-existing files, are green; a
+> full-repository baseline was not claimed this Stage due to a detected
+> concurrent writer to this same working tree (see the Note above and
+> `docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md`
+> §4). `p2p/` remains completely untouched.
+> Next Arc: delivery observation, retry/backoff, and a publish scheduler
+> remain undone by this Arc; see
+> `docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md`
+> §3/§6 for the full, honest account of what else already exists,
+> uncommitted, in this same working tree.
+>
+> See `docs/secure_runtime_alpha_451_existing_publisher_boundary_inventory.md`
+> through `docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md`
 > for the full, per-Stage design record.
 >
 > Prior status:
