@@ -246,10 +246,46 @@ import { FedosBoardServiceReader, type FedosBoardReader } from "../../board/repo
 import { hydrateFedosBoardService } from "../../board/persistence/fedos_board_hydration.js";
 import { FedosBoardQuery } from "../../board/query/fedos_board_query.js";
 import type { FedosDesktopHostState } from "./fedos_desktop_host_state.js";
+import { createFedosBoardOutboxIntent, type FedosBoardOutboxTarget } from "../../board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../../board/outbox/fedos_board_outbox_codec.js";
+import {
+  type FedosBoardOutboxPersistence,
+  type FedosBoardOutboxPersistenceWriteResult,
+} from "../../board/outbox/fedos_board_outbox_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../../board/outbox/in_memory_fedos_board_outbox_persistence.js";
 
 export interface FedosDesktopHostDependencies {
   readonly desktopApplication: DesktopApplication;
   readonly boardPersistence: FedosBoardPersistence;
+  /**
+   * Alpha 419 — OPTIONAL, defaulted in the constructor (below) to a
+   * fresh `InMemoryFedosBoardOutboxPersistence()` when omitted. Kept
+   * optional, unlike `boardPersistence`, so every ONE of the 29
+   * pre-existing `new FedosDesktopHost({desktopApplication, boardPersistence})`
+   * call sites across `test/` continues to compile and behave
+   * identically — see
+   * `docs/secure_runtime_alpha_419_host_submit_outbox_coordination.md`
+   * §"ripple" for why this Arc deliberately avoids widening the
+   * required-field surface of an already-established interface.
+   */
+  readonly outboxPersistence?: FedosBoardOutboxPersistence;
+}
+
+/**
+ * Alpha 419 — one entry per caller-supplied `FedosBoardOutboxTarget`,
+ * reporting `FedosBoardOutboxPersistence.putIntent()`'s own exact
+ * result token for that target. Empty whenever `submitPostWithOutbox()`
+ * never reaches the Outbox-write step at all (see that method's own
+ * header).
+ */
+export interface FedosDesktopHostOutboxIntentResult {
+  readonly target: FedosBoardOutboxTarget;
+  readonly result: FedosBoardOutboxPersistenceWriteResult;
+}
+
+export interface FedosDesktopHostSubmitWithOutboxResult {
+  readonly post: FedosDesktopHostSubmitPostResult;
+  readonly outbox: readonly FedosDesktopHostOutboxIntentResult[];
 }
 
 /**
@@ -266,6 +302,7 @@ export type FedosDesktopHostSubmitPostResult = FedosBoardRegistrationResult | "p
 export class FedosDesktopHost {
   readonly #desktopApplication: DesktopApplication;
   readonly #boardPersistence: FedosBoardPersistence;
+  readonly #outboxPersistence: FedosBoardOutboxPersistence;
   #state: FedosDesktopHostState = "constructed";
   #boardService: FedosBoardService | null = null;
   #boardQuery: FedosBoardQuery | null = null;
@@ -274,6 +311,7 @@ export class FedosDesktopHost {
   constructor(dependencies: FedosDesktopHostDependencies) {
     this.#desktopApplication = dependencies.desktopApplication;
     this.#boardPersistence = dependencies.boardPersistence;
+    this.#outboxPersistence = dependencies.outboxPersistence ?? new InMemoryFedosBoardOutboxPersistence();
   }
 
   state(): FedosDesktopHostState {
@@ -372,5 +410,81 @@ export class FedosDesktopHost {
     // #boardService instance registerPost() just mutated. No separate
     // step, no rebuild, no reload.
     return registerResult;
+  }
+
+  /**
+   * Alpha 419 -- the ADDITIVE explicit-outbound-targets entry point.
+   * `submitPost()` (above) remains completely unchanged and
+   * local-only: it never queues, never publishes, and calling it
+   * directly is still a fully legitimate, first-class product action.
+   * `submitPostWithOutbox()` never infers targets from `post.source`
+   * or any other provenance field -- `targets` is the caller's own
+   * EXPLICIT delivery intent (Alpha 414's own required decision).
+   *
+   * Honest ordering (never described as one atomic transaction -- see
+   * this file's own header and
+   * `docs/secure_runtime_alpha_419_host_submit_outbox_coordination.md`
+   * §"two-file atomicity"): this method delegates the ENTIRE canonical
+   * write to the EXISTING, unmodified `submitPost()` first. Only once
+   * that call returns `"inserted"` or `"already-present"` -- meaning
+   * the post is genuinely durable and visible -- does this method
+   * attempt any Outbox write at all. A domain rejection or
+   * `"persistence-failed"` from `submitPost()` short-circuits with an
+   * EMPTY `outbox` array: no Outbox intent is ever created for a post
+   * that was never durably accepted.
+   *
+   * `targets` is deduplicated by its own deterministic
+   * `FedosBoardOutboxId` (Alpha 413) before any write, so passing the
+   * same logical target twice produces exactly ONE result entry, not
+   * two. An EMPTY `targets` array delegates entirely to `submitPost()`
+   * (chosen over rejecting outright -- see the design doc's own
+   * "empty targets" section) -- `submitPostWithOutbox(post, [])` and
+   * `submitPost(post)` are then behaviorally identical except for the
+   * wrapper shape of the returned value.
+   *
+   * Each Outbox intent's own `createdAt` reuses `post.createdAt`
+   * (this class holds no injected Clock) -- see the design doc's own
+   * "intent timestamp" section for why this keeps the whole call
+   * deterministic rather than introducing a new `Date.now()` dependency.
+   *
+   * A durable Outbox write failing AFTER a successful canonical write
+   * NEVER rolls back, retries, or otherwise touches the already-durable
+   * post -- Persistence has no delete method (Alpha 315), and this Arc
+   * introduces no compensating-transaction machinery of any kind.
+   */
+  submitPostWithOutbox(
+    post: FedosBoardPost,
+    targets: readonly FedosBoardOutboxTarget[],
+  ): FedosDesktopHostSubmitWithOutboxResult {
+    if (this.#state !== "ready") {
+      throw new Error("FedosDesktopHost.submitPostWithOutbox() may only be called from the ready state.");
+    }
+
+    if (targets.length === 0) {
+      return { post: this.submitPost(post), outbox: [] };
+    }
+
+    const postResult = this.submitPost(post);
+    if (postResult !== "inserted" && postResult !== "already-present") {
+      return { post: postResult, outbox: [] };
+    }
+
+    const seenIds = new Set<string>();
+    const outbox: FedosDesktopHostOutboxIntentResult[] = [];
+    for (const target of targets) {
+      const intent = createFedosBoardOutboxIntent(post.id, target, post.createdAt);
+      if (intent === null) {
+        outbox.push({ target, result: "failed" });
+        continue;
+      }
+      if (seenIds.has(intent.id)) continue; // Alpha 419: dedupe by deterministic id, first occurrence wins.
+      seenIds.add(intent.id);
+
+      const record = serializeFedosBoardOutboxIntent(intent);
+      const result = this.#outboxPersistence.putIntent(record);
+      outbox.push({ target, result });
+    }
+
+    return { post: postResult, outbox };
   }
 }

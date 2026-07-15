@@ -45,10 +45,20 @@ import { createDesktopApplication } from "../create_desktop_application.js";
 import { InMemoryFedosBoardPersistence } from "../../board/persistence/in_memory_fedos_board_persistence.js";
 import { FedosDesktopHost, type FedosDesktopHostDependencies } from "./fedos_desktop_host.js";
 
+/**
+ * Alpha 419 (Alpha 411–420 Canonical Board Durable Outbox Foundation
+ * Arc): `dependencies.outboxPersistence` is passed straight through,
+ * UNMODIFIED, to `FedosDesktopHost`'s own constructor, which is the
+ * SOLE place that resolves its default (a fresh
+ * `InMemoryFedosBoardOutboxPersistence()`) when omitted -- this
+ * function does not duplicate that default, matching this file's own
+ * existing "one clearly-scoped responsibility" discipline.
+ */
+
 export function createFedosDesktopHost(
   dependencies: Partial<FedosDesktopHostDependencies> = {},
 ): FedosDesktopHost {
   const desktopApplication = dependencies.desktopApplication ?? createDesktopApplication();
   const boardPersistence = dependencies.boardPersistence ?? new InMemoryFedosBoardPersistence();
-  return new FedosDesktopHost({ desktopApplication, boardPersistence });
+  return new FedosDesktopHost({ desktopApplication, boardPersistence, outboxPersistence: dependencies.outboxPersistence });
 }

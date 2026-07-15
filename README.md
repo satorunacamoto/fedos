@@ -8,6 +8,79 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 411–421 — Canonical Board Durable
+> Outbox Foundation Arc (Phase A complete; Phase B honestly blocked).**
+> Phase A (Alpha 411–420) implements the first durable,
+> protocol-independent Outbox: `FedosBoardOutboxIntent`
+> (`src/board/outbox/fedos_board_outbox_types.ts`) — immutable,
+> referencing a canonical post by id only, never carrying a body
+> duplicate, secret, or protocol-native payload — with a deterministic
+> `FedosBoardOutboxId` derived from `postId + protocol + destination`
+> (never random), giving idempotency for free. Option B (a separate
+> immutable intent record, adopted over folding delivery state into
+> `FedosBoardPost` itself, a shared protocol-native queue, Relay state,
+> or the Ontology Engine) — see
+> `docs/secure_runtime_alpha_412_outbox_responsibility_decision.md`.
+> Inbound provenance NEVER automatically determines outbound targets —
+> a Nostr-imported post is never auto-republished to ActivityPub, and
+> Session content is never auto-published anywhere; targets are always
+> explicit caller intent. `FedosPersistedBoardOutboxRecordV1` (schema
+> version `1`) and a fail-closed codec
+> (`fedos_board_outbox_codec.ts`) mirror the Board-post persistence
+> layer's own established discipline exactly — unknown fields rejected,
+> malformed protocol/timestamp rejected, never throws.
+> `FedosBoardOutboxPersistence` is a dedicated, sibling port (NOT
+> folded into `FedosBoardPersistence`), with an in-memory backend
+> (`InMemoryFedosBoardOutboxPersistence`) and a durable, append-only
+> backend (`AppendOnlyFedosBoardOutboxPersistence`) — Node `node:fs`
+> only, its own independent log file from the Board-post log, the SAME
+> fail-closed corruption discipline `AppendOnlyFedosBoardPersistence`
+> already established (a malformed or conflicting log line throws on
+> replay, never silently repaired). `FedosDesktopHost.submitPostWithOutbox(post, targets)`
+> is a NEW, purely additive method — `submitPost(post)` itself is
+> byte-for-byte UNCHANGED and remains fully local-only; the new method
+> delegates the entire canonical write to the existing `submitPost()`
+> and only then attempts Outbox writes, returning a result that
+> honestly distinguishes "post accepted, all intents queued" from "post
+> accepted, some intents failed" from "post rejected, no Outbox write
+> attempted" — the two-file, two-log write is explicitly NEVER
+> described as one atomic transaction anywhere in code or docs.
+> `outboxPersistence` is an OPTIONAL dependency, defaulted inside the
+> Host constructor, so all 29 pre-existing tests that construct
+> `FedosDesktopHost` directly needed zero changes. Phase B (Alpha
+> 421–430, a reference Nostr outbound publisher) was attempted starting
+> at its own required Alpha 421 inventory Stage, which found the real
+> Nostr signing/event-construction path confined to `pub(crate)` Rust
+> with **no `#[wasm_bindgen]` export reachable from TypeScript at all**
+> — confirmed by enumerating all 13 existing WASM exports (all AEAD,
+> none Nostr) — and this repository's own TypeScript-side Nostr
+> cryptography module (`src/nostr/noble_signature.ts`) explicitly
+> documented, in its own header, as verify-only: *"it never signs. No
+> private keys are involved."* Per this Arc's own binding instruction —
+> STOP before implementing a second signing stack, never duplicate
+> private-key cryptography in TypeScript, never export a raw secret —
+> **Phase B (Alpha 422–430) is honestly NOT implemented**; no
+> `src/board/publish/nostr/` directory, no fabricated design decision
+> for a Stage that did not run. `npm run typecheck`/`npm test` GREEN
+> (the same 55 pre-existing, unrelated Rust-generated-artifact test
+> failures already present at this Arc's own baseline, byte-for-byte
+> identical after the change). `cargo check` GREEN; `cargo test` still
+> fails to BUILD in this environment due to the same pre-existing
+> MinGW `dlltool` path issue every prior Arc has documented identically
+> (a non-ASCII/space-containing path, unrelated to this Arc's own
+> source changes). The pre-existing root-level `p2p/` directory remains
+> completely untouched. Next Arc recommended: **Secure Runtime Alpha
+> 422–430 (renumbered): Nostr Outbound Signing Boundary Decision Arc**
+> — decide how a future publisher obtains a real BIP-340 signature
+> without exporting raw secret bytes to TypeScript, BEFORE attempting a
+> Nostr Outbound Publisher Arc again.
+>
+> See `docs/secure_runtime_alpha_411_existing_delivery_outbox_inventory.md`
+> through `docs/secure_runtime_alpha_421_existing_nostr_outbound_construction_inventory.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 401–410 — Desktop Host Canonical Write
 > Boundary Closure Arc.** Closes the LAST reachable
 > Persistence-bypassing Host write route: `board()?.registerPost(post)`.

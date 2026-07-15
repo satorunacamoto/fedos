@@ -46,8 +46,12 @@ describe("Secure Runtime Alpha 409 -- Outbound Publish Readiness Review", () => 
     );
   });
 
-  it("7. structural: zero Outbox-related code exists anywhere in src/desktop/host/", () => {
-    expect(hostSource).not.toMatch(/Outbox|outboundPublish|deliverPost/i);
+  it("7. structural: submitPost()'s own body remains Outbox-free -- the Outbox this Stage reviewed (unimplemented as of Arc 401-410) was later added, Arc 411-420, as the ADDITIVE submitPostWithOutbox() surface only, never inside submitPost() itself", () => {
+    const submitPostMatch = hostSource.match(
+      /submitPost\(post: FedosBoardPost\): FedosDesktopHostSubmitPostResult \{([\s\S]*?)\n {2}\}/,
+    );
+    expect(submitPostMatch).not.toBeNull();
+    expect(submitPostMatch![1]).not.toMatch(/Outbox/);
   });
 
   it("8. Regression: package.json dependency count remains unchanged at 2, no new dependency for a future publisher", () => {

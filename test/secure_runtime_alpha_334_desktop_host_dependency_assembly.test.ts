@@ -77,10 +77,11 @@ describe("Secure Runtime Alpha 334 -- Desktop Host Dependency Assembly", () => {
     }
   });
 
-  it("9. structural: FedosDesktopHostDependencies has exactly the two documented fields", () => {
+  it("9. structural: FedosDesktopHostDependencies still has its two original required fields -- Arc 411-420 (Alpha 419) adds only one further OPTIONAL field, outboxPersistence, defaulted in the constructor, never a third required field", () => {
     expect(hostSource).toMatch(
-      /export interface FedosDesktopHostDependencies \{\s*readonly desktopApplication: DesktopApplication;\s*readonly boardPersistence: FedosBoardPersistence;\s*\}/,
+      /export interface FedosDesktopHostDependencies \{\s*readonly desktopApplication: DesktopApplication;\s*readonly boardPersistence: FedosBoardPersistence;/,
     );
+    expect(hostSource).toMatch(/readonly outboxPersistence\?: FedosBoardOutboxPersistence;/);
   });
 
   it("10. the design doc cross-references Alpha 333, Alpha 099, Alpha 109, Alpha 316, and Alpha 329", () => {
