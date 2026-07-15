@@ -8,6 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 501–520 — Durable Delivery Observation
+> Wiring & Host Delivery Lifecycle Arc (complete).** Gives
+> `FedosDesktopHost` real, additive ownership of the Publisher and
+> Observation Repository the Alpha 491–500 Reconciliation Arc built but
+> left unwired to any application entry point. `FedosDesktopHostDependencies`
+> gains three OPTIONAL fields — `publisher`, `observationRepository`,
+> `deliveryIntervalMs` — each defaulted inside the constructor exactly
+> like `outboxPersistence` (Alpha 419) already is, so every pre-existing
+> `new FedosDesktopHost({desktopApplication, boardPersistence})` call
+> site is unaffected (`git diff -- src/desktop/host/fedos_desktop_host.ts`
+> shows zero deleted or modified lines — additive only). `Host.startDelivery()`/
+> `stopDelivery()`/`deliveryStatus()`/`observationQuery()` are four new
+> methods; `FedosPublishScheduler` and `FedosBoardOutboxPublisher` (both
+> Alpha 451–500) are NOT modified — `FedosPublishScheduler.start()`/
+> `stop()` are not even called. A new class,
+> `FedosHostDeliveryController` (`src/desktop/host/fedos_host_delivery_controller.ts`),
+> drives the Scheduler's own PUBLIC `tick()` method on its own injectable
+> interval instead, the only way to honor the required "Scheduler停止
+> → tick終了待ち → Host停止" shutdown ordering without editing
+> `FedosPublishScheduler` (its own `start()` runs a fire-and-forget
+> internal timer no external caller can await). `FedosDesktopHost`
+> itself never calls `.publish()`/`.publishOne()` anywhere — only the
+> Scheduler the Host constructs inside `startDelivery()` does. A real
+> end-to-end test drives an actual `FedosDesktopHost` through
+> `startDelivery()` with a real `FedosNostrBoardPublisherAdapter`
+> wrapping a real `FedosRelayNostrBoardPublisher`/`NullRelay`, confirming
+> the full `Host → Scheduler → Publisher Adapter → Observation
+> Repository` chain this Arc's own instruction named, both the accepted
+> and failed paths, with Observation History and Current State
+> cross-checked for consistency at every step. One honest limitation
+> was discovered and documented, not hidden: because Alpha 494's own
+> single-attempt-per-subject Observation model was never extended with
+> an explicit attempt identity, a retried delivery attempt for the same
+> Outbox intent keeps genuinely retrying transport, but its SECOND
+> `publishing`/terminal Observation pair is rejected by the write
+> validator as `"invalid-transition"` — recorded history for one intent
+> does not grow across retries yet
+> (`docs/secure_runtime_alpha_514_failure_path_verification.md` §"Discovered
+> consequence"). `npm run typecheck` GREEN for every file this Arc adds
+> or touches (one unrelated, pre-existing error remains, outside this
+> Arc's own diff). This Arc's own 20 new test files: green. `p2p/`,
+> Ontology, GUI, Worker, Cloudflare, and every other outbound protocol
+> remain untouched. Built entirely in the same dedicated, isolated git
+> worktree and branch (`worktree-alpha-491-500`) the Alpha 491–500 Arc
+> already established.
+>
+> See `docs/secure_runtime_alpha_501_existing_host_and_delivery_boundary_inventory.md`
+> through `docs/secure_runtime_alpha_520_durable_delivery_observation_wiring_and_host_delivery_lifecycle_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 481–490 — Publish Pipeline Integration
 > Review Arc (complete, review only — zero production code changed).**
 > Reviews the four pipeline components that now all exist in committed

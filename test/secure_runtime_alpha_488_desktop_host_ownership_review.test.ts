@@ -26,9 +26,15 @@ describe("Secure Runtime Alpha 488 -- Desktop Host Ownership Review", () => {
     expect(code).toMatch(/serializeFedosBoardOutboxIntent/);
   });
 
-  it("2. Host source references no Publisher, Scheduler, or Observation type", () => {
-    expect(code).not.toMatch(/Publisher/);
-    expect(code).not.toMatch(/Scheduler/);
-    expect(code).not.toMatch(/Observation/);
+  it("2. Host source referenced no Publisher, Scheduler, or Observation type as of THIS Stage -- fulfilled later, by Alpha 501-520", () => {
+    // This Stage (Alpha 488) itself found zero production caller and zero
+    // ownership of any of the three. Alpha 501-520 (Canonical Publisher &
+    // Delivery Observation Contract Reconciliation's own recommended next
+    // Arc) later gives Host real, additive ownership of all three -- see
+    // docs/secure_runtime_alpha_507_host_constructor_and_factory_wiring.md.
+    // This check now confirms fulfillment, not continued absence.
+    expect(code).toMatch(/Publisher/);
+    expect(code).toMatch(/Scheduler/);
+    expect(code).toMatch(/Observation/);
   });
 });

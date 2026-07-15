@@ -23,7 +23,7 @@ describe("Secure Runtime Alpha 386 -- Host Query Delegation Review", () => {
     expect(designDocSource.length).toBeGreaterThan(2000);
   });
 
-  it("2. structural: no READ delegation/convenience method exists on the Host -- exactly six read/lifecycle public methods, plus submitPost() (Alpha 395's own WRITE boundary, not a Query delegation method) and the constructor", () => {
+  it("2. structural: no Board-Query READ delegation/convenience method exists on the Host -- exactly ten read/lifecycle/delivery public methods, plus submitPost()/submitPostWithOutbox() (write boundaries, not Query delegation) and the constructor", () => {
     const code = codeOnly(hostSource);
     const publicMethodNames = (code.match(/^\s{2}(?:async )?(\w+)\(/gm) ?? [])
       .map((m: string) => m.replace(/^\s*(?:async )?/, "").replace("(", ""))
@@ -31,16 +31,40 @@ describe("Secure Runtime Alpha 386 -- Host Query Delegation Review", () => {
     // Alpha 395 (Arc 391-400) adds submitPost() -- the canonical Host-owned
     // WRITE boundary. Alpha 419 (Arc 411-420) additionally adds
     // submitPostWithOutbox() -- an ADDITIVE, explicit-outbound-targets write
-    // boundary that itself calls submitPost() internally. NEITHER is a
-    // Query-delegation/convenience method (the kind this Stage's own
-    // Objective declined to add) -- both are this repository's own
-    // write-coordination API, added by later Arcs for different, unrelated
-    // reasons. This Stage's own finding -- no
+    // boundary that itself calls submitPost() internally. Alpha 508-510 (Arc
+    // 501-520) additionally add startDelivery()/stopDelivery()/
+    // deliveryStatus()/observationQuery() -- a Delivery LIFECYCLE boundary,
+    // unrelated to Board Query. NONE of the six is a Board-Query
+    // delegation/convenience method (the kind this Stage's own Objective
+    // declined to add) -- all six are this repository's own write-
+    // coordination or delivery-lifecycle API, added by later Arcs for
+    // different, unrelated reasons. This Stage's own finding -- no
     // recentBoardPosts()/threadPosts()/queryBoard() READ delegation method --
-    // still holds exactly, confirmed by test 3 below.
+    // still holds exactly, confirmed by test 3 below (a NEW invariant, not
+    // merely a widened list: observationQuery() is a DIFFERENT read boundary,
+    // over Delivery Observation, never Board Query, and is asserted NOT to
+    // duplicate any FedosBoardQuery method name).
     expect(publicMethodNames.sort()).toEqual(
-      ["state", "start", "stop", "desktop", "board", "query", "submitPost", "submitPostWithOutbox"].sort(),
+      [
+        "state",
+        "start",
+        "stop",
+        "desktop",
+        "board",
+        "query",
+        "submitPost",
+        "submitPostWithOutbox",
+        "startDelivery",
+        "stopDelivery",
+        "deliveryStatus",
+        "observationQuery",
+      ].sort(),
     );
+  });
+
+  it("2b. NEW invariant (Alpha 501-520): observationQuery() is a Delivery Observation read boundary, never a Board Query delegation -- its own name and return type never collide with FedosBoardQuery's own recentFeed()/thread() method names", () => {
+    expect(hostSource).toContain("observationQuery(): FedosDeliveryObservationQuery | null {");
+    expect(codeOnly(hostSource)).not.toMatch(/recentFeed\(|thread\(/);
   });
 
   it("3. structural: no recentBoardPosts/threadPosts/queryBoard method exists anywhere in the Host file", () => {
