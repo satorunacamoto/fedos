@@ -9,8 +9,13 @@ import wasmSigningAuthoritySource from "../src/nostr/sign/fedos_wasm_nostr_signi
 import { existsSync } from "node:fs";
 
 describe("Secure Runtime Alpha 448 -- Outbox Publisher Readiness Adapter", () => {
-  it("no FedosNostrBoardPublisher is created this Stage", () => {
-    expect(existsSync("src/board/publish/nostr/fedos_nostr_board_publisher.ts")).toBe(false);
+  it("no FedosNostrBoardPublisher was created THIS Stage (Alpha 448 itself still says so); it is created later, by Alpha 451-460", () => {
+    // Alpha 451-460 (Canonical Nostr Outbound Publisher Foundation Arc)
+    // fulfills this Stage's own §"Not built this Stage" prediction at exactly
+    // the file path this Stage's own doc reserved. See
+    // docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md.
+    // This doc's own text (unchanged) still correctly describes Alpha 448 itself.
+    expect(existsSync("src/board/publish/nostr/fedos_nostr_board_publisher.ts")).toBe(true);
     expect(doc).toMatch(/not created/);
   });
 

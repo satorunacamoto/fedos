@@ -64,8 +64,11 @@ describe("Secure Runtime Alpha 421 -- Existing Nostr Outbound Construction Inven
     expect(designDocSource).toMatch(/Phase B \(Alpha 422–430\) is not attempted/);
   });
 
-  it("9. no src/board/publish directory exists as a result of this Stage's own conclusion", () => {
-    expect(existsSync("src/board/publish")).toBe(false);
+  it("9. src/board/publish did not exist as a result of this Stage's own conclusion -- fulfilled later, by Alpha 451-460", () => {
+    // Alpha 451-460 (Canonical Nostr Outbound Publisher Foundation Arc) later
+    // fulfills the Publisher this Stage's own inventory found missing. See
+    // docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md.
+    expect(existsSync("src/board/publish")).toBe(true);
   });
 
   it("10. the design doc cross-references Alpha 420, Alpha 163, and Alpha 182", () => {

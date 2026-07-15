@@ -50,8 +50,11 @@ describe("Secure Runtime Alpha 423 -- Signing Boundary Options Review", () => {
     }
   });
 
-  it("8. no src/board/publish or src/desktop/fedos_nostr_signing_authority.ts exists as a result of this Stage", () => {
-    expect(existsSync("src/board/publish")).toBe(false);
+  it("8. no src/desktop/fedos_nostr_signing_authority.ts exists as a result of this Stage; src/board/publish exists only later, from Alpha 451-460", () => {
+    // Alpha 451-460 (Canonical Nostr Outbound Publisher Foundation Arc) later
+    // fulfills the Publisher this Stage itself does not attempt. See
+    // docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md.
+    expect(existsSync("src/board/publish")).toBe(true);
     expect(existsSync("src/desktop/fedos_nostr_signing_authority.ts")).toBe(false);
   });
 });

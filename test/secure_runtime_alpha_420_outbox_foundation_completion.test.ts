@@ -76,8 +76,13 @@ describe("Secure Runtime Alpha 420 -- Outbox Foundation Completion Gate / Declar
     }
   });
 
-  it("7. no src/board/publish/nostr directory exists -- Phase B code was not written", () => {
-    expect(existsSync("src/board/publish")).toBe(false);
+  it("7. src/board/publish/nostr did not exist as of this Stage's own Phase A work -- fulfilled later, by Alpha 451-460", () => {
+    // This Stage (Alpha 420) itself wrote no Phase B code -- `src/board/publish/`
+    // exists now because Alpha 451-460 (Canonical Nostr Outbound Publisher
+    // Foundation Arc) later fulfills the gap this Stage's own "Phase B honestly
+    // blocked" declaration left open. See
+    // docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md.
+    expect(existsSync("src/board/publish")).toBe(true);
   });
 
   it("8. the design doc cross-references Alpha 412, Alpha 419, and Alpha 421", () => {
