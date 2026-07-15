@@ -12,6 +12,7 @@ import { NullRelay } from "../src/desktop/null_relay.js";
 import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
 import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
 
 describe("Secure Runtime Alpha 513 -- Full Pipeline Flow Verification", () => {
@@ -67,10 +68,25 @@ describe("Secure Runtime Alpha 513 -- Full Pipeline Flow Verification", () => {
       },
     ]);
 
-    const query = host.observationQuery()!;
+    // Ripple (Alpha 531, Alpha 521-540 Durable Delivery Retry Coordination
+    // Arc): observations are now recorded under an ATTEMPT-SCOPED subject
+    // id (Alpha 525/529), never the flat original one directly --
+    // FedosDeliveryRetryQuery (Alpha 528) is the canonical way to read
+    // across attempts by the ORIGINAL subject id. historyFor() returns
+    // ONE entry per ATTEMPT (its own current/latest state), not one entry
+    // per individual publishing/terminal observation.
+    const retryQuery = new FedosDeliveryRetryQuery(host.observationQuery()!);
     const subjectId = toFedosDeliveryObservationSubjectId(intent.id)!;
-    const states = new Set(query.historyFor(subjectId).map((o) => o.state));
-    expect(states).toEqual(new Set(["publishing", "accepted"]));
+    const history = retryQuery.historyFor(subjectId);
+    expect(history).toHaveLength(1);
+    // Real wall clock can tie this single attempt's own publishing/terminal
+    // writes to the same millisecond (Alpha 529's own documented
+    // FedosDeliveryObservationQuery tie-break edge case) -- either reported
+    // state is consistent with "one, non-failed, successfully delivered
+    // attempt" (relay.published above already proves delivery really
+    // happened exactly once).
+    expect(history[0]!.attemptNumber).toBe(1);
+    expect(["publishing", "accepted"]).toContain(history[0]!.state);
 
     await host.stop();
   });

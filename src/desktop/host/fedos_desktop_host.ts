@@ -262,6 +262,7 @@ import { FedosDeliveryObservationRepository } from "../../board/observation/fedo
 import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
 import { FedosDeliveryObservationQuery } from "../../board/observation/fedos_delivery_observation_query.js";
 import { FedosValidatingDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosDeliveryRetryRegistry } from "../../board/observation/fedos_delivery_retry_registry.js";
 import { FedosHostDeliveryController } from "./fedos_host_delivery_controller.js";
 
 /**
@@ -355,6 +356,19 @@ export class FedosDesktopHost {
   readonly #observationRepository: FedosDeliveryObservationRepository;
   readonly #deliveryIntervalMs: number;
   #deliveryController: FedosHostDeliveryController | null = null;
+  /**
+   * Alpha 531 (Alpha 521-540 Durable Delivery Retry Coordination Arc,
+   * ripple fix): constructed ONCE, alongside the other Host-owned
+   * fields, and passed to EVERY `FedosHostDeliveryController` this
+   * class ever constructs (`startDelivery()`, below) -- never a fresh
+   * one per call. This is what makes attempt numbering survive a
+   * `stopDelivery()`/`startDelivery()` cycle for the SAME still-pending
+   * intent; a fresh registry per call (this field's own absence, before
+   * this Stage) silently re-used already-terminal attempt-scoped
+   * subject ids after a restart, which the unchanged validator
+   * correctly, but silently, rejected again.
+   */
+  readonly #deliveryRetryRegistry = new FedosDeliveryRetryRegistry();
 
   constructor(dependencies: FedosDesktopHostDependencies) {
     this.#desktopApplication = dependencies.desktopApplication;
@@ -574,6 +588,7 @@ export class FedosDesktopHost {
       scheduler,
       observationRepository: validatingRepository,
       intervalMs: this.#deliveryIntervalMs,
+      retryRegistry: this.#deliveryRetryRegistry,
     });
     this.#deliveryController.start();
   }

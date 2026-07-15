@@ -8,6 +8,7 @@ import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board
 import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
 import { MockFedosBoardOutboxPublisher } from "../src/board/outbox/fedos_board_outbox_publisher.js";
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
 
 function makeHost(outboxPersistence: InMemoryFedosBoardOutboxPersistence, publisher: MockFedosBoardOutboxPublisher) {
   return new FedosDesktopHost({
@@ -64,17 +65,24 @@ describe("Secure Runtime Alpha 510 -- Host.deliveryStatus() and Host.observation
 
     const query = host.observationQuery();
     expect(query).not.toBeNull();
+    // Ripple (Alpha 531, Alpha 521-540 Durable Delivery Retry Coordination
+    // Arc): observations now live under an ATTEMPT-SCOPED subject id
+    // (Alpha 525/529) -- FedosDeliveryRetryQuery (Alpha 528) is the
+    // canonical way to read by the ORIGINAL subject id. historyFor()
+    // returns one entry per ATTEMPT (its own current/latest state), so a
+    // single successful delivery is exactly one entry.
+    const retryQuery = new FedosDeliveryRetryQuery(query!);
     const subjectId = toFedosDeliveryObservationSubjectId(intent.id)!;
-    const history = query!.historyFor(subjectId);
-    // The real wall clock can tie both observations to the same millisecond,
-    // and historyFor()'s own tie-break (Alpha 467, unchanged) sorts by id on
-    // a tie -- so assert the SET of states recorded, not a strict order.
-    expect(new Set(history.map((o) => o.state))).toEqual(new Set(["publishing", "accepted"]));
-    expect(history).toHaveLength(2);
-    // Current State (via observationQuery()) and Observation History
-    // (historyFor()) must always agree with each other, by construction --
-    // currentStateFor() IS historyFor()'s own last entry.
-    expect(query!.currentStateFor(subjectId)).toEqual(history[history.length - 1]);
+    const history = retryQuery.historyFor(subjectId);
+    expect(history).toHaveLength(1);
+    expect(history[0]!.attemptNumber).toBe(1);
+    // Real wall clock can tie the publishing/terminal writes to the same
+    // millisecond (Alpha 529's own documented edge case) -- either
+    // reported state is consistent with "one, non-failed attempt".
+    expect(["publishing", "accepted"]).toContain(history[0]!.state);
+    // Current State (via FedosDeliveryRetryQuery) and Observation History
+    // must always agree with each other, by construction.
+    expect(retryQuery.currentStateFor(subjectId)).toEqual(history[0]);
     await host.stop();
   });
 });

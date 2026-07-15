@@ -9,6 +9,7 @@ import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
 import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/board/outbox/fedos_board_outbox_publisher.js";
 import type { FedosPersistedBoardOutboxRecordV1 } from "../src/board/outbox/fedos_board_outbox_codec.js";
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
 
 class PerPostOutcomePublisher implements FedosBoardOutboxPublisher {
   constructor(private readonly acceptedPostId: string) {}
@@ -44,29 +45,38 @@ describe("Secure Runtime Alpha 515 -- Multi-Intent Consistency Verification", ()
     await new Promise((resolve) => setTimeout(resolve, 55));
     await host.stopDelivery();
 
-    const query = host.observationQuery()!;
+    // Ripple (Alpha 531, Alpha 521-540 Durable Delivery Retry Coordination
+    // Arc): observations now live under ATTEMPT-SCOPED subject ids
+    // (Alpha 525/529) -- FedosDeliveryRetryQuery (Alpha 528) is the
+    // canonical way to read by the ORIGINAL subject id, across attempts.
+    const retryQuery = new FedosDeliveryRetryQuery(host.observationQuery()!);
     const acceptedSubject = toFedosDeliveryObservationSubjectId(acceptedIntent.id)!;
     const failedSubject = toFedosDeliveryObservationSubjectId(failedIntent.id)!;
 
-    const acceptedHistory = query.historyFor(acceptedSubject);
-    const failedHistory = query.historyFor(failedSubject);
+    // The accepted intent is delivered on its FIRST attempt (retryPolicy
+    // "never") -- exactly one attempt. Real-clock same-millisecond
+    // tie-break risk (Alpha 529's own documented edge case) means this
+    // one attempt's own reported state can be "publishing" or "accepted"
+    // depending on timing; either is consistent with "exactly one attempt
+    // exists and it is not a failure".
+    const acceptedHistory = retryQuery.historyFor(acceptedSubject);
+    expect(acceptedHistory).toHaveLength(1);
+    expect(acceptedHistory[0]!.attemptNumber).toBe(1);
+    expect(["publishing", "accepted"]).toContain(acceptedHistory[0]!.state);
 
-    expect(new Set(acceptedHistory.map((o) => o.state))).toEqual(new Set(["publishing", "accepted"]));
-    expect(new Set(failedHistory.map((o) => o.state))).toEqual(new Set(["publishing", "failed"]));
+    // The failed intent keeps retrying (retryPolicy "later") across the
+    // whole window -- every attempt recorded, none final, none
+    // cross-contaminated with the accepted subject's own history.
+    const failedHistory = retryQuery.historyFor(failedSubject);
+    expect(failedHistory.length).toBeGreaterThan(0);
+    for (const attempt of failedHistory) {
+      expect(["publishing", "failed"]).toContain(attempt.state);
+      expect(attempt.isFinal).toBe(false);
+    }
+    expect(failedHistory.map((a) => a.attemptNumber)).toEqual(failedHistory.map((_, i) => i + 1));
 
-    // Cross-contamination check: neither subject's history contains an
-    // observation belonging to the other.
-    for (const o of acceptedHistory) expect(o.subjectId).toBe(acceptedSubject);
-    for (const o of failedHistory) expect(o.subjectId).toBe(failedSubject);
-
-    // Current State always agrees with History's own last entry, by
-    // construction (Alpha 467, unchanged) -- the "all agree" requirement,
-    // independent of the real-clock same-millisecond tie-break risk
-    // Alpha 510's own test already documents.
-    expect(query.currentStateFor(acceptedSubject)).toEqual(acceptedHistory[acceptedHistory.length - 1]);
-    expect(query.currentStateFor(failedSubject)).toEqual(failedHistory[failedHistory.length - 1]);
-    expect(["accepted", "publishing"]).toContain(query.currentStateFor(acceptedSubject)?.state);
-    expect(["failed", "publishing"]).toContain(query.currentStateFor(failedSubject)?.state);
+    expect(retryQuery.currentStateFor(acceptedSubject)).toEqual(acceptedHistory[0]);
+    expect(retryQuery.currentStateFor(failedSubject)).toEqual(failedHistory[failedHistory.length - 1]);
 
     expect(host.deliveryStatus()).toEqual({ running: false });
 

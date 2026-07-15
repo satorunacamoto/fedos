@@ -8,6 +8,66 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 521–540 — Durable Delivery Retry
+> Coordination Arc (complete).** Resolves the exact `invalid-transition`
+> limitation the Alpha 501–520 Arc discovered and documented, not
+> hidden: `FedosDeliveryObservationSubjectId` (Alpha 462, unchanged)
+> now means "one delivery ATTEMPT" by CALLER CONVENTION ONLY (never
+> inside `fedos_delivery_observation.ts` itself) once a caller derives
+> it via new `makeFedosDeliveryAttemptSubjectId()`
+> (`src/board/observation/fedos_delivery_attempt_subject_id.ts`) —
+> `${originalSubjectId}::attempt::${N}`. Each retry attempt for the
+> same Outbox intent gets its OWN fresh attempt-scoped subject, so
+> `queued/unset → publishing` is always the FIRST transition for that
+> subject, always allowed by the completely untouched Alpha 494
+> transition graph and Alpha 495 write validator. A new
+> `FedosDeliveryRetryRegistry` (`fedos_delivery_retry_registry.ts`)
+> allocates monotonically-increasing attempt numbers per original
+> subject; a new `FedosDeliveryRetryReason` codec
+> (`fedos_delivery_retry_reason_codec.ts`) encodes whether a terminal
+> attempt is final into the Observation's own pre-existing `reason`
+> field, no schema change; a new `FedosDeliveryRetryQuery`
+> (`fedos_delivery_retry_query.ts`) reads the full attempt history and
+> current state back out by the ORIGINAL subject id, scanning attempt
+> numbers via the plain `FedosDeliveryObservationQuery` (Alpha 466,
+> unchanged) underneath. `FedosHostDeliveryController`'s own private
+> `#runTickAndPersist()` is REWIRED (Alpha 529) to group each tick's
+> `entry.observations` (Alpha 476's own unchanged shape) into
+> `{started, terminal, isFinal}` triples and record each under its own
+> attempt-scoped subject — its public API
+> (`start()`/`stop()`/`tick()`/`isRunning()`) and
+> `FedosHostDeliveryControllerDependencies` are otherwise unchanged.
+> Ripple review found one real, previously-latent bug, fixed honestly
+> rather than worked around: `FedosDesktopHost.startDelivery()`
+> constructs a fresh Controller (and, before this fix, a fresh
+> Registry) on every call, silently resetting attempt numbering across
+> a `stopDelivery()`/`startDelivery()` cycle for a still-pending
+> intent — fixed with ONE new private field,
+> `#deliveryRetryRegistry`, persisted for the life of the Host
+> instance; `FedosDesktopHost`'s PUBLIC API is unchanged
+> (`start()`/`stop()`/`startDelivery()`/`stopDelivery()`/
+> `deliveryStatus()`/`observationQuery()` all byte-for-byte identical
+> in shape). `FedosPublishScheduler`, every file under
+> `src/board/publish/` and `src/board/outbox/`, and all six canonical
+> Observation model files are byte-for-byte unchanged — confirmed via
+> `git status --porcelain` guards (Alpha 532). All three named
+> Verification case groups confirmed, both with a deterministic
+> injected-clock unit test (Alpha 529) and independently through the
+> full real Host/Scheduler/real-wall-clock pipeline (Alpha 533/534/535,
+> composed together with zero cross-contamination across concurrent
+> intents in Alpha 536): a single first-attempt success; one failure
+> followed by a successful retry; and a longer chain of three failures
+> before a final success. `p2p/`, Ontology, GUI, Worker, Cloudflare,
+> and any new outbound protocol remain untouched. Built entirely in the
+> same dedicated, isolated git worktree and branch
+> (`worktree-alpha-491-500`) the Alpha 491–500 Arc already established.
+>
+> See `docs/secure_runtime_alpha_521_retry_coordination_inventory.md`
+> through `docs/secure_runtime_alpha_540_retry_coordination_completion.md`
+> for the full, per-Stage design record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 501–520 — Durable Delivery Observation
 > Wiring & Host Delivery Lifecycle Arc (complete).** Gives
 > `FedosDesktopHost` real, additive ownership of the Publisher and

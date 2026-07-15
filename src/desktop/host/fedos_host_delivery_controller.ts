@@ -2,7 +2,24 @@
  * Secure Runtime Alpha 505 ("Delivery Controller Tick Loop") / Alpha
  * 506 ("Delivery Controller Shutdown Ordering") — Stages 5–6 of the
  * Alpha 501–520 Durable Delivery Observation Wiring & Host Delivery
- * Lifecycle Arc.
+ * Lifecycle Arc. Secure Runtime Alpha 529 ("Controller Retry Rewiring")
+ * — Stage 9 of the Alpha 521–540 Durable Delivery Retry Coordination
+ * Arc — REWIRES `#runTickAndPersist()`'s own internal persistence logic
+ * (only): each `FedosPublishSchedulerTickEntry.observations` array is
+ * now grouped into individual ATTEMPTS (`#groupObservationsIntoAttempts`,
+ * below) and each attempt is written under its OWN, fresh
+ * `makeFedosDeliveryAttemptSubjectId(originalSubjectId, attemptNumber)`
+ * (`../../board/observation/fedos_delivery_attempt_subject_id.js`,
+ * Alpha 525) — resolving the `"invalid-transition"` collision Alpha
+ * 514 documented, without loosening the transition graph or validator
+ * (both Alpha 494/495, still completely UNCHANGED) at all. `start()`/
+ * `stop()`/`tick()`/`isRunning()` and the shutdown-ordering guarantee
+ * (Alpha 505/506) are UNTOUCHED by this Stage — only the private
+ * persistence helper changes. `FedosHostDeliveryControllerDependencies`
+ * is ALSO unchanged — the new `FedosDeliveryRetryRegistry` (Alpha 527)
+ * this class now owns is constructed INTERNALLY, never injected, since
+ * it is pure write-time bookkeeping no caller ever needs to override or
+ * share.
  *
  * `FedosHostDeliveryController` drives an injected `FedosPublishScheduler`'s
  * (`../../board/outbox/fedos_publish_scheduler.js`, Alpha 476,
@@ -52,15 +69,33 @@
  */
 
 import type { FedosPublishScheduler, FedosPublishSchedulerTickEntry } from "../../board/outbox/fedos_publish_scheduler.js";
+import type { FedosBoardOutboxObservation } from "../../board/outbox/fedos_board_outbox_observation.js";
 import { fedosBoardOutboxObservationToDeliveryObservation } from "../../board/outbox/fedos_board_outbox_observation_to_delivery_observation.js";
 import { toFedosDeliveryObservationSubjectId } from "../../board/observation/fedos_delivery_observation.js";
 import type { FedosValidatingDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosDeliveryRetryRegistry } from "../../board/observation/fedos_delivery_retry_registry.js";
+import { makeFedosDeliveryAttemptSubjectId } from "../../board/observation/fedos_delivery_attempt_subject_id.js";
+import { encodeFedosDeliveryRetryReason } from "../../board/observation/fedos_delivery_retry_reason_codec.js";
 
 export interface FedosHostDeliveryControllerDependencies {
   readonly scheduler: FedosPublishScheduler;
   readonly observationRepository: FedosValidatingDeliveryObservationRepository;
   /** Tick cadence in milliseconds. Must be a positive, finite integer. */
   readonly intervalMs: number;
+  /**
+   * Alpha 531 (ripple fix, discovered by this Arc's own end-to-end
+   * verification) — OPTIONAL, defaulted to a FRESH `FedosDeliveryRetryRegistry`
+   * when omitted, mirroring every other optional-dependency convention
+   * in this repository. Passing the SAME registry across multiple
+   * `FedosHostDeliveryController` instances (as `FedosDesktopHost.startDelivery()`
+   * now does, Alpha 531) is what makes attempt numbering survive a
+   * stop/start delivery cycle for the SAME still-pending intent — a
+   * FRESH registry per instance (this class' own prior, pre-Alpha-531
+   * behavior) silently re-used already-terminal attempt-scoped subject
+   * ids after a restart, which the UNCHANGED validator correctly, but
+   * silently, rejected as `"invalid-transition"` again.
+   */
+  readonly retryRegistry?: FedosDeliveryRetryRegistry;
   /** Defaults to the global `setInterval`. Injectable so tests never depend on a real timer. */
   readonly setIntervalFn?: (handler: () => void, intervalMs: number) => unknown;
   /** Defaults to the global `clearInterval`. */
@@ -78,6 +113,8 @@ export class FedosHostDeliveryController {
   readonly #setIntervalFn: (handler: () => void, intervalMs: number) => unknown;
   readonly #clearIntervalFn: (handle: unknown) => void;
 
+  readonly #retryRegistry: FedosDeliveryRetryRegistry;
+
   #timerHandle: unknown = undefined;
   #running = false;
   #currentTick: Promise<readonly FedosPublishSchedulerTickEntry[]> | null = null;
@@ -89,6 +126,7 @@ export class FedosHostDeliveryController {
     this.#scheduler = dependencies.scheduler;
     this.#observationRepository = dependencies.observationRepository;
     this.#intervalMs = dependencies.intervalMs;
+    this.#retryRegistry = dependencies.retryRegistry ?? new FedosDeliveryRetryRegistry();
     this.#setIntervalFn = dependencies.setIntervalFn ?? ((handler, ms) => setInterval(handler, ms));
     this.#clearIntervalFn = dependencies.clearIntervalFn ?? ((handle) => clearInterval(handle as Parameters<typeof clearInterval>[0]));
   }
@@ -138,14 +176,69 @@ export class FedosHostDeliveryController {
   async #runTickAndPersist(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
     const entries = await this.#scheduler.tick();
     for (const entry of entries) {
-      const subjectId = toFedosDeliveryObservationSubjectId(entry.intent.id);
-      if (subjectId === null) continue;
-      for (const observation of entry.observations) {
-        const canonical = fedosBoardOutboxObservationToDeliveryObservation(observation, subjectId);
-        if (canonical === null) continue;
-        this.#observationRepository.record(canonical.subjectId, canonical.state, canonical.observedAt, canonical.reason);
+      const originalSubjectId = toFedosDeliveryObservationSubjectId(entry.intent.id);
+      if (originalSubjectId === null) continue;
+
+      for (const attempt of groupFedosBoardOutboxObservationsIntoAttempts(entry.observations)) {
+        const attemptNumber = this.#retryRegistry.nextAttemptNumber(originalSubjectId);
+        const attemptSubjectId = makeFedosDeliveryAttemptSubjectId(originalSubjectId, attemptNumber);
+        if (attemptSubjectId === null) continue;
+
+        const startedCanonical = fedosBoardOutboxObservationToDeliveryObservation(attempt.started, attemptSubjectId);
+        if (startedCanonical !== null) {
+          this.#observationRepository.record(
+            startedCanonical.subjectId,
+            startedCanonical.state,
+            startedCanonical.observedAt,
+            startedCanonical.reason,
+          );
+        }
+
+        const terminalCanonical = fedosBoardOutboxObservationToDeliveryObservation(attempt.terminal, attemptSubjectId);
+        if (terminalCanonical !== null) {
+          const reason = encodeFedosDeliveryRetryReason(attempt.isFinal, terminalCanonical.reason ?? null);
+          this.#observationRepository.record(
+            terminalCanonical.subjectId,
+            terminalCanonical.state,
+            terminalCanonical.observedAt,
+            reason,
+          );
+        }
       }
     }
     return entries;
   }
+}
+
+/**
+ * Secure Runtime Alpha 529 — groups ONE `FedosPublishSchedulerTickEntry.observations`
+ * array (Alpha 476, UNCHANGED — always `attempt-started`, terminal,
+ * [`attempt-started`, terminal], [`abandoned`], in that exact order,
+ * per `#attemptIntent()`'s own unchanged body) into individual attempts.
+ * An attempt is FINAL when its own terminal kind is `"delivered"`
+ * (success is always final) or is immediately followed by an
+ * `"abandoned"` entry (the Scheduler's own unchanged signal that no
+ * further attempt will ever occur). Pure, synchronous, never throws —
+ * a malformed/unexpected shape simply stops grouping early rather than
+ * guessing.
+ */
+function groupFedosBoardOutboxObservationsIntoAttempts(
+  observations: readonly FedosBoardOutboxObservation[],
+): ReadonlyArray<{
+  readonly started: FedosBoardOutboxObservation;
+  readonly terminal: FedosBoardOutboxObservation;
+  readonly isFinal: boolean;
+}> {
+  const attempts: Array<{ started: FedosBoardOutboxObservation; terminal: FedosBoardOutboxObservation; isFinal: boolean }> = [];
+  let i = 0;
+  while (i < observations.length) {
+    const started = observations[i];
+    const terminal = observations[i + 1];
+    if (started === undefined || terminal === undefined || started.kind !== "attempt-started") break;
+    i += 2;
+    const abandonedFollows = observations[i]?.kind === "abandoned";
+    if (abandonedFollows) i += 1;
+    attempts.push({ started, terminal, isFinal: terminal.kind === "delivered" || abandonedFollows });
+  }
+  return attempts;
 }

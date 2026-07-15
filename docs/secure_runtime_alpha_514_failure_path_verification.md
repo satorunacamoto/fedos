@@ -29,6 +29,23 @@ unchanged), and `FedosPublishScheduler` (unchanged) records this as an
   `#abandoned` set — a subsequent `tick()` attempts it again, unchanged
   Alpha 476 behavior.
 
+## Resolved by Alpha 521–540 (Durable Delivery Retry Coordination Arc)
+
+The limitation this section originally documented — a retried
+delivery's own SECOND `publishing`/terminal pair being rejected as
+`"invalid-transition"` — is RESOLVED, not merely deferred:
+`makeFedosDeliveryAttemptSubjectId`/`FedosDeliveryRetryQuery`
+(`docs/secure_runtime_alpha_525_attempt_subject_id_implementation.md`,
+`docs/secure_runtime_alpha_528_retry_query_implementation.md`) give
+each retry attempt its own fresh subject identity, so retried delivery
+history now grows correctly, attempt by attempt, with zero
+`"invalid-transition"` rejections — re-verified directly by re-running
+THIS FILE'S OWN test after that Arc landed
+(`test/secure_runtime_alpha_514_failure_path_verification.test.ts`,
+updated at that Arc's own Alpha 531 ripple review). This section's own
+original text is preserved below UNCHANGED as the honest historical
+record of what was true when this Stage was written.
+
 ## Discovered consequence: retries keep transporting, but stop recording after the first terminal fact
 
 Running a SECOND `startDelivery()` cycle against the SAME still-pending

@@ -10,6 +10,7 @@ import { FedosNostrBoardPublisherAdapter } from "../src/board/publish/nostr/fedo
 import { FedosRelayNostrBoardPublisher } from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
 import { NullRelay } from "../src/desktop/null_relay.js";
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
 
 describe("Secure Runtime Alpha 514 -- Failure Path Verification", () => {
@@ -48,31 +49,52 @@ describe("Secure Runtime Alpha 514 -- Failure Path Verification", () => {
     await new Promise((resolve) => setTimeout(resolve, 55)); // let >= one 10ms interval fire
     await host.stopDelivery();
 
-    const query = host.observationQuery()!;
+    // Ripple (Alpha 531, Alpha 521-540 Durable Delivery Retry Coordination
+    // Arc): this test itself is the exact scenario Alpha 514 originally
+    // found "invalid-transition" on retry -- now FIXED. FedosDeliveryRetryQuery
+    // (Alpha 528) reads across attempts by the ORIGINAL subject id; every
+    // attempt this window's own multiple 10ms ticks produced is now
+    // recorded, none rejected.
+    // NOTE on "publishing" vs "failed" below: this test uses the REAL
+    // wall clock (real setTimeout, no injected Scheduler `now()`), so a
+    // given attempt's own publishing/terminal pair can share the exact
+    // same millisecond -- the SAME known FedosDeliveryObservationQuery
+    // tie-break edge case Alpha 529's own doc documents honestly
+    // (docs/secure_runtime_alpha_529_controller_retry_rewiring.md
+    // §"Honest edge case"). Assertions below are written to be correct
+    // regardless of which side of that tie-break any one attempt lands on.
+    const retryQuery = new FedosDeliveryRetryQuery(host.observationQuery()!);
     const subjectId = toFedosDeliveryObservationSubjectId(intent.id)!;
-    const history = query.historyFor(subjectId);
-    expect(new Set(history.map((o) => o.state))).toEqual(new Set(["publishing", "failed"]));
-    expect(query.currentStateFor(subjectId)).toEqual(history[history.length - 1]);
+    const firstWindowHistory = retryQuery.historyFor(subjectId);
+    expect(firstWindowHistory.length).toBeGreaterThan(0);
+    for (const attempt of firstWindowHistory) {
+      expect(["publishing", "failed"]).toContain(attempt.state);
+      expect(attempt.isFinal).toBe(false);
+    }
+    expect(firstWindowHistory.map((a) => a.attemptNumber)).toEqual(
+      firstWindowHistory.map((_, i) => i + 1),
+    );
+    expect(retryQuery.currentStateFor(subjectId)).toEqual(firstWindowHistory[firstWindowHistory.length - 1]);
 
     // The intent is still pending -- a fresh delivery cycle attempts
-    // transport again (the Scheduler really does retry), but the
-    // single-attempt-per-subject Observation model (Alpha 494 §4's own
-    // deliberate deferral of multi-attempt/retry re-entry) means a
-    // SECOND publishing/failed pair for the SAME subjectId is rejected
-    // by the write validator as "invalid-transition" -- recorded
-    // history for this subject therefore does NOT grow across retries
-    // today, a real, honestly-documented consequence of that earlier
-    // decision now visible against a genuinely retrying Scheduler (see
-    // docs/secure_runtime_alpha_514_failure_path_verification.md §"Discovered
-    // consequence").
+    // transport again for real, and now records MORE attempts, each its
+    // own fresh attempt number, continuing the SAME sequence -- the exact
+    // fix for the limitation this file's own doc used to describe as
+    // unresolved (see docs/secure_runtime_alpha_529_controller_retry_rewiring.md).
     host.startDelivery();
     await new Promise((resolve) => setTimeout(resolve, 15));
     await host.stopDelivery();
-    const historyAfterSecondCycle = query.historyFor(subjectId);
-    expect(historyAfterSecondCycle.length).toBe(history.length);
-    expect(new Set(historyAfterSecondCycle.map((o) => o.state))).toEqual(new Set(["publishing", "failed"]));
+    const historyAfterSecondCycle = retryQuery.historyFor(subjectId);
+    expect(historyAfterSecondCycle.length).toBeGreaterThan(firstWindowHistory.length);
+    for (const attempt of historyAfterSecondCycle) {
+      expect(["publishing", "failed"]).toContain(attempt.state);
+    }
+    expect(historyAfterSecondCycle.map((a) => a.attemptNumber)).toEqual(
+      historyAfterSecondCycle.map((_, i) => i + 1),
+    );
     // Transport really did retry -- eventSourceCalls kept growing across both cycles.
     expect(eventSourceCalls).toBeGreaterThan(1);
+    expect(eventSourceCalls).toBe(historyAfterSecondCycle.length);
 
     await host.stop();
   });

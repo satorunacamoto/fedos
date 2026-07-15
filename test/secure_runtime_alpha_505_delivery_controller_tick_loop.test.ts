@@ -12,6 +12,7 @@ import { FedosDeliveryObservationRepository } from "../src/board/observation/fed
 import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
 import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { makeFedosDeliveryAttemptSubjectId } from "../src/board/observation/fedos_delivery_attempt_subject_id.js";
 
 class ControllablePublisher implements FedosBoardOutboxPublisher {
   calls = 0;
@@ -112,8 +113,15 @@ describe("Secure Runtime Alpha 505 -- Delivery Controller Tick Loop", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(publisher.calls).toBe(1);
+    // Ripple (Alpha 531, Alpha 521-540 Durable Delivery Retry Coordination
+    // Arc): observations are now recorded under an ATTEMPT-SCOPED subject
+    // id (Alpha 525/529), not the flat original subject id directly -- the
+    // fix for the "invalid-transition"-on-retry collision Alpha 514 found.
+    // Attempt 1 of a subject with no prior attempts is deterministically
+    // `${subjectId}::attempt::1`.
     const subjectId = toFedosDeliveryObservationSubjectId(intent.id)!;
-    const history = query.historyFor(subjectId);
+    const attemptSubjectId = makeFedosDeliveryAttemptSubjectId(subjectId, 1)!;
+    const history = query.historyFor(attemptSubjectId);
     expect(history.map((o) => o.state)).toEqual(["publishing", "accepted"]);
   });
 

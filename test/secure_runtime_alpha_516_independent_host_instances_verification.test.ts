@@ -5,6 +5,7 @@ import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board
 import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
 
 describe("Secure Runtime Alpha 516 -- Independent Host Instances Verification", () => {
   it("two zero-override Host instances never share Observation Repository state", async () => {
@@ -23,10 +24,15 @@ describe("Secure Runtime Alpha 516 -- Independent Host Instances Verification", 
     await new Promise((resolve) => setTimeout(resolve, 55));
     await hostA.stopDelivery();
 
+    // Ripple (Alpha 531, Alpha 521-540 Durable Delivery Retry Coordination
+    // Arc): read across attempts via FedosDeliveryRetryQuery (Alpha 528),
+    // never the flat original subject id directly.
     const subjectId = toFedosDeliveryObservationSubjectId(intent.id)!;
-    expect(hostA.observationQuery()!.historyFor(subjectId).length).toBeGreaterThan(0);
+    const retryQueryA = new FedosDeliveryRetryQuery(hostA.observationQuery()!);
+    const retryQueryB = new FedosDeliveryRetryQuery(hostB.observationQuery()!);
+    expect(retryQueryA.historyFor(subjectId).length).toBeGreaterThan(0);
     // Host B's own Observation Repository is a completely separate default instance.
-    expect(hostB.observationQuery()!.historyFor(subjectId)).toEqual([]);
+    expect(retryQueryB.historyFor(subjectId)).toEqual([]);
     expect(hostB.deliveryStatus()).toEqual({ running: false });
 
     await hostA.stop();
