@@ -55,10 +55,27 @@ import { FedosDesktopHost, type FedosDesktopHostDependencies } from "./fedos_des
  * existing "one clearly-scoped responsibility" discipline.
  */
 
+/**
+ * Alpha 507 (Alpha 501-520 Durable Delivery Observation Wiring & Host
+ * Delivery Lifecycle Arc): `dependencies.publisher`/
+ * `dependencies.observationRepository`/`dependencies.deliveryIntervalMs`
+ * are passed straight through, UNMODIFIED, to `FedosDesktopHost`'s own
+ * constructor -- the SOLE place that resolves each one's own default
+ * (Alpha 502/503) when omitted -- mirroring this function's own
+ * existing `outboxPersistence` discipline (Alpha 419) exactly; this
+ * function does not duplicate any of the three defaults.
+ */
 export function createFedosDesktopHost(
   dependencies: Partial<FedosDesktopHostDependencies> = {},
 ): FedosDesktopHost {
   const desktopApplication = dependencies.desktopApplication ?? createDesktopApplication();
   const boardPersistence = dependencies.boardPersistence ?? new InMemoryFedosBoardPersistence();
-  return new FedosDesktopHost({ desktopApplication, boardPersistence, outboxPersistence: dependencies.outboxPersistence });
+  return new FedosDesktopHost({
+    desktopApplication,
+    boardPersistence,
+    outboxPersistence: dependencies.outboxPersistence,
+    publisher: dependencies.publisher,
+    observationRepository: dependencies.observationRepository,
+    deliveryIntervalMs: dependencies.deliveryIntervalMs,
+  });
 }

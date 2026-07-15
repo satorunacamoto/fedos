@@ -253,6 +253,34 @@ import {
   type FedosBoardOutboxPersistenceWriteResult,
 } from "../../board/outbox/fedos_board_outbox_persistence.js";
 import { InMemoryFedosBoardOutboxPersistence } from "../../board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import {
+  MockFedosBoardOutboxPublisher,
+  type FedosBoardOutboxPublisher,
+} from "../../board/outbox/fedos_board_outbox_publisher.js";
+import { FedosPublishScheduler } from "../../board/outbox/fedos_publish_scheduler.js";
+import { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosDeliveryObservationQuery } from "../../board/observation/fedos_delivery_observation_query.js";
+import { FedosValidatingDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosDeliveryRetryRegistry } from "../../board/observation/fedos_delivery_retry_registry.js";
+import { FedosHostDeliveryController } from "./fedos_host_delivery_controller.js";
+
+/**
+ * Secure Runtime Alpha 501–520 (Durable Delivery Observation Wiring &
+ * Host Delivery Lifecycle Arc) — every addition below this point is
+ * ADDITIVE ONLY. No line above this comment, and no EXISTING line
+ * below it, is modified by this Arc; see
+ * `docs/secure_runtime_alpha_507_host_constructor_and_factory_wiring.md`
+ * for the full record.
+ */
+
+/** Alpha 507 — the delivery-loop cadence default when `deliveryIntervalMs` is omitted. */
+const DEFAULT_DELIVERY_INTERVAL_MS = 30_000;
+
+/** Alpha 510 — `Host.deliveryStatus()`'s own return shape. A pure lifecycle read, never an Observation payload. */
+export interface FedosHostDeliveryStatus {
+  readonly running: boolean;
+}
 
 export interface FedosDesktopHostDependencies {
   readonly desktopApplication: DesktopApplication;
@@ -269,6 +297,22 @@ export interface FedosDesktopHostDependencies {
    * required-field surface of an already-established interface.
    */
   readonly outboxPersistence?: FedosBoardOutboxPersistence;
+  /**
+   * Alpha 502 — OPTIONAL, defaulted to a fresh
+   * `MockFedosBoardOutboxPublisher()` when omitted (Alpha 503's own
+   * decision) — mirrors `outboxPersistence?`'s identical discipline.
+   * The Host OWNS this Publisher only; it never calls `publish()` on
+   * it directly — only a `FedosPublishScheduler` this Arc constructs
+   * inside `startDelivery()` ever does.
+   */
+  readonly publisher?: FedosBoardOutboxPublisher;
+  /**
+   * Alpha 502 — OPTIONAL, defaulted to a fresh, in-memory-backed
+   * `FedosDeliveryObservationRepository` when omitted (Alpha 503).
+   */
+  readonly observationRepository?: FedosDeliveryObservationRepository;
+  /** Alpha 502 — OPTIONAL, defaulted to `DEFAULT_DELIVERY_INTERVAL_MS` (30s) when omitted. */
+  readonly deliveryIntervalMs?: number;
 }
 
 /**
@@ -307,11 +351,35 @@ export class FedosDesktopHost {
   #boardService: FedosBoardService | null = null;
   #boardQuery: FedosBoardQuery | null = null;
   #boardReader: FedosBoardReader | null = null;
+  // Alpha 507 additions below -- new fields only, no existing field touched.
+  readonly #publisher: FedosBoardOutboxPublisher;
+  readonly #observationRepository: FedosDeliveryObservationRepository;
+  readonly #deliveryIntervalMs: number;
+  #deliveryController: FedosHostDeliveryController | null = null;
+  /**
+   * Alpha 531 (Alpha 521-540 Durable Delivery Retry Coordination Arc,
+   * ripple fix): constructed ONCE, alongside the other Host-owned
+   * fields, and passed to EVERY `FedosHostDeliveryController` this
+   * class ever constructs (`startDelivery()`, below) -- never a fresh
+   * one per call. This is what makes attempt numbering survive a
+   * `stopDelivery()`/`startDelivery()` cycle for the SAME still-pending
+   * intent; a fresh registry per call (this field's own absence, before
+   * this Stage) silently re-used already-terminal attempt-scoped
+   * subject ids after a restart, which the unchanged validator
+   * correctly, but silently, rejected again.
+   */
+  readonly #deliveryRetryRegistry = new FedosDeliveryRetryRegistry();
 
   constructor(dependencies: FedosDesktopHostDependencies) {
     this.#desktopApplication = dependencies.desktopApplication;
     this.#boardPersistence = dependencies.boardPersistence;
     this.#outboxPersistence = dependencies.outboxPersistence ?? new InMemoryFedosBoardOutboxPersistence();
+    // Alpha 507 additions below -- new assignments only, the three lines above are unchanged.
+    this.#publisher = dependencies.publisher ?? new MockFedosBoardOutboxPublisher();
+    this.#observationRepository =
+      dependencies.observationRepository ??
+      new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence());
+    this.#deliveryIntervalMs = dependencies.deliveryIntervalMs ?? DEFAULT_DELIVERY_INTERVAL_MS;
   }
 
   state(): FedosDesktopHostState {
@@ -486,5 +554,78 @@ export class FedosDesktopHost {
     }
 
     return { post: postResult, outbox };
+  }
+
+  /**
+   * Alpha 508 -- constructs (never reuses across a stop/start cycle) a
+   * real `FedosPublishScheduler` over the Host-owned `#outboxPersistence`/
+   * `#publisher`/`#deliveryIntervalMs`, and a `FedosHostDeliveryController`
+   * (Alpha 505/506) over a `FedosValidatingDeliveryObservationRepository`
+   * wrapping the Host-owned `#observationRepository`, then starts the
+   * controller. Callable only once per running cycle, from the Host's
+   * own `"ready"` state -- mirrors `start()`/`stop()`'s own "may only be
+   * called once, from state X" convention exactly. `FedosDesktopHost`
+   * itself never calls `.publish()`/`.publishOne()` anywhere in this
+   * method -- only the newly-constructed `FedosPublishScheduler` does,
+   * exactly as this Arc's own "HostがPublishしない、SchedulerだけがPublish
+   * する" instruction requires.
+   */
+  startDelivery(): void {
+    if (this.#state !== "ready") {
+      throw new Error("FedosDesktopHost.startDelivery() may only be called from the ready state.");
+    }
+    if (this.#deliveryController !== null) {
+      throw new Error("FedosDesktopHost.startDelivery() may only be called while delivery is not already running.");
+    }
+    const scheduler = new FedosPublishScheduler({
+      outboxPersistence: this.#outboxPersistence,
+      publisher: this.#publisher,
+      intervalMs: this.#deliveryIntervalMs,
+    });
+    const query = new FedosDeliveryObservationQuery(this.#observationRepository);
+    const validatingRepository = new FedosValidatingDeliveryObservationRepository(this.#observationRepository, query);
+    this.#deliveryController = new FedosHostDeliveryController({
+      scheduler,
+      observationRepository: validatingRepository,
+      intervalMs: this.#deliveryIntervalMs,
+      retryRegistry: this.#deliveryRetryRegistry,
+    });
+    this.#deliveryController.start();
+  }
+
+  /**
+   * Alpha 509 -- delegates entirely to `FedosHostDeliveryController.stop()`
+   * (Alpha 506), which itself guarantees Scheduler停止 -> tick終了待ち
+   * before its own `Promise` resolves; this method resolves only after
+   * that guarantee holds, which is what makes "Host停止" (in the sense
+   * of "delivery is genuinely, verifiably stopped") true for any caller
+   * awaiting this call. Throws (does not silently no-op) when delivery
+   * is not currently running.
+   */
+  async stopDelivery(): Promise<void> {
+    if (this.#deliveryController === null) {
+      throw new Error("FedosDesktopHost.stopDelivery() may only be called while delivery is running.");
+    }
+    const controller = this.#deliveryController;
+    this.#deliveryController = null;
+    await controller.stop();
+  }
+
+  /** Alpha 510 -- a pure, synchronous lifecycle read; never throws, never touches the Observation Repository. */
+  deliveryStatus(): FedosHostDeliveryStatus {
+    return { running: this.#deliveryController !== null && this.#deliveryController.isRunning() };
+  }
+
+  /**
+   * Alpha 510 -- the canonical READ boundary over the Host-owned
+   * `#observationRepository`, mirroring `query()`'s own identical
+   * "owned instance, read-only, `null` unless `state() === \"ready\"`"
+   * shape. A caller uses this to independently verify Observation
+   * History / Current State consistency against whatever
+   * `startDelivery()`'s own Scheduler run actually recorded -- this
+   * method itself never writes.
+   */
+  observationQuery(): FedosDeliveryObservationQuery | null {
+    return this.#state === "ready" ? new FedosDeliveryObservationQuery(this.#observationRepository) : null;
   }
 }
