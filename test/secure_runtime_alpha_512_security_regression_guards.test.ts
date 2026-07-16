@@ -50,9 +50,12 @@ describe("Secure Runtime Alpha 512 -- Security Regression Guards", () => {
     expect(codeOnly(controllerSource)).not.toMatch(/#scheduler\.start\(\)|#scheduler\.stop\(\)/);
   });
 
-  it("FedosPublishScheduler.ts itself is untouched by this Arc (structural spot-check of its own unchanged public shape)", () => {
+  it("FedosPublishScheduler.ts was untouched by THIS Arc (Alpha 501-520) -- structural spot-check of its own public shape as of that Stage", () => {
+    // Secure Runtime Alpha 563 (Alpha 561-580 Arc) later, legitimately,
+    // changed tick()'s own signature (single-flight guard) -- this
+    // Stage's "untouched by this Arc" claim is scoped to Alpha 501-520.
     expect(schedulerSource).toContain("readonly publisher: FedosBoardOutboxPublisher;");
-    expect(schedulerSource).toContain("async tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {");
+    expect(schedulerSource).toContain("tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {");
   });
 
   it("the doc declares PASS", () => {

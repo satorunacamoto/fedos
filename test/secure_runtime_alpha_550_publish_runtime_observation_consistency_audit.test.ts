@@ -30,13 +30,17 @@ class SlowPublisher implements FedosBoardOutboxPublisher {
 /**
  * Secure Runtime Alpha 550 -- "Observation Consistency Audit": Stage
  * 10 of the Alpha 541-560 Publish Runtime Operational Review Arc.
- * Review test only -- demonstrates, by real execution, that the same
- * Alpha 549 double-publish race produces two "delivered" observation
- * entries for a single logical delivery, with no correlation id
- * distinguishing them.
+ * Originally demonstrated, by real execution, that the Alpha 549
+ * double-publish race produced two "delivered" observation entries for
+ * a single logical delivery, with no correlation id distinguishing
+ * them. Test 1 was UPDATED by Secure Runtime Alpha 570 (Alpha 561-580
+ * Publish Scheduler Concurrency Safety & Abandonment Policy Arc) to
+ * assert the FIXED behavior, now that `tick()` is single-flight
+ * (Alpha 563): the same overlapping-call scenario now produces exactly
+ * ONE "delivered" observation.
  */
 describe("Secure Runtime Alpha 550 -- Observation Consistency Audit", () => {
-  it("1. an overlapping tick() race produces two 'delivered' observations for the SAME outboxId, indistinguishable from two independent deliveries", async () => {
+  it("1. an overlapping tick() race no longer double-observes -- exactly one 'delivered' observation for the SAME outboxId", async () => {
     const persistence = new InMemoryFedosBoardOutboxPersistence();
     const postId = toFedosBoardPostId("post-1")!;
     const intent = createFedosBoardOutboxIntent(postId, { protocol: "nostr", destination: null }, 1)!;
@@ -53,10 +57,7 @@ describe("Secure Runtime Alpha 550 -- Observation Consistency Audit", () => {
     await Promise.all([firstTick, secondTick]);
 
     const deliveredEntries = scheduler.observationLog().filter((o) => o.kind === "delivered" && o.outboxId === intent.id);
-    expect(deliveredEntries).toHaveLength(2);
-
-    // No field on FedosBoardOutboxObservation ties these two entries back to
-    // "the same overlapping tick() window" -- confirmed structurally, not just by count.
+    expect(deliveredEntries).toHaveLength(1);
     expect(Object.keys(deliveredEntries[0]!).sort()).toEqual(["kind", "observedAt", "outboxId"]);
   });
 });

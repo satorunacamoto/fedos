@@ -8,6 +8,49 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 561–580 — Publish Scheduler Concurrency
+> Safety & Abandonment Policy Arc (complete).** Closes the two Publish
+> Runtime defects the Alpha 541–560 Operational Review Arc proved by
+> real execution: (1) `FedosPublishScheduler.tick()`'s own overlapping-
+> call double-publish race — closed via a single-flight guard
+> (`#tickInFlight`, Alpha 563), the SAME in-flight `Promise` returned to
+> any overlapping interval or manual `tick()` call, released in
+> `finally`; `FedosHostDeliveryController`'s own public `tick()` (Alpha
+> 564) now shares the identical guard the interval callback already
+> had, instead of bypassing it. (2) A permanently-failing Publisher
+> retried forever with no termination condition — closed via a new,
+> OPTIONAL, injected `FedosDeliveryAbandonmentPolicy`
+> (`src/board/outbox/fedos_board_outbox_abandonment_policy.ts`, Alpha
+> 566/568), consulted only when the Publisher's own result was not
+> already `"never"`; ships NO default policy or number (no grounded
+> evidence for one exists anywhere in this repository's own history —
+> see `docs/secure_runtime_alpha_566_abandonment_policy_decision.md`),
+> so every prior caller that does not inject one is unaffected,
+> byte-for-byte. Abandonment reuses the Scheduler's own pre-existing
+> `"abandoned"` observation kind end-to-end — zero new canonical
+> Observation states, zero new Repository/Registry wiring (Alpha 567).
+> `FedosDesktopHost` itself is untouched. `npm run typecheck`: zero new
+> errors (the one pre-existing, unrelated error remains, documented
+> since Alpha 560). Five prior-Arc regression-guard tests, genuinely
+> invalidated by this Arc's own in-scope changes (two literal `tick()`
+> signature checks, two import-naming-convention checks tripped by the
+> new sibling file, one live `git status` scope guard), were updated
+> with explicit, scoped exceptions — see
+> `docs/secure_runtime_alpha_578_publish_runtime_compatibility_review.md`.
+> Honest limitation, found broader than originally scoped: `#delivered`/
+> `#abandoned`/attempt-count state is in-memory, per-Scheduler-instance
+> — even a same-process `startDelivery()`/`stopDelivery()` cycle (not
+> only a full restart) re-attempts already-delivered intents, confirmed
+> by real execution (`docs/secure_runtime_alpha_573_restart_stable_abandonment.md`).
+> Next Arc recommended: Durable Retry Registry Persistence, ahead of any
+> production-caller wiring, for exactly that reason.
+>
+> See `docs/secure_runtime_alpha_561_scheduler_concurrency_inventory.md`
+> through `docs/secure_runtime_alpha_580_publish_scheduler_completion.md`
+> for the full, per-Stage record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 541–560 — Publish Runtime Operational
 > Review Arc (complete, review only — zero production code changed).**
 > Reviews the full stack now built — Host, Board, Persistence, Query,

@@ -55,6 +55,16 @@
  * "Shutdown" section requires, now genuinely enforceable because this
  * class, not `FedosPublishScheduler`, owns the timer.
  *
+ * Secure Runtime Alpha 561–580 ("Publish Scheduler Concurrency Safety &
+ * Abandonment Policy Arc") Stage 3/4 (Alpha 563/564) REWIRES the
+ * reentrancy guard, only: the interval callback and the public `tick()`
+ * method now both go through the SAME private `#ensureTick()` — a
+ * manual `tick()` call made while an interval-triggered pass (or a
+ * PRIOR manual call) is still in flight now joins that in-flight
+ * `Promise` rather than starting a second, overlapping
+ * `#runTickAndPersist()` pass. `start()`/`stop()`'s own public contract
+ * is unchanged.
+ *
  * HARD GUARDRAILS:
  *   - `FedosHostDeliveryController` is the ONLY export besides its own
  *     dependencies interface.
@@ -142,12 +152,7 @@ export class FedosHostDeliveryController {
     }
     this.#running = true;
     this.#timerHandle = this.#setIntervalFn(() => {
-      if (this.#currentTick !== null) return; // reentrancy guard -- never overlap, never queue.
-      const tick = this.#runTickAndPersist();
-      this.#currentTick = tick;
-      void tick.finally(() => {
-        this.#currentTick = null;
-      });
+      void this.#ensureTick();
     }, this.#intervalMs);
   }
 
@@ -155,6 +160,15 @@ export class FedosHostDeliveryController {
    * Guarantees Scheduler停止 -> tick終了待ち -> resolves: clears the
    * interval first (no new tick can start), then awaits any in-flight
    * tick before returning.
+   *
+   * Secure Runtime Alpha 564 (Alpha 561–580 Arc) — waits for the
+   * in-flight tick to SETTLE (either outcome), never propagating that
+   * tick's own rejection into `stop()`'s own caller: `stop()`'s
+   * contract is shutdown ORDERING (never return before the in-flight
+   * pass is done), not surfacing an unrelated tick-side error (e.g. an
+   * `#observationRepository.record()` throw) to whoever happened to
+   * call `stop()`. `#ensureTick()`'s own `finally` already guarantees
+   * `#currentTick` itself is cleared either way.
    */
   async stop(): Promise<void> {
     if (!this.#running) {
@@ -164,13 +178,42 @@ export class FedosHostDeliveryController {
     this.#timerHandle = undefined;
     this.#running = false;
     if (this.#currentTick !== null) {
-      await this.#currentTick;
+      await this.#currentTick.catch(() => undefined);
     }
   }
 
-  /** Runs exactly one tick pass immediately, without waiting for the interval -- for tests/manual driving. */
-  async tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
-    return this.#runTickAndPersist();
+  /**
+   * Runs exactly one tick pass immediately, without waiting for the
+   * interval -- for tests/manual driving. Secure Runtime Alpha 563/564
+   * (Alpha 561–580 Arc) — now routes through the SAME single-flight
+   * guard (`#ensureTick`) the interval firing itself uses, rather than
+   * calling `#runTickAndPersist()` directly: previously, calling
+   * `tick()` manually while an interval-triggered tick was still in
+   * flight bypassed the reentrancy guard entirely, starting a SECOND
+   * concurrent `#runTickAndPersist()` pass — safe at the Publisher call
+   * level once `FedosPublishScheduler.tick()` itself became single-flight
+   * (Alpha 563), but still double-counting `#retryRegistry.nextAttemptNumber()`
+   * and double-writing Observations for the SAME entries. A manual
+   * `tick()` call made while one is already in flight now joins that
+   * SAME in-flight `Promise` instead.
+   */
+  tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
+    return this.#ensureTick();
+  }
+
+  #ensureTick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
+    if (this.#currentTick !== null) return this.#currentTick;
+    const run = this.#runTickAndPersist();
+    this.#currentTick = run;
+    // See the identical comment in `FedosPublishScheduler.tick()` --
+    // `.finally()`'s own derived Promise is caught here purely to avoid
+    // an unhandled-rejection report on this internal bookkeeping chain;
+    // `run` itself (returned below) still rejects normally for callers
+    // that await it directly (e.g. `stop()`, which explicitly catches it).
+    run.finally(() => {
+      this.#currentTick = null;
+    }).catch(() => undefined);
+    return run;
   }
 
   async #runTickAndPersist(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
