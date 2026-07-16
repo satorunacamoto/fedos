@@ -104,6 +104,32 @@ export interface FedosPublishSchedulerDependencies {
    * behavior every prior Arc already relied on.
    */
   readonly abandonmentPolicy?: FedosDeliveryAbandonmentPolicy;
+  /**
+   * Secure Runtime Alpha 585/587 (Alpha 581–600 Durable Retry Registry
+   * & Delivery Recovery Arc) — OPTIONAL. A caller (`FedosDesktopHost.startDelivery()`)
+   * that has already hydrated recovery state from durable Observation
+   * history (`fedos_delivery_recovery_hydration.ts`) seeds a FRESH
+   * Scheduler with it here, so an already-`"accepted"` intent is never
+   * re-attempted after a restart. Omitted entirely by default —
+   * reproduces the exact, unchanged "every intent starts pending"
+   * behavior every prior Arc already relied on. Defensively copied into
+   * a fresh `Set`, never the caller's own reference.
+   */
+  readonly initialDelivered?: ReadonlySet<string>;
+  /**
+   * Secure Runtime Alpha 585/588 (Alpha 581–600 Arc) — OPTIONAL, the
+   * `initialDelivered` counterpart for already-abandoned intents (see
+   * above). Omitted by default.
+   */
+  readonly initialAbandoned?: ReadonlySet<string>;
+  /**
+   * Secure Runtime Alpha 585 (Alpha 581–600 Arc) — OPTIONAL. Seeds
+   * `#completedAttempts` (Alpha 568) for an intent that is neither
+   * delivered nor abandoned yet (still genuinely pending, mid-retry) so
+   * an injected `abandonmentPolicy`'s own bound is not silently reset
+   * to zero by a restart. Omitted by default.
+   */
+  readonly initialCompletedAttempts?: ReadonlyMap<string, number>;
 }
 
 export interface FedosPublishSchedulerTickEntry {
@@ -127,9 +153,9 @@ export class FedosPublishScheduler {
   readonly #clearIntervalFn: (handle: unknown) => void;
   readonly #abandonmentPolicy?: FedosDeliveryAbandonmentPolicy;
 
-  readonly #delivered = new Set<string>();
-  readonly #abandoned = new Set<string>();
-  readonly #completedAttempts = new Map<string, number>();
+  readonly #delivered: Set<string>;
+  readonly #abandoned: Set<string>;
+  readonly #completedAttempts: Map<string, number>;
   readonly #observationLog: FedosBoardOutboxObservation[] = [];
 
   #timerHandle: unknown = undefined;
@@ -148,6 +174,9 @@ export class FedosPublishScheduler {
     this.#setIntervalFn = dependencies.setIntervalFn ?? ((handler, ms) => setInterval(handler, ms));
     this.#clearIntervalFn = dependencies.clearIntervalFn ?? ((handle) => clearInterval(handle as Parameters<typeof clearInterval>[0]));
     this.#abandonmentPolicy = dependencies.abandonmentPolicy;
+    this.#delivered = new Set(dependencies.initialDelivered ?? []);
+    this.#abandoned = new Set(dependencies.initialAbandoned ?? []);
+    this.#completedAttempts = new Map(dependencies.initialCompletedAttempts ?? []);
   }
 
   isRunning(): boolean {

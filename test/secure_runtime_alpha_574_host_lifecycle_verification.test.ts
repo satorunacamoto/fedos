@@ -81,23 +81,35 @@ describe("Secure Runtime Alpha 574 -- Host Lifecycle Verification", () => {
     await host.stop();
   });
 
-  it("startDelivery()/stopDelivery() may be cycled repeatedly without wedging -- but each cycle's fresh Scheduler re-attempts EVERY still-present Outbox intent, including already-delivered ones (a pre-existing characteristic, not introduced or fixed by this Arc)", async () => {
-    // `startDelivery()` (Alpha 505, unchanged) constructs a BRAND NEW
-    // `FedosPublishScheduler` every call; `#delivered` (Alpha 476) is
-    // in-memory, per-instance, and `FedosBoardOutboxPersistence` itself
-    // is append-only (`InMemoryFedosBoardOutboxPersistence` has no
-    // removal method) -- so a fresh Scheduler has no memory of a PRIOR
-    // Scheduler instance's own delivered set and re-attempts every
-    // intent still present in the Outbox. Confirmed here by real
-    // execution, not assumed: this is exactly the same "in-memory,
-    // restart-loses-state" characteristic Alpha 573 evaluates for retry/
-    // abandonment tracking, now shown to also apply to "delivered"
-    // itself across a startDelivery()/stopDelivery() cycle.
+  it("startDelivery()/stopDelivery() may be cycled repeatedly without wedging, and no longer re-attempts already-delivered intents (Secure Runtime Alpha 586, Alpha 581-600 Arc)", async () => {
+    // `startDelivery()` (Alpha 505, unchanged) still constructs a BRAND
+    // NEW `FedosPublishScheduler` every call -- but Secure Runtime
+    // Alpha 586 (Alpha 581-600 Durable Retry Registry & Delivery
+    // Recovery Arc) now hydrates that fresh Scheduler's own
+    // `#delivered` (Alpha 476) from the Host-owned, durable Observation
+    // history BEFORE it starts ticking (`createFedosDeliveryScheduler()`,
+    // `fedos_delivery_recovery_hydration.ts`), closing exactly the
+    // "in-memory, restart-loses-state" characteristic Alpha 573/574
+    // originally found and documented as an honest limitation.
     const outboxPersistence = new InMemoryFedosBoardOutboxPersistence();
     let calls = 0;
     const publisher: FedosBoardOutboxPublisher = {
       async publish() {
         calls++;
+        // A tiny real delay -- without it, the Controller's own
+        // "attempt-started"/terminal writes for the SAME attempt (Alpha
+        // 529) can land in the SAME Date.now() millisecond, and
+        // FedosDeliveryObservationQuery's own documented id-based
+        // tie-break (Alpha 513's own comment: "Real wall clock can tie
+        // this single attempt's own publishing/terminal writes to the
+        // same millisecond") can then report "publishing" as the
+        // latest state instead of "accepted" -- itself harmless (Alpha
+        // 586's own hydration fails closed toward an extra safe retry,
+        // never toward a false "delivered"), but it makes THIS test's
+        // own exact call count nondeterministic. A real Publisher never
+        // resolves in literally 0ms, so this delay also matches real
+        // conditions more closely than an instant mock would.
+        await new Promise((resolve) => setTimeout(resolve, 2));
         return { outcome: "delivered", retryPolicy: "never" };
       },
     };
@@ -120,11 +132,10 @@ describe("Secure Runtime Alpha 574 -- Host Lifecycle Verification", () => {
       await host.stopDelivery();
     }
 
-    // Cycle 1 sees 1 pending intent, cycle 2 sees 2 (cycle 1's own intent
-    // is STILL "pending" from a fresh Scheduler's own perspective), cycle
-    // 3 sees 3: 1 + 2 + 3 = 6, not 3 -- proving the fresh-Scheduler
-    // re-attempt characteristic above by real, counted execution.
-    expect(calls).toBe(6);
+    // Before Alpha 586: 1 + 2 + 3 = 6 calls (each cycle re-attempted
+    // every prior cycle's own already-delivered intent). After Alpha
+    // 586: exactly 3 -- one per cycle, its own new intent only.
+    expect(calls).toBe(3);
     await host.stop();
   });
 });

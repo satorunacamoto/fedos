@@ -257,12 +257,12 @@ import {
   MockFedosBoardOutboxPublisher,
   type FedosBoardOutboxPublisher,
 } from "../../board/outbox/fedos_board_outbox_publisher.js";
-import { FedosPublishScheduler } from "../../board/outbox/fedos_publish_scheduler.js";
 import { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
 import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
 import { FedosDeliveryObservationQuery } from "../../board/observation/fedos_delivery_observation_query.js";
 import { FedosValidatingDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_write_validator.js";
 import { FedosDeliveryRetryRegistry } from "../../board/observation/fedos_delivery_retry_registry.js";
+import { createFedosDeliveryScheduler } from "./fedos_delivery_recovery_hydration.js";
 import { FedosHostDeliveryController } from "./fedos_host_delivery_controller.js";
 
 /**
@@ -569,6 +569,16 @@ export class FedosDesktopHost {
    * method -- only the newly-constructed `FedosPublishScheduler` does,
    * exactly as this Arc's own "HostがPublishしない、SchedulerだけがPublish
    * する" instruction requires.
+   *
+   * Secure Runtime Alpha 586 (Alpha 581-600 Arc) additionally hydrates
+   * this call's own fresh Scheduler (`initialDelivered`/
+   * `initialAbandoned`/`initialCompletedAttempts`, Alpha 585) and seeds
+   * `#deliveryRetryRegistry`'s own attempt counts, BOTH derived
+   * entirely from durable Observation history already present in
+   * `#observationRepository` -- an already-`"accepted"` or already-
+   * abandoned intent from a PRIOR cycle (same-process or a genuine
+   * process restart alike) is never re-attempted by this call's own
+   * Scheduler. See `fedos_delivery_recovery_hydration.ts`.
    */
   startDelivery(): void {
     if (this.#state !== "ready") {
@@ -577,10 +587,24 @@ export class FedosDesktopHost {
     if (this.#deliveryController !== null) {
       throw new Error("FedosDesktopHost.startDelivery() may only be called while delivery is not already running.");
     }
-    const scheduler = new FedosPublishScheduler({
+
+    // Secure Runtime Alpha 586 (Alpha 581-600 Durable Retry Registry &
+    // Delivery Recovery Arc) -- createFedosDeliveryScheduler() rebuilds
+    // this call's own fresh Scheduler's recovery state and seeds the
+    // Host-owned (Alpha 531, already-persistent-across-cycles)
+    // #deliveryRetryRegistry, FROM the durable Observation history
+    // alone -- runs on EVERY startDelivery() call, same-process cycle
+    // or genuine process restart alike, since the Scheduler itself is
+    // always freshly constructed here (Alpha 508, unchanged). This
+    // Host source file stays ignorant of attempt-level query internals
+    // -- that boundary (Alpha 522) stays intact; see
+    // fedos_delivery_recovery_hydration.ts for what those are.
+    const scheduler = createFedosDeliveryScheduler({
       outboxPersistence: this.#outboxPersistence,
       publisher: this.#publisher,
       intervalMs: this.#deliveryIntervalMs,
+      observationRepository: this.#observationRepository,
+      retryRegistry: this.#deliveryRetryRegistry,
     });
     const query = new FedosDeliveryObservationQuery(this.#observationRepository);
     const validatingRepository = new FedosValidatingDeliveryObservationRepository(this.#observationRepository, query);

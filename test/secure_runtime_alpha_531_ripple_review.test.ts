@@ -48,6 +48,11 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
       // Stage's own "protected area" check (below) was written to guard,
       // back when no future Arc had yet been authorized to touch it.
       "src/board/outbox/fedos_publish_scheduler.ts",
+      // Secure Runtime Alpha 581-600 (Durable Retry Registry & Delivery
+      // Recovery Arc) legitimately adds ONE additive, never-downward
+      // hydration method (hydrateAttemptCount()) to the Retry Registry
+      // -- see docs/secure_runtime_alpha_585_durable_retry_persistence_implementation.md.
+      "src/board/observation/fedos_delivery_retry_registry.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);

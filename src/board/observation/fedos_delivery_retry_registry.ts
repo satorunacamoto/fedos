@@ -28,6 +28,17 @@
  *     instance is (matching `FedosPublishScheduler`'s own Alpha 476
  *     `#delivered`/`#abandoned` Sets' identical in-memory-only
  *     lifetime).
+ *
+ * Secure Runtime Alpha 586 (Alpha 581–600 Durable Retry Registry &
+ * Delivery Recovery Arc) adds ONE additive method, `hydrateAttemptCount()`
+ * — a one-time, startup-only SEED from durably-recorded history
+ * (`FedosDeliveryRetryQuery.historyFor()`, unchanged), never a general
+ * "reset" or "rewind": it only ever RAISES a subject's own count, never
+ * lowers one, so it can never cause an already-issued attempt-scoped
+ * subject id to be reused. `nextAttemptNumber()`'s own "no gaps, no
+ * reuse" guarantee is preserved — hydration runs strictly BEFORE any
+ * real `nextAttemptNumber()` call for the same subject in any given
+ * process (see `docs/secure_runtime_alpha_584_recovery_lifecycle_design.md`).
  */
 
 import type { FedosDeliveryObservationSubjectId } from "./fedos_delivery_observation.js";
@@ -45,5 +56,18 @@ export class FedosDeliveryRetryRegistry {
   /** The number of attempts already allocated for `subjectId` — `0` if none yet. Never mutates. */
   currentAttemptCount(subjectId: FedosDeliveryObservationSubjectId): number {
     return this.#counts.get(subjectId) ?? 0;
+  }
+
+  /**
+   * Alpha 586 — seeds `subjectId`'s own count to `max(current, count)`,
+   * never downward. Intended to be called ONLY at startup, before any
+   * real `nextAttemptNumber()` call for the same subject, with `count`
+   * derived from durable Observation history
+   * (`fedos_delivery_recovery_hydration.ts`) — never from a guess.
+   */
+  hydrateAttemptCount(subjectId: FedosDeliveryObservationSubjectId, count: number): void {
+    if (!Number.isFinite(count) || !Number.isInteger(count) || count < 0) return;
+    const current = this.#counts.get(subjectId) ?? 0;
+    if (count > current) this.#counts.set(subjectId, count);
   }
 }
