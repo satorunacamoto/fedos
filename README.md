@@ -8,6 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 821–850 — Durable Conversation
+> Membership & Capability Persistence Arc (complete).** Closes the
+> primary durability blocker Alpha 790 named as its own next step: both
+> `InMemoryFedosConversationMembershipAuthority` and
+> `InMemoryFedosConversationCapabilityAuthority` (Alpha 761–790, frozen,
+> unmodified) now have durable ADAPTER siblings —
+> `PersistedFedosConversationMembershipAuthority`
+> (`src/conversation/membership/persistence/`) and
+> `PersistedFedosConversationCapabilityAuthority`
+> (`src/conversation/capability/persistence/`) — backed by dedicated,
+> versioned persistence ports with both an in-memory and a real,
+> zero-new-dependency append-only backend, restart-verified: active/
+> revoked/left Membership state, Capability descriptor/verifier/use-count/
+> exhaustion, and duplicate-redemption rejection all survive a fresh
+> Authority instance over the same backend. The bearer secret itself is
+> NEVER persisted — only a one-way SHA-256 verifier
+> (`@noble/hashes`, an already-existing dependency; no new dependency
+> anywhere in this Arc), via
+> `createFedosConversationCapabilityBearerVerifier()`/
+> `fedosConversationCapabilityBearerVerifierMatches()`
+> (`src/conversation/capability/persistence/fedos_conversation_capability_bearer_verifier.ts`).
+> Capability consumption and Membership admission remain two separate
+> durable writes with no shared transaction — Alpha 785's own honest
+> `"conflict"` disclosure is preserved — but a NEW, additive
+> `FedosConversationDurableRedemptionCoordinator.redeemAndAdmit()`
+> (`src/conversation/capability/coordination/`) layers a five-phase,
+> deterministically-keyed coordination record on top, making a crash
+> BETWEEN those two writes recoverable: a fresh coordinator instance
+> converges safely from every tested interruption point, admits
+> Membership at most once, and never silently restores an already-spent
+> Capability. The guarantee is stated without hedging — restart-stable,
+> idempotent redemption within ONE durable backend set and ONE
+> single-writer model, explicitly NOT distributed exactly-once, NOT safe
+> across independent writable replicas, NOT multi-process-concurrent-safe.
+> `src/board/runtime/` remains untouched; no default Local Runtime wiring
+> is added, since no private Conversation command exists yet to call any
+> of this Arc's own new Authorities from (Alpha 848). No private message,
+> encryption, key distribution, or invitation transport of any kind exists
+> anywhere in this Arc.
+>
+> See `docs/secure_runtime_alpha_821_850_execution_spec.md`,
+> `docs/secure_runtime_alpha_823_824_persistence_and_coordination_decisions.md`,
+> and `docs/secure_runtime_alpha_850_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 791–820 — Conversation Retention &
 > Private Payload Storage Boundary Foundation Arc (complete).** Builds
 > the bottom two boundaries of the target private-message architecture
