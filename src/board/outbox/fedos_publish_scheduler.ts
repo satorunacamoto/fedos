@@ -31,6 +31,20 @@
  *     lifetime of this Scheduler instance, and is never attempted again
  *     by `tick()`.
  *
+ * Secure Runtime Alpha 561–580 ("Publish Scheduler Concurrency Safety &
+ * Abandonment Policy Arc") adds TWO closures, additive only, to the
+ * above, unchanged model:
+ *   - `tick()` is now SINGLE-FLIGHT (Alpha 563) — see its own doc
+ *     comment. Closes the real, reproducible double-publish race Alpha
+ *     549 proved.
+ *   - An OPTIONAL, injected `abandonmentPolicy` (Alpha 566/568,
+ *     `./fedos_board_outbox_abandonment_policy.ts`) is now consulted, in
+ *     ADDITION to the Publisher's own `"never"`, whenever a completed
+ *     attempt is not `"delivered"` — closing Alpha 551's own finding
+ *     that a permanently-crashing/malformed-result Publisher was
+ *     retried forever with no Scheduler-level bound. Omitted by
+ *     default, reproducing the exact prior behavior unchanged.
+ *
  * `start()`/`stop()`/`tick()` are ALL this Arc permits creating; `tick()`
  * is public specifically so callers (and this Arc's own tests) can
  * drive exactly one pass without depending on a real timer.
@@ -40,7 +54,9 @@
  *     core), or any Relay/signing/transport/Ontology/p2p/GUI file
  *     anywhere in this file — only `./fedos_board_outbox_persistence.js`,
  *     `./fedos_board_outbox_codec.js`, `./fedos_board_outbox_publisher.js`,
- *     and `./fedos_board_outbox_observation.js`.
+ *     `./fedos_board_outbox_observation.js`, and (Alpha 561–580)
+ *     `./fedos_board_outbox_abandonment_policy.js` — itself bound by the
+ *     same guardrail, see that file's own header.
  *   - No default `Publisher` implementation is constructed here — the
  *     caller MUST inject one; there is no Nostr/ActivityPub/AT Protocol/
  *     Session fallback of any kind.
@@ -65,6 +81,7 @@ import {
   type FedosBoardOutboxObservationKind,
 } from "./fedos_board_outbox_observation.js";
 import type { FedosBoardOutboxId } from "./fedos_board_outbox_types.js";
+import type { FedosDeliveryAbandonmentPolicy } from "./fedos_board_outbox_abandonment_policy.js";
 
 export interface FedosPublishSchedulerDependencies {
   readonly outboxPersistence: FedosBoardOutboxPersistence;
@@ -76,6 +93,17 @@ export interface FedosPublishSchedulerDependencies {
   readonly setIntervalFn?: (handler: () => void, intervalMs: number) => unknown;
   /** Defaults to the global `clearInterval`. */
   readonly clearIntervalFn?: (handle: unknown) => void;
+  /**
+   * Secure Runtime Alpha 566/568 (Alpha 561–580 Arc) — OPTIONAL,
+   * consulted only when a completed attempt's own `retryPolicy` was NOT
+   * already `"never"`. Omitted entirely by default: this Scheduler
+   * ships no default abandonment policy of its own (see
+   * `./fedos_board_outbox_abandonment_policy.ts` for why no number is
+   * invented here), so omitting this field reproduces the exact,
+   * unchanged "retry forever until the Publisher itself says `never`"
+   * behavior every prior Arc already relied on.
+   */
+  readonly abandonmentPolicy?: FedosDeliveryAbandonmentPolicy;
 }
 
 export interface FedosPublishSchedulerTickEntry {
@@ -97,13 +125,17 @@ export class FedosPublishScheduler {
   readonly #now: () => number;
   readonly #setIntervalFn: (handler: () => void, intervalMs: number) => unknown;
   readonly #clearIntervalFn: (handle: unknown) => void;
+  readonly #abandonmentPolicy?: FedosDeliveryAbandonmentPolicy;
 
   readonly #delivered = new Set<string>();
   readonly #abandoned = new Set<string>();
+  readonly #completedAttempts = new Map<string, number>();
   readonly #observationLog: FedosBoardOutboxObservation[] = [];
 
   #timerHandle: unknown = undefined;
   #running = false;
+  /** Secure Runtime Alpha 563 (Alpha 561–580 Arc) single-flight guard — see `tick()`. */
+  #tickInFlight: Promise<readonly FedosPublishSchedulerTickEntry[]> | null = null;
 
   constructor(dependencies: FedosPublishSchedulerDependencies) {
     if (!isPositiveIntegerMs(dependencies.intervalMs)) {
@@ -115,6 +147,7 @@ export class FedosPublishScheduler {
     this.#now = dependencies.now ?? Date.now;
     this.#setIntervalFn = dependencies.setIntervalFn ?? ((handler, ms) => setInterval(handler, ms));
     this.#clearIntervalFn = dependencies.clearIntervalFn ?? ((handle) => clearInterval(handle as Parameters<typeof clearInterval>[0]));
+    this.#abandonmentPolicy = dependencies.abandonmentPolicy;
   }
 
   isRunning(): boolean {
@@ -156,8 +189,38 @@ export class FedosPublishScheduler {
    * right. Never throws for a `Publisher`-side problem: a rejecting or
    * malformed `publish()` call is treated as `{ outcome: "failed",
    * retryPolicy: "later" }`, fail-closed, never propagated.
+   *
+   * Secure Runtime Alpha 563 (Alpha 561–580 Publish Scheduler
+   * Concurrency Safety & Abandonment Policy Arc) — SINGLE-FLIGHT: if a
+   * previous `tick()` call is still in flight (from `start()`'s own
+   * interval firing again before the prior pass resolved, OR from a
+   * second direct `tick()` call), this call returns the SAME in-flight
+   * `Promise` rather than starting a second, overlapping pass — Option
+   * B from `docs/secure_runtime_alpha_562_single_flight_semantics_decision.md`.
+   * Closes the real, reproducible double-publish race Alpha 549 proved
+   * (`docs/secure_runtime_alpha_549_publish_runtime_thread_safety_audit.md`):
+   * `#delivered`/`#abandoned` are only updated AFTER an attempt's own
+   * `await` resolves, so two overlapping passes previously both listed
+   * the SAME pending intent and both called `Publisher.publish()` on
+   * it. The guard is released in `finally`, so a caller-side throw/
+   * reject never leaves the Scheduler permanently unable to tick again.
    */
-  async tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
+  tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
+    if (this.#tickInFlight !== null) return this.#tickInFlight;
+    const run = this.#runTick();
+    this.#tickInFlight = run;
+    // `.finally()` returns a NEW, separate Promise that also rejects if
+    // `run` does -- caught here (distinct from the `run` Promise itself,
+    // which is what callers actually receive and may or may not await/
+    // catch on their own) purely so a rejecting `run` never surfaces as
+    // an unhandled rejection on THIS internal bookkeeping chain.
+    run.finally(() => {
+      this.#tickInFlight = null;
+    }).catch(() => undefined);
+    return run;
+  }
+
+  async #runTick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {
     const pending = this.#outboxPersistence
       .listIntents()
       .filter((record) => !this.#delivered.has(record.id) && !this.#abandoned.has(record.id));
@@ -187,9 +250,26 @@ export class FedosPublishScheduler {
 
     if (result.outcome === "delivered") {
       this.#delivered.add(intent.id);
-    } else if (result.retryPolicy === "never") {
-      this.#abandoned.add(intent.id);
-      observations.push(this.#observe(intent.id, "abandoned", result.reason));
+      this.#completedAttempts.delete(intent.id);
+    } else {
+      const completedAttempts = (this.#completedAttempts.get(intent.id) ?? 0) + 1;
+      this.#completedAttempts.set(intent.id, completedAttempts);
+
+      const abandonedByPublisher = result.retryPolicy === "never";
+      const abandonedByPolicy =
+        !abandonedByPublisher &&
+        this.#abandonmentPolicy !== undefined &&
+        this.#abandonmentPolicy.evaluate({
+          outboxId: intent.id as FedosBoardOutboxId,
+          completedAttempts,
+          latestOutcome: result.outcome,
+        }) === "abandon";
+
+      if (abandonedByPublisher || abandonedByPolicy) {
+        this.#abandoned.add(intent.id);
+        this.#completedAttempts.delete(intent.id);
+        observations.push(this.#observe(intent.id, "abandoned", result.reason));
+      }
     }
 
     this.#observationLog.push(...observations);

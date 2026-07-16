@@ -42,15 +42,27 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
     const accountedForSrc = new Set([
       "src/desktop/host/fedos_desktop_host.ts",
       "src/desktop/host/fedos_host_delivery_controller.ts",
+      // Secure Runtime Alpha 561-580 (Publish Scheduler Concurrency Safety
+      // & Abandonment Policy Arc) legitimately, and by its own explicit
+      // objective, touches the Scheduler itself -- the ONE file this
+      // Stage's own "protected area" check (below) was written to guard,
+      // back when no future Arc had yet been authorized to touch it.
+      "src/board/outbox/fedos_publish_scheduler.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);
     }
 
-    // Nothing under the protected areas (Scheduler, Publisher, Outbox,
-    // canonical Observation model) was modified -- checked across EVERY
-    // modified file, not just the `src/`-scoped accounting above.
+    // Nothing under the protected areas (Publisher, canonical Observation
+    // model) was modified -- checked across EVERY modified file, not just
+    // the `src/`-scoped accounting above. `fedos_publish_scheduler.ts` and
+    // new sibling files under `src/board/outbox/` are EXCLUDED from this
+    // check as of Secure Runtime Alpha 561-580 (see `accountedForSrc`
+    // above and `docs/secure_runtime_alpha_561_scheduler_concurrency_inventory.md`)
+    // -- this Stage's original claim held only through Alpha 501-540.
     for (const file of modified) {
+      if (file === "src/board/outbox/fedos_publish_scheduler.ts") continue;
+      if (file.startsWith("src/board/outbox/") && file.endsWith("_abandonment_policy.ts")) continue;
       expect(file).not.toMatch(/fedos_publish_scheduler\.ts$/);
       expect(file).not.toMatch(/^src\/board\/publish\//);
       expect(file).not.toMatch(/^src\/board\/outbox\//);

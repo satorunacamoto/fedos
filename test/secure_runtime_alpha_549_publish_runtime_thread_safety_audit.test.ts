@@ -13,11 +13,16 @@ import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 
 /**
  * Secure Runtime Alpha 549 -- "Thread Safety Audit": Stage 9 of the
- * Alpha 541-560 Publish Runtime Operational Review Arc. Review test
- * only -- proves the double-publish interleaving risk by REAL
- * execution against the unmodified FedosPublishScheduler, using a
+ * Alpha 541-560 Publish Runtime Operational Review Arc. Originally
+ * proved the double-publish interleaving risk by REAL execution
+ * against the (then-unmodified) FedosPublishScheduler, using a
  * publisher whose publish() call is held open under test control
- * until both overlapping tick() calls have started.
+ * until both overlapping tick() calls have started. Test 1 was UPDATED
+ * by Secure Runtime Alpha 570 (Alpha 561-580 Publish Scheduler
+ * Concurrency Safety & Abandonment Policy Arc) to assert the FIXED
+ * behavior -- the overlapping-call scenario is unchanged, but tick()
+ * is now single-flight (Alpha 563), so the SAME race condition this
+ * Stage originally reproduced now closes, not reproduces, the bug.
  */
 
 /** A Publisher whose publish() does not resolve until the test explicitly releases it -- lets the test force two tick() calls to overlap. */
@@ -44,7 +49,7 @@ class SlowPublisher implements FedosBoardOutboxPublisher {
 }
 
 describe("Secure Runtime Alpha 549 -- Thread Safety Audit", () => {
-  it("1. two overlapping tick() calls both attempt the SAME pending intent -- a real, reproducible double-publish", async () => {
+  it("1. two overlapping tick() calls join the SAME in-flight pass -- the double-publish this Stage found is now closed (Secure Runtime Alpha 563, Alpha 561-580 Arc)", async () => {
     const persistence = new InMemoryFedosBoardOutboxPersistence();
     const postId = toFedosBoardPostId("post-1")!;
     const intent = createFedosBoardOutboxIntent(postId, { protocol: "nostr", destination: null }, 1)!;
@@ -58,6 +63,9 @@ describe("Secure Runtime Alpha 549 -- Thread Safety Audit", () => {
     const firstTick = scheduler.tick();
     const secondTick = scheduler.tick();
 
+    // Secure Runtime Alpha 563: the second call returns the SAME in-flight Promise.
+    expect(secondTick).toBe(firstTick);
+
     // Release the held publish() calls once both tick() calls have had a chance to start.
     await Promise.resolve();
     await Promise.resolve();
@@ -65,10 +73,11 @@ describe("Secure Runtime Alpha 549 -- Thread Safety Audit", () => {
 
     await Promise.all([firstTick, secondTick]);
 
-    // The SAME intent was published TWICE, concurrently -- the concrete failure this Stage names.
-    expect(publisher.calls).toHaveLength(2);
+    // The SAME intent was published exactly ONCE -- Alpha 549's own double-publish
+    // finding, reproduced above by NOT awaiting between the two tick() calls, no
+    // longer occurs now that tick() is single-flight.
+    expect(publisher.calls).toHaveLength(1);
     expect(publisher.calls[0]!.id).toBe(intent.id);
-    expect(publisher.calls[1]!.id).toBe(intent.id);
   });
 
   it("2. FedosDesktopHost.submitPost() runs its entire read-check-write sequence with zero internal await -- confirmed safe by source inspection", () => {

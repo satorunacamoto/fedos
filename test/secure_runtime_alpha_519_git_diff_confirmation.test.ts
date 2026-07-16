@@ -24,10 +24,15 @@ describe("Secure Runtime Alpha 519 -- Git Diff Confirmation", () => {
     }
   });
 
-  it("FedosPublishScheduler's own public shape is unchanged, confirming the EMPTY diff claim structurally", () => {
+  it("FedosPublishScheduler's own public shape was unchanged as of THIS Arc (Alpha 501-520) -- confirming the EMPTY diff claim structurally at the time", () => {
+    // Secure Runtime Alpha 563 (Alpha 561-580 Publish Scheduler Concurrency
+    // Safety & Abandonment Policy Arc) legitimately changed tick()'s own
+    // signature (single-flight guard, `async` removed since it now returns
+    // an already-in-flight Promise directly) -- the EMPTY diff claim this
+    // Stage documents was true as of Alpha 501-520 only, not permanently.
     expect(schedulerSource).toContain("start(): void {");
     expect(schedulerSource).toContain("stop(): void {");
-    expect(schedulerSource).toContain("async tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {");
+    expect(schedulerSource).toContain("tick(): Promise<readonly FedosPublishSchedulerTickEntry[]> {");
   });
 
   it("FedosBoardOutboxPublisher's own interface is unchanged", () => {
