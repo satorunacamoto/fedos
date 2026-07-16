@@ -100,12 +100,65 @@
  * item 1's own outbound assertion) were updated to expect this
  * corrected, fail-closed outcome — see Alpha 649/665's own doc for why
  * the OLD "protocol match is enough" check was never actually safe.
+ *
+ * Secure Runtime Alpha 754 ("BoardRuntime Creation Integration") / Alpha
+ * 755 ("Reply Integration") — Stages 14/15 of the Alpha 741–760
+ * Canonical Conversation Identity and Record Foundation Arc.
+ *
+ * `createPublicThread()` now durably records exactly ONE
+ * `FedosConversationRecord` (`../../conversation/fedos_conversation_record.js`,
+ * Alpha 745) per new root post, via the injected
+ * `FedosConversationPersistence` (Alpha 749). Alpha 754 compares:
+ *   A. write Conversation FIRST, then Board — rejected; a Conversation
+ *      record for a Board post that never durably existed would be an
+ *      orphaned record with nothing to describe.
+ *   B. write Board FIRST, then Conversation — ADOPTED. Only once
+ *      `#assembleAndSubmit()` confirms the Board write itself succeeded
+ *      (`"created"`/`"already-present"`/`"outbox-partial-failure"`, all
+ *      of which already carry the durable `post`) does this method
+ *      attempt the Conversation write.
+ *   C. preview both, then write in a recoverable order — rejected as
+ *      unnecessary complexity: unlike Board persistence (which has a
+ *      real `previewRegistration()` predicting a genuine domain
+ *      rejection), a Conversation record built from an
+ *      already-durable, already-valid root post cannot itself be
+ *      domain-invalid — the only failure this write can still produce
+ *      is a `FedosConversationPersistence`-level one (`"conflict"`/
+ *      `"failed"`), which Option B already surfaces explicitly.
+ *   D. a dedicated coordinator class — rejected as premature
+ *      abstraction for ONE two-step sequence; `#recordConversationForRootPost()`
+ *      below IS the narrow coordinator the task's own instruction asks
+ *      for, kept as a private method rather than a new exported class.
+ *
+ * NO transactional atomicity is claimed — `FedosBoardPersistence`/
+ * `FedosConversationPersistence` are separate ports with no shared
+ * commit. A process crash between the two writes leaves a durable Board
+ * post with no Conversation record — an honest, narrow, EXPLICIT
+ * partial-failure surfaced via `FedosConversationAssociationResult`'s
+ * own `"conflict"`/`"persistence-failed"` outcomes
+ * (`./fedos_board_runtime_command_types.js`), never silently hidden and
+ * never described as atomic.
+ *
+ * `replyToPublicThread()` never creates a second Conversation record
+ * (Alpha 755's own explicit requirement) — it only RESOLVES the
+ * already-existing one via `#conversationReader.conversationForThread()`.
+ * A reply into a thread with NO Conversation record (this Arc's own
+ * Alpha 756 answer for Board data that predates this Arc) surfaces
+ * `{ outcome: "not-found" }` — the underlying Board reply itself
+ * succeeds or fails EXACTLY as it did before this Arc, regardless (Rule
+ * 10: existing public Board behavior remains compatible).
  */
 
 import type { FedosDesktopHost, FedosDesktopHostSubmitPostResult } from "../../desktop/host/fedos_desktop_host.js";
 import type { FedosBoardPost } from "../fedos_board_post.js";
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../fedos_board_post_validator.js";
-import { toFedosBoardId, toFedosBoardPostId, toFedosThreadId } from "../fedos_board_identifiers.js";
+import {
+  toFedosBoardId,
+  toFedosBoardPostId,
+  toFedosThreadId,
+  type FedosBoardId,
+  type FedosThreadId,
+} from "../fedos_board_identifiers.js";
 import type {
   FedosBoardQueryFilter,
   FedosBoardQueryPageOptions,
@@ -121,6 +174,7 @@ import type {
   CreatePublicThreadCommand,
   FedosBoardRuntimeCommandResult,
   FedosBoardRuntimeOutboxTargetResult,
+  FedosBoardRuntimeWriteResult,
   ReplyToPublicThreadCommand,
 } from "./fedos_board_runtime_command_types.js";
 import {
@@ -134,6 +188,14 @@ import { StaticFedosConversationPolicyAuthority } from "./policy/fedos_conversat
 import type { FedosConversationPolicy } from "./policy/fedos_conversation_policy.js";
 import { evaluateFedosOutboundEligibility } from "./eligibility/fedos_outbound_eligibility_evaluator.js";
 import type { FedosNostrAuthorBindingAuthority, FedosNostrAuthorBindingResult } from "./identity/fedos_nostr_author_binding_types.js";
+import type { FedosConversationAssociationResult } from "./fedos_board_runtime_command_types.js";
+import type { FedosConversationRecord } from "../../conversation/fedos_conversation_record.js";
+import { validateFedosConversationRecord, type FedosConversationRecordInput } from "../../conversation/fedos_conversation_record_validator.js";
+import { toFedosConversationId, type FedosConversationId } from "../../conversation/fedos_conversation_id.js";
+import { FedosConversationReader } from "../../conversation/fedos_conversation_reader.js";
+import type { FedosConversationPersistence } from "../../conversation/persistence/fedos_conversation_persistence.js";
+import { InMemoryFedosConversationPersistence } from "../../conversation/persistence/in_memory_fedos_conversation_persistence.js";
+import { serializeFedosConversationRecord } from "../../conversation/persistence/fedos_conversation_record_codec.js";
 
 export interface FedosBoardRuntimeDependencies {
   readonly host: FedosDesktopHost;
@@ -166,6 +228,17 @@ export interface FedosBoardRuntimeDependencies {
    * single default account). Never inferred from `publicIdentifier`.
    */
   readonly nostrAccountIndex?: number;
+  /**
+   * Secure Runtime Alpha 754 — optional; defaults to a fresh
+   * `InMemoryFedosConversationPersistence()` when omitted. Injected
+   * separately from every Board/Outbox/Observation persistence
+   * (Host-owned, Host-private) — Conversation persistence is an
+   * Application-layer concern `FedosBoardRuntime` itself owns
+   * end-to-end, exactly like `publicAuthorAuthority`/
+   * `conversationPolicyAuthority` (Alpha 749's own "never fold into
+   * Board persistence" requirement).
+   */
+  readonly conversationPersistence?: FedosConversationPersistence;
 }
 
 export class FedosBoardRuntime {
@@ -176,6 +249,8 @@ export class FedosBoardRuntime {
   readonly #policyAuthority: FedosConversationPolicyAuthority;
   readonly #nostrAuthorBindingAuthority: FedosNostrAuthorBindingAuthority | undefined;
   readonly #nostrAccountIndex: number;
+  readonly #conversationPersistence: FedosConversationPersistence;
+  readonly #conversationReader: FedosConversationReader;
 
   constructor(dependencies: FedosBoardRuntimeDependencies) {
     this.#host = dependencies.host;
@@ -185,6 +260,8 @@ export class FedosBoardRuntime {
     this.#policyAuthority = dependencies.conversationPolicyAuthority ?? new StaticFedosConversationPolicyAuthority();
     this.#nostrAuthorBindingAuthority = dependencies.nostrAuthorBindingAuthority;
     this.#nostrAccountIndex = dependencies.nostrAccountIndex ?? 0;
+    this.#conversationPersistence = dependencies.conversationPersistence ?? new InMemoryFedosConversationPersistence();
+    this.#conversationReader = new FedosConversationReader(this.#conversationPersistence);
   }
 
   /**
@@ -232,7 +309,12 @@ export class FedosBoardRuntime {
       source: { protocol: "fedos", reference: id },
     };
 
-    return await this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
+    const result = await this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
+    if (result.outcome === "created" || result.outcome === "already-present" || result.outcome === "outbox-partial-failure") {
+      const conversation = this.#recordConversationForRootPost(result.post);
+      return { ...result, conversation };
+    }
+    return result;
   }
 
   /**
@@ -283,7 +365,12 @@ export class FedosBoardRuntime {
       source: { protocol: "fedos", reference: id },
     };
 
-    return await this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
+    const result = await this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
+    if (result.outcome === "created" || result.outcome === "already-present" || result.outcome === "outbox-partial-failure") {
+      const conversation = this.#resolveConversationForReply(boardId, threadId);
+      return { ...result, conversation };
+    }
+    return result;
   }
 
   async #assembleAndSubmit(
@@ -291,7 +378,7 @@ export class FedosBoardRuntime {
     authorResolution: FedosPublicAuthorResolution,
     policy: FedosConversationPolicy,
     requestedTargets: readonly FedosBoardOutboxTarget[],
-  ): Promise<FedosBoardRuntimeCommandResult> {
+  ): Promise<FedosBoardRuntimeWriteResult> {
     const post = validateFedosBoardPost(input);
     if (post === null) {
       return { outcome: "invalid-command", reason: "malformed-post" };
@@ -358,7 +445,7 @@ export class FedosBoardRuntime {
     hostResult: FedosDesktopHostSubmitPostResult,
     post: FedosBoardPost,
     outbox: readonly FedosBoardRuntimeOutboxTargetResult[],
-  ): FedosBoardRuntimeCommandResult {
+  ): FedosBoardRuntimeWriteResult {
     const outboxHasFailure = outbox.some((entry) => entry.result !== "inserted" && entry.result !== "already-present");
 
     switch (hostResult) {
@@ -383,6 +470,93 @@ export class FedosBoardRuntime {
       case "persistence-failed":
         return { outcome: "persistence-failed" };
     }
+  }
+
+  /**
+   * Alpha 754 -- durably records exactly ONE `FedosConversationRecord`
+   * for a just-durably-written root post, via the injected
+   * `FedosConversationPersistence`. See this file's own header for the
+   * write-ordering rationale (Board write already succeeded by the time
+   * this is called) and why no atomicity is claimed.
+   *
+   * `validateFedosConversationRecord` returning `null` here would mean
+   * this Runtime's OWN root post -- already `validateFedosBoardPost`-
+   * accepted, with `id === threadId` by construction (`createPublicThread`,
+   * above) -- somehow fails `rootPostId === rootThreadId` (Alpha 747).
+   * That is a genuine internal invariant violation, never a normal
+   * outcome, so this throws rather than silently returning a degraded
+   * association -- mirroring `FedosDesktopHost.submitPost()`'s own
+   * identical "invariant violated" throw for its structurally
+   * unreachable case.
+   */
+  #recordConversationForRootPost(post: FedosBoardPost): FedosConversationAssociationResult {
+    const id = toFedosConversationId(post.boardId, post.threadId);
+    const candidate: FedosConversationRecordInput = {
+      id,
+      mode: "public",
+      boardId: post.boardId,
+      rootThreadId: post.threadId,
+      rootPostId: post.id,
+      policyReference: "public-v1",
+      createdAt: post.createdAt,
+    };
+    const record: FedosConversationRecord | null = validateFedosConversationRecord(candidate);
+    if (record === null) {
+      throw new Error(
+        "FedosBoardRuntime: invariant violated -- a root post this Runtime just assembled itself failed FedosConversationRecord validation.",
+      );
+    }
+    const persisted = serializeFedosConversationRecord(record);
+    const writeResult = this.#conversationPersistence.putConversation(persisted);
+    switch (writeResult) {
+      case "inserted":
+        return { outcome: "recorded", conversation: record };
+      case "already-present":
+        return { outcome: "already-recorded", conversation: record };
+      case "conflict":
+        return { outcome: "conflict" };
+      case "failed":
+        return { outcome: "persistence-failed" };
+    }
+  }
+
+  /**
+   * Alpha 755 -- NEVER creates a Conversation record; only resolves the
+   * already-existing one for `(boardId, threadId)`. `{ outcome:
+   * "not-found" }` for a thread that predates this Arc (Alpha 756's own
+   * Option C compatibility answer) -- the Board reply itself has
+   * already succeeded or failed by the time this is called, regardless.
+   */
+  #resolveConversationForReply(boardId: FedosBoardId, threadId: FedosThreadId): FedosConversationAssociationResult {
+    const record = this.#conversationReader.conversationForThread(boardId, threadId);
+    return record === null ? { outcome: "not-found" } : { outcome: "existing", conversation: record };
+  }
+
+  /**
+   * Alpha 757 ("Read API") -- forwards to the injected
+   * `FedosConversationPersistence` via `FedosConversationReader`, never
+   * returning that reader or the persistence object itself. `null` for
+   * an empty/malformed `id` -- mirrors `findPost`'s own convention,
+   * directly below.
+   */
+  findConversation(id: string): FedosConversationRecord | null {
+    if (id.trim().length === 0) return null;
+    return this.#conversationReader.findConversation(id as FedosConversationId);
+  }
+
+  /** Alpha 757 -- no separate index needed (Alpha 747): `toFedosConversationId(boardId, threadId)` alone resolves the record. */
+  conversationForThread(boardId: string, threadId: string): FedosConversationRecord | null {
+    const brandedBoardId = toFedosBoardId(boardId);
+    const brandedThreadId = toFedosThreadId(threadId);
+    if (brandedBoardId === null || brandedThreadId === null) return null;
+    return this.#conversationReader.conversationForThread(brandedBoardId, brandedThreadId);
+  }
+
+  /** Alpha 757 -- filters over `listConversations()` (Alpha 753's own "no side index" decision); empty array for a malformed `boardId`. */
+  listBoardConversations(boardId: string): readonly FedosConversationRecord[] {
+    const branded = toFedosBoardId(boardId);
+    if (branded === null) return [];
+    return this.#conversationReader.listBoardConversations(branded);
   }
 
   /**

@@ -36,6 +36,17 @@
  *     `idGenerator`/`clock` (Alpha 673) are OBJECT/function
  *     dependencies only — no raw identity value, no policy JSON bag,
  *     no UI setting, no arbitrary untyped callback.
+ *
+ * Secure Runtime Alpha 758 ("Local Runtime Ownership") — Stage 18 of
+ * the Alpha 741–760 Canonical Conversation Identity and Record
+ * Foundation Arc. Adds exactly ONE new, OPTIONAL field —
+ * `conversationLogPath` — following the SAME "explicit, caller-supplied
+ * path, no default, no `cwd`-relative implicit path" discipline as
+ * `boardLogPath`/`outboxLogPath`/`observationLogPath` (Alpha 604/609).
+ * Omitted, `FedosBoardRuntime`'s own existing default
+ * (`InMemoryFedosConversationPersistence`) applies — no default
+ * repository-relative path is ever assumed, per this Arc's own explicit
+ * instruction.
  */
 
 import type { FedosBoardOutboxPublisher } from "../../board/outbox/fedos_board_outbox_publisher.js";
@@ -98,4 +109,12 @@ export interface FedosDesktopRuntimeConfig {
   readonly nostrAuthorBindingAuthority?: FedosNostrAuthorBindingAuthority;
   /** Secure Runtime Alpha 697 — optional; passed straight through to `createFedosBoardRuntime()`. Omitted, account index `0` applies (Alpha 689). */
   readonly nostrAccountIndex?: number;
+  /**
+   * Secure Runtime Alpha 758 — optional, explicit, caller-supplied path
+   * to the Conversation append-only log file. Omitted,
+   * `FedosBoardRuntime`'s own existing default
+   * (`InMemoryFedosConversationPersistence`) applies — see this file's
+   * own header.
+   */
+  readonly conversationLogPath?: string;
 }

@@ -8,6 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 741–760 — Canonical Conversation
+> Identity and Record Foundation Arc (complete).** Gives every public
+> Board thread a real, persisted Conversation identity —
+> `FedosConversationId` (`src/conversation/fedos_conversation_id.ts`,
+> Alpha 743), deterministic from the existing `(FedosBoardId,
+> FedosThreadId)` pair, no duplicate identity minted where the Board
+> model already suffices. `FedosConversationRecord`
+> (`fedos_conversation_record.ts`, Alpha 745) reuses the EXISTING
+> `FedosConversationMode` (Policy Arc, unmodified — no second mode enum)
+> and a fixed `policyReference: "public-v1"` tag, fail-closed
+> constructed via `validateFedosConversationRecord()` (Alpha 748),
+> enforcing that every V1 Conversation's root post is also its own
+> thread root. A dedicated `FedosConversationPersistence` port
+> (`src/conversation/persistence/`, Alpha 749) — never folded into
+> Board persistence — ships with both an in-memory
+> (`FedosBoardRuntime`'s own default) and a real, zero-new-dependency
+> append-only backend (Alpha 751/752). `FedosBoardRuntime.createPublicThread()`
+> now durably records exactly one Conversation per new root post;
+> `replyToPublicThread()` only resolves an already-existing one, never
+> creating a second (Alpha 754/755) — both attach a new, PURELY
+> ADDITIVE `conversation` field to their existing result shape, so
+> every pre-Arc caller is unaffected. `hydrateFedosConversations()`
+> (Alpha 756) cross-checks every persisted record against the hydrated
+> Board state at `startFedosDesktopRuntime()` startup, failing closed on
+> corruption or a root mismatch — a Board thread that predates this Arc
+> remains fully readable, with no fabricated Conversation history.
+> `findConversation()`/`conversationForThread()`/`listBoardConversations()`
+> (Alpha 757) round out `FedosBoardRuntime`'s own read surface. No
+> atomicity is claimed between the Board and Conversation writes (two
+> separate ports, no shared commit) — a partial failure is surfaced
+> explicitly, never hidden. Private-group, direct/DM, membership,
+> invitations, encryption, pseudonyms, and deletion/compaction remain
+> entirely unimplemented — public mode only, per this Arc's own scope.
+>
+> See `docs/secure_runtime_alpha_741_current_conversation_and_board_inventory.md`
+> through `docs/secure_runtime_alpha_760_completion_declaration.md` for
+> the full, per-Stage record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 681–720 — Nostr Identity Binding &
 > Outbound Delivery Activation Arc (complete).** Closes the Alpha 649/665
 > blocker the prior Arc left honestly unresolved: no safe way existed to

@@ -64,11 +64,27 @@ describe("Secure Runtime Alpha 632 -- Read Boundary", () => {
   it("7. no read method returns null or throws once Host is ready and inputs are well-formed -- confirms the facade never leaks a raw FedosBoardReader/FedosBoardQuery reference (both TS-unreachable from the Runtime's own public surface)", async () => {
     // Structural: FedosBoardRuntime's own public methods listed below are its
     // ENTIRE read surface -- neither `board()` nor `query()` is one of them.
+    //
+    // Secure Runtime Alpha 757 (Alpha 741-760 Canonical Conversation
+    // Identity and Record Foundation Arc) adds exactly three new read
+    // methods -- `findConversation`/`conversationForThread`/
+    // `listBoardConversations` -- the Conversation-equivalent facade
+    // this Stage's own Board read facade already established the
+    // precedent for. Additive to this closed list, never replacing it.
     const publicMethodNames = Object.getOwnPropertyNames(FedosBoardRuntime.prototype).filter((n) => n !== "constructor");
     expect(publicMethodNames).not.toContain("board");
     expect(publicMethodNames).not.toContain("query");
     expect(publicMethodNames.sort()).toEqual(
-      ["createPublicThread", "findPost", "recentFeed", "replyToPublicThread", "thread"].sort(),
+      [
+        "conversationForThread",
+        "createPublicThread",
+        "findConversation",
+        "findPost",
+        "listBoardConversations",
+        "recentFeed",
+        "replyToPublicThread",
+        "thread",
+      ].sort(),
     );
   });
 

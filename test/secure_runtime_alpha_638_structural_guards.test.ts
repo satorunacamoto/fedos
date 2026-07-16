@@ -10,6 +10,21 @@ import { join } from "node:path";
  * Scans every file this Arc actually added under `src/board/runtime/`
  * (a real recursive filesystem walk, not a fixed file list) for every
  * prohibited pattern this Arc's own instruction names.
+ *
+ * Secure Runtime Alpha 754 (Alpha 741-760 Canonical Conversation
+ * Identity and Record Foundation Arc) narrows test 4's own guard: its
+ * ORIGINAL intent (Alpha 622's own header) was that `FedosBoardRuntime`
+ * never bypasses `FedosDesktopHost`'s private ownership of
+ * Board/Outbox/Observation persistence -- never that it may hold NO
+ * persistence dependency of ANY kind. Conversation persistence is a
+ * deliberate, reasoned exception: Host has no concept of Conversation
+ * Policy/Mode at all (that lives here, in `FedosBoardRuntime`, since
+ * Alpha 656), so `FedosConversationPersistence` (Alpha 749) is an
+ * Application-layer concern this Runtime owns directly, exactly like
+ * `FedosConversationPolicyAuthority`/`FedosPublicAuthorAuthority`
+ * already are -- never routed through Host. Test 4 below is UPDATED,
+ * not weakened: it still fails on ANY persistence import that is not
+ * this one sanctioned exception.
  */
 
 const RUNTIME_DIR = "src/board/runtime";
@@ -56,8 +71,22 @@ describe("Secure Runtime Alpha 638 -- Structural Guards", () => {
     }
   });
 
-  it("4. no direct Persistence import -- no file imports a *Persistence class/interface directly", () => {
+  it("4. no direct Board/Outbox/Observation Persistence import -- every persistence-shaped import found is the ONE sanctioned Conversation persistence exception (Alpha 754, see this file's own header), never a Host-owned bypass", () => {
     for (const [file, code] of Object.entries(readAll())) {
+      const persistenceImportLines = code.split("\n").filter((line) => /from ".*persistence/i.test(line));
+      for (const line of persistenceImportLines) {
+        expect(line, `${file}: ${line}`).toMatch(/from "\.\.\/\.\.\/conversation\/persistence\//);
+      }
+    }
+  });
+
+  it("15. the Alpha 754 Conversation persistence exception is real and narrow -- fedos_board_runtime.ts imports FedosConversationPersistence/InMemoryFedosConversationPersistence from ../../conversation/persistence/, and no OTHER file under src/board/runtime/ imports any persistence at all", () => {
+    const files = readAll();
+    const runtimeSource = files[join(RUNTIME_DIR, "fedos_board_runtime.ts")];
+    expect(runtimeSource).toMatch(/from "\.\.\/\.\.\/conversation\/persistence\/fedos_conversation_persistence\.js"/);
+    expect(runtimeSource).toMatch(/from "\.\.\/\.\.\/conversation\/persistence\/in_memory_fedos_conversation_persistence\.js"/);
+    for (const [file, code] of Object.entries(files)) {
+      if (file === join(RUNTIME_DIR, "fedos_board_runtime.ts")) continue;
       expect(code, file).not.toMatch(/from ".*persistence/i);
     }
   });

@@ -72,6 +72,31 @@
  * second `startFedosDesktopRuntime()` call constructs a fully
  * independent `FedosBoardRuntime`, exactly mirroring this function's
  * own pre-existing "no shared Host" guarantee (Alpha 618).
+ *
+ * Secure Runtime Alpha 758 ("Local Runtime Ownership") — Stage 18 of
+ * the Alpha 741–760 Canonical Conversation Identity and Record
+ * Foundation Arc. `startFedosDesktopRuntime()` now OWNS the one
+ * `FedosConversationPersistence` this running runtime uses —
+ * `AppendOnlyFedosConversationPersistence(config.conversationLogPath)`
+ * when supplied, or an explicit, freshly-constructed
+ * `InMemoryFedosConversationPersistence()` otherwise (constructed HERE,
+ * not left to `FedosBoardRuntime`'s own internal default, so this
+ * function always holds a concrete reference to hydrate against, per
+ * Alpha 756, and pass through explicitly). After `host.start()`
+ * succeeds (Board state is hydrated, `host.board()` is real) and
+ * BEFORE `createFedosBoardRuntime()` is called,
+ * `hydrateFedosConversations()` verifies every persisted Conversation
+ * record against that hydrated Board state; a non-`"hydrated"` outcome
+ * throws, mirroring this function's own existing "convert a corrupt
+ * Board log into a thrown Error" discipline for `host.start()` itself.
+ * Conversation reads are exposed entirely through
+ * `runtime.boardRuntime()`'s own new `findConversation()`/
+ * `conversationForThread()`/`listBoardConversations()` methods (Alpha
+ * 757) — no new accessor is added to `FedosRunningDesktopRuntime`
+ * itself, matching Alpha 671's own "`FedosBoardRuntime` is the one
+ * thing a caller holds a reference to" precedent. No filesystem
+ * internal (the persistence object itself, a raw file handle, etc.) is
+ * ever exposed to a caller.
  */
 
 // @ts-expect-error `node:fs`/`node:path` have no type declarations without `@types/node` in this project's tsconfig.
@@ -87,6 +112,10 @@ import { AppendOnlyFedosDeliveryObservationPersistence } from "../../board/obser
 import { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
 import type { FedosDesktopRuntimeConfig } from "./fedos_desktop_runtime_config.js";
 import { createFedosBoardRuntime, type FedosBoardRuntime } from "../../board/runtime/fedos_board_runtime.js";
+import type { FedosConversationPersistence } from "../../conversation/persistence/fedos_conversation_persistence.js";
+import { AppendOnlyFedosConversationPersistence } from "../../conversation/persistence/append_only_fedos_conversation_persistence.js";
+import { InMemoryFedosConversationPersistence } from "../../conversation/persistence/in_memory_fedos_conversation_persistence.js";
+import { hydrateFedosConversations } from "../../conversation/fedos_conversation_hydration.js";
 
 export interface FedosRunningDesktopRuntime {
   readonly host: FedosDesktopHost;
@@ -142,6 +171,9 @@ export async function startFedosDesktopRuntime(
   if (config.observationLogPath !== undefined) {
     ensureParentDirectoryExists(config.observationLogPath);
   }
+  if (config.conversationLogPath !== undefined) {
+    ensureParentDirectoryExists(config.conversationLogPath);
+  }
 
   const boardPersistence = new AppendOnlyFedosBoardPersistence(config.boardLogPath);
   const outboxPersistence = new AppendOnlyFedosBoardOutboxPersistence(config.outboxLogPath);
@@ -151,6 +183,13 @@ export async function startFedosDesktopRuntime(
           new AppendOnlyFedosDeliveryObservationPersistence(config.observationLogPath),
         )
       : undefined;
+  // Alpha 758 -- constructed explicitly HERE (not left to
+  // FedosBoardRuntime's own internal default) so this function always
+  // holds a concrete reference to hydrate against, below.
+  const conversationPersistence: FedosConversationPersistence =
+    config.conversationLogPath !== undefined
+      ? new AppendOnlyFedosConversationPersistence(config.conversationLogPath)
+      : new InMemoryFedosConversationPersistence();
 
   const host = createFedosDesktopHost({
     desktopApplication: createDesktopApplication(),
@@ -163,6 +202,21 @@ export async function startFedosDesktopRuntime(
 
   await host.start(); // propagates unmodified on a corrupt Board log — Host itself sets state "failed" (Alpha 614)
 
+  // Alpha 756/758 -- verifies every persisted Conversation record
+  // against the Board state host.start() just hydrated, BEFORE any
+  // FedosBoardRuntime Conversation read is ever reachable. A
+  // non-"hydrated" outcome throws, mirroring the exact same "convert a
+  // corrupt log into a thrown Error" discipline host.start() itself
+  // already uses for a corrupt Board log.
+  const boardReaderForHydration = host.board();
+  if (boardReaderForHydration === null) {
+    throw new Error("startFedosDesktopRuntime: Host reported ready but board() returned null -- unreachable under normal operation.");
+  }
+  const conversationHydration = hydrateFedosConversations(conversationPersistence, boardReaderForHydration);
+  if (conversationHydration.outcome !== "hydrated") {
+    throw new Error(`startFedosDesktopRuntime failed to hydrate Conversation state: ${conversationHydration.outcome}`);
+  }
+
   let deliveryStarted = false;
   if (config.deliveryEnabled) {
     host.startDelivery(); // propagates unmodified on a corrupt Outbox/Observation log
@@ -172,6 +226,8 @@ export async function startFedosDesktopRuntime(
   // Alpha 672 -- exactly one FedosBoardRuntime per running runtime,
   // over the SAME host, using whichever Authority/idGenerator/clock
   // the caller supplied (or FedosBoardRuntime's own existing defaults).
+  // Alpha 758 -- conversationPersistence is always the concrete
+  // instance constructed above, never omitted here.
   const boardRuntimeInstance = createFedosBoardRuntime({
     host,
     idGenerator: config.idGenerator,
@@ -180,6 +236,7 @@ export async function startFedosDesktopRuntime(
     conversationPolicyAuthority: config.conversationPolicyAuthority,
     nostrAuthorBindingAuthority: config.nostrAuthorBindingAuthority,
     nostrAccountIndex: config.nostrAccountIndex,
+    conversationPersistence,
   });
 
   let stopped = false;

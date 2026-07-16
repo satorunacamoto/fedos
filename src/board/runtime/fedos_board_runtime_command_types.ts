@@ -38,10 +38,45 @@
  *     authorship or silently blocking as `"unavailable"` (which would
  *     misleadingly imply the Host itself is not ready).
  * No other field on this file changed.
+ *
+ * Secure Runtime Alpha 754/755 ("BoardRuntime Creation/Reply
+ * Integration") — Stages 14/15 of the Alpha 741–760 Canonical
+ * Conversation Identity and Record Foundation Arc — adds ONE new field,
+ * `conversation`, to the three outcomes that already carry `post`
+ * (`"created"`/`"already-present"`/`"outbox-partial-failure"`), purely
+ * additive: every existing caller/test matching on `.outcome`/`.post`/
+ * `.outbox` alone is unaffected. `FedosConversationAssociationResult`
+ * reports what `FedosBoardRuntime` did/found for the Conversation this
+ * post belongs to — `"recorded"`/`"already-recorded"` from
+ * `createPublicThread()` (a new Conversation record durably written, or
+ * an idempotent duplicate of one already there); `"existing"`/
+ * `"not-found"` from `replyToPublicThread()` (an existing Conversation
+ * record resolved, or none found — the honest Alpha 756 answer for a
+ * reply into a thread that predates this Arc, NEVER a reply-command
+ * failure: the underlying Board reply always succeeds or fails exactly
+ * as it did before this Arc, regardless of `conversation`'s own
+ * outcome); `"conflict"`/`"persistence-failed"` surface a genuine
+ * `FedosConversationPersistence` write anomaly, never silently
+ * swallowed.
  */
 
 import type { FedosBoardOutboxTarget } from "../outbox/fedos_board_outbox_types.js";
 import type { FedosBoardPost } from "../fedos_board_post.js";
+import type { FedosConversationRecord } from "../../conversation/fedos_conversation_record.js";
+
+/**
+ * Alpha 754/755 — see this file's own header. `"conflict"` and
+ * `"persistence-failed"` mirror `FedosConversationPersistenceWriteResult`'s
+ * own outcomes (`../../conversation/persistence/fedos_conversation_persistence.js`)
+ * verbatim; no new write-outcome vocabulary is invented here.
+ */
+export type FedosConversationAssociationResult =
+  | { readonly outcome: "recorded"; readonly conversation: FedosConversationRecord }
+  | { readonly outcome: "already-recorded"; readonly conversation: FedosConversationRecord }
+  | { readonly outcome: "existing"; readonly conversation: FedosConversationRecord }
+  | { readonly outcome: "not-found" }
+  | { readonly outcome: "conflict" }
+  | { readonly outcome: "persistence-failed" };
 
 /** Caller input for a new public thread (= a new root post; see Alpha 631 — no separate "board post" API exists). */
 export interface CreatePublicThreadCommand {
@@ -69,6 +104,36 @@ export interface FedosBoardRuntimeOutboxTargetResult {
 }
 
 /**
+ * Alpha 754/755 — the INTERNAL shape `#assembleAndSubmit()`/`#mapResult()`
+ * produce, before `createPublicThread()`/`replyToPublicThread()` each
+ * attach their own `conversation` (Alpha 754 resolves/creates one;
+ * Alpha 755 only resolves one — the two methods disagree on HOW
+ * `conversation` is computed, so neither shared private method can
+ * compute it itself). Byte-for-byte the ORIGINAL (pre-Alpha-754)
+ * `FedosBoardRuntimeCommandResult` shape — never exported outside this
+ * module.
+ */
+type FedosBoardRuntimeWriteResult =
+  | { readonly outcome: "created"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
+  | { readonly outcome: "already-present"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
+  | { readonly outcome: "outbox-partial-failure"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
+  | { readonly outcome: "conflict"; readonly reason: "post-id-conflict" | "source-conflict" }
+  | {
+      readonly outcome: "invalid-command";
+      readonly reason:
+        | "malformed-post"
+        | "missing-parent"
+        | "invalid-thread"
+        | "cross-board-reply"
+        | "unsupported-conversation-mode"
+        | "author-conflict";
+    }
+  | { readonly outcome: "unavailable" }
+  | { readonly outcome: "persistence-failed" };
+
+export type { FedosBoardRuntimeWriteResult };
+
+/**
  * Every outcome `FedosBoardRuntime.createPublicThread()`/
  * `replyToPublicThread()` can ever return. `"created"`/
  * `"already-present"`/`"outbox-partial-failure"` all carry the
@@ -80,9 +145,24 @@ export interface FedosBoardRuntimeOutboxTargetResult {
  * did NOT reach `"inserted"`/`"already-present"`.
  */
 export type FedosBoardRuntimeCommandResult =
-  | { readonly outcome: "created"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
-  | { readonly outcome: "already-present"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
-  | { readonly outcome: "outbox-partial-failure"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
+  | {
+      readonly outcome: "created";
+      readonly post: FedosBoardPost;
+      readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[];
+      readonly conversation: FedosConversationAssociationResult;
+    }
+  | {
+      readonly outcome: "already-present";
+      readonly post: FedosBoardPost;
+      readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[];
+      readonly conversation: FedosConversationAssociationResult;
+    }
+  | {
+      readonly outcome: "outbox-partial-failure";
+      readonly post: FedosBoardPost;
+      readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[];
+      readonly conversation: FedosConversationAssociationResult;
+    }
   | { readonly outcome: "conflict"; readonly reason: "post-id-conflict" | "source-conflict" }
   | {
       readonly outcome: "invalid-command";
