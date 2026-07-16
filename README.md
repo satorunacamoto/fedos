@@ -8,6 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 601–620 — Desktop Local Runtime Entry
+> Point & Publish Pipeline Ownership Arc (complete).** Gives
+> `FedosDesktopHost` — Board Persistence/Hydration, Board Query,
+> Durable Outbox, Nostr Publisher (caller-injected), Delivery
+> Observation, Scheduler, Retry/Abandonment, Recovery Hydration, ALL
+> pre-existing and UNCHANGED — its FIRST real, callable production
+> caller (`src/desktop/runtime/`, Alpha 601's own inventory: none
+> existed before this Arc). `npm run start:runtime` (built via `tsc -p
+> tsconfig.runtime.json`, package.json gains only 2 new scripts, zero
+> new `dependencies`/`devDependencies`) launches
+> `run_fedos_desktop_runtime.js` as a genuine, separate OS process —
+> confirmed by real `child_process.spawn` execution reaching a real
+> `ready` state against real durable files (Alpha 619), not merely an
+> importable, never-invoked function. `FedosDesktopRuntimeConfig`
+> requires every filesystem path explicitly from the caller — no
+> default path, no secret/seed/token field, no `process.env` read
+> (Alpha 603/604). A new, minimal `AppendOnlyFedosDeliveryObservationPersistence`
+> (`node:fs`-only, no new dependency) closes the gap the Alpha 581–600
+> Arc's own recovery machinery needed to be genuinely durable, rather
+> than activating delivery against a backend known to lose everything
+> on restart (Alpha 609) — `deliveryEnabled: true` now REQUIRES a real
+> durable Observation path AND a caller-injected `FedosBoardOutboxPublisher`
+> (this Arc constructs no Signing Authority or Relay of its own — no
+> Runtime crypto touched, per this Arc's own Absolute Prohibitions),
+> fail closed, never a silent Mock/in-memory fallback (Alpha 610/614).
+> `src/worker.ts` is completely untouched; zero cross-reference either
+> direction, confirmed structurally (Alpha 616). The full ten-step
+> real-restart scenario (submit -> queue -> deliver -> stop -> fresh
+> instance -> hydrate -> recover -> no duplicate redelivery) passes
+> end to end against real temporary files (Alpha 615). Honest,
+> disclosed limitation: OS-level `SIGINT`/`SIGTERM` delivery to the
+> built executable could not be independently verified end-to-end in
+> this session's own Windows-sandboxed test environment (three real,
+> independent signal-delivery attempts each failed to reliably reach
+> the spawned child process here) — the handler code follows Node's
+> documented API correctly and is expected to work on a real POSIX
+> target, stated as an expectation, not a proven fact (Alpha 613/619).
+>
+> See `docs/secure_runtime_alpha_601_current_runtime_caller_inventory.md`
+> through `docs/secure_runtime_alpha_620_desktop_local_runtime_completion.md`
+> for the full, per-Stage record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 581–600 — Durable Retry Registry &
 > Delivery Recovery Arc (complete).** Closes the Alpha 573 finding
 > (Alpha 561–580 Arc): `FedosDesktopHost.startDelivery()`'s own
