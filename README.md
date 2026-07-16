@@ -8,6 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 791–820 — Conversation Retention &
+> Private Payload Storage Boundary Foundation Arc (complete).** Builds
+> the bottom two boundaries of the target private-message architecture
+> (Opaque Payload Reference → Private Payload Storage →
+> Retention/Tombstone Authority) — no Private Message Envelope, no
+> encryption, no Membership/Capability of any kind. Eight named
+> deletion meanings (`src/conversation/retention/fedos_payload_retention_state.ts`,
+> Alpha 792) replace any generic "deleted" boolean; only three are V1
+> enforceable (`application-hidden`/`logically-tombstoned`/
+> `local-payload-removed`). `FedosConversationPayloadDescriptor`
+> (`src/conversation/payload_storage/`, Alpha 803) is metadata-only —
+> bytes travel separately through a dedicated
+> `FedosConversationPayloadStorage` port (Alpha 804) with NO delete
+> method, backed by both an in-memory and a real, zero-new-dependency
+> append-only backend (Alpha 807/809). `FedosPayloadRetentionAuthority`
+> (Alpha 796/811) narrowly connects a separate Retention Decision Log
+> to that port: `active → tombstoned → payload-removed` only, every
+> reverse transition rejected, no restore method of any kind (Alpha
+> 798). `removeLocalPayload()` is an honest, CONDITIONAL claim — an
+> access-state transition the Authority itself enforces, never a
+> guarantee that the underlying append-only backend's own bytes are
+> physically erased (Alpha 799). Plaintext bytes round-trip unchanged
+> through the durable backend, confirming no silent encryption occurs
+> anywhere in this Arc (Alpha 814). `FedosConversationRecord`, its
+> persistence, Board persistence, `FedosBoardRuntime`, and
+> `startFedosDesktopRuntime()` are all confirmed byte-for-byte
+> untouched (Alpha 816) — no Runtime wiring is added, since no real
+> private-message consumer exists yet to justify it (Alpha 815).
+> Private-group, direct/DM, Membership, Capability invitations,
+> encryption, and the Private Message Envelope itself remain entirely
+> unimplemented.
+>
+> See `docs/secure_runtime_alpha_791_existing_storage_and_deletion_inventory.md`
+> through `docs/secure_runtime_alpha_820_completion_declaration.md` for
+> the full, per-Stage record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 761–790 — Canonical Conversation
 > Membership & Capability Foundation Arc (complete).** Establishes
 > authorization VOCABULARY and BOUNDARIES only — it does NOT enable
