@@ -8,6 +8,47 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 581–600 — Durable Retry Registry &
+> Delivery Recovery Arc (complete).** Closes the Alpha 573 finding
+> (Alpha 561–580 Arc): `FedosDesktopHost.startDelivery()`'s own
+> fresh-`FedosPublishScheduler`-per-call construction (Alpha 508,
+> unchanged) re-attempted EVERY still-present Outbox intent on a
+> restart, including already-`"delivered"` ones — not merely retry/
+> abandonment bookkeeping. Fix: recovery state (delivered/abandoned/
+> completed-attempt-count/next-attempt-number) is now rebuilt from the
+> EXISTING durable Observation history on every `startDelivery()` call
+> (`FedosDeliveryRetryQuery.historyFor()`, Alpha 528, unchanged) — NO
+> new persistence backend, NO new schema, NO new npm dependency (Alpha
+> 582's own canonical-ownership decision: the Observation history
+> already WAS the durable record; nothing read it back before this
+> Arc). `FedosPublishScheduler` gains 3 additive-only optional
+> constructor fields (`initialDelivered`/`initialAbandoned`/
+> `initialCompletedAttempts`); `FedosDeliveryRetryRegistry` gains 1
+> additive-only, never-downward method (`hydrateAttemptCount`); a new
+> `createFedosDeliveryScheduler()` (`fedos_delivery_recovery_hydration.ts`)
+> is the ONE call `startDelivery()` makes — `FedosDesktopHost`'s own
+> source still never names `FedosDeliveryRetryQuery`/attempt-subject-id
+> concepts (Alpha 522's own boundary, re-confirmed, not weakened).
+> Verified end to end: three `startDelivery()`/`stopDelivery()` cycles
+> on the SAME Host went from 6 re-publish calls (`1+2+3`) to 3 (one per
+> cycle); a genuinely fresh `FedosDesktopHost` instance, sharing only
+> the durable Persistence/Repository objects with a prior one, never
+> re-publishes an already-delivered/abandoned intent but DOES correctly
+> re-attempt genuinely still-pending work; all four protocols this
+> repository defines (nostr/activitypub/atproto/session) recover
+> identically, confirmed protocol-neutral both behaviorally and
+> structurally. `npm run typecheck`: zero new errors. Three prior-Arc
+> regression-guard tests, genuinely invalidated by this Arc's own
+> in-scope changes, were updated with explicit, scoped exceptions —
+> see `docs/secure_runtime_alpha_591_599_regression_review.md`.
+> `package.json`/`Cargo.toml`/`p2p/`: untouched.
+>
+> See `docs/secure_runtime_alpha_581_retry_state_inventory.md` through
+> `docs/secure_runtime_alpha_600_durable_retry_registry_completion.md`
+> for the full, per-Stage record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 561–580 — Publish Scheduler Concurrency
 > Safety & Abandonment Policy Arc (complete).** Closes the two Publish
 > Runtime defects the Alpha 541–560 Operational Review Arc proved by
