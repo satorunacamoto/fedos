@@ -43,6 +43,7 @@ import type { FedosPublicAuthorAuthority } from "../../board/runtime/identity/fe
 import type { FedosConversationPolicyAuthority } from "../../board/runtime/policy/fedos_conversation_policy_authority.js";
 import type { FedosBoardRuntimeIdGenerator } from "../../board/runtime/fedos_board_runtime_id_generator.js";
 import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/identity/fedos_nostr_author_binding_types.js";
 
 export interface FedosDesktopRuntimeConfig {
   /** Explicit, caller-supplied path to the Board append-only log file. */
@@ -84,4 +85,17 @@ export interface FedosDesktopRuntimeConfig {
   readonly idGenerator?: FedosBoardRuntimeIdGenerator;
   /** Alpha 673 — optional; passed straight through to `createFedosBoardRuntime()`. Omitted, `defaultFedosBoardRuntimeClock` applies (Alpha 625, unchanged). */
   readonly clock?: FedosBoardRuntimeClock;
+  /**
+   * Secure Runtime Alpha 697 — optional; passed straight through to
+   * `createFedosBoardRuntime()`. Omitted, this Runtime's own
+   * `FedosBoardRuntime` consults no Binding Authority at all, so every
+   * `"nostr"` outbound target stays `"ineligible"` (the SAME fail-closed
+   * V1 default this codebase already had before the Alpha 681-720 Arc).
+   * Supply `new FedosSigningAuthorityNostrAuthorBinding(signingAuthority)`
+   * (`../../board/runtime/identity/fedos_nostr_author_binding_authority.js`)
+   * to unlock real Nostr eligibility.
+   */
+  readonly nostrAuthorBindingAuthority?: FedosNostrAuthorBindingAuthority;
+  /** Secure Runtime Alpha 697 — optional; passed straight through to `createFedosBoardRuntime()`. Omitted, account index `0` applies (Alpha 689). */
+  readonly nostrAccountIndex?: number;
 }

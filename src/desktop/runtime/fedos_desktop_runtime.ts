@@ -178,6 +178,8 @@ export async function startFedosDesktopRuntime(
     clock: config.clock,
     publicAuthorAuthority: config.publicAuthorAuthority,
     conversationPolicyAuthority: config.conversationPolicyAuthority,
+    nostrAuthorBindingAuthority: config.nostrAuthorBindingAuthority,
+    nostrAccountIndex: config.nostrAccountIndex,
   });
 
   let stopped = false;

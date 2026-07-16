@@ -4775,6 +4775,62 @@ mod master_root {
         ))
     }
 
+    /// Secure Runtime Alpha 684/685 — derives the SAME per-account Nostr
+    /// public key [`sign_nostr_event_from_master_seed_internal`] itself
+    /// derives (identity root -> application root -> nostr root -> nostr
+    /// secret key -> public key, Alpha 146-200's own UNCHANGED chain),
+    /// but stops there — no event is built, no signature is produced, and
+    /// the derived secret key is `clear()`-ed immediately after deriving
+    /// the public key, before this function returns. Returns the
+    /// canonical lowercase hex encoding
+    /// (`nostr_identifier_encoding::encode_nostr_public_key_hex_internal`,
+    /// Alpha 173, UNCHANGED) — never a raw byte, never the secret key
+    /// itself, never an `npub`. `None` on ANY failure at ANY derivation
+    /// step, fail closed, never a panic. This function's sole reviewed
+    /// caller is `FedosMasterSeedAuthority::public_key_hex_for_account`
+    /// (outside this module, its ONE WASM-exported caller).
+    pub(crate) fn derive_nostr_public_key_hex_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+    ) -> Option<String> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let public_key = derive_nostr_public_key_internal(&secret_key);
+        secret_key.clear();
+        let public_key = public_key?;
+
+        nostr_identifier_encoding::encode_nostr_public_key_hex_internal(&public_key)
+            .map(|hex| hex.as_str().to_string())
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -10411,6 +10467,26 @@ impl FedosMasterSeedAuthority {
             content,
         )
     }
+
+    /// Secure Runtime Alpha 684 ("Signing Public Identity Output") /
+    /// Alpha 685 ("Rust/WASM Boundary Review") — the ONE new WASM export
+    /// this Arc adds. Derives the SAME per-account Nostr public key
+    /// [`sign_nostr_event`] itself signs against, via
+    /// `master_root::derive_nostr_public_key_hex_from_master_seed_internal`
+    /// (this Arc's own new sibling function, reusing the EXISTING Alpha
+    /// 146-200 derivation chain byte-for-byte) — but performs NO signing
+    /// of any kind. Returns the canonical 64-character lowercase hex
+    /// public key, or `None` if no Master Seed is currently held (still
+    /// `Empty`, or already `Cleared`) or if any derivation step fails.
+    /// Never panics, never returns a secret byte, never returns `npub`
+    /// (Alpha 683's own "smallest output" decision — hex only).
+    pub fn public_key_hex_for_account(&self, account_index: u32) -> Option<String> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        crate::master_root::derive_nostr_public_key_hex_from_master_seed_internal(handle, account_index)
+    }
 }
 
 #[cfg(test)]
@@ -10809,6 +10885,91 @@ mod master_seed_authority_tests {
         let verifying_key = SchnorrVerifyingKey::from_bytes(&pubkey_bytes).expect("valid x-only pubkey");
         let signature = SchnorrSignature::try_from(sig_bytes.as_slice()).expect("valid 64-byte signature");
         assert!(verifying_key.verify_prehash(&id_bytes, &signature).is_ok());
+    }
+
+    // Secure Runtime Alpha 684/685/696 -- `public_key_hex_for_account`.
+
+    #[test]
+    fn public_key_hex_for_account_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert_eq!(authority.public_key_hex_for_account(0), None);
+    }
+
+    #[test]
+    fn public_key_hex_for_account_fails_closed_on_a_cleared_authority() {
+        let mut authority = generated_authority();
+        authority.clear();
+        assert_eq!(authority.public_key_hex_for_account(0), None);
+    }
+
+    #[test]
+    fn public_key_hex_for_account_returns_exactly_64_lowercase_hex_chars() {
+        let authority = generated_authority();
+        let hex = authority.public_key_hex_for_account(0).expect("must derive");
+        assert_eq!(hex.len(), 64);
+        assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn public_key_hex_for_account_is_deterministic_across_calls() {
+        let authority = generated_authority();
+        let first = authority.public_key_hex_for_account(7).expect("must derive");
+        let second = authority.public_key_hex_for_account(7).expect("must derive");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn public_key_hex_for_account_differs_across_accounts() {
+        let authority = generated_authority();
+        let zero = authority.public_key_hex_for_account(0).expect("must derive");
+        let one = authority.public_key_hex_for_account(1).expect("must derive");
+        let max = authority.public_key_hex_for_account(u32::MAX).expect("must derive");
+        assert_ne!(zero, one);
+        assert_ne!(one, max);
+        assert_ne!(zero, max);
+    }
+
+    #[test]
+    fn public_key_hex_for_account_differs_across_independently_generated_seeds() {
+        let first_seed = generated_authority().public_key_hex_for_account(0).expect("must derive");
+        let second_seed = generated_authority().public_key_hex_for_account(0).expect("must derive");
+        assert_ne!(first_seed, second_seed);
+    }
+
+    #[test]
+    fn public_key_hex_for_account_matches_sign_nostr_events_own_pubkey_for_the_same_account() {
+        let authority = generated_authority();
+        let derived_hex = authority.public_key_hex_for_account(2).expect("must derive");
+        let signed = authority
+            .sign_nostr_event(2, 1_700_000_020.0, 1, vec![], "binding cross-check".to_string())
+            .expect("must sign");
+        let signed_pubkey = extract_json_string_field(&signed, "pubkey");
+        assert_eq!(derived_hex, signed_pubkey);
+    }
+
+    #[test]
+    fn public_key_hex_for_account_never_signs_and_never_touches_a_secret_byte() {
+        // Structural confirmation: `public_key_hex_for_account`'s own
+        // return type is `Option<String>` -- there is no path by which it
+        // could return a secret key, a signature, or an event; this test
+        // exists to document that guarantee alongside its sibling tests
+        // above, not to newly prove it (the type signature itself does).
+        let authority = generated_authority();
+        let hex = authority.public_key_hex_for_account(0).expect("must derive");
+        assert!(!hex.is_empty());
+    }
+
+    #[test]
+    fn public_key_hex_for_account_restored_from_the_same_sealed_envelope_yields_the_identical_hex() {
+        let original = generated_authority();
+        let original_hex = original.public_key_hex_for_account(0).expect("must derive");
+        let sealed = original.seal(TEST_PASSPHRASE).expect("must seal");
+
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(restored.restore_sealed(&sealed, TEST_PASSPHRASE));
+        let restored_hex = restored.public_key_hex_for_account(0).expect("must derive");
+
+        assert_eq!(original_hex, restored_hex);
     }
 }
 

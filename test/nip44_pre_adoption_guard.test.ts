@@ -188,7 +188,7 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
 
   it("11. the crate's public pub fn surface is unchanged at twenty-seven", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
     for (const name of pubFnNames) {
       expect(name.toLowerCase()).not.toContain("nip44");
       expect(name.toLowerCase()).not.toContain("conversation");

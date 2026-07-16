@@ -40,7 +40,7 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
     // `random_bytes_32` (Stage 1004, Secure Runtime Alpha 008),
     // `generate_aead_key_handle`/`kind` (Stage 1008, Secure Runtime
     // Alpha 013 -- REPLACING Stage 1005's `generate_aead_key_32`),
@@ -83,6 +83,7 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
       "restore_sealed",
       "clear",
       "sign_nostr_event",
+      "public_key_hex_for_account",
     ]);
     for (const name of pubFnNames) {
       if (NEW_SINCE_THIS_REVIEW.has(name as string)) continue;
@@ -170,7 +171,7 @@ describe("FedOS Rust Export Readiness Review -- review only, no Rust/Cargo/packa
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
 
     const cargoCode = cargoTomlSource

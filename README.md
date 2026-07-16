@@ -8,6 +8,67 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 681–720 — Nostr Identity Binding &
+> Outbound Delivery Activation Arc (complete).** Closes the Alpha 649/665
+> blocker the prior Arc left honestly unresolved: no safe way existed to
+> confirm a resolved public author's key was actually controlled by this
+> Runtime's own Nostr signing authority. `FedosNostrSigningAuthority`
+> (`src/nostr/sign/`) gains one additive, non-secret method,
+> `publicIdentityForAccount(accountIndex)` (Alpha 684, backed by ONE new
+> reviewed Rust `pub fn`, `public_key_hex_for_account`, Alpha 685 — reuses
+> the existing derivation chain, never signs, never returns a secret
+> byte). `FedosNostrAuthorBindingAuthority`
+> (`src/board/runtime/identity/fedos_nostr_author_binding_authority.ts`,
+> Alpha 686–688) cryptographically compares a resolved author's hex
+> `publicIdentifier` against that derived key before
+> `evaluateFedosOutboundEligibility()` ever marks a `"nostr"` target
+> eligible (Alpha 694) — `FedosBoardRuntime` gained two new optional
+> dependencies, `nostrAuthorBindingAuthority`/`nostrAccountIndex`
+> (default account `0`), both fully backward-compatible: omitted, the
+> pre-Arc fail-closed default is byte-for-byte preserved. A real,
+> controlled Nostr identity now reaches the Outbox for the first time
+> (Alpha 698/699).
+>
+> Phase B activates real delivery: `boardPostToNostrUnsignedEventRequest()`
+> (`src/board/publish/nostr/`, Alpha 703) is the one missing Board-to-Nostr
+> mapping Alpha 701's own inventory found (every other pipeline piece —
+> Outbox, Scheduler, Publisher Adapter, Relay — already existed, Alpha
+> 451–530, untouched); `FedosSigningAuthorityBoardPostEventSource` (Alpha
+> 704) wires it to the same fixed signing account the binding check
+> already verified. `createNodeWebSocketRelaySocketFactory()`
+> (`src/desktop/`, Alpha 705) is a real, production `WebSocket` factory —
+> Node 22+'s own global `WebSocket`, no new dependency. `FedosRelayOkCorrelatedNostrBoardPublisher`
+> (Alpha 710/711) is a genuinely new capability: it correlates a
+> published event's own NIP-01 id against the Relay's real `["OK", ...]`
+> response (reusing `FedosRelay.onRelayMessage()`, shipped since Alpha
+> 238 but never wired into the Publish pipeline until now) — `"delivered"`
+> now honestly means Relay-accepted, not merely transport-sent, when a
+> Local Runtime chooses this Publisher; the older, transport-only
+> `FedosRelayNostrBoardPublisher` remains unchanged and available. A real
+> BIP-340-signed event was independently verified end to end (event id +
+> Schnorr signature, `src/nostr/noble_signature.ts`, reused unchanged),
+> and a full three-runtime restart cycle over real durable append-only
+> files confirmed no duplicate send (Alpha 707–709, 719).
+>
+> Known, disclosed V1 limitations (not silent gaps): reply/thread NIP-01
+> `"e"` tags are not populated (no postId-keyed Observation lookup exists
+> yet, Alpha 703); a Relay's explicit `accepted: false` rejection
+> currently retries on the same schedule a transient failure would,
+> rather than being permanently abandoned (Alpha 711) — widening the
+> frozen `FedosNostrBoardPublisher.publishOne(): Promise<boolean>`
+> contract to add a third state was judged out of this Arc's own reviewed
+> scope. Multiple Nostr accounts per command, ActivityPub/AT Protocol/
+> Session outbound, Relay Pool, bridge attribution, private-group, DM,
+> invitations, encryption, pseudonyms, GUI, Worker, Humanizer/AI,
+> Ontology, and economic anti-spam all remain entirely out of scope,
+> unchanged.
+>
+> See `docs/secure_runtime_alpha_681_identity_and_signing_inventory.md`
+> through `docs/secure_runtime_alpha_720_completion_declaration.md` for
+> the full, per-Alpha record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 641–680 — Public Identity, Conversation
 > Policy & Application Runtime Integration Arc (complete).** Turns the
 > existing Local Runtime and Public Board Runtime into one honest,

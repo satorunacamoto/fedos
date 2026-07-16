@@ -13,7 +13,10 @@
  * Never signs in TypeScript, never selects a Relay, never reads the
  * Outbox, never retries.
  */
-import type { FedosWasmLoaderNostrSignEventExecution } from "../../runtime/fedos_wasm_loader.js";
+import type {
+  FedosWasmLoaderNostrPublicIdentityExecution,
+  FedosWasmLoaderNostrSignEventExecution,
+} from "../../runtime/fedos_wasm_loader.js";
 import { FedosWasmLoaderSkeleton } from "../../runtime/fedos_wasm_loader.js";
 import { FedosWasmMasterSeedAuthority } from "../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
 import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
@@ -23,6 +26,10 @@ import {
   type FedosNostrSigningAuthority,
   type FedosNostrUnsignedEventRequest,
 } from "./fedos_nostr_signing_authority.js";
+import type { FedosNostrSigningPublicIdentity } from "./fedos_nostr_signing_public_identity.js";
+
+const U32_MAX = 4_294_967_295;
+const NOSTR_PUBLIC_KEY_HEX_PATTERN = /^[0-9a-f]{64}$/;
 
 /** Matches `FEDOS_NOSTR_TAG_FIELD_SEPARATOR` in `lib.rs` exactly — U+0001, never a legitimate Nostr tag field character. */
 const NOSTR_TAG_FIELD_SEPARATOR = "";
@@ -37,6 +44,10 @@ export interface FedosNostrSigningWasmLoaderBoundary {
     tags: string[],
     content: string,
   ): Promise<FedosWasmLoaderNostrSignEventExecution>;
+  attemptDevOnlyNostrPublicIdentityForAccountCall(
+    authority: unknown,
+    accountIndex: number,
+  ): Promise<FedosWasmLoaderNostrPublicIdentityExecution>;
 }
 
 /**
@@ -114,6 +125,29 @@ export class FedosWasmNostrSigningAuthority implements FedosNostrSigningAuthorit
     if (!result.succeeded || result.signedEventJson === null) return null;
 
     return parseSignedNostrWireEventJson(result.signedEventJson);
+  }
+
+  /**
+   * Secure Runtime Alpha 684 — derives `accountIndex`'s public identity
+   * without signing. `accountIndex` is validated as a `u32` exactly like
+   * `signEvent()`'s own field (Alpha 442); an out-of-range or
+   * non-integer value fails closed to `null` before the WASM boundary is
+   * ever reached. Never returns a secret byte.
+   */
+  async publicIdentityForAccount(accountIndex: number): Promise<FedosNostrSigningPublicIdentity | null> {
+    if (typeof accountIndex !== "number" || !Number.isInteger(accountIndex) || accountIndex < 0 || accountIndex > U32_MAX) {
+      return null;
+    }
+
+    const authority = await this.#masterSeedAuthority.accessForNostrSigningAuthorityInternalUse();
+    if (!authority) return null;
+
+    const result = await this.#loaderBoundary.attemptDevOnlyNostrPublicIdentityForAccountCall(authority, accountIndex);
+    if (!result.succeeded || result.publicKeyHex === null || !NOSTR_PUBLIC_KEY_HEX_PATTERN.test(result.publicKeyHex)) {
+      return null;
+    }
+
+    return Object.freeze({ accountIndex, publicKeyHex: result.publicKeyHex });
   }
 }
 

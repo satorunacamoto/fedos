@@ -158,7 +158,7 @@ describe("FedOS private Rust boundary, blocked before Rust crypto (Stage 329-336
 
   it("17. dependency counts unchanged -- Cargo.toml (10) and package.json (2) dependencies, Rust pub fn surface (27)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
 
     const cargoCode = cargoTomlSource
       .split("\n")

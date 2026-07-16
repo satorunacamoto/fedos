@@ -21,6 +21,7 @@ function fakeHandle(): FedosMasterSeedAuthorityHandle {
     restore_sealed: vi.fn(() => true),
     clear: vi.fn(),
     sign_nostr_event: vi.fn(() => REAL_SIGNED_EVENT_JSON),
+    public_key_hex_for_account: vi.fn(() => "0dd114".repeat(11).slice(0, 64)),
   };
 }
 
@@ -47,6 +48,12 @@ function mockSigningLoaderBoundary(signedEventJson: string | null): FedosNostrSi
       succeeded: signedEventJson !== null,
       signedEventJson,
       reason: signedEventJson !== null ? ("Succeeded" as const) : ("SigningFailed" as const),
+    })),
+    attemptDevOnlyNostrPublicIdentityForAccountCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      publicKeyHex: "0dd114".repeat(11).slice(0, 64),
+      reason: "Succeeded" as const,
     })),
   };
 }

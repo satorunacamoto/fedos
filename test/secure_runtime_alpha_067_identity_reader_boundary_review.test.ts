@@ -449,7 +449,7 @@ describe("Secure Runtime Alpha 067 -- Identity Reader Boundary Review, review/de
 
   it("35. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- no reference to this Stage's own doc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_067/);
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_067/);

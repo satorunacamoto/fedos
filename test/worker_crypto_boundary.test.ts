@@ -316,8 +316,12 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
   });
 
   it("15. public pub fn surface is unchanged at twenty-seven", () => {
+    // Secure Runtime Alpha 684/685 (Alpha 681-720 Arc) added exactly one
+    // new, reviewed pub fn -- `FedosMasterSeedAuthority::public_key_hex_for_account`
+    // -- reusing the existing derivation chain, no signing, no secret
+    // exposure. 44 -> 45.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
   });
 
   it("16. Cargo.toml and package.json dependency counts are unchanged", () => {

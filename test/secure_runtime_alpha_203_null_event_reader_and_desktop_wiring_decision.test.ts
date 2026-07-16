@@ -131,7 +131,7 @@ describe("Secure Runtime Alpha 203 -- Null Event Reader & Desktop Wiring Decisio
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
   });
 
   // ---------------------------------------------------------------------

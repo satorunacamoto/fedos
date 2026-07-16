@@ -1630,6 +1630,8 @@ export interface FedosMasterSeedAuthorityHandle {
     tags: string[],
     content: string,
   ) => string | undefined;
+  /** Secure Runtime Alpha 684/685 — derives the per-account Nostr public key without signing. */
+  readonly public_key_hex_for_account: (accountIndex: number) => string | undefined;
 }
 
 /**
@@ -1649,7 +1651,8 @@ function isFedosMasterSeedAuthorityShape(value: unknown): value is FedosMasterSe
     typeof candidate.seal === "function" &&
     typeof candidate.restore_sealed === "function" &&
     typeof candidate.clear === "function" &&
-    typeof candidate.sign_nostr_event === "function"
+    typeof candidate.sign_nostr_event === "function" &&
+    typeof candidate.public_key_hex_for_account === "function"
   );
 }
 
@@ -1722,6 +1725,20 @@ export interface FedosWasmLoaderNostrSignEventExecution {
   readonly reason:
     | "Succeeded"
     | "SigningFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 684/685 — `attemptDevOnlyNostrPublicIdentityForAccountCall()`'s own result. `publicKeyHex` is the canonical 64-character lowercase hex public key, never a secret Handle. */
+export interface FedosWasmLoaderNostrPublicIdentityExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly publicKeyHex: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "DerivationFailed"
     | "InvalidAuthorityHandle"
     | "NotInitialized"
     | "CallFailed"
@@ -1914,6 +1931,9 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   /** Secure Runtime Alpha 444 — most recent `attemptDevOnlyNostrSignEventCall()` result, or `null` before it has ever been called. Read via `nostrSignEventExecution()`. */
   #nostrSignEventExecution: FedosWasmLoaderNostrSignEventExecution | null = null;
+
+  /** Secure Runtime Alpha 684/685 — most recent `attemptDevOnlyNostrPublicIdentityForAccountCall()` result, or `null` before it has ever been called. Read via `nostrPublicIdentityExecution()`. */
+  #nostrPublicIdentityExecution: FedosWasmLoaderNostrPublicIdentityExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -2332,6 +2352,11 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   /** Secure Runtime Alpha 444 — read-only accessor for `#nostrSignEventExecution`. */
   nostrSignEventExecution(): FedosWasmLoaderNostrSignEventExecution | null {
     return this.#nostrSignEventExecution;
+  }
+
+  /** Secure Runtime Alpha 684/685 — read-only accessor for `#nostrPublicIdentityExecution`. */
+  nostrPublicIdentityExecution(): FedosWasmLoaderNostrPublicIdentityExecution | null {
+    return this.#nostrPublicIdentityExecution;
   }
 
   /**
@@ -3387,6 +3412,56 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#nostrSignEventExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 684/685 — PUBLIC, ASYNC. Calls
+   * `authority.public_key_hex_for_account(accountIndex)` — derives the
+   * per-account Nostr public key WITHOUT signing. Mirrors
+   * `attemptDevOnlyNostrSignEventCall()`'s own gating exactly (same
+   * artifact/dev-gate/readiness/import/init checks, same
+   * `isFedosMasterSeedAuthorityShape()` validation), returning the
+   * canonical hex string on success, never a secret Handle.
+   */
+  async attemptDevOnlyNostrPublicIdentityForAccountCall(
+    authority: unknown,
+    accountIndex: number,
+  ): Promise<FedosWasmLoaderNostrPublicIdentityExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderNostrPublicIdentityExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, publicKeyHex: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, publicKeyHex: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, publicKeyHex: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.public_key_hex_for_account(accountIndex);
+        if (typeof value === "string") {
+          result = { attempted: true, succeeded: true, publicKeyHex: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, publicKeyHex: null, reason: "DerivationFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, publicKeyHex: null, reason: "CallFailed" };
+      }
+    }
+    this.#nostrPublicIdentityExecution = result;
     return result;
   }
 

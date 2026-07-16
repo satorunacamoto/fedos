@@ -148,7 +148,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
     expect(pubFnNames).not.toContain("crypto_diagnostics_preview");
   });
 

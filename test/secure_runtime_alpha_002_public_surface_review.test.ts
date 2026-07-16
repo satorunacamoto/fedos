@@ -158,7 +158,7 @@ describe("Secure Runtime Alpha 002 Public Surface Review -- review only, no Runt
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_002_public_surface_review/);
 

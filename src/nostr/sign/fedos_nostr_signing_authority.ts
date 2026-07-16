@@ -19,6 +19,7 @@
  * Alpha 426's own reuse decision).
  */
 import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrSigningPublicIdentity } from "./fedos_nostr_signing_public_identity.js";
 
 export interface FedosNostrUnsignedEventRequest {
   readonly accountIndex: number;
@@ -104,4 +105,15 @@ export function freezeFedosNostrUnsignedEventRequest(
 
 export interface FedosNostrSigningAuthority {
   signEvent(request: FedosNostrUnsignedEventRequest): Promise<FedosNostrWireEvent | null>;
+  /**
+   * Secure Runtime Alpha 684 — derives the given account's public
+   * identity WITHOUT signing anything. `accountIndex` is a `u32`
+   * (0..=4294967295), matching `signEvent()`'s own `accountIndex` field
+   * exactly — the SAME account index passed here and to `signEvent()`
+   * always yields the matching `publicKeyHex`/`pubkey` pair (proven by
+   * `FedosNostrAuthorBindingAuthority`, `src/board/runtime/identity/`).
+   * `null` when no Master Seed is currently held or any derivation step
+   * fails — fail closed, never a panic, never a secret byte.
+   */
+  publicIdentityForAccount(accountIndex: number): Promise<FedosNostrSigningPublicIdentity | null>;
 }

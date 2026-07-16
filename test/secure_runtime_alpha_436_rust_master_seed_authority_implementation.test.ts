@@ -7,7 +7,7 @@ import libRaw from "../packages/fedos-core-rust/src/lib.rs?raw";
 const lib: string = (libRaw as string).replace(/\r\n/g, "\n");
 
 describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation", () => {
-  it("FedosMasterSeedAuthority exposes exactly the seven lifecycle methods plus sign_nostr_event, no more", () => {
+  it("FedosMasterSeedAuthority exposes exactly the seven lifecycle methods plus sign_nostr_event and (Alpha 684/685) public_key_hex_for_account, no more", () => {
     const implBlock = (lib.match(/impl FedosMasterSeedAuthority \{[\s\S]*?\n\}\n\n#\[cfg\(test\)\]/) ?? [""])[0];
     expect(implBlock.length).toBeGreaterThan(0);
     for (const method of [
@@ -19,11 +19,12 @@ describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation"
       "pub fn restore_sealed(",
       "pub fn clear(",
       "pub fn sign_nostr_event(",
+      "pub fn public_key_hex_for_account(",
     ]) {
       expect(implBlock).toContain(method);
     }
     const pubFnCount = (implBlock.match(/pub fn /g) ?? []).length;
-    expect(pubFnCount).toBe(8);
+    expect(pubFnCount).toBe(9);
   });
 
   it("no method returns raw seed bytes to the caller", () => {

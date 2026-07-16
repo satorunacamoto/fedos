@@ -71,7 +71,7 @@ describe("Secure Runtime Alpha 146 -- Master Seed Handle", () => {
 
   it("8. structural: the crate's total pub fn count remains fixed at 36 -- confirming zero public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(44);
+    expect(pubFnNames.length).toBe(45);
   });
 
   it("9. the design doc cross-references Alpha 141, Alpha 142, secret_handle_api_shape.md, and secret_lifecycle_implementation_plan.md", () => {

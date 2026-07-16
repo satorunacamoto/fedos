@@ -133,6 +133,7 @@ import type { FedosConversationPolicyAuthority } from "./policy/fedos_conversati
 import { StaticFedosConversationPolicyAuthority } from "./policy/fedos_conversation_policy_authority.js";
 import type { FedosConversationPolicy } from "./policy/fedos_conversation_policy.js";
 import { evaluateFedosOutboundEligibility } from "./eligibility/fedos_outbound_eligibility_evaluator.js";
+import type { FedosNostrAuthorBindingAuthority, FedosNostrAuthorBindingResult } from "./identity/fedos_nostr_author_binding_types.js";
 
 export interface FedosBoardRuntimeDependencies {
   readonly host: FedosDesktopHost;
@@ -144,6 +145,27 @@ export interface FedosBoardRuntimeDependencies {
   readonly publicAuthorAuthority?: FedosPublicAuthorAuthority;
   /** Optional; defaults to `new StaticFedosConversationPolicyAuthority()` (Alpha 654/656). */
   readonly conversationPolicyAuthority?: FedosConversationPolicyAuthority;
+  /**
+   * Secure Runtime Alpha 690/694/697 — optional; omitted means a
+   * `"nostr"`-resolved author can NEVER bind (this Runtime consults no
+   * Binding Authority at all), so every `"nostr"` target stays
+   * `"ineligible"` with reason `"identity-not-controlled"` — the SAME
+   * fail-closed behavior this class had before this Arc. Supply
+   * `new FedosSigningAuthorityNostrAuthorBinding(signingAuthority)`
+   * (`./identity/fedos_nostr_author_binding_authority.js`) to unlock
+   * real Nostr eligibility for a genuinely-controlled identity.
+   */
+  readonly nostrAuthorBindingAuthority?: FedosNostrAuthorBindingAuthority;
+  /**
+   * Secure Runtime Alpha 689 — the ONE explicit Nostr signing account
+   * index this Runtime's own Binding Authority checks against for every
+   * command. Optional; defaults to `0` (Alpha 689's own "Runtime/
+   * application configuration owns one explicit account index,
+   * defaulting only if an existing decision already establishes account
+   * 0" decision — Alpha 424 already fixed `kind: 1`/V1 scope around a
+   * single default account). Never inferred from `publicIdentifier`.
+   */
+  readonly nostrAccountIndex?: number;
 }
 
 export class FedosBoardRuntime {
@@ -152,6 +174,8 @@ export class FedosBoardRuntime {
   readonly #clock: FedosBoardRuntimeClock;
   readonly #authorAuthority: FedosPublicAuthorAuthority;
   readonly #policyAuthority: FedosConversationPolicyAuthority;
+  readonly #nostrAuthorBindingAuthority: FedosNostrAuthorBindingAuthority | undefined;
+  readonly #nostrAccountIndex: number;
 
   constructor(dependencies: FedosBoardRuntimeDependencies) {
     this.#host = dependencies.host;
@@ -159,6 +183,8 @@ export class FedosBoardRuntime {
     this.#clock = dependencies.clock ?? defaultFedosBoardRuntimeClock;
     this.#authorAuthority = dependencies.publicAuthorAuthority ?? new FedosDesktopPublicAuthorAuthority(dependencies.host);
     this.#policyAuthority = dependencies.conversationPolicyAuthority ?? new StaticFedosConversationPolicyAuthority();
+    this.#nostrAuthorBindingAuthority = dependencies.nostrAuthorBindingAuthority;
+    this.#nostrAccountIndex = dependencies.nostrAccountIndex ?? 0;
   }
 
   /**
@@ -206,7 +232,7 @@ export class FedosBoardRuntime {
       source: { protocol: "fedos", reference: id },
     };
 
-    return this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
+    return await this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
   }
 
   /**
@@ -257,15 +283,15 @@ export class FedosBoardRuntime {
       source: { protocol: "fedos", reference: id },
     };
 
-    return this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
+    return await this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
   }
 
-  #assembleAndSubmit(
+  async #assembleAndSubmit(
     input: FedosBoardPostInput,
     authorResolution: FedosPublicAuthorResolution,
     policy: FedosConversationPolicy,
     requestedTargets: readonly FedosBoardOutboxTarget[],
-  ): FedosBoardRuntimeCommandResult {
+  ): Promise<FedosBoardRuntimeCommandResult> {
     const post = validateFedosBoardPost(input);
     if (post === null) {
       return { outcome: "invalid-command", reason: "malformed-post" };
@@ -283,10 +309,32 @@ export class FedosBoardRuntime {
     // 633's own original §10 requirement, extended with Policy):
     // an ineligible target NEVER reaches `submitPostWithOutbox()`, so
     // `createFedosBoardOutboxIntent` is never even called for it.
+    //
+    // Alpha 694/698 -- the Nostr Identity-to-Signing Binding check is
+    // computed AT MOST ONCE per command (never per-target), lazily, only
+    // once the first "nostr" target is actually encountered, and only
+    // when the resolved author is itself "nostr"-protocol (an anonymous-
+    // local/ActivityPub/AT Protocol/Session author can never bind --
+    // Alpha 692 -- so no Binding Authority call is ever made for one).
+    let nostrAuthorBinding: FedosNostrAuthorBindingResult | undefined;
+    let nostrAuthorBindingComputed = false;
     const eligibleTargets: FedosBoardOutboxTarget[] = [];
     const ineligibleResults: FedosBoardRuntimeOutboxTargetResult[] = [];
     for (const target of requestedTargets) {
-      const eligibility = evaluateFedosOutboundEligibility({ policy, target, authorResolution });
+      if (target.protocol === "nostr" && !nostrAuthorBindingComputed) {
+        nostrAuthorBindingComputed = true;
+        if (
+          this.#nostrAuthorBindingAuthority !== undefined &&
+          isResolvedPublicAuthorResolution(authorResolution) &&
+          authorResolution.author.protocol === "nostr"
+        ) {
+          nostrAuthorBinding = await this.#nostrAuthorBindingAuthority.verifyBinding({
+            author: authorResolution.author,
+            accountIndex: this.#nostrAccountIndex,
+          });
+        }
+      }
+      const eligibility = evaluateFedosOutboundEligibility({ policy, target, authorResolution, nostrAuthorBinding });
       if (eligibility.outcome === "eligible") {
         eligibleTargets.push(target);
       } else {

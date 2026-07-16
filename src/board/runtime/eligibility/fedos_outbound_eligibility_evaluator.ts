@@ -83,8 +83,17 @@ export function evaluateFedosOutboundEligibility(input: FedosOutboundEligibility
   }
 
   if (input.target.protocol === "nostr") {
-    // Alpha 649/665: no safe key-control check exists -- fail closed,
-    // always, until a future Arc adds one.
+    // Secure Runtime Alpha 694 (Alpha 681-720 Nostr Identity Binding &
+    // Outbound Delivery Activation Arc): the Alpha 649/665 blocker is
+    // closed -- a real, cryptographically-verified binding (computed
+    // ONCE by `FedosBoardRuntime`, never here) now unlocks eligibility.
+    // Every other outcome (including `undefined`, when no Binding
+    // Authority is configured) keeps the SAME fail-closed
+    // `"identity-not-controlled"` reason this evaluator has always used
+    // -- no new eligibility reason token is introduced.
+    if (input.nostrAuthorBinding?.outcome === "bound") {
+      return { outcome: "eligible" };
+    }
     return { outcome: "ineligible", reason: "identity-not-controlled" };
   }
 

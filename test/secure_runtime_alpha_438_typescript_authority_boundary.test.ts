@@ -14,6 +14,7 @@ function fakeHandle(overrides: Partial<FedosMasterSeedAuthorityHandle> = {}): Fe
     restore_sealed: vi.fn(() => true),
     clear: vi.fn(),
     sign_nostr_event: vi.fn(() => "signed-event-json"),
+    public_key_hex_for_account: vi.fn(() => "a".repeat(64)),
     ...overrides,
   };
 }

@@ -26,11 +26,23 @@
 import type { FedosBoardOutboxTarget } from "../../outbox/fedos_board_outbox_types.js";
 import type { FedosConversationPolicy } from "../policy/fedos_conversation_policy.js";
 import type { FedosPublicAuthorResolution } from "../identity/fedos_public_author_authority.js";
+import type { FedosNostrAuthorBindingResult } from "../identity/fedos_nostr_author_binding_types.js";
 
 export interface FedosOutboundEligibilityInput {
   readonly policy: FedosConversationPolicy;
   readonly target: FedosBoardOutboxTarget;
   readonly authorResolution: FedosPublicAuthorResolution;
+  /**
+   * Secure Runtime Alpha 694 — the resolved author's own Nostr Identity-
+   * to-Signing Binding outcome (`../identity/fedos_nostr_author_binding_types.js`,
+   * Alpha 686/688), computed ONCE by `FedosBoardRuntime` before this
+   * evaluator is ever called (never by this evaluator itself — it
+   * performs no signing-authority call of its own). Omitted whenever the
+   * resolved author is not `"nostr"`-protocol, or no
+   * `FedosNostrAuthorBindingAuthority` is configured — both are treated
+   * identically to `undefined` below (not `"bound"` -> `"ineligible"`).
+   */
+  readonly nostrAuthorBinding?: FedosNostrAuthorBindingResult;
 }
 
 /**
