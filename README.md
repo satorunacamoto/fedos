@@ -8,6 +8,45 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 641–680 — Public Identity, Conversation
+> Policy & Application Runtime Integration Arc (complete).** Turns the
+> existing Local Runtime and Public Board Runtime into one honest,
+> public-mode Application Runtime with explicit identity and policy
+> boundaries. `FedosPublicAuthorAuthority` (`src/board/runtime/identity/`)
+> resolves a post's author with a closed, four-outcome vocabulary
+> (`resolved`/`anonymous-local`/`unavailable`/`conflict`) — anonymous-
+> local remains the honest V1 default (no default identity source is
+> wired, confirmed unchanged), never silently promoted to a real
+> identity. `FedosConversationPolicyAuthority` (`src/board/runtime/policy/`)
+> introduces a public-mode-only Conversation Policy (six independent
+> axes — mode/discoverability/readAccess/writeAccess/inviteAuthority/
+> federationEligibility) — `private-group`/`direct` are named vocabulary
+> only, rejected fail-closed by `validateFedosConversationPolicy()`, and
+> no membership implementation was added merely to support a
+> `writeAccess: "restricted"` value the vocabulary already allows.
+> `evaluateFedosOutboundEligibility()` (`src/board/runtime/eligibility/`)
+> composes Author + Policy + Target into one closed eligibility result —
+> its own honest, confirmed conclusion is that EVERY real outbound
+> target is ineligible today: Nostr fails closed on an unproven
+> signing-authority key-control check (no `accountIndex`-to-
+> `publicIdentifier` mapping exists anywhere in this codebase, Alpha
+> 649/665), and ActivityPub/AT Protocol/Session have no live Publisher
+> at all. `FedosBoardRuntime.createPublicThread()`/`replyToPublicThread()`
+> are now `async`, routing through all three new seams instead of the
+> prior Arc's own direct calls — `FedosDesktopHost`/`FedosDesktopRuntime`
+> now own and expose exactly ONE `FedosBoardRuntime` per running
+> runtime, via `runtime.boardRuntime()` (`src/desktop/runtime/fedos_desktop_runtime.ts`,
+> Alpha 671/672), inaccessible after `stop()`, verified through a real
+> restart cycle over durable append-only files (Alpha 676). Private
+> Group, DM, membership, invitations, encryption, and pseudonyms remain
+> entirely unimplemented — public mode only, per this Arc's own scope.
+>
+> See `docs/secure_runtime_alpha_641_current_identity_and_author_inventory.md`
+> through `docs/secure_runtime_alpha_680_completion_declaration.md` for
+> the full, per-Stage record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 601–620 — Desktop Local Runtime Entry
 > Point & Publish Pipeline Ownership Arc (complete).** Gives
 > `FedosDesktopHost` — Board Persistence/Hydration, Board Query,

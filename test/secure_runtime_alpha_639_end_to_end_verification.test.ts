@@ -70,11 +70,11 @@ describe("Secure Runtime Alpha 639 -- End-to-End Verification", () => {
     });
 
     // Local-only public post (Alpha 634).
-    const rootResult = runtime1.createPublicThread({ boardId: "e2e-board", body: "root post, local-only" });
+    const rootResult = await runtime1.createPublicThread({ boardId: "e2e-board", body: "root post, local-only" });
     expect(rootResult.outcome).toBe("created");
 
     // Reply, still local-only.
-    const replyResult = runtime1.replyToPublicThread({
+    const replyResult = await runtime1.replyToPublicThread({
       boardId: "e2e-board",
       threadId: "e2e-root",
       replyTo: "e2e-root",
@@ -87,16 +87,21 @@ describe("Secure Runtime Alpha 639 -- End-to-End Verification", () => {
     expect(runtime1.recentFeed("e2e-board")?.posts).toHaveLength(2);
     expect(runtime1.thread("e2e-board", "e2e-root")?.posts.map((p) => p.id)).toEqual(["e2e-root", "e2e-reply"]);
 
-    // Explicit Nostr Outbox intent on a THIRD post.
+    // Explicit Nostr Outbox intent on a THIRD post -- updated for Alpha
+    // 667/Phase C: even a real, resolved nostr identity is now
+    // ineligible for a nostr target (Alpha 649/665's own confirmed
+    // signing-authority key-control blocker), so the post itself still
+    // durably writes (local write is unaffected) but the requested
+    // target surfaces as ineligible, not inserted.
     const outboxRuntime = createFedosBoardRuntime({ host: host1, idGenerator: fixedIdGenerator("e2e-outbound") });
-    const outboundResult = outboxRuntime.createPublicThread({
+    const outboundResult = await outboxRuntime.createPublicThread({
       boardId: "e2e-board",
       body: "explicitly federated to nostr",
       outboundTargets: [{ protocol: "nostr", destination: null }],
     });
-    expect(outboundResult.outcome).toBe("created");
-    if (outboundResult.outcome !== "created") throw new Error("unreachable");
-    expect(outboundResult.outbox).toEqual([{ target: { protocol: "nostr", destination: null }, result: "inserted" }]);
+    expect(outboundResult.outcome).toBe("outbox-partial-failure");
+    if (outboundResult.outcome !== "outbox-partial-failure") throw new Error("unreachable");
+    expect(outboundResult.outbox).toEqual([{ target: { protocol: "nostr", destination: null }, result: "ineligible" }]);
 
     await host1.stop();
 
@@ -142,8 +147,8 @@ describe("Secure Runtime Alpha 639 -- End-to-End Verification", () => {
       const runtimeA = createFedosBoardRuntime({ host: hostA, idGenerator: fixedIdGenerator("only-in-a") });
       const runtimeB = createFedosBoardRuntime({ host: hostB, idGenerator: fixedIdGenerator("only-in-b") });
 
-      runtimeA.createPublicThread({ boardId: "board", body: "belongs to host A" });
-      runtimeB.createPublicThread({ boardId: "board", body: "belongs to host B" });
+      await runtimeA.createPublicThread({ boardId: "board", body: "belongs to host A" });
+      await runtimeB.createPublicThread({ boardId: "board", body: "belongs to host B" });
 
       expect(runtimeA.findPost("only-in-b")).toBeNull();
       expect(runtimeB.findPost("only-in-a")).toBeNull();
@@ -167,7 +172,7 @@ describe("Secure Runtime Alpha 639 -- End-to-End Verification", () => {
     const runtimeX = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("shared-host-x") });
     const runtimeY = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("shared-host-y") });
     expect(runtimeX).not.toBe(runtimeY);
-    runtimeX.createPublicThread({ boardId: "b", body: "from X" });
+    await runtimeX.createPublicThread({ boardId: "b", body: "from X" });
     // Both see it -- they share the SAME underlying Host, by design, but are
     // themselves two structurally distinct instances (no singleton).
     expect(runtimeY.findPost("shared-host-x")?.body).toBe("from X");

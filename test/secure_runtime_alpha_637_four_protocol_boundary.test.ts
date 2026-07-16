@@ -53,7 +53,7 @@ describe("Secure Runtime Alpha 637 -- Four-Protocol Boundary Review", () => {
     }
 
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("local-post") });
-    runtime.createPublicThread({ boardId: "shared-board", body: "a local public post" });
+    await runtime.createPublicThread({ boardId: "shared-board", body: "a local public post" });
 
     const feed = runtime.recentFeed("shared-board");
     expect(feed?.posts.map((p) => p.id).sort()).toEqual(
@@ -94,13 +94,13 @@ describe("Secure Runtime Alpha 637 -- Four-Protocol Boundary Review", () => {
     expect(outboxPersistence.listIntents()).toHaveLength(0);
   });
 
-  it("4. no protocol-specific command method exists on FedosBoardRuntime -- its own public surface names no protocol", () => {
+  it("4. no protocol-specific command method exists on FedosBoardRuntime -- its own public surface names no protocol", async () => {
     for (const protocolWord of ["Nostr", "ActivityPub", "Atproto", "AtProto", "Session"]) {
       expect(runtimeSource as string).not.toMatch(new RegExp(`create${protocolWord}|reply${protocolWord}|publish${protocolWord}`, "i"));
     }
   });
 
-  it("5. FedosBoardRuntime's own source imports no Protocol Adapter file -- confirmed by source inspection", () => {
+  it("5. FedosBoardRuntime's own source imports no Protocol Adapter file -- confirmed by source inspection", async () => {
     const code = runtimeSource as string;
     expect(code).not.toMatch(/fedos_board_nostr_adapter|fedos_activitypub_board_adapter|fedos_atproto_board_adapter|fedos_session_board_adapter/);
   });

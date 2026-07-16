@@ -27,7 +27,7 @@ function readerResolvingToNostr(publicIdentifier: string): FedosPublicIdentityRe
  * Public Board Runtime Application API Foundation Arc.
  */
 describe("Secure Runtime Alpha 633 -- Outbound Eligibility V1", () => {
-  it("1. session is never eligible for public fan-out, for any author", () => {
+  it("1. session is never eligible for public fan-out, for any author", async () => {
     const anon = anonymousLocalAuthorReference();
     expect(isEligibleForPublicOutboundTarget(anon, { protocol: "session", destination: null })).toBe(false);
     expect(
@@ -38,19 +38,19 @@ describe("Secure Runtime Alpha 633 -- Outbound Eligibility V1", () => {
     ).toBe(false);
   });
 
-  it("2. an anonymous-local author is never eligible for ANY outbound target -- no real identity to sign under", () => {
+  it("2. an anonymous-local author is never eligible for ANY outbound target -- no real identity to sign under", async () => {
     const anon = anonymousLocalAuthorReference();
     for (const protocol of FEDOS_BOARD_RUNTIME_PUBLIC_ELIGIBLE_PROTOCOLS) {
       expect(isEligibleForPublicOutboundTarget(anon, { protocol, destination: null })).toBe(false);
     }
   });
 
-  it("3. a real nostr-protocol author is eligible for a nostr target", () => {
+  it("3. a real nostr-protocol author is eligible for a nostr target", async () => {
     const author = { identityId: "id-1", protocol: "nostr" as const, publicIdentifier: "npub1x" };
     expect(isEligibleForPublicOutboundTarget(author, { protocol: "nostr", destination: null })).toBe(true);
   });
 
-  it("4. a real nostr-protocol author is NOT eligible for activitypub/atproto targets -- no identity resolution exists for those protocols yet, impersonation guard", () => {
+  it("4. a real nostr-protocol author is NOT eligible for activitypub/atproto targets -- no identity resolution exists for those protocols yet, impersonation guard", async () => {
     const author = { identityId: "id-1", protocol: "nostr" as const, publicIdentifier: "npub1x" };
     expect(isEligibleForPublicOutboundTarget(author, { protocol: "activitypub", destination: null })).toBe(false);
     expect(isEligibleForPublicOutboundTarget(author, { protocol: "atproto", destination: null })).toBe(false);
@@ -66,7 +66,7 @@ describe("Secure Runtime Alpha 633 -- Outbound Eligibility V1", () => {
     await host.start();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("post-1") });
 
-    const result = runtime.createPublicThread({
+    const result = await runtime.createPublicThread({
       boardId: "board-a",
       body: "hello",
       outboundTargets: [{ protocol: "nostr", destination: null }],
@@ -82,7 +82,7 @@ describe("Secure Runtime Alpha 633 -- Outbound Eligibility V1", () => {
     expect(outboxPersistence.listIntents()).toHaveLength(0);
   });
 
-  it("6. end to end: a real nostr-identity author's public post with an explicit nostr target DOES create a durable Outbox intent", async () => {
+  it("6. end to end (updated, Alpha 667/Phase C): a real nostr-identity author's public post with an explicit nostr target is now ALSO ineligible -- Phase C's own signing-authority key-control check (Alpha 649/665) has no safe way to confirm this account controls that identity, so it fails closed, unlike Alpha 633's own original, less-strict protocol-match-only check", async () => {
     const outboxPersistence = new InMemoryFedosBoardOutboxPersistence();
     const desktopApplication = new DesktopApplication(readerResolvingToNostr("npub1realauthor"));
     const host = new FedosDesktopHost({
@@ -93,19 +93,19 @@ describe("Secure Runtime Alpha 633 -- Outbound Eligibility V1", () => {
     await host.start();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("post-2") });
 
-    const result = runtime.createPublicThread({
+    const result = await runtime.createPublicThread({
       boardId: "board-a",
       body: "hello nostr",
       outboundTargets: [{ protocol: "nostr", destination: null }],
     });
 
-    expect(result.outcome).toBe("created");
-    if (result.outcome !== "created") throw new Error("unreachable");
-    expect(result.outbox).toEqual([{ target: { protocol: "nostr", destination: null }, result: "inserted" }]);
-    expect(outboxPersistence.listIntents()).toHaveLength(1);
+    expect(result.outcome).toBe("outbox-partial-failure");
+    if (result.outcome !== "outbox-partial-failure") throw new Error("unreachable");
+    expect(result.outbox).toEqual([{ target: { protocol: "nostr", destination: null }, result: "ineligible" }]);
+    expect(outboxPersistence.listIntents()).toHaveLength(0);
   });
 
-  it("7. the eligibility gate never reads FedosBoardPost.source -- its own signature takes no post parameter at all", () => {
+  it("7. the eligibility gate never reads FedosBoardPost.source -- its own signature takes no post parameter at all", async () => {
     expect(isEligibleForPublicOutboundTarget.length).toBe(2);
   });
 
@@ -126,7 +126,7 @@ describe("Secure Runtime Alpha 633 -- Outbound Eligibility V1", () => {
     });
     await host.start();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("post-3") });
-    runtime.createPublicThread({
+    await runtime.createPublicThread({
       boardId: "board-a",
       body: "hello",
       outboundTargets: [{ protocol: "nostr", destination: null }],

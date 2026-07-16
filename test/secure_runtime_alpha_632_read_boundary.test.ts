@@ -28,40 +28,40 @@ describe("Secure Runtime Alpha 632 -- Read Boundary", () => {
     });
     await host.start();
     runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("p1", "p2", "p3") });
-    runtime.createPublicThread({ boardId: "board-r", body: "post one" });
-    runtime.createPublicThread({ boardId: "board-r", body: "post two" });
+    await runtime.createPublicThread({ boardId: "board-r", body: "post one" });
+    await runtime.createPublicThread({ boardId: "board-r", body: "post two" });
   });
 
-  it("1. findPost() returns a post written through createPublicThread()", () => {
+  it("1. findPost() returns a post written through createPublicThread()", async () => {
     expect(runtime.findPost("p1")?.body).toBe("post one");
   });
 
-  it("2. findPost() returns null for a nonexistent id", () => {
+  it("2. findPost() returns null for a nonexistent id", async () => {
     expect(runtime.findPost("does-not-exist")).toBeNull();
   });
 
-  it("3. findPost() returns null for a malformed (empty) id, never throws", () => {
+  it("3. findPost() returns null for a malformed (empty) id, never throws", async () => {
     expect(() => runtime.findPost("")).not.toThrow();
     expect(runtime.findPost("")).toBeNull();
   });
 
-  it("4. recentFeed() returns both posts, most recent first by default ordering", () => {
+  it("4. recentFeed() returns both posts, most recent first by default ordering", async () => {
     const feed = runtime.recentFeed("board-r");
     expect(feed?.posts).toHaveLength(2);
   });
 
-  it("5. recentFeed() supports the existing filter/pagination options unchanged", () => {
+  it("5. recentFeed() supports the existing filter/pagination options unchanged", async () => {
     const feed = runtime.recentFeed("board-r", undefined, { limit: 1 });
     expect(feed?.posts).toHaveLength(1);
     expect(feed?.hasMore).toBe(true);
   });
 
-  it("6. thread() returns the root plus any replies for a given thread id", () => {
+  it("6. thread() returns the root plus any replies for a given thread id", async () => {
     const threadResult = runtime.thread("board-r", "p1");
     expect(threadResult?.posts.map((p) => p.id)).toEqual(["p1"]);
   });
 
-  it("7. no read method returns null or throws once Host is ready and inputs are well-formed -- confirms the facade never leaks a raw FedosBoardReader/FedosBoardQuery reference (both TS-unreachable from the Runtime's own public surface)", () => {
+  it("7. no read method returns null or throws once Host is ready and inputs are well-formed -- confirms the facade never leaks a raw FedosBoardReader/FedosBoardQuery reference (both TS-unreachable from the Runtime's own public surface)", async () => {
     // Structural: FedosBoardRuntime's own public methods listed below are its
     // ENTIRE read surface -- neither `board()` nor `query()` is one of them.
     const publicMethodNames = Object.getOwnPropertyNames(FedosBoardRuntime.prototype).filter((n) => n !== "constructor");

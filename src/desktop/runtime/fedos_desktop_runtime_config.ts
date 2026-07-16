@@ -8,6 +8,22 @@
  * `docs/secure_runtime_alpha_603_local_runtime_configuration_model.md`
  * for the full rationale.
  *
+ * Secure Runtime Alpha 673 ("Runtime Configuration Extension") — Stage
+ * 3 of Phase D of the Alpha 641–680 Public Identity, Conversation
+ * Policy & Application Runtime Integration Arc. Adds exactly four new,
+ * OPTIONAL fields — `publicAuthorAuthority`, `conversationPolicyAuthority`,
+ * `idGenerator`, `clock` — all OBJECT dependencies passed straight
+ * through to `createFedosBoardRuntime()` (`fedos_desktop_runtime.ts`,
+ * Alpha 672), never interpreted or transformed here. Deliberately
+ * OMITS a `publicIdentity` field of any kind: Alpha 673's own "no raw
+ * identity values" prohibition means a caller wanting a real, resolved
+ * public author does so by supplying a `publicAuthorAuthority`
+ * implementation (e.g. a `StaticFedosPublicAuthorAuthority` wrapping an
+ * already-resolved identity) — never by handing this config file a raw
+ * identity snapshot to plumb through `createDesktopApplication()`
+ * itself, which stays byte-for-byte unchanged, still called with no
+ * argument (Alpha 606, unmodified — see Alpha 674's own rationale).
+ *
  * HARD GUARDRAILS:
  *   - `FedosDesktopRuntimeConfig` is the ONLY export.
  *   - NO secret/seed/token/credential field of any kind.
@@ -16,9 +32,17 @@
  *     no default path, no `cwd`-relative implicit path (Alpha 604).
  *   - `publisher` is an OBJECT dependency (Alpha 610), never a
  *     primitive credential/URL this file would need to interpret.
+ *   - `publicAuthorAuthority`/`conversationPolicyAuthority`/
+ *     `idGenerator`/`clock` (Alpha 673) are OBJECT/function
+ *     dependencies only — no raw identity value, no policy JSON bag,
+ *     no UI setting, no arbitrary untyped callback.
  */
 
 import type { FedosBoardOutboxPublisher } from "../../board/outbox/fedos_board_outbox_publisher.js";
+import type { FedosPublicAuthorAuthority } from "../../board/runtime/identity/fedos_public_author_authority.js";
+import type { FedosConversationPolicyAuthority } from "../../board/runtime/policy/fedos_conversation_policy_authority.js";
+import type { FedosBoardRuntimeIdGenerator } from "../../board/runtime/fedos_board_runtime_id_generator.js";
+import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
 
 export interface FedosDesktopRuntimeConfig {
   /** Explicit, caller-supplied path to the Board append-only log file. */
@@ -45,4 +69,19 @@ export interface FedosDesktopRuntimeConfig {
    * `false`.
    */
   readonly publisher?: FedosBoardOutboxPublisher;
+  /**
+   * Alpha 673 — optional; passed straight through to
+   * `createFedosBoardRuntime()`. Omitted, `FedosBoardRuntime`'s own
+   * existing default (`FedosDesktopPublicAuthorAuthority` wrapping this
+   * runtime's own `host`) applies — anonymous-local authorship remains
+   * the safe V1 default (Alpha 645/674) unless the caller injects a
+   * different Authority here.
+   */
+  readonly publicAuthorAuthority?: FedosPublicAuthorAuthority;
+  /** Alpha 673 — optional; passed straight through to `createFedosBoardRuntime()`. Omitted, `StaticFedosConversationPolicyAuthority` applies (Alpha 654/656). */
+  readonly conversationPolicyAuthority?: FedosConversationPolicyAuthority;
+  /** Alpha 673 — optional; passed straight through to `createFedosBoardRuntime()`. Omitted, `FedosSecureRandomBoardRuntimeIdGenerator` applies (Alpha 626, unchanged). */
+  readonly idGenerator?: FedosBoardRuntimeIdGenerator;
+  /** Alpha 673 — optional; passed straight through to `createFedosBoardRuntime()`. Omitted, `defaultFedosBoardRuntimeClock` applies (Alpha 625, unchanged). */
+  readonly clock?: FedosBoardRuntimeClock;
 }

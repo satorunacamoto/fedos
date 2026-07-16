@@ -37,26 +37,26 @@ async function readyHost(outboxPersistence?: FedosBoardOutboxPersistence): Promi
  * partial-success outcome hidden behind a coarser one.
  */
 describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
-  it("1. Host not ready (never started) -> unavailable", () => {
+  it("1. Host not ready (never started) -> unavailable", async () => {
     const host = new FedosDesktopHost({
       desktopApplication: new DesktopApplication(),
       boardPersistence: new InMemoryFedosBoardPersistence(),
     });
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x") });
-    expect(runtime.createPublicThread({ boardId: "b", body: "hi" })).toEqual({ outcome: "unavailable" });
+    expect(await runtime.createPublicThread({ boardId: "b", body: "hi" })).toEqual({ outcome: "unavailable" });
   });
 
   it("2. Host stopped after being ready -> unavailable", async () => {
     const host = await readyHost();
     await host.stop();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x") });
-    expect(runtime.createPublicThread({ boardId: "b", body: "hi" })).toEqual({ outcome: "unavailable" });
+    expect(await runtime.createPublicThread({ boardId: "b", body: "hi" })).toEqual({ outcome: "unavailable" });
   });
 
   it("3. invalid (empty) body -> invalid-command/malformed-post", async () => {
     const host = await readyHost();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x") });
-    expect(runtime.createPublicThread({ boardId: "b", body: "" })).toEqual({
+    expect(await runtime.createPublicThread({ boardId: "b", body: "" })).toEqual({
       outcome: "invalid-command",
       reason: "malformed-post",
     });
@@ -66,7 +66,7 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
     const host = await readyHost();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x") });
     const oversized = "a".repeat(FEDOS_BOARD_POST_MAX_BODY_LENGTH + 1);
-    expect(runtime.createPublicThread({ boardId: "b", body: oversized })).toEqual({
+    expect(await runtime.createPublicThread({ boardId: "b", body: oversized })).toEqual({
       outcome: "invalid-command",
       reason: "malformed-post",
     });
@@ -75,7 +75,7 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
   it("5. invalid (empty) board ID -> invalid-command/malformed-post", async () => {
     const host = await readyHost();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x") });
-    expect(runtime.createPublicThread({ boardId: "", body: "hi" })).toEqual({
+    expect(await runtime.createPublicThread({ boardId: "", body: "hi" })).toEqual({
       outcome: "invalid-command",
       reason: "malformed-post",
     });
@@ -85,24 +85,24 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
     const host = await readyHost();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x") });
     expect(
-      runtime.replyToPublicThread({ boardId: "b", threadId: "ghost", replyTo: "ghost", body: "hi" }),
+      await runtime.replyToPublicThread({ boardId: "b", threadId: "ghost", replyTo: "ghost", body: "hi" }),
     ).toEqual({ outcome: "invalid-command", reason: "missing-parent" });
   });
 
   it("7. cross-board reply -> invalid-command/cross-board-reply", async () => {
     const host = await readyHost();
     const rootRuntime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-7") });
-    rootRuntime.createPublicThread({ boardId: "board-a", body: "root" });
+    await rootRuntime.createPublicThread({ boardId: "board-a", body: "root" });
     const replyRuntime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("reply-7") });
     expect(
-      replyRuntime.replyToPublicThread({ boardId: "board-b", threadId: "root-7", replyTo: "root-7", body: "hi" }),
+      await replyRuntime.replyToPublicThread({ boardId: "board-b", threadId: "root-7", replyTo: "root-7", body: "hi" }),
     ).toEqual({ outcome: "invalid-command", reason: "cross-board-reply" });
   });
 
   it("8. identity unavailable does NOT fail the command -- Option B's own point: succeeds anonymously (Alpha 627)", async () => {
     const host = await readyHost();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x8") });
-    const result = runtime.createPublicThread({ boardId: "b", body: "hi" });
+    const result = await runtime.createPublicThread({ boardId: "b", body: "hi" });
     expect(result.outcome).toBe("created");
   });
 
@@ -129,17 +129,17 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
     // post's id ("C") -- the precise shape FedosBoardService's own precheck
     // recognizes as source-conflict rather than post-id-conflict.
     const collidingRuntime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("B") });
-    const result = collidingRuntime.createPublicThread({ boardId: "b", body: "colliding" });
+    const result = await collidingRuntime.createPublicThread({ boardId: "b", body: "colliding" });
     expect(result).toEqual({ outcome: "conflict", reason: "source-conflict" });
   });
 
   it("10. ID collision (post-id-conflict path): a rigged generator reusing an EXISTING Runtime-authored post's own id with different content -> conflict/post-id-conflict", async () => {
     const host = await readyHost();
     const first = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("dup-id") });
-    first.createPublicThread({ boardId: "b", body: "first body" });
+    await first.createPublicThread({ boardId: "b", body: "first body" });
 
     const second = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("dup-id") });
-    const result = second.createPublicThread({ boardId: "b", body: "different body" });
+    const result = await second.createPublicThread({ boardId: "b", body: "different body" });
     expect(result).toEqual({ outcome: "conflict", reason: "post-id-conflict" });
   });
 
@@ -155,11 +155,11 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
     });
     await host.start();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x11") });
-    const result = runtime.createPublicThread({ boardId: "b", body: "hi" });
+    const result = await runtime.createPublicThread({ boardId: "b", body: "hi" });
     expect(result).toEqual({ outcome: "persistence-failed" });
   });
 
-  it("12. Outbox partial failure -- one eligible target durably fails at the persistence layer, surfaced, not hidden", async () => {
+  it("12. Outbox partial failure -- updated for Alpha 667/Phase C: a 'nostr' target is now ineligible for EVERY author (Alpha 649/665's own confirmed signing-authority key-control blocker), so the flaky Outbox persistence below is never even reached -- the gate itself runs first, and its own rejection is surfaced, not hidden, exactly like a genuine persistence failure would have been", async () => {
     let calls = 0;
     const flakyOutbox: FedosBoardOutboxPersistence = {
       putIntent: () => (calls++ === 0 ? "failed" : "inserted"),
@@ -174,14 +174,15 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
     });
     await host.start();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x12") });
-    const result = runtime.createPublicThread({
+    const result = await runtime.createPublicThread({
       boardId: "b",
       body: "hi",
       outboundTargets: [{ protocol: "nostr", destination: null }],
     });
     expect(result.outcome).toBe("outbox-partial-failure");
     if (result.outcome !== "outbox-partial-failure") throw new Error("unreachable");
-    expect(result.outbox).toEqual([{ target: { protocol: "nostr", destination: null }, result: "failed" }]);
+    expect(result.outbox).toEqual([{ target: { protocol: "nostr", destination: null }, result: "ineligible" }]);
+    expect(calls).toBe(0);
   });
 
   it("13. unsupported/unrecognized target protocol string is treated as ineligible, never throws", async () => {
@@ -193,7 +194,7 @@ describe("Secure Runtime Alpha 636 -- Failure Matrix", () => {
     });
     await host.start();
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("x13") });
-    const result = runtime.createPublicThread({
+    const result = await runtime.createPublicThread({
       boardId: "b",
       body: "hi",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

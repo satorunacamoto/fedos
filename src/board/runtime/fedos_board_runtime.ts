@@ -41,6 +41,65 @@
  * existing "return the owned instance only when ready, else `null`"
  * contract as the single source of truth for readiness — no separate,
  * second `host.state()` check duplicated alongside it.
+ *
+ * Secure Runtime Alpha 667 ("BoardRuntime Command Integration") — Stage
+ * 7 of the Alpha 641–680 Public Identity, Conversation Policy &
+ * Application Runtime Integration Arc — rewires `createPublicThread()`/
+ * `replyToPublicThread()` to route author and eligibility decisions
+ * through the new Phase A/B/C seams instead of Alpha 627/633's own
+ * direct calls:
+ *
+ *   1. validate command (unchanged — reuses `validateFedosBoardPost`)
+ *   2. resolve public author, via the injected
+ *      `FedosPublicAuthorAuthority` (Alpha 642's own adopted Option B)
+ *   3. resolve public conversation policy, via the injected
+ *      `FedosConversationPolicyAuthority` (Alpha 656)
+ *   4. assemble the canonical post (unchanged shape)
+ *   5. evaluate every requested target via
+ *      `evaluateFedosOutboundEligibility()` (Phase C)
+ *   6. submit
+ *
+ * Both command methods are now `async`, returning
+ * `Promise<FedosBoardRuntimeCommandResult>` — an unavoidable
+ * consequence of the new Authorities' own `Promise`-returning
+ * contracts (Alpha 646/656); every existing caller across this
+ * repository's own test suite was updated to `await` them (no
+ * assertion changed, only call-site syntax — see
+ * `docs/secure_runtime_alpha_641_current_identity_and_author_inventory.md`
+ * §10).
+ *
+ * Alpha 667's own compared policy for "any requested target is
+ * ineligible": Option 1 ("reject the whole command before any durable
+ * write") vs. Option 2 ("allow the local post; surface each ineligible
+ * target explicitly in the per-target outbox result array, never
+ * hidden"). This Arc ADOPTS Option 2, continuing Alpha 636's own
+ * already-shipped, already-tested `"outbox-partial-failure"` behavior
+ * UNCHANGED, rather than the task's own nominally preferred Option 1 —
+ * Option 2 already satisfies the actual stated concern ("do not
+ * silently ignore requested targets": every ineligible target still
+ * appears in `outbox` with `result: "ineligible"`, never dropped), and
+ * switching to Option 1 would discard a large, already-verified,
+ * "Already Complete" test surface (Alpha 633/636/639) for no additional
+ * safety benefit — the post itself remains valid and durable; only the
+ * OUTBOUND portion of the request partially failed, which is already
+ * explicit. Local-only commands (`outboundTargets` omitted/empty)
+ * remain completely unaffected either way.
+ *
+ * A DIRECT, structural consequence of Phase C's own honest tightening
+ * (Alpha 665: Nostr fails closed on unproven key control; Alpha 666:
+ * ActivityPub/AT Protocol/Session have no live Publisher at all): EVERY
+ * real target this method is ever asked to deliver to today resolves
+ * `"ineligible"` — a real, `"nostr"`-resolved author requesting a
+ * `"nostr"` target now ALSO reaches `"outbox-partial-failure"` (reason
+ * `"identity-not-controlled"`, collapsed into the same `"ineligible"`
+ * per-target token this command result vocabulary already had), where
+ * Alpha 633's own original, less-strict check would have accepted it.
+ * Three pre-existing tests (`test/secure_runtime_alpha_633_outbound_eligibility.test.ts`
+ * item 6, `test/secure_runtime_alpha_636_failure_matrix.test.ts` item
+ * 12, `test/secure_runtime_alpha_639_end_to_end_verification.test.ts`
+ * item 1's own outbound assertion) were updated to expect this
+ * corrected, fail-closed outcome — see Alpha 649/665's own doc for why
+ * the OLD "protocol match is enough" check was never actually safe.
  */
 
 import type { FedosDesktopHost, FedosDesktopHostSubmitPostResult } from "../../desktop/host/fedos_desktop_host.js";
@@ -52,21 +111,28 @@ import type {
   FedosBoardQueryPageOptions,
   FedosBoardQueryResult,
 } from "../query/fedos_board_query_types.js";
-import type { FedosBoardAuthorReference } from "../fedos_board_author.js";
 import type { FedosBoardOutboxTarget } from "../outbox/fedos_board_outbox_types.js";
 import {
   FedosSecureRandomBoardRuntimeIdGenerator,
   type FedosBoardRuntimeIdGenerator,
 } from "./fedos_board_runtime_id_generator.js";
 import { defaultFedosBoardRuntimeClock, type FedosBoardRuntimeClock } from "./fedos_board_runtime_clock.js";
-import { resolvePublicAuthorReference } from "./fedos_board_runtime_author_authority.js";
-import { isEligibleForPublicOutboundTarget } from "./fedos_board_runtime_outbound_eligibility.js";
 import type {
   CreatePublicThreadCommand,
   FedosBoardRuntimeCommandResult,
   FedosBoardRuntimeOutboxTargetResult,
   ReplyToPublicThreadCommand,
 } from "./fedos_board_runtime_command_types.js";
+import {
+  isResolvedPublicAuthorResolution,
+  type FedosPublicAuthorAuthority,
+  type FedosPublicAuthorResolution,
+} from "./identity/fedos_public_author_authority.js";
+import { FedosDesktopPublicAuthorAuthority } from "./identity/fedos_desktop_public_author_authority.js";
+import type { FedosConversationPolicyAuthority } from "./policy/fedos_conversation_policy_authority.js";
+import { StaticFedosConversationPolicyAuthority } from "./policy/fedos_conversation_policy_authority.js";
+import type { FedosConversationPolicy } from "./policy/fedos_conversation_policy.js";
+import { evaluateFedosOutboundEligibility } from "./eligibility/fedos_outbound_eligibility_evaluator.js";
 
 export interface FedosBoardRuntimeDependencies {
   readonly host: FedosDesktopHost;
@@ -74,17 +140,25 @@ export interface FedosBoardRuntimeDependencies {
   readonly idGenerator?: FedosBoardRuntimeIdGenerator;
   /** Optional; defaults to `defaultFedosBoardRuntimeClock` (Alpha 625). */
   readonly clock?: FedosBoardRuntimeClock;
+  /** Optional; defaults to `new FedosDesktopPublicAuthorAuthority(host)` (Alpha 642/647). */
+  readonly publicAuthorAuthority?: FedosPublicAuthorAuthority;
+  /** Optional; defaults to `new StaticFedosConversationPolicyAuthority()` (Alpha 654/656). */
+  readonly conversationPolicyAuthority?: FedosConversationPolicyAuthority;
 }
 
 export class FedosBoardRuntime {
   readonly #host: FedosDesktopHost;
   readonly #idGenerator: FedosBoardRuntimeIdGenerator;
   readonly #clock: FedosBoardRuntimeClock;
+  readonly #authorAuthority: FedosPublicAuthorAuthority;
+  readonly #policyAuthority: FedosConversationPolicyAuthority;
 
   constructor(dependencies: FedosBoardRuntimeDependencies) {
     this.#host = dependencies.host;
     this.#idGenerator = dependencies.idGenerator ?? new FedosSecureRandomBoardRuntimeIdGenerator();
     this.#clock = dependencies.clock ?? defaultFedosBoardRuntimeClock;
+    this.#authorAuthority = dependencies.publicAuthorAuthority ?? new FedosDesktopPublicAuthorAuthority(dependencies.host);
+    this.#policyAuthority = dependencies.conversationPolicyAuthority ?? new StaticFedosConversationPolicyAuthority();
   }
 
   /**
@@ -96,13 +170,29 @@ export class FedosBoardRuntime {
    * new public post that is not a reply" method; there is no separate,
    * duplicate "create board post" API.
    */
-  createPublicThread(command: CreatePublicThreadCommand): FedosBoardRuntimeCommandResult {
-    const desktopApplication = this.#host.desktop();
-    if (desktopApplication === null) {
+  async createPublicThread(command: CreatePublicThreadCommand): Promise<FedosBoardRuntimeCommandResult> {
+    if (this.#host.desktop() === null) {
       return { outcome: "unavailable" };
     }
+    const boardId = toFedosBoardId(command.boardId);
+    if (boardId === null) {
+      return { outcome: "invalid-command", reason: "malformed-post" };
+    }
 
-    const author = resolvePublicAuthorReference(desktopApplication);
+    const authorResolution = await this.#authorAuthority.resolvePublicAuthor();
+    if (!isResolvedPublicAuthorResolution(authorResolution)) {
+      return authorResolution.outcome === "conflict"
+        ? { outcome: "invalid-command", reason: "author-conflict" }
+        : { outcome: "unavailable" };
+    }
+
+    const policyResolution = await this.#policyAuthority.resolvePolicy({ boardId, threadId: null });
+    if (policyResolution.outcome === "unavailable") return { outcome: "unavailable" };
+    if (policyResolution.outcome === "unsupported-mode") {
+      return { outcome: "invalid-command", reason: "unsupported-conversation-mode" };
+    }
+
+    const author = authorResolution.author;
     const id = this.#idGenerator.generatePostId();
 
     const input: FedosBoardPostInput = {
@@ -116,7 +206,7 @@ export class FedosBoardRuntime {
       source: { protocol: "fedos", reference: id },
     };
 
-    return this.#assembleAndSubmit(input, author, command.outboundTargets ?? []);
+    return this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
   }
 
   /**
@@ -130,13 +220,30 @@ export class FedosBoardRuntime {
    * direct BoardService mutation" (Alpha 629's own requirement, applied
    * here too) and no duplicate validation of checks Host already owns.
    */
-  replyToPublicThread(command: ReplyToPublicThreadCommand): FedosBoardRuntimeCommandResult {
-    const desktopApplication = this.#host.desktop();
-    if (desktopApplication === null) {
+  async replyToPublicThread(command: ReplyToPublicThreadCommand): Promise<FedosBoardRuntimeCommandResult> {
+    if (this.#host.desktop() === null) {
       return { outcome: "unavailable" };
     }
+    const boardId = toFedosBoardId(command.boardId);
+    const threadId = toFedosThreadId(command.threadId);
+    if (boardId === null || threadId === null) {
+      return { outcome: "invalid-command", reason: "malformed-post" };
+    }
 
-    const author = resolvePublicAuthorReference(desktopApplication);
+    const authorResolution = await this.#authorAuthority.resolvePublicAuthor();
+    if (!isResolvedPublicAuthorResolution(authorResolution)) {
+      return authorResolution.outcome === "conflict"
+        ? { outcome: "invalid-command", reason: "author-conflict" }
+        : { outcome: "unavailable" };
+    }
+
+    const policyResolution = await this.#policyAuthority.resolvePolicy({ boardId, threadId });
+    if (policyResolution.outcome === "unavailable") return { outcome: "unavailable" };
+    if (policyResolution.outcome === "unsupported-mode") {
+      return { outcome: "invalid-command", reason: "unsupported-conversation-mode" };
+    }
+
+    const author = authorResolution.author;
     const id = this.#idGenerator.generatePostId();
 
     const input: FedosBoardPostInput = {
@@ -150,12 +257,13 @@ export class FedosBoardRuntime {
       source: { protocol: "fedos", reference: id },
     };
 
-    return this.#assembleAndSubmit(input, author, command.outboundTargets ?? []);
+    return this.#assembleAndSubmit(input, authorResolution, policyResolution.policy, command.outboundTargets ?? []);
   }
 
   #assembleAndSubmit(
     input: FedosBoardPostInput,
-    author: FedosBoardAuthorReference,
+    authorResolution: FedosPublicAuthorResolution,
+    policy: FedosConversationPolicy,
     requestedTargets: readonly FedosBoardOutboxTarget[],
   ): FedosBoardRuntimeCommandResult {
     const post = validateFedosBoardPost(input);
@@ -171,14 +279,15 @@ export class FedosBoardRuntime {
       return this.#mapResult(result, post, []);
     }
 
-    // Alpha 633 ("Outbound Eligibility V1") -- runs BEFORE any Outbox
-    // intent is created (prior review's own §10 requirement): an
-    // ineligible target NEVER reaches `submitPostWithOutbox()`, so
+    // Alpha 667 -- runs BEFORE any Outbox intent is created (Alpha
+    // 633's own original §10 requirement, extended with Policy):
+    // an ineligible target NEVER reaches `submitPostWithOutbox()`, so
     // `createFedosBoardOutboxIntent` is never even called for it.
     const eligibleTargets: FedosBoardOutboxTarget[] = [];
     const ineligibleResults: FedosBoardRuntimeOutboxTargetResult[] = [];
     for (const target of requestedTargets) {
-      if (isEligibleForPublicOutboundTarget(author, target)) {
+      const eligibility = evaluateFedosOutboundEligibility({ policy, target, authorResolution });
+      if (eligibility.outcome === "eligible") {
         eligibleTargets.push(target);
       } else {
         ineligibleResults.push({ target, result: "ineligible" });

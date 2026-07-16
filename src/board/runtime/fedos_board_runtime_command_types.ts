@@ -23,6 +23,21 @@
  * (`FedosDesktopHostSubmitPostResult`/`FedosBoardOutboxPersistenceWriteResult`,
  * `src/desktop/host/fedos_desktop_host.ts`) — no outcome invented here
  * that Host itself has no way of ever producing.
+ *
+ * Secure Runtime Alpha 667 ("BoardRuntime Command Integration") adds
+ * exactly two new `"invalid-command"` reasons:
+ *   - `"unsupported-conversation-mode"` — reachable only if a future,
+ *     non-V1 `FedosConversationPolicyAuthority` ever resolved a policy
+ *     this Arc's own vocabulary does not accept; structurally
+ *     UNREACHABLE today, since `StaticFedosConversationPolicyAuthority`
+ *     (the only V1 implementation) always resolves `"public"`.
+ *   - `"author-conflict"` — a resolved-but-structurally-malformed
+ *     identity (`FedosPublicAuthorResolution`'s own `"conflict"`
+ *     outcome, Alpha 643/644) fails the command closed, explicitly,
+ *     rather than either silently downgrading to anonymous-local
+ *     authorship or silently blocking as `"unavailable"` (which would
+ *     misleadingly imply the Host itself is not ready).
+ * No other field on this file changed.
  */
 
 import type { FedosBoardOutboxTarget } from "../outbox/fedos_board_outbox_types.js";
@@ -69,6 +84,15 @@ export type FedosBoardRuntimeCommandResult =
   | { readonly outcome: "already-present"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
   | { readonly outcome: "outbox-partial-failure"; readonly post: FedosBoardPost; readonly outbox: readonly FedosBoardRuntimeOutboxTargetResult[] }
   | { readonly outcome: "conflict"; readonly reason: "post-id-conflict" | "source-conflict" }
-  | { readonly outcome: "invalid-command"; readonly reason: "malformed-post" | "missing-parent" | "invalid-thread" | "cross-board-reply" }
+  | {
+      readonly outcome: "invalid-command";
+      readonly reason:
+        | "malformed-post"
+        | "missing-parent"
+        | "invalid-thread"
+        | "cross-board-reply"
+        | "unsupported-conversation-mode"
+        | "author-conflict";
+    }
   | { readonly outcome: "unavailable" }
   | { readonly outcome: "persistence-failed" };

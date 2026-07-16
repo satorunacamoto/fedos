@@ -53,6 +53,17 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
       // hydration method (hydrateAttemptCount()) to the Retry Registry
       // -- see docs/secure_runtime_alpha_585_durable_retry_persistence_implementation.md.
       "src/board/observation/fedos_delivery_retry_registry.ts",
+      // Secure Runtime Alpha 641-680 (Public Identity, Conversation
+      // Policy & Application Runtime Integration Arc) legitimately
+      // rewires FedosBoardRuntime's command methods onto the new
+      // Author/Policy/Eligibility seams (Alpha 667) and extends the
+      // Local Runtime to own/expose FedosBoardRuntime (Alpha 671-673)
+      // -- see docs/secure_runtime_alpha_667_boardruntime_command_integration.md
+      // and docs/secure_runtime_alpha_672_application_runtime_construction.md.
+      "src/board/runtime/fedos_board_runtime.ts",
+      "src/board/runtime/fedos_board_runtime_command_types.ts",
+      "src/desktop/runtime/fedos_desktop_runtime.ts",
+      "src/desktop/runtime/fedos_desktop_runtime_config.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);

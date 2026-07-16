@@ -31,9 +31,9 @@ describe("Secure Runtime Alpha 629 -- Create Public Thread", () => {
     host = await readyHost();
   });
 
-  it("1. creates a root post whose threadId equals its own id, replyTo null -- Alpha 631: no separate thread-creation API needed", () => {
+  it("1. creates a root post whose threadId equals its own id, replyTo null -- Alpha 631: no separate thread-creation API needed", async () => {
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-1") });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "hello board" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "hello board" });
     expect(result.outcome).toBe("created");
     if (result.outcome !== "created") throw new Error("unreachable");
     expect(result.post.id).toBe("root-1");
@@ -43,22 +43,22 @@ describe("Secure Runtime Alpha 629 -- Create Public Thread", () => {
     expect(result.post.body).toBe("hello board");
   });
 
-  it("2. the created post's source is { protocol: 'fedos', reference: <own id> } -- Alpha 628", () => {
+  it("2. the created post's source is { protocol: 'fedos', reference: <own id> } -- Alpha 628", async () => {
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-2") });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "hi" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "hi" });
     if (result.outcome !== "created") throw new Error("unreachable");
     expect(result.post.source).toEqual({ protocol: "fedos", reference: "root-2" });
   });
 
-  it("3. author is anonymous-local by default (today's real DesktopApplication default) -- Alpha 627", () => {
+  it("3. author is anonymous-local by default (today's real DesktopApplication default) -- Alpha 627", async () => {
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-3") });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "hi" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "hi" });
     if (result.outcome !== "created") throw new Error("unreachable");
     expect(result.post.author.identityId).toBeNull();
     expect(result.post.author.protocol).toBe("fedos");
   });
 
-  it("4. createdAt is Runtime clock authority -- caller cannot supply it, and an injected clock is honored", () => {
+  it("4. createdAt is Runtime clock authority -- caller cannot supply it, and an injected clock is honored", async () => {
     const runtime = createFedosBoardRuntime({
       host,
       idGenerator: fixedIdGenerator("root-4"),
@@ -68,34 +68,34 @@ describe("Secure Runtime Alpha 629 -- Create Public Thread", () => {
     // TypeScript itself proves createdAt cannot be supplied: this command's own
     // type carries no createdAt field at all (see fedos_board_runtime_command_types.ts).
     expect((command as Record<string, unknown>).createdAt).toBeUndefined();
-    const result = runtime.createPublicThread(command);
+    const result = await runtime.createPublicThread(command);
     if (result.outcome !== "created") throw new Error("unreachable");
     expect(result.post.createdAt).toBe(1_700_000_000);
   });
 
-  it("5. no outboundTargets -> local-only: durable write, empty outbox array, no Outbox intent -- Alpha 634", () => {
+  it("5. no outboundTargets -> local-only: durable write, empty outbox array, no Outbox intent -- Alpha 634", async () => {
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-5") });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "hi" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "hi" });
     if (result.outcome !== "created") throw new Error("unreachable");
     expect(result.outbox).toEqual([]);
   });
 
-  it("6. two independent FedosBoardRuntime instances wrapping the SAME Host both see each other's writes", () => {
+  it("6. two independent FedosBoardRuntime instances wrapping the SAME Host both see each other's writes", async () => {
     const runtimeA = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("shared-1") });
     const runtimeB = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("irrelevant") });
-    runtimeA.createPublicThread({ boardId: "board-shared", body: "from A" });
+    await runtimeA.createPublicThread({ boardId: "board-shared", body: "from A" });
     expect(runtimeB.findPost("shared-1")?.body).toBe("from A");
   });
 
-  it("7. rejects an empty body -- validation reuse (validateFedosBoardPost), not a bespoke check", () => {
+  it("7. rejects an empty body -- validation reuse (validateFedosBoardPost), not a bespoke check", async () => {
     const runtime = createFedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-7") });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "" });
     expect(result).toEqual({ outcome: "invalid-command", reason: "malformed-post" });
   });
 
-  it("8. FedosBoardRuntime is directly constructible via `new`, matching createFedosBoardRuntime()'s own behavior", () => {
+  it("8. FedosBoardRuntime is directly constructible via `new`, matching createFedosBoardRuntime()'s own behavior", async () => {
     const runtime = new FedosBoardRuntime({ host, idGenerator: fixedIdGenerator("root-8") });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "hi" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "hi" });
     expect(result.outcome).toBe("created");
   });
 });
