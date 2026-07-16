@@ -48,6 +48,45 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status:
 >
+> **Status: Secure Runtime Alpha 721–740 — Nostr Relay ACK Semantics &
+> Permanent Rejection Arc (complete).** Closes the one semantic defect
+> the prior Arc disclosed: a genuine Relay `OK` rejection (`accepted:
+> false`) was retried using the same policy as a transient signing/
+> socket/timeout failure. The inventory (Alpha 721) found every
+> downstream layer already correct and already built for this —
+> `FedosOutboundPublishResult` (`src/board/publish/fedos_outbound_publish_result.ts`,
+> Alpha 492) already distinguished `accepted`/`rejected`/`failed`;
+> `outboundPublishOutcomeToRetryPolicy()` (Alpha 497) already mapped
+> `rejected` to `retryPolicy: "never"`; `FedosPublishScheduler` and the
+> Delivery Observation transition graph already treated `rejected` as a
+> real, terminal state. The ONLY broken link was that nothing in the
+> Nostr publish path could ever PRODUCE `rejected` — it was forced
+> through `FedosNostrBoardPublisher.publishOne()`'s own frozen `boolean`
+> return, which cannot carry the distinction. A new, additive interface,
+> `FedosNostrBoardPublisherWithOutcome` (`src/board/publish/nostr/`, Alpha
+> 722/723), lets `FedosRelayOkCorrelatedNostrBoardPublisher` say what it
+> already internally knows; a new, sibling adapter,
+> `FedosOutcomeAwareNostrBoardPublisherAdapter`, wires the canonical
+> result straight through to the Scheduler with no lossy boolean step.
+> Every existing, frozen contract (`FedosNostrBoardPublisher`,
+> `FedosRelayNostrBoardPublisher`, `FedosNostrBoardPublisherAdapter`, the
+> Scheduler, Retry Registry, Abandonment Policy, Observation vocabulary)
+> is byte-for-byte unchanged. Verified for real: a genuine Relay
+> rejection now produces exactly one delivery attempt across ~15
+> Scheduler ticks and is never resent after a runtime restart (the Arc's
+> own headline criterion); a genuine transient failure (timeout,
+> disconnect, socket throw, signer unavailable, malformed event) still
+> retries under the existing, unchanged policy; three independent
+> runtimes running concurrently (accepted / rejected / transient) show
+> zero cross-contamination. A rigorous before/after full-suite diff found
+> zero new regressions and required no ripple to any historical test.
+>
+> See `docs/secure_runtime_alpha_721_ack_and_publish_result_inventory.md`
+> through `docs/secure_runtime_alpha_740_completion_declaration.md` for
+> the full, per-Alpha record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 681–720 — Nostr Identity Binding &
 > Outbound Delivery Activation Arc (complete).** Closes the Alpha 649/665
 > blocker the prior Arc left honestly unresolved: no safe way existed to
