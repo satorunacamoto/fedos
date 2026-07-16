@@ -8,6 +8,45 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 761–790 — Canonical Conversation
+> Membership & Capability Foundation Arc (complete).** Establishes
+> authorization VOCABULARY and BOUNDARIES only — it does NOT enable
+> private messages, encrypted groups, direct messages, or production
+> invitation URLs. `FedosConversationParticipantReference`
+> (`src/conversation/membership/`) is a protocol-neutral participant
+> identity, reusing the existing `FedosBoardSourceProtocol` vocabulary
+> (`"fedos"`, not a new `"fedos-identity"` label) plus one addition,
+> `"temporary-capability"`. `FedosConversationMembership` carries a
+> closed `member | moderator | owner` role and `active | revoked | left`
+> state, with a deterministic identity
+> (`conversationId` + participant `authority` + `publicIdentifier`) and
+> a six-transition contract that permanently forbids reactivating a
+> revoked or left membership — enforced for real by
+> `InMemoryFedosConversationMembershipAuthority`, never a fake
+> allow-all. `FedosConversationCapabilityDescriptor`
+> (`src/conversation/capability/`) keeps a PUBLIC capability identifier
+> structurally separate from `FedosConversationCapabilityBearerSecret`
+> (an opaque, injected-generator-only type — this Arc mints no real
+> cryptographic secret itself, and imports no new dependency).
+> `InMemoryFedosConversationCapabilityAuthority` implements the full
+> Alpha 785 Capability-to-Membership coordination sequence — validate
+> without mutation, preview Membership admission, commit the capability
+> use, commit Membership admission — with an honestly-disclosed
+> `"conflict"` outcome if the last step fails after the capability was
+> already consumed; local exactly-once semantics are stated without
+> hedging (one in-memory instance only, no distributed or cross-process
+> claim). `src/board/runtime/` is UNTOUCHED by this Arc (verified by a
+> real recursive filesystem scan) — public thread/reply creation is
+> completely unaffected, and Membership/Capability remain unused by
+> every current public command. Durable persistence for both new
+> domains remains the Arc's own next, explicitly recommended step.
+>
+> See `docs/secure_runtime_alpha_761_membership_and_authorization_inventory.md`
+> through `docs/secure_runtime_alpha_790_completion_declaration.md` for
+> the full, per-Alpha record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 741–760 — Canonical Conversation
 > Identity and Record Foundation Arc (complete).** Gives every public
 > Board thread a real, persisted Conversation identity —

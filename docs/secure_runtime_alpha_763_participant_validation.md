@@ -1,0 +1,5 @@
+# Secure Runtime Alpha 763 — Participant Validation
+
+`validateFedosConversationParticipantReference()` (`src/conversation/membership/fedos_conversation_participant_reference_validator.ts`) — the only constructor for `FedosConversationParticipantReference`, mirroring `validateFedosConversationRecord`'s own "typed builder, fail-closed to `null`, never throws" discipline.
+
+Fail-closed checks, in order: exact key set (`authority`/`publicIdentifier`/`identityId`, no more), known `authority` only (`FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES`), bounded non-empty `publicIdentifier` (`FEDOS_CONVERSATION_PARTICIPANT_PUBLIC_IDENTIFIER_MAX_LENGTH = 512` — generous enough for an npub/DID/ActivityPub Actor URI/Session ID, bounded against abuse; no existing repo-wide identifier bound to reuse, only a content-length bound, `FEDOS_BOARD_POST_MAX_BODY_LENGTH`, existed), `identityId` either `null` or a bounded non-empty string. Deep-copies and `Object.freeze`s the result. No network, no profile resolution, no identity mutation — verified by `test/secure_runtime_alpha_762_763_participant_reference.test.ts`.

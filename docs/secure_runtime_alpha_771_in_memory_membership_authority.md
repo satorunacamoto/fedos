@@ -1,0 +1,5 @@
+# Secure Runtime Alpha 771 — In-Memory Membership Authority
+
+`InMemoryFedosConversationMembershipAuthority` (`src/conversation/membership/in_memory_fedos_conversation_membership_authority.ts`) — a REAL implementation, not a stub. The prior review's own `10_membership_boundary.md` §"no fake allow-all membership" warning is honored: this authority enforces the Alpha 768 transition contract for real, on real state, with no bypass — it never returns `"member"`/`"admitted"` without a genuine, tracked transition.
+
+Mirrors `InMemoryFedosConversationPersistence`'s own private-field `Map`-backed convention. Verified by `test/secure_runtime_alpha_769_771_membership_authority.test.ts` (16 assertions): idempotent admission, role conflict, all six transitions (allowed and forbidden), two independent Conversations never contaminate each other, the same `publicIdentifier` under two different `authority` values are distinct memberships, two independent authority instances never share state, every returned `FedosConversationMembership` is deep-frozen (caller mutation never reaches internal state), `listMemberships()` returns a new array every call.

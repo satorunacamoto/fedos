@@ -1,0 +1,5 @@
+# Secure Runtime Alpha 776 — Capability Responsibility Decision
+
+`FedosConversationCapabilityAction = "join-conversation"` (`src/conversation/capability/fedos_conversation_capability_descriptor.ts`) — exactly one action in V1, per this Arc's own instruction. `"invite-participant"` (a capability that grants the power to issue MORE capabilities) is named vocabulary the prior reviews considered but this Arc does not implement — no consumer needs it yet, and it would require its own delegation-depth/revocation-cascade design this Arc's own scope does not cover.
+
+No post/read/admin permission is added — a Capability grants exactly one narrowly-scoped action, never a general permission grant. A Capability is not Membership (it is consumed once and produces at most one Membership admission, Alpha 785); a Capability is not Identity (its `issuer`/`intendedRecipient` are `FedosConversationParticipantReference`s, never the Capability's own identity); a Capability is not a URL (no transport representation is implemented — Alpha 777's own descriptor is server-side authority state only).

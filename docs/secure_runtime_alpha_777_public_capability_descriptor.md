@@ -1,0 +1,7 @@
+# Secure Runtime Alpha 777 — Public Capability Descriptor
+
+`FedosConversationCapabilityDescriptor` (`src/conversation/capability/fedos_conversation_capability_descriptor.ts`) — `capabilityId | conversationId | action | issuer | intendedRecipient | maxUses | expiresAt | issuedAt`, directly adopting the field list this Arc's own instruction names, itself the converged shape of both prior reviews' own Capability sketches (`docs/reviews/conversation_foundation_v1/12_invitation_capability.md`, `docs/reviews/private_conversation_security/09_capability_invitation.md`).
+
+No bearer secret, no raw token, no URL, no key material — every one of those is either a separate type (`FedosConversationCapabilityBearerSecret`, Alpha 778) or simply not implemented (transport representation, out of this Arc's own Absolute Prohibitions). `keyEpochReference`/`redemptionAuthority` (present in the prior reviews' own wider sketches) are NOT included — this Arc implements no encryption, and single-authority redemption is structurally guaranteed by having exactly one in-memory Capability Authority instance rather than a separate field naming which authority to trust.
+
+Constructed only by `InMemoryFedosConversationCapabilityAuthority.issueJoinCapability()` (Alpha 786) — no separate validator file, since the descriptor's own fields are Authority-derived (id/timestamp) or already-validated inputs (participant references), unlike `FedosConversationRecord`'s own caller-supplied-candidate shape.

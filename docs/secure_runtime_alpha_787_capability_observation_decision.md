@@ -1,0 +1,5 @@
+# Secure Runtime Alpha 787 — Capability Observation Decision
+
+**No separate Observation/Repository layer is added.** Per this Arc's own instruction ("only implement if there is a real consumer... at minimum, current state must be derivable honestly"): `InMemoryFedosConversationCapabilityAuthority.remainingUses(capabilityId)` derives current redemption state honestly from the authority's own internal `Map` — `maxUses - redeemedByParticipantKeys.size`, clamped to zero — with a real, concrete consumer: `test/secure_runtime_alpha_786_in_memory_capability_authority.test.ts` #13's own "no mutation after terminal exhaustion" check.
+
+A full redemption HISTORY (who redeemed, when, in what order) is NOT exposed — no consumer in this Arc's scope needs it, and adding it would be exactly the "speculative Observation/Repository layer merely for symmetry" this Arc's own instruction forbids. `inspectDescriptor()` (Alpha 780) plus `remainingUses()` together already let a caller honestly answer "does this capability still work" without inventing a new domain concept.

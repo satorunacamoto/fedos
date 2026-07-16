@@ -1,0 +1,5 @@
+# Secure Runtime Alpha 786 — In-Memory Capability Authority
+
+`InMemoryFedosConversationCapabilityAuthority` (`src/conversation/capability/in_memory_fedos_conversation_capability_authority.ts`) implements both `FedosConversationCapabilityIssuerAuthority` and `FedosConversationCapabilityRedemptionAuthority` in one class — it owns both the capability `Map` and the injected `FedosConversationMembershipAuthority` reference the Alpha 785 coordination sequence needs, so splitting issuance/redemption into two classes would only add cross-class plumbing with no independent value.
+
+Verified by `test/secure_runtime_alpha_786_in_memory_capability_authority.test.ts` (13 assertions): issue, redeem, one-use exhaustion against a DIFFERENT redeemer, multi-use admitting several distinct redeemers, expiry, intended-recipient enforcement (and continued usability by the correct recipient afterward), wrong-secret and unknown-id both collapsing to `invalid-capability`, independent instances never sharing state, no bearer secret ever appearing on an inspected descriptor, and `remainingUses()` never mutating below zero after terminal exhaustion.

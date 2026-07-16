@@ -111,7 +111,7 @@ describe("Private Conversation Security Review -- architecture invariants", () =
       host,
       idGenerator: { generatePostId: () => "inv-test-post" },
     });
-    const result = runtime.createPublicThread({ boardId: "board-a", body: "hello" });
+    const result = await runtime.createPublicThread({ boardId: "board-a", body: "hello" });
     expect(result.outcome).toBe("created");
     if (result.outcome !== "created") throw new Error("unreachable");
     expect(result.post.source).toEqual({ protocol: "fedos", reference: "inv-test-post" });
