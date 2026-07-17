@@ -140,6 +140,21 @@ import {
 import type { FedosConversationDirectMessageSendResult } from "../messaging/fedos_conversation_direct_message_send_result.js";
 import type { FedosConversationDirectMessageReadResult } from "../messaging/fedos_conversation_direct_message_read_result.js";
 import type { FedosConversationDirectMessageSummary } from "../messaging/fedos_conversation_direct_message_summary.js";
+import type { FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
+import { InMemoryFedosGroupGenerationPersistence } from "../group/in_memory_fedos_group_generation_persistence.js";
+import type { FedosGroupDirectPathPersistence } from "../group/fedos_group_direct_path.js";
+import { InMemoryFedosGroupDirectPathPersistence } from "../group/in_memory_fedos_group_direct_path_persistence.js";
+import type { FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
+import { InMemoryFedosGroupMessagePersistence } from "../group/in_memory_fedos_group_message_persistence.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../group/fedos_group_fanout_delivery.js";
+import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../group/in_memory_fedos_group_fanout_delivery_persistence.js";
+import { FixedFedosGroupParticipantLimitPolicy, type FedosGroupParticipantLimitPolicy } from "../group/fedos_group_participant_limit.js";
+import { FedosGroupGenerationAuthority } from "../group/fedos_group_generation_authority.js";
+import { FedosGroupDirectPathAuthority } from "../group/fedos_group_direct_path_authority.js";
+import { FedosGroupAdmission } from "../group/fedos_group_admission.js";
+import { FedosGroupSendCoordinator } from "../group/fedos_group_send_coordinator.js";
+import { FedosGroupReadFacade } from "../group/fedos_group_read_facade.js";
+import { FedosConversationGroupRuntime } from "../group/fedos_conversation_group_runtime.js";
 
 /**
  * The full injected dependency set — the construction coordinator's own
@@ -187,6 +202,19 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
   readonly activationPersistence?: FedosConversationActivationPersistence;
   /** Alpha 1143 — optional; default in-memory. Backs the retention gate `readDirectMessage()` enforces. */
   readonly retentionPersistence?: FedosPayloadRetentionPersistence;
+  /**
+   * Alpha 1321–1390 — Private Group Pairwise Fanout Foundation Arc.
+   * Every field below is OPTIONAL with a safe in-memory default, mirroring
+   * `envelopePersistence`/`payloadStorage`'s own discipline exactly. None
+   * of this widens the Direct Activation Coordinator's own Private-Group
+   * Gate — `groupRuntime()` is a NEW, additive facade composing the SAME
+   * frozen Direct pipeline N times, never a change to it.
+   */
+  readonly groupGenerationPersistence?: FedosGroupGenerationPersistence;
+  readonly groupDirectPathPersistence?: FedosGroupDirectPathPersistence;
+  readonly groupMessagePersistence?: FedosGroupMessagePersistence;
+  readonly groupFanoutDeliveryPersistence?: FedosGroupFanoutDeliveryPersistence;
+  readonly groupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
 };
 
 export class FedosConversationRuntime {
@@ -200,6 +228,7 @@ export class FedosConversationRuntime {
   readonly #draftManager: FedosConversationDraftManager | null;
   readonly #activationCoordinator: FedosConversationDirectActivationCoordinator;
   readonly #directMessagingCoordinator: FedosConversationDirectMessagingCoordinator;
+  readonly #groupRuntime: FedosConversationGroupRuntime;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
@@ -292,6 +321,76 @@ export class FedosConversationRuntime {
       retentionAuthority,
       encryptionCoordinator: this.#encryptionCoordinator,
       decryptionCoordinator: this.#decryptionCoordinator,
+    });
+
+    // Alpha 1321–1390 — the Group Runtime facade. Always constructible
+    // (safe in-memory defaults for every new persistence backend, mirroring
+    // envelopePersistence/payloadStorage above); reuses the SAME
+    // identityResolver/coordinator instances already built above, never a
+    // second, divergent graph. `admission` is `null` only when the
+    // Capability issuer/redemption backends were not injected — matching
+    // `#invitationTransport`'s own "null when not assembled" precedent.
+    const groupGenerationPersistence = deps.groupGenerationPersistence ?? new InMemoryFedosGroupGenerationPersistence();
+    const groupDirectPathPersistence = deps.groupDirectPathPersistence ?? new InMemoryFedosGroupDirectPathPersistence();
+    const groupMessagePersistence = deps.groupMessagePersistence ?? new InMemoryFedosGroupMessagePersistence();
+    const groupFanoutDeliveryPersistence = deps.groupFanoutDeliveryPersistence ?? new InMemoryFedosGroupFanoutDeliveryPersistence();
+    const groupParticipantLimitPolicy = deps.groupParticipantLimitPolicy ?? new FixedFedosGroupParticipantLimitPolicy();
+    const groupGenerationAuthority = new FedosGroupGenerationAuthority({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      generationPersistence: groupGenerationPersistence,
+      pathPersistence: groupDirectPathPersistence,
+      participantLimitPolicy: groupParticipantLimitPolicy,
+      identityResolver,
+    });
+    const groupDirectPathAuthority = new FedosGroupDirectPathAuthority({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      pathPersistence: groupDirectPathPersistence,
+      constructionCoordinator: this.#coordinator,
+      redemptionAuthority: deps.capabilityRedemptionAuthority,
+      activationCoordinator: this.#activationCoordinator,
+    });
+    const groupSendCoordinator = new FedosGroupSendCoordinator({
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      generationPersistence: groupGenerationPersistence,
+      pathPersistence: groupDirectPathPersistence,
+      pathAuthority: groupDirectPathAuthority,
+      messagePersistence: groupMessagePersistence,
+      deliveryPersistence: groupFanoutDeliveryPersistence,
+      directMessagingCoordinator: this.#directMessagingCoordinator,
+      idempotencyKeyGenerator: deps.encryptionIdempotencyKeyGenerator ?? new FedosSecureRandomEncryptionIdempotencyKeyGenerator(),
+      clock: deps.clock,
+    });
+    const groupReadFacade = new FedosGroupReadFacade({
+      generationPersistence: groupGenerationPersistence,
+      messagePersistence: groupMessagePersistence,
+      deliveryPersistence: groupFanoutDeliveryPersistence,
+    });
+    const groupAdmission =
+      deps.capabilityIssuerAuthority !== undefined && deps.capabilityRedemptionAuthority !== undefined
+        ? new FedosGroupAdmission({
+            membershipAuthority: deps.membershipAuthority,
+            capabilityIssuerAuthority: deps.capabilityIssuerAuthority,
+            redemptionAuthority: deps.capabilityRedemptionAuthority,
+          })
+        : null;
+    this.#groupRuntime = new FedosConversationGroupRuntime({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      generationAuthority: groupGenerationAuthority,
+      admission: groupAdmission,
+      sendCoordinator: groupSendCoordinator,
+      readFacade: groupReadFacade,
+      usabilityDeps: {
+        draftPersistence: deps.draftPersistence,
+        membershipAuthority: deps.membershipAuthority,
+        generationPersistence: groupGenerationPersistence,
+        pathPersistence: groupDirectPathPersistence,
+      },
+      clock: deps.clock,
     });
 
     // Alpha 1011 — assemble the invitation transport ONLY when every frozen +
@@ -514,6 +613,17 @@ export class FedosConversationRuntime {
   restoreDraft(id: string, actor: FedosConversationParticipantReference): FedosConversationDraftRestoreResult {
     if (this.#draftManager === null) return { outcome: "unavailable" };
     return this.#draftManager.restoreDraft(id, actor);
+  }
+
+  /**
+   * Alpha 1321–1390 — the additive Private Group Pairwise Fanout facade.
+   * ALWAYS available (every backend it needs has a safe default); never
+   * activates a `private-group` draft itself and never widens the Direct
+   * Activation Coordinator's own Private-Group Gate — it composes the
+   * SAME frozen Direct pipeline once per active OTHER group member.
+   */
+  groupRuntime(): FedosConversationGroupRuntime {
+    return this.#groupRuntime;
   }
 }
 

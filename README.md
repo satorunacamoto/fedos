@@ -8,6 +8,72 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1321–1390 — Private Group Pairwise
+> Fanout Foundation Arc (complete).** Run in a dedicated integration
+> worktree (`C:\wt\private-group-fanout`, branch
+> `arc/private-group-pairwise-fanout-foundation`) built from the prior
+> Arc's own tip (`7990ce4`), with the required Pairwise Fanout Review
+> commit (`b205ff0`, `review/private-group-pairwise-fanout-v1`) merged
+> in cleanly — one merge, zero conflicts, reported in full in
+> `docs/secure_runtime_alpha_1321_1390_reconciliation_report.md`. No
+> `Alpha 1261–1320` ("Production Crypto Activation") branch existed
+> anywhere in this repository during this Arc; nothing from it was
+> merged, depended on, or guessed at.
+>
+> Implements private-group messaging as a purely ADDITIVE orchestration
+> layer over the now-real Alpha 1111–1260 Direct pipeline — it never
+> widens the Direct Activation Coordinator's own Private-Group Gate
+> (`draft.mode !== "direct"` still returns `"unsupported-mode"`,
+> byte-for-byte unchanged), never touches the frozen Encryption/
+> Decryption Coordinators, and never widens the Direct participant
+> resolver beyond its own exactly-one-counterparty contract. Instead, a
+> new `src/conversation/group/` domain (20 files) composes the EXISTING
+> `direct` pipeline once per active OTHER group member: an immutable
+> `FedosGroupGenerationRecord` snapshots the group's own real Membership
+> roster on every admission/removal; a `FedosGroupDirectPathAuthority`
+> lazily constructs, admits, and activates one real, independently-keyed
+> `direct` Conversation per (local, counterparty) pair — reusing
+> `createDirectDraft()`/`redeem()`/`activateDirectConversation()`
+> unmodified; a `FedosGroupSendCoordinator` fans one logical plaintext
+> out into N independently-encrypted Envelopes (all-or-nothing for a
+> fresh send, Option A), recording a local canonical
+> `FedosGroupMessageRecord` plus one `FedosGroupFanoutDeliveryRecord`
+> per recipient — its OWN "already-stored" check is the crash-recovery
+> mechanism, since `sendDirectMessage()`'s own public surface exposes no
+> idempotency key. `FedosConversationRuntime.groupRuntime()` is the one
+> new, narrow accessor exposing `preparePrivateGroup()`/
+> `readinessForPrivateGroup()`/`sendPrivateGroupMessage()`/
+> `listPrivateGroupMessages()`/`listPrivateGroupGenerations()`/
+> `addPrivateGroupMember()`/`removePrivateGroupMember()` — no existing
+> public method's signature changes.
+>
+> Verified end to end through the real `startFedosDesktopRuntime()`
+> entry point with injected Fake Direct Authorities (no WASM artifact in
+> this tree, unchanged from every prior Arc): a 3-member group, two
+> independent recipient Envelopes per send, restart with the identical
+> idempotency key returning the identical result with no duplicate
+> Envelope, member removal excluding the removed member from the next
+> send while leaving their own prior Direct Conversation untouched, and
+> an unsupported-authority (non-`"nostr"`) counterparty failing that one
+> path closed without blocking the rest of the group. No shared group
+> key, Sender Key, MLS, NIP-17/NIP-59, or network delivery of any kind
+> is implemented or claimed — restated explicitly in
+> `docs/secure_runtime_alpha_1321_1390_completion_declaration.md`, §9.
+> `npm run typecheck` clean (one pre-existing, unrelated failure,
+> unchanged from every prior Arc); targeted Conversation+Group-domain
+> run 95/95; full `npm test` 12015/12259, every one of the 244 failures
+> individually categorized as a confirmed pre-existing `core.autocrlf`
+> CRLF-checkout artifact, an already-independently-named pre-existing
+> failure, or a prior review's own now-expected "working tree unchanged"
+> staleness check — zero attributable to this Arc. `package.json`/
+> `package-lock.json`/`Cargo.toml` byte-for-byte unchanged; `packages/fedos-core-rust/`
+> untouched; `p2p/` untouched. See
+> `docs/secure_runtime_alpha_1321_1390_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_1321_1390_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1181–1260 — Conversation Runtime
 > Finalization Arc (complete).** Same worktree/branch as the prior Arc —
 > no new sibling Arc branch had landed, so no additional integration was

@@ -94,6 +94,19 @@ import { AppendOnlyFedosConversationActivationPersistence } from "../activation/
 import type { FedosPayloadRetentionPersistence } from "../retention/fedos_payload_retention_persistence.js";
 import { InMemoryFedosPayloadRetentionPersistence } from "../retention/in_memory_fedos_payload_retention_persistence.js";
 import { AppendOnlyFedosPayloadRetentionPersistence } from "../retention/append_only_fedos_payload_retention_persistence.js";
+import type { FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
+import { InMemoryFedosGroupGenerationPersistence } from "../group/in_memory_fedos_group_generation_persistence.js";
+import { AppendOnlyFedosGroupGenerationPersistence } from "../group/append_only_fedos_group_generation_persistence.js";
+import type { FedosGroupDirectPathPersistence } from "../group/fedos_group_direct_path.js";
+import { InMemoryFedosGroupDirectPathPersistence } from "../group/in_memory_fedos_group_direct_path_persistence.js";
+import { AppendOnlyFedosGroupDirectPathPersistence } from "../group/append_only_fedos_group_direct_path_persistence.js";
+import type { FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
+import { InMemoryFedosGroupMessagePersistence } from "../group/in_memory_fedos_group_message_persistence.js";
+import { AppendOnlyFedosGroupMessagePersistence } from "../group/append_only_fedos_group_message_persistence.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../group/fedos_group_fanout_delivery.js";
+import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../group/in_memory_fedos_group_fanout_delivery_persistence.js";
+import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../group/append_only_fedos_group_fanout_delivery_persistence.js";
+import type { FedosGroupParticipantLimitPolicy } from "../group/fedos_group_participant_limit.js";
 
 export interface FedosConversationRuntimeAssemblyConfig {
   /** Explicit, caller-supplied append-only log path for the private-draft record; omitted, an in-memory backend is used. */
@@ -149,6 +162,16 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly activationCoordinationLogPath?: string;
   /** Alpha 1143 — explicit append-only log path for the Payload Retention decision log; omitted, in-memory. */
   readonly payloadRetentionLogPath?: string;
+  /** Alpha 1321–1390 — explicit append-only log path for Group Generation snapshots; omitted, in-memory. */
+  readonly groupGenerationLogPath?: string;
+  /** Alpha 1321–1390 — explicit append-only log path for Group Direct Path facts; omitted, in-memory. */
+  readonly groupDirectPathLogPath?: string;
+  /** Alpha 1321–1390 — explicit append-only log path for local canonical Group Message facts; omitted, in-memory. */
+  readonly groupMessageLogPath?: string;
+  /** Alpha 1321–1390 — explicit append-only log path for Fanout Delivery facts; omitted, in-memory. */
+  readonly groupFanoutDeliveryLogPath?: string;
+  /** Alpha 1321–1390 — optional; default a conservative fixed operational limit (never a cryptographic one). */
+  readonly groupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
 }
 
 function participantIsActiveInviter(
@@ -242,6 +265,27 @@ export function assembleFedosConversationRuntimeDependencies(
       ? new AppendOnlyFedosPayloadRetentionPersistence(config.payloadRetentionLogPath)
       : new InMemoryFedosPayloadRetentionPersistence();
 
+  // Alpha 1321–1390 — mirrors every backend construction above exactly.
+  const groupGenerationPersistence: FedosGroupGenerationPersistence =
+    config.groupGenerationLogPath !== undefined
+      ? new AppendOnlyFedosGroupGenerationPersistence(config.groupGenerationLogPath)
+      : new InMemoryFedosGroupGenerationPersistence();
+
+  const groupDirectPathPersistence: FedosGroupDirectPathPersistence =
+    config.groupDirectPathLogPath !== undefined
+      ? new AppendOnlyFedosGroupDirectPathPersistence(config.groupDirectPathLogPath)
+      : new InMemoryFedosGroupDirectPathPersistence();
+
+  const groupMessagePersistence: FedosGroupMessagePersistence =
+    config.groupMessageLogPath !== undefined
+      ? new AppendOnlyFedosGroupMessagePersistence(config.groupMessageLogPath)
+      : new InMemoryFedosGroupMessagePersistence();
+
+  const groupFanoutDeliveryPersistence: FedosGroupFanoutDeliveryPersistence =
+    config.groupFanoutDeliveryLogPath !== undefined
+      ? new AppendOnlyFedosGroupFanoutDeliveryPersistence(config.groupFanoutDeliveryLogPath)
+      : new InMemoryFedosGroupFanoutDeliveryPersistence();
+
   // Alpha 996/1003 — the two NEW additive backends this Arc introduces.
   const invitationRevocationRegistry: FedosConversationInvitationRevocationRegistry =
     config.invitationRevocationLogPath !== undefined
@@ -307,5 +351,10 @@ export function assembleFedosConversationRuntimeDependencies(
     encryptionIdempotencyKeyGenerator: config.encryptionIdempotencyKeyGenerator,
     activationPersistence,
     retentionPersistence,
+    groupGenerationPersistence,
+    groupDirectPathPersistence,
+    groupMessagePersistence,
+    groupFanoutDeliveryPersistence,
+    groupParticipantLimitPolicy: config.groupParticipantLimitPolicy,
   };
 }

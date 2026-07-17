@@ -207,6 +207,11 @@ export async function startFedosDesktopRuntime(
     config.conversationEncryptionCoordinationLogPath,
     config.conversationActivationCoordinationLogPath,
     config.conversationPayloadRetentionLogPath,
+    // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+    config.conversationGroupGenerationLogPath,
+    config.conversationGroupDirectPathLogPath,
+    config.conversationGroupMessageLogPath,
+    config.conversationGroupFanoutDeliveryLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -314,6 +319,12 @@ export async function startFedosDesktopRuntime(
       // Retention logs this Arc introduces.
       activationCoordinationLogPath: config.conversationActivationCoordinationLogPath,
       payloadRetentionLogPath: config.conversationPayloadRetentionLogPath,
+      // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+      groupGenerationLogPath: config.conversationGroupGenerationLogPath,
+      groupDirectPathLogPath: config.conversationGroupDirectPathLogPath,
+      groupMessageLogPath: config.conversationGroupMessageLogPath,
+      groupFanoutDeliveryLogPath: config.conversationGroupFanoutDeliveryLogPath,
+      groupParticipantLimitPolicy: config.conversationGroupParticipantLimitPolicy,
     }),
   );
 
