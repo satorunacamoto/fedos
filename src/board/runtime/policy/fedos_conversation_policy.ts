@@ -44,9 +44,27 @@
 import type { FedosConversationMode } from "./fedos_conversation_mode.js";
 
 export type FedosConversationDiscoverability = "listed" | "unlisted";
-export type FedosConversationReadAccess = "public";
+/**
+ * Secure Runtime Alpha 896 ("Private Policy V1") widened this closed
+ * vocabulary ADDITIVELY with `"members-only"` — the value a
+ * `private-group`/`direct` draft policy needs to express "only Members
+ * may read." `validateFedosConversationPolicy` below (the PUBLIC
+ * validator) is byte-for-byte unchanged and still rejects any
+ * non-`"public"` value, so Public Runtime behavior is preserved exactly;
+ * the private value is validated only by
+ * `validateFedosPrivateConversationPolicy`
+ * (`../../../conversation/construction/fedos_private_conversation_policy.ts`).
+ */
+export type FedosConversationReadAccess = "public" | "members-only";
 export type FedosConversationWriteAccess = "public" | "restricted";
-export type FedosConversationInviteAuthority = "none";
+/**
+ * Secure Runtime Alpha 896 widened this closed vocabulary ADDITIVELY with
+ * `"owner-and-moderators"` — the value a `private-group` draft policy
+ * needs to express who may issue a join Capability. `direct` keeps
+ * `"none"` (its two participants never invite a third, Alpha 902). The
+ * PUBLIC validator below still rejects any non-`"none"` value, unchanged.
+ */
+export type FedosConversationInviteAuthority = "none" | "owner-and-moderators";
 export type FedosConversationFederationEligibility = "allowed" | "local-only";
 
 export interface FedosConversationPolicy {

@@ -87,18 +87,24 @@ describe("Private Conversation Construction V1 -- source alignment", () => {
     expect(conversationPolicySource).toMatch(/if \(value\.writeAccess === "restricted"\) return null;/);
   });
 
-  it("6. FedosConversationReadAccess has exactly one legal value, 'public' -- 07's 'cannot express members-only' finding is grounded", () => {
+  // Secure Runtime Alpha 896 ("Private Policy V1") ADDITIVELY widened this
+  // closed vocabulary with "members-only" -- exactly the blocker 07's
+  // "cannot express members-only" finding said the implementing Arc must
+  // lift. The PUBLIC validator (validateFedosConversationPolicy) is
+  // unchanged and still rejects it (verified by that validator's own
+  // tests); this assertion now grounds the SUPERSEDED state.
+  it("6. FedosConversationReadAccess now also allows 'members-only' -- 07's blocker was lifted by Alpha 896", () => {
     const match = conversationPolicySource.match(/export type FedosConversationReadAccess = ("[^"]+"(?:\s*\|\s*"[^"]+")*)/);
     expect(match).not.toBeNull();
     const literals = (match?.[1] ?? "").match(/"[^"]+"/g) ?? [];
-    expect(literals).toEqual(['"public"']);
+    expect(literals).toEqual(['"public"', '"members-only"']);
   });
 
-  it("7. FedosConversationInviteAuthority has exactly one legal value, 'none' -- 07's blocker table is grounded", () => {
+  it("7. FedosConversationInviteAuthority now also allows 'owner-and-moderators' -- 07's blocker was lifted by Alpha 896", () => {
     const match = conversationPolicySource.match(/export type FedosConversationInviteAuthority = ("[^"]+"(?:\s*\|\s*"[^"]+")*)/);
     expect(match).not.toBeNull();
     const literals = (match?.[1] ?? "").match(/"[^"]+"/g) ?? [];
-    expect(literals).toEqual(['"none"']);
+    expect(literals).toEqual(['"none"', '"owner-and-moderators"']);
   });
 
   it("8. StaticFedosConversationPolicyAuthority resolves the SAME fixed policy value unconditionally, for every input -- 07's 'no per-Conversation authority exists' finding is grounded", () => {
@@ -191,7 +197,12 @@ describe("Private Conversation Construction V1 -- source alignment", () => {
     expect(log).not.toMatch(/Alpha 85[1-9]|Alpha 8[6-8][0-9]|Alpha 890/);
   });
 
-  it("26. no src/conversation directory or file defines a FedosConversationRuntime class -- 12's 'no dedicated Conversation Application boundary exists' finding is grounded", () => {
+  // Secure Runtime Alpha 921 ("Runtime Ownership Decision") implemented
+  // 12's own recommendation: a dedicated FedosConversationRuntime, a peer
+  // to FedosBoardRuntime owned by the Local Runtime. This assertion now
+  // grounds the SUPERSEDED state -- the class exists exactly once, under
+  // src/conversation/runtime/.
+  it("26. FedosConversationRuntime now exists in src/conversation/runtime/ -- 12's recommendation was implemented by Alpha 921", () => {
     function allSrcConversationFiles(dir: string): string[] {
       const entries = readdirSync(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean }>;
       let files: string[] = [];
@@ -206,11 +217,11 @@ describe("Private Conversation Construction V1 -- source alignment", () => {
       return files;
     }
     const files = allSrcConversationFiles("src/conversation");
-    const offending: string[] = [];
+    const defining: string[] = [];
     for (const file of files) {
       const text = readFileSync(file, "utf8") as string;
-      if (/class FedosConversationRuntime/.test(text)) offending.push(file);
+      if (/class FedosConversationRuntime\b/.test(text)) defining.push(file);
     }
-    expect(offending).toEqual([]);
+    expect(defining).toEqual(["src/conversation/runtime/fedos_conversation_runtime.ts"]);
   });
 });

@@ -81,14 +81,18 @@ describe("Secure Runtime Alpha 758 -- Local Runtime Ownership", () => {
     ).rejects.toThrow();
   });
 
-  it("5. no filesystem internal is exposed -- the running runtime handle exposes only host/boardRuntime()/stop()", async () => {
+  it("5. no filesystem internal is exposed -- the running runtime handle exposes only host/boardRuntime()/conversationRuntime()/stop()", async () => {
     const dir = freshDir();
     const runtime = await startFedosDesktopRuntime({
       boardLogPath: join(dir, "board.ndjson"),
       outboxLogPath: join(dir, "outbox.ndjson"),
       deliveryEnabled: false,
     });
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "host", "stop"].sort());
+    // Secure Runtime Alpha 923 ADDITIVELY extended this handle with
+    // `conversationRuntime()` (the private-Conversation draft runtime the
+    // Local Runtime now also owns). Still NO filesystem internal is exposed
+    // -- only the two Application-Runtime accessors and `stop()`.
+    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"].sort());
     await runtime.stop();
   });
 
