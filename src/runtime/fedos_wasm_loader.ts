@@ -1632,6 +1632,8 @@ export interface FedosMasterSeedAuthorityHandle {
   ) => string | undefined;
   /** Secure Runtime Alpha 684/685 — derives the per-account Nostr public key without signing. */
   readonly public_key_hex_for_account: (accountIndex: number) => string | undefined;
+  /** Secure Runtime Alpha 869 — resolves the Direct-mode pairwise conversation key (an opaque `AeadKeyHandle`) for `accountIndex` and one counterparty's public key hex. Never a raw key byte. */
+  readonly resolve_conversation_key: (accountIndex: number, counterpartyPublicKeyHex: string) => unknown;
 }
 
 /**
@@ -1652,7 +1654,8 @@ function isFedosMasterSeedAuthorityShape(value: unknown): value is FedosMasterSe
     typeof candidate.restore_sealed === "function" &&
     typeof candidate.clear === "function" &&
     typeof candidate.sign_nostr_event === "function" &&
-    typeof candidate.public_key_hex_for_account === "function"
+    typeof candidate.public_key_hex_for_account === "function" &&
+    typeof candidate.resolve_conversation_key === "function"
   );
 }
 
@@ -1739,6 +1742,21 @@ export interface FedosWasmLoaderNostrPublicIdentityExecution {
   readonly reason:
     | "Succeeded"
     | "DerivationFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 869 — `attemptDevOnlyMasterSeedResolveConversationKeyCall()`'s own result. `keyHandle` is an opaque `AeadKeyHandle` (SAME type `attemptDevOnlyAeadKeyGenerationCall()` already returns), never a raw key byte. */
+export interface FedosWasmLoaderConversationKeyResolutionExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly keyHandle: AeadKeyHandle | null;
+  readonly reason:
+    | "Succeeded"
+    | "DerivationFailed"
+    | "InvalidHandleShape"
     | "InvalidAuthorityHandle"
     | "NotInitialized"
     | "CallFailed"
@@ -1934,6 +1952,9 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   /** Secure Runtime Alpha 684/685 — most recent `attemptDevOnlyNostrPublicIdentityForAccountCall()` result, or `null` before it has ever been called. Read via `nostrPublicIdentityExecution()`. */
   #nostrPublicIdentityExecution: FedosWasmLoaderNostrPublicIdentityExecution | null = null;
+
+  /** Secure Runtime Alpha 869 — most recent `attemptDevOnlyMasterSeedResolveConversationKeyCall()` result, or `null` before it has ever been called. Read via `masterSeedResolveConversationKeyExecution()`. */
+  #masterSeedResolveConversationKeyExecution: FedosWasmLoaderConversationKeyResolutionExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -2357,6 +2378,11 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   /** Secure Runtime Alpha 684/685 — read-only accessor for `#nostrPublicIdentityExecution`. */
   nostrPublicIdentityExecution(): FedosWasmLoaderNostrPublicIdentityExecution | null {
     return this.#nostrPublicIdentityExecution;
+  }
+
+  /** Secure Runtime Alpha 869 — read-only accessor for `#masterSeedResolveConversationKeyExecution`. */
+  masterSeedResolveConversationKeyExecution(): FedosWasmLoaderConversationKeyResolutionExecution | null {
+    return this.#masterSeedResolveConversationKeyExecution;
   }
 
   /**
@@ -3462,6 +3488,67 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#nostrPublicIdentityExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 869 ("Rust/WASM Encryption Export") — PUBLIC,
+   * ASYNC. Calls `authority.resolve_conversation_key(accountIndex,
+   * counterpartyPublicKeyHex)` — the Direct-mode Package C2 export
+   * (`docs/reviews/private_message_envelope_v1/12_wasm_export_gap.md`).
+   * Mirrors `attemptDevOnlyNostrPublicIdentityForAccountCall()`'s own
+   * gating exactly (same artifact/dev-gate/readiness/import/init checks,
+   * same `isFedosMasterSeedAuthorityShape()` validation), but validates
+   * its RETURN value with `isAeadKeyHandleShape()`
+   * (`attemptDevOnlyAeadKeyGenerationCall()`'s own check, reused
+   * unchanged) rather than a `string` check — `resolve_conversation_key`
+   * returns an opaque `AeadKeyHandle`, the SAME type
+   * `generate_aead_key_handle()` returns, never a raw key byte. A
+   * genuine return that is neither `undefined` nor a structurally real
+   * handle resolves `"InvalidHandleShape"` — a distinct Fail-Closed
+   * reason from `"CallFailed"`, since nothing threw.
+   */
+  async attemptDevOnlyMasterSeedResolveConversationKeyCall(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+  ): Promise<FedosWasmLoaderConversationKeyResolutionExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderConversationKeyResolutionExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, keyHandle: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, keyHandle: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, keyHandle: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value: unknown = authority.resolve_conversation_key(accountIndex, counterpartyPublicKeyHex);
+        if (isAeadKeyHandleShape(value)) {
+          result = { attempted: true, succeeded: true, keyHandle: value, reason: "Succeeded" };
+        } else if (value === undefined) {
+          result = { attempted: true, succeeded: false, keyHandle: null, reason: "DerivationFailed" };
+        } else {
+          result = { attempted: true, succeeded: false, keyHandle: null, reason: "InvalidHandleShape" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, keyHandle: null, reason: "CallFailed" };
+      }
+    }
+    this.#masterSeedResolveConversationKeyExecution = result;
     return result;
   }
 

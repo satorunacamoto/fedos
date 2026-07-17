@@ -4831,6 +4831,101 @@ mod master_root {
             .map(|hex| hex.as_str().to_string())
     }
 
+    /// Secure Runtime Alpha 869 ("Rust/WASM Encryption Export") — the
+    /// `#[wasm_bindgen]`-reachable bridge from an account-derived Master
+    /// Seed secret key to a real conversation key (Package C2,
+    /// `docs/reviews/private_message_envelope_v1/12_wasm_export_gap.md`).
+    /// Reuses the EXACT SAME identity → application → nostr-root → secret
+    /// key derivation chain [`derive_nostr_public_key_hex_from_master_seed_internal`]
+    /// (above, unchanged) already establishes — this function's only new
+    /// work is (a) bridging the resulting [`FedosNostrSecretKeyHandle`]
+    /// into a [`crate::secret_handle::SecretHandle`] of the
+    /// `NostrKeyMaterial` kind `crypto::conversation_key`'s own
+    /// (UNCHANGED, already NIP-44-vector-verified)
+    /// `derive_conversation_key_via_ecdh_internal` requires, and (b)
+    /// wrapping its own `counterparty_public_key_x_only` parameter the
+    /// same way. NO elliptic-curve arithmetic, HKDF, or AEAD code is
+    /// added or modified by this function — it is narrowly plumbing.
+    ///
+    /// `counterparty_public_key_x_only` is the OTHER party's already-
+    /// PUBLIC 32-byte x-only Nostr public key (never secret) — the SAME
+    /// shape `crypto::conversation_key`'s own `pub2` parameter already
+    /// requires (even-Y lift, per that module's own doc comment).
+    ///
+    /// Returns the derived 32-byte conversation key on success, `None` on
+    /// ANY failure at ANY step (no Master Seed held, an invalid
+    /// `account_index` derivation, or `derive_conversation_key_via_ecdh_internal`
+    /// itself rejecting either input) — fail closed, never a panic. Every
+    /// intermediate root/key handle is `clear()`-ed immediately after its
+    /// own single use, the same discipline every function in this module
+    /// already follows.
+    pub(crate) fn derive_conversation_key_bytes_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+        counterparty_public_key_x_only: [u8; 32],
+    ) -> Option<[u8; 32]> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let mut local_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        secret_key.clear();
+
+        let local_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            local_secret_bytes,
+        );
+        local_secret_bytes.zeroize();
+        let counterparty_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            counterparty_public_key_x_only,
+        );
+
+        let decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &local_secret_handle,
+            &counterparty_handle,
+        );
+        if decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            return None;
+        }
+        let mut conversation_key = decision.output?;
+        let conversation_key_bytes = conversation_key.expose_bytes_for_internal_message_key_derivation();
+        conversation_key.clear();
+        conversation_key_bytes
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -10487,6 +10582,94 @@ impl FedosMasterSeedAuthority {
         };
         crate::master_root::derive_nostr_public_key_hex_from_master_seed_internal(handle, account_index)
     }
+
+    /// Secure Runtime Alpha 869 ("Rust/WASM Encryption Export") — Package
+    /// C2's own single new WASM export
+    /// (`docs/reviews/private_message_envelope_v1/12_wasm_export_gap.md`,
+    /// `20_normative_next_arc.md`). Resolves the pairwise Direct-mode
+    /// conversation key for `account_index` and one counterparty's public
+    /// key, following the EXACT opaque-handle-in/opaque-handle-out
+    /// pattern [`generate_aead_key_handle`]/[`encrypt_aead`] already
+    /// establish (Alpha 12/14's own Key Boundary Decision) — NO raw key
+    /// byte crosses this boundary in either direction; the ONE `String`
+    /// argument this function accepts is `counterparty_public_key_hex`,
+    /// which is ALREADY-PUBLIC key material, never a secret.
+    ///
+    /// `counterparty_public_key_hex` must be exactly 64 lowercase-or-
+    /// uppercase hex characters (32 bytes, x-only, the same shape
+    /// [`public_key_hex_for_account`] itself already returns) — anything
+    /// else (wrong length, non-hex characters) fails closed to `None`
+    /// before any key derivation is attempted, via
+    /// [`fedos_decode_fixed_32_hex`] below.
+    ///
+    /// The returned [`AeadKeyHandle`] is immediately usable with the
+    /// EXISTING, UNCHANGED [`encrypt_aead`]/[`decrypt_aead`] — this
+    /// function adds no new AEAD call, no new algorithm, and no new nonce
+    /// policy; it only supplies a key those two functions already accept,
+    /// derived via ECDH + HKDF-extract
+    /// (`crypto::conversation_key::derive_conversation_key_via_ecdh_internal`,
+    /// Stage 199, unmodified, NIP-44-v2-vector-verified) instead of fresh
+    /// CSPRNG randomness. `resolveConversationKey()` (Alpha 861/862's own
+    /// design-level Encryption/Decryption Authority boundary) is this
+    /// function's sole intended TypeScript-side caller.
+    ///
+    /// `None` on ANY failure: no Master Seed held, a malformed
+    /// `counterparty_public_key_hex`, or any internal derivation/ECDH
+    /// step failing (an off-curve or otherwise invalid counterparty
+    /// public key, most likely). Never panics. Does NOT claim distributed
+    /// key agreement, group keys, or any Private Group scheme — strictly
+    /// the Direct-mode pairwise primitive (`09_direct_key_strategy.md`).
+    pub fn resolve_conversation_key(&self, account_index: u32, counterparty_public_key_hex: String) -> Option<AeadKeyHandle> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let counterparty_bytes = fedos_decode_fixed_32_hex(&counterparty_public_key_hex)?;
+        let conversation_key_bytes = crate::master_root::derive_conversation_key_bytes_from_master_seed_internal(
+            handle,
+            account_index,
+            counterparty_bytes,
+        )?;
+        let inner = secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            secret_handle::SecretHandleKind::AeadKeyMaterial,
+            conversation_key_bytes,
+        );
+        Some(AeadKeyHandle {
+            inner: FedosAeadKeyHandle { inner },
+        })
+    }
+}
+
+/// Secure Runtime Alpha 869 — a minimal, fail-closed, fixed-length (64
+/// lowercase-or-uppercase hex characters -> 32 bytes) hex decoder for
+/// [`FedosMasterSeedAuthority::resolve_conversation_key`]'s own
+/// `counterparty_public_key_hex` argument. This crate has no `hex` crate
+/// as a PRODUCTION dependency (only `[dev-dependencies]`, per
+/// `Cargo.toml`'s own comment) — introducing one for this one fixed-width
+/// decode would be a new production dependency this Arc's own
+/// instruction forbids ("no new Cargo dependency"). Rejects (`None`) any
+/// input whose length is not exactly 64 characters or that contains a
+/// non-hex-digit character — never panics, never partially decodes.
+fn fedos_decode_fixed_32_hex(hex: &str) -> Option<[u8; 32]> {
+    let bytes = hex.as_bytes();
+    if bytes.len() != 64 {
+        return None;
+    }
+    fn nibble(byte: u8) -> Option<u8> {
+        match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            b'A'..=b'F' => Some(byte - b'A' + 10),
+            _ => None,
+        }
+    }
+    let mut out = [0u8; 32];
+    for i in 0..32 {
+        let high = nibble(bytes[2 * i])?;
+        let low = nibble(bytes[2 * i + 1])?;
+        out[i] = (high << 4) | low;
+    }
+    Some(out)
 }
 
 #[cfg(test)]
@@ -10970,6 +11153,130 @@ mod master_seed_authority_tests {
         let restored_hex = restored.public_key_hex_for_account(0).expect("must derive");
 
         assert_eq!(original_hex, restored_hex);
+    }
+
+    // Secure Runtime Alpha 869 -- `resolve_conversation_key` tests.
+
+    #[test]
+    fn resolve_conversation_key_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(authority
+            .resolve_conversation_key(0, "ab".repeat(32))
+            .is_none());
+    }
+
+    #[test]
+    fn resolve_conversation_key_fails_closed_on_malformed_hex() {
+        let authority = generated_authority();
+        // Too short.
+        assert!(authority.resolve_conversation_key(0, "ab".repeat(10)).is_none());
+        // Too long.
+        assert!(authority.resolve_conversation_key(0, "ab".repeat(40)).is_none());
+        // Non-hex character.
+        assert!(authority
+            .resolve_conversation_key(0, "zz".repeat(32))
+            .is_none());
+    }
+
+    #[test]
+    fn resolve_conversation_key_succeeds_for_a_well_formed_counterparty_key() {
+        let authority = generated_authority();
+        // A real, on-curve x-only public key (a real generated authority's
+        // own account-0 pubkey) -- an arbitrary 32 zero/one-pattern byte
+        // string is not guaranteed to lift to a valid curve point.
+        let counterparty = generated_authority();
+        let counterparty_hex = counterparty.public_key_hex_for_account(0).expect("must derive");
+        assert!(authority
+            .resolve_conversation_key(0, counterparty_hex)
+            .is_some());
+    }
+
+    #[test]
+    fn resolve_conversation_key_is_deterministic_for_the_same_account_and_counterparty() {
+        let authority = generated_authority();
+        let counterparty = generated_authority();
+        let counterparty_hex = counterparty.public_key_hex_for_account(0).expect("must derive");
+
+        let first = authority
+            .resolve_conversation_key(3, counterparty_hex.clone())
+            .expect("must resolve");
+        let second = authority
+            .resolve_conversation_key(3, counterparty_hex)
+            .expect("must resolve");
+
+        // Handles are opaque -- determinism is proven functionally: a
+        // plaintext sealed under the FIRST handle must open under the
+        // SECOND, and vice versa.
+        let plaintext = b"determinism check";
+        let sealed_with_first = encrypt_aead(&first, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, plaintext)
+            .expect("must encrypt");
+        let opened_with_second = decrypt_aead(&second, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, &sealed_with_first)
+            .expect("must decrypt");
+        assert_eq!(opened_with_second, plaintext);
+    }
+
+    #[test]
+    fn resolve_conversation_key_differs_across_distinct_accounts() {
+        let authority = generated_authority();
+        let counterparty = generated_authority();
+        let counterparty_hex = counterparty.public_key_hex_for_account(0).expect("must derive");
+
+        let key_account_0 = authority
+            .resolve_conversation_key(0, counterparty_hex.clone())
+            .expect("must resolve");
+        let key_account_1 = authority
+            .resolve_conversation_key(1, counterparty_hex)
+            .expect("must resolve");
+
+        let plaintext = b"account separation check";
+        let sealed = encrypt_aead(&key_account_0, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, plaintext)
+            .expect("must encrypt");
+        assert!(decrypt_aead(&key_account_1, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, &sealed).is_none());
+    }
+
+    /// The core NIP-44/ECDH reciprocity property: two independent parties,
+    /// each deriving the conversation key from THEIR OWN local account and
+    /// the OTHER party's public key, must land on the identical shared
+    /// key -- proven functionally (encrypt under Alice's own handle,
+    /// decrypt under Bob's own handle, and the reverse), never by
+    /// inspecting a raw byte of either handle.
+    #[test]
+    fn resolve_conversation_key_is_reciprocal_between_two_independent_parties() {
+        let alice = generated_authority();
+        let bob = generated_authority();
+        let alice_pubkey = alice.public_key_hex_for_account(0).expect("must derive");
+        let bob_pubkey = bob.public_key_hex_for_account(0).expect("must derive");
+
+        let alice_view = alice
+            .resolve_conversation_key(0, bob_pubkey)
+            .expect("alice must resolve");
+        let bob_view = bob
+            .resolve_conversation_key(0, alice_pubkey)
+            .expect("bob must resolve");
+
+        let plaintext = b"reciprocity check";
+        let sealed_by_alice = encrypt_aead(&alice_view, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, plaintext)
+            .expect("alice must encrypt");
+        let opened_by_bob = decrypt_aead(&bob_view, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, &sealed_by_alice)
+            .expect("bob must decrypt what alice sealed");
+        assert_eq!(opened_by_bob, plaintext);
+
+        let sealed_by_bob = encrypt_aead(&bob_view, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, plaintext)
+            .expect("bob must encrypt");
+        let opened_by_alice = decrypt_aead(&alice_view, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, &sealed_by_bob)
+            .expect("alice must decrypt what bob sealed");
+        assert_eq!(opened_by_alice, plaintext);
+    }
+
+    #[test]
+    fn resolve_conversation_key_never_touches_a_cleared_authority() {
+        let mut authority = generated_authority();
+        let counterparty = generated_authority();
+        let counterparty_hex = counterparty.public_key_hex_for_account(0).expect("must derive");
+        authority.clear();
+        assert!(authority
+            .resolve_conversation_key(0, counterparty_hex)
+            .is_none());
     }
 }
 

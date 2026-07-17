@@ -21,7 +21,9 @@ import {
   type FedosWasmLoaderMasterSeedGenerateExecution,
   type FedosWasmLoaderMasterSeedRestoreSealedExecution,
   type FedosWasmLoaderMasterSeedSealExecution,
+  type FedosWasmLoaderConversationKeyResolutionExecution,
   type FedosMasterSeedAuthorityHandle,
+  type AeadKeyHandle,
 } from "../fedos_wasm_loader.js";
 import type { FedosMasterSeedAuthority } from "./fedos_master_seed_authority.js";
 import {
@@ -43,6 +45,11 @@ export interface FedosMasterSeedWasmLoaderBoundary {
     passphrase: Uint8Array,
   ): Promise<FedosWasmLoaderMasterSeedRestoreSealedExecution>;
   attemptDevOnlyMasterSeedClearCall(authority: unknown): Promise<FedosWasmLoaderMasterSeedClearExecution>;
+  attemptDevOnlyMasterSeedResolveConversationKeyCall(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+  ): Promise<FedosWasmLoaderConversationKeyResolutionExecution>;
 }
 
 export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority {
@@ -119,6 +126,17 @@ export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority {
     const authority = await this.#ensureConstructed();
     if (!authority) return;
     await this.#loaderBoundary.attemptDevOnlyMasterSeedClearCall(authority);
+  }
+
+  async resolveConversationKey(accountIndex: number, counterpartyPublicKeyHex: string): Promise<AeadKeyHandle | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyMasterSeedResolveConversationKeyCall(
+      authority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+    );
+    return result.succeeded ? result.keyHandle : null;
   }
 
   /**

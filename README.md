@@ -8,6 +8,49 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 851–890 — Private Message Envelope and
+> Encryption Authority Activation Arc (partial — stopped at a named
+> blocker).** Implements Package C1 (Envelope model + validator +
+> persistence, Alpha 853–860), completes Package C2 (the Rust/WASM
+> Encryption Authority export), and builds the buildable slice of
+> Package C3 (`docs/reviews/private_message_envelope_v1/19_arc_packaging.md`).
+> `FedosMasterSeedAuthority::resolve_conversation_key()`
+> (`packages/fedos-core-rust/src/lib.rs`) is now a real, `#[wasm_bindgen]`-
+> exported bridge from an account's Master Seed secret key to a pairwise
+> ECDH conversation key — reusing the existing, unchanged,
+> NIP-44-vector-verified `derive_conversation_key_via_ecdh_internal`, zero
+> new elliptic-curve/HKDF/AEAD code — wired end to end through
+> `FedosWasmMasterSeedAuthority.resolveConversationKey()`. A real
+> `FedosConversationMessageEnvelope` (Alpha 854) now exists, with a
+> deterministic, length-prefixed associated-data header
+> (`encodeFedosConversationEnvelopeAssociatedData()`, Alpha 856,
+> prefix-then-encrypt) cryptographically binding `conversationId`/
+> `keyEpoch`/`senderMembershipId`/etc. into the sealed ciphertext.
+> `FedosWasmConversationEncryptionAuthority`/`FedosWasmConversationDecryptionAuthority`
+> (`src/conversation/encryption/`, Alpha 870/871) are real, concrete, and
+> tested — resolving the key, prepending/stripping the associated-data
+> header, and reusing the EXISTING `encrypt()`/`decrypt()`/
+> `exportCiphertext()`/`importCiphertext()` Runtime Service chain with
+> zero new cryptography. Pairwise/Direct mode ONLY — two real AEAD
+> suites (`ChaCha20Poly1305`, `Aes256Gcm`), no group/Private-Group
+> support of any kind. **Stops at one named, deliberate blocker:**
+> resolving `localAccountIndex`/`counterpartyPublicKeyHex` from a live
+> `FedosConversationId`/`FedosConversationMembership` pair is a genuinely
+> separate Identity-domain decision this Arc does not invent — both
+> Authorities accept those two fields already resolved, and no
+> Coordinator wiring a live Conversation to either Authority exists yet.
+> Seam 2's Development-Runtime gate remains exactly as permanently closed
+> as before this Arc — no production-runtime activation of any kind.
+> Ciphertext confidentiality only — no traffic-analysis/anonymity
+> guarantee; `senderMembershipId`/`conversationId`/`createdAt` still
+> travel in the plaintext Envelope record itself.
+>
+> See `docs/secure_runtime_alpha_851_890_execution_spec.md` and
+> `docs/secure_runtime_alpha_890_completion_declaration.md` for the full
+> record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 821–850 — Durable Conversation
 > Membership & Capability Persistence Arc (complete).** Closes the
 > primary durability blocker Alpha 790 named as its own next step: both

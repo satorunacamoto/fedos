@@ -15,6 +15,7 @@
  * throwing.
  */
 import type { FedosSealedMasterSeedEnvelopeV1 } from "./fedos_sealed_master_seed_envelope.js";
+import type { AeadKeyHandle } from "../fedos_wasm_loader.js";
 
 export interface FedosMasterSeedAuthority {
   isAvailable(): Promise<boolean>;
@@ -23,4 +24,17 @@ export interface FedosMasterSeedAuthority {
   restoreSealed(envelope: FedosSealedMasterSeedEnvelopeV1, passphrase: Uint8Array): Promise<boolean>;
   seal(passphrase: Uint8Array): Promise<FedosSealedMasterSeedEnvelopeV1 | null>;
   clear(): Promise<void>;
+  /**
+   * Secure Runtime Alpha 869 — resolves the Direct-mode pairwise
+   * conversation key for `accountIndex` and one counterparty's public
+   * key hex (64 lowercase-or-uppercase hex characters, x-only, the SAME
+   * shape a `FedosMasterSeedAuthority`'s own future `publicKeyHexForAccount`-
+   * shaped method would return). Returns an opaque `AeadKeyHandle`
+   * directly usable with `encrypt()`/`decrypt()`
+   * (`../fedos_runtime_encrypt.js`/`../fedos_runtime_decrypt.js`) — never
+   * a raw key byte. `null` on ANY failure: no Master Seed held, malformed
+   * hex, or an internal derivation/ECDH failure (most likely an
+   * off-curve counterparty key).
+   */
+  resolveConversationKey(accountIndex: number, counterpartyPublicKeyHex: string): Promise<AeadKeyHandle | null>;
 }

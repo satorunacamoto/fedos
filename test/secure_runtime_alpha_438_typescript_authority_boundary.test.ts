@@ -15,6 +15,7 @@ function fakeHandle(overrides: Partial<FedosMasterSeedAuthorityHandle> = {}): Fe
     clear: vi.fn(),
     sign_nostr_event: vi.fn(() => "signed-event-json"),
     public_key_hex_for_account: vi.fn(() => "a".repeat(64)),
+    resolve_conversation_key: vi.fn(() => ({ kind: "AeadKeyHandle" }) as unknown),
     ...overrides,
   };
 }
@@ -46,6 +47,12 @@ function mockLoaderBoundary(handle: FedosMasterSeedAuthorityHandle | null): Fedo
     attemptDevOnlyMasterSeedClearCall: vi.fn(async () => ({
       attempted: true,
       succeeded: true,
+      reason: "Succeeded" as const,
+    })),
+    attemptDevOnlyMasterSeedResolveConversationKeyCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      keyHandle: { kind: "AeadKeyHandle" } as const,
       reason: "Succeeded" as const,
     })),
   };

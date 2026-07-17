@@ -18,6 +18,7 @@ function fakeHandle(overrides: Partial<FedosMasterSeedAuthorityHandle> = {}): Fe
     clear: vi.fn(),
     sign_nostr_event: vi.fn(() => "{}"),
     public_key_hex_for_account: vi.fn(() => VALID_HEX),
+    resolve_conversation_key: vi.fn(() => ({ kind: "AeadKeyHandle" }) as unknown),
     ...overrides,
   };
 }
@@ -34,6 +35,7 @@ function masterSeedAuthorityWithHandle(handle: FedosMasterSeedAuthorityHandle | 
     attemptDevOnlyMasterSeedSealCall: vi.fn(),
     attemptDevOnlyMasterSeedRestoreSealedCall: vi.fn(),
     attemptDevOnlyMasterSeedClearCall: vi.fn(),
+    attemptDevOnlyMasterSeedResolveConversationKeyCall: vi.fn(),
   };
   return new FedosWasmMasterSeedAuthority(boundary);
 }

@@ -22,6 +22,7 @@ function fakeHandle(): FedosMasterSeedAuthorityHandle {
     clear: vi.fn(),
     sign_nostr_event: vi.fn(() => REAL_SIGNED_EVENT_JSON),
     public_key_hex_for_account: vi.fn(() => "0dd114".repeat(11).slice(0, 64)),
+    resolve_conversation_key: vi.fn(() => ({ kind: "AeadKeyHandle" }) as unknown),
   };
 }
 
@@ -37,6 +38,12 @@ function masterSeedAuthorityWithHandle(handle: FedosMasterSeedAuthorityHandle | 
     attemptDevOnlyMasterSeedSealCall: vi.fn(async () => ({ attempted: true, succeeded: false, envelope: null, reason: "SealFailed" as const })),
     attemptDevOnlyMasterSeedRestoreSealedCall: vi.fn(async () => ({ attempted: true, succeeded: true, reason: "Succeeded" as const })),
     attemptDevOnlyMasterSeedClearCall: vi.fn(async () => ({ attempted: true, succeeded: true, reason: "Succeeded" as const })),
+    attemptDevOnlyMasterSeedResolveConversationKeyCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      keyHandle: { kind: "AeadKeyHandle" } as const,
+      reason: "Succeeded" as const,
+    })),
   };
   return new FedosWasmMasterSeedAuthority(boundary);
 }
