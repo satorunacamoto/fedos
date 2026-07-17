@@ -62,6 +62,7 @@ import type { FedosConversationDecryptionAuthority } from "../../conversation/en
 import type { FedosConversationIdentityResolver } from "../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
 import type { FedosConversationLocalAccountIndexAuthority } from "../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
 import type { FedosConversationProductionCryptoConfig } from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosGroupParticipantLimitPolicy } from "../../conversation/group/fedos_group_participant_limit.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -210,4 +211,21 @@ export interface FedosDesktopRuntimeConfig {
    * value itself.
    */
   readonly conversationProductionCrypto?: FedosConversationProductionCryptoConfig;
+  /**
+   * Secure Runtime Alpha 1321–1390 ("Private Group Pairwise Fanout
+   * Foundation Arc") — the additive `groupRuntime()` facade's own
+   * backends. Every field OPTIONAL; omitted, in-memory (the same
+   * "explicit path or safe in-memory default" discipline as every field
+   * above). Never widens the Direct Activation Coordinator's own
+   * Private-Group Gate.
+   */
+  readonly conversationGroupGenerationLogPath?: string;
+  /** Alpha 1321–1390 — optional append-only log for Group Direct Path facts; omitted, in-memory. */
+  readonly conversationGroupDirectPathLogPath?: string;
+  /** Alpha 1321–1390 — optional append-only log for local canonical Group Message facts; omitted, in-memory. */
+  readonly conversationGroupMessageLogPath?: string;
+  /** Alpha 1321–1390 — optional append-only log for Fanout Delivery facts; omitted, in-memory. */
+  readonly conversationGroupFanoutDeliveryLogPath?: string;
+  /** Alpha 1321–1390 — optional; omitted, a conservative fixed OPERATIONAL limit applies (never a cryptographic one). */
+  readonly conversationGroupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
 }
