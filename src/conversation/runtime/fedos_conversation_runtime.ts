@@ -25,9 +25,58 @@
  * from the injected already-durable ports/authorities and returns one
  * runtime. No singleton, no Host lifecycle ownership, no automatic
  * network/timer.
+ *
+ * Secure Runtime Alpha 949 ("Encryption Runtime Wiring") — Phase C of the
+ * Alpha 931–990 Conversation Identity Resolution and Encryption
+ * Coordinator Arc. Adds `encryptMessage()`/`decryptMessage()`, delegating
+ * to a newly-owned `FedosConversationEncryptionCoordinator`/
+ * `FedosConversationDecryptionCoordinator` (Alpha 943/946) — the SAME
+ * "runtime owns exactly one coordinator, methods delegate to it"
+ * pattern `createPrivateGroupDraft()`/`createDirectDraft()` already use
+ * for `FedosPrivateConversationConstructionCoordinator`, applied a
+ * second time rather than invented fresh. Every new dependency this
+ * needs is OPTIONAL with a safe, fail-closed default (an
+ * `UnavailableFedosConversationEncryptionAuthority`/
+ * `UnavailableFedosConversationDecryptionAuthority` pair, Alpha 942,
+ * mirroring `UnavailableFedosConversationEncryptionReadinessAuthority`'s
+ * own already-adopted default shape exactly) — so
+ * `fedos_desktop_runtime.ts`'s EXISTING, unmodified call to
+ * `assembleFedosConversationRuntimeDependencies()` continues to work
+ * byte-for-byte unchanged and automatically gains
+ * `conversationRuntime().encryptMessage()`/`decryptMessage()`, both
+ * fail-closed by default. No existing public method's signature changes.
  */
 
 import type { FedosConversationId } from "../fedos_conversation_id.js";
+import {
+  FedosConversationEncryptionCoordinator,
+  FedosSecureRandomEncryptionIdempotencyKeyGenerator,
+  type FedosConversationEncryptMessageCommand,
+  type FedosConversationEncryptionCoordinatorResult,
+  type FedosConversationEncryptionIdempotencyKeyGenerator,
+} from "../encryption/fedos_conversation_encryption_coordinator.js";
+import {
+  FedosConversationDecryptionCoordinator,
+  type FedosConversationDecryptMessageCommand,
+  type FedosConversationDecryptionCoordinatorResult,
+} from "../encryption/fedos_conversation_decryption_coordinator.js";
+import type { FedosConversationEncryptionAuthority } from "../encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority } from "../encryption/fedos_conversation_decryption_authority.js";
+import { UnavailableFedosConversationEncryptionAuthority } from "../encryption/fedos_unavailable_conversation_encryption_authority.js";
+import { UnavailableFedosConversationDecryptionAuthority } from "../encryption/fedos_unavailable_conversation_decryption_authority.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { FedosSecureRandomConversationEnvelopeIdGenerator, type FedosConversationEnvelopeIdGenerator } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import { InMemoryFedosConversationPayloadStorage } from "../payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { FedosSecureRandomConversationPayloadIdGenerator, type FedosConversationPayloadIdGenerator } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationEncryptionCoordinationPersistence } from "../encryption/coordination/fedos_conversation_encryption_coordination_persistence.js";
+import { InMemoryFedosConversationEncryptionCoordinationPersistence } from "../encryption/coordination/in_memory_fedos_conversation_encryption_coordination_persistence.js";
+import { DelegatingFedosConversationIdentityResolver, type FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
+import { MembershipFedosConversationParticipantResolver } from "../encryption/identity/fedos_conversation_participant_resolver.js";
+import { FixedFedosConversationLocalAccountIndexAuthority, type FedosConversationLocalAccountIndexAuthority } from "../encryption/identity/fedos_conversation_local_account_index_authority.js";
+import { FedosConversationKeyResolver } from "../encryption/identity/fedos_conversation_key_resolver.js";
+import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/identity/fedos_nostr_author_binding_types.js";
 import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
 import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 import type { FedosConversationCapabilityDescriptor } from "../capability/fedos_conversation_capability_descriptor.js";
@@ -50,16 +99,102 @@ import {
   type FedosConversationConstructionCoordinationPhase,
 } from "../construction/coordination/fedos_persisted_conversation_construction_coordination_v1.js";
 
-/** The full injected dependency set — the coordinator's own, reused verbatim so reads and writes share one backend set. */
-export type FedosConversationRuntimeDependencies = FedosPrivateConversationConstructionCoordinatorDependencies;
+/**
+ * The full injected dependency set — the construction coordinator's own
+ * fields, reused verbatim (so reads/writes share one backend set), PLUS
+ * the Alpha 931–990 Encryption Runtime Wiring's own additive fields —
+ * every one of them OPTIONAL, with a safe fail-closed default (see this
+ * file's own header). No existing field is renamed, removed, or made
+ * required.
+ */
+export interface FedosConversationRuntimeDependencies extends FedosPrivateConversationConstructionCoordinatorDependencies {
+  /** Optional — default `UnavailableFedosConversationEncryptionAuthority` (Alpha 942): every call fails closed to `"unavailable"`. */
+  readonly encryptionAuthority?: FedosConversationEncryptionAuthority;
+  /** Optional — default `UnavailableFedosConversationDecryptionAuthority` (Alpha 942): every call fails closed to `"unavailable"`. */
+  readonly decryptionAuthority?: FedosConversationDecryptionAuthority;
+  /** Optional — default in-memory. */
+  readonly envelopePersistence?: FedosConversationMessageEnvelopePersistence;
+  /** Optional — default in-memory. */
+  readonly payloadStorage?: FedosConversationPayloadStorage;
+  /** Optional — default in-memory. */
+  readonly encryptionCoordinationPersistence?: FedosConversationEncryptionCoordinationPersistence;
+  /** Optional — default delegates to `creatorIdentityAuthority` (already required above), Alpha 931. */
+  readonly identityResolver?: FedosConversationIdentityResolver;
+  /** Optional — default fixed `0` (Alpha 933, mirroring Alpha 689's own precedent). */
+  readonly accountIndexAuthority?: FedosConversationLocalAccountIndexAuthority;
+  /** Optional — when omitted, a "nostr"-authority local identity fails closed to `"identity-binding-unavailable"` (Alpha 935's own documented default). */
+  readonly nostrAuthorBindingAuthority?: FedosNostrAuthorBindingAuthority;
+  /** Optional — default secure-random. */
+  readonly envelopeIdGenerator?: FedosConversationEnvelopeIdGenerator;
+  /** Optional — default secure-random. */
+  readonly payloadIdGenerator?: FedosConversationPayloadIdGenerator;
+  /** Optional — default secure-random. */
+  readonly encryptionIdempotencyKeyGenerator?: FedosConversationEncryptionIdempotencyKeyGenerator;
+}
 
 export class FedosConversationRuntime {
   readonly #deps: FedosConversationRuntimeDependencies;
   readonly #coordinator: FedosPrivateConversationConstructionCoordinator;
+  readonly #encryptionCoordinator: FedosConversationEncryptionCoordinator;
+  readonly #decryptionCoordinator: FedosConversationDecryptionCoordinator;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
     this.#coordinator = new FedosPrivateConversationConstructionCoordinator(deps);
+
+    // Alpha 949 — every field below is either already REQUIRED above (and
+    // reused, never duplicated) or has a safe, fail-closed default; see
+    // this file's own header.
+    const identityResolver = deps.identityResolver ?? new DelegatingFedosConversationIdentityResolver(deps.creatorIdentityAuthority);
+    const accountIndexAuthority = deps.accountIndexAuthority ?? new FixedFedosConversationLocalAccountIndexAuthority();
+    const keyResolver = new FedosConversationKeyResolver({
+      identityResolver,
+      participantResolver: new MembershipFedosConversationParticipantResolver(deps.membershipAuthority),
+      accountIndexAuthority,
+      nostrAuthorBindingAuthority: deps.nostrAuthorBindingAuthority,
+    });
+    const envelopePersistence = deps.envelopePersistence ?? new InMemoryFedosConversationMessageEnvelopePersistence();
+    const payloadStorage = deps.payloadStorage ?? new InMemoryFedosConversationPayloadStorage();
+
+    this.#encryptionCoordinator = new FedosConversationEncryptionCoordinator({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      keyResolver,
+      encryptionAuthority: deps.encryptionAuthority ?? new UnavailableFedosConversationEncryptionAuthority(),
+      envelopePersistence,
+      payloadStorage,
+      coordinationPersistence: deps.encryptionCoordinationPersistence ?? new InMemoryFedosConversationEncryptionCoordinationPersistence(),
+      envelopeIdGenerator: deps.envelopeIdGenerator ?? new FedosSecureRandomConversationEnvelopeIdGenerator(),
+      payloadIdGenerator: deps.payloadIdGenerator ?? new FedosSecureRandomConversationPayloadIdGenerator(),
+      idempotencyKeyGenerator: deps.encryptionIdempotencyKeyGenerator ?? new FedosSecureRandomEncryptionIdempotencyKeyGenerator(),
+      clock: deps.clock,
+    });
+    this.#decryptionCoordinator = new FedosConversationDecryptionCoordinator({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      keyResolver,
+      decryptionAuthority: deps.decryptionAuthority ?? new UnavailableFedosConversationDecryptionAuthority(),
+      envelopePersistence,
+      payloadStorage,
+    });
+  }
+
+  /**
+   * Alpha 943/949 — encrypt and durably persist one Envelope+Payload for
+   * an ACTIVE Conversation. Fails closed to `"conversation-not-active"`
+   * for every draft this repository can currently construct (nothing
+   * constructs `"active"` yet — see this Arc's own completion
+   * declaration). Never throws.
+   */
+  async encryptMessage(command: FedosConversationEncryptMessageCommand): Promise<FedosConversationEncryptionCoordinatorResult> {
+    return this.#encryptionCoordinator.encrypt(command);
+  }
+
+  /** Alpha 946/949 — decrypt an already-persisted Envelope. Same fail-closed gates as `encryptMessage()`. Never throws. */
+  async decryptMessage(command: FedosConversationDecryptMessageCommand): Promise<FedosConversationDecryptionCoordinatorResult> {
+    return this.#decryptionCoordinator.decrypt(command);
   }
 
   /** Alpha 901/915 — construct a private-group draft. Never activates, never sends a message. */
