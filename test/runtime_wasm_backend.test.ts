@@ -303,8 +303,8 @@ describe("FedOS WASM Backend Planning Layer, PlanningOnly/not-ready, no side eff
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(45);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
+    expect(pubFnNames.length).toBe(46);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
 
     const cargoCode = cargoTomlSource
       .split("\n")

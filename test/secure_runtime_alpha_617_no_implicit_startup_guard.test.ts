@@ -13,8 +13,14 @@ describe("Secure Runtime Alpha 617 -- No Implicit Startup Guard", () => {
   it("1. every non-indented (module-top-level) line is only an import, an interface/function declaration opener, or a brace -- no top-level statement executes anything", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
     const source = (await import("../src/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
+    // This file is checked out with CRLF line endings on this platform
+    // (see e.g. `test/secure_runtime_alpha_436_...ts`'s own note); a bare
+    // `\n` split otherwise leaves a stray `"\r"` "line" for every blank
+    // line, which is neither empty nor indented and so would incorrectly
+    // survive the filter below.
     const topLevelLines = source
       .split("\n")
+      .map((line) => line.replace(/\r$/, ""))
       .filter((line) => line.length > 0 && !line.startsWith(" ") && !line.startsWith("\t") && !line.startsWith("*") && !line.startsWith("/"));
     for (const line of topLevelLines) {
       expect(line).toMatch(/^(import |export interface |export async function |function |readonly |\}|\{|\))/);

@@ -26,9 +26,12 @@ import { readdirSync, readFileSync } from "node:fs";
  * Verifies, against this worktree's own REAL checked-out `src/` tree
  * (== current `master`), the "current implementation reality" claims
  * `01_decision_reconciliation.md` and `04_conversation_record_v1.md`
- * make. Does not assert anything about the unmerged Policy/Nostr-binding
- * Arcs -- those are checked in `decision_consistency.test.ts` via `git
- * show`, since their files do not exist in this checked-out tree.
+ * make.
+ *
+ * Alpha 1051-1110 (Conversation Runtime Consolidation Arc) has since
+ * merged the Policy/Nostr-binding Arcs this file's tests 9/10 originally
+ * documented as absent -- those two tests now assert the opposite,
+ * current fact instead of deleting the historical record.
  */
 
 function allSrcBoardFiles(dir: string): string[] {
@@ -91,22 +94,22 @@ describe("Conversation Foundation V1 -- source alignment (master reality)", () =
     expect(authorAuthoritySource).toMatch(/ALWAYS falls back/);
   });
 
-  it("9. NO Conversation/ConversationPolicy/ConversationMode type exists anywhere under src/board/ in this checked-out tree -- confirms master truly lacks what the Policy Arc (unmerged) added", () => {
+  it("9. FedosConversationPolicy/FedosConversationMode/FedosConversationRecord now exist under src/board/ -- the Policy Arc landed via the Alpha 1051-1110 Conversation Runtime Consolidation Arc, superseding this review's original 'master truly lacks it' finding", () => {
     const files = allSrcBoardFiles("src/board");
-    const offendingMatches: string[] = [];
+    const matches: string[] = [];
     for (const file of files) {
       const text = readFileSync(file, "utf8") as string;
       if (/\bFedosConversationPolicy\b|\bFedosConversationMode\b|\bFedosConversationRecord\b/.test(text)) {
-        offendingMatches.push(file);
+        matches.push(file);
       }
     }
-    expect(offendingMatches).toEqual([]);
+    expect(matches.length).toBeGreaterThan(0);
   });
 
-  it("10. no src/board/runtime/policy, src/board/runtime/identity, or src/board/runtime/eligibility directory exists in this checked-out tree -- the Policy Arc's own new subdirectories are absent from master, confirming it is genuinely unmerged", () => {
+  it("10. src/board/runtime/policy, src/board/runtime/identity, and src/board/runtime/eligibility now exist -- the Policy Arc's own subdirectories, merged by the Alpha 1051-1110 Conversation Runtime Consolidation Arc", () => {
     const files = allSrcBoardFiles("src/board/runtime");
-    for (const file of files) {
-      expect(file).not.toMatch(/\/runtime\/(policy|identity|eligibility)\//);
+    for (const dir of ["policy", "identity", "eligibility"]) {
+      expect(files.some((file) => file.includes(`/runtime/${dir}/`))).toBe(true);
     }
   });
 });

@@ -130,7 +130,7 @@ describe("Secure Runtime Alpha 160 -- Integration Completion", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(45);
+    expect(pubFnNames.length).toBe(46);
   });
 
   it("10. RIPPLE (Secure Runtime Alpha 164, 173, 183): no Nostr secret-key generation, npub, nsec, or signature CODE existed anywhere in the master_root module AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1021 (Secure Runtime Alpha 164) legitimately added secret-key derivation, Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding, and Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature generation in LATER Arcs -- nsec CODE remains absent, reconfirmed here as the CURRENT state", () => {

@@ -192,9 +192,9 @@ describe("Private Conversation Construction V1 -- source alignment", () => {
     expect(() => readdirSync("packages/fedos-core-rust/pkg")).toThrow();
   });
 
-  it("25. no Alpha 851 (or 851-890 range) commit exists anywhere in this repository's reachable history -- 20's central 'does not exist yet' claim is grounded, not assumed", () => {
+  it("25. Alpha 851-8XX now exists in history (landed by the Alpha 1051-1110 Conversation Runtime Consolidation Arc) -- 20's 'does not exist yet' finding was a point-in-time observation, since superseded, not a permanent invariant", () => {
     const log = execFileSync("git", ["log", "--all", "--oneline"], { encoding: "utf8" }) as string;
-    expect(log).not.toMatch(/Alpha 85[1-9]|Alpha 8[6-8][0-9]|Alpha 890/);
+    expect(log).toMatch(/Alpha 851-8XX/);
   });
 
   // Secure Runtime Alpha 921 ("Runtime Ownership Decision") implemented

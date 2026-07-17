@@ -62,7 +62,13 @@ describe("Secure Runtime Alpha 422 -- Existing Rust / WASM Boundary Inventory", 
     const endIndex = libRsSource.indexOf("mod key_material", startIndex);
     expect(endIndex).toBeGreaterThan(startIndex);
     const moduleBody = libRsSource.slice(startIndex, endIndex);
-    expect(moduleBody).not.toMatch(/#\[wasm_bindgen\]/);
+    // Line-start-anchored -- Alpha 869 added a doc comment inside this
+    // module that legitimately NAMES `` `#[wasm_bindgen]` `` in prose,
+    // describing a helper this module owns as reachable FROM a real
+    // wasm_bindgen-annotated caller defined elsewhere (outside this
+    // module). An actually-applied attribute always starts its own line;
+    // prose mentioning it does not.
+    expect(moduleBody).not.toMatch(/^#\[wasm_bindgen\]/m);
   });
 
   it("6. structural: src/vault/types.ts documents itself as key-material-free", () => {

@@ -155,7 +155,7 @@ describe("Secure Runtime Alpha 180 -- Nostr Public Identifier Runtime Boundary C
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(45);
+    expect(pubFnNames.length).toBe(46);
   });
 
   it("11. structural: FedosNostrPublicKeyHex/FedosNostrNpub remain pub(crate), no #[wasm_bindgen] on either", () => {

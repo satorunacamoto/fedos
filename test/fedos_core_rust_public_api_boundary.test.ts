@@ -196,6 +196,7 @@ describe("FedOS Rust crate — public crypto API design docs + boundary", () => 
       "clear",
       "sign_nostr_event",
       "public_key_hex_for_account",
+      "resolve_conversation_key",
     ]);
     for (const name of pubFnNames) {
       const hasSafeSuffix =

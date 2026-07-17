@@ -112,8 +112,10 @@ describe("Secure Runtime Alpha 752 -- AppendOnlyFedosConversationPersistence", (
   });
 
   it("9. structural: no external dependency -- only node:fs, reached via the established @ts-expect-error pattern", () => {
+    // `\r?\n` -- this file is checked out with CRLF line endings on this
+    // platform (see e.g. `test/secure_runtime_alpha_436_...ts`'s own note).
     expect(implementationSource).toMatch(
-      /\/\/ @ts-expect-error `node:fs` has no type declarations without `@types\/node` in this project's tsconfig\.\nimport \{ readFileSync, appendFileSync \} from "node:fs";/,
+      /\/\/ @ts-expect-error `node:fs` has no type declarations without `@types\/node` in this project's tsconfig\.\r?\nimport \{ readFileSync, appendFileSync \} from "node:fs";/,
     );
     expect(codeOnlyLines(implementationSource)).not.toMatch(/from ["'](?!\.\/|\.\.\/|node:fs)/);
   });

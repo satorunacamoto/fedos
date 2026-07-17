@@ -15,14 +15,18 @@ import conversationRecordSource from "../src/conversation/fedos_conversation_rec
  * state and real source, that this Arc did not touch or duplicate the
  * existing Conversation persistence layer.
  *
- * Pinned to this Arc's own BASE commit (the Alpha 741-760 completion,
- * not the moving `HEAD`) so this check stays meaningful whether run
- * before or after this Arc's own single commit lands.
+ * Pinned to this Arc's own single commit (not a `BASE..HEAD` range) so
+ * this check stays scoped to what Alpha 791-820 itself changed, and
+ * stays meaningful regardless of how much later, unrelated history
+ * (e.g. the Policy Arc's own src/board/runtime/policy/, or Alpha
+ * 921/923's conversationRuntime() wiring in src/desktop/runtime/,
+ * both landed by the Alpha 1051-1110 Conversation Runtime Consolidation
+ * Arc) accumulates on top of it.
  */
-const BASE_SHA = "20f9cfcbb009fdc453b2c3519aab804d4fdbbc2a";
+const ARC_COMMIT_SHA = "dd7149f";
 
 function diffAgainstBase(path: string): string {
-  return execFileSync("git", ["diff", BASE_SHA, "--", path], { encoding: "utf8" }) as string;
+  return execFileSync("git", ["diff", `${ARC_COMMIT_SHA}^`, ARC_COMMIT_SHA, "--", path], { encoding: "utf8" }) as string;
 }
 
 describe("Secure Runtime Alpha 816 -- No Conversation Record Duplication Guard", () => {

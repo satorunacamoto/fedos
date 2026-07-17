@@ -280,8 +280,8 @@ describe("Secure Runtime Alpha 038 -- FedOS Identity Descriptor Decision, review
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(45);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
+    expect(pubFnNames.length).toBe(46);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_038/);
 
     const cargoCode = cargoTomlSource

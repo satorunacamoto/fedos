@@ -166,7 +166,7 @@ describe("Private Message Envelope V1 review -- source alignment (master reality
     expect(chatTypesSource as string).toMatch(/OUT OF SCOPE for this stage/i);
   });
 
-  it("16. no Conversation/ConversationPolicy/ConversationMode/ConversationId type exists anywhere under src/ -- confirms this review's own 'unimplemented' claims are true of the repository as it stands", () => {
+  it("16. Conversation/ConversationPolicy/ConversationMode/ConversationId types now exist under src/ -- the Alpha 1051-1110 Conversation Runtime Consolidation Arc merged the Conversation domain this review's 'unimplemented' finding originally documented as absent", () => {
     function allSrcFiles(dir: string): string[] {
       const entries = readdirSync(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean }>;
       let files: string[] = [];
@@ -180,14 +180,14 @@ describe("Private Message Envelope V1 review -- source alignment (master reality
       }
       return files;
     }
-    const offending: string[] = [];
+    const found: string[] = [];
     for (const file of allSrcFiles("src")) {
       const text = readFileSync(file, "utf8") as string;
       if (/\bFedosConversationPolicy\b|\bFedosConversationMode\b|\bFedosConversationId\b|\bFedosConversationMessageEnvelope\b/.test(text)) {
-        offending.push(file);
+        found.push(file);
       }
     }
-    expect(offending).toEqual([]);
+    expect(found.length).toBeGreaterThan(0);
   });
 
   it("17. conversation_key.rs remains pub(crate)-only in the checked-out Rust source -- grounds 01/12's BLOCK-1 finding", () => {
@@ -202,18 +202,10 @@ describe("Private Message Envelope V1 review -- source alignment (master reality
     expect(rustSource).toMatch(/adds NO public API/i);
   });
 
-  it("19. no #[wasm_bindgen] export exists near a conversation-key or nip44 item in lib.rs -- grounds 12's export-gap finding", () => {
+  it("19. a #[wasm_bindgen] export now exists near a conversation-key item in lib.rs -- Alpha 869's resolve_conversation_key (wired to the pre-existing crypto::conversation_key ECDH module, see test/nip44_key_derivation_stage_guard.test.ts test 8) closes 12's export-gap finding", () => {
     const libSource = readFileSync("packages/fedos-core-rust/src/lib.rs", "utf8") as string;
-    const lines = libSource.split("\n");
-    let offendingHit = false;
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i] ?? "";
-      if (/wasm_bindgen\]/.test(line)) {
-        const window = lines.slice(i, i + 2).join("\n");
-        if (/conversation|nip44/i.test(window)) offendingHit = true;
-      }
-    }
-    expect(offendingHit).toBe(false);
+    expect(libSource).toMatch(/#\[wasm_bindgen\]\s*\nimpl FedosMasterSeedAuthority \{/);
+    expect(libSource).toMatch(/pub fn resolve_conversation_key\(/);
   });
 
   it("20. package.json already names a build:wasm script -- grounds 12/20's finding that tooling (not just source) exists to close the artifact gap", () => {

@@ -15,7 +15,12 @@ describe("Secure Runtime Alpha 537 -- README Status Update", () => {
   it("README preserves the prior Alpha 501-520 banner nested beneath it", () => {
     const readme = readFileSync("README.md", "utf8");
     const newBannerIndex = readme.indexOf("Secure Runtime Alpha 521–540");
-    const priorStatusIndex = readme.indexOf("Prior status:");
+    // Searched FROM newBannerIndex, not from the start of the file: later
+    // Arcs (up through Alpha 1051-1110) have since nested their own newer
+    // "Prior status:" transitions ABOVE this one, so a from-the-start
+    // search would find one of those instead of the one that specifically
+    // unwinds FROM the 521-540 banner TO the 501-520 banner beneath it.
+    const priorStatusIndex = readme.indexOf("Prior status:", newBannerIndex);
     const oldBannerIndex = readme.indexOf("Secure Runtime Alpha 501–520");
     expect(newBannerIndex).toBeGreaterThanOrEqual(0);
     expect(priorStatusIndex).toBeGreaterThan(newBannerIndex);

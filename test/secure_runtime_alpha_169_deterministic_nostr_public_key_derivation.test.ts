@@ -102,7 +102,7 @@ describe("Secure Runtime Alpha 169 -- Deterministic Nostr Public Key Derivation"
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(45);
+    expect(pubFnNames.length).toBe(46);
   });
 
   it("12. Regression: desktop_application.ts and fedos_runtime_identity.ts carry no reference to this Stage's own doc", () => {

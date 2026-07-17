@@ -104,14 +104,14 @@ describe("Secure Runtime Alpha 606 -- Runtime Assembly (Board/Outbox Wiring, Alp
     expect(existsSync(outboxLogPath)).toBe(false);
   });
 
-  it("5. the returned handle exposes ONLY {host, boardRuntime, stop} -- no low-level Persistence/Scheduler leaked (Secure Runtime Alpha 671-673 add boardRuntime() -- see docs/secure_runtime_alpha_671_running_runtime_ownership_decision.md)", async () => {
+  it("5. the returned handle exposes ONLY {host, boardRuntime, conversationRuntime, stop} -- no low-level Persistence/Scheduler leaked (Secure Runtime Alpha 671-673 add boardRuntime(); Alpha 921/923 add conversationRuntime() -- see docs/secure_runtime_alpha_671_running_runtime_ownership_decision.md)", async () => {
     const dir = freshDir();
     const runtime: FedosRunningDesktopRuntime = await startFedosDesktopRuntime({
       boardLogPath: join(dir, "board.jsonl"),
       outboxLogPath: join(dir, "outbox.jsonl"),
       deliveryEnabled: false,
     });
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "host", "stop"]);
+    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"]);
     await runtime.stop();
   });
 

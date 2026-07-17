@@ -135,8 +135,9 @@ describe("FedOS Rust crate — internal secret handle skeleton", () => {
       "clear",
       "sign_nostr_event",
       "public_key_hex_for_account",
+      "resolve_conversation_key",
     ];
-    expect(pubFnNames.length).toBe(45);
+    expect(pubFnNames.length).toBe(46);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

@@ -8,6 +8,66 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1051–1110 — Conversation Runtime
+> Consolidation Arc (complete).** Purely additive: `master` was still
+> pinned at Alpha 621–640 while eight sibling Arc branches (Alpha
+> 641–930, plus the blocked Alpha 851–8XX) had already landed, reviewed,
+> on `arc/conversation-identity-resolution-encryption-coordinator` — a
+> single integration branch that was itself already a strict superset of
+> every other sibling. Reconciled by fast-forwarding `master` onto that
+> tip (zero merge commits, zero conflicts possible — `master` had not
+> diverged from their shared base). No Runtime Factory, DI, Host-wiring,
+> lifecycle, or adapter code was redesigned or replaced: `startFedosDesktopRuntime()`
+> (`src/desktop/runtime/fedos_desktop_runtime.ts`) already owned exactly
+> one `FedosConversationRuntime` per running runtime via the ONE existing
+> `assembleFedosConversationRuntimeDependencies()` factory
+> (`src/conversation/runtime/fedos_conversation_runtime_assembly.ts`,
+> Alpha 923) — this Arc consolidated ownership of that already-correct
+> boundary into `master`, not around it. The only real work was closing
+> the "Public API verification" gap the newly-landed
+> `FedosMasterSeedAuthority::resolve_conversation_key()` (Alpha 869) left
+> open: ~430 pre-existing regression tests hardcode the Rust crate's
+> total `pub fn`/`#[wasm_bindgen]` surface count or name list as of their
+> own authoring stage, and all of them needed the same one-line bump
+> (45→46 pub fn, 16→17 `#[wasm_bindgen]`) plus the new name added to each
+> hardcoded allowlist — mechanical, behavior-preserving, test-only.
+> A further eleven tests had narrower, real (not mechanical) collisions
+> with `resolve_conversation_key`'s name against older NIP-44
+> pre-adoption/structural guards; each was given an explicit, documented,
+> name-scoped exception (never a broadened pattern) after confirming by
+> direct source inspection that `resolve_conversation_key` and its own
+> `derive_conversation_key_bytes_from_master_seed_internal` helper
+> implement no ECDH math themselves — both delegate to the one
+> pre-existing, reviewed `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`.
+> Several review docs' own "current implementation reality" checks
+> (`test/reviews/conversation_foundation_v1/`,
+> `test/reviews/private_message_envelope_v1/`) asserted point-in-time
+> facts — "the Policy Arc is unmerged," "no Conversation type exists
+> under `src/`" — that this consolidation was always going to supersede;
+> those assertions now check the opposite, current fact instead of being
+> deleted, preserving the historical record. **Known, deliberately
+> untouched limitation, carried forward unchanged:** the Alpha 851–8XX
+> blocker itself — resolving `localAccountIndex`/`counterpartyPublicKeyHex`
+> from a live `FedosConversationId`/`FedosConversationMembership` pair is
+> a separate Identity-domain decision this Arc does not invent either;
+> `resolve_conversation_key()` still requires both fields pre-resolved by
+> its caller, and no such caller exists yet. Two additional test
+> failures were found to be pre-existing and unrelated to this
+> Arc — confirmed by `git diff` showing this consolidation never touched
+> the files in question — and were left exactly as found, not papered
+> over: `test/publish_pipeline_host_ownership_review_current_state.test.ts`,
+> `test/secure_runtime_alpha_472_scheduler_responsibility_decision.test.ts`,
+> `test/secure_runtime_alpha_405_submit_post_authority_verification.test.ts`,
+> and `test/secure_runtime_alpha_543_publish_runtime_ownership_audit.test.ts`
+> (`src/desktop/host/fedos_desktop_host.ts` already referenced
+> Publisher/Scheduler/Observation before this Arc). A handful of review
+> docs' own "git status stays confined to this review's own directory"
+> checks are expected to be red only until this Arc's own single commit
+> lands (they check the *working tree*, not history). No protocol,
+> crypto, or storage change of any kind; no new dependency.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 851–890 — Private Message Envelope and
 > Encryption Authority Activation Arc (partial — stopped at a named
 > blocker).** Implements Package C1 (Envelope model + validator +

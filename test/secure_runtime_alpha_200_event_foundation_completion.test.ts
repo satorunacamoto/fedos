@@ -127,7 +127,7 @@ describe("Secure Runtime Alpha 200 -- Nostr Event Foundation Completion", () => 
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(45);
+    expect(pubFnNames.length).toBe(46);
   });
 
   it("9. structural: all four Event Foundation functions and the Handle exist, pub(crate) only, no wasm_bindgen", () => {

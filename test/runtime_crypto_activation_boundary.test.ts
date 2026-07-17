@@ -376,7 +376,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
 
   it("14. public pub fn surface is unchanged at twenty-seven, and SecretHandle/ConversationKey/MessageKey/Nip44WirePayload stay pub(crate)-only", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(45);
+    expect(pubFnNames.length).toBe(46);
 
     expect(libRsSource).toMatch(/pub\(crate\)\s+struct\s+SecretHandle\b/);
     expect(libRsSource).not.toMatch(/pub\s+struct\s+SecretHandle\b/);

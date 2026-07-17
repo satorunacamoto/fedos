@@ -40,7 +40,12 @@ describe("Secure Runtime Alpha 421 -- Existing Nostr Outbound Construction Inven
   });
 
   it("4. structural: zero #[wasm_bindgen] export sits within 5 lines above any Nostr-signing-named function", () => {
-    const wasmBindgenBlocks = libRsSource.match(/#\[wasm_bindgen\][\s\S]{0,400}/g) ?? [];
+    // Line-start-anchored -- Alpha 869 added a doc comment elsewhere in
+    // this file that legitimately NAMES `` `#[wasm_bindgen]` `` in prose
+    // (describing a helper reachable from a real, unrelated
+    // wasm_bindgen-annotated caller); an actually-applied attribute
+    // always starts its own line, prose mentioning it does not.
+    const wasmBindgenBlocks = libRsSource.match(/^#\[wasm_bindgen\][\s\S]{0,400}/gm) ?? [];
     const signingRelated = wasmBindgenBlocks.filter((block: string) =>
       /nostr|schnorr|sign_event|NostrSecretKey/i.test(block),
     );

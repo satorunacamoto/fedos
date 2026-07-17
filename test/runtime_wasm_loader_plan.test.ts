@@ -258,8 +258,8 @@ describe("FedOS WASM Loader Plan, planning only, fail-closed everywhere (Stage 5
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(45);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(16);
+    expect(pubFnNames.length).toBe(46);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
   });
 
   it("14. the loader planning doc records the five phases and the execution contract doc records the revised Loader Plan diagram", () => {
