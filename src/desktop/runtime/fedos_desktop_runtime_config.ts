@@ -57,6 +57,10 @@ import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_run
 import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/identity/fedos_nostr_author_binding_types.js";
 import type { FedosConversationCreatorIdentityAuthority } from "../../conversation/construction/fedos_conversation_creator_identity_authority.js";
 import type { FedosConversationEncryptionReadinessAuthority } from "../../conversation/readiness/fedos_conversation_encryption_readiness_authority.js";
+import type { FedosRelay } from "../fedos_relay.js";
+import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosConversationTransportPublisher } from "../../conversation/transport/fedos_conversation_transport_publisher.js";
+import type { FedosPrivateTransportInboundConfig } from "../../conversation/transport/fedos_private_transport.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -149,4 +153,55 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationEncryptionReadinessAuthority?: FedosConversationEncryptionReadinessAuthority;
   /** Alpha 904/923 — optional; omitted, `false` (an anonymous-local creator may create a local draft). */
   readonly conversationRequireResolvedCreatorIdentity?: boolean;
+
+  /**
+   * Secure Runtime Alpha 1471–1540 ("Private Transport Boundary and
+   * Multi-Relay Delivery Arc"). OPTIONAL, unlike `deliveryEnabled` —
+   * kept optional specifically so every pre-existing call site that
+   * constructs a `FedosDesktopRuntimeConfig` continues to compile
+   * unchanged (the SAME "no widened required-field surface" discipline
+   * `outboxPersistence?`/`publisher?` (Alpha 419/502) already established
+   * for this exact reason). Omitted or `false`, the runtime reaches
+   * `"ready"` without ever constructing a `FedosPrivateTransport`
+   * (`../../conversation/transport/fedos_private_transport.ts`) or
+   * calling `.start()` on one.
+   */
+  readonly privateTransportEnabled?: boolean;
+  /** Explicit, caller-supplied path to the Conversation Message Envelope append-only log file (Private Delivery, Alpha 857 — reused, unchanged). Omitted, in-memory. */
+  readonly conversationEnvelopeLogPath?: string;
+  /** Explicit, caller-supplied path to the Conversation Payload Storage append-only log file (Private Delivery, Alpha 804 — reused, unchanged). Omitted, in-memory. */
+  readonly conversationPayloadLogPath?: string;
+  /**
+   * `AppendOnlyFedosConversationPayloadStorage`'s own REQUIRED
+   * `maxPayloadByteLength` constructor parameter (Alpha 809 — that Arc's
+   * own instruction: "a caller must make an explicit, informed choice,"
+   * no default invented there). Only consulted when
+   * `conversationPayloadLogPath` is supplied (the in-memory backend has
+   * no such limit). Omitted, this runtime's own explicit default of 1
+   * MiB applies (`DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH`,
+   * `./fedos_desktop_runtime.ts`) — this runtime's own choice, not a
+   * Payload Storage default.
+   */
+  readonly conversationPayloadMaxByteLength?: number;
+  /** Explicit, caller-supplied path to the Mailbox Delivery Outbox append-only log file. Omitted, in-memory. */
+  readonly conversationTransportOutboxLogPath?: string;
+  /** REQUIRED when `privateTransportEnabled` is `true` — a durable Observation backend is required to activate transport honestly (mirrors `observationLogPath`, Alpha 609). */
+  readonly conversationTransportObservationLogPath?: string;
+  /**
+   * REQUIRED when `privateTransportEnabled` is `true` — this runtime
+   * constructs no Relay of its own (no WebSocket, no reconnect policy).
+   * The caller supplies one or more already-constructed `FedosRelay`
+   * instances (Multiple Relay fan-out).
+   */
+  readonly conversationTransportRelays?: readonly FedosRelay[];
+  /** REQUIRED when `privateTransportEnabled` is `true` — this runtime constructs no Signing Authority of its own. */
+  readonly conversationTransportSigningAuthority?: FedosNostrSigningAuthority;
+  /** Optional; omitted, account index `0` applies (mirrors `nostrAccountIndex`, Alpha 689). */
+  readonly conversationTransportAccountIndex?: number;
+  /** Optional; omitted, `FedosPrivateTransport`'s own default Mailbox Delivery cadence applies. */
+  readonly conversationTransportIntervalMs?: number;
+  /** Optional override of the default Multi-Relay Publisher; omitted, `FedosMultiRelayOkCorrelatedConversationTransportPublisher` over `conversationTransportRelays` is constructed. */
+  readonly conversationTransportPublisher?: FedosConversationTransportPublisher;
+  /** Optional — Inbound Subscription is activated ONLY when this is supplied. No silent default subscription of any kind. */
+  readonly conversationTransportInbound?: FedosPrivateTransportInboundConfig;
 }

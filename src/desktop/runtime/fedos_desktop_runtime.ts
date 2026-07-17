@@ -123,6 +123,28 @@ import {
 import { assembleFedosConversationRuntimeDependencies } from "../../conversation/runtime/fedos_conversation_runtime_assembly.js";
 import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
 
+// Secure Runtime Alpha 1471-1540 (Private Transport Boundary and
+// Multi-Relay Delivery Arc) -- every import/addition below this comment
+// is ADDITIVE ONLY, mirroring the Alpha 501-520 boundary comment
+// already established in `fedos_desktop_host.ts` for the same reason.
+import type { FedosConversationMessageEnvelopePersistence } from "../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../../conversation/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../../conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationPayloadStorage } from "../../conversation/payload_storage/fedos_conversation_payload_storage.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../../conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
+import { InMemoryFedosConversationPayloadStorage } from "../../conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import type { FedosConversationTransportOutboxPersistence } from "../../conversation/transport/fedos_conversation_transport_outbox_persistence.js";
+import { AppendOnlyFedosConversationTransportOutboxPersistence } from "../../conversation/transport/append_only_fedos_conversation_transport_outbox_persistence.js";
+import { InMemoryFedosConversationTransportOutboxPersistence } from "../../conversation/transport/in_memory_fedos_conversation_transport_outbox_persistence.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosConversationRelaySet } from "../../conversation/transport/relay/fedos_conversation_relay_set.js";
+import { FedosPrivateTransport } from "../../conversation/transport/fedos_private_transport.js";
+
+/** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
+const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
+/** Alpha 1471-1540 -- Mailbox Delivery's own default tick cadence when `conversationTransportIntervalMs` is omitted. Mirrors the Board delivery loop's own `DEFAULT_DELIVERY_INTERVAL_MS` (`../host/fedos_desktop_host.ts`, Alpha 507) — same value, a separate constant since that one is not exported. */
+const DEFAULT_CONVERSATION_TRANSPORT_INTERVAL_MS = 30_000;
+
 export interface FedosRunningDesktopRuntime {
   readonly host: FedosDesktopHost;
   /**
@@ -149,6 +171,18 @@ export interface FedosRunningDesktopRuntime {
    * constructs an active Conversation and never sends a private message.
    */
   conversationRuntime(): FedosConversationRuntime;
+  /**
+   * Secure Runtime Alpha 1471–1540 — the `FedosPrivateTransport`
+   * (`../../conversation/transport/fedos_private_transport.ts`) this
+   * running Local Runtime owns, constructed ONLY when
+   * `config.privateTransportEnabled` was `true`. Throws
+   * `"not enabled"` if it was never configured, and throws
+   * `"inaccessible after stop"` once `stop()` has been called — the SAME
+   * two-state fail-closed contract `boardRuntime()`/`conversationRuntime()`
+   * themselves use, extended with the one additional "was it even
+   * configured" state this accessor alone needs.
+   */
+  privateTransport(): FedosPrivateTransport;
   /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
@@ -182,6 +216,27 @@ export async function startFedosDesktopRuntime(
       );
     }
   }
+  // Secure Runtime Alpha 1471-1540 -- mirrors the deliveryEnabled guard
+  // above exactly: a configuration error is thrown synchronously, BEFORE
+  // any Persistence backend or Host is constructed, never a silent
+  // fallback to an in-memory Observation backend or a no-op Relay.
+  if (config.privateTransportEnabled) {
+    if (config.conversationTransportObservationLogPath === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: privateTransportEnabled is true but conversationTransportObservationLogPath was not supplied — a durable Observation backend is required to activate transport honestly.",
+      );
+    }
+    if (config.conversationTransportRelays === undefined || config.conversationTransportRelays.length === 0) {
+      throw new Error(
+        "startFedosDesktopRuntime: privateTransportEnabled is true but no conversationTransportRelays were supplied — this runtime constructs no Relay of its own.",
+      );
+    }
+    if (config.conversationTransportSigningAuthority === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: privateTransportEnabled is true but no conversationTransportSigningAuthority was supplied — this runtime constructs no Signing Authority of its own.",
+      );
+    }
+  }
 
   ensureParentDirectoryExists(config.boardLogPath);
   ensureParentDirectoryExists(config.outboxLogPath);
@@ -197,6 +252,15 @@ export async function startFedosDesktopRuntime(
     config.conversationMembershipLogPath,
     config.conversationCapabilityLogPath,
     config.conversationConstructionCoordinationLogPath,
+  ]) {
+    if (path !== undefined) ensureParentDirectoryExists(path);
+  }
+  // Secure Runtime Alpha 1471-1540 -- the private-Transport runtime's own logs.
+  for (const path of [
+    config.conversationTransportOutboxLogPath,
+    config.conversationTransportObservationLogPath,
+    config.conversationEnvelopeLogPath,
+    config.conversationPayloadLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -216,6 +280,26 @@ export async function startFedosDesktopRuntime(
     config.conversationLogPath !== undefined
       ? new AppendOnlyFedosConversationPersistence(config.conversationLogPath)
       : new InMemoryFedosConversationPersistence();
+
+  // Secure Runtime Alpha 1471-1540 -- Private Delivery's own durable
+  // backends (Alpha 804/857, UNCHANGED classes), constructed HERE for
+  // the first time anywhere in this runtime: no prior Arc ever wired
+  // them into `startFedosDesktopRuntime()`. Constructed unconditionally
+  // (not gated by `privateTransportEnabled`) so a future Coordinator
+  // that produces real Envelopes/Payloads never depends on Transport
+  // being enabled -- mirrors `conversationPersistence`'s own identical
+  // "always constructed, in-memory when no log path given" discipline.
+  const conversationEnvelopePersistence: FedosConversationMessageEnvelopePersistence =
+    config.conversationEnvelopeLogPath !== undefined
+      ? new AppendOnlyFedosConversationMessageEnvelopePersistence(config.conversationEnvelopeLogPath)
+      : new InMemoryFedosConversationMessageEnvelopePersistence();
+  const conversationPayloadStorage: FedosConversationPayloadStorage =
+    config.conversationPayloadLogPath !== undefined
+      ? new AppendOnlyFedosConversationPayloadStorage(
+          config.conversationPayloadLogPath,
+          config.conversationPayloadMaxByteLength ?? DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH,
+        )
+      : new InMemoryFedosConversationPayloadStorage();
 
   const host = createFedosDesktopHost({
     desktopApplication: createDesktopApplication(),
@@ -285,6 +369,42 @@ export async function startFedosDesktopRuntime(
     }),
   );
 
+  // Secure Runtime Alpha 1471-1540 -- exactly one FedosPrivateTransport
+  // per running runtime, constructed ONLY when config.privateTransportEnabled
+  // was true (the guard at the top of this function already confirmed
+  // conversationTransportObservationLogPath/conversationTransportRelays/
+  // conversationTransportSigningAuthority are all present in that case).
+  // Reaches into conversationRuntimeInstance for membership reads ONLY
+  // (`listMemberships`), the SAME narrow-accessor discipline
+  // `FedosConversationTransportSignedEventSource` itself requires.
+  let privateTransportInstance: FedosPrivateTransport | undefined;
+  let privateTransportStarted = false;
+  if (config.privateTransportEnabled) {
+    const conversationTransportOutboxPersistence: FedosConversationTransportOutboxPersistence =
+      config.conversationTransportOutboxLogPath !== undefined
+        ? new AppendOnlyFedosConversationTransportOutboxPersistence(config.conversationTransportOutboxLogPath)
+        : new InMemoryFedosConversationTransportOutboxPersistence();
+    const conversationTransportObservationRepository = new FedosDeliveryObservationRepository(
+      new AppendOnlyFedosDeliveryObservationPersistence(config.conversationTransportObservationLogPath!),
+    );
+
+    privateTransportInstance = new FedosPrivateTransport({
+      relaySet: new FedosConversationRelaySet(config.conversationTransportRelays!),
+      signingAuthority: config.conversationTransportSigningAuthority!,
+      localAccountIndex: config.conversationTransportAccountIndex ?? 0,
+      envelopePersistence: conversationEnvelopePersistence,
+      payloadStorage: conversationPayloadStorage,
+      membershipsForConversation: (id) => conversationRuntimeInstance.listMemberships(id),
+      outboxPersistence: conversationTransportOutboxPersistence,
+      observationRepository: conversationTransportObservationRepository,
+      intervalMs: config.conversationTransportIntervalMs ?? DEFAULT_CONVERSATION_TRANSPORT_INTERVAL_MS,
+      publisher: config.conversationTransportPublisher,
+      inbound: config.conversationTransportInbound,
+    });
+    await privateTransportInstance.start();
+    privateTransportStarted = true;
+  }
+
   let stopped = false;
   return {
     host,
@@ -300,11 +420,24 @@ export async function startFedosDesktopRuntime(
       }
       return conversationRuntimeInstance;
     },
+    privateTransport(): FedosPrivateTransport {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.privateTransport() is inaccessible after stop().");
+      }
+      if (privateTransportInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.privateTransport() is not enabled -- see config.privateTransportEnabled.");
+      }
+      return privateTransportInstance;
+    },
     async stop(): Promise<void> {
       if (stopped) {
         throw new Error("FedosRunningDesktopRuntime.stop() may only be called once.");
       }
       stopped = true;
+      // Newest-constructed, stopped first -- the reverse of construction order.
+      if (privateTransportStarted && privateTransportInstance !== undefined) {
+        await privateTransportInstance.stop();
+      }
       if (deliveryStarted) {
         await host.stopDelivery();
       }

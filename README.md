@@ -8,6 +8,84 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
+> and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
+> crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
+> Worker wiring. Builds `FedosPrivateTransport`
+> (`src/conversation/transport/`, 18 new files) — the boundary that
+> actually moves an already-encrypted `FedosConversationMessageEnvelope`
+> (Private Delivery, Alpha 851–890, UNCHANGED) over one or more Nostr
+> relays, closing the gap every prior Arc left open: nothing before this
+> one ever sent a Conversation Envelope anywhere. Reuses, by direct
+> import, the fully generic `FedosDeliveryObservation`/
+> `FedosDeliveryObservationRepository`/`FedosValidatingDeliveryObservationRepository`
+> and `FedosDeliveryRetryRegistry`/`makeFedosDeliveryAttemptSubjectId`
+> (`src/board/observation/*`, Alpha 461–470/521–540, UNCHANGED) for both
+> Mailbox (durable) and Ephemeral (best-effort, no Outbox row, no Retry
+> Registry) Delivery; mirrors — never redesigns — Board's own Outbox/
+> Publisher/Scheduler architecture as a new, parallel
+> `FedosConversationTransportOutbox`/`FedosConversationTransportPublisher`/
+> `FedosConversationTransportScheduler` set, since Board's own types are
+> `postId`-bound and this Arc's instruction forbids touching them.
+> Multiple Relay fan-out (`FedosConversationRelaySet` +
+> `FedosMultiRelayOkCorrelatedConversationTransportPublisher`) reruns the
+> SAME per-relay OK-correlation idiom `FedosRelayOkCorrelatedNostrBoardPublisher`
+> (Alpha 710/711/724) already established, once per relay, in parallel —
+> `"delivered"` if ANY relay accepts, `"rejected"` only if EVERY relay
+> explicitly does. Inbound Subscription + Relay Deduplication
+> (`FedosConversationInboundSubscription`/`FedosRelayEventDeduplicator`)
+> opens every relay's own subscription simultaneously and funnels every
+> inbound event through ONE shared, bounded, FIFO-evicted dedup gate
+> keyed by the Nostr event's own deterministic id, so a caller's envelope
+> callback fires exactly once per event no matter how many relays
+> deliver it. Wire packaging is constrained to `kind: 1` (Alpha 424's own
+> V1 signing policy, unmodified) — a private-transport event is
+> distinguished from a public Board post purely by tags
+> (`fedos-private`/`p`/`e-envelope`), never a new Nostr kind; `content` is
+> base64 ciphertext, mirroring `fedos_conversation_payload_codec.ts`'s
+> (Alpha 806) own encoding-only boundary discipline. Identity Resolution
+> reuse: `fedos_conversation_transport_routing.ts` resolves the still-open
+> Alpha 890 `localAccountIndex`/`counterpartyPublicKeyHex` blocker for
+> Direct conversations ONLY, by applying the exact verification idiom
+> `FedosSigningAuthorityNostrAuthorBinding` (Alpha 688) already
+> established for Board Authors to Conversation Membership instead — a
+> group conversation fails closed to `"not-direct"`, not silently routed.
+> Named, real (not glossed-over) limitation: `FedosSubscriptionFilter`
+> has no server-side tag filter, so Inbound Subscription filters by
+> `authors`/`kinds` server-side and does the `#p`-equivalent recipient
+> check client-side. Runtime wiring: `FedosRunningDesktopRuntime` gains a
+> new `privateTransport()` sibling accessor to `boardRuntime()`/
+> `conversationRuntime()`, gated by an OPTIONAL `privateTransportEnabled`
+> config field (kept optional, unlike `deliveryEnabled`, so every
+> pre-existing `FedosDesktopRuntimeConfig` call site keeps compiling
+> unchanged) with the same synchronous fail-closed guard
+> `deliveryEnabled` already established; this Arc also wires Private
+> Delivery's own Envelope/Payload durable backends (Alpha 857/804) into
+> the runtime for the first time — no prior Arc ever constructed them
+> there. Eight new test files (59 new tests), including one full
+> end-to-end test exercising two independent `FedosPrivateTransport`
+> instances (sender + receiver) over two independent relay connections
+> each to two shared in-process relay servers: real Mailbox queueing, a
+> real Scheduler tick, real Multi-Relay fan-out publish + OK correlation
+> on BOTH relays, a real canonical Observation showing `"accepted"`, a
+> real Inbound Subscription receiving the identical event from BOTH
+> relays with the envelope callback firing EXACTLY ONCE, and the opaque
+> payload bytes surviving the full sign→publish→OK-correlate→subscribe→
+> dedup→parse→decode pipeline byte-for-byte. **Verification**: `npm run
+> typecheck` clean except the same one PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`)
+> every recent Arc has already confirmed predates it; `npx vitest run`
+> baseline (before this Arc's own files existed) already showed 18
+> failing test files / 29 failing tests, every one of them a
+> `git status`-cleanliness check unrelated to Transport (the untracked
+> `p2p/` directory and the then-uncommitted Alpha 1541–1610 Archive
+> work, both already present in this working tree before this Arc
+> began) — this Arc's own 59 new tests all pass, and it introduces zero
+> new failures beyond that pre-existing baseline. See
+> `docs/secure_runtime_alpha_1471_1540_private_transport_boundary_and_multi_relay_delivery_arc.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1541–1610 — Conversation Export,
 > Restore, Archive Foundation Arc (complete).** Architecture frozen: no
 > new Rust/WASM primitive, no new `AeadAadDomain` variant, no Host/GUI
