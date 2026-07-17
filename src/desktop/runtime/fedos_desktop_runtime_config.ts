@@ -61,6 +61,7 @@ import type { FedosConversationEncryptionAuthority } from "../../conversation/en
 import type { FedosConversationDecryptionAuthority } from "../../conversation/encryption/fedos_conversation_decryption_authority.js";
 import type { FedosConversationIdentityResolver } from "../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
 import type { FedosConversationLocalAccountIndexAuthority } from "../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
+import type { FedosConversationProductionCryptoConfig } from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -188,4 +189,25 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationActivationCoordinationLogPath?: string;
   /** Alpha 1143 — optional append-only log for the Payload Retention decision log; omitted, in-memory. */
   readonly conversationPayloadRetentionLogPath?: string;
+  /**
+   * Secure Runtime Alpha 1274 ("Runtime Config Wiring") — Phase C of the
+   * Alpha 1261–1320 Production Conversation Crypto Runtime Activation
+   * Arc. Optional; omitted, production crypto stays entirely unconfigured
+   * (Alpha 1275's own "Default Unavailable Adapter" — identical to every
+   * prior Arc's own default). When present, resolved via
+   * `assembleFedosConversationProductionCryptoGraph()`
+   * (`../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.ts`)
+   * BEFORE Conversation Runtime assembly; a successful (`"available"`)
+   * resolution supplies its own real, WASM-backed Authorities in place of
+   * `conversationEncryptionAuthority`/`conversationDecryptionAuthority`/
+   * `conversationCreatorIdentityAuthority`/`conversationAccountIndexAuthority`/
+   * `nostrAuthorBindingAuthority` above; any OTHER outcome falls back to
+   * those individual fields' own existing defaults, unchanged — Runtime
+   * startup itself never fails because production crypto could not be
+   * assembled (Alpha 1264). No raw secret field of any kind — this object
+   * carries only a durable-file-persistence port and an injected
+   * passphrase-provider BOUNDARY (Alpha 1266/1267), never a passphrase
+   * value itself.
+   */
+  readonly conversationProductionCrypto?: FedosConversationProductionCryptoConfig;
 }

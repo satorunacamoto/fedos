@@ -8,6 +8,116 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1261–1320 — Production Conversation
+> Crypto Runtime Activation Arc (complete, Development-mode only —
+> Production activation remains a deliberately closed, separate
+> decision).** Same worktree/branch as the prior two Arcs — `master` was
+> unchanged, so no additional integration was needed. Turns the
+> already-tested INJECTED-Authority Direct-message path into a genuinely
+> real, no-Fake-Authority one: `npm run build:wasm` (unmodified command)
+> produces `packages/fedos-core-rust/pkg/{fedos_core_rust.js,fedos_core_rust_bg.wasm}`
+> cleanly and reproducibly; `cargo test` — 531/532 native, one
+> pre-existing unrelated dependency-count guard failure — proves the Rust
+> Master Seed Authority's own seal/restore/wrong-passphrase/corrupt-file
+> paths were ALREADY real before this Arc touched anything.
+>
+> **A genuine, empirically-discovered wiring gap, closed additively:**
+> `FedosWasmMasterSeedAuthority#ensureConstructed()` calls
+> `attemptDevOnlyMasterSeedAuthorityConstructCall()` directly, whose own
+> gate requires `fedos_wasm_loader.ts`'s `generatedArtifactCheckResult`/
+> `devOnlyGateEvaluation`/`importReadiness`/`importExecution`/
+> `jsGlueModule`/`wasmInitialization` to already be populated on the SAME
+> loader instance — nothing populated them automatically, so constructing
+> a `FedosWasmMasterSeedAuthority` directly always failed with
+> `"PrototypeStillClosed"`, even under `NODE_ENV=development` with the
+> artifact built (confirmed empirically before writing any production
+> code). `attemptDevOnlyRuntimeEncrypt()` (`fedos_runtime_encrypt.ts`,
+> unmodified) already primes this exact three-call chain
+> (`planLoad()` → `attemptDevOnlyJsGlueImport()` →
+> `attemptDevOnlyWasmInitialization()`) before its own Rust Boundary
+> reach — the new
+> `assembleFedosConversationProductionCryptoGraph()`
+> (`src/conversation/encryption/production/`, Alpha 1273) reuses that
+> IDENTICAL, already-established sequence rather than modifying
+> `FedosWasmMasterSeedAuthority` itself (an already-reviewed file this
+> Arc does not touch).
+>
+> **New, additive-only:** a file-based sealed-seed envelope port
+> (`FileFedosSealedMasterSeedEnvelopePersistence` — never overwrites an
+> existing file, throws on structural corruption rather than silently
+> treating it as absent) and a narrow injected passphrase-provider
+> boundary (`FedosPassphraseProvider` — no GUI, no `process.env` read, no
+> plaintext-passphrase config field anywhere). `FedosDesktopRuntimeConfig`
+> gained exactly one new optional field, `conversationProductionCrypto`;
+> `startFedosDesktopRuntime()` resolves it before Conversation Runtime
+> assembly and, on a real `"available"` outcome, supplies the resulting
+> real Authorities in place of the individual
+> `conversationEncryptionAuthority`/etc. fields Alpha 1113 already wired —
+> any other outcome (including simply omitting the field) falls back to
+> those fields' own pre-existing, unmodified defaults. A new read
+> accessor, `conversationProductionCryptoCapability()`, surfaces Alpha
+> 1263's own nine-outcome closed vocabulary
+> (`available`/`artifact-missing`/`artifact-incompatible`/`seed-unavailable`/
+> `seed-restore-failed`/`identity-unavailable`/`unsupported-runtime`/
+> `disabled`/`failed`) — never a raw loader `Error`.
+>
+> **Proven for real, no Fake Authority anywhere in the acceptance test:**
+> two independently generated/sealed real identities (Alice, Bob) exchange
+> one genuinely ChaCha20-Poly1305-AEAD-encrypted Direct message, pairwise-
+> keyed via real secp256k1 ECDH, through the REAL application path
+> (`createDirectDraft` → invitation → redemption →
+> `activateDirectConversation` → `sendDirectMessage` → full restart —
+> fresh backends AND a freshly-restored Master Seed Authority from the
+> same sealed-seed file — → `readDirectMessage`), exact plaintext
+> recovered; an unrelated real identity, the correct sealed-seed file with
+> the wrong passphrase, and a different account index against the SAME
+> sealed seed are all denied; a real ciphertext byte flip (decoded from
+> the durable payload log's own `bytesBase64` field) fails closed; real
+> retention and revocation denial both hold. Twelve tests total across
+> `test/secure_runtime_alpha_1261_1320_real_crypto_vertical_slice.test.ts`
+> and `test/secure_runtime_alpha_1261_1320_production_gate_semantics.test.ts`
+> (config-disabled/unsupported-runtime/corrupt-seed/no-passphrase/clear-
+> denies-reuse/`stop()`-clears-the-real-authority), all 12 passing with
+> the artifact built and `NODE_ENV=development`.
+>
+> **Kept Development-only — deliberately, per this Arc's own reviewed
+> option menu.** `fedos_wasm_loader.ts`'s `#evaluateDevOnlyGate()` is
+> completely untouched: it already, permanently, returns
+> `developmentAllowed: false` for `mode === "Production"` — confirmed by
+> direct source inspection, the gate's own header states "never
+> Production, never Worker." This is a reviewed, intentional security
+> boundary, not an unimplemented feature; architecture-frozen forbids
+> redesigning it, so this Arc extends nothing there. The Desktop
+> Runtime's own `start:runtime` script never sets `NODE_ENV` itself —
+> reaching Development mode (and therefore any real crypto capability at
+> all) requires an explicit, deliberate operator action, never an
+> accident.
+>
+> **Artifact policy, restated plainly (Alpha 1306):** `packages/fedos-core-rust/pkg/`
+> is gitignored and was removed after verification, exactly like every
+> prior Arc's own `target/`/`Cargo.lock` — anyone building on this commit
+> must run `npm run build:wasm` themselves before this Arc's own two new
+> test files (or any real Development-mode crypto path) report
+> `"available"` instead of `"artifact-missing"`; without it, they report
+> that closed, honest outcome — never a crash, never a silent fallback —
+> which is the SAME pre-existing behavior every other real-WASM-dependent
+> test in this repository already has on a stock checkout.
+>
+> **Historical ripple (Alpha 1304), exact and mechanical:**
+> `secure_runtime_alpha_606_runtime_assembly.test.ts` and
+> `secure_runtime_alpha_758_local_runtime_ownership.test.ts` each assert
+> the EXACT closed set of keys `FedosRunningDesktopRuntime` exposes; both
+> updated to include the one new, genuinely additive, non-secret
+> accessor. `npm run typecheck` clean; full `npm test` precisely diffed
+> by exact failing file name against the prior Arc's own baseline —
+> zero other regressions. `package.json`/`Cargo.toml` byte-for-byte
+> unchanged; no new dependency; `p2p/` untouched.
+>
+> See `docs/secure_runtime_alpha_1261_1320_completion_declaration.md` for
+> the full record, including the Production Readiness Statement.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1181–1260 — Conversation Runtime
 > Finalization Arc (complete).** Same worktree/branch as the prior Arc —
 > no new sibling Arc branch had landed, so no additional integration was
