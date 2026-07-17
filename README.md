@@ -49,6 +49,61 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `docs/secure_runtime_alpha_890_completion_declaration.md` for the full
 > record.
 >
+> **Status: Secure Runtime Alpha 891–930 — Private Conversation Draft
+> Construction & Readiness Runtime Arc (complete).** Wires the
+> already-shipped, mode-agnostic Membership/Capability/durable-persistence
+> domains (Alpha 761–850) into the FIRST real construction path for a
+> `private-group`/`direct` Conversation — as a strictly metadata-only
+> **draft**, never active, never encrypted, never a message. The public
+> `FedosConversationRecord` V1, its validator, codec, persistence, and
+> reader are ALL byte-for-byte unchanged; a private draft is a NEW,
+> separate, versioned record (`FedosConversationDraftRecord`,
+> `src/conversation/construction/`) carrying `lifecycleState: "draft"`
+> inline, with its own id namespace (`private-draft::<mode>::<requestId>`,
+> not Board-thread-anchored), validator, codec, and in-memory +
+> append-only persistence — so every existing public log stays valid and
+> readable (Alpha 894/900/919). A closed four-value lifecycle vocabulary
+> (`draft | active | closed | tombstoned`) is named for future-safe
+> validation, but ONLY `"draft"` is ever constructed — `"active"` cannot
+> be produced anywhere in this Arc. Construction runs through a reviewed
+> `FedosPrivateConversationConstructionCoordinator`
+> (`createPrivateGroupDraft()`/`createDirectDraft()`): resolve creator
+> identity → validate mode/policy → durable coordination "prepared" →
+> persist draft → admit ONE durable owner creator Membership (idempotent,
+> deterministic id, never duplicated) → issue the initial join Capability
+> (optional/general for private-group; a required `intendedRecipient`-bound,
+> one-use Capability for the direct recipient — never a fabricated
+> Membership for anyone who has not redeemed) → record completion →
+> evaluate readiness. A dedicated five-phase construction-coordination log
+> (mirroring the Alpha 845 redemption coordinator field-for-field) makes a
+> crash at any step recoverable: a fresh coordinator over the same
+> backends converges every partial state forward, with no duplicate
+> Membership and no second Capability (the issued id is recorded on the
+> coordination fact). Readiness is a nine-axis, closed multidimensional
+> model (`src/conversation/readiness/`) evaluated purely into
+> `draft-ready | activation-ready | blocked`; `activation-ready` is
+> returned ONLY when an INJECTED encryption-readiness authority proves
+> encryption ready — the sole shipped implementation is
+> `UnavailableFedosConversationEncryptionReadinessAuthority` (no fallback
+> crypto), so every constructed Conversation stays `draft-ready` at best,
+> honestly blocked on encryption. A new `FedosConversationRuntime`
+> (`src/conversation/runtime/`), a peer to `FedosBoardRuntime` owned by the
+> Local Runtime (`runtime.conversationRuntime()`, available only while
+> running, denied after stop, no singleton), exposes construction plus an
+> immutable read facade — draft view, live readiness, Membership
+> summaries, PUBLIC Capability descriptors, construction status — and never
+> a persistence port, raw authority, encryption handle, or bearer secret.
+> The bearer secret of an initial Capability is returned exactly once, on
+> the construction result, and is verified absent from every durable log.
+> No private message send/receive, no ciphertext/plaintext, no key
+> generation/epochs, no activation, no protocol delivery, no invitation
+> transport, no new dependency, no Rust/Cargo change, no `p2p/`; public
+> Board create/reply/query behavior is entirely unaffected.
+>
+> See `docs/secure_runtime_alpha_891_930_execution_spec.md` and
+> `docs/reviews/private_conversation_construction_v1/` (the specification
+> this Arc implements) for the full record.
+>
 > Prior status:
 >
 > **Status: Secure Runtime Alpha 821–850 — Durable Conversation

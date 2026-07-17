@@ -55,7 +55,21 @@ import type { FedosConversationPolicyAuthority } from "../../board/runtime/polic
 import type { FedosBoardRuntimeIdGenerator } from "../../board/runtime/fedos_board_runtime_id_generator.js";
 import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
 import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/identity/fedos_nostr_author_binding_types.js";
+import type { FedosConversationCreatorIdentityAuthority } from "../../conversation/construction/fedos_conversation_creator_identity_authority.js";
+import type { FedosConversationEncryptionReadinessAuthority } from "../../conversation/readiness/fedos_conversation_encryption_readiness_authority.js";
 
+/**
+ * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
+ * the Alpha 891–930 Private Conversation Draft Construction and Readiness
+ * Runtime Arc. Adds only OPTIONAL fields for the private-Conversation
+ * draft runtime the Local Runtime now also owns
+ * (`runtime.conversationRuntime()`). Every field follows the SAME
+ * "explicit, caller-supplied path, no default, no `cwd`-relative implicit
+ * path" discipline as `boardLogPath` (Alpha 604). Omitted, in-memory
+ * backends and the safe defaults (anonymous-local creator identity,
+ * UNAVAILABLE encryption readiness — no fallback crypto, Alpha 924) apply.
+ * Public Board behavior is entirely unaffected by any of these.
+ */
 export interface FedosDesktopRuntimeConfig {
   /** Explicit, caller-supplied path to the Board append-only log file. */
   readonly boardLogPath: string;
@@ -117,4 +131,22 @@ export interface FedosDesktopRuntimeConfig {
    * own header.
    */
   readonly conversationLogPath?: string;
+  /** Alpha 923 — optional append-only log for private-Conversation DRAFT records; omitted, in-memory. */
+  readonly conversationDraftLogPath?: string;
+  /** Alpha 923 — optional append-only log for Conversation Membership; omitted, in-memory. */
+  readonly conversationMembershipLogPath?: string;
+  /** Alpha 923 — optional append-only log for Conversation Capabilities; omitted, in-memory. */
+  readonly conversationCapabilityLogPath?: string;
+  /** Alpha 923 — optional append-only log for the construction-coordination facts; omitted, in-memory. */
+  readonly conversationConstructionCoordinationLogPath?: string;
+  /** Alpha 904/923 — optional; omitted, an anonymous-local creator identity applies. */
+  readonly conversationCreatorIdentityAuthority?: FedosConversationCreatorIdentityAuthority;
+  /**
+   * Alpha 924/923 — optional; omitted, encryption readiness is UNAVAILABLE
+   * (no fallback crypto). A future encryption Arc injects a real
+   * implementation here to unlock `activation-ready`; this Arc never does.
+   */
+  readonly conversationEncryptionReadinessAuthority?: FedosConversationEncryptionReadinessAuthority;
+  /** Alpha 904/923 — optional; omitted, `false` (an anonymous-local creator may create a local draft). */
+  readonly conversationRequireResolvedCreatorIdentity?: boolean;
 }

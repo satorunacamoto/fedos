@@ -116,6 +116,12 @@ import type { FedosConversationPersistence } from "../../conversation/persistenc
 import { AppendOnlyFedosConversationPersistence } from "../../conversation/persistence/append_only_fedos_conversation_persistence.js";
 import { InMemoryFedosConversationPersistence } from "../../conversation/persistence/in_memory_fedos_conversation_persistence.js";
 import { hydrateFedosConversations } from "../../conversation/fedos_conversation_hydration.js";
+import {
+  createFedosConversationRuntime,
+  type FedosConversationRuntime,
+} from "../../conversation/runtime/fedos_conversation_runtime.js";
+import { assembleFedosConversationRuntimeDependencies } from "../../conversation/runtime/fedos_conversation_runtime_assembly.js";
+import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
 
 export interface FedosRunningDesktopRuntime {
   readonly host: FedosDesktopHost;
@@ -132,6 +138,17 @@ export interface FedosRunningDesktopRuntime {
    * started successfully).
    */
   boardRuntime(): FedosBoardRuntime;
+  /**
+   * Alpha 923 — the Conversation Application Runtime this running Local
+   * Runtime owns, for `private-group`/`direct` DRAFT construction and
+   * reads. EXACTLY ONE instance per running runtime, returned on every
+   * call while running; throws once `stop()` has been called (the same
+   * "inaccessible after stop" contract as `boardRuntime()`). No singleton
+   * (a second `startFedosDesktopRuntime()` builds a fully independent
+   * one), no automatic network/timer, no Host internal exposed. It never
+   * constructs an active Conversation and never sends a private message.
+   */
+  conversationRuntime(): FedosConversationRuntime;
   /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
@@ -173,6 +190,15 @@ export async function startFedosDesktopRuntime(
   }
   if (config.conversationLogPath !== undefined) {
     ensureParentDirectoryExists(config.conversationLogPath);
+  }
+  // Alpha 923 -- the private-Conversation draft runtime's own logs.
+  for (const path of [
+    config.conversationDraftLogPath,
+    config.conversationMembershipLogPath,
+    config.conversationCapabilityLogPath,
+    config.conversationConstructionCoordinationLogPath,
+  ]) {
+    if (path !== undefined) ensureParentDirectoryExists(path);
   }
 
   const boardPersistence = new AppendOnlyFedosBoardPersistence(config.boardLogPath);
@@ -239,6 +265,26 @@ export async function startFedosDesktopRuntime(
     conversationPersistence,
   });
 
+  // Alpha 921/923 -- exactly one FedosConversationRuntime per running
+  // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
+  // subclass), over its own durable (or in-memory) backends. Constructed
+  // over already-assembled ports/authorities; it reaches into Host for
+  // nothing. Encryption readiness defaults to UNAVAILABLE, so every draft
+  // it constructs stays "draft" -- never active, never a message (Alpha
+  // 924/928).
+  const conversationRuntimeInstance = createFedosConversationRuntime(
+    assembleFedosConversationRuntimeDependencies({
+      draftLogPath: config.conversationDraftLogPath,
+      membershipLogPath: config.conversationMembershipLogPath,
+      capabilityLogPath: config.conversationCapabilityLogPath,
+      constructionCoordinationLogPath: config.conversationConstructionCoordinationLogPath,
+      clock: config.clock ?? defaultFedosBoardRuntimeClock,
+      creatorIdentityAuthority: config.conversationCreatorIdentityAuthority,
+      encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
+      requireResolvedCreatorIdentity: config.conversationRequireResolvedCreatorIdentity,
+    }),
+  );
+
   let stopped = false;
   return {
     host,
@@ -247,6 +293,12 @@ export async function startFedosDesktopRuntime(
         throw new Error("FedosRunningDesktopRuntime.boardRuntime() is inaccessible after stop().");
       }
       return boardRuntimeInstance;
+    },
+    conversationRuntime(): FedosConversationRuntime {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.conversationRuntime() is inaccessible after stop().");
+      }
+      return conversationRuntimeInstance;
     },
     async stop(): Promise<void> {
       if (stopped) {
