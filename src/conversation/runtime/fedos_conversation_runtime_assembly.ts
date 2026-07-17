@@ -33,6 +33,8 @@ import { PersistedFedosConversationMembershipAuthority } from "../membership/per
 import { InMemoryFedosConversationMembershipPersistence } from "../membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
 import { AppendOnlyFedosConversationMembershipPersistence } from "../membership/persistence/append_only_fedos_conversation_membership_persistence.js";
 import type { FedosConversationCapabilityIssuerAuthority } from "../capability/fedos_conversation_capability_issuer_authority.js";
+import type { FedosConversationCapabilityRedemptionAuthority } from "../capability/fedos_conversation_capability_redemption_authority.js";
+import type { FedosConversationCapabilityDescriptor } from "../capability/fedos_conversation_capability_descriptor.js";
 import { InMemoryFedosConversationCapabilityAuthority } from "../capability/in_memory_fedos_conversation_capability_authority.js";
 import { PersistedFedosConversationCapabilityAuthority } from "../capability/persistence/persisted_fedos_conversation_capability_authority.js";
 import { InMemoryFedosConversationCapabilityPersistence } from "../capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
@@ -42,6 +44,13 @@ import type { FedosConversationCapabilitySecretGenerator } from "../capability/f
 import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
 import { InMemoryFedosConversationDraftPersistence } from "../construction/in_memory_fedos_conversation_draft_persistence.js";
 import { AppendOnlyFedosConversationDraftPersistence } from "../construction/append_only_fedos_conversation_draft_persistence.js";
+import type { FedosConversationDraftRecord } from "../construction/fedos_conversation_draft_record.js";
+import type { FedosConversationDraftManagementPersistence } from "../construction/fedos_conversation_draft_management_persistence.js";
+import { InMemoryFedosConversationDraftManagementPersistence } from "../construction/in_memory_fedos_conversation_draft_management_persistence.js";
+import { AppendOnlyFedosConversationDraftManagementPersistence } from "../construction/append_only_fedos_conversation_draft_management_persistence.js";
+import type { FedosConversationInvitationRevocationRegistry } from "../invitation/fedos_conversation_invitation_revocation_registry.js";
+import { InMemoryFedosConversationInvitationRevocationRegistry } from "../invitation/in_memory_fedos_conversation_invitation_revocation_registry.js";
+import { AppendOnlyFedosConversationInvitationRevocationRegistry } from "../invitation/append_only_fedos_conversation_invitation_revocation_registry.js";
 import type { FedosConversationConstructionCoordinationPersistence } from "../construction/coordination/fedos_conversation_construction_coordination_persistence.js";
 import { InMemoryFedosConversationConstructionCoordinationPersistence } from "../construction/coordination/in_memory_fedos_conversation_construction_coordination_persistence.js";
 import { AppendOnlyFedosConversationConstructionCoordinationPersistence } from "../construction/coordination/append_only_fedos_conversation_construction_coordination_persistence.js";
@@ -97,6 +106,10 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly maxPayloadByteLength?: number;
   /** Alpha 949 — explicit append-only log path for the encryption-coordination facts; omitted, in-memory. */
   readonly encryptionCoordinationLogPath?: string;
+  /** Explicit append-only log path for invitation-revocation facts (Alpha 996); omitted, in-memory. */
+  readonly invitationRevocationLogPath?: string;
+  /** Explicit append-only log path for draft-management-state facts (Alpha 1003); omitted, in-memory. */
+  readonly draftManagementLogPath?: string;
   readonly clock: FedosBoardRuntimeClock;
   /** Optional — default anonymous-local (Alpha 904). */
   readonly creatorIdentityAuthority?: FedosConversationCreatorIdentityAuthority;
@@ -169,7 +182,10 @@ export function assembleFedosConversationRuntimeDependencies(
   const authorizationCheck = (conversationId: FedosConversationId, issuer: FedosConversationParticipantReference): boolean =>
     participantIsActiveInviter(membershipAuthority, conversationId, issuer);
 
-  const capabilityIssuerAuthority: FedosConversationCapabilityIssuerAuthority =
+  // One concrete instance implements BOTH the issuer and redemption halves of
+  // the frozen Capability boundary (Alpha 786/841) — the invitation transport
+  // (Alpha 999) needs both, so it is typed as their intersection and shared.
+  const capabilityAuthority: FedosConversationCapabilityIssuerAuthority & FedosConversationCapabilityRedemptionAuthority =
     config.capabilityLogPath !== undefined
       ? new PersistedFedosConversationCapabilityAuthority({
           persistence: new AppendOnlyFedosConversationCapabilityPersistence(config.capabilityLogPath),
@@ -205,11 +221,52 @@ export function assembleFedosConversationRuntimeDependencies(
       ? new AppendOnlyFedosConversationEncryptionCoordinationPersistence(config.encryptionCoordinationLogPath)
       : new InMemoryFedosConversationEncryptionCoordinationPersistence();
 
+  // Alpha 996/1003 — the two NEW additive backends this Arc introduces.
+  const invitationRevocationRegistry: FedosConversationInvitationRevocationRegistry =
+    config.invitationRevocationLogPath !== undefined
+      ? new AppendOnlyFedosConversationInvitationRevocationRegistry(config.invitationRevocationLogPath)
+      : new InMemoryFedosConversationInvitationRevocationRegistry();
+
+  const draftManagementPersistence: FedosConversationDraftManagementPersistence =
+    config.draftManagementLogPath !== undefined
+      ? new AppendOnlyFedosConversationDraftManagementPersistence(config.draftManagementLogPath)
+      : new InMemoryFedosConversationDraftManagementPersistence();
+
+  // Alpha 1011 — REAL, honest authorization (never always-true). A revoker may
+  // revoke an invitation iff they issued it OR are an active owner/moderator
+  // member of its conversation — the same authority that could have issued it.
+  const invitationRevocationAuthorizationCheck = (
+    descriptor: FedosConversationCapabilityDescriptor,
+    revoker: FedosConversationParticipantReference,
+  ): boolean => {
+    if (descriptor.issuer.authority === revoker.authority && descriptor.issuer.publicIdentifier === revoker.publicIdentifier) {
+      return true;
+    }
+    return participantIsActiveInviter(membershipAuthority, descriptor.conversationId as FedosConversationId, revoker);
+  };
+
+  // Alpha 1011 — a draft's creator, or an active owner/moderator member, may
+  // delete/restore it.
+  const draftManagementAuthorizationCheck = (
+    draft: FedosConversationDraftRecord,
+    actor: FedosConversationParticipantReference,
+  ): boolean => {
+    if (draft.creator.authority === actor.authority && draft.creator.publicIdentifier === actor.publicIdentifier) {
+      return true;
+    }
+    return participantIsActiveInviter(membershipAuthority, draft.id, actor);
+  };
+
   return {
     draftPersistence,
     coordinationPersistence,
     membershipAuthority,
-    capabilityIssuerAuthority,
+    capabilityIssuerAuthority: capabilityAuthority,
+    capabilityRedemptionAuthority: capabilityAuthority,
+    invitationRevocationRegistry,
+    invitationRevocationAuthorizationCheck,
+    draftManagementPersistence,
+    draftManagementAuthorizationCheck,
     creatorIdentityAuthority: config.creatorIdentityAuthority ?? new AnonymousLocalFedosConversationCreatorIdentityAuthority(),
     encryptionReadinessAuthority:
       config.encryptionReadinessAuthority ?? new UnavailableFedosConversationEncryptionReadinessAuthority(),

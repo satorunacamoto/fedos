@@ -40,6 +40,7 @@
  * own "no mutation after terminal exhaustion" check).
  */
 
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "./fedos_conversation_capability_descriptor.js";
 import { toFedosConversationCapabilityId, type FedosConversationCapabilityId } from "./fedos_conversation_capability_id.js";
 import {
@@ -143,6 +144,15 @@ export class InMemoryFedosConversationCapabilityAuthority
 
   inspectDescriptor(capabilityId: FedosConversationCapabilityId): FedosConversationCapabilityDescriptor | null {
     return this.#capabilities.get(capabilityId)?.descriptor ?? null;
+  }
+
+  /** Alpha 1000 — additive, read-only directory of every descriptor issued for one conversation. Descriptors only; never a bearer secret. */
+  listIssuedDescriptorsForConversation(conversationId: FedosConversationId): readonly FedosConversationCapabilityDescriptor[] {
+    const result: FedosConversationCapabilityDescriptor[] = [];
+    for (const stored of this.#capabilities.values()) {
+      if (stored.descriptor.conversationId === conversationId) result.push(stored.descriptor);
+    }
+    return result;
   }
 
   /** Alpha 787 — honest, derivable current state; `null` for an unknown capability. */

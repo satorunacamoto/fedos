@@ -197,6 +197,9 @@ export async function startFedosDesktopRuntime(
     config.conversationMembershipLogPath,
     config.conversationCapabilityLogPath,
     config.conversationConstructionCoordinationLogPath,
+    // Alpha 996/1003 -- the invitation-revocation and draft-management logs.
+    config.conversationInvitationRevocationLogPath,
+    config.conversationDraftManagementLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -278,6 +281,8 @@ export async function startFedosDesktopRuntime(
       membershipLogPath: config.conversationMembershipLogPath,
       capabilityLogPath: config.conversationCapabilityLogPath,
       constructionCoordinationLogPath: config.conversationConstructionCoordinationLogPath,
+      invitationRevocationLogPath: config.conversationInvitationRevocationLogPath,
+      draftManagementLogPath: config.conversationDraftManagementLogPath,
       clock: config.clock ?? defaultFedosBoardRuntimeClock,
       creatorIdentityAuthority: config.conversationCreatorIdentityAuthority,
       encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
