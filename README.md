@@ -8,6 +8,85 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1541–1610 — Conversation Export,
+> Restore, Archive Foundation Arc (complete).** Architecture frozen: no
+> new Rust/WASM primitive, no new `AeadAadDomain` variant, no Host/GUI
+> wiring, no network transport of any kind (No Cloud, No Sync, No GUI).
+> A pure TypeScript orchestration layer, `src/conversation/archive/`
+> (11 new files), built entirely on five already-existing, unmodified
+> domains — Conversation Persistence (Alpha 749/750), Envelope (Alpha
+> 854/858), Payload (Alpha 803/804/806), Membership (Alpha 825/827),
+> Capability (Alpha 833/836/837) — implementing Encrypted Export,
+> Encrypted Import, Manifest, Integrity, Schema Version, Restore, and
+> Duplicate Detection. An Archive is sealed under the SAME per-
+> conversation `AeadKeyHandle` `FedosMasterSeedAuthority.resolveConversationKey()`
+> already derives for that conversation's own Envelopes (Alpha 869) —
+> never a new passphrase or key-derivation domain; identity binding
+> reuses Alpha 856's own prefix-then-encrypt technique
+> (`fedos_conversation_archive_header.ts`) rather than native AAD, and
+> the `"Conversation"` `AeadAadDomain` label is reused verbatim, never
+> extended. Integrity is a SHA-256 content hash (`@noble/hashes`, an
+> existing dependency) over the canonical Bundle bytes, carried in a
+> cleartext Manifest and independently re-verified after decrypt — a
+> distinct `"manifest-mismatch"` outcome, kept separate from AEAD's own
+> undifferentiated `"failed"`. Restore replays a decrypted Bundle back
+> into the five EXISTING ports' own `put*` methods, reusing each
+> domain's own EXISTING `deserializeX`/`serializeX` codec pair for deep
+> per-record validation rather than re-implementing any check; Duplicate
+> Detection is not a new outcome vocabulary — `"already-present"`/
+> `"conflict"` are this codebase's own pre-existing write-result
+> vocabulary (Alpha 315/749/804/827/837/857), surfaced either as
+> Restore's own write-outcome tally or, read-only, via a dedicated
+> preflight report over each port's existing `get*`/`has*` methods. ONE
+> additive port method, `FedosConversationCapabilityPersistence.listConversationCapabilityEvents()`
+> (plus both its backends), mirrors `hasRedeemedEvent()`'s own Alpha 841
+> additive-port precedent: Capability is exported/restored via RAW
+> `"issued"`/`"redeemed"` events rather than the lossy reconstructed
+> `currentUses`-only record, since replaying just a count back into a
+> fresh backend would lose WHICH distinct redeemers already used a slot,
+> silently permitting a double-redemption after restore. Membership
+> export uses the CURRENT record per id (`listConversationMemberships()`)
+> — that port exposes no raw-event listing, and the current record alone
+> is sufficient to reconstruct correct present-day status. Four new test
+> files, `test/secure_runtime_alpha_1541_1560_archive_manifest_integrity.test.ts`,
+> `test/secure_runtime_alpha_1561_1580_archive_encrypted_export_import.test.ts`,
+> `test/secure_runtime_alpha_1581_1600_archive_restore_duplicate_detection.test.ts`,
+> `test/secure_runtime_alpha_1601_1610_capability_event_listing.test.ts`
+> (48 new tests): Bundle codec round-trip/order-independence/
+> fail-closed rejection; Manifest build/codec round-trip/fail-closed
+> rejection; Header encode/split/mismatch-detection; a full injected-
+> boundary Export→Import round trip plus every coarse failure branch
+> (`invalid-input`/`key-unavailable`/`failed`/`manifest-mismatch`);
+> Restore's insert/duplicate/conflict/invalid tally against real
+> in-memory backends; the read-only Duplicate Detection report; and the
+> new `listConversationCapabilityEvents()` port method against both the
+> in-memory and append-only Capability backends. **Verification**:
+> `npm run typecheck` clean except one PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> confirmed via `git log` to predate this Arc entirely); `npx vitest run`
+> (915 files / 12,119 tests): 48/48 new tests pass, and every one of the
+> 31 pre-existing failing assertions falls into a category this
+> codebase's own prior Arcs already documented as expected — ten
+> Rust-source static-analysis files this Arc's own `git diff` confirms
+> zero touch to `packages/fedos-core-rust/`, the same four files the
+> Alpha 1051–1110 completion declaration already named verbatim as
+> pre-existing (`publish_pipeline_host_ownership_review_current_state`,
+> `secure_runtime_alpha_405/472/543`), one `src/board/`-scoped ripple
+> check this Arc never touches, and three review docs' own
+> "git working tree is clean" checks that are by construction red while
+> this Arc's own new files sit uncommitted — each of those three docs'
+> own header already states this check "is expected to be red only
+> until this Arc's own single commit lands." Draft (private,
+> not-yet-active) conversations, any Host/file-path/GUI wiring for where
+> Export/Import bytes are read from or written to, passphrase-protected
+> export independent of live conversation-key availability, and any
+> Cloud/Sync/network transport are all explicitly named OUT of this
+> Arc's scope, not silently dropped — see
+> `docs/secure_runtime_alpha_1541_1610_execution_spec.md`/
+> `_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1051–1110 — Conversation Runtime
 > Consolidation Arc (complete).** Purely additive: `master` was still
 > pinned at Alpha 621–640 while eight sibling Arc branches (Alpha

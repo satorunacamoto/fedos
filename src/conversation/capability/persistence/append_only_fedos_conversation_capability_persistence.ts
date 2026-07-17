@@ -121,4 +121,11 @@ export class AppendOnlyFedosConversationCapabilityPersistence implements FedosCo
     const key = fedosConversationCapabilityRedeemedEventKey(capabilityId, redeemerAuthority, redeemerPublicIdentifier);
     return replayLog(this.#filePath).some((event) => fedosConversationCapabilityEventKey(event) === key);
   }
+
+  listConversationCapabilityEvents(conversationId: string): readonly FedosPersistedConversationCapabilityEventV1[] {
+    const events = replayLog(this.#filePath);
+    const issuedForConversation = events.filter((event) => event.eventType === "issued" && event.conversationId === conversationId);
+    const capabilityIds = new Set(issuedForConversation.map((event) => event.capabilityId));
+    return events.filter((event) => capabilityIds.has(event.capabilityId));
+  }
 }

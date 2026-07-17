@@ -26,6 +26,17 @@
  * additive port method — this port has no other consumer yet outside
  * this same Arc, so extending it here is not a ripple into
  * already-accepted, already-merged surface.
+ *
+ * `listConversationCapabilityEvents()` — added for Secure Runtime Alpha
+ * 1541–1610 (Conversation Export, Restore, Archive Foundation), the
+ * SAME additive-port precedent `hasRedeemedEvent()` already set: a new
+ * consumer (Archive Export/Restore) genuinely needs the RAW `"issued"`/
+ * `"redeemed"` events, not the reconstructed current-state view
+ * `listConversationCapabilities()` returns — a reconstructed record's
+ * `currentUses` is a COUNT only and cannot be replayed back into a
+ * fresh backend without losing WHICH distinct redeemers already used a
+ * slot (silently permitting a double-redemption after restore). No
+ * existing caller or contract changes; this is a pure addition.
  */
 
 import {
@@ -48,6 +59,8 @@ export interface FedosConversationCapabilityPersistence {
   listConversationCapabilities(conversationId: string): readonly FedosPersistedConversationCapabilityRecordV1[];
   /** `true` iff a `"redeemed"` event already exists for this exact `(capabilityId, redeemer)` pair. See this file's own header. */
   hasRedeemedEvent(capabilityId: string, redeemerAuthority: string, redeemerPublicIdentifier: string): boolean;
+  /** Every raw `"issued"`/`"redeemed"` event for every capability ever issued for this conversation — see this file's own header (Alpha 1541–1610). */
+  listConversationCapabilityEvents(conversationId: string): readonly FedosPersistedConversationCapabilityEventV1[];
 }
 
 /** The internal storage key for one event -- `"issued"` keyed by capability id alone; `"redeemed"` keyed by `(capabilityId, redeemer)`, mirroring the in-memory Authority's own per-redeemer Set (Alpha 786). */

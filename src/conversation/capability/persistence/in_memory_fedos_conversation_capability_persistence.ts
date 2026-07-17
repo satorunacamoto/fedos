@@ -57,6 +57,14 @@ export class InMemoryFedosConversationCapabilityPersistence implements FedosConv
     return this.#events.has(fedosConversationCapabilityRedeemedEventKey(capabilityId, redeemerAuthority, redeemerPublicIdentifier));
   }
 
+  listConversationCapabilityEvents(conversationId: string): readonly FedosPersistedConversationCapabilityEventV1[] {
+    const issuedForConversation = [...this.#events.values()].filter(
+      (event) => event.eventType === "issued" && event.conversationId === conversationId,
+    );
+    const capabilityIds = new Set(issuedForConversation.map((event) => event.capabilityId));
+    return [...this.#events.values()].filter((event) => capabilityIds.has(event.capabilityId));
+  }
+
   #eventsForCapability(capabilityId: string): readonly FedosPersistedConversationCapabilityEventV1[] {
     return [...this.#events.values()].filter((event) => event.capabilityId === capabilityId);
   }
