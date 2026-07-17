@@ -155,6 +155,16 @@ import { FedosGroupAdmission } from "../group/fedos_group_admission.js";
 import { FedosGroupSendCoordinator } from "../group/fedos_group_send_coordinator.js";
 import { FedosGroupReadFacade } from "../group/fedos_group_read_facade.js";
 import { FedosConversationGroupRuntime } from "../group/fedos_conversation_group_runtime.js";
+import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import type { FedosPrivateNostrDeliveryMode } from "../delivery/nostr/fedos_private_nostr_delivery_mode.js";
+import type { FedosPrivateNostrDeliveryRequestPersistence } from "../delivery/nostr/fedos_private_nostr_delivery_request.js";
+import { InMemoryFedosPrivateNostrDeliveryRequestPersistence } from "../delivery/nostr/in_memory_fedos_private_nostr_delivery_request_persistence.js";
+import type { FedosPrivateNostrImportRecordPersistence } from "../delivery/nostr/fedos_private_nostr_import_record.js";
+import { InMemoryFedosPrivateNostrImportRecordPersistence } from "../delivery/nostr/in_memory_fedos_private_nostr_import_record_persistence.js";
+import type { FedosPrivateNostrDeliveryPublisher } from "../delivery/nostr/fedos_private_nostr_delivery_publisher.js";
+import { FedosConversationPrivateNostrDeliveryRuntime } from "../delivery/nostr/fedos_conversation_private_nostr_delivery_runtime.js";
 
 /**
  * The full injected dependency set — the construction coordinator's own
@@ -215,6 +225,26 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
   readonly groupMessagePersistence?: FedosGroupMessagePersistence;
   readonly groupFanoutDeliveryPersistence?: FedosGroupFanoutDeliveryPersistence;
   readonly groupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
+  /**
+   * Alpha 1391–1470 — Nostr Private Direct and Pairwise Fanout Delivery
+   * Arc. Every field below is OPTIONAL with a safe in-memory/fail-closed
+   * default, mirroring `envelopePersistence`/`groupGenerationPersistence`'s
+   * own discipline exactly. `privateNostrSigningAuthority`/
+   * `privateNostrDeliveryPublisher` follow `publisher`'s own established
+   * "this runtime constructs no Signing Authority/Relay of its own"
+   * precedent (Alpha 610) — omitted, `privateNostrDelivery()` is
+   * constructed but every one of its methods fails closed to
+   * `"unavailable"` (Alpha 1440).
+   */
+  readonly privateNostrDeliveryRequestPersistence?: FedosPrivateNostrDeliveryRequestPersistence;
+  readonly privateNostrImportRecordPersistence?: FedosPrivateNostrImportRecordPersistence;
+  readonly privateNostrDeliveryObservationRepository?: FedosDeliveryObservationRepository;
+  readonly privateNostrSigningAuthority?: FedosNostrSigningAuthority;
+  readonly privateNostrDeliveryPublisher?: FedosPrivateNostrDeliveryPublisher;
+  /** Alpha 1434 — optional; omitted, `"mailbox"` (the explicit, documented default). */
+  readonly privateNostrDefaultMode?: FedosPrivateNostrDeliveryMode;
+  /** Optional; omitted, `[]` (a caller must then supply `relayUrls` per call). */
+  readonly privateNostrDefaultRelayUrls?: readonly string[];
 };
 
 export class FedosConversationRuntime {
@@ -229,6 +259,7 @@ export class FedosConversationRuntime {
   readonly #activationCoordinator: FedosConversationDirectActivationCoordinator;
   readonly #directMessagingCoordinator: FedosConversationDirectMessagingCoordinator;
   readonly #groupRuntime: FedosConversationGroupRuntime;
+  readonly #privateNostrDeliveryRuntime: FedosConversationPrivateNostrDeliveryRuntime;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
@@ -390,6 +421,41 @@ export class FedosConversationRuntime {
         generationPersistence: groupGenerationPersistence,
         pathPersistence: groupDirectPathPersistence,
       },
+      clock: deps.clock,
+    });
+
+    // Alpha 1391–1470 — the additive Private Nostr Delivery facade. Reuses
+    // every EXISTING instance already constructed above (envelopePersistence,
+    // payloadStorage, membershipAuthority, identityResolver,
+    // decryptionAuthority, activationPersistence, the Group persistence
+    // instances) rather than constructing a second, divergent graph — the
+    // SAME "one coherent graph" discipline this file's own header already
+    // applies everywhere else. Always constructible; every method fails
+    // closed to `"unavailable"` when `privateNostrSigningAuthority`/
+    // `privateNostrDeliveryPublisher` were not injected (Alpha 1440).
+    this.#privateNostrDeliveryRuntime = new FedosConversationPrivateNostrDeliveryRuntime({
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      accountIndexAuthority,
+      envelopePersistence,
+      payloadStorage,
+      decryptionAuthority,
+      draftPersistence: deps.draftPersistence,
+      activationPersistence,
+      envelopeIdGenerator: deps.envelopeIdGenerator ?? new FedosSecureRandomConversationEnvelopeIdGenerator(),
+      payloadIdGenerator: deps.payloadIdGenerator ?? new FedosSecureRandomConversationPayloadIdGenerator(),
+      groupMessagePersistence,
+      groupFanoutDeliveryPersistence,
+      groupDirectPathPersistence,
+      deliveryRequestPersistence: deps.privateNostrDeliveryRequestPersistence ?? new InMemoryFedosPrivateNostrDeliveryRequestPersistence(),
+      importRecordPersistence: deps.privateNostrImportRecordPersistence ?? new InMemoryFedosPrivateNostrImportRecordPersistence(),
+      observationRepository:
+        deps.privateNostrDeliveryObservationRepository ??
+        new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence()),
+      signingAuthority: deps.privateNostrSigningAuthority,
+      publisher: deps.privateNostrDeliveryPublisher,
+      defaultMode: deps.privateNostrDefaultMode ?? "mailbox",
+      defaultRelayUrls: deps.privateNostrDefaultRelayUrls ?? [],
       clock: deps.clock,
     });
 
@@ -624,6 +690,16 @@ export class FedosConversationRuntime {
    */
   groupRuntime(): FedosConversationGroupRuntime {
     return this.#groupRuntime;
+  }
+
+  /**
+   * Alpha 1391–1470 — the additive Private Nostr Delivery facade. ALWAYS
+   * available as an object (every backend it needs has a safe default);
+   * its own methods fail closed to `"unavailable"` when no Signing
+   * Authority/Publisher were injected (Alpha 1440).
+   */
+  privateNostrDelivery(): FedosConversationPrivateNostrDeliveryRuntime {
+    return this.#privateNostrDeliveryRuntime;
   }
 }
 

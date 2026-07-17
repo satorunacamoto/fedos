@@ -8,6 +8,118 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1391–1470 — Nostr Private Direct and
+> Pairwise Fanout Delivery Arc (complete, protocol-neutral — NOT
+> NIP-17/NIP-44/NIP-59 compliant).** Run in a dedicated integration
+> worktree (`C:\wt\nostr-private-delivery`, branch
+> `arc/nostr-private-direct-pairwise-fanout-delivery`) built from the
+> prior Arc's own tip (`b3b9b96`), with two required prerequisite
+> branches merged in — `f715a5d` (Private Protocol Delivery review,
+> clean, zero conflicts) and `3dc4f7a` (Alpha 1321–1390 Private Group
+> Pairwise Fanout Foundation, two clean additive-union conflicts,
+> resolved chronologically) — both reported in full in
+> `docs/secure_runtime_alpha_1391_1470_completion_declaration.md`.
+>
+> **Protocol Compliance Gate (Alpha 1393), run first, before any
+> production code:** this repository contains ZERO normative NIP-17/
+> NIP-44-wire/NIP-59 material — every review already present
+> (`docs/reviews/private_protocol_delivery_group_v1/04_nostr_readiness.md`,
+> `docs/reviews/private_group_pairwise_fanout/01_nip17_inventory.md`/
+> `02_gift_wrap_inventory.md`) independently reconfirms this and
+> explicitly defers the research. Per the Gate's own fallback, this Arc
+> implements PROTOCOL-NEUTRAL Private Nostr Delivery contracts and makes
+> no NIP-17/44/59 compliance claim anywhere:
+> `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND = 24700` is a disclosed,
+> FedOS-proprietary event kind, not a registered NIP, not interoperable
+> with any other Nostr client. Confidentiality is provided entirely by
+> the EXISTING, real, already-proven pairwise ECDH + AEAD scheme (Alpha
+> 861–890, real since Alpha 1261–1320) — no gift-wrap, no seal, no
+> ephemeral per-recipient key scheme is invented.
+>
+> **New domain, `src/conversation/delivery/nostr/` (13 files):** a
+> Private Delivery Request (a NEW, parallel durable intent, deliberately
+> not forced into the Board-post-specific `FedosBoardOutboxIntent`) whose
+> STATE reuses the EXISTING `FedosDeliveryObservationRepository`
+> directly; a recipient-specific wire payload carrying the sender's own
+> Envelope-identifying fields verbatim (required for the Alpha 856
+> associated-data header to re-derive correctly); an OK-correlated
+> Publisher adapter mirroring `FedosRelayOkCorrelatedNostrBoardPublisher`'s
+> own technique field-for-field over the unmodified `FedosRelay`; an
+> Inbound Delivery Coordinator sitting strictly ABOVE the unmodified
+> `validateInboundNostrEvent()` that classifies, gates by recipient
+> ownership, deduplicates by intrinsic NIP-01 event id, unwraps/decrypts
+> via the EXISTING `FedosConversationDecryptionAuthority.decrypt()`
+> directly (no cryptography in TypeScript), and imports into a FRESH
+> local Envelope/Payload pair through the unmodified persistence ports —
+> the received message becomes readable through the UNCHANGED
+> `readDirectMessage()`/`listDirectMessages()`; a Group Delivery Planner
+> that reuses the EXISTING Alpha 1321–1390 Pairwise Fanout plan
+> unmodified, firing one independent recipient-specific delivery per
+> already-fanned-out recipient (never one shared group event), threading
+> the sender's own local Group Message id through as opaque
+> authenticated-encrypted `groupLinkage` (never any recipient's own
+> canonical id).
+>
+> **Minimal, additive extension to one frozen file, disclosed:**
+> `src/nostr/sign/fedos_nostr_signing_authority.ts`'s own kind allowlist
+> widened from the single fixed `1` to a closed two-value set
+> (`{1, FEDOS_PRIVATE_NOSTR_DELIVERY_KIND}`) — the minimal change Alpha
+> 1447's own "no private plaintext in a public kind-1 event" requirement
+> makes unavoidable; every other field/behavior in that file is
+> unchanged. `FedosConversationRuntime` gains one new, additive,
+> always-constructible `privateNostrDelivery()` facade — `FedosRunningDesktopRuntime`'s
+> own exposed key set is UNCHANGED (confirmed:
+> `secure_runtime_alpha_606_runtime_assembly.test.ts`/
+> `secure_runtime_alpha_758_local_runtime_ownership.test.ts` both still
+> pass unmodified).
+>
+> **Verified for real:** both a Direct and a 3-member Group vertical
+> slice run through the real `startFedosDesktopRuntime()` entry point
+> with genuinely independent Alice/Bob(/Carol) runtime instances (Fake
+> Encryption/Decryption Authorities — this Arc's own baseline tier —
+> combined with a REAL Schnorr-signing `FedosNostrSigningAuthority`,
+> `@noble/curves`, real BIP-340 verification through the unmodified
+> inbound validator, and a real OK-correlated Relay publisher): real
+> signed private event → Relay ACK → the SAME real event received on a
+> genuinely separate runtime → unwrap/decrypt/import → exact plaintext
+> read back through the unchanged `readDirectMessage()`; restart-safe
+> idempotency (no duplicate publish, no duplicate import); a real
+> ciphertext-byte tamper (re-signed with the sender's own real key —
+> proving a valid signature alone never proves ciphertext integrity)
+> fails closed; a wrong-recipient `p`-tag event is denied before any
+> decrypt attempt; a genuine Relay rejection is a distinct, terminal
+> outcome; Group fanout produces two independent, non-shared-ciphertext
+> recipient-specific events, each importable ONLY by its own addressed
+> recipient, with a removed member correctly excluded from the next
+> send. 26 new focused tests, all passing (10 wire-payload-codec + 2
+> Direct vertical slice + 1 Group vertical slice + 13 architecture/secret
+> guards).
+>
+> **Honest scope limits, named explicitly:** no wire-level (NIP-40-style)
+> expiration encoding and no Nostr deletion-request construction (no
+> reviewed normative material for either); `"ephemeral-online"` mode is
+> an application-level distinction only, not backed by any wire-level
+> convention; no automatic Runtime-level subscription/reconnect wiring
+> (`receiveInboundEvent()` is a manually-invoked coordinator method); no
+> automatic retry/Scheduler integration for outbound delivery (a
+> `"rejected"` vs `"failed"` Observation distinction exists, but this
+> layer does not itself decide whether to retry). The Production-mode
+> WASM Dev-only Gate remains byte-for-byte untouched — private delivery
+> is development-Runtime capable only, never production-enabled.
+> `npm run typecheck` clean (one pre-existing, unrelated failure,
+> unchanged from every prior Arc); full `npm test` precisely diffed
+> against a stashed clean-baseline re-run in this exact worktree — every
+> newly-failing test traced to a pre-existing, git-status-dependent
+> "working tree unchanged" staleness guard, zero attributable to a
+> genuine functional regression. `package.json`/`package-lock.json`/
+> `Cargo.toml` byte-for-byte unchanged; no new dependency; `p2p/`
+> untouched. See
+> `docs/secure_runtime_alpha_1391_1470_phase_a_inventory.md` and
+> `docs/secure_runtime_alpha_1391_1470_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1321–1390 — Private Group Pairwise
 > Fanout Foundation Arc (complete).** Run in a dedicated integration
 > worktree (`C:\wt\private-group-fanout`, branch

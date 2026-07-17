@@ -17,9 +17,21 @@
  * (`src/desktop/fedos_nostr_wire_event.ts`, Secure Runtime Alpha 234)
  * rather than a fourth duplicate signed-event type (Secure Runtime
  * Alpha 426's own reuse decision).
+ *
+ * Secure Runtime Alpha 1399/1402 (Alpha 1391–1470 Nostr Private Direct
+ * and Pairwise Fanout Delivery Arc) — ADDITIVE extension: the closed
+ * kind allowlist now also accepts `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND`
+ * (`../../conversation/delivery/nostr/fedos_private_nostr_delivery_mode.ts`),
+ * a FedOS-proprietary, disclosed non-standard kind — NOT NIP-17, NOT any
+ * registered NIP. This is the minimal change required for Alpha 1447's
+ * own "no private plaintext in a public kind-1 event" requirement to be
+ * satisfiable at all; every other field/behavior in this file is
+ * unchanged (still `kind` is a fixed CLOSED SET of exactly two values,
+ * never an arbitrary caller-chosen number).
  */
 import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
 import type { FedosNostrSigningPublicIdentity } from "./fedos_nostr_signing_public_identity.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
 
 export interface FedosNostrUnsignedEventRequest {
   readonly accountIndex: number;
@@ -31,7 +43,8 @@ export interface FedosNostrUnsignedEventRequest {
 
 /** The one reserved character no tag field may contain — this Arc's own WASM wire separator (Secure Runtime Alpha 442). */
 const NOSTR_TAG_FIELD_SEPARATOR = "";
-const SUPPORTED_NOSTR_KIND = 1;
+/** Alpha 424's original public-post kind, plus Alpha 1399/1402's additive private-delivery kind — see this file's own header. A CLOSED set of exactly two, never an arbitrary caller-chosen number. */
+const SUPPORTED_NOSTR_KINDS: ReadonlySet<number> = new Set([1, FEDOS_PRIVATE_NOSTR_DELIVERY_KIND]);
 const U32_MAX = 4_294_967_295;
 
 /**
@@ -72,7 +85,7 @@ export function isWellFormedFedosNostrUnsignedEventRequest(
   ) {
     return false;
   }
-  if (value.kind !== SUPPORTED_NOSTR_KIND) return false;
+  if (typeof value.kind !== "number" || !SUPPORTED_NOSTR_KINDS.has(value.kind)) return false;
   if (!Array.isArray(value.tags)) return false;
   for (const tag of value.tags) {
     if (!Array.isArray(tag) || tag.length === 0) return false;

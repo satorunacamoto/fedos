@@ -63,6 +63,9 @@ import type { FedosConversationIdentityResolver } from "../../conversation/encry
 import type { FedosConversationLocalAccountIndexAuthority } from "../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
 import type { FedosConversationProductionCryptoConfig } from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
 import type { FedosGroupParticipantLimitPolicy } from "../../conversation/group/fedos_group_participant_limit.js";
+import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosPrivateNostrDeliveryMode } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
+import type { FedosPrivateNostrDeliveryPublisher } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_publisher.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -228,4 +231,27 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationGroupFanoutDeliveryLogPath?: string;
   /** Alpha 1321–1390 — optional; omitted, a conservative fixed OPERATIONAL limit applies (never a cryptographic one). */
   readonly conversationGroupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
+  /**
+   * Secure Runtime Alpha 1391–1470 ("Nostr Private Direct and Pairwise
+   * Fanout Delivery Arc") — the additive `conversationRuntime().privateNostrDelivery()`
+   * facade's own backends. Every field OPTIONAL; omitted, private
+   * delivery stays entirely unavailable (Alpha 1440) — local Direct/Group
+   * messaging itself is unaffected. This runtime constructs no Signing
+   * Authority or Relay/Publisher of its own (mirrors `publisher`'s own
+   * established "caller supplies a real, fully-constructed" precedent,
+   * Alpha 610).
+   */
+  readonly conversationPrivateNostrDeliveryRequestLogPath?: string;
+  /** Alpha 1391–1470 — optional append-only log for Local Import Record facts; omitted, in-memory. */
+  readonly conversationPrivateNostrImportRecordLogPath?: string;
+  /** Alpha 1391–1470 — optional append-only log for Private Nostr Delivery Observation facts; omitted, in-memory. A SEPARATE log from the Board's own `observationLogPath`. */
+  readonly conversationPrivateNostrDeliveryObservationLogPath?: string;
+  /** Alpha 1391–1470 — optional; omitted, private delivery stays entirely unavailable (Alpha 1440). */
+  readonly conversationPrivateNostrSigningAuthority?: FedosNostrSigningAuthority;
+  /** Alpha 1391–1470 — optional; omitted, outbound private delivery stays unavailable. */
+  readonly conversationPrivateNostrDeliveryPublisher?: FedosPrivateNostrDeliveryPublisher;
+  /** Alpha 1391–1470 — optional; omitted, `"mailbox"` (Alpha 1434's own explicit default). */
+  readonly conversationPrivateNostrDefaultMode?: FedosPrivateNostrDeliveryMode;
+  /** Alpha 1391–1470 — optional; omitted, `[]`. */
+  readonly conversationPrivateNostrDefaultRelayUrls?: readonly string[];
 }

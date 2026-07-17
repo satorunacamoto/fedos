@@ -228,6 +228,10 @@ export async function startFedosDesktopRuntime(
     config.conversationGroupDirectPathLogPath,
     config.conversationGroupMessageLogPath,
     config.conversationGroupFanoutDeliveryLogPath,
+    // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own logs.
+    config.conversationPrivateNostrDeliveryRequestLogPath,
+    config.conversationPrivateNostrImportRecordLogPath,
+    config.conversationPrivateNostrDeliveryObservationLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -366,6 +370,16 @@ export async function startFedosDesktopRuntime(
       groupMessageLogPath: config.conversationGroupMessageLogPath,
       groupFanoutDeliveryLogPath: config.conversationGroupFanoutDeliveryLogPath,
       groupParticipantLimitPolicy: config.conversationGroupParticipantLimitPolicy,
+      // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own
+      // backends. This runtime constructs no Signing Authority or
+      // Relay/Publisher of its own -- see this file's own config type header.
+      privateNostrDeliveryRequestLogPath: config.conversationPrivateNostrDeliveryRequestLogPath,
+      privateNostrImportRecordLogPath: config.conversationPrivateNostrImportRecordLogPath,
+      privateNostrDeliveryObservationLogPath: config.conversationPrivateNostrDeliveryObservationLogPath,
+      privateNostrSigningAuthority: config.conversationPrivateNostrSigningAuthority,
+      privateNostrDeliveryPublisher: config.conversationPrivateNostrDeliveryPublisher,
+      privateNostrDefaultMode: config.conversationPrivateNostrDefaultMode,
+      privateNostrDefaultRelayUrls: config.conversationPrivateNostrDefaultRelayUrls,
     }),
   );
 

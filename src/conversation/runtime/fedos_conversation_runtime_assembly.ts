@@ -107,6 +107,18 @@ import type { FedosGroupFanoutDeliveryPersistence } from "../group/fedos_group_f
 import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../group/in_memory_fedos_group_fanout_delivery_persistence.js";
 import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../group/append_only_fedos_group_fanout_delivery_persistence.js";
 import type { FedosGroupParticipantLimitPolicy } from "../group/fedos_group_participant_limit.js";
+import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { AppendOnlyFedosDeliveryObservationPersistence } from "../../board/observation/append_only_fedos_delivery_observation_persistence.js";
+import type { FedosPrivateNostrDeliveryMode } from "../delivery/nostr/fedos_private_nostr_delivery_mode.js";
+import type { FedosPrivateNostrDeliveryRequestPersistence } from "../delivery/nostr/fedos_private_nostr_delivery_request.js";
+import { InMemoryFedosPrivateNostrDeliveryRequestPersistence } from "../delivery/nostr/in_memory_fedos_private_nostr_delivery_request_persistence.js";
+import { AppendOnlyFedosPrivateNostrDeliveryRequestPersistence } from "../delivery/nostr/append_only_fedos_private_nostr_delivery_request_persistence.js";
+import type { FedosPrivateNostrImportRecordPersistence } from "../delivery/nostr/fedos_private_nostr_import_record.js";
+import { InMemoryFedosPrivateNostrImportRecordPersistence } from "../delivery/nostr/in_memory_fedos_private_nostr_import_record_persistence.js";
+import { AppendOnlyFedosPrivateNostrImportRecordPersistence } from "../delivery/nostr/append_only_fedos_private_nostr_import_record_persistence.js";
+import type { FedosPrivateNostrDeliveryPublisher } from "../delivery/nostr/fedos_private_nostr_delivery_publisher.js";
 
 export interface FedosConversationRuntimeAssemblyConfig {
   /** Explicit, caller-supplied append-only log path for the private-draft record; omitted, an in-memory backend is used. */
@@ -172,6 +184,20 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly groupFanoutDeliveryLogPath?: string;
   /** Alpha 1321–1390 — optional; default a conservative fixed operational limit (never a cryptographic one). */
   readonly groupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
+  /** Alpha 1391–1470 — optional append-only log path for durable Private Nostr Delivery Request intents; omitted, in-memory. */
+  readonly privateNostrDeliveryRequestLogPath?: string;
+  /** Alpha 1391–1470 — optional append-only log path for Local Import Record facts; omitted, in-memory. */
+  readonly privateNostrImportRecordLogPath?: string;
+  /** Alpha 1391–1470 — optional append-only log path for Private Nostr Delivery Observation facts; omitted, in-memory. A SEPARATE log from the Board's own Delivery Observation log (different subject-id namespace). */
+  readonly privateNostrDeliveryObservationLogPath?: string;
+  /** Alpha 1391–1470 — optional; omitted, private delivery stays entirely unavailable (Alpha 1440). This assembly constructs no Signing Authority of its own. */
+  readonly privateNostrSigningAuthority?: FedosNostrSigningAuthority;
+  /** Alpha 1391–1470 — optional; omitted, outbound private delivery stays unavailable. This assembly constructs no Relay/Publisher of its own. */
+  readonly privateNostrDeliveryPublisher?: FedosPrivateNostrDeliveryPublisher;
+  /** Alpha 1391–1470 — optional; omitted, `"mailbox"` (Alpha 1434's own explicit default). */
+  readonly privateNostrDefaultMode?: FedosPrivateNostrDeliveryMode;
+  /** Alpha 1391–1470 — optional; omitted, `[]`. */
+  readonly privateNostrDefaultRelayUrls?: readonly string[];
 }
 
 function participantIsActiveInviter(
@@ -286,6 +312,25 @@ export function assembleFedosConversationRuntimeDependencies(
       ? new AppendOnlyFedosGroupFanoutDeliveryPersistence(config.groupFanoutDeliveryLogPath)
       : new InMemoryFedosGroupFanoutDeliveryPersistence();
 
+  // Alpha 1391–1470 — mirrors every backend construction above exactly.
+  const privateNostrDeliveryRequestPersistence: FedosPrivateNostrDeliveryRequestPersistence =
+    config.privateNostrDeliveryRequestLogPath !== undefined
+      ? new AppendOnlyFedosPrivateNostrDeliveryRequestPersistence(config.privateNostrDeliveryRequestLogPath)
+      : new InMemoryFedosPrivateNostrDeliveryRequestPersistence();
+
+  const privateNostrImportRecordPersistence: FedosPrivateNostrImportRecordPersistence =
+    config.privateNostrImportRecordLogPath !== undefined
+      ? new AppendOnlyFedosPrivateNostrImportRecordPersistence(config.privateNostrImportRecordLogPath)
+      : new InMemoryFedosPrivateNostrImportRecordPersistence();
+
+  // A SEPARATE Observation repository from the Board's own -- different
+  // subject-id namespace, never shared (see this file's own header).
+  const privateNostrDeliveryObservationRepository = new FedosDeliveryObservationRepository(
+    config.privateNostrDeliveryObservationLogPath !== undefined
+      ? new AppendOnlyFedosDeliveryObservationPersistence(config.privateNostrDeliveryObservationLogPath)
+      : new InMemoryFedosDeliveryObservationPersistence(),
+  );
+
   // Alpha 996/1003 — the two NEW additive backends this Arc introduces.
   const invitationRevocationRegistry: FedosConversationInvitationRevocationRegistry =
     config.invitationRevocationLogPath !== undefined
@@ -356,5 +401,12 @@ export function assembleFedosConversationRuntimeDependencies(
     groupMessagePersistence,
     groupFanoutDeliveryPersistence,
     groupParticipantLimitPolicy: config.groupParticipantLimitPolicy,
+    privateNostrDeliveryRequestPersistence,
+    privateNostrImportRecordPersistence,
+    privateNostrDeliveryObservationRepository,
+    privateNostrSigningAuthority: config.privateNostrSigningAuthority,
+    privateNostrDeliveryPublisher: config.privateNostrDeliveryPublisher,
+    privateNostrDefaultMode: config.privateNostrDefaultMode,
+    privateNostrDefaultRelayUrls: config.privateNostrDefaultRelayUrls,
   };
 }
