@@ -139,6 +139,10 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationCapabilityLogPath?: string;
   /** Alpha 923 — optional append-only log for the construction-coordination facts; omitted, in-memory. */
   readonly conversationConstructionCoordinationLogPath?: string;
+  /** Alpha 996 — optional append-only log for invitation-revocation facts; omitted, in-memory. */
+  readonly conversationInvitationRevocationLogPath?: string;
+  /** Alpha 1003 — optional append-only log for draft-management-state facts; omitted, in-memory. */
+  readonly conversationDraftManagementLogPath?: string;
   /** Alpha 904/923 — optional; omitted, an anonymous-local creator identity applies. */
   readonly conversationCreatorIdentityAuthority?: FedosConversationCreatorIdentityAuthority;
   /**
