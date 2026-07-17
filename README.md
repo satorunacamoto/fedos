@@ -8,6 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1181–1260 — Conversation Runtime
+> Finalization Arc (complete).** Same worktree/branch as the prior Arc —
+> no new sibling Arc branch had landed, so no additional integration was
+> needed. Phase A (Runtime ownership/dependency/lifecycle) and Phase B
+> (Conversation Runtime API completion) were reviewed by direct source
+> inspection and found ALREADY correct and complete: `FedosConversationRuntime`'s
+> public surface exposes no persistence port, encryption handle, WASM
+> handle, or raw-key resolver (Alpha 1144); `conversationRuntime()`
+> already throws after `stop()` (Alpha 923); a repository-wide search for
+> `TODO`/`FIXME`/`temporary`/`placeholder` scaffolding across
+> `src/conversation/`/`src/desktop/` found none to eliminate (the only
+> `"temporary"` hits are the reviewed, permanent `"temporary-capability"`
+> participant-authority enum value, Alpha 762) — reported honestly rather
+> than manufacturing a change. Phase C adds real, additive test coverage
+> the prior Arc's own completion declaration named as not individually
+> exercised: a corruption matrix over the new Activation log and the
+> Envelope log (malformed lines and conflicting duplicate records both
+> throw on replay, mirroring this codebase's own established "one corrupt
+> record voids the backend" precedent — no new corruption-handling
+> mechanism invented); confirmation that a corrupted Activation log makes
+> `sendDirectMessage()`/`readDirectMessage()` REJECT rather than silently
+> report a wrong or false-active answer, reproducibly across three
+> independent restarts over the same corrupted file (Alpha 1156);
+> Independent Runtime Isolation — two wholly independent backend sets
+> addressing the identical Conversation id never share state (Alpha
+> 1167); and Restart Identity Stability — the same local identity across
+> a restart resolves the same Membership and decrypts an existing
+> message, a different, never-admitted identity is denied (Alpha 1163).
+> One new test file, zero production source changes. `npm run typecheck`
+> clean (one pre-existing, unrelated failure, unchanged from the prior
+> Arc); targeted Conversation-domain run 115/115; full `npm test`
+> 11984/12215, consistent with the prior Arc's own diagnosed baseline
+> (17 pre-existing-on-`master` failures plus the same previously-confirmed
+> `core.autocrlf` worktree-checkout CRLF artifact affecting ~173 unrelated
+> early-stage files) — zero Conversation-domain regression. See
+> `docs/secure_runtime_alpha_1181_1260_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1111–1180 — Private Conversation
 > Activation and Direct Messaging Runtime Arc (complete).** Closes the
 > final gap between a durable private Conversation draft and a real,
