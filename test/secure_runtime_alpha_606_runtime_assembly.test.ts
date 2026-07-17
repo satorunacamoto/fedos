@@ -111,7 +111,17 @@ describe("Secure Runtime Alpha 606 -- Runtime Assembly (Board/Outbox Wiring, Alp
       outboxLogPath: join(dir, "outbox.jsonl"),
       deliveryEnabled: false,
     });
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"]);
+    // Secure Runtime Alpha 1263/1291 -- conversationProductionCryptoCapability()
+    // adds ONE coarse, non-secret capability-outcome accessor (Alpha
+    // 1261-1320); no persistence port, encryption handle, or Host internal
+    // is exposed by it.
+    expect(Object.keys(runtime).sort()).toEqual([
+      "boardRuntime",
+      "conversationProductionCryptoCapability",
+      "conversationRuntime",
+      "host",
+      "stop",
+    ]);
     await runtime.stop();
   });
 

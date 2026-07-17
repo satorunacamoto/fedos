@@ -182,6 +182,11 @@ export class PersistedFedosConversationCapabilityAuthority
     return record === null ? null : descriptorFromPersistedCapabilityRecord(record);
   }
 
+  /** Alpha 1000 — additive, read-only directory of every descriptor issued for one conversation, forwarded to the durable `listConversationCapabilities()`. Descriptors only; never a bearer secret. */
+  listIssuedDescriptorsForConversation(conversationId: FedosConversationId): readonly FedosConversationCapabilityDescriptor[] {
+    return this.#persistence.listConversationCapabilities(conversationId).map(descriptorFromPersistedCapabilityRecord);
+  }
+
   redeem(request: FedosConversationCapabilityRedemptionRequest, now: number): FedosConversationCapabilityRedemptionResult {
     // Step 1 — validate without mutation.
     const record = this.#persistence.getCapability(request.capabilityId);

@@ -90,9 +90,13 @@ describe("Secure Runtime Alpha 758 -- Local Runtime Ownership", () => {
     });
     // Secure Runtime Alpha 923 ADDITIVELY extended this handle with
     // `conversationRuntime()` (the private-Conversation draft runtime the
-    // Local Runtime now also owns). Still NO filesystem internal is exposed
-    // -- only the two Application-Runtime accessors and `stop()`.
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"].sort());
+    // Local Runtime now also owns). Secure Runtime Alpha 1263/1291
+    // (Alpha 1261-1320) ADDITIVELY extends it again with
+    // `conversationProductionCryptoCapability()` -- ONE coarse, non-secret
+    // capability-outcome accessor. Still NO filesystem internal is exposed.
+    expect(Object.keys(runtime).sort()).toEqual(
+      ["boardRuntime", "conversationProductionCryptoCapability", "conversationRuntime", "host", "stop"].sort(),
+    );
     await runtime.stop();
   });
 

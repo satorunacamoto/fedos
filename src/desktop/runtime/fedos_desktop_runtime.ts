@@ -122,6 +122,12 @@ import {
 } from "../../conversation/runtime/fedos_conversation_runtime.js";
 import { assembleFedosConversationRuntimeDependencies } from "../../conversation/runtime/fedos_conversation_runtime_assembly.js";
 import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import {
+  assembleFedosConversationProductionCryptoGraph,
+  type FedosConversationProductionCryptoConfig,
+  type FedosConversationProductionCryptoGraph,
+} from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
 
 // Secure Runtime Alpha 1471-1540 (Private Transport Boundary and
 // Multi-Relay Delivery Arc) -- every import/addition below this comment
@@ -171,6 +177,16 @@ export interface FedosRunningDesktopRuntime {
    * constructs an active Conversation and never sends a private message.
    */
   conversationRuntime(): FedosConversationRuntime;
+  /**
+   * Secure Runtime Alpha 1263/1291 — the closed, non-secret reason
+   * production Conversation crypto is (or is not) currently available.
+   * `"disabled"` when `config.conversationProductionCrypto` was never
+   * supplied; one of the other eight closed outcomes otherwise (Alpha
+   * 1263). Never a raw loader `Error`, never a provider message, never a
+   * secret byte. Readable even after `stop()` — a coarse, static fact
+   * about how THIS runtime started, not a live probe.
+   */
+  conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome;
   /**
    * Secure Runtime Alpha 1471–1540 — the `FedosPrivateTransport`
    * (`../../conversation/transport/fedos_private_transport.ts`) this
@@ -252,6 +268,25 @@ export async function startFedosDesktopRuntime(
     config.conversationMembershipLogPath,
     config.conversationCapabilityLogPath,
     config.conversationConstructionCoordinationLogPath,
+    // Alpha 996/1003 -- the invitation-revocation and draft-management logs.
+    config.conversationInvitationRevocationLogPath,
+    config.conversationDraftManagementLogPath,
+    // Alpha 1113/1121/1143 -- the Encryption Runtime Wiring's own logs plus
+    // the NEW Activation coordination and Payload Retention logs.
+    config.conversationEnvelopeLogPath,
+    config.conversationPayloadLogPath,
+    config.conversationEncryptionCoordinationLogPath,
+    config.conversationActivationCoordinationLogPath,
+    config.conversationPayloadRetentionLogPath,
+    // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+    config.conversationGroupGenerationLogPath,
+    config.conversationGroupDirectPathLogPath,
+    config.conversationGroupMessageLogPath,
+    config.conversationGroupFanoutDeliveryLogPath,
+    // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own logs.
+    config.conversationPrivateNostrDeliveryRequestLogPath,
+    config.conversationPrivateNostrImportRecordLogPath,
+    config.conversationPrivateNostrDeliveryObservationLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -349,6 +384,23 @@ export async function startFedosDesktopRuntime(
     conversationPersistence,
   });
 
+  // Alpha 1273/1274 -- resolve the real, WASM-backed Production Crypto
+  // Graph BEFORE Conversation Runtime assembly, so a successful
+  // resolution can supply its own real Authorities below. Never throws
+  // and never fails Runtime startup -- every internal failure mode
+  // collapses to one of the nine closed capability outcomes (Alpha 1263);
+  // Runtime startup itself never fails because production crypto could
+  // not be assembled (Alpha 1264/1275).
+  let productionCryptoCapability: FedosConversationProductionCryptoCapabilityOutcome = "disabled";
+  let productionCryptoGraph: FedosConversationProductionCryptoGraph | null = null;
+  if (config.conversationProductionCrypto !== undefined) {
+    const productionCryptoResult = await assembleFedosConversationProductionCryptoGraph(config.conversationProductionCrypto);
+    productionCryptoCapability = productionCryptoResult.outcome;
+    if (productionCryptoResult.outcome === "available") {
+      productionCryptoGraph = productionCryptoResult.graph;
+    }
+  }
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -362,10 +414,56 @@ export async function startFedosDesktopRuntime(
       membershipLogPath: config.conversationMembershipLogPath,
       capabilityLogPath: config.conversationCapabilityLogPath,
       constructionCoordinationLogPath: config.conversationConstructionCoordinationLogPath,
+      invitationRevocationLogPath: config.conversationInvitationRevocationLogPath,
+      draftManagementLogPath: config.conversationDraftManagementLogPath,
       clock: config.clock ?? defaultFedosBoardRuntimeClock,
-      creatorIdentityAuthority: config.conversationCreatorIdentityAuthority,
+      // Alpha 1273 -- a real, "available" Production Crypto Graph supplies
+      // its own real creator identity/Authorities in place of these
+      // individual fields' own existing defaults; any other outcome
+      // (including "disabled" -- no config supplied at all) leaves this
+      // exactly as every prior Arc's own default (Alpha 1275).
+      creatorIdentityAuthority: productionCryptoGraph?.creatorIdentityAuthority ?? config.conversationCreatorIdentityAuthority,
       encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
       requireResolvedCreatorIdentity: config.conversationRequireResolvedCreatorIdentity,
+      // Alpha 1113/1114 -- the Encryption Runtime Wiring's own dependencies,
+      // finally threaded through from this config (previously accepted by
+      // `FedosConversationRuntimeDependencies` but unreachable from here —
+      // see `docs/secure_runtime_alpha_1111_1180_integrated_inventory.md`
+      // §7). `nostrAuthorBindingAuthority` reuses the SAME instance already
+      // passed to `createFedosBoardRuntime()` above -- one coherent graph,
+      // never a second signing/encryption identity (Alpha 1114) -- UNLESS
+      // a real Production Crypto Graph resolved, in which case ITS OWN
+      // binding authority (sharing ITS OWN Master Seed Authority instance)
+      // is the coherent one to use instead.
+      encryptionAuthority: productionCryptoGraph?.encryptionAuthority ?? config.conversationEncryptionAuthority,
+      decryptionAuthority: productionCryptoGraph?.decryptionAuthority ?? config.conversationDecryptionAuthority,
+      identityResolver: config.conversationIdentityResolver,
+      accountIndexAuthority: productionCryptoGraph?.accountIndexAuthority ?? config.conversationAccountIndexAuthority,
+      nostrAuthorBindingAuthority: productionCryptoGraph?.nostrAuthorBindingAuthority ?? config.nostrAuthorBindingAuthority,
+      envelopeLogPath: config.conversationEnvelopeLogPath,
+      payloadLogPath: config.conversationPayloadLogPath,
+      maxPayloadByteLength: config.conversationMaxPayloadByteLength,
+      encryptionCoordinationLogPath: config.conversationEncryptionCoordinationLogPath,
+      // Alpha 1121/1143 -- the NEW Activation coordination and Payload
+      // Retention logs this Arc introduces.
+      activationCoordinationLogPath: config.conversationActivationCoordinationLogPath,
+      payloadRetentionLogPath: config.conversationPayloadRetentionLogPath,
+      // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+      groupGenerationLogPath: config.conversationGroupGenerationLogPath,
+      groupDirectPathLogPath: config.conversationGroupDirectPathLogPath,
+      groupMessageLogPath: config.conversationGroupMessageLogPath,
+      groupFanoutDeliveryLogPath: config.conversationGroupFanoutDeliveryLogPath,
+      groupParticipantLimitPolicy: config.conversationGroupParticipantLimitPolicy,
+      // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own
+      // backends. This runtime constructs no Signing Authority or
+      // Relay/Publisher of its own -- see this file's own config type header.
+      privateNostrDeliveryRequestLogPath: config.conversationPrivateNostrDeliveryRequestLogPath,
+      privateNostrImportRecordLogPath: config.conversationPrivateNostrImportRecordLogPath,
+      privateNostrDeliveryObservationLogPath: config.conversationPrivateNostrDeliveryObservationLogPath,
+      privateNostrSigningAuthority: config.conversationPrivateNostrSigningAuthority,
+      privateNostrDeliveryPublisher: config.conversationPrivateNostrDeliveryPublisher,
+      privateNostrDefaultMode: config.conversationPrivateNostrDefaultMode,
+      privateNostrDefaultRelayUrls: config.conversationPrivateNostrDefaultRelayUrls,
     }),
   );
 
@@ -420,6 +518,10 @@ export async function startFedosDesktopRuntime(
       }
       return conversationRuntimeInstance;
     },
+    /** Alpha 1263/1291 -- the closed, non-secret reason production crypto is (or is not) available. `"disabled"` when `conversationProductionCrypto` was never supplied. Readable even after `stop()`. */
+    conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome {
+      return productionCryptoCapability;
+    },
     privateTransport(): FedosPrivateTransport {
       if (stopped) {
         throw new Error("FedosRunningDesktopRuntime.privateTransport() is inaccessible after stop().");
@@ -440,6 +542,14 @@ export async function startFedosDesktopRuntime(
       }
       if (deliveryStarted) {
         await host.stopDelivery();
+      }
+      // Alpha 1277/1278 -- clear the real Master Seed Authority (where one
+      // was assembled) BEFORE the Host itself stops: no passphrase
+      // material is retained, and every subsequent encrypt/decrypt/sign
+      // attempt against it fails closed (Alpha 438's own `clear()`
+      // contract, unmodified).
+      if (productionCryptoGraph !== null) {
+        await productionCryptoGraph.masterSeedAuthority.clear();
       }
       await host.stop();
     },
