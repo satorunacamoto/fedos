@@ -41,6 +41,8 @@ import { toFedosConversationEnvelopeId } from "../envelope/fedos_conversation_en
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import type { FedosConversationIdentityResolver } from "./identity/fedos_conversation_identity_resolver.js";
 import type { FedosConversationKeyResolver } from "./identity/fedos_conversation_key_resolver.js";
+import type { FedosConversationActivationPersistence } from "../activation/fedos_conversation_activation_persistence.js";
+import { resolveFedosConversationActiveConversation } from "../activation/fedos_conversation_active_lookup.js";
 
 export interface FedosConversationDecryptMessageCommand {
   readonly conversationId: string;
@@ -69,6 +71,8 @@ export type FedosConversationDecryptionCoordinatorResult =
 
 export interface FedosConversationDecryptionCoordinatorDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;
+  /** Alpha 1116/1160 -- the ONE durable source of truth for "is this Conversation active" (see `../activation/fedos_conversation_active_lookup.ts`'s own header). */
+  readonly activationPersistence: FedosConversationActivationPersistence;
   readonly membershipAuthority: FedosConversationMembershipAuthority;
   readonly identityResolver: FedosConversationIdentityResolver;
   readonly keyResolver: FedosConversationKeyResolver;
@@ -99,14 +103,16 @@ export class FedosConversationDecryptionCoordinator {
     if (envelope === null) return { outcome: "envelope-not-found" };
     if (envelope.conversationId !== conversationId) return { outcome: "envelope-not-found" };
 
-    // Fail closed #2 — the Conversation must be "active". Reads the RAW
-    // persisted `lifecycleState` field directly — see
-    // `FedosConversationEncryptionCoordinator`'s own identical gate for the
-    // full rationale (avoids a permanently-dead-code branch without
-    // inventing any new way to construct an `"active"` record).
-    const persistedDraft = this.#deps.draftPersistence.getDraft(conversationId);
-    if (persistedDraft === null) return { outcome: "conversation-not-found" };
-    if (persistedDraft.lifecycleState !== "active") return { outcome: "conversation-not-active" };
+    // Fail closed #2 — the Conversation must be genuinely active. See
+    // `FedosConversationEncryptionCoordinator`'s own identical gate
+    // (Alpha 1111–1180) for the full rationale.
+    const activeLookup = resolveFedosConversationActiveConversation(
+      this.#deps.draftPersistence,
+      this.#deps.activationPersistence,
+      conversationId,
+    );
+    if (activeLookup.outcome === "not-found") return { outcome: "conversation-not-found" };
+    if (activeLookup.outcome === "not-active") return { outcome: "conversation-not-active" };
 
     // Fail closed #1 — resolve local identity.
     const identity = this.#deps.identityResolver.resolveLocalParticipant();

@@ -125,6 +125,21 @@ import type {
   FedosConversationInvitationRevocationResult,
   FedosConversationInvitationSummary,
 } from "../invitation/fedos_conversation_invitation_result.js";
+import type { FedosConversationActivationPersistence } from "../activation/fedos_conversation_activation_persistence.js";
+import { InMemoryFedosConversationActivationPersistence } from "../activation/in_memory_fedos_conversation_activation_persistence.js";
+import { FedosConversationDirectActivationCoordinator } from "../activation/fedos_conversation_direct_activation_coordinator.js";
+import type { FedosConversationDirectActivationResult } from "../activation/fedos_conversation_direct_activation_result.js";
+import type { FedosPayloadRetentionPersistence } from "../retention/fedos_payload_retention_persistence.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../retention/in_memory_fedos_payload_retention_persistence.js";
+import { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
+import {
+  FedosConversationDirectMessagingCoordinator,
+  type FedosConversationDirectMessageSendCommand,
+  type FedosConversationDirectMessageReadCommand,
+} from "../messaging/fedos_conversation_direct_messaging_coordinator.js";
+import type { FedosConversationDirectMessageSendResult } from "../messaging/fedos_conversation_direct_message_send_result.js";
+import type { FedosConversationDirectMessageReadResult } from "../messaging/fedos_conversation_direct_message_read_result.js";
+import type { FedosConversationDirectMessageSummary } from "../messaging/fedos_conversation_direct_message_summary.js";
 
 /**
  * The full injected dependency set — the construction coordinator's own
@@ -168,6 +183,10 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
   readonly draftManagementPersistence?: FedosConversationDraftManagementPersistence;
   /** Injected draft-management authorization (Alpha 1011). */
   readonly draftManagementAuthorizationCheck?: FedosConversationDraftManagementAuthorizationCheck;
+  /** Alpha 1121 — optional; default in-memory. The ONE durable source of truth for "is this Conversation active" (Alpha 1116/1160). */
+  readonly activationPersistence?: FedosConversationActivationPersistence;
+  /** Alpha 1143 — optional; default in-memory. Backs the retention gate `readDirectMessage()` enforces. */
+  readonly retentionPersistence?: FedosPayloadRetentionPersistence;
 };
 
 export class FedosConversationRuntime {
@@ -179,6 +198,8 @@ export class FedosConversationRuntime {
   readonly #invitationTransport: FedosConversationInvitationTransport | null;
   /** `null` when the draft-management backends were not injected — every management method then fails closed. */
   readonly #draftManager: FedosConversationDraftManager | null;
+  readonly #activationCoordinator: FedosConversationDirectActivationCoordinator;
+  readonly #directMessagingCoordinator: FedosConversationDirectMessagingCoordinator;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
@@ -189,21 +210,37 @@ export class FedosConversationRuntime {
     // this file's own header.
     const identityResolver = deps.identityResolver ?? new DelegatingFedosConversationIdentityResolver(deps.creatorIdentityAuthority);
     const accountIndexAuthority = deps.accountIndexAuthority ?? new FixedFedosConversationLocalAccountIndexAuthority();
+    const participantResolver = new MembershipFedosConversationParticipantResolver(deps.membershipAuthority);
     const keyResolver = new FedosConversationKeyResolver({
       identityResolver,
-      participantResolver: new MembershipFedosConversationParticipantResolver(deps.membershipAuthority),
+      participantResolver,
       accountIndexAuthority,
       nostrAuthorBindingAuthority: deps.nostrAuthorBindingAuthority,
     });
     const envelopePersistence = deps.envelopePersistence ?? new InMemoryFedosConversationMessageEnvelopePersistence();
     const payloadStorage = deps.payloadStorage ?? new InMemoryFedosConversationPayloadStorage();
+    const encryptionAuthority = deps.encryptionAuthority ?? new UnavailableFedosConversationEncryptionAuthority();
+    const decryptionAuthority = deps.decryptionAuthority ?? new UnavailableFedosConversationDecryptionAuthority();
+    // Alpha 1121 — the ONE durable source of truth for "is this Conversation
+    // active" (Alpha 1116/1160), shared by BOTH Coordinators below AND the
+    // new Direct Activation Coordinator (Alpha 1122) — never a second,
+    // disagreeing instance.
+    const activationPersistence = deps.activationPersistence ?? new InMemoryFedosConversationActivationPersistence();
+    // Alpha 1143 — always constructed (mirrors envelopePersistence/
+    // payloadStorage's own "safe in-memory default" discipline); an empty
+    // retention log means every payload reads "active" by default, so this
+    // never denies a read that Alpha 796's own established behavior would
+    // not already deny.
+    const retentionPersistence = deps.retentionPersistence ?? new InMemoryFedosPayloadRetentionPersistence();
+    const retentionAuthority = new FedosPayloadRetentionAuthority({ retentionPersistence, payloadStorage, clock: deps.clock });
 
     this.#encryptionCoordinator = new FedosConversationEncryptionCoordinator({
       draftPersistence: deps.draftPersistence,
+      activationPersistence,
       membershipAuthority: deps.membershipAuthority,
       identityResolver,
       keyResolver,
-      encryptionAuthority: deps.encryptionAuthority ?? new UnavailableFedosConversationEncryptionAuthority(),
+      encryptionAuthority,
       envelopePersistence,
       payloadStorage,
       coordinationPersistence: deps.encryptionCoordinationPersistence ?? new InMemoryFedosConversationEncryptionCoordinationPersistence(),
@@ -214,12 +251,47 @@ export class FedosConversationRuntime {
     });
     this.#decryptionCoordinator = new FedosConversationDecryptionCoordinator({
       draftPersistence: deps.draftPersistence,
+      activationPersistence,
       membershipAuthority: deps.membershipAuthority,
       identityResolver,
       keyResolver,
-      decryptionAuthority: deps.decryptionAuthority ?? new UnavailableFedosConversationDecryptionAuthority(),
+      decryptionAuthority,
       envelopePersistence,
       payloadStorage,
+    });
+
+    // Alpha 1122 — the Direct Activation Coordinator reuses every one of
+    // the SAME instances above (identity/participant/key resolvers,
+    // encryption/decryption Authorities, storage) — never a second,
+    // divergent graph (Alpha 1114's own "one coherent graph" rule).
+    this.#activationCoordinator = new FedosConversationDirectActivationCoordinator({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      activationPersistence,
+      identityResolver,
+      participantResolver,
+      keyResolver,
+      encryptionAuthority,
+      decryptionAuthority,
+      envelopePersistence,
+      payloadStorage,
+      retentionAuthority,
+      clock: deps.clock,
+    });
+
+    // Alpha 1126 — the direct-messaging facade delegates every crypto/
+    // Envelope/Payload decision to the SAME two Coordinators above; it
+    // owns only input validation, authorization, and the retention gate
+    // (Alpha 1136/1138/1143).
+    this.#directMessagingCoordinator = new FedosConversationDirectMessagingCoordinator({
+      draftPersistence: deps.draftPersistence,
+      activationPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      envelopePersistence,
+      retentionAuthority,
+      encryptionCoordinator: this.#encryptionCoordinator,
+      decryptionCoordinator: this.#decryptionCoordinator,
     });
 
     // Alpha 1011 — assemble the invitation transport ONLY when every frozen +
@@ -269,6 +341,40 @@ export class FedosConversationRuntime {
   /** Alpha 946/949 — decrypt an already-persisted Envelope. Same fail-closed gates as `encryptMessage()`. Never throws. */
   async decryptMessage(command: FedosConversationDecryptMessageCommand): Promise<FedosConversationDecryptionCoordinatorResult> {
     return this.#decryptionCoordinator.decrypt(command);
+  }
+
+  /**
+   * Alpha 1122 — activate a real, durable `direct` draft. Every required
+   * fact (Alpha 1117) is proven fresh on every call; never activates a
+   * `private-group` draft (Alpha 1123's own gate — always
+   * `"unsupported-mode"`). No message is ever sent by this call. Never
+   * throws.
+   */
+  async activateDirectConversation(conversationId: string): Promise<FedosConversationDirectActivationResult> {
+    return this.#activationCoordinator.activateDirectConversation(conversationId);
+  }
+
+  /**
+   * Alpha 1126/1127 — send one encrypted direct message. The caller
+   * supplies ONLY `conversationId`/`body`/`replyToEnvelopeId` — sender
+   * identity, Envelope/payload id, nonce, key material, and encryption
+   * suite are all resolved internally. Never throws.
+   */
+  async sendDirectMessage(command: FedosConversationDirectMessageSendCommand): Promise<FedosConversationDirectMessageSendResult> {
+    return this.#directMessagingCoordinator.sendDirectMessage(command);
+  }
+
+  /**
+   * Alpha 1126/1136 — authorize, enforce retention, and decrypt one
+   * already-persisted Envelope. Never throws.
+   */
+  async readDirectMessage(command: FedosConversationDirectMessageReadCommand): Promise<FedosConversationDirectMessageReadResult> {
+    return this.#directMessagingCoordinator.readDirectMessage(command);
+  }
+
+  /** Alpha 1126/1139 — safe Envelope metadata only, deterministically ordered; never decrypts. `[]` for an unknown or non-active Conversation. */
+  listDirectMessages(id: string): readonly FedosConversationDirectMessageSummary[] {
+    return this.#directMessagingCoordinator.listDirectMessages(id);
   }
 
   /** Alpha 901/915 — construct a private-group draft. Never activates, never sends a message. */

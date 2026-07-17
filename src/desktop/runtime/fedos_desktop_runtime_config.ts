@@ -57,6 +57,10 @@ import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_run
 import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/identity/fedos_nostr_author_binding_types.js";
 import type { FedosConversationCreatorIdentityAuthority } from "../../conversation/construction/fedos_conversation_creator_identity_authority.js";
 import type { FedosConversationEncryptionReadinessAuthority } from "../../conversation/readiness/fedos_conversation_encryption_readiness_authority.js";
+import type { FedosConversationEncryptionAuthority } from "../../conversation/encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority } from "../../conversation/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationIdentityResolver } from "../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationLocalAccountIndexAuthority } from "../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -153,4 +157,35 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationEncryptionReadinessAuthority?: FedosConversationEncryptionReadinessAuthority;
   /** Alpha 904/923 — optional; omitted, `false` (an anonymous-local creator may create a local draft). */
   readonly conversationRequireResolvedCreatorIdentity?: boolean;
+  /**
+   * Secure Runtime Alpha 1113 ("Runtime Encryption Configuration") —
+   * Phase A of the Alpha 1111–1180 Private Conversation Activation and
+   * Direct Messaging Runtime Arc. Threads the Alpha 949 encryption
+   * dependencies — already accepted on `FedosConversationRuntimeDependencies`
+   * but never previously reachable from this config — through to
+   * `assembleFedosConversationRuntimeDependencies()`. Omitted, the SAME
+   * fail-closed `Unavailable*` defaults apply as before (Alpha 942, Alpha
+   * 1115's own "no fallback crypto" rule): direct activation and direct
+   * messaging stay unavailable; public Board and local draft management
+   * remain entirely unaffected.
+   */
+  readonly conversationEncryptionAuthority?: FedosConversationEncryptionAuthority;
+  /** Alpha 1113 — optional; omitted, fail-closed (Alpha 942/1115). */
+  readonly conversationDecryptionAuthority?: FedosConversationDecryptionAuthority;
+  /** Alpha 1113 — optional; omitted, delegates to `conversationCreatorIdentityAuthority` (Alpha 931's own default). */
+  readonly conversationIdentityResolver?: FedosConversationIdentityResolver;
+  /** Alpha 1113 — optional; omitted, fixed `0` (Alpha 933's own default). */
+  readonly conversationAccountIndexAuthority?: FedosConversationLocalAccountIndexAuthority;
+  /** Alpha 1113 — optional append-only log for private-message Envelope metadata; omitted, in-memory. */
+  readonly conversationEnvelopeLogPath?: string;
+  /** Alpha 1113 — optional append-only log for opaque ciphertext payload bytes; omitted, in-memory. */
+  readonly conversationPayloadLogPath?: string;
+  /** Alpha 1113 — optional, only meaningful with `conversationPayloadLogPath`; omitted, `1_000_000` bytes (Alpha 949's own default). */
+  readonly conversationMaxPayloadByteLength?: number;
+  /** Alpha 1113 — optional append-only log for the encryption-coordination facts; omitted, in-memory. */
+  readonly conversationEncryptionCoordinationLogPath?: string;
+  /** Alpha 1121 — optional append-only log for the Direct Activation coordination facts; omitted, in-memory. */
+  readonly conversationActivationCoordinationLogPath?: string;
+  /** Alpha 1143 — optional append-only log for the Payload Retention decision log; omitted, in-memory. */
+  readonly conversationPayloadRetentionLogPath?: string;
 }

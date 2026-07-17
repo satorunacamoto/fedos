@@ -88,6 +88,12 @@ import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/ident
 import type { FedosConversationEnvelopeIdGenerator } from "../envelope/fedos_conversation_envelope_id.js";
 import type { FedosConversationPayloadIdGenerator } from "../payload_storage/fedos_conversation_payload_id.js";
 import type { FedosConversationEncryptionIdempotencyKeyGenerator } from "../encryption/fedos_conversation_encryption_coordinator.js";
+import type { FedosConversationActivationPersistence } from "../activation/fedos_conversation_activation_persistence.js";
+import { InMemoryFedosConversationActivationPersistence } from "../activation/in_memory_fedos_conversation_activation_persistence.js";
+import { AppendOnlyFedosConversationActivationPersistence } from "../activation/append_only_fedos_conversation_activation_persistence.js";
+import type { FedosPayloadRetentionPersistence } from "../retention/fedos_payload_retention_persistence.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../retention/in_memory_fedos_payload_retention_persistence.js";
+import { AppendOnlyFedosPayloadRetentionPersistence } from "../retention/append_only_fedos_payload_retention_persistence.js";
 
 export interface FedosConversationRuntimeAssemblyConfig {
   /** Explicit, caller-supplied append-only log path for the private-draft record; omitted, an in-memory backend is used. */
@@ -139,6 +145,10 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly payloadIdGenerator?: FedosConversationPayloadIdGenerator;
   /** Alpha 949 — optional, default secure-random. */
   readonly encryptionIdempotencyKeyGenerator?: FedosConversationEncryptionIdempotencyKeyGenerator;
+  /** Alpha 1121 — explicit append-only log path for the Direct Activation coordination facts; omitted, in-memory. */
+  readonly activationCoordinationLogPath?: string;
+  /** Alpha 1143 — explicit append-only log path for the Payload Retention decision log; omitted, in-memory. */
+  readonly payloadRetentionLogPath?: string;
 }
 
 function participantIsActiveInviter(
@@ -221,6 +231,17 @@ export function assembleFedosConversationRuntimeDependencies(
       ? new AppendOnlyFedosConversationEncryptionCoordinationPersistence(config.encryptionCoordinationLogPath)
       : new InMemoryFedosConversationEncryptionCoordinationPersistence();
 
+  // Alpha 1121/1143 — mirrors every backend construction above exactly.
+  const activationPersistence: FedosConversationActivationPersistence =
+    config.activationCoordinationLogPath !== undefined
+      ? new AppendOnlyFedosConversationActivationPersistence(config.activationCoordinationLogPath)
+      : new InMemoryFedosConversationActivationPersistence();
+
+  const retentionPersistence: FedosPayloadRetentionPersistence =
+    config.payloadRetentionLogPath !== undefined
+      ? new AppendOnlyFedosPayloadRetentionPersistence(config.payloadRetentionLogPath)
+      : new InMemoryFedosPayloadRetentionPersistence();
+
   // Alpha 996/1003 — the two NEW additive backends this Arc introduces.
   const invitationRevocationRegistry: FedosConversationInvitationRevocationRegistry =
     config.invitationRevocationLogPath !== undefined
@@ -284,5 +305,7 @@ export function assembleFedosConversationRuntimeDependencies(
     envelopeIdGenerator: config.envelopeIdGenerator,
     payloadIdGenerator: config.payloadIdGenerator,
     encryptionIdempotencyKeyGenerator: config.encryptionIdempotencyKeyGenerator,
+    activationPersistence,
+    retentionPersistence,
   };
 }

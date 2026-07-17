@@ -39,6 +39,8 @@ import { MembershipFedosConversationParticipantResolver } from "../src/conversat
 import { FixedFedosConversationLocalAccountIndexAuthority } from "../src/conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
 import { FedosConversationKeyResolver } from "../src/conversation/encryption/identity/fedos_conversation_key_resolver.js";
 import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
+import { InMemoryFedosConversationActivationPersistence } from "../src/conversation/activation/in_memory_fedos_conversation_activation_persistence.js";
+import { fedosConversationActivationId } from "../src/conversation/activation/fedos_persisted_conversation_activation_v1.js";
 import { FedosSigningAuthorityNostrAuthorBinding } from "../src/board/runtime/identity/fedos_nostr_author_binding_authority.js";
 import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationEncryptionAuthority, FedosConversationEncryptionRequest, FedosConversationEncryptionResult } from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
@@ -77,6 +79,25 @@ function activeDraftRecord(id: string, creator: FedosConversationParticipantRefe
     creatorIdentityId: creator.identityId,
     createdAt: NOW,
   };
+}
+
+/**
+ * Alpha 1111–1180 -- this suite's own `activeDraftRecord()` sets
+ * `lifecycleState: "active"` on the hand-built draft record, but the
+ * Coordinators now consult a SEPARATE Activation fact instead (see
+ * `../src/conversation/activation/fedos_conversation_active_lookup.ts`'s
+ * own header) -- the draft record's `lifecycleState` field is no longer
+ * consulted at all. This helper records the matching `"completed"`
+ * Activation fact so this suite's existing "active" fixtures keep
+ * reaching past the gate exactly as before.
+ */
+function activatedPersistence(conversationId: string, active: boolean): InMemoryFedosConversationActivationPersistence {
+  const persistence = new InMemoryFedosConversationActivationPersistence();
+  if (active) {
+    const activationId = fedosConversationActivationId(conversationId);
+    persistence.putActivationFact({ schemaVersion: 1, activationId, conversationId, phase: "completed", startedAt: NOW, updatedAt: NOW });
+  }
+  return persistence;
 }
 
 class ScriptedEncryptionAuthority implements FedosConversationEncryptionAuthority {
@@ -142,6 +163,7 @@ function buildEncryptionFixture(opts: {
   });
   const coordinator = new FedosConversationEncryptionCoordinator({
     draftPersistence,
+    activationPersistence: activatedPersistence(CONVERSATION_ID, !opts.draftInactive),
     membershipAuthority,
     identityResolver,
     keyResolver,
@@ -316,6 +338,7 @@ function buildDecryptionFixture(opts: {
   });
   const coordinator = new FedosConversationDecryptionCoordinator({
     draftPersistence,
+    activationPersistence: activatedPersistence(CONVERSATION_ID, !opts.draftInactive),
     membershipAuthority,
     identityResolver,
     keyResolver,

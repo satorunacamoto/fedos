@@ -28,6 +28,8 @@ import { FedosConversationKeyResolver } from "../src/conversation/encryption/ide
 import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
 import { UnavailableFedosConversationEncryptionAuthority } from "../src/conversation/encryption/fedos_unavailable_conversation_encryption_authority.js";
 import { UnavailableFedosConversationDecryptionAuthority } from "../src/conversation/encryption/fedos_unavailable_conversation_decryption_authority.js";
+import { InMemoryFedosConversationActivationPersistence } from "../src/conversation/activation/in_memory_fedos_conversation_activation_persistence.js";
+import { fedosConversationActivationId } from "../src/conversation/activation/fedos_persisted_conversation_activation_v1.js";
 import type { FedosConversationEncryptionAuthority, FedosConversationEncryptionRequest, FedosConversationEncryptionResult } from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
 import type { FedosConversationDecryptionAuthority, FedosConversationDecryptionRequest, FedosConversationDecryptionResult } from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
 import type { FedosPersistedConversationDraftRecordV1 } from "../src/conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
@@ -89,9 +91,18 @@ function fixedIdGenerators(envelopeId: string, payloadId: string, idempotencyKey
   };
 }
 
+/** Alpha 1111–1180 -- see `secure_runtime_alpha_931_990_failure_matrix.test.ts`'s own identical helper for why this replaces the draft record's own (now-ignored) `lifecycleState` field. */
+function activatedPersistence(conversationId: string): InMemoryFedosConversationActivationPersistence {
+  const persistence = new InMemoryFedosConversationActivationPersistence();
+  const activationId = fedosConversationActivationId(conversationId);
+  persistence.putActivationFact({ schemaVersion: 1, activationId, conversationId, phase: "completed", startedAt: NOW, updatedAt: NOW });
+  return persistence;
+}
+
 function buildFixture(overrides: { encryptionAuthority?: FedosConversationEncryptionAuthority; decryptionAuthority?: FedosConversationDecryptionAuthority } = {}) {
   const draftPersistence = new InMemoryFedosConversationDraftPersistence();
   draftPersistence.putDraft(activeDraftRecord(CONVERSATION_ID));
+  const activationPersistence = activatedPersistence(CONVERSATION_ID);
   const membershipAuthority = new InMemoryFedosConversationMembershipAuthority();
   membershipAuthority.admit(CONVERSATION_ID, ALICE, "owner", NOW);
   membershipAuthority.admit(CONVERSATION_ID, BOB, "member", NOW);
@@ -111,6 +122,7 @@ function buildFixture(overrides: { encryptionAuthority?: FedosConversationEncryp
 
   const encryptionCoordinator = new FedosConversationEncryptionCoordinator({
     draftPersistence,
+    activationPersistence,
     membershipAuthority,
     identityResolver,
     keyResolver,
@@ -123,6 +135,7 @@ function buildFixture(overrides: { encryptionAuthority?: FedosConversationEncryp
   });
   const decryptionCoordinator = new FedosConversationDecryptionCoordinator({
     draftPersistence,
+    activationPersistence,
     membershipAuthority,
     identityResolver,
     keyResolver,

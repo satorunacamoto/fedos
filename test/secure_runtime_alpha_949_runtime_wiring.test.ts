@@ -9,11 +9,24 @@
  * over a REAL private-group draft this repository's own real construction
  * pipeline can actually build (still `"draft"`, never `"active"` --
  * `encryptMessage()` on it is expected, honestly, to fail closed).
+ *
+ * Secure Runtime Alpha 1111–1180 -- test 4 below originally hand-wrote
+ * `lifecycleState: "active"` directly onto a persisted draft record to
+ * prove the gate's wiring was real, not merely type-level, because
+ * nothing in this repository could construct genuine activation yet. That
+ * bypass is now genuinely obsolete: the draft record's own
+ * `lifecycleState` field is NEVER consulted for this gate anymore (Alpha
+ * 1116) -- `resolveFedosConversationActiveConversation()`
+ * (`../src/conversation/activation/fedos_conversation_active_lookup.ts`)
+ * consults a SEPARATE, durable Activation fact instead. Updated to prove
+ * the identical property (the wiring is real, not merely type-level)
+ * through the NEW mechanism.
  */
 import { describe, it, expect } from "vitest";
 import { createFedosConversationRuntime } from "../src/conversation/runtime/fedos_conversation_runtime.js";
 import { assembleFedosConversationRuntimeDependencies } from "../src/conversation/runtime/fedos_conversation_runtime_assembly.js";
 import type { FedosPersistedConversationDraftRecordV1 } from "../src/conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
+import { fedosConversationActivationId } from "../src/conversation/activation/fedos_persisted_conversation_activation_v1.js";
 
 const clock = () => 1_700_005_000;
 
@@ -49,38 +62,48 @@ describe("Alpha 949 -- FedosConversationRuntime.encryptMessage()/decryptMessage(
     expect(result).toEqual({ outcome: "envelope-not-found" });
   });
 
-  it("4. a hand-built ACTIVE fixture injected directly into the SAME draftPersistence the runtime already holds is reachable through encryptMessage() -- confirms the wiring is real, not merely type-level", async () => {
+  it("4. a hand-built ACTIVE fixture (draft record + completed Activation fact) injected directly into the SAME backends the runtime already holds is reachable through encryptMessage() -- confirms the wiring is real, not merely type-level", async () => {
     const deps = assembleFedosConversationRuntimeDependencies({ clock });
     const runtime = createFedosConversationRuntime(deps);
 
-    const activeRecord: FedosPersistedConversationDraftRecordV1 = {
+    const draftRecord: FedosPersistedConversationDraftRecordV1 = {
       schemaVersion: 1,
       id: "private-draft::direct::alpha-949-active",
       mode: "direct",
-      lifecycleState: "active",
+      lifecycleState: "draft",
       policyReference: "direct-draft-v1",
       creatorAuthority: "fedos",
       creatorPublicIdentifier: "anonymous-local",
       creatorIdentityId: null,
       createdAt: 1_700_005_000,
     };
-    // Writes directly into the SAME `FedosConversationDraftPersistence`
-    // instance `deps` (and therefore the Runtime built over it) already
-    // holds -- the dumb, unvalidated port `assembleFedosConversationRuntimeDependencies()`
+    // Writes directly into the SAME `FedosConversationDraftPersistence` AND
+    // `FedosConversationActivationPersistence` instances `deps` (and
+    // therefore the Runtime built over it) already holds -- both dumb,
+    // unvalidated ports `assembleFedosConversationRuntimeDependencies()`
     // itself constructs. No new constructor parameter is added anywhere.
-    deps.draftPersistence.putDraft(activeRecord);
+    deps.draftPersistence.putDraft(draftRecord);
+    const activationId = fedosConversationActivationId(draftRecord.id);
+    deps.activationPersistence!.putActivationFact({
+      schemaVersion: 1,
+      activationId,
+      conversationId: draftRecord.id,
+      phase: "completed",
+      startedAt: 1_700_005_000,
+      updatedAt: 1_700_005_000,
+    });
 
     const result = await runtime.encryptMessage({
-      conversationId: activeRecord.id,
+      conversationId: draftRecord.id,
       plaintext: new TextEncoder().encode("hi"),
       suite: "ChaCha20Poly1305",
       replyToEnvelopeId: null,
     });
     // No Membership exists for any local participant on this hand-built
-    // Conversation, so this reaches PAST the lifecycle gate and fails
+    // Conversation, so this reaches PAST the activation gate and fails
     // closed on the NEXT real check -- proving `encryptMessage()` truly
-    // reached `lifecycleState === "active"` and moved on to identity/
-    // Membership resolution, not that the lifecycle gate was bypassed.
+    // reached "active" and moved on to identity/Membership resolution, not
+    // that the activation gate was bypassed.
     expect(result).toEqual({ outcome: "not-member" });
   });
 });

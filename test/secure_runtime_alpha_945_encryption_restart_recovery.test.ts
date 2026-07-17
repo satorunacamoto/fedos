@@ -26,6 +26,8 @@ import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/co
 import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
 import { AppendOnlyFedosConversationEncryptionCoordinationPersistence } from "../src/conversation/encryption/coordination/append_only_fedos_conversation_encryption_coordination_persistence.js";
 import { fedosConversationEncryptionCoordinationId } from "../src/conversation/encryption/coordination/fedos_persisted_conversation_encryption_coordination_v1.js";
+import { AppendOnlyFedosConversationActivationPersistence } from "../src/conversation/activation/append_only_fedos_conversation_activation_persistence.js";
+import { fedosConversationActivationId } from "../src/conversation/activation/fedos_persisted_conversation_activation_v1.js";
 import { DelegatingFedosConversationIdentityResolver } from "../src/conversation/encryption/identity/fedos_conversation_identity_resolver.js";
 import { MembershipFedosConversationParticipantResolver } from "../src/conversation/encryption/identity/fedos_conversation_participant_resolver.js";
 import { FixedFedosConversationLocalAccountIndexAuthority } from "../src/conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
@@ -61,7 +63,15 @@ function tempPaths() {
     envelopeLogPath: join(dir, "envelope.log"),
     payloadLogPath: join(dir, "payload.log"),
     coordinationLogPath: join(dir, "coordination.log"),
+    activationLogPath: join(dir, "activation.log"),
   };
+}
+
+/** Alpha 1111–1180 -- see `secure_runtime_alpha_931_990_failure_matrix.test.ts`'s own identical helper for why this replaces the draft record's own (now-ignored) `lifecycleState` field. */
+function setupActivatedConversation(paths: ReturnType<typeof tempPaths>): void {
+  const activationPersistence = new AppendOnlyFedosConversationActivationPersistence(paths.activationLogPath);
+  const activationId = fedosConversationActivationId(CONVERSATION_ID);
+  activationPersistence.putActivationFact({ schemaVersion: 1, activationId, conversationId: CONVERSATION_ID, phase: "completed", startedAt: NOW, updatedAt: NOW });
 }
 
 function activeDraftRecord(): FedosPersistedConversationDraftRecordV1 {
@@ -93,8 +103,10 @@ function buildCoordinatorOverFiles(paths: ReturnType<typeof tempPaths>, encrypti
     participantResolver: new MembershipFedosConversationParticipantResolver(membershipAuthority),
     accountIndexAuthority: new FixedFedosConversationLocalAccountIndexAuthority(0),
   });
+  const activationPersistence = new AppendOnlyFedosConversationActivationPersistence(paths.activationLogPath);
   const coordinator = new FedosConversationEncryptionCoordinator({
     draftPersistence,
+    activationPersistence,
     membershipAuthority,
     identityResolver,
     keyResolver,
@@ -116,6 +128,7 @@ describe("Alpha 945 -- restart recovery, full happy-path attempt completed befor
 
     const setupDraft = new AppendOnlyFedosConversationDraftPersistence(paths.draftLogPath);
     setupDraft.putDraft(activeDraftRecord());
+    setupActivatedConversation(paths);
     const setupMembership = new PersistedFedosConversationMembershipAuthority(
       new AppendOnlyFedosConversationMembershipPersistence(paths.membershipLogPath),
     );
@@ -158,6 +171,7 @@ describe("Alpha 945 -- restart recovery, crash simulated BETWEEN payload-persist
     const paths = tempPaths();
     const setupDraft = new AppendOnlyFedosConversationDraftPersistence(paths.draftLogPath);
     setupDraft.putDraft(activeDraftRecord());
+    setupActivatedConversation(paths);
     const setupMembership = new PersistedFedosConversationMembershipAuthority(
       new AppendOnlyFedosConversationMembershipPersistence(paths.membershipLogPath),
     );
@@ -231,6 +245,7 @@ describe("Alpha 945 -- restart recovery, crash simulated at 'prepared' only (not
     const paths = tempPaths();
     const setupDraft = new AppendOnlyFedosConversationDraftPersistence(paths.draftLogPath);
     setupDraft.putDraft(activeDraftRecord());
+    setupActivatedConversation(paths);
     const setupMembership = new PersistedFedosConversationMembershipAuthority(
       new AppendOnlyFedosConversationMembershipPersistence(paths.membershipLogPath),
     );

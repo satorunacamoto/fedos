@@ -100,6 +100,8 @@ import {
   type FedosPersistedConversationEncryptionCoordinationV1,
 } from "./coordination/fedos_persisted_conversation_encryption_coordination_v1.js";
 import type { FedosConversationEncryptionCoordinationPersistence } from "./coordination/fedos_conversation_encryption_coordination_persistence.js";
+import type { FedosConversationActivationPersistence } from "../activation/fedos_conversation_activation_persistence.js";
+import { resolveFedosConversationActiveConversation } from "../activation/fedos_conversation_active_lookup.js";
 
 /** Injected — mints the opaque idempotency key a fresh (non-recovery) call uses. Mirrors `FedosConversationConstructionIdGenerator`'s own shape (Alpha 908). */
 export interface FedosConversationEncryptionIdempotencyKeyGenerator {
@@ -143,6 +145,8 @@ export type FedosConversationEncryptionCoordinatorResult =
 
 export interface FedosConversationEncryptionCoordinatorDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;
+  /** Alpha 1116/1160 -- the ONE durable source of truth for "is this Conversation active" (see `../activation/fedos_conversation_active_lookup.ts`'s own header). */
+  readonly activationPersistence: FedosConversationActivationPersistence;
   readonly membershipAuthority: FedosConversationMembershipAuthority;
   readonly identityResolver: FedosConversationIdentityResolver;
   readonly keyResolver: FedosConversationKeyResolver;
@@ -183,24 +187,23 @@ export class FedosConversationEncryptionCoordinator {
 
     const conversationId = command.conversationId as FedosConversationId;
 
-    // Fail closed #2 — load the Conversation and require lifecycleState === "active".
-    // Reads the RAW persisted `lifecycleState` field directly, never through
-    // `validateFedosConversationDraftRecord`/`deserializeFedosConversationDraftRecord`
-    // (Alpha 895, frozen, statically rejects every lifecycle value except
-    // `"draft"`) — this gate's own only concern is the lifecycle string
-    // itself; routing it through the full domain validator would make this
-    // branch permanently DEAD CODE (a validator rejection always collapses
-    // to `"conversation-not-found"` before the lifecycle check ever runs),
-    // which would silently misreport "not-active" as "not-found" the
-    // instant a future Arc's activation path legitimately persists an
-    // `"active"` record. This does NOT invent any way to CONSTRUCT an
-    // `"active"` record — `FedosConversationDraftPersistence` is a dumb
-    // port with no validation of its own (this Arc's own "no database
-    // vocabulary" discipline), so nothing about this read makes `"active"`
-    // reachable that was not already reachable at the persistence layer.
-    const persistedDraft = this.#deps.draftPersistence.getDraft(conversationId);
-    if (persistedDraft === null) return { outcome: "conversation-not-found" };
-    if (persistedDraft.lifecycleState !== "active") return { outcome: "conversation-not-active" };
+    // Fail closed #2 — the Conversation must be genuinely active. Alpha
+    // 1111–1180 closes what this gate's own prior header documented as
+    // permanently dead code: `resolveFedosConversationActiveConversation()`
+    // (`../activation/fedos_conversation_active_lookup.ts`) consults the
+    // NEW, separate, durable Activation fact
+    // (`FedosConversationDirectActivationCoordinator`, Alpha 1122) rather
+    // than the draft record's own `lifecycleState` field, which stays
+    // permanently `"draft"` by design (Alpha 1116's own "do not silently
+    // rewrite persisted V1 records" instruction) and is never consulted
+    // here.
+    const activeLookup = resolveFedosConversationActiveConversation(
+      this.#deps.draftPersistence,
+      this.#deps.activationPersistence,
+      conversationId,
+    );
+    if (activeLookup.outcome === "not-found") return { outcome: "conversation-not-found" };
+    if (activeLookup.outcome === "not-active") return { outcome: "conversation-not-active" };
 
     // Fail closed #1 — resolve local identity before any durable write.
     const identity = this.#deps.identityResolver.resolveLocalParticipant();

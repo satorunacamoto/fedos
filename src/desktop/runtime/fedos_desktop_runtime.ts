@@ -200,6 +200,13 @@ export async function startFedosDesktopRuntime(
     // Alpha 996/1003 -- the invitation-revocation and draft-management logs.
     config.conversationInvitationRevocationLogPath,
     config.conversationDraftManagementLogPath,
+    // Alpha 1113/1121/1143 -- the Encryption Runtime Wiring's own logs plus
+    // the NEW Activation coordination and Payload Retention logs.
+    config.conversationEnvelopeLogPath,
+    config.conversationPayloadLogPath,
+    config.conversationEncryptionCoordinationLogPath,
+    config.conversationActivationCoordinationLogPath,
+    config.conversationPayloadRetentionLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -287,6 +294,26 @@ export async function startFedosDesktopRuntime(
       creatorIdentityAuthority: config.conversationCreatorIdentityAuthority,
       encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
       requireResolvedCreatorIdentity: config.conversationRequireResolvedCreatorIdentity,
+      // Alpha 1113/1114 -- the Encryption Runtime Wiring's own dependencies,
+      // finally threaded through from this config (previously accepted by
+      // `FedosConversationRuntimeDependencies` but unreachable from here —
+      // see `docs/secure_runtime_alpha_1111_1180_integrated_inventory.md`
+      // §7). `nostrAuthorBindingAuthority` reuses the SAME instance already
+      // passed to `createFedosBoardRuntime()` above -- one coherent graph,
+      // never a second signing/encryption identity (Alpha 1114).
+      encryptionAuthority: config.conversationEncryptionAuthority,
+      decryptionAuthority: config.conversationDecryptionAuthority,
+      identityResolver: config.conversationIdentityResolver,
+      accountIndexAuthority: config.conversationAccountIndexAuthority,
+      nostrAuthorBindingAuthority: config.nostrAuthorBindingAuthority,
+      envelopeLogPath: config.conversationEnvelopeLogPath,
+      payloadLogPath: config.conversationPayloadLogPath,
+      maxPayloadByteLength: config.conversationMaxPayloadByteLength,
+      encryptionCoordinationLogPath: config.conversationEncryptionCoordinationLogPath,
+      // Alpha 1121/1143 -- the NEW Activation coordination and Payload
+      // Retention logs this Arc introduces.
+      activationCoordinationLogPath: config.conversationActivationCoordinationLogPath,
+      payloadRetentionLogPath: config.conversationPayloadRetentionLogPath,
     }),
   );
 
