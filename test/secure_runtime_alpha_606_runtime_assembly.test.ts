@@ -114,12 +114,17 @@ describe("Secure Runtime Alpha 606 -- Runtime Assembly (Board/Outbox Wiring, Alp
     // Secure Runtime Alpha 1263/1291 -- conversationProductionCryptoCapability()
     // adds ONE coarse, non-secret capability-outcome accessor (Alpha
     // 1261-1320); no persistence port, encryption handle, or Host internal
-    // is exposed by it.
+    // is exposed by it. Secure Runtime Alpha 1471-1540's own `privateTransport()`
+    // accessor is ALSO present here (`privateTransportEnabled` was not
+    // supplied above, so it throws "not enabled" when called, but the key
+    // itself is unconditionally exposed) -- reconciled onto this same
+    // Alpha 1263/1291 assertion during the Alpha 1611-1690 integration merge.
     expect(Object.keys(runtime).sort()).toEqual([
       "boardRuntime",
       "conversationProductionCryptoCapability",
       "conversationRuntime",
       "host",
+      "privateTransport",
       "stop",
     ]);
     await runtime.stop();

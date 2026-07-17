@@ -56,9 +56,9 @@ describe("Secure Runtime Alpha 1471-1540 -- Private Transport Structural Guards"
     );
   });
 
-  it("5. the wire-packaging event builder hard-fixes kind to 1 -- no new Nostr kind is invented", () => {
-    expect(eventSource).toMatch(/kind:\s*1,/);
-    expect(eventSource).not.toMatch(/kind:\s*(?!1\b)\d+/);
+  it("5. the wire-packaging event builder hard-fixes kind to the shared FedOS proprietary kind (Alpha 1615's own Kind-1 Closure -- no new Nostr kind is invented, and kind 1 is never used for private ciphertext)", () => {
+    expect(eventSource).toMatch(/kind:\s*FEDOS_PRIVATE_NOSTR_DELIVERY_KIND,/);
+    expect(eventSource).not.toMatch(/kind:\s*1,/);
   });
 
   it("6. no import anywhere under the new transport module or its runtime wiring references a Tor/onion/ActivityPub/AT-Protocol module (doc-comment mentions of these as explicit EXCLUSIONS are expected and legitimate -- see e.g. this file's own header)", () => {

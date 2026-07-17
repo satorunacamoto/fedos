@@ -8,6 +8,52 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1611–1690 — Nostr Private Wire
+> Standardization and Transport Reconciliation Arc (honest partial —
+> Phase A/B safety closure complete, Phase C+ deferred).** Reconciled
+> two prerequisite branches that had diverged since Alpha 1051–1110
+> (`arc/nostr-private-direct-pairwise-fanout-delivery`, tip `71c938b`,
+> merged into this integration branch — three mechanical conflicts, full
+> detail in `docs/secure_runtime_alpha_1611_1690_phase_a_reconciliation.md`).
+> **Closed the kind-1 hole** (Alpha 1612/1615): `FedosPrivateTransport`'s
+> own wire event builder (`fedos_conversation_transport_event.ts`)
+> previously hard-fixed `kind: 1` for private ciphertext — closed by a
+> failing-regression-test-first fix, now hard-fixed to the SAME disclosed
+> `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND` (`24700`) the `privateNostrDelivery()`
+> facade (Alpha 1391–1470) already used; public Board `kind: 1` behavior
+> is byte-for-byte unchanged. Froze the `FedosPrivateWireAdapter`
+> boundary (Alpha 1616 — Transport owns Relay/mailbox/multi-Relay/retry/
+> dedup, unchanged; a Wire Adapter owns event shape/kind/tags/unwrap) with
+> two real implementations: `FedosPrivateV1WireAdapter` (thin wrapper
+> around the existing, now kind-1615-closed, proprietary wire functions)
+> and `NostrNip17V1WireAdapter` (`src/conversation/delivery/nostr/nip17/`,
+> real module, honestly `isAvailable() === false` today — NOT because
+> normative material is missing, see below, but because Rumor/Seal/
+> Gift-Wrap construction itself is real, deferred, new protocol work).
+> Added the closed `"fedos-private-v1" | "nostr-nip17-v1" | "unsupported"`
+> route vocabulary (Alpha 1613) with one fixed, never file-probed
+> default. **Fetched and checked in real, byte-verbatim NIP-17/NIP-44/
+> NIP-59 text** (Alpha 1617 — `docs/normative/nostr-protocol-nips/`,
+> pinned to `nostr-protocol/nips@bdfa7e62ef87fcfcb992b1a27aee49d36b0b4f91`,
+> fetched directly rather than through any summarizing tool), resolving
+> every prior Arc's own "zero normative material" finding and confirming
+> directly from source (never guessed) that kind 14/15/13/1059/21059/10050
+> are Chat Message/File Message/Seal/Gift Wrap/Ephemeral Gift Wrap/DM
+> relay list respectively. Confirmed, by actually running `cargo test` in
+> this exact worktree (531 passed / 1 pre-existing unrelated failure),
+> that `packages/fedos-core-rust/src/crypto/`'s own existing 5,463-line
+> NIP-44 v2 implementation already matches the normative pipeline exactly
+> (Alpha 1618) — untouched by this Arc. **Deliberately deferred, not
+> blocked**: Phase C (real Rumor/Seal/Gift-Wrap construction) and every
+> phase after it, plus the NIP-44 narrow-WASM-export boundary (Alpha
+> 1619–1621) — genuine new security-sensitive protocol work, scoped to
+> a recommended next Arc rather than rushed inside this one. See
+> `docs/secure_runtime_alpha_1611_1690_phase_a_reconciliation.md`,
+> `_phase_b_normative_source_gate.md`, `_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
 > and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
 > crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
