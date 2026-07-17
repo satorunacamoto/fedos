@@ -62,6 +62,23 @@ import {
   FedosSecureRandomCapabilitySecretGenerator,
 } from "./fedos_conversation_capability_generators.js";
 import type { FedosConversationRuntimeDependencies } from "./fedos_conversation_runtime.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import { InMemoryFedosConversationPayloadStorage } from "../payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../payload_storage/append_only_fedos_conversation_payload_storage.js";
+import type { FedosConversationEncryptionCoordinationPersistence } from "../encryption/coordination/fedos_conversation_encryption_coordination_persistence.js";
+import { InMemoryFedosConversationEncryptionCoordinationPersistence } from "../encryption/coordination/in_memory_fedos_conversation_encryption_coordination_persistence.js";
+import { AppendOnlyFedosConversationEncryptionCoordinationPersistence } from "../encryption/coordination/append_only_fedos_conversation_encryption_coordination_persistence.js";
+import type { FedosConversationEncryptionAuthority } from "../encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority } from "../encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationLocalAccountIndexAuthority } from "../encryption/identity/fedos_conversation_local_account_index_authority.js";
+import type { FedosNostrAuthorBindingAuthority } from "../../board/runtime/identity/fedos_nostr_author_binding_types.js";
+import type { FedosConversationEnvelopeIdGenerator } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationPayloadIdGenerator } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationEncryptionIdempotencyKeyGenerator } from "../encryption/fedos_conversation_encryption_coordinator.js";
 
 export interface FedosConversationRuntimeAssemblyConfig {
   /** Explicit, caller-supplied append-only log path for the private-draft record; omitted, an in-memory backend is used. */
@@ -72,6 +89,14 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly capabilityLogPath?: string;
   /** Explicit append-only log path for the construction-coordination facts; omitted, in-memory. */
   readonly constructionCoordinationLogPath?: string;
+  /** Alpha 949 — explicit append-only log path for private-message Envelope metadata; omitted, in-memory. */
+  readonly envelopeLogPath?: string;
+  /** Alpha 949 — explicit append-only log path for opaque ciphertext payload bytes; omitted, in-memory. */
+  readonly payloadLogPath?: string;
+  /** Alpha 949 — optional, only meaningful with `payloadLogPath`; default `1_000_000` bytes, matching this codebase's own established `AppendOnlyFedosConversationPayloadStorage` convention (`test/secure_runtime_alpha_809_append_only_payload_storage.test.ts`). */
+  readonly maxPayloadByteLength?: number;
+  /** Alpha 949 — explicit append-only log path for the encryption-coordination facts; omitted, in-memory. */
+  readonly encryptionCoordinationLogPath?: string;
   readonly clock: FedosBoardRuntimeClock;
   /** Optional — default anonymous-local (Alpha 904). */
   readonly creatorIdentityAuthority?: FedosConversationCreatorIdentityAuthority;
@@ -85,6 +110,22 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly capabilitySecretGenerator?: FedosConversationCapabilitySecretGenerator;
   /** Optional — default `false` (Alpha 904). */
   readonly requireResolvedCreatorIdentity?: boolean;
+  /** Alpha 949 — optional, default `UnavailableFedosConversationEncryptionAuthority` (Alpha 942). */
+  readonly encryptionAuthority?: FedosConversationEncryptionAuthority;
+  /** Alpha 949 — optional, default `UnavailableFedosConversationDecryptionAuthority` (Alpha 942). */
+  readonly decryptionAuthority?: FedosConversationDecryptionAuthority;
+  /** Alpha 949 — optional, default delegates to `creatorIdentityAuthority` (Alpha 931). */
+  readonly identityResolver?: FedosConversationIdentityResolver;
+  /** Alpha 949 — optional, default fixed `0` (Alpha 933). */
+  readonly accountIndexAuthority?: FedosConversationLocalAccountIndexAuthority;
+  /** Alpha 949 — optional; omitted, a `"nostr"`-authority local identity fails closed (Alpha 935). */
+  readonly nostrAuthorBindingAuthority?: FedosNostrAuthorBindingAuthority;
+  /** Alpha 949 — optional, default secure-random. */
+  readonly envelopeIdGenerator?: FedosConversationEnvelopeIdGenerator;
+  /** Alpha 949 — optional, default secure-random. */
+  readonly payloadIdGenerator?: FedosConversationPayloadIdGenerator;
+  /** Alpha 949 — optional, default secure-random. */
+  readonly encryptionIdempotencyKeyGenerator?: FedosConversationEncryptionIdempotencyKeyGenerator;
 }
 
 function participantIsActiveInviter(
@@ -146,6 +187,24 @@ export function assembleFedosConversationRuntimeDependencies(
           membershipAuthority,
         });
 
+  // Alpha 949 — the Encryption Runtime Wiring's own additive backends,
+  // append-only when a log path is supplied, in-memory otherwise; mirrors
+  // every backend construction above exactly.
+  const envelopePersistence: FedosConversationMessageEnvelopePersistence =
+    config.envelopeLogPath !== undefined
+      ? new AppendOnlyFedosConversationMessageEnvelopePersistence(config.envelopeLogPath)
+      : new InMemoryFedosConversationMessageEnvelopePersistence();
+
+  const payloadStorage: FedosConversationPayloadStorage =
+    config.payloadLogPath !== undefined
+      ? new AppendOnlyFedosConversationPayloadStorage(config.payloadLogPath, config.maxPayloadByteLength ?? 1_000_000)
+      : new InMemoryFedosConversationPayloadStorage();
+
+  const encryptionCoordinationPersistence: FedosConversationEncryptionCoordinationPersistence =
+    config.encryptionCoordinationLogPath !== undefined
+      ? new AppendOnlyFedosConversationEncryptionCoordinationPersistence(config.encryptionCoordinationLogPath)
+      : new InMemoryFedosConversationEncryptionCoordinationPersistence();
+
   return {
     draftPersistence,
     coordinationPersistence,
@@ -157,5 +216,16 @@ export function assembleFedosConversationRuntimeDependencies(
     idGenerator: config.constructionIdGenerator ?? new FedosSecureRandomConstructionIdGenerator(),
     clock: config.clock,
     requireResolvedCreatorIdentity: config.requireResolvedCreatorIdentity,
+    encryptionAuthority: config.encryptionAuthority,
+    decryptionAuthority: config.decryptionAuthority,
+    envelopePersistence,
+    payloadStorage,
+    encryptionCoordinationPersistence,
+    identityResolver: config.identityResolver,
+    accountIndexAuthority: config.accountIndexAuthority,
+    nostrAuthorBindingAuthority: config.nostrAuthorBindingAuthority,
+    envelopeIdGenerator: config.envelopeIdGenerator,
+    payloadIdGenerator: config.payloadIdGenerator,
+    encryptionIdempotencyKeyGenerator: config.encryptionIdempotencyKeyGenerator,
   };
 }
