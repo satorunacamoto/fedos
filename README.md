@@ -8,6 +8,59 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1921–1980 — Group Conversation Archive
+> Integration and Cross-Branch Recovery Arc (complete).** Extends the
+> Alpha 1541–1610/1691–1760 Archive Foundation/Runtime additively to
+> cover Group Conversations, resolving the exact blocker the prior Arc's
+> own status (below) named: this branch's own prerequisite merges
+> (`03ac16e`) brought in the real Group Runtime lineage, and this Arc
+> adds the ONE new optional `group?` bundle section (same
+> `schemaVersion: 1`, no second schema branch) carrying every
+> Generation (exhaustive), every current Path fact, the current record
+> per Group Message/Fanout Delivery, and one full nested bundle per
+> child Direct Conversation a Group's own paths reference — deduplicated
+> by conversation id. A real, load-bearing correction was found while
+> wiring the Collector's own group-detection signal (documented in full
+> in `docs/secure_runtime_alpha_1921_1980_completion_declaration.md`
+> §1): no real Group or Direct Conversation is ever written into
+> `FedosConversationPersistence` by any production code path in this
+> codebase (that port is Public-Board-only, Alpha 748) — a pre-existing
+> gap in the Archive Foundation/Runtime this Arc does not introduce and
+> does not redesign; the Group Section's own population signal was
+> built instead on the real, authoritative Group Generation persistence,
+> entirely decoupled from that gap. Export/Preflight/Restore/Duplicate-
+> Detection all extended additively, reusing every existing Group
+> equality/validator helper (adding three new deep validators —
+> `validateFedosGroupDirectPathRecord`/`validateFedosGroupMessageRecord`/
+> `validateFedosGroupFanoutDeliveryRecord` — mirroring Generation's own
+> existing one, since Path/Message/Fanout Delivery had none before this
+> Arc). The REAL Application Round Trip acceptance test passes: a real
+> `startFedosDesktopRuntime()` source Runtime creates a Private Group,
+> admits two real-keyed recipients, sends, removes one member, sends
+> again, exports; a fully independent destination Runtime inspects,
+> preflights, restores, stops, and restarts as a genuinely fresh
+> instance — 3 generations survive exactly, the removed member is
+> excluded from the later generation, canonical Group Message order and
+> the reply reference are exact, an authorized party decrypts the
+> restored ciphertext back to the exact original plaintext, a second
+> restore reports fully `already-present` (no duplicate fanout facts),
+> no transport/delivery was ever configured (no network side effect is
+> even possible), and one genuinely new Group Message sent after restore
+> is neither duplicated nor replayed. Full corruption/security matrix
+> (missing child conversation, deep-invalid records, tampered manifest/
+> ciphertext, two-Group isolation, no-plaintext) all fail closed. All 92
+> pre-existing Direct archive tests remain green, unchanged; a Direct-only
+> bundle still round-trips byte-for-byte identical to every archive this
+> codebase produced before this Arc. `npm test`: 760 passed files
+> (identical to the pre-Arc baseline), every new failure traced to a
+> pre-existing, already-documented category or the expected
+> "git working tree is clean" review-guard flip (red only until this
+> Arc's own commit lands) — zero real regressions. See
+> `docs/secure_runtime_alpha_1921_1980_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1691–1760 — Conversation Archive
 > Runtime Integration and Recovery Operations Arc (complete for Direct
 > Conversations; Group Conversation round trip genuinely blocked, not

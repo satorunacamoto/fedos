@@ -35,6 +35,46 @@ const DELIVERY_STATE_RANK: Readonly<Record<FedosGroupFanoutDeliveryState, number
   stored: 3,
 };
 
+const DELIVERY_STATES: ReadonlySet<string> = new Set(Object.keys(DELIVERY_STATE_RANK));
+const MAX_STRING_LENGTH = 512;
+
+function isSafeNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_STRING_LENGTH;
+}
+
+/**
+ * Secure Runtime Alpha 1921–1980 — the deep validator for a
+ * `FedosGroupFanoutDeliveryRecord`, mirroring `validateFedosGroupGenerationRecord()`'s
+ * own discipline (`../group/fedos_group_generation.ts`, Alpha 1327):
+ * rejects unknown fields, requires `state` to be one of the closed
+ * vocabulary above, requires `envelopeId` to be `null` or a safe
+ * non-empty string, and freezes the result. Fails closed to `null`,
+ * never throws.
+ */
+export function validateFedosGroupFanoutDeliveryRecord(candidate: unknown): FedosGroupFanoutDeliveryRecord | null {
+  if (candidate === null || typeof candidate !== "object") return null;
+  const keys = Object.keys(candidate as object).sort();
+  const expected = ["createdAt", "envelopeId", "groupMessageId", "pathId", "recipientMembershipId", "state"];
+  if (keys.length !== expected.length || !keys.every((k, i) => k === expected[i])) return null;
+
+  const record = candidate as Record<string, unknown>;
+  if (!isSafeNonEmptyString(record.groupMessageId)) return null;
+  if (!isSafeNonEmptyString(record.recipientMembershipId)) return null;
+  if (!isSafeNonEmptyString(record.pathId)) return null;
+  if (record.envelopeId !== null && !isSafeNonEmptyString(record.envelopeId)) return null;
+  if (typeof record.state !== "string" || !DELIVERY_STATES.has(record.state)) return null;
+  if (typeof record.createdAt !== "number" || !Number.isInteger(record.createdAt) || record.createdAt < 0) return null;
+
+  return Object.freeze({
+    groupMessageId: record.groupMessageId,
+    recipientMembershipId: record.recipientMembershipId,
+    pathId: record.pathId,
+    envelopeId: record.envelopeId as string | null,
+    state: record.state as FedosGroupFanoutDeliveryState,
+    createdAt: record.createdAt,
+  });
+}
+
 export function resolveCurrentGroupFanoutDeliveryRecord(
   factsForId: readonly FedosGroupFanoutDeliveryRecord[],
 ): FedosGroupFanoutDeliveryRecord | null {

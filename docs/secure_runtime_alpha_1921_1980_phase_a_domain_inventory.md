@@ -201,3 +201,28 @@ work — not yet implemented as of this document. No production code has
 been added in this pass; only the two branch-merge commits
 (`20ae79a`, `03ac16e`) and this design record exist on
 `arc/group-conversation-archive-integration-recovery` so far.
+
+## Post-implementation correction (recorded during Phase C, see the
+completion declaration's own §1 for the full finding)
+
+§1's own "Group Container" row above — *"already archived — covered by
+the existing Direct bundle's own `conversation` field once the
+Collector is pointed at the Group's own conversation id"* — is
+**factually incorrect** against real source, discovered while wiring
+the Collector: no real `private-group`/`direct` Conversation is ever
+written into `FedosConversationPersistence` by any real production
+path in this codebase (that port/its sole validator,
+`validateFedosConversationRecord`, Alpha 748, is Public-Board-only,
+hard-rejecting any other `mode`) — a private Conversation's own
+identity lives entirely in `FedosConversationDraftPersistence` +
+`FedosConversationActivationPersistence` instead, a pre-existing gap
+in the Direct Archive Foundation/Runtime this Arc does not introduce
+and (per its own "extend don't redesign" rule) does not fix. This does
+NOT invalidate the Alpha 1923 archive-version decision (§3) or the
+canonical-vs-derivable table (§2) — both stand as designed and were
+implemented unchanged. It changes only the Collector's own
+group-detection SIGNAL, from the (never-true-for-a-real-Group)
+`conversation.mode === "private-group"` to the real, authoritative
+`groupGenerationPersistence.currentGenerationForGroup(conversationId) !== null`.
+See `docs/secure_runtime_alpha_1921_1980_completion_declaration.md`
+§1 for the full derivation and its own recommended next-Arc follow-up.

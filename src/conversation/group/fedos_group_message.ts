@@ -38,6 +38,63 @@ const FANOUT_STATE_RANK: Readonly<Record<FedosGroupMessageFanoutState, number>> 
   complete: 2,
 };
 
+const FANOUT_STATES: ReadonlySet<string> = new Set(Object.keys(FANOUT_STATE_RANK));
+const MAX_STRING_LENGTH = 512;
+
+function isSafeNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_STRING_LENGTH;
+}
+
+/**
+ * Secure Runtime Alpha 1921–1980 — the deep validator for a
+ * `FedosGroupMessageRecord`, mirroring `validateFedosGroupGenerationRecord()`'s
+ * own discipline (`./fedos_group_generation.ts`, Alpha 1327): rejects
+ * unknown fields, requires `fanoutState` to be one of the closed
+ * vocabulary above, requires `recipientCount` to be a non-negative
+ * integer, and freezes the result. Unlike Generation's own `generationId`
+ * or Path's own `pathId`, `id` cannot be re-derived here (`toFedosGroupMessageId()`
+ * needs the ORIGINAL idempotency key, which this record does not itself
+ * carry) — it is validated structurally only, exactly as this codebase
+ * already accepts for other ids it cannot independently re-derive. Fails
+ * closed to `null`, never throws.
+ */
+export function validateFedosGroupMessageRecord(candidate: unknown): FedosGroupMessageRecord | null {
+  if (candidate === null || typeof candidate !== "object") return null;
+  const keys = Object.keys(candidate as object).sort();
+  const expected = [
+    "createdAt",
+    "fanoutState",
+    "generationId",
+    "groupConversationId",
+    "id",
+    "recipientCount",
+    "replyToGroupMessageId",
+    "senderMembershipId",
+  ];
+  if (keys.length !== expected.length || !keys.every((k, i) => k === expected[i])) return null;
+
+  const record = candidate as Record<string, unknown>;
+  if (!isSafeNonEmptyString(record.id)) return null;
+  if (!isSafeNonEmptyString(record.groupConversationId)) return null;
+  if (!isSafeNonEmptyString(record.generationId)) return null;
+  if (!isSafeNonEmptyString(record.senderMembershipId)) return null;
+  if (typeof record.createdAt !== "number" || !Number.isInteger(record.createdAt) || record.createdAt < 0) return null;
+  if (record.replyToGroupMessageId !== null && !isSafeNonEmptyString(record.replyToGroupMessageId)) return null;
+  if (typeof record.recipientCount !== "number" || !Number.isInteger(record.recipientCount) || record.recipientCount < 0) return null;
+  if (typeof record.fanoutState !== "string" || !FANOUT_STATES.has(record.fanoutState)) return null;
+
+  return Object.freeze({
+    id: record.id,
+    groupConversationId: record.groupConversationId,
+    generationId: record.generationId,
+    senderMembershipId: record.senderMembershipId,
+    createdAt: record.createdAt,
+    replyToGroupMessageId: record.replyToGroupMessageId as string | null,
+    recipientCount: record.recipientCount,
+    fanoutState: record.fanoutState as FedosGroupMessageFanoutState,
+  });
+}
+
 export function resolveCurrentGroupMessageRecord(
   factsForId: readonly FedosGroupMessageRecord[],
 ): FedosGroupMessageRecord | null {

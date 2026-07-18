@@ -35,6 +35,10 @@ import type { FedosConversationMembershipPersistence } from "../../membership/pe
 import type { FedosConversationCapabilityPersistence } from "../../capability/persistence/fedos_conversation_capability_persistence.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import type { FedosConversationPayloadStorage } from "../../payload_storage/fedos_conversation_payload_storage.js";
+import type { FedosGroupGenerationPersistence } from "../../group/fedos_group_generation.js";
+import type { FedosGroupDirectPathPersistence } from "../../group/fedos_group_direct_path.js";
+import type { FedosGroupMessagePersistence } from "../../group/fedos_group_message.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../../group/fedos_group_fanout_delivery.js";
 import type { FedosMasterSeedAuthority } from "../../../runtime/master_seed/fedos_master_seed_authority.js";
 import type { FedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
 import { defaultFedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
@@ -53,6 +57,18 @@ export interface FedosConversationArchiveRuntimeAssemblyConfig {
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
   readonly payloadStorage: FedosConversationPayloadStorage;
+  /**
+   * Secure Runtime Alpha 1921–1980 — the four Group-only persistence
+   * ports, passed straight through to `createFedosConversationArchiveRuntime()`
+   * unmodified. ALL four optional, meaningful only together — omitted,
+   * this Runtime never populates or restores a Group Section (the
+   * IDENTICAL Direct-only behavior every prior Arc's own assembly
+   * already produced).
+   */
+  readonly groupGenerationPersistence?: FedosGroupGenerationPersistence;
+  readonly groupDirectPathPersistence?: FedosGroupDirectPathPersistence;
+  readonly groupMessagePersistence?: FedosGroupMessagePersistence;
+  readonly groupFanoutDeliveryPersistence?: FedosGroupFanoutDeliveryPersistence;
   /** REQUIRED — this function constructs no Master Seed Authority of its own. */
   readonly masterSeedAuthority: FedosMasterSeedAuthority;
   /** REQUIRED — the owning Local Runtime's own live "am I still running" predicate. See `FedosConversationArchiveRuntime`'s own header, "LIFECYCLE". */
@@ -82,6 +98,10 @@ export function assembleFedosConversationArchiveRuntime(
     capabilityPersistence: config.capabilityPersistence,
     envelopePersistence: config.envelopePersistence,
     payloadStorage: config.payloadStorage,
+    groupGenerationPersistence: config.groupGenerationPersistence,
+    groupDirectPathPersistence: config.groupDirectPathPersistence,
+    groupMessagePersistence: config.groupMessagePersistence,
+    groupFanoutDeliveryPersistence: config.groupFanoutDeliveryPersistence,
     encryptionAuthority,
     fileAuthority: config.fileAuthority ?? fedosConversationArchiveFileAuthority,
     clock: config.clock ?? defaultFedosBoardRuntimeClock,

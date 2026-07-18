@@ -79,6 +79,69 @@ const PATH_STATE_RANK: Readonly<Record<FedosGroupDirectPathState, number>> = {
   superseded: 3,
 };
 
+const PATH_STATES: ReadonlySet<string> = new Set(Object.keys(PATH_STATE_RANK));
+const MAX_STRING_LENGTH = 512;
+
+function isSafeNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_STRING_LENGTH;
+}
+
+/**
+ * Secure Runtime Alpha 1921–1980 — the deep validator for a
+ * `FedosGroupDirectPathRecord`, mirroring `validateFedosGroupGenerationRecord()`'s
+ * own exact discipline (`./fedos_group_generation.ts`, Alpha 1327): rejects
+ * unknown fields, requires `pathId` to be genuinely DERIVED from its own
+ * parts (never caller-asserted independently of them), requires `state` to
+ * be one of the closed vocabulary above, and freezes the result. Fails
+ * closed to `null`, never throws. Added for the Archive Restore/Duplicate
+ * Detection layers to reuse (Alpha 1921–1980) — this domain's own file is
+ * the correct home for its own deep validator, exactly like Generation's.
+ */
+export function validateFedosGroupDirectPathRecord(candidate: unknown): FedosGroupDirectPathRecord | null {
+  if (candidate === null || typeof candidate !== "object") return null;
+  const keys = Object.keys(candidate as object).sort();
+  const expected = [
+    "createdAt",
+    "directConversationId",
+    "generationId",
+    "groupConversationId",
+    "pathId",
+    "recipientMembershipId",
+    "senderMembershipId",
+    "state",
+    "updatedAt",
+  ];
+  if (keys.length !== expected.length || !keys.every((k, i) => k === expected[i])) return null;
+
+  const record = candidate as Record<string, unknown>;
+  if (!isSafeNonEmptyString(record.groupConversationId)) return null;
+  if (!isSafeNonEmptyString(record.generationId)) return null;
+  if (!isSafeNonEmptyString(record.senderMembershipId)) return null;
+  if (!isSafeNonEmptyString(record.recipientMembershipId)) return null;
+  if (!isSafeNonEmptyString(record.directConversationId)) return null;
+  if (
+    record.pathId !==
+    toFedosGroupDirectPathId(record.groupConversationId, record.generationId, record.senderMembershipId, record.recipientMembershipId)
+  ) {
+    return null;
+  }
+  if (typeof record.state !== "string" || !PATH_STATES.has(record.state)) return null;
+  if (typeof record.createdAt !== "number" || !Number.isInteger(record.createdAt) || record.createdAt < 0) return null;
+  if (typeof record.updatedAt !== "number" || !Number.isInteger(record.updatedAt) || record.updatedAt < 0) return null;
+
+  return Object.freeze({
+    pathId: record.pathId as string,
+    groupConversationId: record.groupConversationId,
+    generationId: record.generationId,
+    senderMembershipId: record.senderMembershipId,
+    recipientMembershipId: record.recipientMembershipId,
+    directConversationId: record.directConversationId,
+    state: record.state as FedosGroupDirectPathState,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  });
+}
+
 export function resolveCurrentGroupDirectPathRecord(
   factsForId: readonly FedosGroupDirectPathRecord[],
 ): FedosGroupDirectPathRecord | null {

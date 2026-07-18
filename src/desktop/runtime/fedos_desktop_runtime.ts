@@ -159,6 +159,23 @@ import { InMemoryFedosConversationCapabilityPersistence } from "../../conversati
 import { assembleFedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.js";
 import type { FedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
 
+// Secure Runtime Alpha 1921-1980 (Group Conversation Archive Integration and
+// Cross-Branch Recovery Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1691-1760 boundary comment above for the
+// same reason.
+import type { FedosGroupGenerationPersistence } from "../../conversation/group/fedos_group_generation.js";
+import { AppendOnlyFedosGroupGenerationPersistence } from "../../conversation/group/append_only_fedos_group_generation_persistence.js";
+import { InMemoryFedosGroupGenerationPersistence } from "../../conversation/group/in_memory_fedos_group_generation_persistence.js";
+import type { FedosGroupDirectPathPersistence } from "../../conversation/group/fedos_group_direct_path.js";
+import { AppendOnlyFedosGroupDirectPathPersistence } from "../../conversation/group/append_only_fedos_group_direct_path_persistence.js";
+import { InMemoryFedosGroupDirectPathPersistence } from "../../conversation/group/in_memory_fedos_group_direct_path_persistence.js";
+import type { FedosGroupMessagePersistence } from "../../conversation/group/fedos_group_message.js";
+import { AppendOnlyFedosGroupMessagePersistence } from "../../conversation/group/append_only_fedos_group_message_persistence.js";
+import { InMemoryFedosGroupMessagePersistence } from "../../conversation/group/in_memory_fedos_group_message_persistence.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../../conversation/group/fedos_group_fanout_delivery.js";
+import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/append_only_fedos_group_fanout_delivery_persistence.js";
+import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/in_memory_fedos_group_fanout_delivery_persistence.js";
+
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
 /** Alpha 1471-1540 -- Mailbox Delivery's own default tick cadence when `conversationTransportIntervalMs` is omitted. Mirrors the Board delivery loop's own `DEFAULT_DELIVERY_INTERVAL_MS` (`../host/fedos_desktop_host.ts`, Alpha 507) — same value, a separate constant since that one is not exported. */
@@ -391,6 +408,28 @@ export async function startFedosDesktopRuntime(
       ? new AppendOnlyFedosConversationCapabilityPersistence(config.conversationCapabilityLogPath)
       : new InMemoryFedosConversationCapabilityPersistence();
 
+  // Secure Runtime Alpha 1921-1980 -- mirrors conversationArchiveMembershipPersistence/
+  // conversationArchiveCapabilityPersistence's own identical discipline immediately above: a SECOND
+  // port instance over the SAME durable Group log paths the Conversation Runtime's own Group facade
+  // (assembleFedosConversationRuntimeDependencies, via groupGenerationLogPath etc.) already uses --
+  // never a second, duplicate log file, and never shared/reused across running Runtime instances.
+  const conversationArchiveGroupGenerationPersistence: FedosGroupGenerationPersistence =
+    config.conversationGroupGenerationLogPath !== undefined
+      ? new AppendOnlyFedosGroupGenerationPersistence(config.conversationGroupGenerationLogPath)
+      : new InMemoryFedosGroupGenerationPersistence();
+  const conversationArchiveGroupDirectPathPersistence: FedosGroupDirectPathPersistence =
+    config.conversationGroupDirectPathLogPath !== undefined
+      ? new AppendOnlyFedosGroupDirectPathPersistence(config.conversationGroupDirectPathLogPath)
+      : new InMemoryFedosGroupDirectPathPersistence();
+  const conversationArchiveGroupMessagePersistence: FedosGroupMessagePersistence =
+    config.conversationGroupMessageLogPath !== undefined
+      ? new AppendOnlyFedosGroupMessagePersistence(config.conversationGroupMessageLogPath)
+      : new InMemoryFedosGroupMessagePersistence();
+  const conversationArchiveGroupFanoutDeliveryPersistence: FedosGroupFanoutDeliveryPersistence =
+    config.conversationGroupFanoutDeliveryLogPath !== undefined
+      ? new AppendOnlyFedosGroupFanoutDeliveryPersistence(config.conversationGroupFanoutDeliveryLogPath)
+      : new InMemoryFedosGroupFanoutDeliveryPersistence();
+
   const host = createFedosDesktopHost({
     desktopApplication: createDesktopApplication(),
     boardPersistence,
@@ -580,6 +619,12 @@ export async function startFedosDesktopRuntime(
       capabilityPersistence: conversationArchiveCapabilityPersistence,
       envelopePersistence: conversationEnvelopePersistence,
       payloadStorage: conversationPayloadStorage,
+      // Secure Runtime Alpha 1921-1980 -- the SAME "second port instance over the same durable Group
+      // log path" pattern the base five ports above already establish.
+      groupGenerationPersistence: conversationArchiveGroupGenerationPersistence,
+      groupDirectPathPersistence: conversationArchiveGroupDirectPathPersistence,
+      groupMessagePersistence: conversationArchiveGroupMessagePersistence,
+      groupFanoutDeliveryPersistence: conversationArchiveGroupFanoutDeliveryPersistence,
       masterSeedAuthority: config.conversationArchiveMasterSeedAuthority!,
       isRuntimeRunning: () => !stopped,
       clock: config.clock,
