@@ -61,6 +61,8 @@ import type { FedosRelay } from "../fedos_relay.js";
 import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationTransportPublisher } from "../../conversation/transport/fedos_conversation_transport_publisher.js";
 import type { FedosPrivateTransportInboundConfig } from "../../conversation/transport/fedos_private_transport.js";
+import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosConversationArchiveRuntimeBounds } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -204,4 +206,27 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationTransportPublisher?: FedosConversationTransportPublisher;
   /** Optional — Inbound Subscription is activated ONLY when this is supplied. No silent default subscription of any kind. */
   readonly conversationTransportInbound?: FedosPrivateTransportInboundConfig;
+
+  /**
+   * Secure Runtime Alpha 1691–1760 ("Conversation Archive Runtime
+   * Integration and Recovery Operations Arc"). OPTIONAL, unlike
+   * `deliveryEnabled` — the SAME "no widened required-field surface"
+   * discipline `privateTransportEnabled` itself already established
+   * (Alpha 1471–1540). Omitted or `false`, the runtime reaches `"ready"`
+   * without ever constructing a `FedosConversationArchiveRuntime`, and
+   * `runtime.conversationArchiveRuntime()` throws `"not enabled"`.
+   */
+  readonly archiveEnabled?: boolean;
+  /**
+   * REQUIRED when `archiveEnabled` is `true` — this runtime constructs
+   * no Master Seed Authority of its own (mirrors
+   * `conversationTransportSigningAuthority`'s own identical "this
+   * runtime constructs no Signing Authority of its own" discipline). The
+   * caller supplies a real, already-constructed `FedosMasterSeedAuthority`
+   * — the SAME instance backing this account's own conversation
+   * encryption, never a second, duplicate one.
+   */
+  readonly conversationArchiveMasterSeedAuthority?: FedosMasterSeedAuthority;
+  /** Optional override of the Archive Runtime's own default byte/record bounds (`DEFAULT_FEDOS_CONVERSATION_ARCHIVE_RUNTIME_BOUNDS`). No secret, no path policy beyond what the caller-supplied destination/source path itself already is. */
+  readonly conversationArchiveBounds?: FedosConversationArchiveRuntimeBounds;
 }

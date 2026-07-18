@@ -8,6 +8,57 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 1691–1760 — Conversation Archive
+> Runtime Integration and Recovery Operations Arc (complete for Direct
+> Conversations; Group Conversation round trip genuinely blocked, not
+> attempted).** Resumed uncommitted partial work rather than
+> restarting: the File Authority (exclusive-create via same-directory
+> temp-file + `link()`, bounded read, never overwrites) and File
+> Container (length-prefixed Manifest+ciphertext framing) were already
+> complete; `FedosConversationArchiveRuntime`'s own four operations
+> (`exportConversationArchive()`/`inspectConversationArchive()`/
+> `preflightRestore()`/`restoreConversationArchive()`) were already
+> wired against the real Alpha 1541–1610 Archive Foundation, but the
+> Local Runtime's own `conversationArchiveRuntime()` accessor was
+> declared and imported, never actually constructed or implemented —
+> completed this Arc, mirroring `privateTransport()`'s own exact
+> two-state fail-closed contract. One real defect found and fixed
+> during reconciliation, matching this Arc's own Quality Gate: `restoreConversationArchive()`
+> tracked `.failed`/`.conflict`/`.inserted` per-domain tallies but never
+> checked `.invalid`, so a cryptographically authentic,
+> integrity-passing Archive containing individually-malformed child
+> records would silently report `"restored"` despite incomplete data —
+> fixed by adding one precisely-scoped `"partially-invalid"` outcome to
+> this Arc's own closed vocabulary, proven by a real end-to-end test
+> constructing exactly that scenario. Direct Conversation round trip
+> verified for real: seed -> export -> stop -> a genuinely independent
+> fresh Runtime -> inspect -> preflight -> restore -> the exact original
+> message plaintext recovered byte-for-byte; duplicate restore
+> (`"already-present"`, never a duplicate record), conflict
+> (`"conflicts-found"`, pre-existing record never overwritten), and
+> crash/restart recovery (a restore interrupted after only SOME
+> persistence domains were written converges cleanly on a fresh retry,
+> no duplication) all verified with real interrupted-then-resumed
+> scenarios, not mere assertions. Group Conversation round trip is a
+> genuine, named, structural blocker, not attempted: this worktree's own
+> branch contains zero Group Conversation code and zero Direct-messaging
+> activation/send facade at all (both live only on a separate,
+> still-unmerged branch this Arc's own task carries no authorization to
+> merge) — the Archive Runtime's own contract is provably agnostic to
+> how a record reached persistence, so no Archive-layer code change is
+> expected once that lineage merges; only the test seeding would change.
+> No plaintext/raw-secret ever appears in an on-disk archive file
+> (verified directly, not by type signature alone). `npm test`: every
+> failure traced to the SAME two pre-existing, cross-Arc-documented
+> categories (the `core.autocrlf` fresh-worktree CRLF artifact, and
+> three review docs' own "git working tree is clean" guards, red only
+> until this Arc's own commit lands) — zero new failures, zero
+> Archive-specific failures. See
+> `docs/secure_runtime_alpha_1691_1760_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
 > and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
 > crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
