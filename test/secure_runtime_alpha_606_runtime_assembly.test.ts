@@ -104,14 +104,21 @@ describe("Secure Runtime Alpha 606 -- Runtime Assembly (Board/Outbox Wiring, Alp
     expect(existsSync(outboxLogPath)).toBe(false);
   });
 
-  it("5. the returned handle exposes ONLY {host, boardRuntime, conversationRuntime, stop} -- no low-level Persistence/Scheduler leaked (Secure Runtime Alpha 671-673 add boardRuntime(); Alpha 921/923 add conversationRuntime() -- see docs/secure_runtime_alpha_671_running_runtime_ownership_decision.md)", async () => {
+  it("5. the returned handle exposes ONLY {host, boardRuntime, conversationRuntime, privateTransport, conversationArchiveRuntime, stop} -- no low-level Persistence/Scheduler leaked (Secure Runtime Alpha 671-673 add boardRuntime(); Alpha 921/923 add conversationRuntime(); Alpha 1471-1540 adds privateTransport() -- reconciled onto this assertion by Alpha 1691-1760, which found it had never been updated for that addition; Alpha 1691-1760 itself adds conversationArchiveRuntime() -- see docs/secure_runtime_alpha_671_running_runtime_ownership_decision.md)", async () => {
     const dir = freshDir();
     const runtime: FedosRunningDesktopRuntime = await startFedosDesktopRuntime({
       boardLogPath: join(dir, "board.jsonl"),
       outboxLogPath: join(dir, "outbox.jsonl"),
       deliveryEnabled: false,
     });
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"]);
+    expect(Object.keys(runtime).sort()).toEqual([
+      "boardRuntime",
+      "conversationArchiveRuntime",
+      "conversationRuntime",
+      "host",
+      "privateTransport",
+      "stop",
+    ]);
     await runtime.stop();
   });
 

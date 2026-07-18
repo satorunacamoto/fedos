@@ -140,6 +140,19 @@ import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observa
 import { FedosConversationRelaySet } from "../../conversation/transport/relay/fedos_conversation_relay_set.js";
 import { FedosPrivateTransport } from "../../conversation/transport/fedos_private_transport.js";
 
+// Secure Runtime Alpha 1691-1760 (Conversation Archive Runtime
+// Integration and Recovery Operations Arc) -- every import/addition
+// below this comment is ADDITIVE ONLY, mirroring the Alpha 1471-1540
+// boundary comment above for the same reason.
+import type { FedosConversationMembershipPersistence } from "../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
+import { AppendOnlyFedosConversationMembershipPersistence } from "../../conversation/membership/persistence/append_only_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../../conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+import { AppendOnlyFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { assembleFedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.js";
+import type { FedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
+
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
 /** Alpha 1471-1540 -- Mailbox Delivery's own default tick cadence when `conversationTransportIntervalMs` is omitted. Mirrors the Board delivery loop's own `DEFAULT_DELIVERY_INTERVAL_MS` (`../host/fedos_desktop_host.ts`, Alpha 507) — same value, a separate constant since that one is not exported. */
@@ -183,6 +196,20 @@ export interface FedosRunningDesktopRuntime {
    * configured" state this accessor alone needs.
    */
   privateTransport(): FedosPrivateTransport;
+  /**
+   * Secure Runtime Alpha 1691–1760 — the `FedosConversationArchiveRuntime`
+   * (`../../conversation/archive/runtime/fedos_conversation_archive_runtime.ts`)
+   * this running Local Runtime owns, constructed ONLY when
+   * `config.archiveEnabled` was `true`. Throws `"not enabled"` if it was
+   * never configured, and throws `"inaccessible after stop"` once
+   * `stop()` has been called — the SAME two-state fail-closed contract
+   * `privateTransport()` itself already uses. Independently of THIS
+   * accessor's own gate, the returned Runtime's own operations ALSO fail
+   * closed once `stop()` has been called (see its own "LIFECYCLE"
+   * header) — a caller that grabbed a reference before `stop()` cannot
+   * use it afterward either.
+   */
+  conversationArchiveRuntime(): FedosConversationArchiveRuntime;
   /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
@@ -234,6 +261,17 @@ export async function startFedosDesktopRuntime(
     if (config.conversationTransportSigningAuthority === undefined) {
       throw new Error(
         "startFedosDesktopRuntime: privateTransportEnabled is true but no conversationTransportSigningAuthority was supplied — this runtime constructs no Signing Authority of its own.",
+      );
+    }
+  }
+  // Secure Runtime Alpha 1691-1760 -- mirrors the privateTransportEnabled guard
+  // above exactly: a configuration error is thrown synchronously, BEFORE any
+  // Persistence backend or Host is constructed, never a silent fallback to a
+  // second, internally-constructed Master Seed Authority.
+  if (config.archiveEnabled) {
+    if (config.conversationArchiveMasterSeedAuthority === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveEnabled is true but no conversationArchiveMasterSeedAuthority was supplied — this runtime constructs no Master Seed Authority of its own.",
       );
     }
   }
@@ -300,6 +338,23 @@ export async function startFedosDesktopRuntime(
           config.conversationPayloadMaxByteLength ?? DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH,
         )
       : new InMemoryFedosConversationPayloadStorage();
+
+  // Secure Runtime Alpha 1691-1760 -- constructed unconditionally (mirrors
+  // conversationEnvelopePersistence/conversationPayloadStorage's own identical
+  // discipline above), over the SAME conversationMembershipLogPath/
+  // conversationCapabilityLogPath the Conversation Runtime's own Alpha 923
+  // assembly already uses for its Membership/Capability Authorities -- two
+  // separate port instances reading/writing the SAME durable append-only log
+  // file, the same "fresh instance over the same durable backend" pattern
+  // this codebase already relies on for restart-stability (Alpha 618/589).
+  const conversationArchiveMembershipPersistence: FedosConversationMembershipPersistence =
+    config.conversationMembershipLogPath !== undefined
+      ? new AppendOnlyFedosConversationMembershipPersistence(config.conversationMembershipLogPath)
+      : new InMemoryFedosConversationMembershipPersistence();
+  const conversationArchiveCapabilityPersistence: FedosConversationCapabilityPersistence =
+    config.conversationCapabilityLogPath !== undefined
+      ? new AppendOnlyFedosConversationCapabilityPersistence(config.conversationCapabilityLogPath)
+      : new InMemoryFedosConversationCapabilityPersistence();
 
   const host = createFedosDesktopHost({
     desktopApplication: createDesktopApplication(),
@@ -406,6 +461,34 @@ export async function startFedosDesktopRuntime(
   }
 
   let stopped = false;
+
+  // Secure Runtime Alpha 1691-1760 -- exactly one FedosConversationArchiveRuntime
+  // per running runtime, constructed ONLY when config.archiveEnabled was true (the
+  // guard at the top of this function already confirmed
+  // conversationArchiveMasterSeedAuthority is present in that case). Wraps the SAME
+  // conversationPersistence/conversationArchiveMembershipPersistence/
+  // conversationArchiveCapabilityPersistence/conversationEnvelopePersistence/
+  // conversationPayloadStorage instances this runtime already owns -- never a
+  // second, duplicate set of ports, and constructs no Master Seed Authority of its
+  // own (mirrors privateTransportInstance's own identical "no Signing Authority of
+  // its own" discipline just above). `isRuntimeRunning` closes over this same
+  // `stopped` flag -- lazily read only once actually invoked, so its textual
+  // position relative to `let stopped` above is not order-sensitive.
+  let archiveRuntimeInstance: FedosConversationArchiveRuntime | undefined;
+  if (config.archiveEnabled) {
+    archiveRuntimeInstance = assembleFedosConversationArchiveRuntime({
+      conversationPersistence,
+      membershipPersistence: conversationArchiveMembershipPersistence,
+      capabilityPersistence: conversationArchiveCapabilityPersistence,
+      envelopePersistence: conversationEnvelopePersistence,
+      payloadStorage: conversationPayloadStorage,
+      masterSeedAuthority: config.conversationArchiveMasterSeedAuthority!,
+      isRuntimeRunning: () => !stopped,
+      clock: config.clock,
+      bounds: config.conversationArchiveBounds,
+    });
+  }
+
   return {
     host,
     boardRuntime(): FedosBoardRuntime {
@@ -428,6 +511,15 @@ export async function startFedosDesktopRuntime(
         throw new Error("FedosRunningDesktopRuntime.privateTransport() is not enabled -- see config.privateTransportEnabled.");
       }
       return privateTransportInstance;
+    },
+    conversationArchiveRuntime(): FedosConversationArchiveRuntime {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is inaccessible after stop().");
+      }
+      if (archiveRuntimeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is not enabled -- see config.archiveEnabled.");
+      }
+      return archiveRuntimeInstance;
     },
     async stop(): Promise<void> {
       if (stopped) {
