@@ -8,6 +8,100 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2421–2500 — Multi Device
+> Synchronization Foundation Arc (complete).** Architecture frozen: no
+> new Rust/WASM primitive, no new `AeadAadDomain` variant, no Host/GUI
+> wiring, no network transport, and no Sender-Key change — additive
+> synchronization PRIMITIVES only, entirely new `src/sync/` (9 new
+> files), never touching `src/conversation/transport/` (Alpha
+> 1471–1540) or any Sender-Key material. Implements Device Binding
+> (`fedos_sync_device_binding.ts`) — the first file in this codebase to
+> carry a real "sync" concept in its own name, since every earlier
+> device-shaped boundary (`src/identity/device_registration.ts`/
+> `device_trust.ts`, Stage 127/128) explicitly deferred it — a pure
+> three-state (`bound`/`unbound`/`revoked`) state machine over an
+> opaque `(deviceRef, accountRef)` pair; Device Registry
+> (`fedos_sync_device_registry.ts`), mirroring
+> `InMemoryFedosConversationPersistence`'s own private-`Map`, no-delete
+> convention (Alpha 751), enforcing that a `deviceRef` belongs to at
+> most one `accountRef` (`"conflict"` otherwise); Sync Journal
+> (`fedos_sync_journal.ts`), the single append-only, per-account source
+> of truth for "what changed," assigning monotonic sequence numbers
+> with `changeId` de-duplication as a hard invariant of `append()`;
+> Sync Cursor (`fedos_sync_cursor.ts`), a per-device, monotonic-only
+> position marker into the Journal; Sync Queue
+> (`fedos_sync_queue.ts`), the durable per-target-device OUTBOUND
+> delivery queue (`"queued"` → `"delivered"` → `"acknowledged"`, plus a
+> retryable `"failed"`) a local change fans out into — transport-
+> agnostic, mirroring `FedosPrivateTransport`'s own Outbox/Publisher
+> split in spirit only (Alpha 1471–1540), never a socket this Arc owns;
+> Pending Changes (`fedos_sync_pending_changes.ts`), the per-device
+> INBOUND staging area a delivered/redelivered entry lands in before
+> resolution — the one place duplicate delivery is caught independently
+> of the Journal's own `changeId` check; Conflict Vocabulary
+> (`fedos_sync_conflict.ts`), a pure CLASSIFICATION
+> (`"none" | "duplicate" | "tombstone-vs-upsert" | "concurrent-update"`)
+> of one conversation's next candidate entry against the last entry a
+> DEVICE actually applied — classification only, resolution policy
+> (last-write-wins, CRDT merge, a user prompt) is explicitly OUT of
+> scope, mirroring the Archive Arc's own "Restore ≠ new persistence
+> logic" discipline (Alpha 1541–1610); Sync State
+> (`fedos_sync_state.ts`), the per-account coordinator composing every
+> primitive above (`recordLocalChange`/`deliverQueuedChanges`/
+> `redeliverChange`/`applyPendingChanges`/`acknowledgeApplied`); and
+> Recovery State (`fedos_sync_recovery.ts`), a serializable snapshot of
+> exactly the LOCAL, per-device state (Cursor position, still-pending
+> and already-resolved `changeId`s) a device process needs to survive a
+> restart without loss or duplication, restoring only that fragile
+> local memory — the Journal, Device Registry, Sync Queue, and each
+> device's own already-applied local-conversation state are modeled as
+> durable and unaffected by a restart. One real bug this Arc's own
+> end-to-end verification caught before it shipped: an early draft
+> tracked "last entry applied per conversation" in one map SHARED
+> across every device, so a THIRD device receiving a change two
+> siblings had already each applied saw it as a false `"duplicate"`;
+> the fix scopes that map per `(deviceRef, conversationId)`, since each
+> device's own local-application state is independent and never shared
+> with a sibling's. Archive interaction is a narrow, OPTIONAL, caller-
+> injected `archiveAwareness: { isConversationArchived(conversationId) }`
+> port — `src/sync/` never imports `src/conversation/archive/` directly;
+> a pending change targeting an archived conversation is reported
+> `"archived-skip"` and still advances the Cursor, so it never blocks
+> the rest of the Journal, mirroring Archive's own 1541–1610 deferral
+> of Sync. Four new test files (46 new tests):
+> `test/secure_runtime_alpha_2421_2500_device_binding_and_registry.test.ts`,
+> `test/secure_runtime_alpha_2421_2500_journal_cursor_queue_and_conflict.test.ts`,
+> `test/secure_runtime_alpha_2421_2500_end_to_end_verification.test.ts`,
+> `test/secure_runtime_alpha_2421_2500_structural_guards.test.ts` —
+> covering 2-device and 3-device fan-out, an offline device's queue
+> entries staying `"queued"` indefinitely, that same device coming
+> online and applying everything it missed in order, a genuine
+> cross-device conflict (`"concurrent-update"`) surfacing without
+> blocking the journal, both a retried local write and an out-of-band
+> redelivery being recognized as `"duplicate"`, a device's local
+> runtime state being lost and exactly reconstructed from a Recovery
+> snapshot (both after full apply and mid-flight, before any apply),
+> and the archive-interaction skip-and-continue behavior.
+> **Verification**: `npm run typecheck` clean except the same one
+> PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`)
+> every recent Arc has already confirmed predates it; `npx vitest run`
+> (931 test files / 12,172 tests): this Arc's own 46 new tests all
+> pass, and every one of the 36 pre-existing failing tests (28 files)
+> is either a Rust-source structural check this Arc's own `git diff`
+> confirms zero touch to `packages/fedos-core-rust/`, or a
+> `git status`-cleanliness check unrelated to Sync — the untracked
+> `p2p/` directory, `.tmp_gen/`, this Arc's own then-uncommitted files,
+> and other already-in-progress, unrelated uncommitted work sharing
+> this working tree (`src/conversation/search/` and its own test files)
+> all already present before this Arc began. No UI, no transport
+> redesign, no Sender-Key redesign, and no real device pairing/key-
+> exchange/attestation of any kind are all explicitly named OUT of this
+> Arc's scope, not silently dropped — see
+> `docs/secure_runtime_alpha_2421_2500_execution_spec.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
 > and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
 > crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
