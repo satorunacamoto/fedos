@@ -59,6 +59,118 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status:
 >
+> **Status: Secure Runtime Alpha 1391–1470 — Nostr Private Direct and
+> Pairwise Fanout Delivery Arc (complete, protocol-neutral — NOT
+> NIP-17/NIP-44/NIP-59 compliant).** Run in a dedicated integration
+> worktree (`C:\wt\nostr-private-delivery`, branch
+> `arc/nostr-private-direct-pairwise-fanout-delivery`) built from the
+> prior Arc's own tip (`b3b9b96`), with two required prerequisite
+> branches merged in — `f715a5d` (Private Protocol Delivery review,
+> clean, zero conflicts) and `3dc4f7a` (Alpha 1321–1390 Private Group
+> Pairwise Fanout Foundation, two clean additive-union conflicts,
+> resolved chronologically) — both reported in full in
+> `docs/secure_runtime_alpha_1391_1470_completion_declaration.md`.
+>
+> **Protocol Compliance Gate (Alpha 1393), run first, before any
+> production code:** this repository contains ZERO normative NIP-17/
+> NIP-44-wire/NIP-59 material — every review already present
+> (`docs/reviews/private_protocol_delivery_group_v1/04_nostr_readiness.md`,
+> `docs/reviews/private_group_pairwise_fanout/01_nip17_inventory.md`/
+> `02_gift_wrap_inventory.md`) independently reconfirms this and
+> explicitly defers the research. Per the Gate's own fallback, this Arc
+> implements PROTOCOL-NEUTRAL Private Nostr Delivery contracts and makes
+> no NIP-17/44/59 compliance claim anywhere:
+> `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND = 24700` is a disclosed,
+> FedOS-proprietary event kind, not a registered NIP, not interoperable
+> with any other Nostr client. Confidentiality is provided entirely by
+> the EXISTING, real, already-proven pairwise ECDH + AEAD scheme (Alpha
+> 861–890, real since Alpha 1261–1320) — no gift-wrap, no seal, no
+> ephemeral per-recipient key scheme is invented.
+>
+> **New domain, `src/conversation/delivery/nostr/` (13 files):** a
+> Private Delivery Request (a NEW, parallel durable intent, deliberately
+> not forced into the Board-post-specific `FedosBoardOutboxIntent`) whose
+> STATE reuses the EXISTING `FedosDeliveryObservationRepository`
+> directly; a recipient-specific wire payload carrying the sender's own
+> Envelope-identifying fields verbatim (required for the Alpha 856
+> associated-data header to re-derive correctly); an OK-correlated
+> Publisher adapter mirroring `FedosRelayOkCorrelatedNostrBoardPublisher`'s
+> own technique field-for-field over the unmodified `FedosRelay`; an
+> Inbound Delivery Coordinator sitting strictly ABOVE the unmodified
+> `validateInboundNostrEvent()` that classifies, gates by recipient
+> ownership, deduplicates by intrinsic NIP-01 event id, unwraps/decrypts
+> via the EXISTING `FedosConversationDecryptionAuthority.decrypt()`
+> directly (no cryptography in TypeScript), and imports into a FRESH
+> local Envelope/Payload pair through the unmodified persistence ports —
+> the received message becomes readable through the UNCHANGED
+> `readDirectMessage()`/`listDirectMessages()`; a Group Delivery Planner
+> that reuses the EXISTING Alpha 1321–1390 Pairwise Fanout plan
+> unmodified, firing one independent recipient-specific delivery per
+> already-fanned-out recipient (never one shared group event), threading
+> the sender's own local Group Message id through as opaque
+> authenticated-encrypted `groupLinkage` (never any recipient's own
+> canonical id).
+>
+> **Minimal, additive extension to one frozen file, disclosed:**
+> `src/nostr/sign/fedos_nostr_signing_authority.ts`'s own kind allowlist
+> widened from the single fixed `1` to a closed two-value set
+> (`{1, FEDOS_PRIVATE_NOSTR_DELIVERY_KIND}`) — the minimal change Alpha
+> 1447's own "no private plaintext in a public kind-1 event" requirement
+> makes unavoidable; every other field/behavior in that file is
+> unchanged. `FedosConversationRuntime` gains one new, additive,
+> always-constructible `privateNostrDelivery()` facade — `FedosRunningDesktopRuntime`'s
+> own exposed key set is UNCHANGED (confirmed:
+> `secure_runtime_alpha_606_runtime_assembly.test.ts`/
+> `secure_runtime_alpha_758_local_runtime_ownership.test.ts` both still
+> pass unmodified).
+>
+> **Verified for real:** both a Direct and a 3-member Group vertical
+> slice run through the real `startFedosDesktopRuntime()` entry point
+> with genuinely independent Alice/Bob(/Carol) runtime instances (Fake
+> Encryption/Decryption Authorities — this Arc's own baseline tier —
+> combined with a REAL Schnorr-signing `FedosNostrSigningAuthority`,
+> `@noble/curves`, real BIP-340 verification through the unmodified
+> inbound validator, and a real OK-correlated Relay publisher): real
+> signed private event → Relay ACK → the SAME real event received on a
+> genuinely separate runtime → unwrap/decrypt/import → exact plaintext
+> read back through the unchanged `readDirectMessage()`; restart-safe
+> idempotency (no duplicate publish, no duplicate import); a real
+> ciphertext-byte tamper (re-signed with the sender's own real key —
+> proving a valid signature alone never proves ciphertext integrity)
+> fails closed; a wrong-recipient `p`-tag event is denied before any
+> decrypt attempt; a genuine Relay rejection is a distinct, terminal
+> outcome; Group fanout produces two independent, non-shared-ciphertext
+> recipient-specific events, each importable ONLY by its own addressed
+> recipient, with a removed member correctly excluded from the next
+> send. 26 new focused tests, all passing (10 wire-payload-codec + 2
+> Direct vertical slice + 1 Group vertical slice + 13 architecture/secret
+> guards).
+>
+> **Honest scope limits, named explicitly:** no wire-level (NIP-40-style)
+> expiration encoding and no Nostr deletion-request construction (no
+> reviewed normative material for either); `"ephemeral-online"` mode is
+> an application-level distinction only, not backed by any wire-level
+> convention; no automatic Runtime-level subscription/reconnect wiring
+> (`receiveInboundEvent()` is a manually-invoked coordinator method); no
+> automatic retry/Scheduler integration for outbound delivery (a
+> `"rejected"` vs `"failed"` Observation distinction exists, but this
+> layer does not itself decide whether to retry). The Production-mode
+> WASM Dev-only Gate remains byte-for-byte untouched — private delivery
+> is development-Runtime capable only, never production-enabled.
+> `npm run typecheck` clean (one pre-existing, unrelated failure,
+> unchanged from every prior Arc); full `npm test` precisely diffed
+> against a stashed clean-baseline re-run in this exact worktree — every
+> newly-failing test traced to a pre-existing, git-status-dependent
+> "working tree unchanged" staleness guard, zero attributable to a
+> genuine functional regression. `package.json`/`package-lock.json`/
+> `Cargo.toml` byte-for-byte unchanged; no new dependency; `p2p/`
+> untouched. See
+> `docs/secure_runtime_alpha_1391_1470_phase_a_inventory.md` and
+> `docs/secure_runtime_alpha_1391_1470_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
 > and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
 > crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
@@ -213,6 +325,376 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Arc's scope, not silently dropped — see
 > `docs/secure_runtime_alpha_1541_1610_execution_spec.md`/
 > `_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1321–1390 — Private Group Pairwise
+> Fanout Foundation Arc (complete).** Run in a dedicated integration
+> worktree (`C:\wt\private-group-fanout`, branch
+> `arc/private-group-pairwise-fanout-foundation`) built from the prior
+> Arc's own tip (`7990ce4`), with the required Pairwise Fanout Review
+> commit (`b205ff0`, `review/private-group-pairwise-fanout-v1`) merged
+> in cleanly — one merge, zero conflicts, reported in full in
+> `docs/secure_runtime_alpha_1321_1390_reconciliation_report.md`. No
+> `Alpha 1261–1320` ("Production Crypto Activation") branch existed
+> anywhere in this repository during this Arc; nothing from it was
+> merged, depended on, or guessed at.
+>
+> Implements private-group messaging as a purely ADDITIVE orchestration
+> layer over the now-real Alpha 1111–1260 Direct pipeline — it never
+> widens the Direct Activation Coordinator's own Private-Group Gate
+> (`draft.mode !== "direct"` still returns `"unsupported-mode"`,
+> byte-for-byte unchanged), never touches the frozen Encryption/
+> Decryption Coordinators, and never widens the Direct participant
+> resolver beyond its own exactly-one-counterparty contract. Instead, a
+> new `src/conversation/group/` domain (20 files) composes the EXISTING
+> `direct` pipeline once per active OTHER group member: an immutable
+> `FedosGroupGenerationRecord` snapshots the group's own real Membership
+> roster on every admission/removal; a `FedosGroupDirectPathAuthority`
+> lazily constructs, admits, and activates one real, independently-keyed
+> `direct` Conversation per (local, counterparty) pair — reusing
+> `createDirectDraft()`/`redeem()`/`activateDirectConversation()`
+> unmodified; a `FedosGroupSendCoordinator` fans one logical plaintext
+> out into N independently-encrypted Envelopes (all-or-nothing for a
+> fresh send, Option A), recording a local canonical
+> `FedosGroupMessageRecord` plus one `FedosGroupFanoutDeliveryRecord`
+> per recipient — its OWN "already-stored" check is the crash-recovery
+> mechanism, since `sendDirectMessage()`'s own public surface exposes no
+> idempotency key. `FedosConversationRuntime.groupRuntime()` is the one
+> new, narrow accessor exposing `preparePrivateGroup()`/
+> `readinessForPrivateGroup()`/`sendPrivateGroupMessage()`/
+> `listPrivateGroupMessages()`/`listPrivateGroupGenerations()`/
+> `addPrivateGroupMember()`/`removePrivateGroupMember()` — no existing
+> public method's signature changes.
+>
+> Verified end to end through the real `startFedosDesktopRuntime()`
+> entry point with injected Fake Direct Authorities (no WASM artifact in
+> this tree, unchanged from every prior Arc): a 3-member group, two
+> independent recipient Envelopes per send, restart with the identical
+> idempotency key returning the identical result with no duplicate
+> Envelope, member removal excluding the removed member from the next
+> send while leaving their own prior Direct Conversation untouched, and
+> an unsupported-authority (non-`"nostr"`) counterparty failing that one
+> path closed without blocking the rest of the group. No shared group
+> key, Sender Key, MLS, NIP-17/NIP-59, or network delivery of any kind
+> is implemented or claimed — restated explicitly in
+> `docs/secure_runtime_alpha_1321_1390_completion_declaration.md`, §9.
+> `npm run typecheck` clean (one pre-existing, unrelated failure,
+> unchanged from every prior Arc); targeted Conversation+Group-domain
+> run 95/95; full `npm test` 12015/12259, every one of the 244 failures
+> individually categorized as a confirmed pre-existing `core.autocrlf`
+> CRLF-checkout artifact, an already-independently-named pre-existing
+> failure, or a prior review's own now-expected "working tree unchanged"
+> staleness check — zero attributable to this Arc. `package.json`/
+> `package-lock.json`/`Cargo.toml` byte-for-byte unchanged; `packages/fedos-core-rust/`
+> untouched; `p2p/` untouched. See
+> `docs/secure_runtime_alpha_1321_1390_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_1321_1390_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1261–1320 — Production Conversation
+> Crypto Runtime Activation Arc (complete, Development-mode only —
+> Production activation remains a deliberately closed, separate
+> decision).** Same worktree/branch as the prior two Arcs — `master` was
+> unchanged, so no additional integration was needed. Turns the
+> already-tested INJECTED-Authority Direct-message path into a genuinely
+> real, no-Fake-Authority one: `npm run build:wasm` (unmodified command)
+> produces `packages/fedos-core-rust/pkg/{fedos_core_rust.js,fedos_core_rust_bg.wasm}`
+> cleanly and reproducibly; `cargo test` — 531/532 native, one
+> pre-existing unrelated dependency-count guard failure — proves the Rust
+> Master Seed Authority's own seal/restore/wrong-passphrase/corrupt-file
+> paths were ALREADY real before this Arc touched anything.
+>
+> **A genuine, empirically-discovered wiring gap, closed additively:**
+> `FedosWasmMasterSeedAuthority#ensureConstructed()` calls
+> `attemptDevOnlyMasterSeedAuthorityConstructCall()` directly, whose own
+> gate requires `fedos_wasm_loader.ts`'s `generatedArtifactCheckResult`/
+> `devOnlyGateEvaluation`/`importReadiness`/`importExecution`/
+> `jsGlueModule`/`wasmInitialization` to already be populated on the SAME
+> loader instance — nothing populated them automatically, so constructing
+> a `FedosWasmMasterSeedAuthority` directly always failed with
+> `"PrototypeStillClosed"`, even under `NODE_ENV=development` with the
+> artifact built (confirmed empirically before writing any production
+> code). `attemptDevOnlyRuntimeEncrypt()` (`fedos_runtime_encrypt.ts`,
+> unmodified) already primes this exact three-call chain
+> (`planLoad()` → `attemptDevOnlyJsGlueImport()` →
+> `attemptDevOnlyWasmInitialization()`) before its own Rust Boundary
+> reach — the new
+> `assembleFedosConversationProductionCryptoGraph()`
+> (`src/conversation/encryption/production/`, Alpha 1273) reuses that
+> IDENTICAL, already-established sequence rather than modifying
+> `FedosWasmMasterSeedAuthority` itself (an already-reviewed file this
+> Arc does not touch).
+>
+> **New, additive-only:** a file-based sealed-seed envelope port
+> (`FileFedosSealedMasterSeedEnvelopePersistence` — never overwrites an
+> existing file, throws on structural corruption rather than silently
+> treating it as absent) and a narrow injected passphrase-provider
+> boundary (`FedosPassphraseProvider` — no GUI, no `process.env` read, no
+> plaintext-passphrase config field anywhere). `FedosDesktopRuntimeConfig`
+> gained exactly one new optional field, `conversationProductionCrypto`;
+> `startFedosDesktopRuntime()` resolves it before Conversation Runtime
+> assembly and, on a real `"available"` outcome, supplies the resulting
+> real Authorities in place of the individual
+> `conversationEncryptionAuthority`/etc. fields Alpha 1113 already wired —
+> any other outcome (including simply omitting the field) falls back to
+> those fields' own pre-existing, unmodified defaults. A new read
+> accessor, `conversationProductionCryptoCapability()`, surfaces Alpha
+> 1263's own nine-outcome closed vocabulary
+> (`available`/`artifact-missing`/`artifact-incompatible`/`seed-unavailable`/
+> `seed-restore-failed`/`identity-unavailable`/`unsupported-runtime`/
+> `disabled`/`failed`) — never a raw loader `Error`.
+>
+> **Proven for real, no Fake Authority anywhere in the acceptance test:**
+> two independently generated/sealed real identities (Alice, Bob) exchange
+> one genuinely ChaCha20-Poly1305-AEAD-encrypted Direct message, pairwise-
+> keyed via real secp256k1 ECDH, through the REAL application path
+> (`createDirectDraft` → invitation → redemption →
+> `activateDirectConversation` → `sendDirectMessage` → full restart —
+> fresh backends AND a freshly-restored Master Seed Authority from the
+> same sealed-seed file — → `readDirectMessage`), exact plaintext
+> recovered; an unrelated real identity, the correct sealed-seed file with
+> the wrong passphrase, and a different account index against the SAME
+> sealed seed are all denied; a real ciphertext byte flip (decoded from
+> the durable payload log's own `bytesBase64` field) fails closed; real
+> retention and revocation denial both hold. Twelve tests total across
+> `test/secure_runtime_alpha_1261_1320_real_crypto_vertical_slice.test.ts`
+> and `test/secure_runtime_alpha_1261_1320_production_gate_semantics.test.ts`
+> (config-disabled/unsupported-runtime/corrupt-seed/no-passphrase/clear-
+> denies-reuse/`stop()`-clears-the-real-authority), all 12 passing with
+> the artifact built and `NODE_ENV=development`.
+>
+> **Kept Development-only — deliberately, per this Arc's own reviewed
+> option menu.** `fedos_wasm_loader.ts`'s `#evaluateDevOnlyGate()` is
+> completely untouched: it already, permanently, returns
+> `developmentAllowed: false` for `mode === "Production"` — confirmed by
+> direct source inspection, the gate's own header states "never
+> Production, never Worker." This is a reviewed, intentional security
+> boundary, not an unimplemented feature; architecture-frozen forbids
+> redesigning it, so this Arc extends nothing there. The Desktop
+> Runtime's own `start:runtime` script never sets `NODE_ENV` itself —
+> reaching Development mode (and therefore any real crypto capability at
+> all) requires an explicit, deliberate operator action, never an
+> accident.
+>
+> **Artifact policy, restated plainly (Alpha 1306):** `packages/fedos-core-rust/pkg/`
+> is gitignored and was removed after verification, exactly like every
+> prior Arc's own `target/`/`Cargo.lock` — anyone building on this commit
+> must run `npm run build:wasm` themselves before this Arc's own two new
+> test files (or any real Development-mode crypto path) report
+> `"available"` instead of `"artifact-missing"`; without it, they report
+> that closed, honest outcome — never a crash, never a silent fallback —
+> which is the SAME pre-existing behavior every other real-WASM-dependent
+> test in this repository already has on a stock checkout.
+>
+> **Historical ripple (Alpha 1304), exact and mechanical:**
+> `secure_runtime_alpha_606_runtime_assembly.test.ts` and
+> `secure_runtime_alpha_758_local_runtime_ownership.test.ts` each assert
+> the EXACT closed set of keys `FedosRunningDesktopRuntime` exposes; both
+> updated to include the one new, genuinely additive, non-secret
+> accessor. `npm run typecheck` clean; full `npm test` precisely diffed
+> by exact failing file name against the prior Arc's own baseline —
+> zero other regressions. `package.json`/`Cargo.toml` byte-for-byte
+> unchanged; no new dependency; `p2p/` untouched.
+>
+> See `docs/secure_runtime_alpha_1261_1320_completion_declaration.md` for
+> the full record, including the Production Readiness Statement.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1181–1260 — Conversation Runtime
+> Finalization Arc (complete).** Same worktree/branch as the prior Arc —
+> no new sibling Arc branch had landed, so no additional integration was
+> needed. Phase A (Runtime ownership/dependency/lifecycle) and Phase B
+> (Conversation Runtime API completion) were reviewed by direct source
+> inspection and found ALREADY correct and complete: `FedosConversationRuntime`'s
+> public surface exposes no persistence port, encryption handle, WASM
+> handle, or raw-key resolver (Alpha 1144); `conversationRuntime()`
+> already throws after `stop()` (Alpha 923); a repository-wide search for
+> `TODO`/`FIXME`/`temporary`/`placeholder` scaffolding across
+> `src/conversation/`/`src/desktop/` found none to eliminate (the only
+> `"temporary"` hits are the reviewed, permanent `"temporary-capability"`
+> participant-authority enum value, Alpha 762) — reported honestly rather
+> than manufacturing a change. Phase C adds real, additive test coverage
+> the prior Arc's own completion declaration named as not individually
+> exercised: a corruption matrix over the new Activation log and the
+> Envelope log (malformed lines and conflicting duplicate records both
+> throw on replay, mirroring this codebase's own established "one corrupt
+> record voids the backend" precedent — no new corruption-handling
+> mechanism invented); confirmation that a corrupted Activation log makes
+> `sendDirectMessage()`/`readDirectMessage()` REJECT rather than silently
+> report a wrong or false-active answer, reproducibly across three
+> independent restarts over the same corrupted file (Alpha 1156);
+> Independent Runtime Isolation — two wholly independent backend sets
+> addressing the identical Conversation id never share state (Alpha
+> 1167); and Restart Identity Stability — the same local identity across
+> a restart resolves the same Membership and decrypts an existing
+> message, a different, never-admitted identity is denied (Alpha 1163).
+> One new test file, zero production source changes. `npm run typecheck`
+> clean (one pre-existing, unrelated failure, unchanged from the prior
+> Arc); targeted Conversation-domain run 115/115; full `npm test`
+> 11984/12215, consistent with the prior Arc's own diagnosed baseline
+> (17 pre-existing-on-`master` failures plus the same previously-confirmed
+> `core.autocrlf` worktree-checkout CRLF artifact affecting ~173 unrelated
+> early-stage files) — zero Conversation-domain regression. See
+> `docs/secure_runtime_alpha_1181_1260_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1111–1180 — Private Conversation
+> Activation and Direct Messaging Runtime Arc (complete).** Closes the
+> final gap between a durable private Conversation draft and a real,
+> usable DIRECT encrypted Conversation. Run in a dedicated short-path
+> integration worktree (`C:\wt\private-direct-messaging`, branch
+> `arc/private-conversation-activation-direct-messaging`) because two
+> required prerequisite Arcs — `arc/conversation-identity-resolution-encryption-coordinator`
+> (Alpha 931–990) and `arc/conversation-invitation-draft-management`
+> (Alpha 991–1050) — existed only on sibling branches, never reached
+> `master`, and had themselves diverged from each other (each continuing
+> independently past their own shared base). Both were merged in first
+> (two mechanical merges, zero non-mechanical conflicts — both sibling
+> Arcs had added disjoint fields/branches to the same two files,
+> `fedos_conversation_runtime.ts`/`fedos_conversation_runtime_assembly.ts`;
+> resolution was a pure union, no logic changed), superseding the PRIOR
+> status entry's own "the Alpha 851–8XX blocker... requires both fields
+> pre-resolved by its caller, and no such caller exists yet" claim — that
+> caller (`FedosConversationKeyResolver`, Alpha 935) already existed on
+> the merged-in branch; this Arc consumes it unmodified.
+>
+> **What activation means, concretely:** the immutable private-draft
+> record (`FedosConversationDraftRecord`, still permanently
+> `lifecycleState: "draft"` by construction — never rewritten) is NOT the
+> source of truth for "is this Conversation active." A NEW, separate,
+> durable Activation fact is (`src/conversation/activation/`,
+> `FedosConversationDirectActivationCoordinator`) — a five-phase
+> (`prepared → readiness-confirmed → lifecycle-activated → completed`,
+> or `terminal-failed`) coordination log mirroring the Alpha 913/845
+> construction/redemption coordinators' own proven crash-recovery
+> discipline field-for-field. `activateDirectConversation(conversationId)`
+> proves, fresh on every call (never trusting a stale phase): direct mode
+> only (private-group always `"unsupported-mode"` — no group key
+> strategy exists, none is invented); the LOCAL controlled participant
+> resolves and holds active Membership; the ONE counterparty resolves and
+> is — by `MembershipFedosConversationParticipantResolver`'s own
+> construction — already proven active; pairwise key readiness (identity,
+> account index, counterparty public key, Nostr-binding verification) via
+> ONE call to the existing, unmodified `FedosConversationKeyResolver`;
+> real (non-placeholder) Encryption/Decryption Authorities; storage/
+> retention availability. `FedosConversationEncryptionCoordinator`/
+> `DecryptionCoordinator` (Alpha 943/946) — previously permanently
+> dead-code past their own `lifecycleState !== "active"` gate, since
+> nothing could ever construct that value — now consult this SAME
+> Activation fact via one shared helper
+> (`resolveFedosConversationActiveConversation()`), the only change made
+> to either frozen coordinator.
+>
+> **Direct messaging** (`src/conversation/messaging/`,
+> `FedosConversationDirectMessagingCoordinator`, exposed on
+> `FedosConversationRuntime` as `sendDirectMessage()`/`readDirectMessage()`/
+> `listDirectMessages()`) is a thin application-command layer over the
+> SAME two Encryption/Decryption Coordinators — no crypto, no Envelope
+> encoding, no crash-recovery logic duplicated (the encryption
+> coordinator's own existing coordination log already makes a retried
+> send safe against duplicate Envelopes/Payloads). The caller supplies
+> ONLY `conversationId`/`body`/`replyToEnvelopeId` — sender identity,
+> Envelope/payload ids, nonce, account index, counterparty key, suite, and
+> key epoch are all resolved or fixed internally (suite is always
+> `ChaCha20Poly1305`; epoch is always `0`, matching the Alpha 850
+> Direct-mode decision). The plaintext body reuses the Board domain's own
+> reviewed size discipline verbatim (`FEDOS_BOARD_POST_MAX_BODY_LENGTH =
+> 10_000` UTF-16 code units, restated rather than cross-imported to avoid
+> an accidental Board/Conversation coupling). **Retention enforcement on
+> read is a genuine new gate:** `FedosPayloadRetentionAuthority` (Alpha
+> 796) existed but was wired into nothing in the Conversation Runtime;
+> `readDirectMessage()` now consults it before ever calling into the
+> Decryption Coordinator — a tombstoned/removed payload is denied,
+> matching Alpha 796's own already-reviewed security claims exactly, no
+> claim strengthened or invented.
+>
+> **Runtime Encryption Configuration** (Alpha 1113) closes a confirmed
+> gap: `FedosConversationRuntimeDependencies` already accepted every Alpha
+> 949 field (real Encryption/Decryption Authority, identity resolver,
+> account index authority, Nostr binding authority, Envelope/Payload log
+> paths) as optional — but `FedosDesktopRuntimeConfig`/
+> `startFedosDesktopRuntime()` never threaded ANY of them through; a real
+> desktop deployment had no way to reach this Arc's own crypto injection
+> seam at all. Now threaded, reusing the SAME `nostrAuthorBindingAuthority`
+> instance already passed to `createFedosBoardRuntime()` — one coherent
+> identity graph, never a second signing/encryption identity.
+>
+> **Production crypto gate: still closed, exactly as every prior Arc back
+> to Alpha 851 already found.** No `packages/fedos-core-rust/pkg/` WASM
+> artifact exists in this checked-out tree (confirmed by direct filesystem
+> check); `cargo`/`wasm-bindgen` are present on this machine but building
+> the existing, unmodified Rust crate changes no TypeScript behavior this
+> Arc needs and is out of scope (no Rust file touched). Every test proving
+> the activation/send/read vertical slice uses injected
+> `FakeConversationEncryptionAuthority`/`DecryptionAuthority` test
+> doubles — the SAME pattern the pre-existing Alpha 943/946 coordinator
+> suite already established — never a real WASM call; the REAL
+> `FedosWasmConversationEncryptionAuthority`/`DecryptionAuthority` (Alpha
+> 870/871, already built, already reviewed) slot into the identical
+> `conversationEncryptionAuthority`/`conversationDecryptionAuthority`
+> config fields unchanged, once a real seeded `FedosMasterSeedAuthority`
+> is available. By DEFAULT (nothing injected), activation and messaging
+> stay fail-closed unavailable; public Board and local draft management
+> are entirely unaffected either way (Alpha 1115/1162, verified).
+>
+> **The real application path, not a hand-built fixture, constructs an
+> active direct Conversation:** `test/secure_runtime_alpha_1111_1180_runtime_vertical_slice.test.ts`
+> drives `startFedosDesktopRuntime()` directly — real Direct Draft, real
+> recipient-bound Capability, real redemption, real Activation
+> Coordinator call, real `sendDirectMessage()`, a full `stop()`/fresh
+> `startFedosDesktopRuntime()` restart, then real
+> `readDirectMessage()` recovering the exact original plaintext — closing
+> the gap the pre-existing Alpha 949 test's own "hand-built ACTIVE
+> fixture… reachable only through tests bypassing Runtime" language had
+> named (that test is updated, not deleted, to prove the identical
+> "wiring is real" property through the new mechanism, since the
+> `lifecycleState` field it used to write directly is now permanently
+> inert).
+>
+> **Known, deliberately unimplemented (unchanged from every prior Arc's
+> own scope line):** private-group activation, group/shared keys, Sender
+> Keys, MLS, any protocol delivery (Nostr DM/ActivityPub/AT Protocol/
+> Session), Relay Pool, GUI, Worker, invitation URL/QR transport,
+> distributed/multi-writer redemption, moderation plaintext inspection,
+> multi-device key recovery, physical-deletion or operator-anonymity
+> claims. `p2p/` untouched. No new npm or Cargo dependency.
+>
+> **Verification:** `npm run typecheck` clean (one pre-existing failure,
+> `test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> confirmed byte-identical and independently failing on plain `master`).
+> Full `npm test` run in BOTH this integration worktree and, separately,
+> plain `master`, then diffed by exact failing test name (never assumed):
+> of this worktree's 190 failing files, 17 are byte-identical to
+> `master`'s own 17 pre-existing failures (unrelated: identity/protocol-
+> root-handle tests, and three `test/reviews/*` "git status stays clean"
+> guards broken by this repository's own pre-existing untracked `p2p/`
+> directory in the MAIN worktree, not by this Arc). The remaining 173 —
+> spanning `test/fedos_core_rust_*`, `test/runtime_wasm_*`,
+> `test/secure_runtime_alpha_001` through `060`, none of them
+> Conversation/Encryption/Activation/Messaging-related — all fail on the
+> IDENTICAL signature (`expected +0 to be 11`, a Cargo.toml
+> dependency-count assertion reading raw file content via a Vite `?raw`
+> import) and were confirmed, by direct byte inspection, to be caused by
+> `core.autocrlf=true` giving this freshly-created worktree CRLF line
+> endings while `packages/fedos-core-rust/Cargo.toml` in the pre-existing
+> `master` worktree has LF — a pure git-worktree-checkout environmental
+> artifact, not a behavioral regression; global git config was
+> deliberately left untouched per this Arc's own explicit instruction.
+> Every Conversation-domain test this Arc added or modified was
+> individually re-verified passing after this comparison (activation: 13/13;
+> messaging: 23/23; vertical slice: 3/3; the four pre-existing coordinator/
+> wiring test files this Arc's own gate change required updating: all
+> green). `cargo`/WASM not rebuilt (no Rust file changed).
+>
+> See `docs/secure_runtime_alpha_1111_1180_integrated_inventory.md` and
+> `docs/secure_runtime_alpha_1111_1180_completion_declaration.md` for the
+> full record.
 >
 > Prior status:
 >
