@@ -34,6 +34,24 @@
  * internally, matching `FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH`'s
  * own already-adopted "Direct mode never advances past its initial epoch"
  * decision (Alpha 850, unmodified).
+ *
+ * Secure Runtime Alpha 1841-1920 ("NIP-17 Standard Transport Integration
+ * and Group Pairwise Delivery Arc") Phase C (Alpha 1842/1843/1844/1850)
+ * -- THIS is the exact seam that Arc's own "Plaintext Ownership Decision"
+ * names: `plaintext` (below, `new TextEncoder().encode(body)`) is still
+ * in scope, right here, immediately after
+ * `encryptionCoordinator.encrypt()` returns -- the ONE place in the
+ * entire send path plaintext is ever held outside the frozen Encryption
+ * Coordinator/Authority. The OPTIONAL `deps.delivery` (Alpha 1844's own
+ * "application/Runtime config explicitly selects the route, no
+ * heuristic, no fallback") hands that SAME plaintext, ONCE, to
+ * `FedosPrivateTransport.sendMailboxNip17()` via a narrow accessor
+ * function (never the whole Transport type, mirroring
+ * `membershipsForConversation`'s own established discipline elsewhere in
+ * this codebase) -- closing the Arc's own named blocker WITHOUT
+ * decrypting stored ciphertext, exposing raw Conversation keys, or
+ * duplicating Conversation encryption. Omitted `deps.delivery` -> ZERO
+ * behavior change from before this Arc.
  */
 
 import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
@@ -58,6 +76,7 @@ import { validateFedosConversationDirectMessageBody } from "./fedos_conversation
 import type { FedosConversationDirectMessageSendResult } from "./fedos_conversation_direct_message_send_result.js";
 import type { FedosConversationDirectMessageReadResult } from "./fedos_conversation_direct_message_read_result.js";
 import type { FedosConversationDirectMessageSummary } from "./fedos_conversation_direct_message_summary.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
 
 /** The ONE encryption suite this facade ever selects — never caller-chosen (Alpha 1127). */
 export const FIXED_DIRECT_MESSAGE_SUITE: FedosConversationEnvelopeEncryptionSuite = "ChaCha20Poly1305";
@@ -73,6 +92,26 @@ export interface FedosConversationDirectMessageReadCommand {
   readonly envelopeId: string;
 }
 
+/**
+ * Secure Runtime Alpha 1841–1920 Phase C (Alpha 1843/1844) — the
+ * narrowest possible accessor a caller supplies to opt a Direct send
+ * into ALSO preparing + durably enqueuing a standard NIP-17 delivery.
+ * `route` is a closed, explicit, single-value selection (Alpha 1844's
+ * own "no heuristic, no fallback" rule) — today the ONLY value is
+ * `"nostr-nip17-v1"`; `sendMailboxNip17` is a THUNK a production caller
+ * binds to a real `FedosPrivateTransport` instance (never the whole
+ * Transport type imported here), mirroring `membershipsForConversation`'s
+ * own established "narrow accessor over the whole object" discipline.
+ */
+export interface FedosConversationDirectMessageDeliveryDependencies {
+  readonly route: "nostr-nip17-v1";
+  readonly sendMailboxNip17: (
+    envelopeId: string,
+    conversationId: string,
+    plaintext: Uint8Array,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+}
+
 export interface FedosConversationDirectMessagingCoordinatorDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;
   readonly activationPersistence: FedosConversationActivationPersistence;
@@ -82,6 +121,8 @@ export interface FedosConversationDirectMessagingCoordinatorDependencies {
   readonly retentionAuthority: FedosPayloadRetentionAuthority;
   readonly encryptionCoordinator: FedosConversationEncryptionCoordinator;
   readonly decryptionCoordinator: FedosConversationDecryptionCoordinator;
+  /** OPTIONAL — omitted, `sendDirectMessage()` behaves byte-for-byte as before this Arc (local storage only). See this file's own header. */
+  readonly delivery?: FedosConversationDirectMessageDeliveryDependencies;
 }
 
 export class FedosConversationDirectMessagingCoordinator {
@@ -121,7 +162,20 @@ export class FedosConversationDirectMessagingCoordinator {
       suite: FIXED_DIRECT_MESSAGE_SUITE,
       replyToEnvelopeId: command.replyToEnvelopeId,
     });
-    return this.#mapSendOutcome(encryption.outcome, encryption.outcome === "encrypted" ? encryption.envelope.id : undefined);
+    const result = this.#mapSendOutcome(encryption.outcome, encryption.outcome === "encrypted" ? encryption.envelope.id : undefined);
+
+    // Secure Runtime Alpha 1841–1920 Phase C (Alpha 1842/1843/1850) — the
+    // ONE place plaintext is handed to standard NIP-17 preparation,
+    // still in scope from the `encrypt()` call above. Local storage
+    // ("sent-locally") ALWAYS happens first and independently — a
+    // delivery failure here is reported as a SEPARATE fact (Alpha 1851),
+    // never downgrades or erases the local-storage outcome.
+    if (result.outcome === "sent-locally" && this.#deps.delivery !== undefined) {
+      const delivery = await this.#deps.delivery.sendMailboxNip17(result.envelopeId, conversationId, plaintext);
+      return { ...result, delivery };
+    }
+
+    return result;
   }
 
   async readDirectMessage(command: FedosConversationDirectMessageReadCommand): Promise<FedosConversationDirectMessageReadResult> {

@@ -233,6 +233,26 @@ export interface FedosDesktopRuntimeConfig {
   /** Optional — Inbound Subscription is activated ONLY when this is supplied. No silent default subscription of any kind. */
   readonly conversationTransportInbound?: FedosPrivateTransportInboundConfig;
   /**
+   * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport
+   * Integration and Group Pairwise Delivery Arc") Phase C/G (Alpha
+   * 1844/1878) — the ONE explicit, closed route-selection knob for
+   * Direct (and, transitively, Group pairwise) send delivery. Omitted
+   * (the default) — `sendDirectMessage()` behaves byte-for-byte as
+   * before this Arc: local storage only, no standard delivery attempted,
+   * no Relay event of this kind ever emitted. `"nostr-nip17-v1"` —
+   * REQUIRES `privateTransportEnabled: true` (this route rides the SAME
+   * Private Transport queue/Scheduler/Multi-Relay/Observation, never a
+   * second Outbox domain); a real `NostrNip17V1WireAdapter` is
+   * constructed and injected into `FedosPrivateTransport`'s own
+   * `wireAdapter`, and `sendDirectMessage()` additionally prepares +
+   * durably enqueues a standard Gift Wrap for every successfully
+   * locally-stored Direct message. NEVER a heuristic, NEVER a silent
+   * fallback to `fedos-private-v1` if unavailable (Alpha 1844).
+   */
+  readonly conversationDirectMessageDeliveryRoute?: "nostr-nip17-v1";
+  /** Alpha 1844 — optional; forwarded to `NostrNip17V1WireAdapter`'s own `localAccountIndex` (defaults `0`). Only meaningful with `conversationDirectMessageDeliveryRoute: "nostr-nip17-v1"`. */
+  readonly conversationNip17LocalAccountIndex?: number;
+  /**
    * Secure Runtime Alpha 1113 ("Runtime Encryption Configuration") —
    * Phase A of the Alpha 1111–1180 Private Conversation Activation and
    * Direct Messaging Runtime Arc. Threads the Alpha 949 encryption

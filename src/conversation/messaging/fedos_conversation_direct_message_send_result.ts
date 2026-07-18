@@ -13,10 +13,21 @@
  * ever surfacing an intermediate write to a caller — the identical
  * reasoning `FedosConversationDirectActivationResult` already applies to
  * `"partial-activation"`.
+ *
+ * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport Integration
+ * and Group Pairwise Delivery Arc") Phase C (Alpha 1851) — ADDITIVE,
+ * OPTIONAL `delivery` field on `"sent-locally"` ONLY. Alpha 1851's own
+ * "never label Relay ACK as recipient delivery, return SEPARATE facts"
+ * instruction: `delivery` is a SEPARATE fact from local storage, present
+ * ONLY when a caller configured standard delivery (`deps.delivery` on
+ * `FedosConversationDirectMessagingCoordinatorDependencies`) — omitted
+ * entirely for every caller that did not, so this remains 100%
+ * source-compatible with every existing caller/test.
  */
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
 
 export type FedosConversationDirectMessageSendResult =
-  | { readonly outcome: "sent-locally"; readonly envelopeId: string }
+  | { readonly outcome: "sent-locally"; readonly envelopeId: string; readonly delivery?: FedosPrivateWireDeliveryQueueOutcome }
   | { readonly outcome: "invalid-input" }
   | { readonly outcome: "conversation-not-found" }
   | { readonly outcome: "conversation-not-active" }

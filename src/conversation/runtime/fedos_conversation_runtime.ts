@@ -134,6 +134,7 @@ import { InMemoryFedosPayloadRetentionPersistence } from "../retention/in_memory
 import { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
 import {
   FedosConversationDirectMessagingCoordinator,
+  type FedosConversationDirectMessageDeliveryDependencies,
   type FedosConversationDirectMessageSendCommand,
   type FedosConversationDirectMessageReadCommand,
 } from "../messaging/fedos_conversation_direct_messaging_coordinator.js";
@@ -165,6 +166,11 @@ import type { FedosPrivateNostrImportRecordPersistence } from "../delivery/nostr
 import { InMemoryFedosPrivateNostrImportRecordPersistence } from "../delivery/nostr/in_memory_fedos_private_nostr_import_record_persistence.js";
 import type { FedosPrivateNostrDeliveryPublisher } from "../delivery/nostr/fedos_private_nostr_delivery_publisher.js";
 import { FedosConversationPrivateNostrDeliveryRuntime } from "../delivery/nostr/fedos_conversation_private_nostr_delivery_runtime.js";
+import {
+  FedosNip17InboundImportCoordinator,
+  type FedosNip17InboundReceiveResult,
+} from "../delivery/nostr/nip17/fedos_nip17_inbound_import_coordinator.js";
+import type { FedosPrivateWireParsedRumor } from "../transport/fedos_private_wire_adapter.js";
 
 /**
  * The full injected dependency set — the construction coordinator's own
@@ -245,6 +251,32 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
   readonly privateNostrDefaultMode?: FedosPrivateNostrDeliveryMode;
   /** Optional; omitted, `[]` (a caller must then supply `relayUrls` per call). */
   readonly privateNostrDefaultRelayUrls?: readonly string[];
+  /**
+   * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport
+   * Integration and Group Pairwise Delivery Arc") Phase C (Alpha 1843/
+   * 1844) — OPTIONAL. Passed straight through to
+   * `FedosConversationDirectMessagingCoordinator`'s own identically-named
+   * field; see that file's own header for the exact, narrow shape and
+   * why omitting it leaves `sendDirectMessage()` byte-for-byte unchanged
+   * from before this Arc. Also reused, unchanged, by the Group Runtime's
+   * own `FedosGroupSendCoordinator` fanout (`groupRuntime()` below) —
+   * that coordinator already calls THIS SAME `sendDirectMessage()` once
+   * per active recipient's own Direct path Conversation (Alpha 1341–1354,
+   * unmodified), so a standard delivery route configured here
+   * automatically reaches Group pairwise fanout with zero Group-specific
+   * code.
+   */
+  readonly directMessageDelivery?: FedosConversationDirectMessageDeliveryDependencies;
+  /**
+   * Secure Runtime Alpha 1841–1920 Phase D (Alpha 1861/1893) — OPTIONAL;
+   * omitted, a fresh, SEPARATE `InMemoryFedosPrivateNostrImportRecordPersistence`
+   * is constructed (never shared with `privateNostrImportRecordPersistence`
+   * above — that one dedups the PROPRIETARY route; this one dedups the
+   * STANDARD NIP-17 route, keyed by Rumor id rather than outer wire event
+   * id — see `fedos_nip17_inbound_import_coordinator.ts`'s own header for
+   * why the two must never collapse into one dedup namespace).
+   */
+  readonly nip17ImportRecordPersistence?: FedosPrivateNostrImportRecordPersistence;
 };
 
 export class FedosConversationRuntime {
@@ -260,6 +292,7 @@ export class FedosConversationRuntime {
   readonly #directMessagingCoordinator: FedosConversationDirectMessagingCoordinator;
   readonly #groupRuntime: FedosConversationGroupRuntime;
   readonly #privateNostrDeliveryRuntime: FedosConversationPrivateNostrDeliveryRuntime;
+  readonly #nip17InboundImportCoordinator: FedosNip17InboundImportCoordinator;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
@@ -293,6 +326,8 @@ export class FedosConversationRuntime {
     // not already deny.
     const retentionPersistence = deps.retentionPersistence ?? new InMemoryFedosPayloadRetentionPersistence();
     const retentionAuthority = new FedosPayloadRetentionAuthority({ retentionPersistence, payloadStorage, clock: deps.clock });
+    const envelopeIdGenerator = deps.envelopeIdGenerator ?? new FedosSecureRandomConversationEnvelopeIdGenerator();
+    const payloadIdGenerator = deps.payloadIdGenerator ?? new FedosSecureRandomConversationPayloadIdGenerator();
 
     this.#encryptionCoordinator = new FedosConversationEncryptionCoordinator({
       draftPersistence: deps.draftPersistence,
@@ -304,8 +339,8 @@ export class FedosConversationRuntime {
       envelopePersistence,
       payloadStorage,
       coordinationPersistence: deps.encryptionCoordinationPersistence ?? new InMemoryFedosConversationEncryptionCoordinationPersistence(),
-      envelopeIdGenerator: deps.envelopeIdGenerator ?? new FedosSecureRandomConversationEnvelopeIdGenerator(),
-      payloadIdGenerator: deps.payloadIdGenerator ?? new FedosSecureRandomConversationPayloadIdGenerator(),
+      envelopeIdGenerator,
+      payloadIdGenerator,
       idempotencyKeyGenerator: deps.encryptionIdempotencyKeyGenerator ?? new FedosSecureRandomEncryptionIdempotencyKeyGenerator(),
       clock: deps.clock,
     });
@@ -352,6 +387,28 @@ export class FedosConversationRuntime {
       retentionAuthority,
       encryptionCoordinator: this.#encryptionCoordinator,
       decryptionCoordinator: this.#decryptionCoordinator,
+      delivery: deps.directMessageDelivery,
+    });
+
+    // Secure Runtime Alpha 1841–1920 Phase D (Alpha 1856–1861) — reuses
+    // the SAME identityResolver/encryptionAuthority/envelopePersistence/
+    // payloadStorage/id-generator instances already built above, never a
+    // second, divergent graph (Alpha 1879's own "one coherent graph"
+    // rule, applied to inbound the same way `#activationCoordinator`
+    // already applies it to outbound).
+    this.#nip17InboundImportCoordinator = new FedosNip17InboundImportCoordinator({
+      draftPersistence: deps.draftPersistence,
+      activationPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      localAccountIndex: accountIndexAuthority.localAccountIndex(),
+      encryptionAuthority,
+      envelopePersistence,
+      payloadStorage,
+      envelopeIdGenerator,
+      payloadIdGenerator,
+      importRecordPersistence: deps.nip17ImportRecordPersistence ?? new InMemoryFedosPrivateNostrImportRecordPersistence(),
+      clock: deps.clock,
     });
 
     // Alpha 1321–1390 — the Group Runtime facade. Always constructible
@@ -700,6 +757,19 @@ export class FedosConversationRuntime {
    */
   privateNostrDelivery(): FedosConversationPrivateNostrDeliveryRuntime {
     return this.#privateNostrDeliveryRuntime;
+  }
+
+  /**
+   * Secure Runtime Alpha 1841–1920 Phase D (Alpha 1856–1861) — the ONE
+   * inbound entry point for an already fully unwrapped, fully
+   * authenticated standard NIP-17 Rumor (a real inbound subscription
+   * dispatches through `NostrNip17V1WireAdapter.parse()` first — see
+   * `fedos_nip17_inbound_import_coordinator.ts`'s own header for the
+   * exact division of labor). Delegates entirely; this Runtime performs
+   * no crypto/admission/import logic of its own.
+   */
+  async receiveNip17Rumor(rumor: FedosPrivateWireParsedRumor, relaySource: string | null): Promise<FedosNip17InboundReceiveResult> {
+    return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
   }
 }
 

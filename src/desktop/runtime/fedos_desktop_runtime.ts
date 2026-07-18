@@ -145,6 +145,8 @@ import { InMemoryFedosConversationTransportOutboxPersistence } from "../../conve
 import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
 import { FedosConversationRelaySet } from "../../conversation/transport/relay/fedos_conversation_relay_set.js";
 import { FedosPrivateTransport } from "../../conversation/transport/fedos_private_transport.js";
+import { NostrNip17V1WireAdapter } from "../../conversation/delivery/nostr/nip17/fedos_nostr_nip17_v1_wire_adapter.js";
+import type { FedosConversationDirectMessageDeliveryDependencies } from "../../conversation/messaging/fedos_conversation_direct_messaging_coordinator.js";
 
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
@@ -252,6 +254,27 @@ export async function startFedosDesktopRuntime(
         "startFedosDesktopRuntime: privateTransportEnabled is true but no conversationTransportSigningAuthority was supplied — this runtime constructs no Signing Authority of its own.",
       );
     }
+  }
+  // Secure Runtime Alpha 1841-1920 Phase G (Alpha 1844/1878) -- the
+  // standard route rides the SAME Private Transport this guard block
+  // already gates; requesting it without transport enabled is a genuine
+  // configuration error, thrown synchronously, never a silent no-op.
+  if (config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && !config.privateTransportEnabled) {
+    throw new Error(
+      "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but privateTransportEnabled is not true -- the standard route requires the Private Transport queue/Scheduler/Multi-Relay plumbing.",
+    );
+  }
+  // Secure Runtime Alpha 1841-1920 Phase C (Alpha 1843) -- the standard
+  // route's own NIP-44 Seal encryption MUST use the SAME Master Seed
+  // `conversationTransportSigningAuthority`'s own real Nostr identity is
+  // derived from (NIP-44's ECDH requires the matching private key) --
+  // never a second, independent, incoherent crypto identity. A real
+  // Production Crypto Graph is therefore REQUIRED, never defaulted or
+  // silently substituted with an unrelated fresh WASM master seed.
+  if (config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && config.conversationProductionCrypto === undefined) {
+    throw new Error(
+      "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but conversationProductionCrypto was not supplied -- the standard route requires a real, coherent Master Seed graph for NIP-44/NIP-59, never a second, independent identity.",
+    );
   }
 
   ensureParentDirectoryExists(config.boardLogPath);
@@ -401,6 +424,28 @@ export async function startFedosDesktopRuntime(
     }
   }
 
+  // Secure Runtime Alpha 1841-1920 Phase C/G (Alpha 1843/1844/1879) --
+  // forward-declared HERE, BEFORE `conversationRuntimeInstance` is built
+  // below, so the closure handed to it can reference the Private
+  // Transport instance this function does not construct until AFTER the
+  // Conversation Runtime (mirrors `membershipsForConversation`'s own
+  // identical forward-reference-via-closure discipline a few dozen lines
+  // below, applied in the opposite direction). By the time
+  // `sendDirectMessage()` is EVER actually called (well after this whole
+  // function returns), `privateTransportInstance` is already assigned --
+  // this is a construction-order convenience, never a live race.
+  let privateTransportInstance: FedosPrivateTransport | undefined;
+  const directMessageDelivery: FedosConversationDirectMessageDeliveryDependencies | undefined =
+    config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1"
+      ? {
+          route: "nostr-nip17-v1",
+          sendMailboxNip17: async (envelopeId, conversationId, plaintext) => {
+            if (privateTransportInstance === undefined) return { outcome: "route-unavailable" };
+            return privateTransportInstance.sendMailboxNip17(envelopeId as never, conversationId as never, plaintext);
+          },
+        }
+      : undefined;
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -408,8 +453,8 @@ export async function startFedosDesktopRuntime(
   // nothing. Encryption readiness defaults to UNAVAILABLE, so every draft
   // it constructs stays "draft" -- never active, never a message (Alpha
   // 924/928).
-  const conversationRuntimeInstance = createFedosConversationRuntime(
-    assembleFedosConversationRuntimeDependencies({
+  const conversationRuntimeInstance = createFedosConversationRuntime({
+    ...assembleFedosConversationRuntimeDependencies({
       draftLogPath: config.conversationDraftLogPath,
       membershipLogPath: config.conversationMembershipLogPath,
       capabilityLogPath: config.conversationCapabilityLogPath,
@@ -465,7 +510,8 @@ export async function startFedosDesktopRuntime(
       privateNostrDefaultMode: config.conversationPrivateNostrDefaultMode,
       privateNostrDefaultRelayUrls: config.conversationPrivateNostrDefaultRelayUrls,
     }),
-  );
+    directMessageDelivery,
+  });
 
   // Secure Runtime Alpha 1471-1540 -- exactly one FedosPrivateTransport
   // per running runtime, constructed ONLY when config.privateTransportEnabled
@@ -475,7 +521,14 @@ export async function startFedosDesktopRuntime(
   // Reaches into conversationRuntimeInstance for membership reads ONLY
   // (`listMemberships`), the SAME narrow-accessor discipline
   // `FedosConversationTransportSignedEventSource` itself requires.
-  let privateTransportInstance: FedosPrivateTransport | undefined;
+  //
+  // Secure Runtime Alpha 1841-1920 Phase C/G (Alpha 1843/1844) --
+  // `privateTransportInstance` itself is declared ABOVE (before
+  // `conversationRuntimeInstance`, for the closure reason documented
+  // there); this block only ASSIGNS it now. A real `NostrNip17V1WireAdapter`
+  // is constructed and injected as `wireAdapter` ONLY when
+  // `conversationDirectMessageDeliveryRoute` selected the standard route
+  // -- never unconditionally, never as a silent default.
   let privateTransportStarted = false;
   if (config.privateTransportEnabled) {
     const conversationTransportOutboxPersistence: FedosConversationTransportOutboxPersistence =
@@ -485,6 +538,41 @@ export async function startFedosDesktopRuntime(
     const conversationTransportObservationRepository = new FedosDeliveryObservationRepository(
       new AppendOnlyFedosDeliveryObservationPersistence(config.conversationTransportObservationLogPath!),
     );
+    // `nip44Wire` MUST be the SAME Master Seed `conversationTransportSigningAuthority`'s
+    // own real identity is derived from -- the top-of-function guard
+    // above already REQUIRES `conversationProductionCrypto` (hence a
+    // resolved, "available" `productionCryptoGraph`) whenever this route
+    // is selected; a caller reaching this line with the route selected
+    // but no resolved graph is a genuine, unrecoverable misconfiguration
+    // this Transport was never meant to paper over.
+    const nip17WireAdapter =
+      config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && productionCryptoGraph !== null
+        ? new NostrNip17V1WireAdapter({
+            localAccountIndex: config.conversationNip17LocalAccountIndex ?? config.conversationTransportAccountIndex ?? 0,
+            signingAuthority: config.conversationTransportSigningAuthority!,
+            nip44Wire: productionCryptoGraph.masterSeedAuthority,
+          })
+        : undefined;
+
+    // Secure Runtime Alpha 1841-1920 Phase D (Alpha 1856/1860) -- when the
+    // caller ALSO configured Inbound Subscription (`conversationTransportInbound`,
+    // still never a silent default), a standard-route Rumor is routed
+    // straight into `conversationRuntimeInstance`'s own admission/import
+    // pipeline (`receiveNip17Rumor()`) -- the SAME coherent graph, never a
+    // second, caller-owned import path the caller would otherwise have
+    // to reimplement by hand.
+    const inboundConfig =
+      config.conversationTransportInbound !== undefined
+        ? {
+            ...config.conversationTransportInbound,
+            onRumor:
+              nip17WireAdapter !== undefined
+                ? (rumor: Parameters<typeof conversationRuntimeInstance.receiveNip17Rumor>[0], relaySource: string) => {
+                    void conversationRuntimeInstance.receiveNip17Rumor(rumor, relaySource);
+                  }
+                : config.conversationTransportInbound.onRumor,
+          }
+        : undefined;
 
     privateTransportInstance = new FedosPrivateTransport({
       relaySet: new FedosConversationRelaySet(config.conversationTransportRelays!),
@@ -497,7 +585,8 @@ export async function startFedosDesktopRuntime(
       observationRepository: conversationTransportObservationRepository,
       intervalMs: config.conversationTransportIntervalMs ?? DEFAULT_CONVERSATION_TRANSPORT_INTERVAL_MS,
       publisher: config.conversationTransportPublisher,
-      inbound: config.conversationTransportInbound,
+      inbound: inboundConfig,
+      wireAdapter: nip17WireAdapter,
     });
     await privateTransportInstance.start();
     privateTransportStarted = true;
