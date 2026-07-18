@@ -43,6 +43,7 @@
 
 import type { FedosConversationRelaySet } from "./relay/fedos_conversation_relay_set.js";
 import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosPrivateWireAdapter } from "./fedos_private_wire_adapter.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
@@ -102,6 +103,29 @@ export interface FedosPrivateTransportDependencies {
   readonly now?: () => number;
   /** OPTIONAL — Inbound Subscription is activated ONLY when this is supplied. No silent default subscription of any kind. */
   readonly inbound?: FedosPrivateTransportInboundConfig;
+  /**
+   * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+   * Standard Delivery Arc") Phase G (Alpha 1788) — OPTIONAL. Narrow
+   * constructor-injection ONLY: a caller MAY supply a
+   * `FedosPrivateWireAdapter` (`fedos_private_wire_adapter.js`) and
+   * retrieve it via `wireAdapter()` below, but this Transport's own
+   * internal outbound dispatch (`FedosConversationTransportSignedEventSource`,
+   * unchanged) and inbound path (`FedosConversationInboundSubscription`,
+   * unchanged) do NOT yet route through it — that deeper rewiring is a
+   * real, separate, deliberately deferred piece of work (see the
+   * completion declaration's own honest boundary: the Transport's
+   * existing outbound path resolves already-encrypted, plaintext-free
+   * ciphertext via `FedosConversationMessageEnvelope`/
+   * `FedosConversationPayloadStorage` — by design, neither ever carries
+   * plaintext — BEFORE any Wire Adapter is reached, but the standard
+   * NIP-17 route structurally requires the original plaintext; sourcing
+   * it at the right seam without redesigning the Envelope/Payload
+   * domains is real surgery this Arc's own "extend, don't redesign"
+   * discipline does not rush). This field exists so a caller CAN start
+   * holding/passing a real adapter reference today, ahead of that future
+   * wiring, without a second breaking constructor change later.
+   */
+  readonly wireAdapter?: FedosPrivateWireAdapter;
 }
 
 export class FedosPrivateTransport {
@@ -116,6 +140,7 @@ export class FedosPrivateTransport {
   readonly #scheduler: FedosConversationTransportScheduler;
   readonly #now: () => number;
   readonly #inboundConfig: FedosPrivateTransportInboundConfig | undefined;
+  readonly #wireAdapter: FedosPrivateWireAdapter | undefined;
 
   #inboundSubscription: FedosConversationInboundSubscription | null = null;
   #running = false;
@@ -124,6 +149,7 @@ export class FedosPrivateTransport {
     this.#relaySet = dependencies.relaySet;
     this.#signingAuthority = dependencies.signingAuthority;
     this.#localAccountIndex = dependencies.localAccountIndex;
+    this.#wireAdapter = dependencies.wireAdapter;
     this.#outboxPersistence = dependencies.outboxPersistence;
     this.#envelopePersistence = dependencies.envelopePersistence;
     this.#now = dependencies.now ?? Date.now;
@@ -160,6 +186,18 @@ export class FedosPrivateTransport {
 
   isRunning(): boolean {
     return this.#running;
+  }
+
+  /**
+   * Secure Runtime Alpha 1761–1840 Phase G (Alpha 1788) — read-only
+   * accessor for the OPTIONAL injected `FedosPrivateWireAdapter`, or
+   * `undefined` if none was supplied at construction. See
+   * `FedosPrivateTransportDependencies.wireAdapter`'s own doc comment
+   * for the exact, honest scope of this injection today (retrievable,
+   * not yet dispatched-through internally).
+   */
+  wireAdapter(): FedosPrivateWireAdapter | undefined {
+    return this.#wireAdapter;
   }
 
   /**

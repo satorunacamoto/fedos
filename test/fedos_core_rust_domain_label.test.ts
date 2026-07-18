@@ -135,8 +135,12 @@ describe("FedOS Rust crate — internal domain label skeleton", () => {
       "sign_nostr_event",
       "public_key_hex_for_account",
       "resolve_conversation_key",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
     ];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

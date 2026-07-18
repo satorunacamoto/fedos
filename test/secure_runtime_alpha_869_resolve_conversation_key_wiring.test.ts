@@ -38,6 +38,8 @@ function boundaryWithResolveResult(
     attemptDevOnlyMasterSeedRestoreSealedCall: vi.fn(),
     attemptDevOnlyMasterSeedClearCall: vi.fn(),
     attemptDevOnlyMasterSeedResolveConversationKeyCall: vi.fn(async () => resolveResult),
+    attemptDevOnlyEncryptNip44WireCall: vi.fn(),
+    attemptDevOnlyDecryptNip44WireCall: vi.fn(),
   };
 }
 

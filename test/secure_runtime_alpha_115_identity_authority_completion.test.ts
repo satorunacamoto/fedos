@@ -175,7 +175,7 @@ describe("Secure Runtime Alpha 115 -- Identity Authority Completion", () => {
 
   it("13. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED across the whole Arc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
     for (const stage of ARC_STAGES) {
       expect(libRsSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
       expect(cargoTomlSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));

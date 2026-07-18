@@ -37,9 +37,9 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1613: Canonical Route Decision
     expect(resolveFedosPrivateWireRoute("fedos-private-v1", (route) => table[route])).toBe("fedos-private-v1");
   });
 
-  it("4. explicitly requesting nostr-nip17-v1 resolves to unsupported today -- never a silent fallback to fedos-private-v1 (Alpha 1648 No-Downgrade Rule)", () => {
+  it("4. explicitly requesting nostr-nip17-v1 resolves to nostr-nip17-v1 -- real as of Secure Runtime Alpha 1761-1840's own Phase B/G, never a silent fallback to fedos-private-v1 either way (Alpha 1648 No-Downgrade Rule)", () => {
     const table = adapters();
-    expect(resolveFedosPrivateWireRoute("nostr-nip17-v1", (route) => table[route])).toBe("unsupported");
+    expect(resolveFedosPrivateWireRoute("nostr-nip17-v1", (route) => table[route])).toBe("nostr-nip17-v1");
   });
 
   it("5. the default does not depend on which adapters are constructed/passed in -- same fixed value regardless (Alpha 1613's own 'never silently changes based on available files')", () => {
@@ -71,8 +71,8 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1614/1616: FedosPrivateV1WireA
     expect(adapter.isAvailable()).toBe(true);
   });
 
-  it("2. build() produces a request at the shared proprietary kind, never kind 1", () => {
-    const result = adapter.build({
+  it("2. build() produces a request at the shared proprietary kind, never kind 1", async () => {
+    const result = await adapter.build({
       envelope: fakeEnvelope(),
       ciphertext: new Uint8Array([1, 2, 3]),
       counterpartyPublicKeyHex: "b".repeat(64),
@@ -85,8 +85,8 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1614/1616: FedosPrivateV1WireA
     }
   });
 
-  it("3. parse() is not-mine for an unrelated descriptor, parsed for one built by this same adapter", () => {
-    const built = adapter.build({
+  it("3. parse() is not-mine for an unrelated descriptor, parsed for one built by this same adapter", async () => {
+    const built = await adapter.build({
       envelope: fakeEnvelope(),
       ciphertext: new Uint8Array([9, 9]),
       counterpartyPublicKeyHex: "b".repeat(64),
@@ -104,7 +104,7 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1614/1616: FedosPrivateV1WireA
       content: built.request.content,
       signature: "sig",
     });
-    expect(adapter.parse(descriptor).outcome).toBe("parsed");
+    expect((await adapter.parse(descriptor)).outcome).toBe("parsed");
 
     const unrelated: FedosEventDescriptor = Object.freeze({
       id: "event-2",
@@ -116,20 +116,20 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1614/1616: FedosPrivateV1WireA
       content: "",
       signature: "sig",
     });
-    expect(adapter.parse(unrelated).outcome).toBe("not-mine");
+    expect((await adapter.parse(unrelated)).outcome).toBe("not-mine");
   });
 });
 
-describe("Secure Runtime Alpha 1611-1690 -- Alpha 1616/1617: NostrNip17V1WireAdapter (real module, permanently unsupported today)", () => {
+describe("Secure Runtime Alpha 1611-1690/1761-1840 -- Alpha 1616/1788: NostrNip17V1WireAdapter (real module as of the NIP-17 Rumor Seal Gift Wrap Standard Delivery Arc)", () => {
   const adapter = new NostrNip17V1WireAdapter();
 
-  it("1. route is nostr-nip17-v1 and it is never available", () => {
+  it("1. route is nostr-nip17-v1 and it is available -- the Alpha 1617 Normative Source Gate blocker is resolved (Phase B/E/F's own real, verified implementation)", () => {
     expect(adapter.route).toBe("nostr-nip17-v1");
-    expect(adapter.isAvailable()).toBe(false);
+    expect(adapter.isAvailable()).toBe(true);
   });
 
-  it("2. build() always resolves to unsupported -- never a partial/best-effort event", () => {
-    const result = adapter.build({
+  it("2. build() resolves to unsupported when no plaintext is supplied -- the proprietary route's own already-encrypted ciphertext is never reused as NIP-44 wire ciphertext", async () => {
+    const result = await adapter.build({
       envelope: fakeEnvelope(),
       ciphertext: new Uint8Array([1, 2, 3]),
       counterpartyPublicKeyHex: "b".repeat(64),
@@ -138,17 +138,42 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1616/1617: NostrNip17V1WireAda
     expect(result).toEqual({ outcome: "unsupported" });
   });
 
-  it("3. parse() always resolves to unsupported -- never a best-effort partial parse", () => {
+  it("3. build() resolves to unsupported for a malformed counterparty public key, even with plaintext supplied", async () => {
+    const result = await adapter.build({
+      envelope: fakeEnvelope(),
+      ciphertext: new Uint8Array([1, 2, 3]),
+      counterpartyPublicKeyHex: "not-a-real-hex-pubkey",
+      localAccountIndex: 0,
+      plaintext: new TextEncoder().encode("hello"),
+    });
+    expect(result).toEqual({ outcome: "unsupported" });
+  });
+
+  it("4. parse() is not-mine for a non-Gift-Wrap kind -- never a best-effort partial parse", async () => {
+    const descriptor: FedosEventDescriptor = Object.freeze({
+      id: "event-1",
+      provider: "nostr",
+      author: "a".repeat(64),
+      createdAt: 0,
+      kind: 1,
+      tags: [],
+      content: "",
+      signature: "sig",
+    });
+    expect(await adapter.parse(descriptor)).toEqual({ outcome: "not-mine" });
+  });
+
+  it("5. parse() is not-mine for a structurally Gift-Wrap-shaped but undecryptable descriptor (no real Master Seed held by this test's own adapter instance)", async () => {
     const descriptor: FedosEventDescriptor = Object.freeze({
       id: "event-1",
       provider: "nostr",
       author: "a".repeat(64),
       createdAt: 0,
       kind: 1059,
-      tags: [],
-      content: "",
+      tags: [["p", "b".repeat(64)]],
+      content: "not-a-real-nip44-payload",
       signature: "sig",
     });
-    expect(adapter.parse(descriptor)).toEqual({ outcome: "unsupported" });
+    expect(await adapter.parse(descriptor)).toEqual({ outcome: "not-mine" });
   });
 });

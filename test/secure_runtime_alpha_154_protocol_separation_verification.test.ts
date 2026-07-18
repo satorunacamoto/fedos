@@ -94,9 +94,9 @@ describe("Secure Runtime Alpha 154 -- Protocol Separation Verification", () => {
 
   it("10. Regression: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
   });
 
   it("11. Regression: subtle usage remains confined to the master_root module", () => {

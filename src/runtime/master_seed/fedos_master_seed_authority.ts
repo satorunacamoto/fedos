@@ -37,4 +37,28 @@ export interface FedosMasterSeedAuthority {
    * off-curve counterparty key).
    */
   resolveConversationKey(accountIndex: number, counterpartyPublicKeyHex: string): Promise<AeadKeyHandle | null>;
+
+  /**
+   * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+   * Delivery Arc") Phase B — encrypts `plaintext` (a caller-supplied
+   * Rumor/Seal serialization; this method performs NO Rumor/Seal
+   * construction of its own) into a genuine NIP-44 v2 WIRE payload string
+   * for the pairwise conversation between `accountIndex` and
+   * `counterpartyPublicKeyHex`. This is NOT [`resolveConversationKey`] +
+   * `encrypt()` (`../fedos_runtime_encrypt.js`) — that pipeline produces
+   * this crate's own generic Envelope AEAD ciphertext, never standard
+   * NIP-44 wire ciphertext a real Nostr client could decrypt. `null` on
+   * ANY failure (no Master Seed held, malformed input, or an internal
+   * derivation/encrypt failure) — fail closed, never a partial payload.
+   */
+  encryptNip44Wire(accountIndex: number, counterpartyPublicKeyHex: string, plaintext: Uint8Array): Promise<string | null>;
+
+  /**
+   * The decrypt-direction sibling of [`encryptNip44Wire`]. `null` on ANY
+   * failure — no Master Seed held, malformed input, a structurally
+   * malformed `payload`, OR a genuine authentication failure (wrong
+   * recipient or tampered ciphertext) — never distinguishing which, never
+   * a partial/best-effort plaintext.
+   */
+  decryptNip44Wire(accountIndex: number, counterpartyPublicKeyHex: string, payload: string): Promise<Uint8Array | null>;
 }

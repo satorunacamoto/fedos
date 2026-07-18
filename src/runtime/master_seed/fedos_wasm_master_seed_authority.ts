@@ -22,6 +22,8 @@ import {
   type FedosWasmLoaderMasterSeedRestoreSealedExecution,
   type FedosWasmLoaderMasterSeedSealExecution,
   type FedosWasmLoaderConversationKeyResolutionExecution,
+  type FedosWasmLoaderNip44WireEncryptExecution,
+  type FedosWasmLoaderNip44WireDecryptExecution,
   type FedosMasterSeedAuthorityHandle,
   type AeadKeyHandle,
 } from "../fedos_wasm_loader.js";
@@ -50,6 +52,18 @@ export interface FedosMasterSeedWasmLoaderBoundary {
     accountIndex: number,
     counterpartyPublicKeyHex: string,
   ): Promise<FedosWasmLoaderConversationKeyResolutionExecution>;
+  attemptDevOnlyEncryptNip44WireCall(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ): Promise<FedosWasmLoaderNip44WireEncryptExecution>;
+  attemptDevOnlyDecryptNip44WireCall(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ): Promise<FedosWasmLoaderNip44WireDecryptExecution>;
 }
 
 export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority {
@@ -137,6 +151,38 @@ export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority {
       counterpartyPublicKeyHex,
     );
     return result.succeeded ? result.keyHandle : null;
+  }
+
+  async encryptNip44Wire(
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ): Promise<string | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyEncryptNip44WireCall(
+      authority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+      plaintext,
+    );
+    return result.succeeded ? result.payload : null;
+  }
+
+  async decryptNip44Wire(
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ): Promise<Uint8Array | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyDecryptNip44WireCall(
+      authority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+      payload,
+    );
+    return result.succeeded ? result.plaintext : null;
   }
 
   /**

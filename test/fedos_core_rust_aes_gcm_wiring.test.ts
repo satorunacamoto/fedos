@@ -207,8 +207,12 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "sign_nostr_event",
       "public_key_hex_for_account",
       "resolve_conversation_key",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
     ];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
@@ -383,6 +387,10 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       // existing Alpha 146-200 chain; no signing, no new algorithm.
       "public_key_hex_for_account",
       "resolve_conversation_key",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

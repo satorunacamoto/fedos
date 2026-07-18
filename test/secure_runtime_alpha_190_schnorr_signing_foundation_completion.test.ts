@@ -126,9 +126,9 @@ describe("Secure Runtime Alpha 190 -- Nostr Schnorr Signing Foundation Completio
 
   it("8. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
   });
 
   it("9. structural: FedosNostrSignatureHandle and derive_nostr_signature_internal both exist, pub(crate) only, no wasm_bindgen", () => {

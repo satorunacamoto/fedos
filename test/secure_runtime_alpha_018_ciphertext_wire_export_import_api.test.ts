@@ -832,7 +832,7 @@ describe("Secure Runtime Alpha 018 -- Public Ciphertext Wire Export/Import APIs,
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
     expect(pubFnNames).toContain("serialize_aead_ciphertext");
     expect(pubFnNames).toContain("deserialize_aead_ciphertext");
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);

@@ -129,9 +129,9 @@ describe("Secure Runtime Alpha 203 -- Null Event Reader & Desktop Wiring Decisio
 
   it("11. structural: lib.rs #[wasm_bindgen] count and pub fn count remain fixed at 13/36 -- no new Rust export was added to justify wiring", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
   });
 
   // ---------------------------------------------------------------------

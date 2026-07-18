@@ -26,11 +26,17 @@ describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation"
       "pub fn sign_nostr_event(",
       "pub fn public_key_hex_for_account(",
       "pub fn resolve_conversation_key(",
+      // Secure Runtime Alpha 1761-1840 ("NIP-17 Rumor Seal Gift Wrap
+      // Standard Delivery Arc") Phase B -- the real NIP-44 wire bridge,
+      // additive, reusing every existing internal derivation/encrypt/
+      // decrypt function unmodified.
+      "pub fn encrypt_nip44_wire(",
+      "pub fn decrypt_nip44_wire(",
     ]) {
       expect(implBlock).toContain(method);
     }
     const pubFnCount = (implBlock.match(/pub fn /g) ?? []).length;
-    expect(pubFnCount).toBe(10);
+    expect(pubFnCount).toBe(12);
   });
 
   it("no method returns raw seed bytes to the caller", () => {

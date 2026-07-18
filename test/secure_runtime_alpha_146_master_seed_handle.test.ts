@@ -60,7 +60,7 @@ describe("Secure Runtime Alpha 146 -- Master Seed Handle", () => {
 
   it("6. structural: the crate's #[wasm_bindgen] count remains fixed at 13 -- confirming zero WASM exposure added", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
   });
 
   it("7. structural: no wasm_bindgen annotation exists anywhere inside the master_root module", () => {
@@ -78,7 +78,7 @@ describe("Secure Runtime Alpha 146 -- Master Seed Handle", () => {
 
   it("8. structural: the crate's total pub fn count remains fixed at 36 -- confirming zero public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
   });
 
   it("9. the design doc cross-references Alpha 141, Alpha 142, secret_handle_api_shape.md, and secret_lifecycle_implementation_plan.md", () => {

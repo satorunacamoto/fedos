@@ -220,7 +220,7 @@ describe("FedOS WASM artifact, not built, fail-closed everywhere (Stage 393-400,
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
   });
 
   it("19. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is untouched -- still fixed false", async () => {

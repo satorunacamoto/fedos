@@ -185,6 +185,10 @@ describe("FedOS Rust crate — ciphertext transport descriptor + NIP-44/storage 
     // look for.
     const knownAlpha869ConversationKeyWiringFns = [
       "resolve_conversation_key",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
       "derive_conversation_key_bytes_from_master_seed_internal",
     ];
     let libRsSanitized = libRsSource;
@@ -219,9 +223,12 @@ describe("FedOS Rust crate — ciphertext transport descriptor + NIP-44/storage 
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
     expect(pubFnNames).not.toContain("ciphertext_transport_descriptor");
     for (const name of pubFnNames) {
+      // Secure Runtime Alpha 1761-1840 Phase B -- real, reviewed NIP-44
+      // wire additions, not this stage's own concern.
+      if (name === "encrypt_nip44_wire" || name === "decrypt_nip44_wire") continue;
       expect(name.toLowerCase()).not.toContain("nip44");
       expect(name.toLowerCase()).not.toContain("transport");
     }

@@ -44,7 +44,21 @@ export interface FedosNostrUnsignedEventRequest {
 /** The one reserved character no tag field may contain — this Arc's own WASM wire separator (Secure Runtime Alpha 442). */
 const NOSTR_TAG_FIELD_SEPARATOR = "";
 /** Alpha 424's original public-post kind, plus Alpha 1399/1402's additive private-delivery kind — see this file's own header. A CLOSED set of exactly two, never an arbitrary caller-chosen number. */
-const SUPPORTED_NOSTR_KINDS: ReadonlySet<number> = new Set([1, FEDOS_PRIVATE_NOSTR_DELIVERY_KIND]);
+/**
+ * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+ * Delivery Arc") Phase D (Alpha 1774) — NIP-59's Seal kind, added to the
+ * closed allowlist below. The Seal MUST be signed by the REAL sender
+ * identity (NIP-17's own impersonation guard: "Clients MUST verify if
+ * pubkey of the kind:13 is the same pubkey as that of the
+ * unsignedMessageRumor" only holds if the Seal is genuinely signed by
+ * the real account) — never the ephemeral Gift-Wrap key (kinds
+ * 1059/21059), which uses a wholly separate, narrower authority
+ * (`../../conversation/delivery/nostr/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.ts`)
+ * that never touches the Master Seed and is therefore structurally
+ * incapable of appearing in this file's own allowlist.
+ */
+export const FEDOS_NIP59_SEAL_KIND = 13;
+const SUPPORTED_NOSTR_KINDS: ReadonlySet<number> = new Set([1, FEDOS_PRIVATE_NOSTR_DELIVERY_KIND, FEDOS_NIP59_SEAL_KIND]);
 const U32_MAX = 4_294_967_295;
 
 /**

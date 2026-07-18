@@ -56,11 +56,22 @@ export class FedosPrivateV1WireAdapter implements FedosPrivateWireAdapter {
     return true;
   }
 
-  build(input: FedosPrivateWireBuildInput): FedosPrivateWireBuildResult {
+  /**
+   * Secure Runtime Alpha 1761–1840 Phase G (Alpha 1788) — `async` only
+   * (the interface's own new shape; see `fedos_private_wire_adapter.ts`'s
+   * doc comment for the reviewed-defect rationale). The BODY below is
+   * byte-for-byte identical to before this Arc — never awaits anything,
+   * since `buildFedosPrivateTransportUnsignedEventRequest()` is, and
+   * remains, a pure synchronous function. Wrapping its already-synchronous
+   * result in a resolved `Promise` changes nothing observable about this
+   * adapter's behavior.
+   */
+  async build(input: FedosPrivateWireBuildInput): Promise<FedosPrivateWireBuildResult> {
     return { outcome: "built", request: buildFedosPrivateTransportUnsignedEventRequest(input) };
   }
 
-  parse(descriptor: FedosEventDescriptor): FedosPrivateWireParseResult {
+  /** Secure Runtime Alpha 1761–1840 Phase G (Alpha 1788) — `async` only, same rationale as `build()` above; the body is unchanged. */
+  async parse(descriptor: FedosEventDescriptor): Promise<FedosPrivateWireParseResult> {
     const parsed = parseFedosPrivateTransportEventDescriptor(descriptor);
     return parsed === null ? { outcome: "not-mine" } : { outcome: "parsed", event: parsed };
   }

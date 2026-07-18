@@ -210,4 +210,43 @@ describe("Secure Runtime Alpha 1471-1540 -- FedosPrivateTransport Coordinator", 
     expect(transport.isRunning()).toBe(true);
     await transport.stop();
   });
+
+  it("6. (Secure Runtime Alpha 1761-1840 Phase G) an optional injected wireAdapter is retrievable via wireAdapter() -- narrow constructor-injection only, no internal dispatch rewiring in this Arc", () => {
+    const relay = new ManualRelay("wss://relay.example");
+    const envelopePersistence = new InMemoryFedosConversationMessageEnvelopePersistence();
+    const payloadStorage = new InMemoryFedosConversationPayloadStorage();
+    const fakeAdapter = {
+      route: "nostr-nip17-v1" as const,
+      isAvailable: () => true,
+      build: async () => ({ outcome: "unsupported" as const }),
+      parse: async () => ({ outcome: "unsupported" as const }),
+    };
+
+    const withAdapter = new FedosPrivateTransport({
+      relaySet: new FedosConversationRelaySet([relay]),
+      signingAuthority: fakeSigningAuthority(),
+      localAccountIndex: 0,
+      envelopePersistence,
+      payloadStorage,
+      membershipsForConversation: () => [],
+      outboxPersistence: new InMemoryFedosConversationTransportOutboxPersistence(),
+      observationRepository: new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence()),
+      intervalMs: 1000,
+      wireAdapter: fakeAdapter,
+    });
+    expect(withAdapter.wireAdapter()).toBe(fakeAdapter);
+
+    const withoutAdapter = new FedosPrivateTransport({
+      relaySet: new FedosConversationRelaySet([relay]),
+      signingAuthority: fakeSigningAuthority(),
+      localAccountIndex: 0,
+      envelopePersistence,
+      payloadStorage,
+      membershipsForConversation: () => [],
+      outboxPersistence: new InMemoryFedosConversationTransportOutboxPersistence(),
+      observationRepository: new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence()),
+      intervalMs: 1000,
+    });
+    expect(withoutAdapter.wireAdapter()).toBeUndefined();
+  });
 });

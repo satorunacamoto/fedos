@@ -109,7 +109,7 @@ describe("Secure Runtime Alpha 199 -- Nostr Event Protocol Extensibility Review"
 
   it("10. structural: wasm_bindgen count remains fixed at 13, unchanged by this REVIEW-ONLY Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
   });
 
   // ---------------------------------------------------------------------

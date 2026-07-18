@@ -129,7 +129,7 @@ describe("FedOS Rust crate — public key-usage label boundary (Stage 106)", () 
       (m) => m[1],
     );
     expect(pubFnNames).toContain("fedos_key_usage_descriptor_placeholder");
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(50);
   });
 
   it("8. no Runtime / Worker / CryptoProvider connection anywhere related to key usage", () => {
