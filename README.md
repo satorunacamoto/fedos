@@ -8,6 +8,82 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2041–2120 — Conversation Identity
+> Restoration and Reactivation Arc (complete).** Closes the ONE real,
+> structural gap the prior Arc's own completion declaration named as its
+> recommended next step: archived Conversations restored their persisted
+> DATA correctly, but a restored Conversation had no production-grade path
+> back to normal send/read — the prior Arc's own round-trip test needed a
+> test-only workaround (directly seeding a child Direct Conversation's
+> Draft+Activation facts) just to prove a post-restore send wasn't
+> replayed. A mandatory Phase 1 reconciliation report
+> (`docs/secure_runtime_alpha_2041_2120_reconciliation_report.md`),
+> written and committed before any production code change, traced the
+> real gap in full: `resolveFedosConversationActiveConversation()`
+> requires a Draft record (Alpha 894) AND a `"completed"` Activation fact
+> (Alpha 1121), neither of which the archive ever replays (by frozen
+> design, unchanged); additionally, for a restored Group,
+> `FedosGroupGenerationAuthority.createNextGeneration()`/
+> `evaluateFedosGroupUsability()` both independently require the GROUP's
+> own top-level Draft too — a blocker the prior Arc's own analysis had not
+> named. `FedosConversationRuntime` — confirmed the correct owner over
+> `FedosConversationArchiveRuntime`/`FedosRunningDesktopRuntime` (both
+> considered and rejected in the reconciliation report §1) — gains ONE
+> new, additive method, `reactivateRestoredConversation(conversationId)`,
+> delegating to a new `FedosConversationReactivationCoordinator`
+> (`src/conversation/activation/`) composed ENTIRELY over existing,
+> unmodified machinery: it deterministically re-derives a missing Draft
+> from the ONE already-restored Membership fact with `role === "owner"`
+> (never invented), then activates every `direct` id — the top-level id
+> itself, or, for a restored Group, every distinct pairwise child Direct
+> Conversation its restored Paths reference — through the SAME, untouched
+> `FedosConversationDirectActivationCoordinator.activateDirectConversation()`
+> (Alpha 1122). Authorization reuses the SAME "local identity resolves and
+> holds an ACTIVE Membership on this id" gate `activateDirectConversation()`/
+> `sendGroupMessage()` already enforce — never a new authorization model;
+> a caller with no legitimate claim to a conversation gets `"unauthorized"`
+> (or, per child, `"not-member"`), and a genuinely unknown id gets
+> `"conversation-not-found"` before any identity check even runs. Every
+> write is idempotent (a repeat call reports `"already-active"`, never
+> re-running a durable write) and fails closed on a structurally corrupt
+> pre-existing Draft rather than silently re-deriving over it. The REAL
+> Application Round Trip acceptance test passes: a real
+> `startFedosDesktopRuntime()` source Runtime creates a Private Group,
+> admits two real-keyed recipients, sends, exports; a fully independent
+> destination Runtime restores, stops, and restarts as a genuinely fresh
+> instance — confirmed GENUINELY INERT first (`findConversation()` returns
+> `null`, `readinessForPrivateGroup()` reports `"failed"`) — then
+> `reactivateRestoredConversation()` reactivates the group's own Draft and
+> both real pairwise children; discovery now succeeds via real Runtime
+> read APIs (`findConversation()` returns the record,
+> `readinessForPrivateGroup()` reports `"usable"`); a genuinely NEW send
+> succeeds, a REPLY to it succeeds; a repeat reactivation call reports
+> `"already-active"` for both children with nothing duplicated; a second,
+> independent archive/restore cycle into a THIRD, fully fresh Runtime
+> reports the exact expected insert counts with zero duplicates, and
+> reactivation composes cleanly across that second cycle too. No
+> plaintext of any real message sent in the test appears anywhere in
+> either raw on-disk archive file; no network side effect is even
+> possible (no transport of any kind was ever configured). A dedicated
+> 12-test unit suite additionally covers the full security/idempotency
+> matrix directly (unauthorized, not-found, identity-unavailable,
+> creator-unresolvable, a structurally corrupt pre-existing Draft, an
+> already-present valid Draft trusted verbatim, a child no longer an
+> active member skipped while siblings still reactivate). A TRUE fresh
+> baseline was captured in this exact worktree (stash/re-run/restore, not
+> reused from any other Arc's own documented numbers): 764 passed files /
+> 192 failed at the clean pre-Arc tip; with this Arc's own changes
+> present, 762 passed / 196 failed — diffed file-by-file, confirming the
+> entire +4 delta is exactly four "git working tree is clean" review
+> guards reacting to this session's own not-yet-committed diff (the same
+> "red only until this Arc's own commit lands" phenomenon every prior Arc
+> already documents), with the +2 passed-file delta being this Arc's own
+> two new, fully-passing test files — zero real regressions. See
+> `docs/secure_runtime_alpha_2041_2120_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1921–1980 — Group Conversation Archive
 > Integration and Cross-Branch Recovery Arc (complete).** Extends the
 > Alpha 1541–1610/1691–1760 Archive Foundation/Runtime additively to

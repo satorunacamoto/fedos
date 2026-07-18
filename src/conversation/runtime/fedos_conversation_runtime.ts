@@ -129,6 +129,8 @@ import type { FedosConversationActivationPersistence } from "../activation/fedos
 import { InMemoryFedosConversationActivationPersistence } from "../activation/in_memory_fedos_conversation_activation_persistence.js";
 import { FedosConversationDirectActivationCoordinator } from "../activation/fedos_conversation_direct_activation_coordinator.js";
 import type { FedosConversationDirectActivationResult } from "../activation/fedos_conversation_direct_activation_result.js";
+import { FedosConversationReactivationCoordinator } from "../activation/fedos_conversation_reactivation_coordinator.js";
+import type { FedosConversationReactivationResult } from "../activation/fedos_conversation_reactivation_result.js";
 import type { FedosPayloadRetentionPersistence } from "../retention/fedos_payload_retention_persistence.js";
 import { InMemoryFedosPayloadRetentionPersistence } from "../retention/in_memory_fedos_payload_retention_persistence.js";
 import { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
@@ -260,6 +262,8 @@ export class FedosConversationRuntime {
   readonly #directMessagingCoordinator: FedosConversationDirectMessagingCoordinator;
   readonly #groupRuntime: FedosConversationGroupRuntime;
   readonly #privateNostrDeliveryRuntime: FedosConversationPrivateNostrDeliveryRuntime;
+  /** Alpha 2041–2120 — see `../activation/fedos_conversation_reactivation_coordinator.ts`'s own header. */
+  readonly #reactivationCoordinator: FedosConversationReactivationCoordinator;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
@@ -424,6 +428,21 @@ export class FedosConversationRuntime {
       clock: deps.clock,
     });
 
+    // Alpha 2041–2120 — reuses every EXISTING instance already constructed
+    // above (draftPersistence, membershipAuthority, identityResolver, the
+    // SAME #activationCoordinator, groupGenerationPersistence,
+    // groupDirectPathPersistence) rather than a second, divergent graph —
+    // see `../activation/fedos_conversation_reactivation_coordinator.ts`'s
+    // own header for the full rationale.
+    this.#reactivationCoordinator = new FedosConversationReactivationCoordinator({
+      draftPersistence: deps.draftPersistence,
+      membershipAuthority: deps.membershipAuthority,
+      identityResolver,
+      groupGenerationPersistence,
+      groupDirectPathPersistence,
+      activationCoordinator: this.#activationCoordinator,
+    });
+
     // Alpha 1391–1470 — the additive Private Nostr Delivery facade. Reuses
     // every EXISTING instance already constructed above (envelopePersistence,
     // payloadStorage, membershipAuthority, identityResolver,
@@ -517,6 +536,30 @@ export class FedosConversationRuntime {
    */
   async activateDirectConversation(conversationId: string): Promise<FedosConversationDirectActivationResult> {
     return this.#activationCoordinator.activateDirectConversation(conversationId);
+  }
+
+  /**
+   * Alpha 2041–2120 — reactivate a conversation whose identity/data an
+   * Archive `restoreConversationArchive()` already recovered, but whose
+   * Draft(+Activation, for `direct`) facts that restore deliberately never
+   * replays (Archive's own frozen exclusion, unchanged by this Arc — see
+   * `docs/secure_runtime_alpha_2041_2120_reconciliation_report.md`).
+   * Deterministically re-derives the missing Draft(s) from already-restored
+   * Membership `"owner"` facts (never invented), then activates every
+   * `direct` id through the SAME, unmodified `activateDirectConversation()`
+   * — for a `private-group` id, its OWN Draft is restored (so
+   * `createNextGeneration()`/`readinessForPrivateGroup()` keep working) and
+   * every distinct pairwise child Direct Conversation its restored Paths
+   * reference is reactivated independently. Requires the local identity to
+   * already hold an ACTIVE Membership on whatever id is being reactivated
+   * (the SAME authorization this codebase's own activation/send paths
+   * already apply) — never reactivates a conversation the caller has no
+   * legitimate claim to. Idempotent: calling it once, twice, or on an
+   * already-active conversation never duplicates or corrupts anything.
+   * Never throws.
+   */
+  async reactivateRestoredConversation(conversationId: string): Promise<FedosConversationReactivationResult> {
+    return this.#reactivationCoordinator.reactivateRestoredConversation(conversationId);
   }
 
   /**
