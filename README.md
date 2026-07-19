@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3161–3240 — Account-to-Device
+> Signature Verification Boundary Arc (complete).**
+> Architecture frozen: no redesign of the accepted Device Registry,
+> trust-state transition table, or Multi-Device Sync Foundation
+> (`src/sync/`, unmodified); no Desktop Runtime/Shell change; no
+> Archive/Search/Sender-Key/Group change; no new dependency, no Rust
+> change, `p2p/`/`.tmp_gen` untouched. Closes the exact blocker named
+> by Alpha 2921–3000: this codebase now has a real, independent Device
+> signing keypair (`src/device/crypto/`, `@noble/curves`
+> Schnorr/secp256k1 — the same already-shipped production library used
+> for Nostr verification — never derived from the Master Seed, never
+> the account key, opaque handle with no raw private-key getter), a
+> canonical versioned `FedosDeviceBindingChallengeV1` (fixed domain
+> separator, fixed-order array serialization, `register-device`/
+> `revoke-device` action, expiry, CSPRNG nonce), a detached
+> account-authorization signature reusing the existing kind-1 Nostr
+> signing authority unwidened, and a Device proof of possession under a
+> distinct signed preimage — neither signature alone can register or
+> self-authorize anything; both are independently re-verified on every
+> call. A new `FedosDeviceBindingRegistrationAuthority`
+> (`src/device/binding_challenge/`) orchestrates both checks plus a
+> durable, restart-safe replay/expiry guard (separate codec + in-memory
+> + append-only persistence, fail-closed on corruption, idempotent on
+> byte-identical resubmission, refused on any changed-byte reuse of a
+> consumed nonce) against the EXISTING, unmodified Device Registry
+> (`PersistedFedosDeviceTrustAuthority`, Alpha 2921–3000) — through an
+> internal `AlreadyVerifiedFedosDeviceRegistrationAuthority` this Arc's
+> own orchestrator is the only caller of, never a default anywhere else.
+> `UnavailableFedosDeviceRegistrationAuthority` remains untouched and
+> still fails closed. Account-authorized revocation is implemented
+> (separate action/domain, bound to the exact target device key,
+> terminal, idempotent, wrong-account denied) with no device-sync key
+> rotation and no remote-erasure claim. A Phase J factory
+> (`fedos_device_binding_boundary_factory.ts`) provides the one
+> construction point a future Desktop Runtime integration would call —
+> **not wired into `fedos_desktop_runtime.ts` in this Arc**, so this Arc
+> remains independently mergeable alongside the Desktop Content Accessor
+> Arc. One new test file, 48 tests, real BIP-340 Schnorr signatures
+> throughout (a test-only real-crypto signing-authority stand-in ships
+> nowhere in `src/`), covering the full 28-item required matrix,
+> including a genuine bug found and fixed in Phase C's own challenge
+> validator (an off-by-one field-count check that rejected every
+> well-formed challenge, caught by this Arc's first real-crypto test).
+> See `docs/secure_runtime_alpha_3161_3240_execution_spec.md` and
+> `docs/secure_runtime_alpha_3161_3240_completion_declaration.md`.
+> Recommended next Arc: **Device Registration Runtime Activation and
+> Encrypted Device-to-Device Sync Transport**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2921–3000 — Device Trust and
 > Multi-Device Runtime Integration Arc (complete, honest partial
 > capability — cryptographic Device authorization blocked).**
