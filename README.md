@@ -8,6 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2501–2580 — Conversation Search Runtime
+> Arc (complete).** Architecture frozen: no new Rust/WASM primitive, no
+> new `AeadAadDomain` variant, no new persistence port, no Host/GUI
+> wiring, no network transport of any kind. A pure TypeScript, in-memory,
+> derived indexing layer, `src/conversation/search/` (9 new files),
+> reusing Conversation Runtime (`src/conversation/runtime/`, Alpha
+> 921–930 — `FedosConversationRuntimeDependencies`'s own
+> `draftPersistence`/`membershipAuthority` pair, via a literal `Pick<>`,
+> not a merely same-shaped lookalike) and Archive
+> (`src/conversation/archive/`, Alpha 1541–1610 —
+> `FedosConversationArchiveBundleV1`, reusing its own existing envelope
+> codec verbatim). Implements a `FedosConversationSearchIndex` facade
+> over Incremental, Archive, Mode (satisfying both "group index" and
+> "direct index" off ONE shared `conversationId → mode` map, per
+> `FedosConversationReader`'s own Alpha 753 "no redundant second index
+> for one closed enum" precedent — never two separately-maintained
+> structures), Reply, Date, Participant, and Keyword sub-indexes. Named,
+> real boundary (not silently dropped): the Keyword Index never decrypts
+> anything — `FedosConversationSearchEnvelopeDocument.text` is
+> ALREADY-DECRYPTED plaintext SUPPLIED BY THE CALLER, the exact same
+> "ALREADY RESOLVED by the caller" idiom
+> `FedosConversationEncryptionRequest`/`FedosConversationDecryptionRequest`
+> (Alpha 861/862) already use for `localAccountIndex`/
+> `counterpartyPublicKeyHex` — no Decryption Authority is called, no
+> ciphertext or Payload byte is ever touched here. No new persistence of
+> any kind: every sub-index is a pure, rebuildable, in-memory structure
+> over already-durable Envelope/Membership/Draft/Archive data, proven by
+> this Arc's own "restart" verification (two independent instances fed
+> identical source data reproduce identical query results). Every
+> ingestion path (`indexEnvelope`/`indexEnvelopes`/`indexArchiveBundle`)
+> is incremental and idempotent through one shared dedup guard
+> (`FedosConversationSearchIncrementalIndex`) — the "duplicate"
+> verification; `removeEnvelope()` purges an id from every sub-index and
+> reopens it for a later legitimate re-index — the "delete" verification,
+> deliberately non-cascading (mirrors this codebase's own "no cascading
+> delete" discipline on every append-only-backed port). Four new test
+> files (30 new tests), including a "large dataset" test indexing 3,000
+> Envelopes across 20 conversations/3 participants and an
+> "archive restore" test round-tripping a real Archive Bundle through
+> the existing collector/restore path into the new index. See
+> `docs/secure_runtime_alpha_2501_2580_execution_spec.md` and
+> `docs/secure_runtime_alpha_2501_2580_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2421–2500 — Multi Device
 > Synchronization Foundation Arc (complete).** Architecture frozen: no
 > new Rust/WASM primitive, no new `AeadAadDomain` variant, no Host/GUI
