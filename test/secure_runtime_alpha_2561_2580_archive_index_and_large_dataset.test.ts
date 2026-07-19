@@ -7,6 +7,7 @@ import { InMemoryFedosConversationMembershipPersistence } from "../src/conversat
 import { InMemoryFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
 import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
 import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadStorage } from "../src/conversation/payload_storage/fedos_conversation_payload_storage.js";
 import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
 import type { FedosConversationArchiveBundleV1 } from "../src/conversation/archive/fedos_conversation_archive_bundle.js";
 import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreDependencies } from "../src/conversation/archive/fedos_conversation_archive_restore.js";
@@ -17,6 +18,17 @@ import type { FedosPersistedConversationDraftRecordV1 } from "../src/conversatio
 import { FedosConversationSearchIndex } from "../src/conversation/search/fedos_conversation_search_index.js";
 import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
 import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+import { FedosPayloadRetentionAuthority } from "../src/conversation/retention/fedos_payload_retention_authority.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
+import type { FedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
+
+/** Registers `payloadId` as active in `payloadStorage` so the Alpha 2581-2620 ingestion gate permits it. */
+function seedActivePayload(payloadStorage: FedosConversationPayloadStorage, conversationId: FedosConversationId, payloadId: string): void {
+  payloadStorage.putPayload(
+    { id: payloadId as FedosConversationPayloadId, conversationId, mediaType: "application/octet-stream", byteLength: 1, createdAt: 1_700_000_000 },
+    new Uint8Array([1]),
+  );
+}
 
 const ARCHIVE_CONVERSATION_ID = "board-a::thread-1" as FedosConversationId;
 
@@ -91,15 +103,21 @@ describe("Secure Runtime Alpha 2561-2580 -- Archive Index (Reuse Archive)", () =
     expect(bundle).not.toBeNull();
     if (bundle === null) throw new Error("unreachable");
 
+    // The Retention Authority wraps the SAME destination payload storage Restore just wrote "payload-1" into --
+    // Phase C's own "evaluate current destination Runtime retention policy" (Alpha 2581-2620), never a second store.
     const searchIndex = new FedosConversationSearchIndex({
       draftPersistence: new InMemoryFedosConversationDraftPersistence(),
       membershipAuthority: new InMemoryFedosConversationMembershipAuthority(),
+      retentionAuthority: new FedosPayloadRetentionAuthority({
+        retentionPersistence: new InMemoryFedosPayloadRetentionPersistence(),
+        payloadStorage: archiveDeps.payloadStorage,
+      }),
     });
 
     expect(searchIndex.isFromArchive(ARCHIVE_CONVERSATION_ID)).toBe(false);
     const outcome = searchIndex.indexArchiveBundle(bundle, new Map([["envelope-1", "hello from the archive"]]), 1_700_001_000);
 
-    expect(outcome).toEqual({ indexed: 1, duplicate: 0 });
+    expect(outcome).toEqual({ indexed: 1, duplicate: 0, denied: 0 });
     expect(searchIndex.isFromArchive(ARCHIVE_CONVERSATION_ID)).toBe(true);
     expect(searchIndex.archivedConversationIds()).toEqual([ARCHIVE_CONVERSATION_ID]);
     expect(searchIndex.searchKeyword("archive")).toEqual(["envelope-1"]);
@@ -145,14 +163,21 @@ describe("Secure Runtime Alpha 2561-2580 -- Archive Index (Reuse Archive)", () =
       payloads: [],
     };
     restoreFedosConversationArchiveBundle(bundle, archiveDeps);
+    // This bundle's own `payloads` array is empty (Restore writes no bytes) -- seed "payload-1" directly so the
+    // ingestion gate has something to evaluate; this test is about duplicate detection, not retention itself.
+    seedActivePayload(archiveDeps.payloadStorage, ARCHIVE_CONVERSATION_ID, "payload-1");
 
     const searchIndex = new FedosConversationSearchIndex({
       draftPersistence: new InMemoryFedosConversationDraftPersistence(),
       membershipAuthority: new InMemoryFedosConversationMembershipAuthority(),
+      retentionAuthority: new FedosPayloadRetentionAuthority({
+        retentionPersistence: new InMemoryFedosPayloadRetentionPersistence(),
+        payloadStorage: archiveDeps.payloadStorage,
+      }),
     });
     searchIndex.indexArchiveBundle(bundle, new Map(), 1_700_001_000);
     const second = searchIndex.indexArchiveBundle(bundle, new Map(), 1_700_001_100);
-    expect(second).toEqual({ indexed: 0, duplicate: 1 });
+    expect(second).toEqual({ indexed: 0, duplicate: 1, denied: 0 });
     expect(searchIndex.size()).toBe(1);
   });
 });
@@ -206,7 +231,12 @@ describe("Secure Runtime Alpha 2561-2580 -- large dataset", () => {
       membershipIdsByConversation.set(conversationId, membershipIds);
     }
 
-    const searchIndex = new FedosConversationSearchIndex({ draftPersistence, membershipAuthority });
+    const payloadStorage = new InMemoryFedosConversationPayloadStorage();
+    const retentionAuthority = new FedosPayloadRetentionAuthority({
+      retentionPersistence: new InMemoryFedosPayloadRetentionPersistence(),
+      payloadStorage,
+    });
+    const searchIndex = new FedosConversationSearchIndex({ draftPersistence, membershipAuthority, retentionAuthority });
     const expectedEnvelopesByParticipantIndex = new Map<number, number>();
     let expectedNeedleCount = 0;
     let globalIndex = 0;
@@ -236,6 +266,7 @@ describe("Secure Runtime Alpha 2561-2580 -- large dataset", () => {
           replyToEnvelopeId,
         });
         if (built === null) throw new Error("test setup: invalid envelope fixture");
+        seedActivePayload(payloadStorage, conversationId, built.payloadId);
 
         const outcome = searchIndex.indexEnvelope({ envelope: built, text: isNeedle ? "needle common text" : "common text" });
         expect(outcome).toBe("indexed");

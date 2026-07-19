@@ -42,6 +42,20 @@ import completionDeclarationSource from "../../../docs/secure_runtime_alpha_2501
  * Archive Collector/Restore still never reference the Retention
  * domain. Never asserts that any retention-gating fix has been made --
  * that would contradict this audit's own central finding.
+ *
+ * UPDATE (Secure Runtime Alpha 2581-2620, "Conversation Search Retention
+ * Authority and Index Purge Hardening"): this Arc closed the central
+ * finding (Review 11) by threading a narrow FedosPayloadRetentionAuthority
+ * dependency into the FACADE ONLY (`fedos_conversation_search_index.ts`).
+ * Assertions 7-9 and 14 below, which pinned the PRE-FIX absence of that
+ * gate, are updated to assert the POST-FIX reality instead -- this is a
+ * genuinely stale-test update, not a relaxation of this audit's own
+ * historical record (the numbered .md documents themselves are UNCHANGED
+ * and remain an accurate account of what was true when this audit was
+ * written). Every other assertion in this file is unaffected: the Archive
+ * Index conversion function, the Participant Index's cache lifetime,
+ * Archive Collector/Restore, and FedosConversationEnvelopeId are all
+ * untouched by Alpha 2581-2620.
  */
 
 const DOCS_DIR = "docs/reviews/private_conversation_search_runtime_v1";
@@ -111,17 +125,28 @@ describe("Private Conversation Search V1 runtime audit -- deliverable structure"
   });
 
   it("6. every changed/untracked repository path is either this audit's own deliverable, or a pre-existing path this audit does not modify", () => {
+    // [Alpha 2581-2620 update] the previous `.map((l) => l.trim())` stripped a
+    // MODIFIED (non-untracked) line's own leading " M " status prefix down to
+    // "M ", shifting the later `slice(3)` by one character -- invisible while
+    // this audit's own base commit only ever added new ("??") files, but a
+    // real off-by-one once Alpha 2581-2620 legitimately MODIFIES an existing
+    // tracked file (the facade). Trimming is now deferred to after the status
+    // prefix is sliced off; the allowlist's own scope is unchanged.
     const status = execSync("git status --porcelain", { encoding: "utf8" }) as string;
-    const lines = status.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+    const lines = status.split("\n").filter((l: string) => l.trim().length > 0);
     const PRE_EXISTING_ALLOWLIST = [
       "README.md",
       "docs/secure_runtime_alpha_2501_2580_completion_declaration.md",
       "docs/secure_runtime_alpha_2501_2580_execution_spec.md",
+      "docs/secure_runtime_alpha_2581_2620_execution_spec.md",
+      "docs/secure_runtime_alpha_2581_2620_completion_declaration.md",
       "src/conversation/search/",
       "test/secure_runtime_alpha_2501_2520_keyword_date_reply_indexes.test.ts",
       "test/secure_runtime_alpha_2521_2540_participant_mode_indexes.test.ts",
       "test/secure_runtime_alpha_2541_2560_search_index_incremental_and_delete.test.ts",
       "test/secure_runtime_alpha_2561_2580_archive_index_and_large_dataset.test.ts",
+      "test/secure_runtime_alpha_2581_2600_retention_ingestion_gate_and_purge.test.ts",
+      "test/secure_runtime_alpha_2601_2620_archive_restart_query_race_and_compat.test.ts",
       ".tmp_gen/",
       "p2p/",
     ];
@@ -137,19 +162,25 @@ describe("Private Conversation Search V1 runtime audit -- deliverable structure"
 });
 
 describe("Private Conversation Search V1 runtime audit -- source alignment (central finding)", () => {
-  it("7. none of the search module's own files import from src/conversation/retention/", () => {
-    const files = [documentSource, indexSource, keywordIndexSource, archiveIndexSource, participantIndexSource, modeIndexSource] as string[];
-    for (const src of files) {
+  it("7. [Alpha 2581-2620 update] every search sub-index EXCEPT the facade still has no import from src/conversation/retention/ -- the fix imports the type into the facade only", () => {
+    const subIndexFiles = [documentSource, keywordIndexSource, archiveIndexSource, participantIndexSource, modeIndexSource] as string[];
+    for (const src of subIndexFiles) {
       expect(src).not.toMatch(/from ["']\.\.\/retention\//);
     }
+    expect(indexSource as string).toMatch(/from ["']\.\.\/retention\/fedos_payload_retention_authority\.js["']/);
   });
 
-  it("8. FedosConversationSearchIndexDependencies is a Pick of exactly draftPersistence and membershipAuthority -- no retention dependency exists", () => {
-    expect(indexSource as string).toMatch(/Pick<\s*\n?\s*FedosConversationRuntimeDependencies,\s*\n?\s*"draftPersistence" \| "membershipAuthority"\s*\n?\s*>/);
+  it("8. [Alpha 2581-2620 update] FedosConversationSearchIndexDependencies is now the SAME Pick of draftPersistence/membershipAuthority, additively intersected with a new, narrow retentionAuthority dependency", () => {
+    expect(indexSource as string).toMatch(/Pick<\s*\n?\s*FedosConversationRuntimeDependencies,\s*\n?\s*"draftPersistence" \| "membershipAuthority"\s*\n?\s*>\s*&\s*\{/);
+    expect(indexSource as string).toMatch(/readonly retentionAuthority: FedosConversationSearchRetentionAuthorityDependency/);
   });
 
-  it("9. indexEnvelope/indexEnvelopes/indexArchiveBundle never call evaluatePayloadAccess or readPayload", () => {
-    expect(indexSource as string).not.toMatch(/evaluatePayloadAccess|readPayload\(/);
+  it("9. [Alpha 2581-2620 update] indexEnvelope/indexEnvelopes/indexArchiveBundle now gate through evaluatePayloadAccess, but still never CALL readPayload (a prose mention in a comment is not a call) -- Search Runtime still never reads a payload byte", () => {
+    expect(indexSource as string).toMatch(/evaluatePayloadAccess/);
+    // A dot-prefixed invocation would be a real call; this file's own comments only ever mention
+    // `readPayload()` inside backticks, mirroring this audit's own Review 4b precision for exactly
+    // this "rhetorical comment citation, never a call" distinction.
+    expect(indexSource as string).not.toMatch(/\.readPayload\(/);
   });
 
   it("10. the Keyword Index tokenizes to raw, unhashed, lower-cased terms -- confirms Option 2, not a blind/HMAC index", () => {
@@ -171,10 +202,11 @@ describe("Private Conversation Search V1 runtime audit -- source alignment (cent
     expect(removeDocumentBody).not.toMatch(/#resolvedByMembershipId/);
   });
 
-  it("14. forgetConversation()/removeConversation() exist on the Archive/Mode sub-indexes but are never called from the facade", () => {
+  it("14. [Alpha 2581-2620 update] forgetConversation()/removeConversation() exist on the Archive/Mode sub-indexes and are now reachable from the facade once a conversation's indexed Envelope count reaches zero", () => {
     expect(archiveIndexSource as string).toMatch(/forgetConversation\(conversationId: FedosConversationId\): void/);
     expect(modeIndexSource as string).toMatch(/removeConversation\(conversationId: FedosConversationId\): void/);
-    expect(indexSource as string).not.toMatch(/forgetConversation|removeConversation/);
+    expect(indexSource as string).toMatch(/this\.#mode\.removeConversation/);
+    expect(indexSource as string).toMatch(/this\.#archive\.forgetConversation/);
   });
 
   it("15. FedosConversationEnvelopeId is an opaque, randomly-generated string with no protocol or chronological meaning", () => {

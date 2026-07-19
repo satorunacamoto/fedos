@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2581–2620 — Conversation Search
+> Retention Authority and Index Purge Hardening Arc (complete).**
+> Architecture frozen: no redesign of the accepted Search Runtime, no
+> replaced persisted index, no vector/remote/cloud search, no new
+> Rust/WASM primitive, no new persistence port, no Host/GUI wiring, no
+> new dependency. Closes the High-severity retention-gating defect the
+> Private Conversation Search V1 runtime audit found (`docs/reviews/private_conversation_search_runtime_v1/11_retention_bypass_risk_realized.md`,
+> commit `bec5142`, against Arc commit `3b7143f`): threads the EXISTING
+> `FedosPayloadRetentionAuthority` (`src/conversation/retention/`, Alpha
+> 796–811) into the EXISTING Search Runtime through one new, narrow,
+> additive dependency (`Pick<FedosPayloadRetentionAuthority,
+> "evaluatePayloadAccess">` — the pure-preview method only, never
+> `readPayload()`/`tombstonePayload()`/`removeLocalPayload()`) on
+> `FedosConversationSearchIndexDependencies`. Exactly ONE production file
+> changes: `src/conversation/search/fedos_conversation_search_index.ts`.
+> `indexEnvelope()`/`indexArchiveBundle()` now refuse anything not
+> currently `"allowed"` (denied, tombstoned, payload-removed, not-found,
+> or a thrown/unavailable Authority — all fail closed) via a new closed
+> `"denied"` outcome; a mixed Archive Bundle indexes only permitted
+> records while honestly counting denied ones. `reconcilePayloadRetention()`
+> is new, narrow wiring reusing the EXISTING `removeEnvelope()` to purge
+> every searchable trace once a payload transitions away from `"active"`;
+> `removeEnvelope()` itself now also reaches the Mode/Archive sub-indexes'
+> own previously-dead `removeConversation()`/`forgetConversation()` once a
+> conversation's indexed Envelope count reaches zero, closing the audit's
+> Medium-severity dead-code finding. Every content-adjacent query
+> (`searchKeyword`/`envelopesBetween`/`repliesTo`/`parentOf`/
+> `envelopesByParticipant`) additionally re-checks retention per result at
+> query time — the one honest race a synchronous, non-reactive Retention
+> Authority leaves open between a transition and its caller-invoked
+> reconciliation — while conversation-level classification
+> (`modeOf`/`directConversationIds`/`groupConversationIds`/
+> `isFromArchive`/`archivedConversationIds`/`conversationsByParticipant`/
+> `size`) stays ungated, carrying no message content. Restart safety is
+> free: a freshly rebuilt instance re-feeds through the identical gate, so
+> denied content never resurfaces. Two new test files (33 new tests)
+> cover the full 20-item required matrix (allowed/denied/tombstoned
+> ingestion, purge, mixed Archive, restart, query-time race, group/direct/
+> encryption-suite neutrality, fail-closed on wrong identity and on an
+> unavailable Authority, no plaintext leakage, unrelated-content
+> isolation, ordering compatibility); four pre-existing test files were
+> updated for the new required dependency and two of the runtime audit's
+> own source-alignment assertions were updated to reflect the now-closed
+> gap (the audit's 20 numbered `.md` documents themselves are UNCHANGED
+> and remain an accurate historical record). See
+> `docs/secure_runtime_alpha_2581_2620_execution_spec.md` and
+> `docs/secure_runtime_alpha_2581_2620_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2341–2420 — Conversation Archive CLI and
 > User Packaging Arc (complete).** Architecture frozen: no new Archive
 > wire shape, no new crypto primitive, no new `AeadAadDomain` variant, no

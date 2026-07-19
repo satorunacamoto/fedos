@@ -28,6 +28,15 @@ import archiveIndexSource from "../../../src/conversation/search/fedos_conversat
  * their central finding (no retention gating) consistently. Never
  * asserts that any retention-gating fix has been made -- doing so
  * would contradict this audit's own central finding (Review 11).
+ *
+ * UPDATE (Secure Runtime Alpha 2581-2620): the central finding (Review
+ * 11) is now closed in the FACADE only -- assertions 4 and 6 below,
+ * which pinned the PRE-FIX absence of that gate, are updated to assert
+ * the POST-FIX reality. The historical .md documents themselves are
+ * UNCHANGED. Every other assertion here (document field exclusions,
+ * no network/filesystem access, unbounded Keyword Index lifetime, the
+ * caller-supplied plaintext boundary, and every doc-consistency check)
+ * is unaffected -- none of those facts changed.
  */
 
 const DOCS_DIR = "docs/reviews/private_conversation_search_runtime_v1";
@@ -56,11 +65,10 @@ describe("Private Conversation Search V1 runtime audit -- boundary invariants (s
     expect(keywordIndexSource as string).toMatch(/#envelopesByToken = new Map<string, Set<FedosConversationEnvelopeId>>\(\);/);
   });
 
-  it("4. neither the facade nor the Archive Index imports, references, or accepts a retention/access-decision dependency of any kind", () => {
-    const files = [indexSource, archiveIndexSource] as string[];
-    for (const src of files) {
-      expect(src).not.toMatch(/FedosPayloadRetentionAuthority|FedosPayloadAccessEvaluation|evaluatePayloadAccess/);
-    }
+  it("4. [Alpha 2581-2620 update] the Archive Index still has no retention/access-decision reference of any kind; the facade now does, and only the facade", () => {
+    expect(archiveIndexSource as string).not.toMatch(/FedosPayloadRetentionAuthority|FedosPayloadAccessEvaluation|evaluatePayloadAccess/);
+    expect(indexSource as string).toMatch(/FedosPayloadRetentionAuthority/);
+    expect(indexSource as string).toMatch(/evaluatePayloadAccess/);
   });
 
   it("4b. the Keyword Index's own two mentions of FedosPayloadRetentionAuthority are rhetorical comment citations only, never an import, call, or dependency", () => {
@@ -74,14 +82,16 @@ describe("Private Conversation Search V1 runtime audit -- boundary invariants (s
     expect(indexSource as string).toMatch(/plaintextByEnvelopeId: ReadonlyMap<string, string>/);
   });
 
-  it("6. removeEnvelope() purges the four content/metadata sub-indexes but never touches the Mode or Archive sub-indexes", () => {
+  it("6. [Alpha 2581-2620 update] removeEnvelope() purges the four content/metadata sub-indexes directly, and now also reaches the Mode/Archive sub-indexes (via #purgeConversationMetadataIfEmpty) once a conversation's indexed Envelope count reaches zero", () => {
     const removeEnvelopeBody = (indexSource as string).match(/removeEnvelope\(envelopeId[^)]*\)[^{]*\{([\s\S]*?)\n {2}\}/)?.[1] ?? "";
     expect(removeEnvelopeBody).toMatch(/#keyword\.removeDocument/);
     expect(removeEnvelopeBody).toMatch(/#date\.removeDocument/);
     expect(removeEnvelopeBody).toMatch(/#reply\.removeDocument/);
     expect(removeEnvelopeBody).toMatch(/#participant\.removeDocument/);
-    expect(removeEnvelopeBody).not.toMatch(/#mode\./);
-    expect(removeEnvelopeBody).not.toMatch(/#archive\./);
+    expect(removeEnvelopeBody).toMatch(/#purgeConversationMetadataIfEmpty/);
+    expect(indexSource as string).toMatch(
+      /#purgeConversationMetadataIfEmpty\(conversationId: FedosConversationId\): void \{[\s\S]*?this\.#mode\.removeConversation[\s\S]*?this\.#archive\.forgetConversation/,
+    );
   });
 });
 
