@@ -8,6 +8,86 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3081–3160 — Desktop Runtime Conversation
+> Content Accessor and Application Shell Activation Arc (complete).**
+> Closes the exact boundary Alpha 2841-2920 documented and stopped at.
+> Architecture frozen: no redesign of `FedosDesktopRuntime`/Conversation
+> Runtime/Direct/Group messaging, no second message repository, no
+> persistence port or crypto authority/handle exposed, no new dependency,
+> no Rust/WASM/Cargo touch, no `p2p/`/`.tmp_gen` touch. One new narrow
+> boundary — `FedosDesktopConversationContentAccessor`
+> (`src/desktop/content_accessor/`), owned by exactly one
+> `FedosRunningDesktopRuntime` (new `conversationContentAccessor()`
+> accessor, lifecycle-gated exactly like `conversationArchiveRuntime()`) —
+> delegates to the EXISTING Direct/Group messaging, Search, Retention and
+> Archive Runtime APIs; owns no persistence, no crypto authority, no
+> secret. `FedosDesktopApplicationShell.listMessages`/`sendMessage`/`reply`/
+> `search`/`archive` are now real (a new `readMessage()` method was added —
+> a send/read is structurally impossible without message content, which
+> the pre-existing signatures carried none of); every outcome maps onto the
+> Shell's own existing closed result vocabulary, never a raw error. Fixed a
+> real, latent defect Phase A's own inventory found: the Shell's
+> `sendMessage`/`reply` precondition check read `draft.lifecycleState`
+> (permanently `"draft"` by construction, Alpha 1116) instead of the real
+> activation/usability fact — meaning `"requires-activation"` could never
+> have cleared even after Alpha 1111-1180/2041-2120 shipped real
+> activation; now reads
+> `FedosConversationRuntime.resolveActiveConversation()`/
+> `FedosConversationGroupRuntime.readinessForPrivateGroup()` (both new,
+> narrow, additive accessors). Group message plaintext read for a
+> recipient (previously no production API existed for it at all) is now
+> real via a new `FedosConversationGroupRuntime.resolveLocalGroupMessagePlaintext()`,
+> composing the SAME fan-out delivery/path records
+> `FedosGroupSendCoordinator` itself already produces, delegating to the
+> frozen Direct read path — invents no crypto. Honestly documents, rather
+> than works around, two real structural characteristics discovered this
+> Arc: a Group message's own SENDER has no self-Envelope to decrypt on this
+> base (`"own-message"`, not a fabricated plaintext), and
+> `FedosConversationArchiveRuntime.exportConversationArchive()`'s own
+> existence gate is keyed to the PUBLIC, Board-thread-derived Conversation
+> persistence domain — entirely separate from the private Direct/Group
+> draft domain a Shell caller actually messages through — so archiving a
+> real private conversation by its own id requires an independently-existing
+> bridging record this Arc does not auto-create (this codebase's own
+> pre-existing Archive Runtime tests already construct this bridge
+> manually; new tests do the same, never inventing an automatic bridge).
+> Search is wired to the existing, already retention-gated
+> `FedosConversationSearchIndex` (one instance per Runtime, fed
+> incrementally only when this Accessor already holds real plaintext it
+> just encrypted/decrypted — never a bulk decrypt pass); Group messages are
+> deliberately NOT indexed (their own recipient Envelope lives under an
+> internal pairwise-child conversation id, not the Group id a caller
+> holds — indexing it would leak that internal id or require an invented
+> remap). One new test file, 16 tests, every one against a real
+> `startFedosDesktopRuntime()` instance: accessor ownership/lifecycle/
+> isolation; full Direct send→reply→read→list round trip with exact
+> plaintext; malformed-input fail-closed; wrong-identity denial across two
+> independent Runtimes sharing durable state; Group admit→send→real
+> per-recipient read→honest `"own-message"`→member removal excludes a
+> future send; restored/reactivated conversation resumes real messaging;
+> real keyword Search plus a real retention transition removing both the
+> Search hit and the message's plaintext; Archive `inspect`/`export`/
+> `preflightRestore`/`restore` wiring including `requires-unlock` and the
+> honestly-documented, environment-driven `"failed"`/real-file-`inspect`
+> split (this checked-out tree has no compiled WASM artifact — confirmed by
+> direct reproduction, a pre-existing, repo-wide condition unrelated to
+> this Arc, see `docs/secure_runtime_alpha_3081_3160_completion_declaration.md`
+> §14); no raw Error/secret/ciphertext leakage; no hidden network activity.
+> Two pre-existing tests updated as genuinely stale, never weakened: the
+> Shell suite's `listMessages`/`search`/`archive` call sites and one now-more-precise
+> outcome (`"requires-activation"` replacing a stale blanket
+> `"unavailable"`); the Runtime-assembly suite's closed key-enumeration
+> gained the one new key. Baseline (this exact worktree, before this Arc's
+> production edits): typecheck clean except one pre-existing, unrelated
+> failure (`secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> committed `aff32c5`, confirmed untouched); full suite 254/12774 tests
+> failing, every one independently confirmed to fall into one of two
+> pre-existing, environment-only categories (a fresh-linked-worktree
+> Cargo.toml/lib.rs raw-import artifact; the missing compiled WASM
+> artifact) — zero traceable to this Arc's own files. Final: identical.
+> See `docs/secure_runtime_alpha_3081_3160_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_3081_3160_completion_declaration.md`.
+>
 > **Status: Secure Runtime Alpha 2841–2920 — Desktop Local Application
 > Shell and Conversation Management Boundary Arc (complete).**
 > Architecture frozen: no redesign of Conversation Runtime, no renamed

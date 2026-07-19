@@ -16,14 +16,15 @@
  * themselves fail with a structural `"conflict"`/`"unavailable"` (calling
  * `start()` twice, or `stop()`/any other method before a first `start()`).
  *
- * `listMessages`/`sendMessage`/`reply`/`search`/`archive`/`deviceStatus`
- * are real, testable methods that perform every check possible against
- * live Runtime state and terminate at an honest `"unavailable"`/
- * `"requires-activation"` outcome at the exact structural boundary
- * `docs/secure_runtime_alpha_2841_2920_execution_spec.md` Phase A documents
- * — never a fabricated plaintext, never a silent no-op success. See that
- * document for the full reasoning; this file does not restate it inline
- * beyond a one-line pointer per method.
+ * `listMessages`/`readMessage`/`sendMessage`/`reply`/`search`/`archive` are
+ * now REAL, wired through `FedosDesktopConversationContentAccessor`
+ * (`../content_accessor/fedos_desktop_conversation_content_accessor.ts`,
+ * Alpha 3081-3160) — the narrow Runtime-owned boundary that closes the
+ * exact gap Alpha 2841-2920 documented and stopped at (see that Arc's own
+ * execution spec, Phase A/A4/A5/A6). `deviceStatus()` remains honestly
+ * `"unavailable"` — `src/sync/*` (Device Sync Foundation) is still wired
+ * into nothing on this base, an INDEPENDENT gap this Arc's own scope does
+ * not touch (Absolute Prohibitions: "do not implement Device Sync").
  *
  * HARD GUARDRAILS:
  *   - Owns exactly one `FedosRunningDesktopRuntime` per shell instance; two
@@ -31,7 +32,8 @@
  *     independent (mirrors the Runtime's own "no shared singleton"
  *     guarantee).
  *   - Never exposes `this.#runtime` itself, `host`, `boardRuntime()`,
- *     `conversationRuntime()`, or `privateTransport()` to a caller.
+ *     `conversationRuntime()`, `privateTransport()`, or
+ *     `conversationContentAccessor()` itself to a caller.
  *   - No `Error` object, stack trace, or raw backend string crosses this
  *     boundary — every failure is `FedosDesktopShellFailure`.
  *   - No new dependency, no Rust/WASM/Cargo touch, no network transport,
@@ -46,9 +48,12 @@ import type {
 } from "../../conversation/construction/fedos_private_conversation_construction_command.js";
 import type { FedosPrivateConversationConstructionResult } from "../../conversation/construction/fedos_private_conversation_construction_result.js";
 import type { FedosConversationParticipantReference } from "../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationId } from "../../conversation/fedos_conversation_id.js";
 import {
   fedosDesktopShellOk,
   fedosDesktopShellFailure,
+  type FedosDesktopShellFailure,
+  type FedosDesktopShellOutcomeKind,
   type FedosDesktopShellResult,
 } from "./fedos_desktop_shell_result.js";
 import type {
@@ -58,22 +63,50 @@ import type {
   FedosDeviceStatusView,
   FedosIssuedInvitationView,
   FedosMessageView,
+  FedosMessageSendResultView,
 } from "./fedos_desktop_shell_view_models.js";
+import type {
+  FedosContentAccessorArchiveCommand,
+  FedosContentAccessorArchiveValue,
+  FedosContentAccessorFailure,
+  FedosContentAccessorMessageView,
+  FedosContentAccessorResult,
+  FedosContentAccessorSearchHit,
+  FedosContentAccessorSendResult,
+} from "../content_accessor/fedos_desktop_conversation_content_accessor_result.js";
 
-/** Why `listMessages`/`sendMessage`/`reply` cannot reach real Envelope content on this base — see execution spec Phase A/A6. */
-const MESSAGE_ACCESS_UNAVAILABLE_REASON =
-  "message envelope/payload access is not reachable from FedosRunningDesktopRuntime's public surface on this base " +
-  "(no accessor exposes conversation Envelope/Payload persistence; see Alpha 2841-2920 execution spec Phase A/A6)";
+/** A bare `FedosDesktopShellFailure` object — unlike `fedosDesktopShellFailure()`, whose return type is the full `FedosDesktopShellResult<T>` union, for the internal call sites below that need exactly this narrower shape (e.g. `#validateSendPreconditions`'s own `FedosDesktopShellFailure | null` return). */
+function shellFailure(outcome: FedosDesktopShellOutcomeKind, reason: string): FedosDesktopShellFailure {
+  return Object.freeze({ outcome, reason });
+}
 
-/** Why `search()` cannot reach a real, connected Search Index — see execution spec Phase A/A4/A6. */
-const SEARCH_UNAVAILABLE_REASON =
-  "FedosConversationSearchIndex is not owned by, or reachable through, FedosRunningDesktopRuntime on this base " +
-  "(its own draftPersistence/membershipAuthority dependencies are private to FedosConversationRuntime; see Alpha 2841-2920 execution spec Phase A/A4/A6)";
+/** `FedosContentAccessorFailure`'s outcome vocabulary is defined IDENTICALLY to `FedosDesktopShellOutcomeKind` (see both files' own headers) — a straight relabel, never a re-derivation. */
+function mapContentAccessorFailure(failure: FedosContentAccessorFailure): FedosDesktopShellFailure {
+  return shellFailure(failure.outcome as unknown as FedosDesktopShellOutcomeKind, failure.reason);
+}
 
-/** Why `archive()` cannot reach the five raw ports the Archive Collector needs — see execution spec Phase A/A5/A6. */
-const ARCHIVE_UNAVAILABLE_REASON =
-  "the Archive Collector's five required persistence ports (conversation, membership, capability, envelope, payload) " +
-  "are not reachable from FedosRunningDesktopRuntime on this base; see Alpha 2841-2920 execution spec Phase A/A5/A6";
+function toShellMessageView(view: FedosContentAccessorMessageView): FedosMessageView {
+  return Object.freeze({
+    messageId: view.messageId,
+    conversationId: view.conversationId as FedosConversationId,
+    senderMembershipId: view.senderMembershipId,
+    createdAt: view.createdAt,
+    replyToMessageId: view.replyToMessageId,
+    plaintext: view.plaintext,
+    localDeliveryState: view.localDeliveryState,
+    retentionState: view.retentionState,
+  });
+}
+
+function toShellSendResultView(conversationId: string, result: FedosContentAccessorSendResult): FedosMessageSendResultView {
+  return Object.freeze({
+    messageId: result.messageId,
+    conversationId: conversationId as FedosConversationId,
+    createdAt: result.createdAt,
+    localWrite: result.localWrite,
+    fanout: result.fanout,
+  });
+}
 
 /** Why `deviceStatus()` is always unavailable — see execution spec Phase A/A7. */
 const DEVICE_SYNC_UNAVAILABLE_REASON =
@@ -177,64 +210,114 @@ export class FedosDesktopApplicationShell {
   }
 
   // ---------------------------------------------------------------------
-  // Messages — real precondition checks; honest "unavailable" terminus.
-  // See execution spec Phase A/A6, A/A2 (why "requires-activation" fires
-  // before the deeper unavailable boundary is ever reached: no conversation
-  // on this base can ever leave the "draft" lifecycle state).
+  // Messages — Secure Runtime Alpha 3081-3160 — real, wired through
+  // FedosDesktopConversationContentAccessor. `#validateSendPreconditions()`
+  // preserves this Shell's own PRE-EXISTING sender-based authorization/
+  // lifecycle pre-check (Alpha 2841-2920) verbatim in spirit — a non-member
+  // still learns nothing about activation state before authorization is
+  // checked — now consulting the REAL activation/usability fact instead of
+  // the draft record's own permanently-"draft" `lifecycleState` (Alpha
+  // 1116). Once preconditions pass, the real send is delegated to the
+  // Content Accessor.
   // ---------------------------------------------------------------------
 
   listMessages(conversationId: string): FedosDesktopShellResult<readonly FedosMessageView[]> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
-    if (this.#runtime.conversationRuntime().findConversation(conversationId) === null) {
-      return fedosDesktopShellFailure("not-found", "unknown conversation");
-    }
-    return fedosDesktopShellFailure("unavailable", MESSAGE_ACCESS_UNAVAILABLE_REASON);
+    const result = this.#runtime.conversationContentAccessor().listMessages(conversationId);
+    if (result.outcome !== "ok") return mapContentAccessorFailure(result);
+    return fedosDesktopShellOk(Object.freeze(result.value.map((v) => toShellMessageView(v))));
   }
 
-  sendMessage(conversationId: string, sender: FedosConversationParticipantReference): FedosDesktopShellResult<never> {
-    return this.#validateSendPreconditions(conversationId, sender);
-  }
-
-  reply(conversationId: string, sender: FedosConversationParticipantReference, replyToMessageId: string): FedosDesktopShellResult<never> {
-    if (replyToMessageId.length === 0) return fedosDesktopShellFailure("invalid-input", "replyToMessageId must be non-empty");
-    return this.#validateSendPreconditions(conversationId, sender);
-  }
-
-  #validateSendPreconditions(conversationId: string, sender: FedosConversationParticipantReference): FedosDesktopShellResult<never> {
+  async readMessage(conversationId: string, messageId: string): Promise<FedosDesktopShellResult<FedosMessageView>> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const result = await this.#runtime.conversationContentAccessor().readMessage(conversationId, messageId);
+    if (result.outcome !== "ok") return mapContentAccessorFailure(result);
+    return fedosDesktopShellOk(toShellMessageView(result.value));
+  }
+
+  async sendMessage(
+    conversationId: string,
+    sender: FedosConversationParticipantReference,
+    body: string,
+  ): Promise<FedosDesktopShellResult<FedosMessageSendResultView>> {
+    const precondition = this.#validateSendPreconditions(conversationId, sender);
+    if (precondition !== null) return precondition;
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const result = await this.#runtime.conversationContentAccessor().sendMessage(conversationId, body, null);
+    return this.#mapSendResult(conversationId, result);
+  }
+
+  async reply(
+    conversationId: string,
+    sender: FedosConversationParticipantReference,
+    replyToMessageId: string,
+    body: string,
+  ): Promise<FedosDesktopShellResult<FedosMessageSendResultView>> {
+    if (replyToMessageId.length === 0) return fedosDesktopShellFailure("invalid-input", "replyToMessageId must be non-empty");
+    const precondition = this.#validateSendPreconditions(conversationId, sender);
+    if (precondition !== null) return precondition;
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const result = await this.#runtime.conversationContentAccessor().replyToMessage(conversationId, replyToMessageId, body);
+    return this.#mapSendResult(conversationId, result);
+  }
+
+  #mapSendResult(
+    conversationId: string,
+    result: FedosContentAccessorResult<FedosContentAccessorSendResult>,
+  ): FedosDesktopShellResult<FedosMessageSendResultView> {
+    if (result.outcome !== "ok") return mapContentAccessorFailure(result);
+    return fedosDesktopShellOk(toShellSendResultView(conversationId, result.value));
+  }
+
+  /** Returns `null` when every precondition passes (caller should proceed to the real accessor call); a `FedosDesktopShellFailure` otherwise. */
+  #validateSendPreconditions(conversationId: string, sender: FedosConversationParticipantReference): FedosDesktopShellFailure | null {
+    if (this.#runtime === null) return shellFailure("unavailable", "shell is not running");
     const cr = this.#runtime.conversationRuntime();
     const draft = cr.findConversation(conversationId);
-    if (draft === null) return fedosDesktopShellFailure("not-found", "unknown conversation");
+    if (draft === null) return shellFailure("not-found", "unknown conversation");
     // Authorization is checked BEFORE lifecycle state, deliberately: a
     // non-member must never learn anything about a conversation's
     // activation state, only that they are not authorized to act on it.
     const membership = cr.listMemberships(conversationId).find((m) => participantsEqual(m.participant, sender));
     if (membership === undefined || membership.state !== "active") {
-      return fedosDesktopShellFailure("unauthorized", "sender is not an active member of this conversation");
+      return shellFailure("unauthorized", "sender is not an active member of this conversation");
     }
-    if (draft.lifecycleState !== "active") {
-      return fedosDesktopShellFailure(
-        "requires-activation",
-        `conversation lifecycle is "${draft.lifecycleState}"; no activation primitive exists on this base (see Alpha 2841-2920 execution spec Phase A/A2)`,
-      );
+    // Secure Runtime Alpha 3081-3160 -- the REAL activation/usability fact,
+    // never `draft.lifecycleState` (permanently "draft" by construction,
+    // Alpha 1116 -- see `FedosConversationRuntime.resolveActiveConversation()`'s
+    // own header).
+    if (draft.mode === "direct") {
+      const active = cr.resolveActiveConversation(conversationId);
+      if (active.outcome !== "active") {
+        return shellFailure("requires-activation", "this Direct conversation has not been activated yet");
+      }
+    } else {
+      const usability = cr.groupRuntime().readinessForPrivateGroup(conversationId);
+      if (usability.outcome !== "usable") {
+        return shellFailure("requires-activation", `this Group conversation is not currently usable for sending ("${usability.outcome}")`);
+      }
     }
-    return fedosDesktopShellFailure("unavailable", MESSAGE_ACCESS_UNAVAILABLE_REASON);
+    return null;
   }
 
   // ---------------------------------------------------------------------
-  // Search, Archive, Device status — honest "unavailable" on this base.
+  // Search, Archive — Secure Runtime Alpha 3081-3160 — real, wired through
+  // FedosDesktopConversationContentAccessor. Device status remains honestly
+  // "unavailable" — see this file's own header.
   // ---------------------------------------------------------------------
 
-  /** Always `"unavailable"` once running — see execution spec Phase A/A4/A6. */
-  search(): FedosDesktopShellResult<never> {
+  search(query: string): FedosDesktopShellResult<readonly FedosContentAccessorSearchHit[]> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
-    return fedosDesktopShellFailure("unavailable", SEARCH_UNAVAILABLE_REASON);
+    const result = this.#runtime.conversationContentAccessor().searchConversations(query);
+    if (result.outcome !== "ok") return mapContentAccessorFailure(result);
+    return fedosDesktopShellOk(result.value);
   }
 
-  /** Always `"unavailable"` once running — see execution spec Phase A/A5/A6. */
-  archive(): FedosDesktopShellResult<never> {
+  async archive(command: FedosContentAccessorArchiveCommand): Promise<FedosDesktopShellResult<FedosContentAccessorArchiveValue>> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
-    return fedosDesktopShellFailure("unavailable", ARCHIVE_UNAVAILABLE_REASON);
+    const result = await this.#runtime.conversationContentAccessor().archive(command);
+    if (result.outcome !== "ok") return mapContentAccessorFailure(result);
+    return fedosDesktopShellOk(result.value);
   }
 
   /** Always reports `state: "unavailable"` — see execution spec Phase A/A7. */

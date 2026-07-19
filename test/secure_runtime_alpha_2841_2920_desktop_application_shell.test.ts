@@ -62,13 +62,13 @@ describe("1. start/status/stop", () => {
 });
 
 describe("2. operation before start()", () => {
-  it("every operation fails closed with 'unavailable' before start()", () => {
+  it("every operation fails closed with 'unavailable' before start()", async () => {
     const shell = createFedosDesktopApplicationShell();
     expect(shell.listConversations().outcome).toBe("unavailable");
     expect(shell.getConversation("anything").outcome).toBe("unavailable");
     expect(shell.listMessages("anything").outcome).toBe("unavailable");
-    expect(shell.search().outcome).toBe("unavailable");
-    expect(shell.archive().outcome).toBe("unavailable");
+    expect(shell.search("anything").outcome).toBe("unavailable");
+    expect((await shell.archive({ operation: "inspect", sourcePath: "anything" })).outcome).toBe("unavailable");
     expect(shell.deviceStatus().outcome).toBe("unavailable");
     expect(
       shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "npub-x" } }).outcome,
@@ -125,13 +125,13 @@ describe("5/6. create Direct + activation status", () => {
 });
 
 describe("7. send/read/reply on a Direct draft", () => {
-  it("listMessages on a known conversation is honestly 'unavailable', not a fake empty list disguised as success-with-no-content beyond the closed vocabulary", async () => {
+  it("listMessages on a known, never-activated conversation is honestly 'requires-activation', not a fake empty list", async () => {
     const shell = createFedosDesktopApplicationShell();
     await shell.start(freshConfig());
     const created = shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "npub-msg-1" } });
     if (created.outcome !== "ok") throw new Error("expected ok");
     const result = shell.listMessages(created.value.conversationId);
-    expect(result.outcome).toBe("unavailable");
+    expect(result.outcome).toBe("requires-activation");
     await shell.stop();
   });
 
@@ -148,9 +148,9 @@ describe("7. send/read/reply on a Direct draft", () => {
     const created = shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "npub-msg-2" } });
     if (created.outcome !== "ok") throw new Error("expected ok");
     const owner = created.value.memberships[0]!.participant;
-    const sendResult = shell.sendMessage(created.value.conversationId, owner);
+    const sendResult = await shell.sendMessage(created.value.conversationId, owner, "hello bob");
     expect(sendResult).toEqual({ outcome: "requires-activation", reason: expect.any(String) });
-    const replyResult = shell.reply(created.value.conversationId, owner, "some-message-id");
+    const replyResult = await shell.reply(created.value.conversationId, owner, "some-message-id", "hello bob");
     expect(replyResult.outcome).toBe("requires-activation");
     await shell.stop();
   });
@@ -161,7 +161,7 @@ describe("7. send/read/reply on a Direct draft", () => {
     const created = shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "npub-msg-3" } });
     if (created.outcome !== "ok") throw new Error("expected ok");
     const owner = created.value.memberships[0]!.participant;
-    expect(shell.reply(created.value.conversationId, owner, "").outcome).toBe("invalid-input");
+    expect((await shell.reply(created.value.conversationId, owner, "", "hello bob")).outcome).toBe("invalid-input");
     await shell.stop();
   });
 });
@@ -175,7 +175,7 @@ describe("8/10. create Group + Group send", () => {
     if (created.outcome !== "ok") throw new Error("expected ok");
     expect(created.value.mode).toBe("private-group");
     const owner = created.value.memberships[0]!.participant;
-    expect(shell.sendMessage(created.value.conversationId, owner).outcome).toBe("requires-activation");
+    expect((await shell.sendMessage(created.value.conversationId, owner, "hello group")).outcome).toBe("requires-activation");
     await shell.stop();
   });
 });
@@ -205,11 +205,11 @@ describe("9. invite issue/redeem", () => {
 });
 
 describe("14/16. Search and Archive facades", () => {
-  it("search() and archive() are honestly 'unavailable' once running", async () => {
+  it("search() is real (empty hits before anything is indexed); archive() is honestly 'unavailable' when archiveEnabled was never set", async () => {
     const shell = createFedosDesktopApplicationShell();
     await shell.start(freshConfig());
-    expect(shell.search().outcome).toBe("unavailable");
-    expect(shell.archive().outcome).toBe("unavailable");
+    expect(shell.search("hello")).toEqual({ outcome: "ok", value: [] });
+    expect((await shell.archive({ operation: "inspect", sourcePath: "anything" })).outcome).toBe("unavailable");
     await shell.stop();
   });
 });
@@ -296,7 +296,7 @@ describe("22. wrong identity denial", () => {
     const created = shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "npub-wrong-1" } });
     if (created.outcome !== "ok") throw new Error("expected ok");
     const stranger = { authority: "nostr" as const, publicIdentifier: "npub-stranger", identityId: null };
-    const result = shell.sendMessage(created.value.conversationId, stranger);
+    const result = await shell.sendMessage(created.value.conversationId, stranger, "hello");
     expect(result).toEqual({ outcome: "unauthorized", reason: expect.any(String) });
     await shell.stop();
   });
@@ -307,13 +307,14 @@ describe("23. no raw error/key leakage", () => {
     const shell = createFedosDesktopApplicationShell();
     await shell.start(freshConfig());
     const created = shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "npub-leak" } });
+    const archiveResult = await shell.archive({ operation: "inspect", sourcePath: "unknown" });
     const results = [
       created,
       shell.listConversations(),
       shell.getConversation("unknown"),
       shell.listMessages("unknown"),
-      shell.search(),
-      shell.archive(),
+      shell.search("hello"),
+      archiveResult,
       shell.deviceStatus(),
       shell.redeemInvitation(),
     ];

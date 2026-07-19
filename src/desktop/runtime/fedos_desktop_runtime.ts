@@ -159,6 +159,12 @@ import { InMemoryFedosConversationCapabilityPersistence } from "../../conversati
 import { assembleFedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.js";
 import type { FedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
 
+// Secure Runtime Alpha 3081-3160 (Desktop Runtime Conversation Content
+// Accessor and Application Shell Activation Arc) -- every import/addition
+// below this comment is ADDITIVE ONLY, mirroring the Alpha 1691-1760
+// boundary comment above for the same reason.
+import { FedosDesktopConversationContentAccessor } from "../content_accessor/fedos_desktop_conversation_content_accessor.js";
+
 // Secure Runtime Alpha 1921-1980 (Group Conversation Archive Integration and
 // Cross-Branch Recovery Arc) -- every import/addition below this comment is
 // ADDITIVE ONLY, mirroring the Alpha 1691-1760 boundary comment above for the
@@ -233,6 +239,22 @@ export interface FedosRunningDesktopRuntime {
    * use it afterward either.
    */
   conversationArchiveRuntime(): FedosConversationArchiveRuntime;
+  /**
+   * Secure Runtime Alpha 3081-3160 — the `FedosDesktopConversationContentAccessor`
+   * (`../content_accessor/fedos_desktop_conversation_content_accessor.ts`)
+   * this running Local Runtime owns — ALWAYS constructed (never gated by a
+   * config flag, mirroring `conversationRuntime()`'s own "always available"
+   * discipline), over the SAME `conversationRuntimeInstance`/
+   * `archiveRuntimeInstance` this function already holds — never a second,
+   * divergent Conversation Runtime or Archive Runtime. Throws
+   * `"inaccessible after stop"` once `stop()` has been called — the SAME
+   * fail-closed contract every other accessor on this handle already uses;
+   * the accessor's OWN internal `isRuntimeRunning` closure independently
+   * enforces the identical rule for any reference a caller grabbed before
+   * `stop()` (mirrors `conversationArchiveRuntime()`'s own two-layer
+   * defense).
+   */
+  conversationContentAccessor(): FedosDesktopConversationContentAccessor;
   /**
    * Secure Runtime Alpha 1263/1291 — the closed, non-secret reason
    * production Conversation crypto is (or is not) currently available.
@@ -632,6 +654,20 @@ export async function startFedosDesktopRuntime(
     });
   }
 
+  // Secure Runtime Alpha 3081-3160 -- exactly one FedosDesktopConversationContentAccessor
+  // per running runtime, ALWAYS constructed (unlike privateTransportInstance/
+  // archiveRuntimeInstance above, this needs no dedicated config flag: it constructs
+  // no persistence, no crypto authority, no timer of its own -- only composes
+  // conversationRuntimeInstance/archiveRuntimeInstance, exactly like boardRuntimeInstance
+  // itself is always constructed above). `archiveRuntimeInstance` is passed through as
+  // `null` when `config.archiveEnabled` was false, matching every other optional
+  // capability's own "remains optional" discipline (this Arc's own Absolute Prohibitions).
+  const conversationContentAccessorInstance = new FedosDesktopConversationContentAccessor({
+    conversationRuntime: conversationRuntimeInstance,
+    archiveRuntime: archiveRuntimeInstance ?? null,
+    isRuntimeRunning: () => !stopped,
+  });
+
   return {
     host,
     boardRuntime(): FedosBoardRuntime {
@@ -663,6 +699,12 @@ export async function startFedosDesktopRuntime(
         throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is not enabled -- see config.archiveEnabled.");
       }
       return archiveRuntimeInstance;
+    },
+    conversationContentAccessor(): FedosDesktopConversationContentAccessor {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.conversationContentAccessor() is inaccessible after stop().");
+      }
+      return conversationContentAccessorInstance;
     },
     /** Alpha 1263/1291 -- the closed, non-secret reason production crypto is (or is not) available. `"disabled"` when `conversationProductionCrypto` was never supplied. Readable even after `stop()`. */
     conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome {

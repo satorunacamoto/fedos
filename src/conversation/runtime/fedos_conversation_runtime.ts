@@ -66,6 +66,10 @@ import { UnavailableFedosConversationEncryptionAuthority } from "../encryption/f
 import { UnavailableFedosConversationDecryptionAuthority } from "../encryption/fedos_unavailable_conversation_decryption_authority.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import { InMemoryFedosConversationMessageEnvelopePersistence } from "../envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
+import type { FedosConversationMessageEnvelope } from "../envelope/fedos_conversation_message_envelope.js";
+import { FedosConversationSearchIndex } from "../search/fedos_conversation_search_index.js";
+import { resolveFedosConversationActiveConversation, type FedosConversationActiveLookupResult } from "../activation/fedos_conversation_active_lookup.js";
 import { FedosSecureRandomConversationEnvelopeIdGenerator, type FedosConversationEnvelopeIdGenerator } from "../envelope/fedos_conversation_envelope_id.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import { InMemoryFedosConversationPayloadStorage } from "../payload_storage/in_memory_fedos_conversation_payload_storage.js";
@@ -264,6 +268,31 @@ export class FedosConversationRuntime {
   readonly #privateNostrDeliveryRuntime: FedosConversationPrivateNostrDeliveryRuntime;
   /** Alpha 2041–2120 — see `../activation/fedos_conversation_reactivation_coordinator.ts`'s own header. */
   readonly #reactivationCoordinator: FedosConversationReactivationCoordinator;
+  /**
+   * Secure Runtime Alpha 3081-3160 — the SAME already-resolved
+   * `identityResolver`/`retentionAuthority`/`envelopePersistence`
+   * instances every Coordinator above already shares, retained here ONLY
+   * so this Arc's own new narrow accessors below
+   * (`resolveLocalParticipant()`/`createSearchIndex()`/
+   * `getConversationMessageEnvelope()`) can reuse them — never a second,
+   * divergent instance (Alpha 1114's own "one coherent graph" rule,
+   * unchanged). None of the three was reachable from outside this class
+   * before this Arc.
+   */
+  readonly #identityResolver: FedosConversationIdentityResolver;
+  readonly #retentionAuthority: FedosPayloadRetentionAuthority;
+  readonly #envelopePersistence: FedosConversationMessageEnvelopePersistence;
+  /**
+   * Secure Runtime Alpha 3081-3160 — the SAME `activationPersistence`
+   * instance every Coordinator above already shares (Alpha 1121's own "ONE
+   * durable source of truth"), retained here ONLY so `resolveActiveConversation()`
+   * below can answer "is this Conversation active" the SAME way
+   * `resolveFedosConversationActiveConversation()` already answers it inside
+   * `FedosConversationDirectMessagingCoordinator`/`FedosGroupSendCoordinator` —
+   * never a second, divergent instance. Not reachable from outside this class
+   * before this Arc.
+   */
+  readonly #activationPersistence: FedosConversationActivationPersistence;
 
   constructor(deps: FedosConversationRuntimeDependencies) {
     this.#deps = deps;
@@ -358,6 +387,14 @@ export class FedosConversationRuntime {
       decryptionCoordinator: this.#decryptionCoordinator,
     });
 
+    // Secure Runtime Alpha 3081-3160 — retain the SAME instances just used
+    // to build the coordinators above; see this class's own field-level
+    // doc comment. No new construction, no divergent instance.
+    this.#identityResolver = identityResolver;
+    this.#retentionAuthority = retentionAuthority;
+    this.#envelopePersistence = envelopePersistence;
+    this.#activationPersistence = activationPersistence;
+
     // Alpha 1321–1390 — the Group Runtime facade. Always constructible
     // (safe in-memory defaults for every new persistence backend, mirroring
     // envelopePersistence/payloadStorage above); reuses the SAME
@@ -419,6 +456,16 @@ export class FedosConversationRuntime {
       admission: groupAdmission,
       sendCoordinator: groupSendCoordinator,
       readFacade: groupReadFacade,
+      // Secure Runtime Alpha 3081-3160 — the SAME instances just used to build
+      // groupSendCoordinator/groupReadFacade above (never a second, divergent
+      // set), so `resolveLocalGroupMessagePlaintext()` can compose the local
+      // participant's own fanned-out delivery -> Direct path -> Direct read,
+      // exactly mirroring how `groupSendCoordinator` itself already reaches
+      // `directMessagingCoordinator` for the fan-out send.
+      directPathPersistence: groupDirectPathPersistence,
+      deliveryPersistence: groupFanoutDeliveryPersistence,
+      messagePersistence: groupMessagePersistence,
+      directMessagingCoordinator: this.#directMessagingCoordinator,
       usabilityDeps: {
         draftPersistence: deps.draftPersistence,
         membershipAuthority: deps.membershipAuthority,
@@ -583,6 +630,87 @@ export class FedosConversationRuntime {
   /** Alpha 1126/1139 — safe Envelope metadata only, deterministically ordered; never decrypts. `[]` for an unknown or non-active Conversation. */
   listDirectMessages(id: string): readonly FedosConversationDirectMessageSummary[] {
     return this.#directMessagingCoordinator.listDirectMessages(id);
+  }
+
+  /**
+   * Secure Runtime Alpha 3081-3160 — the local participant this running
+   * Runtime resolves for EVERY identity-gated operation above
+   * (`sendDirectMessage`/`readDirectMessage`/`activateDirectConversation`/
+   * `reactivateRestoredConversation`/the Group Runtime's own
+   * `readinessForPrivateGroup`) — never a caller-supplied identity, exactly
+   * mirroring every one of those methods' own "the caller never asserts who
+   * they are" discipline. A narrow, PUBLIC, read-only passthrough to the
+   * SAME `FedosConversationIdentityResolver` those methods already use
+   * internally — never exposed before this Arc. `null` when identity
+   * resolution is currently unavailable (matches every other
+   * `identity-unavailable`-shaped outcome in this file). The returned
+   * `FedosConversationParticipantReference` carries no secret of any kind
+   * (its own type's established guarantee, unchanged).
+   */
+  resolveLocalParticipant(): FedosConversationParticipantReference | null {
+    const identity = this.#identityResolver.resolveLocalParticipant();
+    return identity.outcome === "unavailable" ? null : identity.creator;
+  }
+
+  /**
+   * Secure Runtime Alpha 3081-3160 — ONE already-persisted Envelope's
+   * metadata (id/conversationId/senderMembershipId/payloadId/
+   * encryptionSuite/keyEpoch/createdAt/replyToEnvelopeId) — NEVER
+   * ciphertext, NEVER plaintext, NEVER the Envelope persistence PORT
+   * itself (mirrors `listMemberships()`'s own "real domain objects, never
+   * the port" shape, Alpha 922). `null` for an unknown envelope id or one
+   * belonging to a DIFFERENT conversation than `conversationId` (the same
+   * "wrong-conversation lookup denied identically to missing" rule
+   * `readDirectMessage()` itself already applies, Alpha 1136/1141). Exists
+   * SOLELY so an application-layer caller (the Conversation Content
+   * Accessor, Alpha 3081-3160) can feed `FedosConversationSearchIndex.indexEnvelope()`
+   * its required `envelope` field without this class exposing
+   * `envelopePersistence` itself.
+   */
+  getConversationMessageEnvelope(conversationId: string, envelopeId: string): FedosConversationMessageEnvelope | null {
+    const persisted = this.#envelopePersistence.getEnvelope(envelopeId);
+    if (persisted === null) return null;
+    const envelope = deserializeFedosConversationMessageEnvelope(persisted);
+    if (envelope === null) return null;
+    if (envelope.conversationId !== conversationId) return null;
+    return envelope;
+  }
+
+  /**
+   * Secure Runtime Alpha 3081-3160 — a freshly-constructed
+   * `FedosConversationSearchIndex` (Alpha 2501-2620, UNCHANGED) wired over
+   * the SAME `draftPersistence`/`membershipAuthority` ports this Runtime
+   * already holds plus the SAME `FedosPayloadRetentionAuthority` instance
+   * every message-read path already enforces retention through — never a
+   * second, divergent Retention Authority. Returns the INDEX object itself
+   * (an application-level facade this Runtime's own caller is expected to
+   * retain and incrementally feed via `indexEnvelope()`), never a raw
+   * persistence port. Callers MUST retain and reuse ONE instance per
+   * running Runtime (mirrors `groupRuntime()`'s own "always available,
+   * caller keeps the reference" shape) — calling this twice builds two
+   * independent, empty indexes, never a shared one.
+   */
+  createSearchIndex(): FedosConversationSearchIndex {
+    return new FedosConversationSearchIndex({
+      draftPersistence: this.#deps.draftPersistence,
+      membershipAuthority: this.#deps.membershipAuthority,
+      retentionAuthority: this.#retentionAuthority,
+    });
+  }
+
+  /**
+   * Secure Runtime Alpha 3081-3160 — the SAME "is this Conversation active"
+   * answer `FedosConversationDirectMessagingCoordinator`/`FedosGroupSendCoordinator`
+   * already consult internally (`../activation/fedos_conversation_active_lookup.ts`,
+   * Alpha 1116/1160, UNCHANGED) — never the draft record's own `lifecycleState`
+   * field, which is permanently `"draft"` by construction and carries no
+   * activation information of its own (see that file's own header). Exists so
+   * an application-layer caller (the Conversation Content Accessor, Alpha
+   * 3081-3160) can gate a send/read attempt on the REAL activation fact
+   * instead of re-deriving (or, worse, misreading) it from `findConversation()`.
+   */
+  resolveActiveConversation(conversationId: string): FedosConversationActiveLookupResult {
+    return resolveFedosConversationActiveConversation(this.#deps.draftPersistence, this.#activationPersistence, conversationId as FedosConversationId);
   }
 
   /** Alpha 901/915 — construct a private-group draft. Never activates, never sends a message. */
