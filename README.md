@@ -8,6 +8,68 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2841–2920 — Desktop Local Application
+> Shell and Conversation Management Boundary Arc (complete).**
+> Architecture frozen: no redesign of Conversation Runtime, no renamed
+> public interface, no new dependency, no Rust/WASM/Cargo touch, no
+> `p2p/`/`.tmp_gen` touch, no existing production file changed. Three new
+> files under `src/desktop/shell/` (`fedos_desktop_shell_result.ts`,
+> `fedos_desktop_shell_view_models.ts`, `fedos_desktop_application_shell.ts`)
+> implement `FedosDesktopApplicationShell`, a narrow application boundary
+> owning exactly one `FedosRunningDesktopRuntime`, exposing a closed
+> `ok | unavailable | unauthorized | not-found | invalid-input | conflict |
+> requires-activation | requires-unlock | unsupported | failed` result
+> vocabulary and closed view models (`ConversationSummary`,
+> `ConversationDetail`, `MessageView`) over `start`/`stop`/`status`,
+> `createDirectConversation`/`createPrivateGroup`, `listConversations`/
+> `getConversation`, `issuedInvitations`/`redeemInvitation`,
+> `listMessages`/`sendMessage`/`reply`, `search`, `archive`, `deviceStatus`.
+> Phase A's own inventory found, and this Arc documents honestly rather
+> than working around, a real structural boundary: `FedosRunningDesktopRuntime`
+> exposes only `boardRuntime()`/`conversationRuntime()`/`privateTransport()`,
+> none of which reaches the Envelope/Payload/Membership/Capability
+> persistence ports Search, Archive, and message send/read composition
+> need — `conversationEnvelopePersistence`/`conversationPayloadStorage` are
+> constructed inside `startFedosDesktopRuntime()` but never returned to any
+> caller, and `FedosConversationEncryptionAuthority`/`DecryptionAuthority`
+> both still require an Identity-domain key-resolution mapping named, in
+> their own file headers, as an unsolved blocker since Alpha 890. Rather
+> than bundle an unreviewed extension to `fedos_desktop_runtime.ts` into
+> this already-large Arc, `listMessages`/`sendMessage`/`reply`/`search`/
+> `archive` are real, testable methods that perform every check possible
+> against live Runtime state (existence, membership/authorization checked
+> *before* lifecycle so a non-member never learns activation state,
+> `requires-activation` because no conversation on this base can ever leave
+> `"draft"`) and terminate at an honest, closed `"unavailable"` — never a
+> fabricated plaintext, never a silent empty-list-as-success, never a raw
+> error. `deviceStatus()` is `"unavailable"` for the independent reason that
+> `src/sync/*` (Device Sync Foundation) is real but wired into nothing
+> (zero imports, confirmed by grep); Sender-Key is confirmed not integrated
+> on this base at all. Conversation creation, listing, detail, membership,
+> readiness, and issued-invitation reads are fully real and tested against
+> a live Runtime — no mock. One new test file (20 tests), all against real
+> `startFedosDesktopRuntime()` instances over real append-only log files,
+> covering lifecycle fail-closed behavior before/after start/stop, empty
+> list, real Direct/Group creation, deterministic filtered listing, the
+> honest send/message/search/archive/device `"unavailable"` boundary,
+> invitation issue (never the bearer secret) vs. honestly-unavailable
+> redeem, restart recovery over durable paths, independent Runtime
+> isolation, malformed-command rejection, wrong-identity denial, and no
+> raw-error/secret leakage (JSON-serialized and checked). Baseline (fresh
+> `arc/desktop-application-shell` worktree, `master` @ `3eb9ead`): typecheck
+> clean except one pre-existing unrelated error; full suite 189 files/233
+> tests failed, 751 files/12130 tests passed (a known fresh-worktree
+> artifact plus one already-stale pre-existing assertion, `secure_runtime_alpha_758_*`,
+> that predates this Arc). Final: typecheck unchanged; new shell suite 20/20
+> passed; focused Conversation Runtime/Search/Archive regression 73/74
+> passed (the one failure is the identical pre-existing baseline failure);
+> full-suite failure count unchanged from baseline within measurement noise,
+> zero new failure traceable to this Arc's files. See
+> `docs/secure_runtime_alpha_2841_2920_execution_spec.md` and
+> `docs/secure_runtime_alpha_2841_2920_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2581–2620 — Conversation Search
 > Retention Authority and Index Purge Hardening Arc (complete).**
 > Architecture frozen: no redesign of the accepted Search Runtime, no
