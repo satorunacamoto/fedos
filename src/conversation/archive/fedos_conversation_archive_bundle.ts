@@ -41,6 +41,7 @@ import type { FedosPersistedConversationMembershipV1 } from "../membership/persi
 import type { FedosPersistedConversationCapabilityEventV1 } from "../capability/persistence/fedos_persisted_conversation_capability_v1.js";
 import type { FedosPersistedConversationMessageEnvelopeV1 } from "../envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
 import type { FedosPersistedConversationPayloadV1 } from "../payload_storage/fedos_persisted_conversation_payload_v1.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
 
 export interface FedosConversationArchiveBundleV1 {
   readonly schemaVersion: FedosConversationArchiveSchemaVersion;
@@ -51,4 +52,13 @@ export interface FedosConversationArchiveBundleV1 {
   readonly capabilityEvents: readonly FedosPersistedConversationCapabilityEventV1[];
   readonly envelopes: readonly FedosPersistedConversationMessageEnvelopeV1[];
   readonly payloads: readonly FedosPersistedConversationPayloadV1[];
+  /**
+   * Secure Runtime Alpha 1921–1980 — OPTIONAL, additive. Present iff
+   * `conversationId` is a `private-group` Conversation AND the Collector
+   * was given the Group persistence ports it needs to populate it.
+   * Absent, this bundle is a Direct-only bundle, byte-for-byte identical
+   * in shape to every Archive this codebase produced before this Arc —
+   * see `./fedos_conversation_archive_group_section.ts`'s own header.
+   */
+  readonly group?: FedosConversationArchiveGroupSectionV1;
 }

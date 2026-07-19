@@ -49,6 +49,7 @@
 
 import { fedosConversationCapabilityEventKey } from "../capability/persistence/fedos_conversation_capability_persistence.js";
 import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
 import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "./fedos_conversation_archive_schema_version.js";
 
 const TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
@@ -62,23 +63,54 @@ const TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
   "payloads",
 ]);
 
-/** Canonicalizes `bundle` into deterministic byte form: fixed top-level field order, every nested list sorted by its own natural key. */
-export function serializeFedosConversationArchiveBundleToBytes(bundle: FedosConversationArchiveBundleV1): Uint8Array {
-  const canonical = {
+/** Secure Runtime Alpha 1921–1980 — the ONE new optional top-level key. Never REQUIRED (see this file's own header, "old Direct archives remain readable"). */
+const GROUP_KEY = "group";
+
+const GROUP_SECTION_KEYS: ReadonlySet<string> = new Set(["generations", "paths", "messages", "fanoutDeliveries", "childConversations"]);
+
+function byNaturalKey<T>(key: (value: T) => string): (a: T, b: T) => number {
+  return (a, b) => {
+    const keyA = key(a);
+    const keyB = key(b);
+    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
+  };
+}
+
+/** Canonicalizes a Group Section into deterministic, JSON-serializable plain data — every nested list sorted by its own natural key, mirroring the bundle's own top-level discipline. Recurses into each child conversation bundle via `canonicalizeBundle` itself. */
+function canonicalizeGroupSection(group: FedosConversationArchiveGroupSectionV1): Record<string, unknown> {
+  return {
+    generations: [...group.generations].sort((a, b) => a.generationNumber - b.generationNumber),
+    paths: [...group.paths].sort(byNaturalKey((p) => p.pathId)),
+    messages: [...group.messages].sort(byNaturalKey((m) => m.id)),
+    fanoutDeliveries: [...group.fanoutDeliveries].sort(byNaturalKey((d) => `${d.groupMessageId}::${d.recipientMembershipId}`)),
+    childConversations: [...group.childConversations].sort(byNaturalKey((c) => c.conversationId)).map(canonicalizeBundle),
+  };
+}
+
+/** Canonicalizes `bundle` into a plain, deterministic, JSON-serializable object: fixed top-level field order, every nested list sorted by its own natural key. Recursive — a Group Section's own `childConversations` are each canonicalized identically. */
+function canonicalizeBundle(bundle: FedosConversationArchiveBundleV1): Record<string, unknown> {
+  const canonical: Record<string, unknown> = {
     schemaVersion: bundle.schemaVersion,
     conversationId: bundle.conversationId,
     exportedAt: bundle.exportedAt,
     conversation: bundle.conversation,
-    memberships: [...bundle.memberships].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-    capabilityEvents: [...bundle.capabilityEvents].sort((a, b) => {
-      const keyA = fedosConversationCapabilityEventKey(a);
-      const keyB = fedosConversationCapabilityEventKey(b);
-      return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-    }),
-    envelopes: [...bundle.envelopes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-    payloads: [...bundle.payloads].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    memberships: [...bundle.memberships].sort(byNaturalKey((m) => m.id)),
+    capabilityEvents: [...bundle.capabilityEvents].sort(byNaturalKey(fedosConversationCapabilityEventKey)),
+    envelopes: [...bundle.envelopes].sort(byNaturalKey((e) => e.id)),
+    payloads: [...bundle.payloads].sort(byNaturalKey((p) => p.id)),
   };
-  return new TextEncoder().encode(JSON.stringify(canonical));
+  // Alpha 1921-1980 -- the key is omitted ENTIRELY when absent, so a Direct-only bundle serializes
+  // BYTE-FOR-BYTE identically to every Archive this codebase produced before this Arc (see this
+  // file's own header and the Phase I compatibility regression test).
+  if (bundle.group !== undefined) {
+    canonical.group = canonicalizeGroupSection(bundle.group);
+  }
+  return canonical;
+}
+
+/** Canonicalizes `bundle` into deterministic byte form: fixed top-level field order, every nested list sorted by its own natural key. */
+export function serializeFedosConversationArchiveBundleToBytes(bundle: FedosConversationArchiveBundleV1): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(canonicalizeBundle(bundle)));
 }
 
 interface RawTopLevelFields {
@@ -90,21 +122,53 @@ interface RawTopLevelFields {
   readonly capabilityEvents: unknown;
   readonly envelopes: unknown;
   readonly payloads: unknown;
+  readonly group?: unknown;
 }
 
-/** Coarse, structural-only decode — see this file's own header for why deep per-record validation is deliberately NOT performed here. Fails closed to `null`, never throws. */
-export function deserializeFedosConversationArchiveBundleFromBytes(bytes: Uint8Array): FedosConversationArchiveBundleV1 | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(new TextDecoder().decode(bytes));
-  } catch {
-    return null;
+/** Coarse, structural-only decode of a Group Section value — array-shaped fields only; deep per-record validation is Restore's own job, exactly like every other domain (see this file's own header). Fails closed to `null`. Each `childConversations` entry recurses through `decodeBundleValue` itself. */
+function decodeGroupSectionValue(value: unknown): FedosConversationArchiveGroupSectionV1 | null {
+  if (value === null || typeof value !== "object") return null;
+  const keys = Object.keys(value);
+  if (!keys.every((key) => GROUP_SECTION_KEYS.has(key)) || keys.length !== GROUP_SECTION_KEYS.size) return null;
+
+  const { generations, paths, messages, fanoutDeliveries, childConversations } = value as {
+    readonly generations: unknown;
+    readonly paths: unknown;
+    readonly messages: unknown;
+    readonly fanoutDeliveries: unknown;
+    readonly childConversations: unknown;
+  };
+  if (!Array.isArray(generations)) return null;
+  if (!Array.isArray(paths)) return null;
+  if (!Array.isArray(messages)) return null;
+  if (!Array.isArray(fanoutDeliveries)) return null;
+  if (!Array.isArray(childConversations)) return null;
+
+  const decodedChildren: FedosConversationArchiveBundleV1[] = [];
+  for (const child of childConversations) {
+    const decodedChild = decodeBundleValue(child);
+    if (decodedChild === null) return null; // fail closed -- one malformed child voids the whole Archive.
+    decodedChildren.push(decodedChild);
   }
+
+  return {
+    generations: generations as FedosConversationArchiveGroupSectionV1["generations"],
+    paths: paths as FedosConversationArchiveGroupSectionV1["paths"],
+    messages: messages as FedosConversationArchiveGroupSectionV1["messages"],
+    fanoutDeliveries: fanoutDeliveries as FedosConversationArchiveGroupSectionV1["fanoutDeliveries"],
+    childConversations: decodedChildren,
+  };
+}
+
+/** Coarse, structural-only decode of an already-`JSON.parse`d value — see this file's own header for why deep per-record validation is deliberately NOT performed here. Fails closed to `null`, never throws. Shared by the top-level decode below and, recursively, by every Group Section child conversation. */
+function decodeBundleValue(parsed: unknown): FedosConversationArchiveBundleV1 | null {
   if (parsed === null || typeof parsed !== "object") return null;
   const keys = Object.keys(parsed);
-  if (!keys.every((key) => TOP_LEVEL_KEYS.has(key)) || keys.length !== TOP_LEVEL_KEYS.size) return null;
+  const hasGroup = keys.includes(GROUP_KEY);
+  const expectedSize = TOP_LEVEL_KEYS.size + (hasGroup ? 1 : 0);
+  if (!keys.every((key) => TOP_LEVEL_KEYS.has(key) || key === GROUP_KEY) || keys.length !== expectedSize) return null;
 
-  const { schemaVersion, conversationId, exportedAt, conversation, memberships, capabilityEvents, envelopes, payloads } =
+  const { schemaVersion, conversationId, exportedAt, conversation, memberships, capabilityEvents, envelopes, payloads, group } =
     parsed as RawTopLevelFields;
 
   if (schemaVersion !== FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION) return null;
@@ -116,6 +180,13 @@ export function deserializeFedosConversationArchiveBundleFromBytes(bytes: Uint8A
   if (!Array.isArray(envelopes)) return null;
   if (!Array.isArray(payloads)) return null;
 
+  let decodedGroup: FedosConversationArchiveGroupSectionV1 | undefined;
+  if (hasGroup) {
+    const result = decodeGroupSectionValue(group);
+    if (result === null) return null;
+    decodedGroup = result;
+  }
+
   return {
     schemaVersion: FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION,
     conversationId,
@@ -125,5 +196,17 @@ export function deserializeFedosConversationArchiveBundleFromBytes(bytes: Uint8A
     capabilityEvents: capabilityEvents as FedosConversationArchiveBundleV1["capabilityEvents"],
     envelopes: envelopes as FedosConversationArchiveBundleV1["envelopes"],
     payloads: payloads as FedosConversationArchiveBundleV1["payloads"],
+    ...(decodedGroup !== undefined ? { group: decodedGroup } : {}),
   };
+}
+
+/** Coarse, structural-only decode — see this file's own header for why deep per-record validation is deliberately NOT performed here. Fails closed to `null`, never throws. */
+export function deserializeFedosConversationArchiveBundleFromBytes(bytes: Uint8Array): FedosConversationArchiveBundleV1 | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+  return decodeBundleValue(parsed);
 }

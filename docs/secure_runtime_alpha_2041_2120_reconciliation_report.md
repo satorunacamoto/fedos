@@ -1,0 +1,299 @@
+# Secure Runtime Alpha 2041–2120 — Reconciliation Report
+## Conversation Identity Restoration and Reactivation Arc — Phase 1 (mandatory, before any production code change)
+
+Written in worktree `C:\wt\conversation-identity-reactivation`, branch
+`arc/conversation-identity-restoration-reactivation`, based on `19b3d9f`
+("Add Secure Runtime Alpha 1921-1980: Group Conversation Archive
+Integration and Cross-Branch Recovery Arc"). Every claim below was
+re-verified against real source in this exact worktree, not assumed
+from the prior Arc's own completion declaration (though that document,
+`docs/secure_runtime_alpha_1921_1980_completion_declaration.md`, and
+its own round-trip test,
+`test/secure_runtime_alpha_1921_1980_group_archive_round_trip.test.ts`,
+are both an accurate and load-bearing starting point — every specific
+claim they make about the gap this Arc closes checked out against real
+source, see below).
+
+## 1. Runtime ownership
+
+Three candidates were named; all three were read in full.
+
+- **`FedosConversationRuntime`** (`src/conversation/runtime/fedos_conversation_runtime.ts`)
+  is the ONE class that already owns every fact a reactivation needs in
+  one coherent object graph, constructed once in its constructor and
+  never rebuilt: `draftPersistence` (via `#deps`, Alpha 894),
+  `activationPersistence` (a local `const` inside the constructor,
+  shared by the Encryption/Decryption Coordinators AND the Direct
+  Activation Coordinator — Alpha 1121's own "ONE durable source of
+  truth" instruction), `membershipAuthority` (`#deps`), the already-
+  built `#activationCoordinator` (`FedosConversationDirectActivationCoordinator`,
+  exposing `activateDirectConversation()`, Alpha 1122), the identity
+  resolver (also a local constructor `const`), and `#groupRuntime`
+  (`FedosConversationGroupRuntime`, which itself was built over
+  `groupGenerationPersistence`/`groupDirectPathPersistence`, both ALSO
+  local constructor `const`s). Every one of these already exists on
+  this exact class; none has to be plumbed in from anywhere else.
+- **`FedosConversationArchiveRuntime`** (`src/conversation/archive/runtime/fedos_conversation_archive_runtime.ts`)
+  owns exactly the archive lifecycle — export/inspect/preflight/restore
+  — over `conversationPersistence`/`membershipPersistence`/
+  `capabilityPersistence`/`envelopePersistence`/`payloadStorage` plus the
+  four Group ports. It has NO reference to `draftPersistence` or
+  `activationPersistence` at all (by the prior Arc's own §1 finding:
+  Draft/Activation are the ONE thing this port family deliberately never
+  touches). Giving it a reactivation method would mean either (a)
+  widening its dependency bag with Draft/Activation ports it has no
+  other reason to hold, duplicating what `FedosConversationRuntime`
+  already owns, or (b) reactivating IMMEDIATELY as part of
+  `restoreConversationArchive()` itself, which would silently activate a
+  conversation the local caller may not even control identically to how
+  the original Direct/Group facades gate activation (a security
+  regression the "requires the SAME authorization discipline" governing
+  instruction explicitly forbids) — restore and reactivate are two
+  genuinely different trust decisions ("this bundle's bytes are
+  authentic" vs. "I am entitled to resume messaging as a member of this
+  conversation") and collapsing them into one call would blur that.
+- **`FedosRunningDesktopRuntime`** (`src/desktop/runtime/fedos_desktop_runtime.ts`)
+  is a thin composition/lifecycle holder only — it owns Host startup
+  order, the `stopped` flag, and exposes `boardRuntime()`/
+  `conversationRuntime()`/`conversationArchiveRuntime()`/
+  `privateTransport()` as accessors. It constructs no business logic of
+  its own (Alpha 671's own "the ONE thing a caller holds a reference to"
+  design) and every prior Arc that added a Conversation-domain operation
+  added it to `FedosConversationRuntime`, never to this class.
+
+**DECISION: `FedosConversationRuntime`.** A new public method,
+`reactivateRestoredConversation(conversationId)`, is added there,
+alongside the existing `activateDirectConversation()` it already owns
+— the natural, minimal-ripple home, matching every one of Alpha
+921/1122/1365's own precedents ("the Conversation Runtime owns
+Conversation lifecycle; Archive owns archive lifecycle; Host owns
+process lifecycle"). Two new private fields are added to carry
+`activationPersistence`/`identityResolver`/`groupGenerationPersistence`/
+`groupDirectPathPersistence` forward as instance state (previously
+local constructor `const`s used only to build the sub-coordinators) —
+required because the new method needs to read them directly; this is
+the ONLY structural change to the class, additive, and does not touch
+any existing field, method signature, or dependency shape.
+
+## 2. Identity ownership
+
+A Conversation's identity across a restore is its `FedosConversationId`
+— always deterministic and never regenerated by anything this Arc adds
+(`toFedosPrivateConversationId()`, Alpha 908, for a plain Direct/Group
+draft; `toFedosGroupPairKey()` fed as the `idempotencyKey`, Alpha 1336,
+for a Group's own pairwise child). The archive already preserves this
+id verbatim (Membership/Generation/Path/Message/Fanout records all key
+off it) — nothing about "which conversation this is" is ever in
+question after a restore.
+
+What is genuinely missing, confirmed against real source, is not the
+id but the **Draft record** (`FedosConversationDraftRecord`,
+`src/conversation/construction/fedos_conversation_draft_record.ts`,
+Alpha 894) — the record carrying `mode`/`creator`/`policyReference`/
+`createdAt`. This record is intentionally excluded from the archive
+(confirmed, §4 below) and is intentionally NEVER derivable from the
+public `FedosConversationPersistence`/`FedosPersistedConversationRecordV1`
+(Public-Board-only, Alpha 748 — confirmed unchanged in this worktree).
+The ONE fact durably restored that can reconstruct it deterministically
+is **Membership** (`FedosConversationMembership`,
+`src/conversation/membership/fedos_conversation_membership.ts`, Alpha
+766): every draft's creator is admitted with `role: "owner"`
+(`FedosPrivateConversationConstructionCoordinator.#run()`, line
+`this.#deps.membershipAuthority.admit(conversationId, creator, "owner", now)`)
+— the ONLY place in this codebase that ever assigns the `"owner"` role
+— so "find the Membership with `role === 'owner'`" is a genuine,
+authoritative, already-restored re-derivation of "who created this,"
+never an invented or guessed value. `creator.authority`/
+`creator.publicIdentifier`/`creator.identityId` come directly off that
+Membership's own `participant` field; `createdAt` is re-derived from
+that same Membership's own `joinedAt` (Unix seconds, the exact
+convention `FedosConversationDraftRecord.createdAt` already documents).
+`mode`/`policyReference` are a closed, two-value decision (`"direct"`
++ `"direct-draft-v1"`, or `"private-group"` +
+`"private-group-draft-v1"`) resolved by the SAME signal the prior Arc's
+own §1 finding already established as authoritative and real:
+`groupGenerationPersistence.currentGenerationForGroup(id) !== null` (via
+the real `groupRuntime().listPrivateGroupGenerations(id).length > 0`
+Runtime read, not a raw port peek, wherever the call site allows it).
+
+## 3. Activation ownership
+
+Read in full: `FedosConversationDraftPersistence`
+(`src/conversation/construction/fedos_conversation_draft_persistence.ts`),
+`FedosConversationActivationPersistence`
+(`src/conversation/activation/fedos_conversation_activation_persistence.ts`),
+`resolveFedosConversationActiveConversation()`
+(`src/conversation/activation/fedos_conversation_active_lookup.ts`),
+`FedosConversationDirectActivationCoordinator`
+(`src/conversation/activation/fedos_conversation_direct_activation_coordinator.ts`).
+
+Confirmed exactly as the prior Arc's test header described:
+`resolveFedosConversationActiveConversation()` requires (1) a Draft
+record to exist, AND (2) a `"completed"`-phase Activation fact — never
+consults the Draft's own `lifecycleState` (permanently `"draft"` by
+construction, Alpha 1116). This is consulted, unmodified, deep inside
+`FedosConversationEncryptionCoordinator`/`FedosConversationDecryptionCoordinator`/
+`FedosConversationDirectMessagingCoordinator` — i.e. every real
+send/read path for a `direct` Conversation.
+
+**But Draft+Activation are NOT the only precondition, and a THIRD,
+previously unnamed blocker was found while tracing the real Group send
+path** — this is the one correction this report makes to the Arc
+brief's own framing:
+
+- `FedosGroupGenerationAuthority.createNextGeneration()`
+  (`src/conversation/group/fedos_group_generation_authority.ts`) —
+  called on EVERY membership change (`addPrivateGroupMember()`/
+  `removePrivateGroupMember()`, via `FedosConversationGroupRuntime`) —
+  itself requires `draftPersistence.getDraft(groupConversationId).mode
+  === "private-group"` and returns `"conversation-not-found"`/
+  `"invalid-mode"` otherwise. This means a restored Group's OWN
+  top-level id ALSO needs its Draft reconstructed — not for messaging
+  (the Group id itself is never "activated", see below) but so that
+  ANY future membership change on a restored, non-reactivated Group
+  does not fail closed.
+- `evaluateFedosGroupUsability()` (`src/conversation/group/fedos_group_usability.ts`),
+  backing `groupRuntime().readinessForPrivateGroup()`, ALSO requires
+  `draft !== null && draft.mode === "private-group"` for the group id
+  and reports `"failed"` otherwise.
+- Membership/Capability state ARE already correctly restored by the
+  completed Group Archive Arc (Alpha 1921–1980) — re-verified directly:
+  the archive's base five-domain restore
+  (`restoreFedosConversationArchiveBundle()`,
+  `src/conversation/archive/fedos_conversation_archive_restore.ts`)
+  replays Membership/Capability/Envelope/Payload for every conversation
+  bundle, and — critically for Group — recurses through the exact SAME
+  function for every child Direct Conversation bundle
+  (`childConversations`), so a child's own Membership records (the
+  creator's `"owner"` fact included) are durably present after restore,
+  with no additional work needed from this Arc. This is confirmed, not
+  assumed: `test/secure_runtime_alpha_1921_1980_group_archive_round_trip.test.ts`
+  itself reads Carol's own restored child Direct Conversation's Envelope/
+  Payload directly and decrypts it, which is only possible if that
+  child's Membership/Envelope/Payload state is genuinely present.
+- A Group's own top-level id is **never** "activated" in this codebase
+  — `FedosConversationDirectActivationCoordinator.activateDirectConversation()`
+  rejects any `mode !== "direct"` with `"unsupported-mode"` (Alpha
+  1123's own Private-Group Gate, frozen, never touched by this Arc).
+  Sending a Group message never checks the group id's own Draft+
+  Activation at all — `FedosGroupSendCoordinator.sendGroupMessage()`
+  reads `generationPersistence.currentGenerationForGroup()` and
+  `membershipAuthority.findMembership()` directly. So group-level
+  reactivation is Draft-only (for `createNextGeneration()`/
+  `readinessForPrivateGroup()` to keep working), never an Activation
+  concern for the group id itself.
+- **The real, load-bearing gap for messaging** is one level down: each
+  pairwise child Direct Conversation a Group's paths reference. This is
+  where `FedosConversationDirectMessagingCoordinator.sendDirectMessage()`
+  (invoked by `FedosGroupSendCoordinator` once per recipient) DOES
+  consult `resolveFedosConversationActiveConversation()`, and the child's
+  Draft+Activation are BOTH missing after restore — confirmed exactly as
+  the prior Arc's round-trip test found and worked around with a
+  test-only seed.
+- One more precise finding, not previously named: `FedosGroupDirectPathAuthority.preparePath()`
+  (`src/conversation/group/fedos_group_direct_path_authority.ts`) is
+  ALREADY idempotent and, in the one specific case where a
+  (group, generation) pair's own `FedosGroupDirectPathRecord` does NOT
+  yet exist for the CURRENT generation (e.g. a brand-new generation
+  created by admitting/removing a member after restore), it already
+  calls `createDirectDraft()`/`activateDirectConversation()` again
+  itself, deterministically re-deriving the SAME child conversation id
+  from the same `pairKey` — genuinely self-healing for that one case.
+  But `preparePath()` returns EARLY, without touching Draft/Activation at
+  all, whenever an existing Path record for the id already reports
+  `state === "ready"` (`existing.state === "ready" || "unavailable"` at
+  its own very first check) — exactly the state every restored Path
+  record carries. So sending through an EXISTING (restored) generation's
+  paths — the common case, and exactly what the prior Arc's round-trip
+  test needed a workaround for — never triggers this self-healing path.
+  This Arc's reactivation must therefore act BEFORE the first
+  post-restore send, not rely on `preparePath()`'s own partial
+  self-healing.
+
+## 4. Archive ownership (confirmed against `docs/secure_runtime_alpha_1921_1980_*` and re-checked against real source)
+
+Confirmed unchanged since the prior Arc: the archive restores
+Membership (exhaustive), Capability (exhaustive), Envelope (current),
+Payload (current), Group Generation (exhaustive), Group Path (current),
+Group Message (current), Group Fanout Delivery (current), recursively
+for every child conversation. It deliberately excludes Draft,
+Activation, and retention/tombstone facts — `docs/secure_runtime_alpha_1921_1980_phase_a_domain_inventory.md`
+and the completion declaration's own §9 state this explicitly ("Draft
+state: ... unaffected by anything in this Arc; the archive never
+touches it, by design"); this Arc's own reconciliation confirms the
+Restore/Collector/Duplicate-Detection source
+(`fedos_conversation_archive_collector.ts`/`_restore.ts`/
+`_duplicate_detection.ts`) contains no reference to
+`FedosConversationDraftPersistence` or
+`FedosConversationActivationPersistence` anywhere — the exclusion is
+real, not merely documented.
+
+## 5. Restored Conversation lifecycle (traced in real source)
+
+Immediately after `restoreConversationArchive()` reports `"restored"`:
+Membership/Capability/Envelope/Payload/Group facts are durable; Draft
+and Activation are NOT written by that call (confirmed, §4). The
+conversation is genuinely, completely inert to every real send/read
+API that exists today:
+
+- `conversationRuntime().findConversation(id)` returns `null` (reads
+  `draftPersistence.getDraft(id)` directly — Alpha 922/925).
+- `conversationRuntime().sendDirectMessage()`/`readDirectMessage()` fail
+  closed via `resolveFedosConversationActiveConversation()` returning
+  `"not-found"` (no Draft at all).
+- `conversationRuntime().groupRuntime().readinessForPrivateGroup(id)`
+  reports `"failed"` (no Draft for the group id, `evaluateFedosGroupUsability()`).
+- `conversationRuntime().groupRuntime().sendPrivateGroupMessage()` for
+  an EXISTING (restored) generation succeeds through `preparePath()`'s
+  own early-return (Path already `"ready"`) but then fails inside
+  `sendDirectMessage()` for the child conversation, exactly as the
+  prior Arc's own test found.
+- `conversationRuntime().listPrivateGroupGenerations(id)`/
+  `listPrivateGroupMessages(id)` DO already work post-restore (pure
+  reads over `groupGenerationPersistence`/`groupMessagePersistence`,
+  no Draft/Activation gate) — these are real, already-working
+  "discover the restored conversation" Runtime APIs requiring no new
+  code, confirming a restored conversation is not totally invisible,
+  only non-reachable for send/activate/readiness-style operations.
+
+## 6. Current blockers — exact integration points
+
+1. `resolveFedosConversationActiveConversation()` (`fedos_conversation_active_lookup.ts`)
+   returns `{outcome: "not-found"}` for a restored `direct` conversation
+   (or a restored Group's own pairwise child) because
+   `draftPersistence.getDraft(id) === null`. This is the target this
+   Arc's reactivation operation must satisfy by writing a real,
+   validator-constructed Draft record BEFORE calling the existing,
+   unmodified `activateDirectConversation()`.
+2. `FedosGroupGenerationAuthority.createNextGeneration()` returns
+   `{outcome: "conversation-not-found"}` / `{outcome: "invalid-mode"}`
+   for a restored Group's own top-level id for the same reason — the
+   target this Arc's reactivation must ALSO satisfy for the group id
+   itself (Draft only, no Activation concept applies).
+3. `FedosConversationDirectActivationCoordinator.activateDirectConversation()`
+   itself is entirely reusable, UNMODIFIED — once a Draft exists, it
+   fully re-derives and re-verifies Membership/policy/identity/key
+   readiness fresh (Alpha 1122's own "revalidate in full" design) and
+   writes the `"completed"` Activation fact. No change to this file is
+   needed or made.
+
+## Summary of the plan this reconciliation licenses
+
+Add `FedosConversationRuntime.reactivateRestoredConversation(conversationId)`:
+derives and durably writes the missing Draft record(s) — the top-level
+id's own (mode resolved via the real Group-generation signal), and, when
+the id is a Group, every distinct child `directConversationId` its
+restored Paths reference — deterministically from already-restored
+Membership `"owner"` facts, never invented; then calls the existing,
+unmodified `activateDirectConversation()` for every `direct` id (the
+top-level id itself when it is `direct`, or every child when it is a
+Group). Authorization is enforced by requiring the Runtime's own locally
+resolved identity to already hold an `"active"` Membership on whatever
+id is being reactivated — the SAME check `activateDirectConversation()`/
+`sendGroupMessage()` already perform, reused rather than reinvented, so
+a caller can never reactivate a conversation they were never a genuine
+member of. Both the top-level Draft write and every per-child Draft
+write, plus the activation call itself, are independently idempotent
+(mirrors the archive restore's own per-domain idempotent-loop
+discipline) — calling this operation once, twice, or on an
+already-active conversation never duplicates or corrupts anything.

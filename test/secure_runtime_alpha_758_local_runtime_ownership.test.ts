@@ -90,9 +90,26 @@ describe("Secure Runtime Alpha 758 -- Local Runtime Ownership", () => {
     });
     // Secure Runtime Alpha 923 ADDITIVELY extended this handle with
     // `conversationRuntime()` (the private-Conversation draft runtime the
-    // Local Runtime now also owns). Still NO filesystem internal is exposed
-    // -- only the two Application-Runtime accessors and `stop()`.
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"].sort());
+    // Local Runtime now also owns). Reconciled by Alpha 1691-1760: Alpha
+    // 1471-1540's own `privateTransport()` had never been added to this
+    // assertion (a pre-existing gap, found and fixed here since this Arc
+    // already has to touch this exact line for its own new
+    // `conversationArchiveRuntime()` key). Secure Runtime Alpha 1263/1291
+    // (Alpha 1261-1320, merged into this line via Alpha 1921-1980's Group
+    // integration) ADDITIVELY extends it again with
+    // `conversationProductionCryptoCapability()` -- ONE coarse, non-secret
+    // capability-outcome accessor. Still NO filesystem internal is exposed.
+    expect(Object.keys(runtime).sort()).toEqual(
+      [
+        "boardRuntime",
+        "conversationArchiveRuntime",
+        "conversationProductionCryptoCapability",
+        "conversationRuntime",
+        "host",
+        "privateTransport",
+        "stop",
+      ].sort(),
+    );
     await runtime.stop();
   });
 

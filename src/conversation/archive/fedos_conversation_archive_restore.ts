@@ -52,7 +52,20 @@ import { deserializeFedosConversationMessageEnvelope, serializeFedosConversation
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import { deserializeFedosConversationPayload } from "../payload_storage/fedos_conversation_payload_codec.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import { validateFedosGroupGenerationRecord, type FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
+import { validateFedosGroupDirectPathRecord, type FedosGroupDirectPathPersistence } from "../group/fedos_group_direct_path.js";
+import { validateFedosGroupMessageRecord, type FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
+import { validateFedosGroupFanoutDeliveryRecord, type FedosGroupFanoutDeliveryPersistence } from "../group/fedos_group_fanout_delivery.js";
 import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
+
+/** Secure Runtime Alpha 1921–1980 — the four Group-only persistence ports Restore needs to replay `FedosConversationArchiveBundleV1.group`. OPTIONAL: omitted, a bundle carrying a `group` section simply has that section skipped entirely (never partially written) — mirrors the Collector's own identical "omit `deps.group`, get Direct-only behavior" discipline. */
+export interface FedosConversationArchiveGroupRestoreDependencies {
+  readonly groupGenerationPersistence: FedosGroupGenerationPersistence;
+  readonly groupDirectPathPersistence: FedosGroupDirectPathPersistence;
+  readonly groupMessagePersistence: FedosGroupMessagePersistence;
+  readonly groupFanoutDeliveryPersistence: FedosGroupFanoutDeliveryPersistence;
+}
 
 export interface FedosConversationArchiveRestoreDependencies {
   readonly conversationPersistence: FedosConversationPersistence;
@@ -60,6 +73,7 @@ export interface FedosConversationArchiveRestoreDependencies {
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
   readonly payloadStorage: FedosConversationPayloadStorage;
+  readonly group?: FedosConversationArchiveGroupRestoreDependencies;
 }
 
 export type FedosConversationArchiveSingleRecordOutcome = "inserted" | "duplicate" | "conflict" | "failed" | "invalid";
@@ -72,12 +86,22 @@ export interface FedosConversationArchiveRestoreOutcomeCounts {
   readonly invalid: number;
 }
 
+/** Secure Runtime Alpha 1921–1980 — the Group Section's own per-domain outcome tally, present iff `bundle.group` was present AND `deps.group` was supplied. `childConversations` is one FULL nested `FedosConversationArchiveRestoreResult` per child Direct Conversation bundle, in the SAME order as `bundle.group.childConversations` — each restored through the SAME top-level replay logic this function already applies (new orchestration, never a second write path). */
+export interface FedosConversationArchiveGroupRestoreResult {
+  readonly generations: FedosConversationArchiveRestoreOutcomeCounts;
+  readonly paths: FedosConversationArchiveRestoreOutcomeCounts;
+  readonly childConversations: readonly FedosConversationArchiveRestoreResult[];
+  readonly messages: FedosConversationArchiveRestoreOutcomeCounts;
+  readonly fanoutDeliveries: FedosConversationArchiveRestoreOutcomeCounts;
+}
+
 export interface FedosConversationArchiveRestoreResult {
   readonly conversation: FedosConversationArchiveSingleRecordOutcome;
   readonly memberships: FedosConversationArchiveRestoreOutcomeCounts;
   readonly capabilityEvents: FedosConversationArchiveRestoreOutcomeCounts;
   readonly envelopes: FedosConversationArchiveRestoreOutcomeCounts;
   readonly payloads: FedosConversationArchiveRestoreOutcomeCounts;
+  readonly group?: FedosConversationArchiveGroupRestoreResult;
 }
 
 function zeroCounts(): { inserted: number; duplicate: number; conflict: number; failed: number; invalid: number } {
@@ -160,11 +184,85 @@ export function restoreFedosConversationArchiveBundle(
     tally(payloadCounts, fromWriteResult(deps.payloadStorage.putPayload(decoded.descriptor, decoded.bytes)));
   }
 
+  // Secure Runtime Alpha 1921-1980 -- restores the Group Section ONLY when the bundle actually
+  // carries one AND the caller supplied the Group ports. Order: generations -> paths -> child Direct
+  // Conversations -> messages -> fanout deliveries -- mirrors the REAL dependency shape these domains
+  // have (a path's own `directConversationId` is meaningful once the child exists; a fanout record's
+  // own `pathId`/message id are meaningful once those exist) even though none of these append-only
+  // ports actually ENFORCE a foreign-key check at write time -- every `put*` call here is independently
+  // idempotent, exactly like the base five-domain loop above, so a restore interrupted after any ONE
+  // domain converges cleanly on a fresh retry (never a duplicate, never an overwrite).
+  const groupSection = bundle.group;
+  const groupDeps = deps.group;
+  const group =
+    groupSection !== undefined && groupDeps !== undefined
+      ? restoreFedosConversationArchiveGroupSection(groupSection, { ...deps, group: groupDeps })
+      : undefined;
+
   return {
     conversation: conversationOutcome,
     memberships: membershipCounts,
     capabilityEvents: capabilityCounts,
     envelopes: envelopeCounts,
     payloads: payloadCounts,
+    ...(group !== undefined ? { group } : {}),
+  };
+}
+
+function restoreFedosConversationArchiveGroupSection(
+  section: FedosConversationArchiveGroupSectionV1,
+  deps: FedosConversationArchiveRestoreDependencies & { readonly group: FedosConversationArchiveGroupRestoreDependencies },
+): FedosConversationArchiveGroupRestoreResult {
+  const generationCounts = zeroCounts();
+  for (const raw of section.generations) {
+    const runtime = validateFedosGroupGenerationRecord(raw);
+    if (runtime === null) {
+      tally(generationCounts, "invalid");
+      continue;
+    }
+    tally(generationCounts, fromWriteResult(deps.group.groupGenerationPersistence.putGeneration(runtime)));
+  }
+
+  const pathCounts = zeroCounts();
+  for (const raw of section.paths) {
+    const runtime = validateFedosGroupDirectPathRecord(raw);
+    if (runtime === null) {
+      tally(pathCounts, "invalid");
+      continue;
+    }
+    tally(pathCounts, fromWriteResult(deps.group.groupDirectPathPersistence.putPathFact(runtime)));
+  }
+
+  const childConversations: FedosConversationArchiveRestoreResult[] = [];
+  for (const child of section.childConversations) {
+    childConversations.push(restoreFedosConversationArchiveBundle(child, deps));
+  }
+
+  const messageCounts = zeroCounts();
+  for (const raw of section.messages) {
+    const runtime = validateFedosGroupMessageRecord(raw);
+    if (runtime === null) {
+      tally(messageCounts, "invalid");
+      continue;
+    }
+    tally(messageCounts, fromWriteResult(deps.group.groupMessagePersistence.putMessageFact(runtime)));
+  }
+
+  const fanoutDeliveryCounts = zeroCounts();
+  for (const raw of section.fanoutDeliveries) {
+    const runtime = validateFedosGroupFanoutDeliveryRecord(raw);
+    if (runtime === null) {
+      tally(fanoutDeliveryCounts, "invalid");
+      continue;
+    }
+    tally(fanoutDeliveryCounts, fromWriteResult(deps.group.groupFanoutDeliveryPersistence.putDeliveryFact(runtime)));
+  }
+
+  return {
+    generations: generationCounts,
+    paths: pathCounts,
+    childConversations,
+    messages: messageCounts,
+    fanoutDeliveries: fanoutDeliveryCounts,
   };
 }

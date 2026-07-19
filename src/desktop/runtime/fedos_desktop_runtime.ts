@@ -122,6 +122,12 @@ import {
 } from "../../conversation/runtime/fedos_conversation_runtime.js";
 import { assembleFedosConversationRuntimeDependencies } from "../../conversation/runtime/fedos_conversation_runtime_assembly.js";
 import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import {
+  assembleFedosConversationProductionCryptoGraph,
+  type FedosConversationProductionCryptoConfig,
+  type FedosConversationProductionCryptoGraph,
+} from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
 
 // Secure Runtime Alpha 1471-1540 (Private Transport Boundary and
 // Multi-Relay Delivery Arc) -- every import/addition below this comment
@@ -139,6 +145,36 @@ import { InMemoryFedosConversationTransportOutboxPersistence } from "../../conve
 import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
 import { FedosConversationRelaySet } from "../../conversation/transport/relay/fedos_conversation_relay_set.js";
 import { FedosPrivateTransport } from "../../conversation/transport/fedos_private_transport.js";
+
+// Secure Runtime Alpha 1691-1760 (Conversation Archive Runtime
+// Integration and Recovery Operations Arc) -- every import/addition
+// below this comment is ADDITIVE ONLY, mirroring the Alpha 1471-1540
+// boundary comment above for the same reason.
+import type { FedosConversationMembershipPersistence } from "../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
+import { AppendOnlyFedosConversationMembershipPersistence } from "../../conversation/membership/persistence/append_only_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../../conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+import { AppendOnlyFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { assembleFedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.js";
+import type { FedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
+
+// Secure Runtime Alpha 1921-1980 (Group Conversation Archive Integration and
+// Cross-Branch Recovery Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1691-1760 boundary comment above for the
+// same reason.
+import type { FedosGroupGenerationPersistence } from "../../conversation/group/fedos_group_generation.js";
+import { AppendOnlyFedosGroupGenerationPersistence } from "../../conversation/group/append_only_fedos_group_generation_persistence.js";
+import { InMemoryFedosGroupGenerationPersistence } from "../../conversation/group/in_memory_fedos_group_generation_persistence.js";
+import type { FedosGroupDirectPathPersistence } from "../../conversation/group/fedos_group_direct_path.js";
+import { AppendOnlyFedosGroupDirectPathPersistence } from "../../conversation/group/append_only_fedos_group_direct_path_persistence.js";
+import { InMemoryFedosGroupDirectPathPersistence } from "../../conversation/group/in_memory_fedos_group_direct_path_persistence.js";
+import type { FedosGroupMessagePersistence } from "../../conversation/group/fedos_group_message.js";
+import { AppendOnlyFedosGroupMessagePersistence } from "../../conversation/group/append_only_fedos_group_message_persistence.js";
+import { InMemoryFedosGroupMessagePersistence } from "../../conversation/group/in_memory_fedos_group_message_persistence.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../../conversation/group/fedos_group_fanout_delivery.js";
+import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/append_only_fedos_group_fanout_delivery_persistence.js";
+import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/in_memory_fedos_group_fanout_delivery_persistence.js";
 
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
@@ -183,6 +219,30 @@ export interface FedosRunningDesktopRuntime {
    * configured" state this accessor alone needs.
    */
   privateTransport(): FedosPrivateTransport;
+  /**
+   * Secure Runtime Alpha 1691–1760 — the `FedosConversationArchiveRuntime`
+   * (`../../conversation/archive/runtime/fedos_conversation_archive_runtime.ts`)
+   * this running Local Runtime owns, constructed ONLY when
+   * `config.archiveEnabled` was `true`. Throws `"not enabled"` if it was
+   * never configured, and throws `"inaccessible after stop"` once
+   * `stop()` has been called — the SAME two-state fail-closed contract
+   * `privateTransport()` itself already uses. Independently of THIS
+   * accessor's own gate, the returned Runtime's own operations ALSO fail
+   * closed once `stop()` has been called (see its own "LIFECYCLE"
+   * header) — a caller that grabbed a reference before `stop()` cannot
+   * use it afterward either.
+   */
+  conversationArchiveRuntime(): FedosConversationArchiveRuntime;
+  /**
+   * Secure Runtime Alpha 1263/1291 — the closed, non-secret reason
+   * production Conversation crypto is (or is not) currently available.
+   * `"disabled"` when `config.conversationProductionCrypto` was never
+   * supplied; one of the other eight closed outcomes otherwise (Alpha
+   * 1263). Never a raw loader `Error`, never a provider message, never a
+   * secret byte. Readable even after `stop()` — a coarse, static fact
+   * about how THIS runtime started, not a live probe.
+   */
+  conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome;
   /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
@@ -237,6 +297,17 @@ export async function startFedosDesktopRuntime(
       );
     }
   }
+  // Secure Runtime Alpha 1691-1760 -- mirrors the privateTransportEnabled guard
+  // above exactly: a configuration error is thrown synchronously, BEFORE any
+  // Persistence backend or Host is constructed, never a silent fallback to a
+  // second, internally-constructed Master Seed Authority.
+  if (config.archiveEnabled) {
+    if (config.conversationArchiveMasterSeedAuthority === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveEnabled is true but no conversationArchiveMasterSeedAuthority was supplied — this runtime constructs no Master Seed Authority of its own.",
+      );
+    }
+  }
 
   ensureParentDirectoryExists(config.boardLogPath);
   ensureParentDirectoryExists(config.outboxLogPath);
@@ -252,6 +323,25 @@ export async function startFedosDesktopRuntime(
     config.conversationMembershipLogPath,
     config.conversationCapabilityLogPath,
     config.conversationConstructionCoordinationLogPath,
+    // Alpha 996/1003 -- the invitation-revocation and draft-management logs.
+    config.conversationInvitationRevocationLogPath,
+    config.conversationDraftManagementLogPath,
+    // Alpha 1113/1121/1143 -- the Encryption Runtime Wiring's own logs plus
+    // the NEW Activation coordination and Payload Retention logs.
+    config.conversationEnvelopeLogPath,
+    config.conversationPayloadLogPath,
+    config.conversationEncryptionCoordinationLogPath,
+    config.conversationActivationCoordinationLogPath,
+    config.conversationPayloadRetentionLogPath,
+    // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+    config.conversationGroupGenerationLogPath,
+    config.conversationGroupDirectPathLogPath,
+    config.conversationGroupMessageLogPath,
+    config.conversationGroupFanoutDeliveryLogPath,
+    // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own logs.
+    config.conversationPrivateNostrDeliveryRequestLogPath,
+    config.conversationPrivateNostrImportRecordLogPath,
+    config.conversationPrivateNostrDeliveryObservationLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -301,6 +391,45 @@ export async function startFedosDesktopRuntime(
         )
       : new InMemoryFedosConversationPayloadStorage();
 
+  // Secure Runtime Alpha 1691-1760 -- constructed unconditionally (mirrors
+  // conversationEnvelopePersistence/conversationPayloadStorage's own identical
+  // discipline above), over the SAME conversationMembershipLogPath/
+  // conversationCapabilityLogPath the Conversation Runtime's own Alpha 923
+  // assembly already uses for its Membership/Capability Authorities -- two
+  // separate port instances reading/writing the SAME durable append-only log
+  // file, the same "fresh instance over the same durable backend" pattern
+  // this codebase already relies on for restart-stability (Alpha 618/589).
+  const conversationArchiveMembershipPersistence: FedosConversationMembershipPersistence =
+    config.conversationMembershipLogPath !== undefined
+      ? new AppendOnlyFedosConversationMembershipPersistence(config.conversationMembershipLogPath)
+      : new InMemoryFedosConversationMembershipPersistence();
+  const conversationArchiveCapabilityPersistence: FedosConversationCapabilityPersistence =
+    config.conversationCapabilityLogPath !== undefined
+      ? new AppendOnlyFedosConversationCapabilityPersistence(config.conversationCapabilityLogPath)
+      : new InMemoryFedosConversationCapabilityPersistence();
+
+  // Secure Runtime Alpha 1921-1980 -- mirrors conversationArchiveMembershipPersistence/
+  // conversationArchiveCapabilityPersistence's own identical discipline immediately above: a SECOND
+  // port instance over the SAME durable Group log paths the Conversation Runtime's own Group facade
+  // (assembleFedosConversationRuntimeDependencies, via groupGenerationLogPath etc.) already uses --
+  // never a second, duplicate log file, and never shared/reused across running Runtime instances.
+  const conversationArchiveGroupGenerationPersistence: FedosGroupGenerationPersistence =
+    config.conversationGroupGenerationLogPath !== undefined
+      ? new AppendOnlyFedosGroupGenerationPersistence(config.conversationGroupGenerationLogPath)
+      : new InMemoryFedosGroupGenerationPersistence();
+  const conversationArchiveGroupDirectPathPersistence: FedosGroupDirectPathPersistence =
+    config.conversationGroupDirectPathLogPath !== undefined
+      ? new AppendOnlyFedosGroupDirectPathPersistence(config.conversationGroupDirectPathLogPath)
+      : new InMemoryFedosGroupDirectPathPersistence();
+  const conversationArchiveGroupMessagePersistence: FedosGroupMessagePersistence =
+    config.conversationGroupMessageLogPath !== undefined
+      ? new AppendOnlyFedosGroupMessagePersistence(config.conversationGroupMessageLogPath)
+      : new InMemoryFedosGroupMessagePersistence();
+  const conversationArchiveGroupFanoutDeliveryPersistence: FedosGroupFanoutDeliveryPersistence =
+    config.conversationGroupFanoutDeliveryLogPath !== undefined
+      ? new AppendOnlyFedosGroupFanoutDeliveryPersistence(config.conversationGroupFanoutDeliveryLogPath)
+      : new InMemoryFedosGroupFanoutDeliveryPersistence();
+
   const host = createFedosDesktopHost({
     desktopApplication: createDesktopApplication(),
     boardPersistence,
@@ -349,6 +478,23 @@ export async function startFedosDesktopRuntime(
     conversationPersistence,
   });
 
+  // Alpha 1273/1274 -- resolve the real, WASM-backed Production Crypto
+  // Graph BEFORE Conversation Runtime assembly, so a successful
+  // resolution can supply its own real Authorities below. Never throws
+  // and never fails Runtime startup -- every internal failure mode
+  // collapses to one of the nine closed capability outcomes (Alpha 1263);
+  // Runtime startup itself never fails because production crypto could
+  // not be assembled (Alpha 1264/1275).
+  let productionCryptoCapability: FedosConversationProductionCryptoCapabilityOutcome = "disabled";
+  let productionCryptoGraph: FedosConversationProductionCryptoGraph | null = null;
+  if (config.conversationProductionCrypto !== undefined) {
+    const productionCryptoResult = await assembleFedosConversationProductionCryptoGraph(config.conversationProductionCrypto);
+    productionCryptoCapability = productionCryptoResult.outcome;
+    if (productionCryptoResult.outcome === "available") {
+      productionCryptoGraph = productionCryptoResult.graph;
+    }
+  }
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -362,10 +508,56 @@ export async function startFedosDesktopRuntime(
       membershipLogPath: config.conversationMembershipLogPath,
       capabilityLogPath: config.conversationCapabilityLogPath,
       constructionCoordinationLogPath: config.conversationConstructionCoordinationLogPath,
+      invitationRevocationLogPath: config.conversationInvitationRevocationLogPath,
+      draftManagementLogPath: config.conversationDraftManagementLogPath,
       clock: config.clock ?? defaultFedosBoardRuntimeClock,
-      creatorIdentityAuthority: config.conversationCreatorIdentityAuthority,
+      // Alpha 1273 -- a real, "available" Production Crypto Graph supplies
+      // its own real creator identity/Authorities in place of these
+      // individual fields' own existing defaults; any other outcome
+      // (including "disabled" -- no config supplied at all) leaves this
+      // exactly as every prior Arc's own default (Alpha 1275).
+      creatorIdentityAuthority: productionCryptoGraph?.creatorIdentityAuthority ?? config.conversationCreatorIdentityAuthority,
       encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
       requireResolvedCreatorIdentity: config.conversationRequireResolvedCreatorIdentity,
+      // Alpha 1113/1114 -- the Encryption Runtime Wiring's own dependencies,
+      // finally threaded through from this config (previously accepted by
+      // `FedosConversationRuntimeDependencies` but unreachable from here —
+      // see `docs/secure_runtime_alpha_1111_1180_integrated_inventory.md`
+      // §7). `nostrAuthorBindingAuthority` reuses the SAME instance already
+      // passed to `createFedosBoardRuntime()` above -- one coherent graph,
+      // never a second signing/encryption identity (Alpha 1114) -- UNLESS
+      // a real Production Crypto Graph resolved, in which case ITS OWN
+      // binding authority (sharing ITS OWN Master Seed Authority instance)
+      // is the coherent one to use instead.
+      encryptionAuthority: productionCryptoGraph?.encryptionAuthority ?? config.conversationEncryptionAuthority,
+      decryptionAuthority: productionCryptoGraph?.decryptionAuthority ?? config.conversationDecryptionAuthority,
+      identityResolver: config.conversationIdentityResolver,
+      accountIndexAuthority: productionCryptoGraph?.accountIndexAuthority ?? config.conversationAccountIndexAuthority,
+      nostrAuthorBindingAuthority: productionCryptoGraph?.nostrAuthorBindingAuthority ?? config.nostrAuthorBindingAuthority,
+      envelopeLogPath: config.conversationEnvelopeLogPath,
+      payloadLogPath: config.conversationPayloadLogPath,
+      maxPayloadByteLength: config.conversationMaxPayloadByteLength,
+      encryptionCoordinationLogPath: config.conversationEncryptionCoordinationLogPath,
+      // Alpha 1121/1143 -- the NEW Activation coordination and Payload
+      // Retention logs this Arc introduces.
+      activationCoordinationLogPath: config.conversationActivationCoordinationLogPath,
+      payloadRetentionLogPath: config.conversationPayloadRetentionLogPath,
+      // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+      groupGenerationLogPath: config.conversationGroupGenerationLogPath,
+      groupDirectPathLogPath: config.conversationGroupDirectPathLogPath,
+      groupMessageLogPath: config.conversationGroupMessageLogPath,
+      groupFanoutDeliveryLogPath: config.conversationGroupFanoutDeliveryLogPath,
+      groupParticipantLimitPolicy: config.conversationGroupParticipantLimitPolicy,
+      // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own
+      // backends. This runtime constructs no Signing Authority or
+      // Relay/Publisher of its own -- see this file's own config type header.
+      privateNostrDeliveryRequestLogPath: config.conversationPrivateNostrDeliveryRequestLogPath,
+      privateNostrImportRecordLogPath: config.conversationPrivateNostrImportRecordLogPath,
+      privateNostrDeliveryObservationLogPath: config.conversationPrivateNostrDeliveryObservationLogPath,
+      privateNostrSigningAuthority: config.conversationPrivateNostrSigningAuthority,
+      privateNostrDeliveryPublisher: config.conversationPrivateNostrDeliveryPublisher,
+      privateNostrDefaultMode: config.conversationPrivateNostrDefaultMode,
+      privateNostrDefaultRelayUrls: config.conversationPrivateNostrDefaultRelayUrls,
     }),
   );
 
@@ -406,6 +598,40 @@ export async function startFedosDesktopRuntime(
   }
 
   let stopped = false;
+
+  // Secure Runtime Alpha 1691-1760 -- exactly one FedosConversationArchiveRuntime
+  // per running runtime, constructed ONLY when config.archiveEnabled was true (the
+  // guard at the top of this function already confirmed
+  // conversationArchiveMasterSeedAuthority is present in that case). Wraps the SAME
+  // conversationPersistence/conversationArchiveMembershipPersistence/
+  // conversationArchiveCapabilityPersistence/conversationEnvelopePersistence/
+  // conversationPayloadStorage instances this runtime already owns -- never a
+  // second, duplicate set of ports, and constructs no Master Seed Authority of its
+  // own (mirrors privateTransportInstance's own identical "no Signing Authority of
+  // its own" discipline just above). `isRuntimeRunning` closes over this same
+  // `stopped` flag -- lazily read only once actually invoked, so its textual
+  // position relative to `let stopped` above is not order-sensitive.
+  let archiveRuntimeInstance: FedosConversationArchiveRuntime | undefined;
+  if (config.archiveEnabled) {
+    archiveRuntimeInstance = assembleFedosConversationArchiveRuntime({
+      conversationPersistence,
+      membershipPersistence: conversationArchiveMembershipPersistence,
+      capabilityPersistence: conversationArchiveCapabilityPersistence,
+      envelopePersistence: conversationEnvelopePersistence,
+      payloadStorage: conversationPayloadStorage,
+      // Secure Runtime Alpha 1921-1980 -- the SAME "second port instance over the same durable Group
+      // log path" pattern the base five ports above already establish.
+      groupGenerationPersistence: conversationArchiveGroupGenerationPersistence,
+      groupDirectPathPersistence: conversationArchiveGroupDirectPathPersistence,
+      groupMessagePersistence: conversationArchiveGroupMessagePersistence,
+      groupFanoutDeliveryPersistence: conversationArchiveGroupFanoutDeliveryPersistence,
+      masterSeedAuthority: config.conversationArchiveMasterSeedAuthority!,
+      isRuntimeRunning: () => !stopped,
+      clock: config.clock,
+      bounds: config.conversationArchiveBounds,
+    });
+  }
+
   return {
     host,
     boardRuntime(): FedosBoardRuntime {
@@ -429,6 +655,19 @@ export async function startFedosDesktopRuntime(
       }
       return privateTransportInstance;
     },
+    conversationArchiveRuntime(): FedosConversationArchiveRuntime {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is inaccessible after stop().");
+      }
+      if (archiveRuntimeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is not enabled -- see config.archiveEnabled.");
+      }
+      return archiveRuntimeInstance;
+    },
+    /** Alpha 1263/1291 -- the closed, non-secret reason production crypto is (or is not) available. `"disabled"` when `conversationProductionCrypto` was never supplied. Readable even after `stop()`. */
+    conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome {
+      return productionCryptoCapability;
+    },
     async stop(): Promise<void> {
       if (stopped) {
         throw new Error("FedosRunningDesktopRuntime.stop() may only be called once.");
@@ -440,6 +679,14 @@ export async function startFedosDesktopRuntime(
       }
       if (deliveryStarted) {
         await host.stopDelivery();
+      }
+      // Alpha 1277/1278 -- clear the real Master Seed Authority (where one
+      // was assembled) BEFORE the Host itself stops: no passphrase
+      // material is retained, and every subsequent encrypt/decrypt/sign
+      // attempt against it fails closed (Alpha 438's own `clear()`
+      // contract, unmodified).
+      if (productionCryptoGraph !== null) {
+        await productionCryptoGraph.masterSeedAuthority.clear();
       }
       await host.stop();
     },
