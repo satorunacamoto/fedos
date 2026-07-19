@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2341–2420 — Conversation Archive CLI and
+> User Packaging Arc (complete).** Architecture frozen: no new Archive
+> wire shape, no new crypto primitive, no new `AeadAadDomain` variant, no
+> Rust/WASM change, no change of any kind to `src/conversation/archive/`
+> or `src/conversation/runtime/`. A pure, additive CLI/packaging layer,
+> `src/conversation/archive_cli/` (7 new files), composing the EXISTING,
+> unmodified Archive Runtime (Alpha 1541–1610) end to end: "archive
+> export"/"archive import" wrap `collectFedosConversationArchiveBundle()`
+> and `FedosWasmConversationArchiveEncryptionAuthority.export()`/
+> `.import()` verbatim; "archive verify" is a direct, un-embellished
+> pass-through of `authority.import()`'s own existing decrypt-and-check
+> result (never touches persistence); "archive preflight" runs the
+> existing `detectFedosConversationArchiveDuplicates()` on the decrypted
+> bundle instead of restoring it. "archive metadata"/"archive
+> inspect"/"archive summary"/"archive list"/"archive version display"/
+> "archive hash verification" are all pure, synchronous, key-free
+> functions over the Manifest's own already-cleartext fields (Alpha
+> 1541–1610's own "travels alongside the ciphertext, in the clear"
+> design) or the existing Integrity content-hash check — no decrypt, no
+> key resolution. Packaging adds two new, this-Arc-only wire shapes never
+> conflated with the frozen Archive schema itself: `FedosConversationArchiveCliPackageV1`
+> ("single archive") and `FedosConversationArchiveCliMultiPackageV1`
+> ("multiple archive bundle"), versioned by their OWN `formatVersion`.
+> "directory export"/"directory import" reach the real filesystem
+> through one injected `FedosConversationArchiveCliFileSystem` boundary
+> (real `node:fs`-backed implementation, mirrors this codebase's own
+> established sync-`node:fs`-plus-`@ts-expect-error` convention); "archive
+> list" reads ONLY the directory's own "metadata manifest" index file,
+> never a raw scan. Every batch operation tallies outcomes per
+> conversation and never aborts on one failure — Restore's own Alpha
+> 1541–1610 "a partially-invalid Archive should not block the rest"
+> discipline, extended from one bundle's nested records to many
+> conversations in one directory.
+>
+> Four new test files (42 new tests), including a **Real Runtime**
+> (structurally real, non-cryptographic round-trip) encrypt/decrypt path
+> exercised throughout, **Direct**- and **Group**-classified
+> conversations (via the separate Draft port, alongside the Archive
+> Bundle's own structurally-always-`"public"` conversation record), a
+> **large archive** (1,000 envelopes/payloads) round-tripped losslessly
+> both as a single Package and via "directory export"/"directory
+> import," an **empty archive**, a **duplicate archive** re-import, and
+> three distinct **tampered archive** scenarios (mutated
+> `conversationId`, mutated `contentHash`, substituted ciphertext), each
+> correctly rejected. See
+> `docs/secure_runtime_alpha_2341_2420_execution_spec.md` and
+> `docs/secure_runtime_alpha_2341_2420_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2501–2580 — Conversation Search Runtime
 > Arc (complete).** Architecture frozen: no new Rust/WASM primitive, no
 > new `AeadAadDomain` variant, no new persistence port, no Host/GUI
