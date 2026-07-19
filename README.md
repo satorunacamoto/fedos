@@ -8,6 +8,63 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 2921–3000 — Device Trust and
+> Multi-Device Runtime Integration Arc (complete, honest partial
+> capability — cryptographic Device authorization blocked).**
+> Architecture frozen: no redesign of the accepted Multi-Device Sync
+> Foundation (`src/sync/`, Alpha 2421–2500, unmodified), Conversation
+> Runtime, or Archive; no cloud account/server, no push, no MLS, no
+> Onion/Tor, no new dependency, no Rust change, `p2p/`/`.tmp_gen`
+> untouched. Follows the reviewed recommendation (`docs/reviews/multi_device_device_trust_v1/`,
+> commit `4672244`): account identity + independent Device keys (Option
+> B), never raw Master Seed copying. A new, additive `src/device/`
+> domain implements a versioned `FedosDeviceBindingV1` (deviceId,
+> account reference, opaque device-key reference, label, trustState,
+> `schemaVersion`/`capabilityVersion` — no private key, no Master Seed,
+> no passphrase), a closed `pending|trusted|revoked|unavailable` trust
+> vocabulary with validated transitions (`revoked` terminal), and an
+> event-sourced Device Registry (codec, in-memory + append-only
+> backends, conflict/idempotency, fail-closed on corruption) mirroring
+> the existing Capability persistence pattern exactly — never merged
+> into Membership/Conversation persistence. **The cryptographic
+> blocker, stated honestly**: this codebase has no accepted boundary yet
+> for independent, account-verifiable Device keys
+> (`src/crypto/types.ts` remains a pure placeholder seam) — Phase E
+> stops exactly there: `UnavailableFedosDeviceRegistrationAuthority` is
+> the only production `FedosDeviceRegistrationAuthority`, and it can
+> record a registration attempt but can NEVER return `"verified"`, so no
+> device — legitimate or attacker-controlled — can reach `"trusted"`
+> through it. `FedosDesktopRuntime` gains an opt-in (`deviceTrustEnabled`,
+> mirrors `privateTransportEnabled`'s own discipline), narrow
+> `runtime.deviceTrust()` accessor owning one local Device identity, the
+> Device Registry/Trust Authority, and the EXISTING (unmodified)
+> `FedosSyncState` — sync-fabric membership always follows Device Trust,
+> never the reverse: only a `"trusted"` device may join the Sync fan-out
+> set, and a new, standalone, additive Sync Journal record allowlist
+> (`src/sync/fedos_sync_record_allowlist.ts`) fails closed on any
+> `recordType` outside six named non-secret metadata kinds, or on
+> sensitive-marker metadata, before the Journal is ever touched — zero
+> modification to the Journal's own frozen shape. Revocation denies
+> future sync eligibility and rejects any new change originating from
+> the revoked device, without erasing the historical binding fact or
+> claiming any retroactive deletion of already-copied data; Sender-Key
+> rekey is explicitly out of scope. Archive Restore is proven, directly,
+> to never register or imply a trusted Device. One new test file (26
+> tests) covers the full 24-item required matrix (items 21/22 satisfied
+> by re-running the existing, untouched Search and Conversation Runtime
+> regression suites rather than duplicating their coverage) over real
+> in-memory and append-only backends. See
+> `docs/secure_runtime_alpha_2921_3000_execution_spec.md` and
+> `docs/secure_runtime_alpha_2921_3000_completion_declaration.md`.
+> Recommended next Arc: **Device-to-Device Encrypted Sync Transport**
+> remains blocked on the same cryptographic Device-key boundary named
+> above — the recommended next Arc is instead **Account-to-Device
+> Signature Verification Boundary**, the named prerequisite that would
+> let a real `FedosDeviceRegistrationAuthority` finally return
+> `"verified"`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2581–2620 — Conversation Search
 > Retention Authority and Index Purge Hardening Arc (complete).**
 > Architecture frozen: no redesign of the accepted Search Runtime, no
