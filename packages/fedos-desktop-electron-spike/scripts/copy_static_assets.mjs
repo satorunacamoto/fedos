@@ -1,7 +1,7 @@
-// Secure Runtime Alpha 3881-3940/4021-4100 -- build-support only.
+// Secure Runtime Alpha 3881-3940/4021-4100/4181-4260 -- build-support only.
 //
-// `tsc` compiles ONLY the `.cts`/`.ts` sources in `src/`; the static HTML
-// page is not TypeScript and is never compiled -- this script copies it
+// `tsc` compiles ONLY the `.cts`/`.ts` sources in `src/`; static HTML pages
+// are not TypeScript and are never compiled -- this script copies each one
 // (unmodified) into `dist/`, next to the compiled `.cjs`/`.js` output, so
 // `BrowserWindow.loadFile()`/the `<script src>` tag resolve it via a plain
 // relative path at runtime. Node-native `fs`/`path` only, no new
@@ -18,3 +18,5 @@ mkdirSync(outDir, { recursive: true });
 copyFileSync(join(srcDir, "fedos_electron_spike_page.html"), join(outDir, "fedos_electron_spike_page.html"));
 // Secure Runtime Alpha 4101-4180 -- the Host Adapter's own static page, additive.
 copyFileSync(join(srcDir, "fedos_electron_host_adapter_page.html"), join(outDir, "fedos_electron_host_adapter_page.html"));
+// Secure Runtime Alpha 4181-4260 -- the Navigation Arc's own second, real page.
+copyFileSync(join(srcDir, "fedos_electron_navigation_page.html"), join(outDir, "fedos_electron_navigation_page.html"));

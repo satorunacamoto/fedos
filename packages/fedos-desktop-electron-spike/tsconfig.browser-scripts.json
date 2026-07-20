@@ -13,5 +13,12 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": ["src/fedos_electron_spike_renderer.ts", "src/fedos_electron_host_adapter_selftest.ts", "src/fedos_electron_spike_window.d.ts", "src/fedos_electron_host_adapter_window.d.ts"]
+  "include": [
+    "src/fedos_electron_spike_renderer.ts",
+    "src/fedos_electron_host_adapter_selftest.ts",
+    "src/fedos_electron_spike_window.d.ts",
+    "src/fedos_electron_host_adapter_window.d.ts",
+    "src/fedos_electron_navigation_renderer.ts",
+    "src/fedos_electron_navigation_window.d.ts"
+  ]
 }
