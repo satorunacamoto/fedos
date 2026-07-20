@@ -5,12 +5,18 @@
   "type": "module",
   "description": "Reddit-style window into Nostr — MVP prototype (Stage 1: read-only event ingest).",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck:core": "tsc --noEmit",
+    "typecheck:electron": "npm run typecheck --prefix packages/fedos-desktop-electron-spike",
+    "typecheck": "npm run typecheck:core && npm run typecheck:electron",
     "test": "vitest run",
     "test:watch": "vitest",
     "build:wasm": "cargo build --manifest-path packages/fedos-core-rust/Cargo.toml --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir packages/fedos-core-rust/pkg packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
     "build:runtime": "tsc -p tsconfig.runtime.json",
-    "start:runtime": "npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js"
+    "start:runtime": "npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js",
+    "build:electron-spike": "npm run build --prefix packages/fedos-desktop-electron-spike",
+    "start:electron-spike": "npm run start --prefix packages/fedos-desktop-electron-spike",
+    "package:electron-spike": "npm run package --prefix packages/fedos-desktop-electron-spike",
+    "test:electron-spike": "vitest run --config vitest.electron-spike.config.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",

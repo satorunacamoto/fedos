@@ -1,0 +1,18 @@
+// Secure Runtime Alpha 3881-3940/4021-4100 -- build-support only.
+//
+// `tsc` compiles ONLY the `.cts`/`.ts` sources in `src/`; the static HTML
+// page is not TypeScript and is never compiled -- this script copies it
+// (unmodified) into `dist/`, next to the compiled `.cjs`/`.js` output, so
+// `BrowserWindow.loadFile()`/the `<script src>` tag resolve it via a plain
+// relative path at runtime. Node-native `fs`/`path` only, no new
+// dependency.
+import { copyFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const srcDir = join(packageRoot, "src");
+const outDir = join(packageRoot, "dist");
+
+mkdirSync(outDir, { recursive: true });
+copyFileSync(join(srcDir, "fedos_electron_spike_page.html"), join(outDir, "fedos_electron_spike_page.html"));
