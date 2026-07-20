@@ -8,6 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3321–3400 — Device Registration
+> Runtime Activation and Local Device Sync Foundation Arc (complete).**
+> Architecture frozen: no redesign of the accepted Device Registry,
+> Device Binding, or Account Authorization boundary
+> (`src/device/binding_challenge/`, `src/device/persistence/`,
+> unmodified); no Desktop Shell/Search/Archive/Sender-Key change; no
+> new dependency, no Rust change, `p2p/`/`.tmp_gen` untouched. Activates
+> Alpha 3161–3240's own Registration Authority — built but never called
+> from anywhere in `src/` — inside a real, constructible
+> `FedosDeviceSyncRuntime` (`src/device/runtime/`): Runtime Device
+> Registration/Activation (one atomic, cryptographically-verified call,
+> proven with real BIP-340 Schnorr signatures throughout), Runtime
+> Device Revocation, Local Device Inventory and Device Status Queries
+> (read directly from the existing Registry, no parallel state), and
+> Sync Session Preparation/Validation (`src/device/sync_session/`) — a
+> LOCAL, at-rest snapshot of one account's currently-trusted Device
+> inventory, addressed to one target Device the LIVE Registry currently
+> trusts, re-validated against that same live state rather than a
+> frozen snapshot. An Encrypted Sync Package Builder/Reader
+> (`src/device/sync_package/`) seals and opens that snapshot using the
+> EXISTING, real AEAD Runtime Service and the EXISTING `"Conversation"`
+> `AeadAadDomain` — resolved via a documented self-ECDH adaptation
+> (`resolveConversationKey()` against the account's own public key,
+> since a Sync Package has no counterparty to ECDH against and adding a
+> new AAD domain would require a Rust change) rather than any new
+> cryptographic primitive. No network sync, no cloud sync, no relay
+> sync, and no Encrypted Device-to-Device Local Transfer — this Arc
+> builds the LOCAL data a future transfer mechanism would move, and
+> does not itself move anything between two Devices. Two new test
+> files, 33 tests, real Device Registry + real signatures throughout,
+> covering restart recovery, duplicate registration, revocation,
+> malformed/expired/tampered packages, unauthorized devices, and
+> replay. See `docs/secure_runtime_alpha_3321_3400_execution_spec.md`
+> and `docs/secure_runtime_alpha_3321_3400_completion_declaration.md`.
+> Recommended next Arc: **Encrypted Device-to-Device Local Transfer**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3161–3240 — Account-to-Device
 > Signature Verification Boundary Arc (complete).**
 > Architecture frozen: no redesign of the accepted Device Registry,
