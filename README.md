@@ -8,6 +8,32 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3801–3880 — Device Sync Operational
+> Status and Desktop Shell Integration Arc (complete).**
+> Architecture frozen: reconciles the previously-diverged Desktop UI
+> lineage (Runtime → Shell → ViewModels → Renderer → Host Boundary) and
+> Device Sync lineage (Device Trust/Registry, Device Sync Foundation,
+> Local Transfer, Relay-Assisted Synchronization, Background Scheduling
+> and Conflict Resolution) into one dedicated integration branch with
+> zero content lost, then wires real Device Sync operational state
+> (Device inventory/trust, Scheduler status/control, Schedules, Transfer
+> sessions, Conflicts) through one new, narrow
+> `FedosDeviceSyncOperationalFacade` — reusing the SAME Device
+> Registry/Sync Journal instances `FedosDeviceTrustRuntime` (Alpha
+> 2921-3000) already owns, never a second Device Runtime or Scheduler.
+> No real, network-attached Relay Sync graph is assembled (that needs a
+> Device-scoped signing/encryption authority this Runtime does not
+> source today) — the Scheduler's `attemptFn` remains an explicit,
+> caller-supplied injection point, mirroring `conversationTransportPublisher`'s
+> own established discipline; every tick fails closed to `"failed"`
+> when omitted, never fabricating `"delivered"`. Relay-accepted and
+> Device-imported are two independently-observable facts throughout,
+> never merged into one "synced" label. 11 new Shell commands, 5 new
+> ViewModels, 5 new Renderers, 4 new test files, 50 new tests, real
+> Runtime/Shell/ViewModel/Renderer throughout; full suite failure rate
+> (≈20.0%) matches both source lineages' own independently-confirmed
+> baselines, zero regression traceable to this Arc.
+>
 > **Status: Secure Runtime Alpha 3721–3800 — Background Device Sync
 > Scheduling and Conflict Resolution Arc (complete).**
 > Architecture frozen: no redesign of the Device Registry, Registration

@@ -74,6 +74,17 @@ import type {
   FedosContentAccessorSearchHit,
   FedosContentAccessorSendResult,
 } from "../content_accessor/fedos_desktop_conversation_content_accessor_result.js";
+import type {
+  FedosDeviceSyncConflictView,
+  FedosDeviceSyncDeviceView,
+  FedosDeviceSyncOperationalOutcomeKind,
+  FedosDeviceSyncOperationalResult,
+  FedosDeviceSyncScheduleView,
+  FedosDeviceSyncSchedulerStatusView,
+  FedosDeviceSyncTransferSessionView,
+} from "../runtime/fedos_device_sync_operational_facade.js";
+import type { FedosDeviceSyncTickEntry } from "../../device/sync_scheduler/fedos_device_sync_scheduler.js";
+import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
 
 /** A bare `FedosDesktopShellFailure` object — unlike `fedosDesktopShellFailure()`, whose return type is the full `FedosDesktopShellResult<T>` union, for the internal call sites below that need exactly this narrower shape (e.g. `#validateSendPreconditions`'s own `FedosDesktopShellFailure | null` return). */
 function shellFailure(outcome: FedosDesktopShellOutcomeKind, reason: string): FedosDesktopShellFailure {
@@ -83,6 +94,29 @@ function shellFailure(outcome: FedosDesktopShellOutcomeKind, reason: string): Fe
 /** `FedosContentAccessorFailure`'s outcome vocabulary is defined IDENTICALLY to `FedosDesktopShellOutcomeKind` (see both files' own headers) — a straight relabel, never a re-derivation. */
 function mapContentAccessorFailure(failure: FedosContentAccessorFailure): FedosDesktopShellFailure {
   return shellFailure(failure.outcome as unknown as FedosDesktopShellOutcomeKind, failure.reason);
+}
+
+/**
+ * Secure Runtime Alpha 3801-3880 — maps `FedosDeviceSyncOperationalResult<T>`'s
+ * own closed outcome vocabulary onto the Shell's existing `FedosDesktopShellOutcomeKind`
+ * (`./fedos_desktop_shell_result.ts`, unmodified) — never widens that shared
+ * union. `"disabled"` (the facade's own "this optional capability was never
+ * configured" outcome) maps to the Shell's existing `"unsupported"`; every
+ * other facade outcome name already exists verbatim in the Shell's own
+ * vocabulary.
+ */
+const DEVICE_SYNC_OUTCOME_TO_SHELL_OUTCOME: Readonly<Record<Exclude<FedosDeviceSyncOperationalOutcomeKind, "ok">, FedosDesktopShellOutcomeKind>> = Object.freeze({
+  disabled: "unsupported",
+  unavailable: "unavailable",
+  "not-found": "not-found",
+  "invalid-input": "invalid-input",
+  conflict: "conflict",
+  failed: "failed",
+});
+
+function mapDeviceSyncFacadeResult<T>(result: FedosDeviceSyncOperationalResult<T>): FedosDesktopShellResult<T> {
+  if (result.outcome === "ok") return fedosDesktopShellOk(result.value);
+  return fedosDesktopShellFailure(DEVICE_SYNC_OUTCOME_TO_SHELL_OUTCOME[result.outcome], result.reason);
 }
 
 function toShellMessageView(view: FedosContentAccessorMessageView): FedosMessageView {
@@ -324,6 +358,114 @@ export class FedosDesktopApplicationShell {
   deviceStatus(): FedosDesktopShellResult<FedosDeviceStatusView> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
     return fedosDesktopShellOk(Object.freeze({ state: "unavailable" as const, reason: DEVICE_SYNC_UNAVAILABLE_REASON }));
+  }
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 3801-3880 -- Device Sync Operational commands.
+  // Every method below delegates ENTIRELY to `FedosRunningDesktopRuntime.deviceSyncOperational()`
+  // (`../runtime/fedos_device_sync_operational_facade.ts`) -- this Shell owns
+  // no Device Sync state of its own, only maps that facade's own closed
+  // outcomes onto this Shell's existing result vocabulary.
+  // ---------------------------------------------------------------------
+
+  devicesList(): FedosDesktopShellResult<readonly FedosDeviceSyncDeviceView[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().listDevices());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  deviceDetail(deviceId: string): FedosDesktopShellResult<FedosDeviceSyncDeviceView> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().deviceDetail(deviceId));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  deviceSyncStatus(): FedosDesktopShellResult<FedosDeviceSyncSchedulerStatusView> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().syncStatus());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  deviceSyncStart(): FedosDesktopShellResult<null> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().startSync());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  async deviceSyncStop(): Promise<FedosDesktopShellResult<null>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(await this.#runtime.deviceSyncOperational().stopSync());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  async deviceSyncNow(): Promise<FedosDesktopShellResult<readonly FedosDeviceSyncTickEntry[]>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(await this.#runtime.deviceSyncOperational().triggerSyncNow());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  syncSchedulesList(): FedosDesktopShellResult<readonly FedosDeviceSyncScheduleView[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().listSchedules());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  syncTransfersList(): FedosDesktopShellResult<readonly FedosDeviceSyncTransferSessionView[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().listTransferSessions());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  syncConflictsList(includeResolved = false): FedosDesktopShellResult<readonly FedosDeviceSyncConflictView[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().listConflicts(includeResolved));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  syncConflictDetail(conflictId: string): FedosDesktopShellResult<FedosDeviceSyncConflictView> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().conflictDetail(conflictId));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** Only the safe, existing Conflict Authority actions (`acknowledge`/`accept-identical`/`discard-invalid`/`refresh-missing-dependency`) -- never a generic "resolve-any-conflict" (this Arc's own Absolute Prohibitions). */
+  syncConflictAcknowledge(conflictId: string, action: FedosDeviceSyncConflictResolutionAction): FedosDesktopShellResult<null> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().acknowledgeConflict(conflictId, action));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
   }
 
   // ---------------------------------------------------------------------

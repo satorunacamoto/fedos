@@ -193,6 +193,25 @@ import { UnavailableFedosDeviceRegistrationAuthority } from "../../device/unavai
 import { FedosSyncState } from "../../sync/fedos_sync_state.js";
 import { FedosDeviceTrustRuntime } from "./fedos_device_trust_runtime.js";
 
+// Secure Runtime Alpha 3801-3880 (Device Sync Operational Status and
+// Desktop Shell Integration Arc) -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring the Alpha 1691-1760 boundary
+// comment above for the same reason.
+import { FedosDeviceSyncScheduler } from "../../device/sync_scheduler/fedos_device_sync_scheduler.js";
+import type { FedosDeviceSyncSchedulePersistence } from "../../device/sync_scheduler/persistence/fedos_device_sync_schedule_persistence.js";
+import { AppendOnlyFedosDeviceSyncSchedulePersistence } from "../../device/sync_scheduler/persistence/append_only_fedos_device_sync_schedule_persistence.js";
+import { InMemoryFedosDeviceSyncSchedulePersistence } from "../../device/sync_scheduler/persistence/in_memory_fedos_device_sync_schedule_persistence.js";
+import type { FedosDeviceSyncConflictPersistence } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import { AppendOnlyFedosDeviceSyncConflictPersistence } from "../../device/sync_scheduler/persistence/append_only_fedos_device_sync_conflict_persistence.js";
+import { InMemoryFedosDeviceSyncConflictPersistence } from "../../device/sync_scheduler/persistence/in_memory_fedos_device_sync_conflict_persistence.js";
+import type { FedosDeviceTransferSessionPersistence } from "../../device/transfer/persistence/fedos_device_transfer_session_persistence.js";
+import { AppendOnlyFedosDeviceTransferSessionPersistence } from "../../device/transfer/persistence/append_only_fedos_device_transfer_session_persistence.js";
+import { InMemoryFedosDeviceTransferSessionPersistence } from "../../device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
+import type { FedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/fedos_device_relay_sync_observation.js";
+import { AppendOnlyFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/append_only_fedos_device_relay_sync_observation_repository.js";
+import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
+import { FedosDeviceSyncOperationalFacade, type FedosDeviceSyncOperationalFacadeDeps } from "./fedos_device_sync_operational_facade.js";
+
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
 /** Alpha 1471-1540 -- Mailbox Delivery's own default tick cadence when `conversationTransportIntervalMs` is omitted. Mirrors the Board delivery loop's own `DEFAULT_DELIVERY_INTERVAL_MS` (`../host/fedos_desktop_host.ts`, Alpha 507) — same value, a separate constant since that one is not exported. */
@@ -286,6 +305,20 @@ export interface FedosRunningDesktopRuntime {
    */
   deviceTrust(): FedosDeviceTrustRuntime;
   /**
+   * Secure Runtime Alpha 3801–3880 — the `FedosDeviceSyncOperationalFacade`
+   * (`./fedos_device_sync_operational_facade.js`) this running Local Runtime
+   * owns, constructed ONLY when `config.deviceTrustEnabled` was `true` (the
+   * SAME gate `deviceTrust()` itself uses — the facade composes that SAME
+   * `FedosDeviceTrustRuntime` instance). Throws `"not enabled"` if it was
+   * never configured, and throws `"inaccessible after stop"` once `stop()`
+   * has been called — the SAME two-state fail-closed contract every other
+   * accessor on this handle already uses. The facade's OWN methods apply a
+   * SECOND, independent `isRuntimeRunning` check for a reference a caller
+   * grabbed before `stop()` (mirrors `conversationContentAccessor()`'s own
+   * two-layer defense).
+   */
+  deviceSyncOperational(): FedosDeviceSyncOperationalFacade;
+  /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
    * `host.stopDelivery()` first (itself already guarantees "no new
@@ -362,6 +395,21 @@ export async function startFedosDesktopRuntime(
     if (config.localAccountRef === undefined) {
       throw new Error(
         "startFedosDesktopRuntime: deviceTrustEnabled is true but no localAccountRef was supplied.",
+      );
+    }
+  }
+  // Secure Runtime Alpha 3801-3880 -- mirrors the guards above exactly. Also
+  // requires deviceTrustEnabled, since the Scheduler reuses the SAME Device
+  // Registry/Sync Journal instances FedosDeviceTrustRuntime already owns.
+  if (config.deviceSyncSchedulerEnabled) {
+    if (!config.deviceTrustEnabled) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceSyncSchedulerEnabled is true but deviceTrustEnabled is not -- the Scheduler reuses FedosDeviceTrustRuntime's own Device Registry/Sync Journal instances.",
+      );
+    }
+    if (config.deviceSyncAbandonmentPolicy === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceSyncSchedulerEnabled is true but no deviceSyncAbandonmentPolicy was supplied — this runtime constructs no default retry policy of its own.",
       );
     }
   }
@@ -632,6 +680,14 @@ export async function startFedosDesktopRuntime(
   // no disk persistence for the Sync Journal/Cursor themselves (see
   // fedos_device_trust_runtime.ts's own header).
   let deviceTrustRuntimeInstance: FedosDeviceTrustRuntime | undefined;
+  // Alpha 3801-3880 -- deps for `FedosDeviceSyncOperationalFacade`, assembled
+  // here (inside the SAME deviceTrustEnabled gate that already constructs
+  // deviceTrustRuntimeInstance/deviceRegistryPersistence/syncStateInstance)
+  // but the facade ITSELF is constructed further below, after `let stopped`
+  // is declared -- `isRuntimeRunning: () => !stopped` closes over that
+  // binding and must not be created before it exists in this function's
+  // scope.
+  let deviceSyncFacadeDeps: Omit<FedosDeviceSyncOperationalFacadeDeps, "isRuntimeRunning"> | undefined;
   if (config.deviceTrustEnabled) {
     const deviceRegistryPersistence: FedosDeviceRegistryPersistence =
       config.deviceRegistryLogPath !== undefined
@@ -642,12 +698,73 @@ export async function startFedosDesktopRuntime(
       registrationAuthority: config.deviceRegistrationAuthority ?? new UnavailableFedosDeviceRegistrationAuthority(),
     });
     const syncAccountKey = `${config.localAccountRef!.authority}:${config.localAccountRef!.publicIdentifier}`;
+    // Alpha 3801-3880 -- hoisted into a named instance (rather than the
+    // inline `new FedosSyncState(...)` this field held before this Arc) so
+    // the Scheduler/Import Coordinator below can share the EXACT SAME Sync
+    // Journal instance FedosDeviceTrustRuntime itself owns -- never a
+    // second, divergent Journal.
+    const syncStateInstance = new FedosSyncState(syncAccountKey);
     deviceTrustRuntimeInstance = new FedosDeviceTrustRuntime({
       localDeviceId: config.localDeviceId!,
       localAccountRef: config.localAccountRef!,
       trustAuthority: deviceTrustAuthority,
-      syncState: new FedosSyncState(syncAccountKey),
+      syncState: syncStateInstance,
     });
+
+    // Secure Runtime Alpha 3801-3880 -- the Runtime Operational Facade
+    // (`./fedos_device_sync_operational_facade.ts`). ALWAYS constructed once
+    // deviceTrustEnabled is true (mirrors conversationContentAccessorInstance's
+    // own "always constructed, composes what already exists" discipline);
+    // the Scheduler piece alone stays gated behind
+    // config.deviceSyncSchedulerEnabled (the guard above already confirmed
+    // deviceSyncAbandonmentPolicy is present in that case).
+    const schedulePersistence: FedosDeviceSyncSchedulePersistence | null = config.deviceSyncSchedulerEnabled
+      ? config.deviceSyncScheduleLogPath !== undefined
+        ? new AppendOnlyFedosDeviceSyncSchedulePersistence(config.deviceSyncScheduleLogPath)
+        : new InMemoryFedosDeviceSyncSchedulePersistence()
+      : null;
+    const conflictPersistence: FedosDeviceSyncConflictPersistence | null = config.deviceSyncSchedulerEnabled
+      ? config.deviceSyncConflictLogPath !== undefined
+        ? new AppendOnlyFedosDeviceSyncConflictPersistence(config.deviceSyncConflictLogPath)
+        : new InMemoryFedosDeviceSyncConflictPersistence()
+      : null;
+    let deviceSyncSchedulerInstance: FedosDeviceSyncScheduler | null = null;
+    if (config.deviceSyncSchedulerEnabled) {
+      deviceSyncSchedulerInstance = new FedosDeviceSyncScheduler({
+        schedulePersistence: schedulePersistence!,
+        registryPersistence: deviceRegistryPersistence,
+        accountRef: config.localAccountRef!,
+        sourceDeviceId: config.localDeviceId!,
+        syncState: syncStateInstance,
+        // Alpha 3801-3880 -- this runtime constructs no real Relay Sync
+        // attempt of its own (Phase A §20); omitted, every tick's own
+        // attempt fails closed, never fabricating "delivered".
+        attemptFn: config.deviceSyncAttemptFn ?? (async () => ({ outcome: "failed" })),
+        abandonmentPolicy: config.deviceSyncAbandonmentPolicy!,
+        limits: config.deviceSyncResourceLimits,
+        intervalMs: config.deviceSyncIntervalMs ?? 30_000,
+      });
+    }
+
+    const transferSessionPersistence: FedosDeviceTransferSessionPersistence =
+      config.deviceSyncTransferSessionLogPath !== undefined
+        ? new AppendOnlyFedosDeviceTransferSessionPersistence(config.deviceSyncTransferSessionLogPath)
+        : new InMemoryFedosDeviceTransferSessionPersistence();
+    const relaySyncObservationRepository: FedosDeviceRelaySyncObservationRepository =
+      config.deviceSyncRelaySyncObservationLogPath !== undefined
+        ? new AppendOnlyFedosDeviceRelaySyncObservationRepository(config.deviceSyncRelaySyncObservationLogPath)
+        : new InMemoryFedosDeviceRelaySyncObservationRepository();
+
+    deviceSyncFacadeDeps = {
+      deviceTrust: deviceTrustRuntimeInstance,
+      localAccountRef: config.localAccountRef!,
+      localDeviceId: config.localDeviceId!,
+      scheduler: deviceSyncSchedulerInstance,
+      schedulePersistence,
+      conflictPersistence,
+      transferSessionPersistence,
+      relaySyncObservationRepository,
+    };
   }
 
   // Secure Runtime Alpha 1471-1540 -- exactly one FedosPrivateTransport
@@ -687,6 +804,18 @@ export async function startFedosDesktopRuntime(
   }
 
   let stopped = false;
+
+  // Secure Runtime Alpha 3801-3880 -- exactly one FedosDeviceSyncOperationalFacade
+  // per running runtime, constructed ONLY when deviceSyncFacadeDeps was
+  // assembled above (i.e. config.deviceTrustEnabled was true). Composes
+  // deviceTrustRuntimeInstance and whatever Scheduler/Conflict/Transfer/
+  // Relay-observation pieces were built above -- constructs nothing new
+  // itself. `isRuntimeRunning` closes over this SAME `stopped` flag, mirroring
+  // conversationContentAccessorInstance's own identical pattern just below.
+  const deviceSyncOperationalFacadeInstance: FedosDeviceSyncOperationalFacade | undefined =
+    deviceSyncFacadeDeps !== undefined
+      ? new FedosDeviceSyncOperationalFacade({ ...deviceSyncFacadeDeps, isRuntimeRunning: () => !stopped })
+      : undefined;
 
   // Secure Runtime Alpha 1691-1760 -- exactly one FedosConversationArchiveRuntime
   // per running runtime, constructed ONLY when config.archiveEnabled was true (the
@@ -786,12 +915,26 @@ export async function startFedosDesktopRuntime(
       }
       return deviceTrustRuntimeInstance;
     },
+    deviceSyncOperational(): FedosDeviceSyncOperationalFacade {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.deviceSyncOperational() is inaccessible after stop().");
+      }
+      if (deviceSyncOperationalFacadeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.deviceSyncOperational() is not enabled -- see config.deviceTrustEnabled.");
+      }
+      return deviceSyncOperationalFacadeInstance;
+    },
     async stop(): Promise<void> {
       if (stopped) {
         throw new Error("FedosRunningDesktopRuntime.stop() may only be called once.");
       }
       stopped = true;
       // Newest-constructed, stopped first -- the reverse of construction order.
+      // Alpha 3801-3880 -- waits for any in-flight tick (FedosDeviceSyncScheduler.stopSync()'s
+      // own contract, unmodified) BEFORE the Host itself stops.
+      if (deviceSyncFacadeDeps?.scheduler !== null && deviceSyncFacadeDeps?.scheduler !== undefined) {
+        await deviceSyncFacadeDeps.scheduler.stopSync();
+      }
       if (privateTransportStarted && privateTransportInstance !== undefined) {
         await privateTransportInstance.stop();
       }

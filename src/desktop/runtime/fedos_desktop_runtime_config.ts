@@ -73,6 +73,9 @@ import type { FedosPrivateNostrDeliveryMode } from "../../conversation/delivery/
 import type { FedosPrivateNostrDeliveryPublisher } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_publisher.js";
 import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
 import type { FedosDeviceRegistrationAuthority } from "../../device/fedos_device_registration_authority.js";
+import type { FedosDeviceSyncAbandonmentPolicy } from "../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncResourceLimits } from "../../device/sync_scheduler/fedos_device_sync_resource_limits.js";
+import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos_device_sync_attempt.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -351,4 +354,41 @@ export interface FedosDesktopRuntimeConfig {
   readonly deviceRegistryLogPath?: string;
   /** Optional; omitted, `UnavailableFedosDeviceRegistrationAuthority` applies — this codebase has no accepted cryptographic boundary yet for independent, account-verifiable Device keys (Phase E blocker), so every registration through the default is honestly capped at `"unavailable"`, never `"trusted"`. */
   readonly deviceRegistrationAuthority?: FedosDeviceRegistrationAuthority;
+
+  /**
+   * Secure Runtime Alpha 3801–3880 ("Device Sync Operational Status and
+   * Desktop Shell Integration Arc"). OPTIONAL and meaningful ONLY when
+   * `deviceTrustEnabled` is also `true` (the Scheduler reuses the SAME
+   * Device Registry/Sync Journal instances `FedosDeviceTrustRuntime` already
+   * owns — see `./fedos_device_sync_operational_facade.ts`'s own header).
+   * Omitted or `false`, `runtime.deviceSyncOperational().syncStatus()`
+   * reports `"disabled"`, and no `FedosDeviceSyncScheduler` is ever
+   * constructed. This Arc does not assemble a real, network-attached Relay
+   * Sync graph (Phase A §20) — `deviceSyncAttemptFn` below is the ONLY
+   * bridge to real Relay delivery, and it is entirely caller-supplied.
+   */
+  readonly deviceSyncSchedulerEnabled?: boolean;
+  /** REQUIRED when `deviceSyncSchedulerEnabled` is `true` — this runtime constructs no retry/abandonment policy of its own (`FedosDeviceSyncScheduler`'s own constructor requires one explicitly). */
+  readonly deviceSyncAbandonmentPolicy?: FedosDeviceSyncAbandonmentPolicy;
+  /** Optional; omitted, `FEDOS_DEVICE_SYNC_DEFAULT_RESOURCE_LIMITS` applies. */
+  readonly deviceSyncResourceLimits?: FedosDeviceSyncResourceLimits;
+  /** Optional; omitted, `30_000` ms (mirrors `conversationTransportIntervalMs`'s own default cadence order of magnitude). */
+  readonly deviceSyncIntervalMs?: number;
+  /**
+   * OPTIONAL — this runtime constructs no Relay Sync attempt of its own
+   * (mirrors `conversationTransportPublisher`'s/`conversationTransportSigningAuthority`'s
+   * own "this runtime constructs no Signing Authority or Relay of its own"
+   * discipline). Omitted, every Scheduler tick's own attempt fails closed
+   * with `"failed"` — the Scheduler itself still starts/stops/reports
+   * honest status.
+   */
+  readonly deviceSyncAttemptFn?: FedosDeviceSyncAttemptFn;
+  /** Explicit, caller-supplied path to the Schedule append-only log file. Omitted, in-memory. */
+  readonly deviceSyncScheduleLogPath?: string;
+  /** Explicit, caller-supplied path to the Conflict append-only log file. Omitted, in-memory. */
+  readonly deviceSyncConflictLogPath?: string;
+  /** Explicit, caller-supplied path to the Transfer Session append-only log file. Omitted, in-memory. Independent of `deviceSyncSchedulerEnabled` -- Transfer session STATUS is readable even when the Scheduler itself is disabled. */
+  readonly deviceSyncTransferSessionLogPath?: string;
+  /** Explicit, caller-supplied path to the Relay Sync Observation append-only log file. Omitted, in-memory. Used ONLY to distinguish `relayAccepted` from `deviceImported` on a Transfer Session view -- never to reconstruct a raw Relay event. */
+  readonly deviceSyncRelaySyncObservationLogPath?: string;
 }

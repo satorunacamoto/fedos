@@ -31,6 +31,14 @@ import { FedosDesktopArchiveViewModel } from "./fedos_desktop_archive_view_model
 import { FedosDesktopMembershipViewModel } from "./fedos_desktop_membership_view_model.js";
 import { FedosDesktopUnreadCounterViewModel } from "./fedos_desktop_unread_counter_view_model.js";
 import { FedosDesktopRuntimeStatusViewModel } from "./fedos_desktop_runtime_status_view_model.js";
+// Secure Runtime Alpha 3801-3880 (Device Sync Operational Status and Desktop
+// Shell Integration Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring this file's own established pattern above.
+import { FedosDesktopDeviceInventoryViewModel } from "./fedos_desktop_device_inventory_view_model.js";
+import { FedosDesktopDeviceSyncStatusViewModel } from "./fedos_desktop_device_sync_status_view_model.js";
+import { FedosDesktopSyncScheduleViewModel } from "./fedos_desktop_sync_schedule_view_model.js";
+import { FedosDesktopTransferSessionViewModel } from "./fedos_desktop_transfer_session_view_model.js";
+import { FedosDesktopSyncConflictViewModel } from "./fedos_desktop_sync_conflict_view_model.js";
 
 export class FedosDesktopConversationUiPresentationBoundary {
   readonly #shell: FedosDesktopApplicationShell;
@@ -44,6 +52,11 @@ export class FedosDesktopConversationUiPresentationBoundary {
   readonly membership: FedosDesktopMembershipViewModel;
   readonly unreadCounter: FedosDesktopUnreadCounterViewModel;
   readonly runtimeStatus: FedosDesktopRuntimeStatusViewModel;
+  readonly deviceInventory: FedosDesktopDeviceInventoryViewModel;
+  readonly deviceSyncStatus: FedosDesktopDeviceSyncStatusViewModel;
+  readonly syncSchedule: FedosDesktopSyncScheduleViewModel;
+  readonly transferSession: FedosDesktopTransferSessionViewModel;
+  readonly syncConflict: FedosDesktopSyncConflictViewModel;
 
   private constructor(shell: FedosDesktopApplicationShell) {
     this.#shell = shell;
@@ -57,6 +70,11 @@ export class FedosDesktopConversationUiPresentationBoundary {
     this.membership = new FedosDesktopMembershipViewModel(shell);
     this.unreadCounter = new FedosDesktopUnreadCounterViewModel(shell);
     this.runtimeStatus = new FedosDesktopRuntimeStatusViewModel(shell);
+    this.deviceInventory = new FedosDesktopDeviceInventoryViewModel(shell);
+    this.deviceSyncStatus = new FedosDesktopDeviceSyncStatusViewModel(shell);
+    this.syncSchedule = new FedosDesktopSyncScheduleViewModel(shell);
+    this.transferSession = new FedosDesktopTransferSessionViewModel(shell);
+    this.syncConflict = new FedosDesktopSyncConflictViewModel(shell);
   }
 
   /** Thin factory — mirrors `createFedosDesktopApplicationShell()`'s own style. No side effect (no Runtime started) until `runtimeStatus.start()` is called. */

@@ -31,6 +31,13 @@ import { FedosDesktopSearchRenderer } from "./fedos_desktop_search_renderer.js";
 import { FedosDesktopArchiveRenderer } from "./fedos_desktop_archive_renderer.js";
 import { FedosDesktopMembershipRenderer } from "./fedos_desktop_membership_renderer.js";
 import { FedosDesktopStatusRenderer } from "./fedos_desktop_status_renderer.js";
+// Secure Runtime Alpha 3801-3880 -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring this file's own established pattern.
+import { FedosDesktopDeviceListRenderer } from "./fedos_desktop_device_list_renderer.js";
+import { FedosDesktopDeviceSyncStatusRenderer } from "./fedos_desktop_device_sync_status_renderer.js";
+import { FedosDesktopSyncScheduleRenderer } from "./fedos_desktop_sync_schedule_renderer.js";
+import { FedosDesktopTransferSessionRenderer } from "./fedos_desktop_transfer_session_renderer.js";
+import { FedosDesktopSyncConflictRenderer } from "./fedos_desktop_sync_conflict_renderer.js";
 
 export class FedosDesktopRenderer {
   readonly conversationList: FedosDesktopConversationListRenderer;
@@ -41,6 +48,11 @@ export class FedosDesktopRenderer {
   readonly archive: FedosDesktopArchiveRenderer;
   readonly membership: FedosDesktopMembershipRenderer;
   readonly status: FedosDesktopStatusRenderer;
+  readonly deviceList: FedosDesktopDeviceListRenderer;
+  readonly deviceSyncStatus: FedosDesktopDeviceSyncStatusRenderer;
+  readonly syncSchedule: FedosDesktopSyncScheduleRenderer;
+  readonly transferSession: FedosDesktopTransferSessionRenderer;
+  readonly syncConflict: FedosDesktopSyncConflictRenderer;
 
   constructor(boundary: FedosDesktopConversationUiPresentationBoundary) {
     this.conversationList = new FedosDesktopConversationListRenderer(boundary.conversationList);
@@ -51,6 +63,11 @@ export class FedosDesktopRenderer {
     this.archive = new FedosDesktopArchiveRenderer(boundary.archive);
     this.membership = new FedosDesktopMembershipRenderer(boundary.membership);
     this.status = new FedosDesktopStatusRenderer(boundary.runtimeStatus);
+    this.deviceList = new FedosDesktopDeviceListRenderer(boundary.deviceInventory);
+    this.deviceSyncStatus = new FedosDesktopDeviceSyncStatusRenderer(boundary.deviceSyncStatus);
+    this.syncSchedule = new FedosDesktopSyncScheduleRenderer(boundary.syncSchedule);
+    this.transferSession = new FedosDesktopTransferSessionRenderer(boundary.transferSession);
+    this.syncConflict = new FedosDesktopSyncConflictRenderer(boundary.syncConflict);
   }
 }
 
