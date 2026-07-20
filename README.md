@@ -8,6 +8,47 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3481–3560 — Encrypted
+> Device-to-Device Local Transfer Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, the
+> Registration Authority, Device Trust, or the Device Sync Runtime and
+> its Sync Session/Package types (all unmodified); no Sender-Key,
+> Conversation Runtime, Archive, or Search change; no new dependency,
+> no Rust change, `p2p/`/`.tmp_gen` untouched. Completes local
+> encrypted transfer between two already-registered, already-trusted
+> Devices of the SAME account — still no cloud, no relay, no
+> synchronization daemon. A real `FedosDeviceTransferCoordinator`
+> (`src/device/transfer/`) drives Transfer Invitation → Challenge →
+> Proof of Possession → Approval → Package → Verification →
+> Completion end to end with real BIP-340 Schnorr signatures
+> throughout: the initiator proves possession of its own registered
+> Device key, the responder independently proves possession of ITS
+> own — both re-checked against the LIVE Registry at every step, never
+> a cached snapshot. The Transfer Package is a thin `sessionId` binder
+> around the EXISTING, unmodified `FedosDeviceSyncPackageV1` — zero new
+> encryption logic — protected by a content-hash gate that catches any
+> in-transit tampering before decryption is even attempted, distinct
+> from a benign duplicate resubmission (idempotent) and from an
+> automatic, durable `"failed"` transition on every genuine
+> cryptographic denial (wrong device, replay, expiry, tampering) —
+> while a transient/environmental Package-build failure stays
+> retryable rather than killing the transfer. Restart-safe:
+> event-sourced Transfer Session persistence (in-memory + append-only
+> NDJSON backends, its own separate port from the Device Registry and
+> the Alpha 3161–3240 Challenge Replay persistence) recovers and
+> RESUMES a mid-flight transfer after a simulated process restart. Two
+> new test files, 26 tests, real Device Registry + real signatures +
+> real AEAD wiring throughout, covering tampering, replay, wrong
+> device, wrong account, interrupted transfer, restart recovery,
+> duplicate package, and cancellation — including a genuine off-by-one
+> bug (the same class Alpha 3161–3240 once found) caught by the first
+> real end-to-end test run and fixed in this same commit. See
+> `docs/secure_runtime_alpha_3481_3560_execution_spec.md` and
+> `docs/secure_runtime_alpha_3481_3560_completion_declaration.md`.
+> Recommended next Arc: **Relay-assisted Device Synchronization**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3321–3400 — Device Registration
 > Runtime Activation and Local Device Sync Foundation Arc (complete).**
 > Architecture frozen: no redesign of the accepted Device Registry,
