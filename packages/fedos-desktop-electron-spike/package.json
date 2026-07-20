@@ -11,6 +11,7 @@
     "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.test.json",
     "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json && node scripts/copy_static_assets.mjs",
     "start": "npm run build && electron dist/fedos_electron_spike_main.cjs",
+    "start:navigation": "npm run build && electron dist/fedos_electron_navigation_main.cjs",
     "package": "npm run build && node scripts/run_electron_builder_package.mjs"
   }
 }

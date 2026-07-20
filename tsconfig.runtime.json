@@ -4,5 +4,9 @@
     "noEmit": false,
     "outDir": "dist"
   },
-  "include": ["src/desktop/runtime/run_fedos_desktop_runtime.ts"]
+  "include": [
+    "src/desktop/runtime/run_fedos_desktop_runtime.ts",
+    "src/desktop/navigation/fedos_desktop_conversation_window_registry.ts",
+    "src/conversation/construction/fedos_conversation_creator_identity_authority.ts"
+  ]
 }
