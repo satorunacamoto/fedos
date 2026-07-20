@@ -19,7 +19,8 @@
     "package:electron-spike": "npm run package --prefix packages/fedos-desktop-electron-spike",
     "test:electron-spike": "vitest run --config vitest.electron-spike.config.ts",
     "start:electron-host-adapter": "npm run start:host-adapter --prefix packages/fedos-desktop-electron-spike",
-    "start:electron-navigation": "npm run start:navigation --prefix packages/fedos-desktop-electron-spike"
+    "start:electron-navigation": "npm run start:navigation --prefix packages/fedos-desktop-electron-spike",
+    "start:electron-notifications-tray": "npm run start:notifications-tray --prefix packages/fedos-desktop-electron-spike"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",

@@ -15,5 +15,10 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/fedos_electron_spike_renderer.ts", "src/fedos_electron_host_adapter_selftest.ts", "src/fedos_electron_navigation_renderer.ts"]
+  "exclude": [
+    "src/fedos_electron_spike_renderer.ts",
+    "src/fedos_electron_host_adapter_selftest.ts",
+    "src/fedos_electron_navigation_renderer.ts",
+    "src/fedos_electron_notifications_tray_renderer.ts"
+  ]
 }

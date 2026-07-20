@@ -19,6 +19,8 @@
     "src/fedos_electron_spike_window.d.ts",
     "src/fedos_electron_host_adapter_window.d.ts",
     "src/fedos_electron_navigation_renderer.ts",
-    "src/fedos_electron_navigation_window.d.ts"
+    "src/fedos_electron_navigation_window.d.ts",
+    "src/fedos_electron_notifications_tray_renderer.ts",
+    "src/fedos_electron_notifications_tray_window.d.ts"
   ]
 }

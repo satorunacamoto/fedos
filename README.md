@@ -8,6 +8,60 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4261–4340 — Desktop Notifications, System
+> Tray, and Background Operation Arc (complete).**
+> Architecture frozen: no redesign of Runtime/Shell/Presentation/Renderer/
+> Host Bridge/Navigation. Adds three new, additive boundaries: a closed,
+> nine-kind Desktop Notification boundary (`src/desktop/notification/`,
+> `FedosDesktopNotificationPort`/`FedosDesktopNotificationCoordinator`,
+> fixed per-kind templates only — no custom payloads, fail-closed on any
+> sensitive-looking field); a six-action System Tray boundary
+> (`src/desktop/tray/`, `FedosDesktopTrayPort`/`TrayCoordinator` — Open
+> Window/Recent Conversations/Device Sync Status/Pause Sync/Resume
+> Sync/Exit); and a pure Background Operation state machine
+> (`src/desktop/background/`, `BackgroundLifecycleCoordinator` — window
+> closed keeps the Runtime alive, background sync/notifications, clean
+> shutdown, single runtime ownership; no daemon mode, no singleton
+> service). A new, additive Electron adapter
+> (`packages/fedos-desktop-electron-spike/src/fedos_electron_notifications_tray_*`
+> + `fedos_electron_notification_adapter.ts`/`fedos_electron_tray_adapter.ts`)
+> wires these to real Electron `Notification`/`Tray` APIs — Electron hosts
+> UI only, zero business logic. Investigated Host Bridge reuse honestly:
+> NOT reused directly (would mean a second, divergent Boundary/Runtime
+> racing the Window Registry's own, a direct violation of "single runtime
+> ownership"), but its Port+adapter PATTERN is restated for both new
+> boundaries. Real Electron subprocess acceptance tests, including a
+> main-process self-test sequence (`FEDOS_ELECTRON_BG_AUTOTEST=1`)
+> exercising all 14 named Phase G scenarios against real objects. 8 new
+> source files, 1 new minimal additive Presentation ViewModel, 4 new root
+> test files (31 tests) plus 1 new real Electron acceptance suite (15
+> tests); zero regression traceable to this Arc.
+>
+> **Status: Secure Runtime Alpha 4181–4260 — Desktop Conversation Window
+> and Navigation Arc (complete).**
+> Architecture frozen: no redesign of Runtime/Shell/Presentation/Renderer/
+> Host Bridge. Adds a closed navigation state vocabulary
+> (`empty`/`opening`/`open`/`open-failed`), pure back/forward history,
+> window-title generation, a `FedosDesktopConversationWindowController`
+> (one window's own orchestration — open/switch/close/back/forward/
+> restoreLastOpened/render, owning its OWN ViewModel/Renderer instances
+> over the Presentation Boundary's single shared `.shell`, the deliberate
+> resolution to a genuine multi-window-vs-shared-ViewModel-state safety
+> gap found in Phase A), and a `FedosDesktopConversationWindowRegistry`
+> (multi-window state model + lifecycle + pin state + recent-conversation
+> list + last-opened restoration, backed by a new append-only NDJSON log
+> following this repository's own established persistence pattern). A new,
+> real `ipcMain`/preload Electron adapter
+> (`packages/fedos-desktop-electron-spike/src/fedos_electron_navigation_*`)
+> constructs the Presentation Boundary and Window Registry DIRECTLY —
+> deliberately NOT `FedosDesktopHostBridge`, which has no concept of
+> "window" and owns its own private Boundary internally; reusing it
+> alongside the Registry would race two divergent Runtime instances in one
+> process. 29 new root unit/acceptance tests plus 13 new real Electron
+> acceptance tests (build, security baseline, closed IPC vocabulary, real
+> subprocess launch/repeat-launch/fail-closed-on-corruption); zero
+> regression traceable to this Arc.
+>
 > **Status: Secure Runtime Alpha 4101–4180 — Electron Main/Preload
 > Adapter for FedosDesktopHostBridge Arc (complete).**
 > Architecture frozen: no redesign of Shell/Presentation/Renderer/Runtime/
