@@ -8,6 +8,35 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3721–3800 — Background Device Sync
+> Scheduling and Conflict Resolution Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, Registration
+> Authority, Device Trust, Device Sync Runtime, Sync Session/Package,
+> the Encrypted Device-to-Device Local Transfer protocol, Relay-Assisted
+> Device Synchronization (Alpha 3641–3720), or the Sync
+> Journal/Cursor/Queue/Conflict-Vocabulary/Allowlist (all unmodified);
+> no new dependency, no Rust change, no Desktop UI/Shell change,
+> `p2p/`/`.tmp_gen` untouched. Turns the existing manually-invoked Relay
+> Device Sync flow into a controlled, restart-safe background
+> scheduling boundary (`FedosDeviceSyncScheduler`: disabled by default,
+> explicit `startSync()`/`stopSync()`/`syncStatus()`/`tickSync()`/
+> `triggerSyncNow()`, single-flight, restart-recovery-proven) and
+> introduces an ADDITIVE, richer 11-value Conflict Vocabulary layered
+> over the existing 4-value classifier, a deterministic domain-specific
+> resolution planner (7 closed decisions, never a generic
+> last-write-wins), and durable, queryable Conflict persistence with
+> only 4 objectively-safe resolution actions — no forced overwrite of
+> canonical state anywhere. Explicitly does not claim distributed
+> consensus, strong eventual consistency, or any change to the Sync
+> Journal's own accepted Cursor-advance-past-everything design: an
+> unresolved conflict is made visible through a separate, independent
+> Conflict persistence/query layer instead. 3 new test files, 56 tests,
+> real BIP-340 Schnorr device registration/revocation and real
+> append-only restart-recovery proofs throughout; full suite unchanged
+> at 239 pre-existing failures (both categories independently
+> re-confirmed against a clean `main` checkout), 56 new passes, zero
+> regressions.
+
 > **Status: Secure Runtime Alpha 3641–3720 — Relay-Assisted Device
 > Synchronization Arc (complete).**
 > Architecture frozen: no redesign of the Device Registry, Registration
