@@ -71,6 +71,8 @@ import type { FedosConversationProductionCryptoConfig } from "../../conversation
 import type { FedosGroupParticipantLimitPolicy } from "../../conversation/group/fedos_group_participant_limit.js";
 import type { FedosPrivateNostrDeliveryMode } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
 import type { FedosPrivateNostrDeliveryPublisher } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_publisher.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistrationAuthority } from "../../device/fedos_device_registration_authority.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -329,4 +331,24 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationPrivateNostrDefaultMode?: FedosPrivateNostrDeliveryMode;
   /** Alpha 1391–1470 — optional; omitted, `[]`. */
   readonly conversationPrivateNostrDefaultRelayUrls?: readonly string[];
+
+  /**
+   * Secure Runtime Alpha 2921–3000 ("Device Trust and Multi-Device
+   * Runtime Integration Arc"). OPTIONAL, mirroring
+   * `privateTransportEnabled`'s own "no widened required-field surface"
+   * discipline exactly — every pre-existing call site continues to
+   * compile unchanged. Omitted or `false`, the runtime reaches
+   * `"ready"` without ever constructing a `FedosDeviceTrustRuntime`
+   * (`./fedos_device_trust_runtime.js`), and `runtime.deviceTrust()`
+   * throws `"not enabled"`.
+   */
+  readonly deviceTrustEnabled?: boolean;
+  /** REQUIRED when `deviceTrustEnabled` is `true` — a stable, non-secret identifier for THIS running runtime's own local device. Never a credential; this runtime generates no device id of its own. */
+  readonly localDeviceId?: string;
+  /** REQUIRED when `deviceTrustEnabled` is `true` — the existing account identity this local device is additive beneath (Review `4672244`'s own Option B). */
+  readonly localAccountRef?: FedosDeviceBindingAccountRef;
+  /** Explicit, caller-supplied path to the Device Registry append-only log file. Omitted, in-memory (mirrors every other `*LogPath` field in this config). */
+  readonly deviceRegistryLogPath?: string;
+  /** Optional; omitted, `UnavailableFedosDeviceRegistrationAuthority` applies — this codebase has no accepted cryptographic boundary yet for independent, account-verifiable Device keys (Phase E blocker), so every registration through the default is honestly capped at `"unavailable"`, never `"trusted"`. */
+  readonly deviceRegistrationAuthority?: FedosDeviceRegistrationAuthority;
 }

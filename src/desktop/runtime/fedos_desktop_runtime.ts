@@ -182,6 +182,17 @@ import type { FedosGroupFanoutDeliveryPersistence } from "../../conversation/gro
 import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/append_only_fedos_group_fanout_delivery_persistence.js";
 import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/in_memory_fedos_group_fanout_delivery_persistence.js";
 
+// Secure Runtime Alpha 2921-3000 (Device Trust and Multi-Device Runtime
+// Integration Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1471-1540 boundary comment above.
+import { InMemoryFedosDeviceRegistryPersistence } from "../../device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../../device/persistence/append_only_fedos_device_registry_persistence.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import { PersistedFedosDeviceTrustAuthority } from "../../device/persistence/persisted_fedos_device_trust_authority.js";
+import { UnavailableFedosDeviceRegistrationAuthority } from "../../device/unavailable_fedos_device_registration_authority.js";
+import { FedosSyncState } from "../../sync/fedos_sync_state.js";
+import { FedosDeviceTrustRuntime } from "./fedos_device_trust_runtime.js";
+
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
 /** Alpha 1471-1540 -- Mailbox Delivery's own default tick cadence when `conversationTransportIntervalMs` is omitted. Mirrors the Board delivery loop's own `DEFAULT_DELIVERY_INTERVAL_MS` (`../host/fedos_desktop_host.ts`, Alpha 507) — same value, a separate constant since that one is not exported. */
@@ -266,6 +277,15 @@ export interface FedosRunningDesktopRuntime {
    */
   conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome;
   /**
+   * Secure Runtime Alpha 2921–3000 — the `FedosDeviceTrustRuntime`
+   * (`./fedos_device_trust_runtime.js`) this running Local Runtime owns,
+   * constructed ONLY when `config.deviceTrustEnabled` was `true`. Throws
+   * `"not enabled"` if it was never configured, and throws
+   * `"inaccessible after stop"` once `stop()` has been called — the SAME
+   * two-state fail-closed contract `privateTransport()` itself uses.
+   */
+  deviceTrust(): FedosDeviceTrustRuntime;
+  /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
    * `host.stopDelivery()` first (itself already guarantees "no new
@@ -330,6 +350,21 @@ export async function startFedosDesktopRuntime(
       );
     }
   }
+  // Secure Runtime Alpha 2921-3000 -- mirrors the guards above exactly:
+  // a configuration error is thrown synchronously, BEFORE any Persistence
+  // backend or Host is constructed, never a silent in-memory/no-account fallback.
+  if (config.deviceTrustEnabled) {
+    if (config.localDeviceId === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceTrustEnabled is true but no localDeviceId was supplied — this runtime generates no device id of its own.",
+      );
+    }
+    if (config.localAccountRef === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceTrustEnabled is true but no localAccountRef was supplied.",
+      );
+    }
+  }
 
   ensureParentDirectoryExists(config.boardLogPath);
   ensureParentDirectoryExists(config.outboxLogPath);
@@ -338,6 +373,9 @@ export async function startFedosDesktopRuntime(
   }
   if (config.conversationLogPath !== undefined) {
     ensureParentDirectoryExists(config.conversationLogPath);
+  }
+  if (config.deviceRegistryLogPath !== undefined) {
+    ensureParentDirectoryExists(config.deviceRegistryLogPath);
   }
   // Alpha 923 -- the private-Conversation draft runtime's own logs.
   for (const path of [
@@ -583,6 +621,35 @@ export async function startFedosDesktopRuntime(
     }),
   );
 
+  // Secure Runtime Alpha 2921-3000 -- exactly one FedosDeviceTrustRuntime
+  // per running runtime, constructed ONLY when config.deviceTrustEnabled
+  // was true (the guard at the top of this function already confirmed
+  // localDeviceId/localAccountRef are both present in that case). The
+  // Device Registry persistence backend follows the SAME
+  // "AppendOnly when a log path is supplied, else InMemory" discipline
+  // every other backend in this function already uses. The Sync State
+  // (Alpha 2421-2500, unmodified) is always in-memory -- this Arc adds
+  // no disk persistence for the Sync Journal/Cursor themselves (see
+  // fedos_device_trust_runtime.ts's own header).
+  let deviceTrustRuntimeInstance: FedosDeviceTrustRuntime | undefined;
+  if (config.deviceTrustEnabled) {
+    const deviceRegistryPersistence: FedosDeviceRegistryPersistence =
+      config.deviceRegistryLogPath !== undefined
+        ? new AppendOnlyFedosDeviceRegistryPersistence(config.deviceRegistryLogPath)
+        : new InMemoryFedosDeviceRegistryPersistence();
+    const deviceTrustAuthority = new PersistedFedosDeviceTrustAuthority({
+      persistence: deviceRegistryPersistence,
+      registrationAuthority: config.deviceRegistrationAuthority ?? new UnavailableFedosDeviceRegistrationAuthority(),
+    });
+    const syncAccountKey = `${config.localAccountRef!.authority}:${config.localAccountRef!.publicIdentifier}`;
+    deviceTrustRuntimeInstance = new FedosDeviceTrustRuntime({
+      localDeviceId: config.localDeviceId!,
+      localAccountRef: config.localAccountRef!,
+      trustAuthority: deviceTrustAuthority,
+      syncState: new FedosSyncState(syncAccountKey),
+    });
+  }
+
   // Secure Runtime Alpha 1471-1540 -- exactly one FedosPrivateTransport
   // per running runtime, constructed ONLY when config.privateTransportEnabled
   // was true (the guard at the top of this function already confirmed
@@ -709,6 +776,15 @@ export async function startFedosDesktopRuntime(
     /** Alpha 1263/1291 -- the closed, non-secret reason production crypto is (or is not) available. `"disabled"` when `conversationProductionCrypto` was never supplied. Readable even after `stop()`. */
     conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome {
       return productionCryptoCapability;
+    },
+    deviceTrust(): FedosDeviceTrustRuntime {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.deviceTrust() is inaccessible after stop().");
+      }
+      if (deviceTrustRuntimeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.deviceTrust() is not enabled -- see config.deviceTrustEnabled.");
+      }
+      return deviceTrustRuntimeInstance;
     },
     async stop(): Promise<void> {
       if (stopped) {

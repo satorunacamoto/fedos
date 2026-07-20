@@ -8,6 +8,275 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3721–3800 — Background Device Sync
+> Scheduling and Conflict Resolution Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, Registration
+> Authority, Device Trust, Device Sync Runtime, Sync Session/Package,
+> the Encrypted Device-to-Device Local Transfer protocol, Relay-Assisted
+> Device Synchronization (Alpha 3641–3720), or the Sync
+> Journal/Cursor/Queue/Conflict-Vocabulary/Allowlist (all unmodified);
+> no new dependency, no Rust change, no Desktop UI/Shell change,
+> `p2p/`/`.tmp_gen` untouched. Turns the existing manually-invoked Relay
+> Device Sync flow into a controlled, restart-safe background
+> scheduling boundary (`FedosDeviceSyncScheduler`: disabled by default,
+> explicit `startSync()`/`stopSync()`/`syncStatus()`/`tickSync()`/
+> `triggerSyncNow()`, single-flight, restart-recovery-proven) and
+> introduces an ADDITIVE, richer 11-value Conflict Vocabulary layered
+> over the existing 4-value classifier, a deterministic domain-specific
+> resolution planner (7 closed decisions, never a generic
+> last-write-wins), and durable, queryable Conflict persistence with
+> only 4 objectively-safe resolution actions — no forced overwrite of
+> canonical state anywhere. Explicitly does not claim distributed
+> consensus, strong eventual consistency, or any change to the Sync
+> Journal's own accepted Cursor-advance-past-everything design: an
+> unresolved conflict is made visible through a separate, independent
+> Conflict persistence/query layer instead. 3 new test files, 56 tests,
+> real BIP-340 Schnorr device registration/revocation and real
+> append-only restart-recovery proofs throughout; full suite unchanged
+> at 239 pre-existing failures (both categories independently
+> re-confirmed against a clean `main` checkout), 56 new passes, zero
+> regressions.
+
+> **Status: Secure Runtime Alpha 3641–3720 — Relay-Assisted Device
+> Synchronization Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, Registration
+> Authority, Device Trust, Device Sync Runtime, Sync Session/Package,
+> the Encrypted Device-to-Device Local Transfer protocol, the Sync
+> Journal/Cursor/Allowlist, or the existing `FedosRelay`/
+> `FedosConversationRelaySet`/private transport (all unmodified); no
+> Sender-Key change (this checkout has no Sender-Key secret persistence
+> code at all), no Conversation Runtime/Archive/Search change; no new
+> dependency, no Rust change, `p2p/`/`.tmp_gen` untouched. Extends the
+> proven local Encrypted Device Transfer protocol (Alpha 3481–3560)
+> over an untrusted, store-and-forward Relay boundary — the Relay is a
+> mailbox and transport only, never an identity/trust/decryption
+> authority. Route Decision: NIP-17 Gift Wrap is genuinely absent from
+> this checkout's history (confirmed, not an ancestor of this Arc's own
+> base) and the existing proprietary private-transport route is
+> hard-bound to Direct-mode Conversation membership — a structural
+> mismatch for Device pairing — so this Arc freezes a NEW, dedicated,
+> honestly-labeled proprietary route (kind:1, `["fedos-device-sync","1"]`,
+> route version 1, no NIP compliance claimed), built entirely from
+> ALREADY-REAL primitives (`FedosRelay`/`FedosConversationRelaySet`,
+> the existing kind-1-only `FedosNostrSigningAuthority`). A real
+> `FedosDeviceRelaySyncOutboundCoordinator`/`FedosDeviceRelaySyncInboundHandler`
+> pair carries the EXISTING, unmodified `FedosDeviceTransferPackageV1`
+> across the Relay: outer BIP-340 Schnorr signature re-verification
+> (reusing the existing `NobleSignatureVerifier`) catches any tamper to
+> the routing facts; an outer content-hash gate catches any tamper to,
+> or substitution of, the package itself, BEFORE decryption is ever
+> attempted; the inner package's own mutual device authentication and
+> tamper detection (Alpha 3481–3560, unmodified) runs unchanged.
+> Two-layer durable dedup (outer Relay event id, then
+> transferSessionId+package hash) makes duplicate delivery across
+> multiple Relays and across a simulated process restart import
+> exactly once — proven with a real, functional in-process Relay
+> fixture that actually stores and delivers messages (unlike the
+> existing bookkeeping-only `NullRelay`), including target-offline-
+> then-later-receive. Device revocation fails closed at every point
+> tested (before publish, after publish but before import); Relay
+> acceptance and Device import are tracked as two permanently distinct
+> facts (`"relay-accepted"` vs. `"imported"`) via a new, small,
+> 9-state Observation vocabulary, never collapsed. The existing Sync
+> record allowlist is reused unmodified and directly re-tested against
+> Master Seed/private-key/Sender-Key-secret/passphrase/plaintext
+> shapes; the one genuine, narrow addition this Arc makes is an
+> explicit oversized-payload resource limit (256 KiB), checked before
+> JSON parsing. Three new test files, 50 tests, real Schnorr signatures
+> + real AEAD wiring + a real functional Relay fixture throughout —
+> including two genuine off-by-one field-count bugs (the same class
+> this repo's history already recorded finding twice before) caught by
+> the first real end-to-end test run and fixed in this same commit.
+> See `docs/secure_runtime_alpha_3641_3720_execution_spec.md` and
+> `docs/secure_runtime_alpha_3641_3720_completion_declaration.md`.
+> Recommended next Arc: **Background Device Sync Scheduling and
+> Conflict Resolution**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3481–3560 — Encrypted
+> Device-to-Device Local Transfer Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, the
+> Registration Authority, Device Trust, or the Device Sync Runtime and
+> its Sync Session/Package types (all unmodified); no Sender-Key,
+> Conversation Runtime, Archive, or Search change; no new dependency,
+> no Rust change, `p2p/`/`.tmp_gen` untouched. Completes local
+> encrypted transfer between two already-registered, already-trusted
+> Devices of the SAME account — still no cloud, no relay, no
+> synchronization daemon. A real `FedosDeviceTransferCoordinator`
+> (`src/device/transfer/`) drives Transfer Invitation → Challenge →
+> Proof of Possession → Approval → Package → Verification →
+> Completion end to end with real BIP-340 Schnorr signatures
+> throughout: the initiator proves possession of its own registered
+> Device key, the responder independently proves possession of ITS
+> own — both re-checked against the LIVE Registry at every step, never
+> a cached snapshot. The Transfer Package is a thin `sessionId` binder
+> around the EXISTING, unmodified `FedosDeviceSyncPackageV1` — zero new
+> encryption logic — protected by a content-hash gate that catches any
+> in-transit tampering before decryption is even attempted, distinct
+> from a benign duplicate resubmission (idempotent) and from an
+> automatic, durable `"failed"` transition on every genuine
+> cryptographic denial (wrong device, replay, expiry, tampering) —
+> while a transient/environmental Package-build failure stays
+> retryable rather than killing the transfer. Restart-safe:
+> event-sourced Transfer Session persistence (in-memory + append-only
+> NDJSON backends, its own separate port from the Device Registry and
+> the Alpha 3161–3240 Challenge Replay persistence) recovers and
+> RESUMES a mid-flight transfer after a simulated process restart. Two
+> new test files, 26 tests, real Device Registry + real signatures +
+> real AEAD wiring throughout, covering tampering, replay, wrong
+> device, wrong account, interrupted transfer, restart recovery,
+> duplicate package, and cancellation — including a genuine off-by-one
+> bug (the same class Alpha 3161–3240 once found) caught by the first
+> real end-to-end test run and fixed in this same commit. See
+> `docs/secure_runtime_alpha_3481_3560_execution_spec.md` and
+> `docs/secure_runtime_alpha_3481_3560_completion_declaration.md`.
+> Recommended next Arc: **Relay-assisted Device Synchronization**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3321–3400 — Device Registration
+> Runtime Activation and Local Device Sync Foundation Arc (complete).**
+> Architecture frozen: no redesign of the accepted Device Registry,
+> Device Binding, or Account Authorization boundary
+> (`src/device/binding_challenge/`, `src/device/persistence/`,
+> unmodified); no Desktop Shell/Search/Archive/Sender-Key change; no
+> new dependency, no Rust change, `p2p/`/`.tmp_gen` untouched. Activates
+> Alpha 3161–3240's own Registration Authority — built but never called
+> from anywhere in `src/` — inside a real, constructible
+> `FedosDeviceSyncRuntime` (`src/device/runtime/`): Runtime Device
+> Registration/Activation (one atomic, cryptographically-verified call,
+> proven with real BIP-340 Schnorr signatures throughout), Runtime
+> Device Revocation, Local Device Inventory and Device Status Queries
+> (read directly from the existing Registry, no parallel state), and
+> Sync Session Preparation/Validation (`src/device/sync_session/`) — a
+> LOCAL, at-rest snapshot of one account's currently-trusted Device
+> inventory, addressed to one target Device the LIVE Registry currently
+> trusts, re-validated against that same live state rather than a
+> frozen snapshot. An Encrypted Sync Package Builder/Reader
+> (`src/device/sync_package/`) seals and opens that snapshot using the
+> EXISTING, real AEAD Runtime Service and the EXISTING `"Conversation"`
+> `AeadAadDomain` — resolved via a documented self-ECDH adaptation
+> (`resolveConversationKey()` against the account's own public key,
+> since a Sync Package has no counterparty to ECDH against and adding a
+> new AAD domain would require a Rust change) rather than any new
+> cryptographic primitive. No network sync, no cloud sync, no relay
+> sync, and no Encrypted Device-to-Device Local Transfer — this Arc
+> builds the LOCAL data a future transfer mechanism would move, and
+> does not itself move anything between two Devices. Two new test
+> files, 33 tests, real Device Registry + real signatures throughout,
+> covering restart recovery, duplicate registration, revocation,
+> malformed/expired/tampered packages, unauthorized devices, and
+> replay. See `docs/secure_runtime_alpha_3321_3400_execution_spec.md`
+> and `docs/secure_runtime_alpha_3321_3400_completion_declaration.md`.
+> Recommended next Arc: **Encrypted Device-to-Device Local Transfer**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3161–3240 — Account-to-Device
+> Signature Verification Boundary Arc (complete).**
+> Architecture frozen: no redesign of the accepted Device Registry,
+> trust-state transition table, or Multi-Device Sync Foundation
+> (`src/sync/`, unmodified); no Desktop Runtime/Shell change; no
+> Archive/Search/Sender-Key/Group change; no new dependency, no Rust
+> change, `p2p/`/`.tmp_gen` untouched. Closes the exact blocker named
+> by Alpha 2921–3000: this codebase now has a real, independent Device
+> signing keypair (`src/device/crypto/`, `@noble/curves`
+> Schnorr/secp256k1 — the same already-shipped production library used
+> for Nostr verification — never derived from the Master Seed, never
+> the account key, opaque handle with no raw private-key getter), a
+> canonical versioned `FedosDeviceBindingChallengeV1` (fixed domain
+> separator, fixed-order array serialization, `register-device`/
+> `revoke-device` action, expiry, CSPRNG nonce), a detached
+> account-authorization signature reusing the existing kind-1 Nostr
+> signing authority unwidened, and a Device proof of possession under a
+> distinct signed preimage — neither signature alone can register or
+> self-authorize anything; both are independently re-verified on every
+> call. A new `FedosDeviceBindingRegistrationAuthority`
+> (`src/device/binding_challenge/`) orchestrates both checks plus a
+> durable, restart-safe replay/expiry guard (separate codec + in-memory
+> + append-only persistence, fail-closed on corruption, idempotent on
+> byte-identical resubmission, refused on any changed-byte reuse of a
+> consumed nonce) against the EXISTING, unmodified Device Registry
+> (`PersistedFedosDeviceTrustAuthority`, Alpha 2921–3000) — through an
+> internal `AlreadyVerifiedFedosDeviceRegistrationAuthority` this Arc's
+> own orchestrator is the only caller of, never a default anywhere else.
+> `UnavailableFedosDeviceRegistrationAuthority` remains untouched and
+> still fails closed. Account-authorized revocation is implemented
+> (separate action/domain, bound to the exact target device key,
+> terminal, idempotent, wrong-account denied) with no device-sync key
+> rotation and no remote-erasure claim. A Phase J factory
+> (`fedos_device_binding_boundary_factory.ts`) provides the one
+> construction point a future Desktop Runtime integration would call —
+> **not wired into `fedos_desktop_runtime.ts` in this Arc**, so this Arc
+> remains independently mergeable alongside the Desktop Content Accessor
+> Arc. One new test file, 48 tests, real BIP-340 Schnorr signatures
+> throughout (a test-only real-crypto signing-authority stand-in ships
+> nowhere in `src/`), covering the full 28-item required matrix,
+> including a genuine bug found and fixed in Phase C's own challenge
+> validator (an off-by-one field-count check that rejected every
+> well-formed challenge, caught by this Arc's first real-crypto test).
+> See `docs/secure_runtime_alpha_3161_3240_execution_spec.md` and
+> `docs/secure_runtime_alpha_3161_3240_completion_declaration.md`.
+> Recommended next Arc: **Device Registration Runtime Activation and
+> Encrypted Device-to-Device Sync Transport**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 2921–3000 — Device Trust and
+> Multi-Device Runtime Integration Arc (complete, honest partial
+> capability — cryptographic Device authorization blocked).**
+> Architecture frozen: no redesign of the accepted Multi-Device Sync
+> Foundation (`src/sync/`, Alpha 2421–2500, unmodified), Conversation
+> Runtime, or Archive; no cloud account/server, no push, no MLS, no
+> Onion/Tor, no new dependency, no Rust change, `p2p/`/`.tmp_gen`
+> untouched. Follows the reviewed recommendation (`docs/reviews/multi_device_device_trust_v1/`,
+> commit `4672244`): account identity + independent Device keys (Option
+> B), never raw Master Seed copying. A new, additive `src/device/`
+> domain implements a versioned `FedosDeviceBindingV1` (deviceId,
+> account reference, opaque device-key reference, label, trustState,
+> `schemaVersion`/`capabilityVersion` — no private key, no Master Seed,
+> no passphrase), a closed `pending|trusted|revoked|unavailable` trust
+> vocabulary with validated transitions (`revoked` terminal), and an
+> event-sourced Device Registry (codec, in-memory + append-only
+> backends, conflict/idempotency, fail-closed on corruption) mirroring
+> the existing Capability persistence pattern exactly — never merged
+> into Membership/Conversation persistence. **The cryptographic
+> blocker, stated honestly**: this codebase has no accepted boundary yet
+> for independent, account-verifiable Device keys
+> (`src/crypto/types.ts` remains a pure placeholder seam) — Phase E
+> stops exactly there: `UnavailableFedosDeviceRegistrationAuthority` is
+> the only production `FedosDeviceRegistrationAuthority`, and it can
+> record a registration attempt but can NEVER return `"verified"`, so no
+> device — legitimate or attacker-controlled — can reach `"trusted"`
+> through it. `FedosDesktopRuntime` gains an opt-in (`deviceTrustEnabled`,
+> mirrors `privateTransportEnabled`'s own discipline), narrow
+> `runtime.deviceTrust()` accessor owning one local Device identity, the
+> Device Registry/Trust Authority, and the EXISTING (unmodified)
+> `FedosSyncState` — sync-fabric membership always follows Device Trust,
+> never the reverse: only a `"trusted"` device may join the Sync fan-out
+> set, and a new, standalone, additive Sync Journal record allowlist
+> (`src/sync/fedos_sync_record_allowlist.ts`) fails closed on any
+> `recordType` outside six named non-secret metadata kinds, or on
+> sensitive-marker metadata, before the Journal is ever touched — zero
+> modification to the Journal's own frozen shape. Revocation denies
+> future sync eligibility and rejects any new change originating from
+> the revoked device, without erasing the historical binding fact or
+> claiming any retroactive deletion of already-copied data; Sender-Key
+> rekey is explicitly out of scope. Archive Restore is proven, directly,
+> to never register or imply a trusted Device. One new test file (26
+> tests) covers the full 24-item required matrix (items 21/22 satisfied
+> by re-running the existing, untouched Search and Conversation Runtime
+> regression suites rather than duplicating their coverage) over real
+> in-memory and append-only backends. See
+> `docs/secure_runtime_alpha_2921_3000_execution_spec.md` and
+> `docs/secure_runtime_alpha_2921_3000_completion_declaration.md`.
+> Recommended next Arc: **Device-to-Device Encrypted Sync Transport**
+> remains blocked on the same cryptographic Device-key boundary named
+> above — the recommended next Arc is instead **Account-to-Device
+> Signature Verification Boundary**, the named prerequisite that would
+> let a real `FedosDeviceRegistrationAuthority` finally return
+> `"verified"`.
 > **Status: Secure Runtime Alpha 3561–3640 — Desktop Electron Host Boundary
 > Arc (partial completion, honestly declared).**
 > Creates the first Desktop Host boundary around the completed Runtime →
