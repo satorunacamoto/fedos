@@ -39,6 +39,10 @@ import { FedosDesktopDeviceSyncStatusViewModel } from "./fedos_desktop_device_sy
 import { FedosDesktopSyncScheduleViewModel } from "./fedos_desktop_sync_schedule_view_model.js";
 import { FedosDesktopTransferSessionViewModel } from "./fedos_desktop_transfer_session_view_model.js";
 import { FedosDesktopSyncConflictViewModel } from "./fedos_desktop_sync_conflict_view_model.js";
+// Secure Runtime Alpha 3941-4020 (Desktop Device Management and Sync
+// Operations UI Renderer Arc) -- every import/addition below this comment
+// is ADDITIVE ONLY, mirroring this file's own established pattern above.
+import { FedosDeviceManagementController } from "./device_management/fedos_device_management_controller.js";
 
 export class FedosDesktopConversationUiPresentationBoundary {
   readonly #shell: FedosDesktopApplicationShell;
@@ -57,6 +61,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
   readonly syncSchedule: FedosDesktopSyncScheduleViewModel;
   readonly transferSession: FedosDesktopTransferSessionViewModel;
   readonly syncConflict: FedosDesktopSyncConflictViewModel;
+  readonly deviceManagement: FedosDeviceManagementController;
 
   private constructor(shell: FedosDesktopApplicationShell) {
     this.#shell = shell;
@@ -75,6 +80,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
     this.syncSchedule = new FedosDesktopSyncScheduleViewModel(shell);
     this.transferSession = new FedosDesktopTransferSessionViewModel(shell);
     this.syncConflict = new FedosDesktopSyncConflictViewModel(shell);
+    this.deviceManagement = new FedosDeviceManagementController(this);
   }
 
   /** Thin factory — mirrors `createFedosDesktopApplicationShell()`'s own style. No side effect (no Runtime started) until `runtimeStatus.start()` is called. */

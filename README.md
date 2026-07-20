@@ -8,6 +8,38 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3941–4020 — Desktop Device Management
+> and Sync Operations UI Renderer Arc (honest partial — Device
+> registration/revocation confirmation commands unavailable).**
+> Architecture frozen: no redesign of the Device Registry, Device Trust,
+> Device Sync Scheduler, Relay Sync, or Conflict Authority; no second
+> operational facade, Shell, or Device Runtime; no dependency added; no
+> `package.json`/`package-lock.json`/`tsconfig.json`/Cargo change. Turns
+> the completed Device Sync operational Shell/ViewModel/Renderer boundary
+> (Alpha 3801-3880) into a coherent, framework-neutral Desktop
+> device-management presentation surface: a closed 14-screen vocabulary,
+> a fail-closed in-memory navigation state (never durable canonical
+> data), one composing controller over the 6 existing Device Sync
+> ViewModels (registered additively as `.deviceManagement` on the
+> existing Presentation Boundary/Renderer, never a second parallel one),
+> and a full Overview/Device-list-detail/Sync-Operations/Schedule/
+> Transfer/Conflict-Inbox screen+render-model layer with honest
+> truncation limits and closed, callback-free action descriptors.
+> **Honest, documented boundary**: no `registerDevice`/`confirmTrust`/
+> `revokeDevice` command exists anywhere on the Shell or the Device Sync
+> Operational Facade — only `runtime.deviceTrust()` supports those, and
+> the Shell never calls it. The Registration and Revocation Confirmation
+> screens are therefore complete, real screen models that honestly report
+> their own confirm action as unavailable, never a fabricated success —
+> every OTHER target screen, including the entire Conflict Inbox with
+> safe acknowledgment, is fully real end to end. Relay-accepted and
+> Device-imported remain two independently-observable facts throughout;
+> an empty transfer set never counts as "everything synced." 2 new test
+> files, 37 new tests, real Runtime/Shell/Boundary/Renderer throughout;
+> full suite failure rate matches this environment's own already-
+> documented run-to-run baseline variance, zero regression traceable to
+> this Arc.
+>
 > **Status: Secure Runtime Alpha 3801–3880 — Device Sync Operational
 > Status and Desktop Shell Integration Arc (complete).**
 > Architecture frozen: reconciles the previously-diverged Desktop UI

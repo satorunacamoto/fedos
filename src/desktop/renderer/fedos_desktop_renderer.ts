@@ -38,6 +38,10 @@ import { FedosDesktopDeviceSyncStatusRenderer } from "./fedos_desktop_device_syn
 import { FedosDesktopSyncScheduleRenderer } from "./fedos_desktop_sync_schedule_renderer.js";
 import { FedosDesktopTransferSessionRenderer } from "./fedos_desktop_transfer_session_renderer.js";
 import { FedosDesktopSyncConflictRenderer } from "./fedos_desktop_sync_conflict_renderer.js";
+// Secure Runtime Alpha 3941-4020 (Desktop Device Management and Sync
+// Operations UI Renderer Arc) -- every import/addition below this comment
+// is ADDITIVE ONLY, mirroring this file's own established pattern above.
+import { FedosDeviceManagementRenderer } from "./device_management/fedos_device_management_renderer.js";
 
 export class FedosDesktopRenderer {
   readonly conversationList: FedosDesktopConversationListRenderer;
@@ -53,6 +57,7 @@ export class FedosDesktopRenderer {
   readonly syncSchedule: FedosDesktopSyncScheduleRenderer;
   readonly transferSession: FedosDesktopTransferSessionRenderer;
   readonly syncConflict: FedosDesktopSyncConflictRenderer;
+  readonly deviceManagement: FedosDeviceManagementRenderer;
 
   constructor(boundary: FedosDesktopConversationUiPresentationBoundary) {
     this.conversationList = new FedosDesktopConversationListRenderer(boundary.conversationList);
@@ -68,6 +73,7 @@ export class FedosDesktopRenderer {
     this.syncSchedule = new FedosDesktopSyncScheduleRenderer(boundary.syncSchedule);
     this.transferSession = new FedosDesktopTransferSessionRenderer(boundary.transferSession);
     this.syncConflict = new FedosDesktopSyncConflictRenderer(boundary.syncConflict);
+    this.deviceManagement = new FedosDeviceManagementRenderer(boundary.deviceManagement);
   }
 }
 
