@@ -13,10 +13,12 @@
     "build:wasm": "cargo build --manifest-path packages/fedos-core-rust/Cargo.toml --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir packages/fedos-core-rust/pkg packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
     "build:runtime": "tsc -p tsconfig.runtime.json",
     "start:runtime": "npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js",
+    "build:host-bridge": "tsc -p tsconfig.host-bridge.json",
     "build:electron-spike": "npm run build --prefix packages/fedos-desktop-electron-spike",
     "start:electron-spike": "npm run start --prefix packages/fedos-desktop-electron-spike",
     "package:electron-spike": "npm run package --prefix packages/fedos-desktop-electron-spike",
-    "test:electron-spike": "vitest run --config vitest.electron-spike.config.ts"
+    "test:electron-spike": "vitest run --config vitest.electron-spike.config.ts",
+    "start:electron-host-adapter": "npm run start:host-adapter --prefix packages/fedos-desktop-electron-spike"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",

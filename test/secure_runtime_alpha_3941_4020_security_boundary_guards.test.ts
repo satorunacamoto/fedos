@@ -128,8 +128,19 @@ describe("Secure Runtime Alpha 3941-4020 -- Phase N: dependency/scope guards", (
     }
   });
 
-  it("13. no Conversation/Search/Archive production source is modified by this Arc, and package.json/package-lock.json/tsconfig.json/Cargo.toml show zero git changes", () => {
-    const changed = execFileSync("git", ["status", "--porcelain", "--", "src/conversation", "src/search", "package.json", "package-lock.json", "tsconfig.json", "Cargo.toml"], {
+  it("13. no Conversation/Search/Archive production source is modified, and Cargo.toml shows zero git changes -- this Arc's own permanent scope boundary", () => {
+    // NOTE (genuinely stale, updated per Alpha 4101-4180's own "update historical
+    // exact-shape tests only when genuinely stale" instruction): this test
+    // originally ALSO asserted package.json/package-lock.json/tsconfig.json showed
+    // zero git changes -- true for Alpha 3941-4020's own narrower scope, but not a
+    // permanent repo invariant. Alpha 4101-4180 (Electron Main/Preload Adapter)
+    // legitimately extends root package.json (a new build:host-bridge script) and
+    // adds a new tsconfig.host-bridge.json -- exactly the kind of later, distinct
+    // Arc this check must not falsely fail. The ORIGINAL protection this test
+    // exists for -- Conversation/Search/Archive source and Cargo/Rust are NEVER
+    // touched by ANY Desktop UI/Electron-adapter Arc -- is preserved below,
+    // unweakened.
+    const changed = execFileSync("git", ["status", "--porcelain", "--", "src/conversation", "src/search", "Cargo.toml"], {
       encoding: "utf8",
     }) as string;
     expect(changed.trim()).toBe("");

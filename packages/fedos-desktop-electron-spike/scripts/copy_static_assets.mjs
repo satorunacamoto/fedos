@@ -16,3 +16,5 @@ const outDir = join(packageRoot, "dist");
 
 mkdirSync(outDir, { recursive: true });
 copyFileSync(join(srcDir, "fedos_electron_spike_page.html"), join(outDir, "fedos_electron_spike_page.html"));
+// Secure Runtime Alpha 4101-4180 -- the Host Adapter's own static page, additive.
+copyFileSync(join(srcDir, "fedos_electron_host_adapter_page.html"), join(outDir, "fedos_electron_host_adapter_page.html"));

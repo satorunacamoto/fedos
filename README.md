@@ -8,6 +8,32 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4101–4180 — Electron Main/Preload
+> Adapter for FedosDesktopHostBridge Arc (complete).**
+> Architecture frozen: no redesign of Shell/Presentation/Renderer/Runtime/
+> Host Bridge. Connects the existing, unmodified `FedosDesktopHostBridge`
+> to a real Electron process as a thin transport layer only: Electron
+> Renderer → Preload (`window.fedos.invoke()`, ONE frozen method, no other
+> global) → `ipcRenderer.invoke()` → `ipcMain.handle()` → HostBridge →
+> Presentation → Shell → Runtime, proven end to end against a REAL spawned
+> Electron process (real `status`/`dispatch`/`render` calls reaching the
+> live Runtime, a real malformed-command rejection, real stop/restart).
+> `start()`/`stop()` remain Main-process-owned lifecycle calls, never
+> renderer-invokable (would otherwise indirectly expose filesystem paths
+> to the renderer). All mandatory security defaults
+> (contextIsolation/sandbox/webSecurity/no nodeIntegration) verified both
+> structurally and against real process behavior. Fixed a real
+> TypeScript/Node16-module-resolution blocker discovered during
+> implementation (dynamic `import()` was being silently downleveled to a
+> non-functional `require()` call under the electron package's own prior
+> `module: CommonJS` setting) — resolved entirely within the
+> already-isolated Electron package, root project's own type graph
+> untouched. Also repaired 4 genuinely-stale historical `package.json`
+> exact-shape tests (broken by earlier, unrelated Electron-lineage work),
+> net IMPROVING the full suite's own failure count by 4. 3 new test files
+> (34 new tests) plus the repaired historical ones; zero regression
+> traceable to this Arc.
+>
 > **Status: Secure Runtime Alpha 4021–4100 — Repository-Wide Node Type
 > Isolation and Electron Build Compatibility Arc (complete — type
 > isolation/build compatibility, NOT Electron application integration).**

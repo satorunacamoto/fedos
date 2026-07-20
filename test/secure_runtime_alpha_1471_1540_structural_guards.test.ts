@@ -49,10 +49,25 @@ describe("Secure Runtime Alpha 1471-1540 -- Private Transport Structural Guards"
     expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
   });
 
-  it("4. package.json's own scripts are unchanged -- no new build/start entry point added by this arc", () => {
+  it("4. package.json's own scripts carry no entry point added by THIS arc -- genuinely stale otherwise (updated per later Arcs' own 'update historical exact-shape tests only when genuinely stale' instruction, e.g. Alpha 4101-4180): the Electron Build Spike/Node Type Isolation/Electron Host Adapter Arcs legitimately added their own entry points well after this arc's own scope closed.", () => {
     const parsed = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
     expect(Object.keys(parsed.scripts).sort()).toEqual(
-      ["build:runtime", "build:wasm", "start:runtime", "test", "test:watch", "typecheck"].sort(),
+      [
+        "build:electron-spike",
+        "build:host-bridge",
+        "build:runtime",
+        "build:wasm",
+        "package:electron-spike",
+        "start:electron-host-adapter",
+        "start:electron-spike",
+        "start:runtime",
+        "test",
+        "test:electron-spike",
+        "test:watch",
+        "typecheck",
+        "typecheck:core",
+        "typecheck:electron",
+      ].sort(),
     );
   });
 
