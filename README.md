@@ -8,6 +8,55 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3561–3640 — Desktop Electron Host Boundary
+> Arc (partial completion, honestly declared).**
+> Creates the first Desktop Host boundary around the completed Runtime →
+> Shell → ViewModels → Renderer stack. This repository has no accepted
+> Electron dependency (confirmed: zero references in `package.json`/
+> `package-lock.json`) — per this Arc's own instruction, Electron is NOT
+> added; instead the complete, framework-neutral host abstraction
+> (`FedosDesktopHostPort`, `src/desktop/host_boundary/fedos_desktop_host_port.ts`)
+> and its full in-process reference implementation
+> (`FedosDesktopHostBridge`) are built and fully tested, stopping exactly
+> at the external Electron dependency boundary. The Host owns
+> process/window lifecycle ONLY — exactly one Presentation Boundary (which
+> owns exactly one Shell, which owns exactly one Runtime) and exactly one
+> Renderer per `start()`, constructed once, stopped via the ONE real
+> `shell.stop()` call already needed. A closed, 14-command vocabulary
+> (`fedos_desktop_host_command.ts`) covers exactly what the real Shell/
+> ViewModel stack supports — two categories are deliberately EXCLUDED and
+> documented rather than faked: `archive-list`/`archive-verify` (no such
+> real Archive Runtime operation exists, Alpha 3081-3160's own finding)
+> and `archive-export`/`preflightRestore`/`restore` (need a raw filesystem
+> destination path this foundational Arc declines to expose without a real
+> path-authority/file-picker story). Every command is validated
+> structurally (type/shape/size-bounded, reusing
+> `FEDOS_CONVERSATION_DIRECT_MESSAGE_MAX_BODY_LENGTH`/
+> `FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES` verbatim) before it ever
+> reaches a ViewModel — an unknown command, wrong-shaped payload, or
+> path-traversal attempt all fail closed to `"unknown-command"`. `dispatch()`
+> returns the raw ViewModel action result, never a Renderer-shaped screen
+> model a second time -- Phase G's own explicit "action → state → render"
+> separation, avoiding duplicating what the Renderer layer already owns;
+> `render()` is the separate, on-demand, side-effect-free full-screen
+> snapshot. Every response is a closed, `Object.freeze`d, JSON-safe
+> `FedosDesktopHostResponse<T>` -- no raw Error, no persistence record, no
+> secret, ever (confirmed by a dedicated full-session leakage test).
+> Concurrent `dispatch()` calls are serialized through one internal
+> Promise queue (confirmed by a real 5-way-concurrent-creation test with
+> zero corruption). 17 new real tests against the real
+> Host/Runtime/Shell/ViewModel/Renderer stack, covering every required
+> scenario except the Electron-specific ones (which do not apply). One
+> real, honest discovery along the way: `conversations-list` is a
+> SESSION-scoped in-memory registry, not a durable enumeration (Alpha
+> 2841-2920's own already-documented, unchanged behavior) — a restart-recovery
+> test therefore verifies via `conversation-open` (a real durable read),
+> not `conversations-list`. Baseline/final: typecheck clean except the one
+> already-documented pre-existing failure; full suite's failure count and
+> file set unchanged from Alpha 3401-3480's own baseline. See
+> `docs/secure_runtime_alpha_3561_3640_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_3561_3640_completion_declaration.md`.
+>
 > **Status: Secure Runtime Alpha 3401–3480 — Desktop UI Renderer Boundary
 > (complete).**
 > Implements the rendering boundary only, over the ten ViewModels Alpha
