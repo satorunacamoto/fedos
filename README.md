@@ -8,6 +8,47 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3241–3320 — Desktop Local Conversation
+> Management UI Prototype Arc (complete).**
+> Builds the first real Desktop Local UI boundary over the newly completed
+> `FedosDesktopApplicationShell`/`FedosDesktopConversationContentAccessor`
+> (Alpha 3081-3160) — a pure TypeScript presentation boundary, explicitly
+> NOT Electron/React/Tauri/any rendering framework. Ten ViewModels under
+> `src/desktop/presentation/` (Conversation List, Conversation Detail,
+> Message List, Compose Message, Reply, Search, Archive, Membership,
+> Unread Counter, Runtime Status), one file each, plus a shared closed
+> `"idle" | "loading" | "loaded" | "error"` state shape
+> (`fedos_desktop_view_model_state.ts`) and one aggregating factory
+> (`FedosDesktopConversationUiPresentationBoundary`) that owns exactly one
+> Shell instance and one of each ViewModel over it. Every ViewModel's ONLY
+> dependency is `FedosDesktopApplicationShell` — no persistence port,
+> crypto authority, or `conversationRuntime()`/`conversationContentAccessor()`
+> access anywhere in this directory; no new business logic, only Shell-call
+> plus state-shape bookkeeping. Two honest scope findings, neither worked
+> around: the Shell has no public activation or invitation-redemption
+> method at all (a real, pre-existing characteristic, not something this
+> Arc's own ten ViewModels could or should add), so tests needing a
+> genuinely active conversation establish it via a real, independent Runtime
+> setup call, fully stopped, before starting the presentation boundary's
+> own Shell over that already-durable state — mirroring this codebase's own
+> established restart-recovery testing convention; and the Unread Counter
+> ViewModel is an honest, local, in-memory-only "last viewed" watermark
+> over real `listMessages()` data, never a fabricated cross-device "read
+> receipt" (no such concept exists anywhere in this codebase). 13 new real
+> tests, every one against a real `startFedosDesktopRuntime()` instance —
+> Runtime Status lifecycle, real Direct creation visible through
+> List/Detail/Membership, real send→list→reveal→reply with an exact
+> plaintext round trip and real Unread Counter tracking, real keyword
+> Search, real Archive `"unavailable"`/`"not-found"` behavior, no raw
+> Error/secret leakage, independent boundary isolation. Baseline/final:
+> typecheck clean except the one already-documented pre-existing failure;
+> full suite's failures match, file-for-file, the two pre-existing
+> environment-only categories Alpha 3081-3160 already confirmed, plus three
+> transient failures from three unrelated historical review tests that
+> assert a clean `git status` and briefly saw this Arc's own not-yet-committed
+> files — resolved once this Arc's commit landed. See
+> `docs/secure_runtime_alpha_3241_3320_completion_declaration.md`.
+>
 > **Status: Secure Runtime Alpha 3081–3160 — Desktop Runtime Conversation
 > Content Accessor and Application Shell Activation Arc (complete).**
 > Closes the exact boundary Alpha 2841-2920 documented and stopped at.

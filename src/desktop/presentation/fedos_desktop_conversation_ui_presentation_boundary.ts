@@ -1,0 +1,75 @@
+/**
+ * Secure Runtime Alpha 3241-3320 ("Desktop Local Conversation Management UI
+ * Prototype Arc") — the named top-level deliverable.
+ *
+ * `FedosDesktopConversationUiPresentationBoundary` is a pure TypeScript
+ * presentation boundary a future UI (of ANY kind -- CLI, Electron, a native
+ * shell, a test harness) consumes instead of constructing the ten
+ * ViewModels in this directory by hand. It owns exactly one
+ * `FedosDesktopApplicationShell` instance and constructs exactly one of
+ * each ViewModel over it — never a second, divergent Shell.
+ *
+ * HARD GUARDRAILS (this Arc's own, restated from the ten ViewModel files
+ * this class composes):
+ *   - No persistence, no crypto, no transport of any kind lives here or in
+ *     any file under `src/desktop/presentation/` — every fact and every
+ *     mutation is delegated to `FedosDesktopApplicationShell`.
+ *   - No rendering framework (Electron/React/Vue/Svelte/Tauri), no HTML, no
+ *     CSS, no browser global.
+ *   - No duplicate business logic — every ViewModel method is a thin call
+ *     into the Shell plus state-shape bookkeeping.
+ */
+
+import { createFedosDesktopApplicationShell, type FedosDesktopApplicationShell } from "../shell/fedos_desktop_application_shell.js";
+import { FedosDesktopConversationListViewModel } from "./fedos_desktop_conversation_list_view_model.js";
+import { FedosDesktopConversationDetailViewModel } from "./fedos_desktop_conversation_detail_view_model.js";
+import { FedosDesktopMessageListViewModel } from "./fedos_desktop_message_list_view_model.js";
+import { FedosDesktopComposeMessageViewModel } from "./fedos_desktop_compose_message_view_model.js";
+import { FedosDesktopReplyViewModel } from "./fedos_desktop_reply_view_model.js";
+import { FedosDesktopSearchViewModel } from "./fedos_desktop_search_view_model.js";
+import { FedosDesktopArchiveViewModel } from "./fedos_desktop_archive_view_model.js";
+import { FedosDesktopMembershipViewModel } from "./fedos_desktop_membership_view_model.js";
+import { FedosDesktopUnreadCounterViewModel } from "./fedos_desktop_unread_counter_view_model.js";
+import { FedosDesktopRuntimeStatusViewModel } from "./fedos_desktop_runtime_status_view_model.js";
+
+export class FedosDesktopConversationUiPresentationBoundary {
+  readonly #shell: FedosDesktopApplicationShell;
+  readonly conversationList: FedosDesktopConversationListViewModel;
+  readonly conversationDetail: FedosDesktopConversationDetailViewModel;
+  readonly messageList: FedosDesktopMessageListViewModel;
+  readonly composeMessage: FedosDesktopComposeMessageViewModel;
+  readonly reply: FedosDesktopReplyViewModel;
+  readonly search: FedosDesktopSearchViewModel;
+  readonly archive: FedosDesktopArchiveViewModel;
+  readonly membership: FedosDesktopMembershipViewModel;
+  readonly unreadCounter: FedosDesktopUnreadCounterViewModel;
+  readonly runtimeStatus: FedosDesktopRuntimeStatusViewModel;
+
+  private constructor(shell: FedosDesktopApplicationShell) {
+    this.#shell = shell;
+    this.conversationList = new FedosDesktopConversationListViewModel(shell);
+    this.conversationDetail = new FedosDesktopConversationDetailViewModel(shell);
+    this.messageList = new FedosDesktopMessageListViewModel(shell);
+    this.composeMessage = new FedosDesktopComposeMessageViewModel(shell);
+    this.reply = new FedosDesktopReplyViewModel(shell);
+    this.search = new FedosDesktopSearchViewModel(shell);
+    this.archive = new FedosDesktopArchiveViewModel(shell);
+    this.membership = new FedosDesktopMembershipViewModel(shell);
+    this.unreadCounter = new FedosDesktopUnreadCounterViewModel(shell);
+    this.runtimeStatus = new FedosDesktopRuntimeStatusViewModel(shell);
+  }
+
+  /** Thin factory — mirrors `createFedosDesktopApplicationShell()`'s own style. No side effect (no Runtime started) until `runtimeStatus.start()` is called. */
+  static create(): FedosDesktopConversationUiPresentationBoundary {
+    return new FedosDesktopConversationUiPresentationBoundary(createFedosDesktopApplicationShell());
+  }
+
+  /** Never exposed to a future UI beyond this file's own constructor use -- present only so tests can assert every ViewModel shares the identical Shell instance. */
+  get shell(): FedosDesktopApplicationShell {
+    return this.#shell;
+  }
+}
+
+export function createFedosDesktopConversationUiPresentationBoundary(): FedosDesktopConversationUiPresentationBoundary {
+  return FedosDesktopConversationUiPresentationBoundary.create();
+}
