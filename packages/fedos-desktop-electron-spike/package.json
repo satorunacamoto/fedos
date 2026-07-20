@@ -14,6 +14,7 @@
     "start:host-adapter": "npm run build:host-bridge --prefix ../.. && npm run build && electron dist/fedos_electron_host_adapter_main.cjs",
     "start:navigation": "npm run build:runtime --prefix ../.. && npm run build && electron dist/fedos_electron_navigation_main.cjs",
     "start:notifications-tray": "npm run build:runtime --prefix ../.. && npm run build && electron dist/fedos_electron_notifications_tray_main.cjs",
+    "start:badge": "npm run build:runtime --prefix ../.. && npm run build && electron dist/fedos_electron_badge_main.cjs",
     "package": "npm run build && node scripts/run_electron_builder_package.mjs"
   }
 }

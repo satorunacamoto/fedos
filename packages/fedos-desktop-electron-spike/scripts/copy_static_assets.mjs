@@ -1,4 +1,4 @@
-// Secure Runtime Alpha 3881-3940/4021-4100/4181-4260/4261-4340 -- build-support only.
+// Secure Runtime Alpha 3881-3940/4021-4100/4181-4260/4261-4340/4341-4420 -- build-support only.
 //
 // `tsc` compiles ONLY the `.cts`/`.ts` sources in `src/`; static HTML pages
 // are not TypeScript and are never compiled -- this script copies each one
@@ -22,3 +22,5 @@ copyFileSync(join(srcDir, "fedos_electron_host_adapter_page.html"), join(outDir,
 copyFileSync(join(srcDir, "fedos_electron_navigation_page.html"), join(outDir, "fedos_electron_navigation_page.html"));
 // Secure Runtime Alpha 4261-4340 -- the Notifications/Tray/Background Arc's own status page.
 copyFileSync(join(srcDir, "fedos_electron_notifications_tray_page.html"), join(outDir, "fedos_electron_notifications_tray_page.html"));
+// Secure Runtime Alpha 4341-4420 -- the Unread Badge/Menu Bar Count Arc's own status page.
+copyFileSync(join(srcDir, "fedos_electron_badge_page.html"), join(outDir, "fedos_electron_badge_page.html"));

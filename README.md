@@ -8,6 +8,33 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4341–4420 — Desktop Unread Badge and Menu
+> Bar Count Integration Arc (complete).**
+> Architecture frozen: no persistence changes, no Runtime/Search/Conversation
+> redesign. Reuses the existing `FedosDesktopUnreadCounterViewModel` (Alpha
+> 3241-3320) verbatim — never computes unread independently. Adds one new,
+> additive boundary: a closed, five-state Desktop Badge boundary
+> (`src/desktop/badge/`, `FedosDesktopBadgePort`/`FedosDesktopBadgeCoordinator`
+> — `none`/`count`/`attention`/`synchronizing`/`error`), aggregating real
+> per-conversation unread counts over
+> `FedosDesktopConversationWindowRegistry.recentConversationIds` (a real,
+> disclosed Phase A design finding: `FedosDesktopConversationListViewModel`
+> was tried first and found to never rediscover a conversation activated by
+> a different Shell/runtime instance — the Registry's own persisted list,
+> already reused by `TrayCoordinator`, does not have that gap). A new,
+> additive Electron adapter
+> (`packages/fedos-desktop-electron-spike/src/fedos_electron_badge_*`) wires
+> this to real Electron `app.dock`/`app.setBadgeCount`/
+> `BrowserWindow.setOverlayIcon` APIs, plus the SAME, already-existing
+> `FedosElectronTrayAdapter` instance (tooltip + menu label suffix) — no
+> duplicate Tray, Electron hosts UI only. Real Electron subprocess
+> acceptance tests, including a main-process self-test sequence
+> (`FEDOS_ELECTRON_BADGE_AUTOTEST=1`) exercising all 8 named Phase G
+> scenarios against real objects, plus a genuine two-process restart test.
+> 3 new root source files, 8 new Electron files, 1 new root test file (11
+> tests) plus 1 new real Electron acceptance suite (15 tests); zero
+> regression traceable to this Arc.
+>
 > **Status: Secure Runtime Alpha 4261–4340 — Desktop Notifications, System
 > Tray, and Background Operation Arc (complete).**
 > Architecture frozen: no redesign of Runtime/Shell/Presentation/Renderer/

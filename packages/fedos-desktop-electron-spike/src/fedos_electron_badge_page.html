@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>FedOS Desktop Unread Badge</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 12px; }
+  #toolbar button { margin-right: 6px; }
+  #badge-view, #status-view { white-space: pre-wrap; margin-top: 12px; border: 1px solid #ccc; padding: 8px; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button id="refresh-badge-btn" data-testid="refresh-badge-btn">Refresh Badge</button>
+  <button id="new-window-btn" data-testid="new-window-btn">New Window</button>
+  <button id="close-window-btn" data-testid="close-window-btn">Close Window</button>
+</div>
+<h1>FedOS Unread Badge</h1>
+<pre id="badge-view" data-testid="badge-view"></pre>
+<h1>FedOS Background Status</h1>
+<pre id="status-view" data-testid="status-view"></pre>
+<script src="fedos_electron_badge_renderer.js"></script>
+</body>
+</html>

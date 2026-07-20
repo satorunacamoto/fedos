@@ -11,6 +11,7 @@
     "src/desktop/notification/fedos_desktop_notification_coordinator.ts",
     "src/desktop/tray/fedos_desktop_tray_coordinator.ts",
     "src/desktop/background/fedos_desktop_background_lifecycle_coordinator.ts",
-    "src/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.ts"
+    "src/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.ts",
+    "src/desktop/badge/fedos_desktop_badge_coordinator.ts"
   ]
 }
