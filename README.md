@@ -8,6 +8,38 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4421–4500 — Desktop Device Sync Badge,
+> Notification, and Operational Event Wiring Arc (complete).**
+> Architecture frozen: no Runtime/Scheduler redesign, no Sync protocol or
+> Transport changes, no new persistence, no new crypto. Connects the real
+> `FedosDeviceSyncScheduler` (Alpha 3721-3800) to the Desktop Notification/
+> Tray/Badge boundaries (Alpha 4261-4420) for the first time. New, additive
+> `src/device/sync_events/` (`FedosDeviceSyncEventBridge`) translates real
+> Scheduler attempt activity into a closed nine-kind event vocabulary
+> (`sync-started`/`sync-progress`/`sync-completed`/`sync-failed`/
+> `conflict-detected`/`retry-scheduled`/`retry-aborted`/`device-offline`/
+> `device-online`) — a real Phase A finding drove the integration
+> technique: the Scheduler has no event emitter anywhere in its own file,
+> so the Bridge wraps the ONE real extension seam it does expose, the
+> injected `attemptFn` boundary, rather than monkey-patching the instance.
+> A new `FedosDesktopDeviceSyncPresentationWiring`
+> (`src/desktop/runtime/`) routes those events into the three existing
+> Coordinators through their real, narrow, already-existing public
+> surfaces only — reusing the three existing `"device-sync"`/
+> `"sync-complete"`/`"sync-failed"` notification kinds (never inventing a
+> fourth), reducing a closed five-value tray status list to
+> `FedosDesktopTrayPort.setTooltip()`, and calling only the Badge
+> Coordinator's own two real control surfaces,
+> `setSynchronizing()`/`refresh()` (a disclosed, verified-against-real-
+> source correction of the brief's own wording, which named three
+> nonexistent Coordinator methods). 2 new root source files, 2 new root
+> test files (21 tests, real Runtime/Scheduler/Coordinators, no mocks);
+> zero regression traceable to this Arc (full Electron subprocess suite
+> unchanged at 99/103; full root suite delta is exactly this Arc's own +2
+> files/+21 tests, 0 change to the pre-existing failure baseline).
+> Electron main-process wiring itself is named as the recommended next
+> Arc, disclosed honestly as a scope boundary of time, not feasibility.
+>
 > **Status: Secure Runtime Alpha 4341–4420 — Desktop Unread Badge and Menu
 > Bar Count Integration Arc (complete).**
 > Architecture frozen: no persistence changes, no Runtime/Search/Conversation
