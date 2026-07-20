@@ -8,6 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4501–4580 — Desktop Device Sync Electron
+> Main Integration Arc (complete).**
+> Architecture frozen: no Runtime/Scheduler/Notification/Tray/Badge/Electron
+> redesign. Completes the final Electron integration for Alpha 4421-4500's
+> Device Sync Presentation Wiring, extending
+> `fedos_electron_badge_main.cts` (Package F, Alpha 4341-4420) **in
+> place** — verified, by reading all five Electron main files' own
+> headers, as the ONE process that already owns
+> `FedosDesktopNotificationCoordinator`/`TrayCoordinator`/
+> `FedosDesktopBadgeCoordinator` together, so this is the only place
+> attaching Device Sync routing does not duplicate ownership. Constructs
+> exactly one `FedosDeviceSyncEventBridge`/`FedosDesktopDeviceSyncPresentationWiring`
+> (both UNMODIFIED) per real startup, threads
+> `eventBridge.wrapAttemptFn()` into the real `startFedosDesktopRuntime()`
+> config (`deviceTrustEnabled`/`deviceSyncSchedulerEnabled` turned on for
+> the first time in this file's own history — the real, previously-inert
+> Tray `"pause-sync"`/`"resume-sync"` actions are now genuinely
+> functional, with zero changes to `TrayCoordinator`), and destroys both
+> idempotently on shutdown. New idempotent-startup/idempotent-shutdown
+> guards, proven via real object-identity comparison and a real count of
+> `"shutdown clean"` occurrences across two deliberate calls in a real
+> spawned process. Honest, disclosed Phase A finding: Shell/Boundary
+> expose Device Sync OPERATIONAL commands only, never a device
+> REGISTRATION surface, and the Sync Journal has no durable-path config
+> anywhere in this codebase — so this real process's own real Scheduler
+> can never have a real, trusted, in-range target device today; the new
+> Device Sync self-test proves the real, live Notification/Badge/Tray
+> Coordinators still correctly receive and process events by driving
+> `wiring.handleEvent()` directly with hand-built, schema-valid events —
+> the identical method a genuine Scheduler-sourced event takes. 1 file
+> modified in place, 2 new files (a selftest module, an acceptance test),
+> zero new IPC channels; real Electron subprocess suite 108/4/0 (was
+> 99/4/0 — this Arc's own +9 tests, +0 regressions); full root suite
+> byte-for-byte unchanged at 1013 files/810 passed/203 failed, 13269
+> tests/13009 passed/260 failed (this Arc adds no root `test/` file).
+> Recommended next Arc: a Device Sync Registration and Pairing Arc to
+> close the one remaining gap this Arc's own Phase A finding surfaced.
+>
 > **Status: Secure Runtime Alpha 4421–4500 — Desktop Device Sync Badge,
 > Notification, and Operational Event Wiring Arc (complete).**
 > Architecture frozen: no Runtime/Scheduler redesign, no Sync protocol or
