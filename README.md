@@ -8,6 +8,63 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3641–3720 — Relay-Assisted Device
+> Synchronization Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, Registration
+> Authority, Device Trust, Device Sync Runtime, Sync Session/Package,
+> the Encrypted Device-to-Device Local Transfer protocol, the Sync
+> Journal/Cursor/Allowlist, or the existing `FedosRelay`/
+> `FedosConversationRelaySet`/private transport (all unmodified); no
+> Sender-Key change (this checkout has no Sender-Key secret persistence
+> code at all), no Conversation Runtime/Archive/Search change; no new
+> dependency, no Rust change, `p2p/`/`.tmp_gen` untouched. Extends the
+> proven local Encrypted Device Transfer protocol (Alpha 3481–3560)
+> over an untrusted, store-and-forward Relay boundary — the Relay is a
+> mailbox and transport only, never an identity/trust/decryption
+> authority. Route Decision: NIP-17 Gift Wrap is genuinely absent from
+> this checkout's history (confirmed, not an ancestor of this Arc's own
+> base) and the existing proprietary private-transport route is
+> hard-bound to Direct-mode Conversation membership — a structural
+> mismatch for Device pairing — so this Arc freezes a NEW, dedicated,
+> honestly-labeled proprietary route (kind:1, `["fedos-device-sync","1"]`,
+> route version 1, no NIP compliance claimed), built entirely from
+> ALREADY-REAL primitives (`FedosRelay`/`FedosConversationRelaySet`,
+> the existing kind-1-only `FedosNostrSigningAuthority`). A real
+> `FedosDeviceRelaySyncOutboundCoordinator`/`FedosDeviceRelaySyncInboundHandler`
+> pair carries the EXISTING, unmodified `FedosDeviceTransferPackageV1`
+> across the Relay: outer BIP-340 Schnorr signature re-verification
+> (reusing the existing `NobleSignatureVerifier`) catches any tamper to
+> the routing facts; an outer content-hash gate catches any tamper to,
+> or substitution of, the package itself, BEFORE decryption is ever
+> attempted; the inner package's own mutual device authentication and
+> tamper detection (Alpha 3481–3560, unmodified) runs unchanged.
+> Two-layer durable dedup (outer Relay event id, then
+> transferSessionId+package hash) makes duplicate delivery across
+> multiple Relays and across a simulated process restart import
+> exactly once — proven with a real, functional in-process Relay
+> fixture that actually stores and delivers messages (unlike the
+> existing bookkeeping-only `NullRelay`), including target-offline-
+> then-later-receive. Device revocation fails closed at every point
+> tested (before publish, after publish but before import); Relay
+> acceptance and Device import are tracked as two permanently distinct
+> facts (`"relay-accepted"` vs. `"imported"`) via a new, small,
+> 9-state Observation vocabulary, never collapsed. The existing Sync
+> record allowlist is reused unmodified and directly re-tested against
+> Master Seed/private-key/Sender-Key-secret/passphrase/plaintext
+> shapes; the one genuine, narrow addition this Arc makes is an
+> explicit oversized-payload resource limit (256 KiB), checked before
+> JSON parsing. Three new test files, 50 tests, real Schnorr signatures
+> + real AEAD wiring + a real functional Relay fixture throughout —
+> including two genuine off-by-one field-count bugs (the same class
+> this repo's history already recorded finding twice before) caught by
+> the first real end-to-end test run and fixed in this same commit.
+> See `docs/secure_runtime_alpha_3641_3720_execution_spec.md` and
+> `docs/secure_runtime_alpha_3641_3720_completion_declaration.md`.
+> Recommended next Arc: **Background Device Sync Scheduling and
+> Conflict Resolution**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3481–3560 — Encrypted
 > Device-to-Device Local Transfer Arc (complete).**
 > Architecture frozen: no redesign of the Device Registry, the
