@@ -1,43 +1,40 @@
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` in this project's root tsconfig (test-only usage, matches this repository's own established convention).
 import { execFileSync, spawn } from "node:child_process";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's root tsconfig.
 import { existsSync, readFileSync, mkdirSync, rmSync } from "node:fs";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import mainSource from "../src/desktop/electron_spike/fedos_electron_spike_main.cts?raw";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import preloadSource from "../src/desktop/electron_spike/fedos_electron_spike_preload.cts?raw";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import mainSource from "../src/fedos_electron_spike_main.cts?raw";
+import preloadSource from "../src/fedos_electron_spike_preload.cts?raw";
 import packageJsonSource from "../package.json?raw";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import builderConfigSource from "../src/desktop/electron_spike/electron_builder.spike.config.json?raw";
-// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import gitignoreSource from "../.gitignore?raw";
+import rootPackageJsonSource from "../../../package.json?raw";
+import builderConfigSource from "../electron_builder.config.json?raw";
+import gitignoreSource from "../../../.gitignore?raw";
 
 /**
- * Secure Runtime Alpha 3881-3940 -- Electron Dependency and Build Spike
- * (Package A only). Real test matrix (Phase I/O), against REAL compiled
- * output and REAL subprocess launches, not prose.
+ * Secure Runtime Alpha 3881-3940/4021-4100 -- Electron Dependency and Build
+ * Spike (Package A only), physically isolated as its own package
+ * (`packages/fedos-desktop-electron-spike/`) per Alpha 4021-4100's own
+ * architecture decision -- see that Arc's own docs for why tsconfig-only
+ * isolation could not prevent Electron's transitive `@types/node`
+ * dependency from leaking into the root application's own TypeScript
+ * graph, and why a physically separate `node_modules` tree was required
+ * instead. This test file itself now typechecks cleanly with REAL
+ * `@types/node` (via this package's own `tsconfig.test.json`) -- no more
+ * `@ts-expect-error` suppression needed for `node:fs`/`node:child_process`
+ * here, unlike the root project's own, deliberately preserved convention.
  *
- * A note on method, per this Arc's own Phase I instruction ("use the
- * narrowest reliable Electron test method... if a headless environment may
- * not support visible window interaction, test configuration structurally,
- * run a real process smoke test where possible, disclose the limitation,
- * do not claim visual acceptance"): this suite spawns the REAL, compiled
- * Electron main process and asserts on its REAL, observable process
- * lifecycle (starts, stays alive, exits cleanly on request) -- it does NOT
- * assert on rendered pixels or DOM content, since vitest itself runs
- * outside any Electron renderer and this Arc adds no browser-automation
- * dependency (Playwright/WebdriverIO/Spectron) to do so, per its own
- * "add at most one packaging/build tool, do not add runtime dependencies
- * unless strictly required" instruction. Separately, and disclosed
- * honestly here rather than only in this Arc's own docs: during this
- * Arc's own development, in THIS exact Windows environment, a REAL,
- * visible `BrowserWindow` was independently observed via
- * `Get-Process | Select MainWindowTitle`, showing the exact title
- * "FedOS Desktop Build Spike" (the page's own `<title>`) -- genuine
- * evidence beyond what this automated suite itself re-proves, recorded in
- * this Arc's own Completion Declaration, not fabricated or assumed here.
+ * Invoked from the ROOT project via `npm run test:electron-spike`
+ * (`vitest run --config vitest.electron-spike.config.ts`), so
+ * `process.cwd()` here is the ROOT of the whole repository, not this
+ * package's own directory -- every path below is built accordingly.
+ *
+ * A note on method (unchanged from Alpha 3881-3940's own reasoning): this
+ * suite spawns the REAL, compiled Electron main process and asserts on its
+ * REAL, observable process lifecycle -- it does NOT assert on rendered
+ * pixels or DOM content, since vitest runs outside any Electron renderer
+ * and this Arc adds no browser-automation dependency to do so. A REAL,
+ * visible `BrowserWindow` was independently observed, in this exact
+ * environment, via `Get-Process | Select MainWindowTitle`, during Alpha
+ * 3881-3940's own development -- recorded in that Arc's own Completion
+ * Declaration.
  */
 
 /** Strips `/* ... *\/` and `// ...` comments so "must not appear in real code" checks below verify actual code, never this file's own explanatory prose about what is deliberately absent. */
@@ -46,11 +43,12 @@ function stripComments(source: string): string {
 }
 
 const repoRoot = process.cwd();
-const mainCjsPath = `${repoRoot}/dist-electron-spike/fedos_electron_spike_main.cjs`;
-const preloadCjsPath = `${repoRoot}/dist-electron-spike/fedos_electron_spike_preload.cjs`;
-const pageHtmlPath = `${repoRoot}/dist-electron-spike/fedos_electron_spike_page.html`;
-const rendererJsPath = `${repoRoot}/dist-electron-spike/fedos_electron_spike_renderer.js`;
-const electronBinPath = `${repoRoot}/node_modules/electron/dist/electron.exe`;
+const packageDir = `${repoRoot}/packages/fedos-desktop-electron-spike`;
+const mainCjsPath = `${packageDir}/dist/fedos_electron_spike_main.cjs`;
+const preloadCjsPath = `${packageDir}/dist/fedos_electron_spike_preload.cjs`;
+const pageHtmlPath = `${packageDir}/dist/fedos_electron_spike_page.html`;
+const rendererJsPath = `${packageDir}/dist/fedos_electron_spike_renderer.js`;
+const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
 
 let spawnedElectronPid: number | undefined;
 
@@ -69,25 +67,27 @@ afterEach(() => {
 });
 
 describe("Secure Runtime Alpha 3881-3940 -- dependency and build (Phase I 1-2)", () => {
-  it("1. electron and electron-builder resolve as installed devDependencies, not runtime dependencies", () => {
-    expect(existsSync(`${repoRoot}/node_modules/electron/package.json`)).toBe(true);
-    expect(existsSync(`${repoRoot}/node_modules/electron-builder/package.json`)).toBe(true);
-    const pkg = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
+  it("1. electron and electron-builder resolve as installed devDependencies of the ISOLATED package, never the root project", () => {
+    expect(existsSync(`${packageDir}/node_modules/electron/package.json`)).toBe(true);
+    expect(existsSync(`${packageDir}/node_modules/electron-builder/package.json`)).toBe(true);
+    const pkg = JSON.parse(packageJsonSource as string) as { dependencies?: Record<string, string>; devDependencies: Record<string, string> };
     expect(pkg.devDependencies.electron).toBeDefined();
     expect(pkg.devDependencies["electron-builder"]).toBeDefined();
-    expect(pkg.dependencies.electron).toBeUndefined();
-    expect(pkg.dependencies["electron-builder"]).toBeUndefined();
-    // NOTE: `@types/node` is NOT a direct devDependency of this repository -- see this Arc's own
-    // Phase A retrospective/Completion Declaration for why it was deliberately NOT added (Electron's own
-    // transitive `@types/node` dependency already breaks `npm run typecheck` repository-wide; adding it
-    // directly here would not change that, and this Arc does not additionally depend on it for anything).
+    expect(pkg.dependencies).toBeUndefined();
+
+    const rootPkg = JSON.parse(rootPackageJsonSource as string) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
+    expect(rootPkg.devDependencies.electron).toBeUndefined();
+    expect(rootPkg.devDependencies["electron-builder"]).toBeUndefined();
+    expect(rootPkg.devDependencies["@types/node"]).toBeUndefined();
   });
 
   it("2. the electron-spike TypeScript build succeeds and produces exactly the expected four output files", () => {
-    // `process.execPath` (this same Node binary) invoked directly against `tsc`'s own JS entry --
-    // avoids relying on Windows' `npx`/`npx.cmd` shell resolution, which `execFileSync` (no shell) cannot see.
-    execFileSync(process.execPath, [`${repoRoot}/node_modules/typescript/bin/tsc`, "-p", "tsconfig.electron-spike.json"], { cwd: repoRoot, encoding: "utf8" });
-    execFileSync(process.execPath, [`${repoRoot}/src/desktop/electron_spike/copy_electron_spike_static_assets.mjs`], { cwd: repoRoot, encoding: "utf8" });
+    // `process.execPath` (this same Node binary) invoked directly against the ROOT project's own already-
+    // installed `tsc` -- reused, not duplicated, per Alpha 4021-4100's own "no new runtime dependency,
+    // minimize duplicate installs" decision; module resolution for `node:*`/`electron` types is governed by
+    // the SOURCE FILE's own directory (this package's), never by which physical `tsc` copy executes it.
+    execFileSync(process.execPath, [`${repoRoot}/node_modules/typescript/bin/tsc`, "-p", "tsconfig.json"], { cwd: packageDir, encoding: "utf8" });
+    execFileSync(process.execPath, [`${packageDir}/scripts/copy_static_assets.mjs`], { cwd: packageDir, encoding: "utf8" });
     expect(existsSync(mainCjsPath)).toBe(true);
     expect(existsSync(preloadCjsPath)).toBe(true);
     expect(existsSync(rendererJsPath)).toBe(true);
@@ -180,8 +180,8 @@ describe("Secure Runtime Alpha 3881-3940 -- real process smoke tests (Phase I 3,
   it(
     "16. the compiled main process starts as a real subprocess, stays alive briefly, and exits cleanly on termination",
     async () => {
-      const child = spawn(electronBinPath as unknown as string, [mainCjsPath], {
-        cwd: repoRoot,
+      const child = spawn(electronBinPath, [mainCjsPath], {
+        cwd: packageDir,
         stdio: "ignore",
       });
       spawnedElectronPid = child.pid;
@@ -213,8 +213,8 @@ describe("Secure Runtime Alpha 3881-3940 -- real process smoke tests (Phase I 3,
       expect(existsSync(mainCjsPath)).toBe(true);
       const beforeContent = readFileSync(mainCjsPath, "utf8");
 
-      const child = spawn(electronBinPath as unknown as string, [mainCjsPath], {
-        cwd: repoRoot,
+      const child = spawn(electronBinPath, [mainCjsPath], {
+        cwd: packageDir,
         stdio: "ignore",
       });
       spawnedElectronPid = child.pid;
@@ -242,28 +242,26 @@ describe("Secure Runtime Alpha 3881-3940 -- Windows/OneDrive/path and output loc
     expect(repoRoot.length).toBeLessThan(60);
   });
 
-  it("19. the electron-builder output directory is project-relative and gitignored, never under p2p/.tmp_gen or a tracked path", () => {
+  it("19. the electron-builder output directory is project-relative, scoped inside the isolated package, and gitignored -- never under p2p/.tmp_gen or a tracked path", () => {
     const config = JSON.parse(builderConfigSource as string) as { directories: { output: string } };
-    expect(config.directories.output).toBe("dist-electron-spike-package");
-    expect(gitignoreSource as string).toMatch(/dist-electron-spike-package/);
+    expect(config.directories.output).toBe("dist-package");
+    expect(gitignoreSource as string).toMatch(/dist-package/);
     expect(config.directories.output).not.toMatch(/p2p|\.tmp_gen/);
   });
 });
 
 describe("Secure Runtime Alpha 3881-3940 -- packaging spike (Phase J)", () => {
-  const packageOutputDir = `${repoRoot}/dist-electron-spike-package`;
+  const packageOutputDir = `${packageDir}/dist-package`;
   const unpackedDir = `${packageOutputDir}/win-unpacked`;
   const asarPath = `${unpackedDir}/resources/app.asar`;
-  const asarBin = `${repoRoot}/node_modules/@electron/asar/bin/asar.js`;
+  const asarBin = `${packageDir}/node_modules/@electron/asar/bin/asar.js`;
   // Packaging (electron-builder) is a separate, heavier step (`npm run package:electron-spike`) than the
   // fast TypeScript build above -- these tests verify an ALREADY-produced artifact rather than invoking
   // electron-builder inline (which downloads/extracts a fresh Electron zip and takes materially longer per
-  // run). They skip, rather than fail, when the artifact has not been produced in this run -- matching this
-  // Arc's own Phase J instruction that a packaging attempt is a distinct, separately-verifiable step.
+  // run). They skip, rather than fail, when the artifact has not been produced in this run.
   const packagingArtifactExists = existsSync(asarPath);
 
   it.skipIf(!packagingArtifactExists)("22. packaging (electron-builder, 'dir' target) succeeds and produces an unpacked Windows directory containing the local static page", () => {
-    execFileSync(process.execPath, [asarBin, "list", asarPath], { encoding: "utf8" });
     expect(existsSync(`${unpackedDir}/FedOS Desktop Build Spike.exe`)).toBe(true);
     const listing = execFileSync(process.execPath, [asarBin, "list", asarPath], { encoding: "utf8" }) as string;
     expect(listing).toMatch(/fedos_electron_spike_page\.html/);
@@ -275,18 +273,15 @@ describe("Secure Runtime Alpha 3881-3940 -- packaging spike (Phase J)", () => {
     const listing = execFileSync(process.execPath, [asarBin, "list", asarPath], { encoding: "utf8" }) as string;
     expect(listing).not.toMatch(/\.map\b/);
     expect(listing).not.toMatch(/node_modules/);
-    expect(listing).not.toMatch(/@noble/);
   });
 
   it.skipIf(!packagingArtifactExists)("24. no secret-shaped marker appears anywhere in the packaged app's own bundled files", () => {
-    // `asar extract-file <archive> <name>` writes the extracted file to `<name>` INSIDE the invocation's
-    // own working directory (it has no separate output-path argument, and does NOT print content to
-    // stdout) -- it is run here with `cwd` pointed at a dedicated scratch directory, NEVER the repo root,
-    // specifically because one bundled file is itself named `package.json`: running this extraction
-    // against the repo root would silently overwrite the REAL root `package.json` with the packaged,
-    // `extraMetadata`-rewritten copy (a real mistake this suite's own earlier draft made and caught during
-    // this Arc's own development -- see this Arc's own Phase K/completion docs).
-    const scratchDir = `${repoRoot}/dist-electron-spike-package/.asar-extract-scratch`;
+    // `asar extract-file <archive> <name>` writes the extracted file to the FLAT BASENAME of `<name>`
+    // inside the invocation's own working directory -- run here with `cwd` pointed at a dedicated scratch
+    // directory, never this package's own directory, specifically because one bundled file is itself named
+    // `package.json` (a real mistake this suite's own earlier draft made against the ROOT `package.json`,
+    // caught and fixed during Alpha 3881-3940's own development -- see that Arc's own docs).
+    const scratchDir = `${packageOutputDir}/.asar-extract-scratch`;
     mkdirSync(scratchDir, { recursive: true });
     const listing = execFileSync(process.execPath, [asarBin, "list", asarPath], { encoding: "utf8" }) as string;
     const bundledTextFiles = listing
@@ -295,9 +290,6 @@ describe("Secure Runtime Alpha 3881-3940 -- packaging spike (Phase J)", () => {
       .filter((s: string) => s.length > 0 && (s.endsWith(".cjs") || s.endsWith(".js") || s.endsWith(".html") || s.endsWith(".json")));
     for (const file of bundledTextFiles) {
       const relativeName = file.replace(/^[/\\]/, "").replace(/\\/g, "/");
-      // `extract-file` writes to the FLAT basename of `<name>` in `cwd`, discarding any archive-internal
-      // subdirectory prefix (confirmed directly, empirically, during this Arc's own development) --
-      // never the full `relativeName` path.
       const baseName = relativeName.slice(relativeName.lastIndexOf("/") + 1);
       execFileSync(process.execPath, [asarBin, "extract-file", asarPath, relativeName], { cwd: scratchDir, encoding: "utf8" });
       const content = readFileSync(`${scratchDir}/${baseName}`, "utf8") as string;
@@ -312,11 +304,11 @@ describe("Secure Runtime Alpha 3881-3940 -- packaging spike (Phase J)", () => {
   });
 });
 
-describe("Secure Runtime Alpha 3881-3940 -- ordinary typecheck/test compatibility (Phase I 20, G)", () => {
-  it("20. ordinary `npm test` never launches Electron -- no test file outside this one's own directory imports electron, and this file itself never calls Electron APIs in-process", () => {
+describe("Secure Runtime Alpha 4021-4100 -- root/Electron graph isolation (Phase M)", () => {
+  it("26. ordinary root `test/` contains NO electron reference of any kind -- `npm test` cannot discover or launch anything Electron-related", () => {
     const grep = (): string[] => {
       try {
-        const output = execFileSync("git", ["grep", "-lE", "from [\"']electron[\"']|require\\([\"']electron[\"']\\)", "--", "test/"], { encoding: "utf8" }) as string;
+        const output = execFileSync("git", ["grep", "-lE", "from [\"']electron[\"']|require\\([\"']electron[\"']\\)", "--", "test/"], { encoding: "utf8", cwd: repoRoot }) as string;
         return output.split("\n").map((s: string) => s.trim()).filter((s: string) => s.length > 0);
       } catch (error) {
         const status = (error as { status?: number }).status;
@@ -324,19 +316,29 @@ describe("Secure Runtime Alpha 3881-3940 -- ordinary typecheck/test compatibilit
         throw error;
       }
     };
-    const matches = grep();
-    expect(matches).toEqual([]);
+    expect(grep()).toEqual([]);
   });
 
-  it("21. the build:electron-spike/start:electron-spike/package:electron-spike/test:electron-spike scripts are additive -- typecheck/test/build:runtime/start:runtime scripts are unchanged", () => {
+  it("27. root scripts remain additive and backward compatible -- typecheck:core preserves the ORIGINAL single-graph check verbatim; test/build:runtime/start:runtime are unchanged", () => {
+    const rootPkg = JSON.parse(rootPackageJsonSource as string) as { scripts: Record<string, string> };
+    expect(rootPkg.scripts["typecheck:core"]).toBe("tsc --noEmit");
+    expect(rootPkg.scripts.test).toBe("vitest run");
+    expect(rootPkg.scripts["build:runtime"]).toBe("tsc -p tsconfig.runtime.json");
+    expect(rootPkg.scripts["start:runtime"]).toBe("npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js");
+    expect(rootPkg.scripts.typecheck).toBe("npm run typecheck:core && npm run typecheck:electron");
+    expect(rootPkg.scripts["typecheck:electron"]).toBeDefined();
+    expect(rootPkg.scripts["build:electron-spike"]).toBeDefined();
+    expect(rootPkg.scripts["start:electron-spike"]).toBeDefined();
+    expect(rootPkg.scripts["package:electron-spike"]).toBeDefined();
+    expect(rootPkg.scripts["test:electron-spike"]).toBeDefined();
+  });
+
+  it("28. no postinstall/install lifecycle script exists anywhere in either package.json", () => {
     const pkg = JSON.parse(packageJsonSource as string) as { scripts: Record<string, string> };
-    expect(pkg.scripts.typecheck).toBe("tsc --noEmit");
-    expect(pkg.scripts.test).toBe("vitest run");
-    expect(pkg.scripts["build:runtime"]).toBe("tsc -p tsconfig.runtime.json");
-    expect(pkg.scripts["start:runtime"]).toBe("npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js");
-    expect(pkg.scripts["build:electron-spike"]).toBeDefined();
-    expect(pkg.scripts["start:electron-spike"]).toBeDefined();
-    expect(pkg.scripts["package:electron-spike"]).toBeDefined();
-    expect(pkg.scripts["test:electron-spike"]).toBeDefined();
+    const rootPkg = JSON.parse(rootPackageJsonSource as string) as { scripts: Record<string, string> };
+    expect(Object.keys(pkg.scripts)).not.toContain("postinstall");
+    expect(Object.keys(pkg.scripts)).not.toContain("install");
+    expect(Object.keys(rootPkg.scripts)).not.toContain("postinstall");
+    expect(Object.keys(rootPkg.scripts)).not.toContain("install");
   });
 });

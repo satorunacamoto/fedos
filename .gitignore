@@ -4,13 +4,16 @@ dist/
 *.log
 .DS_Store
 
-# Secure Runtime Alpha 3881-3940 -- Electron build/package spike output
-# (Phase H: never tracked, never placed under p2p/.tmp_gen/a worktree's own
-# git metadata). Regenerated on demand by build:electron-spike/
-# package:electron-spike; never a required, committed configuration-only
-# artifact.
-/dist-electron-spike/
-/dist-electron-spike-package/
+# Secure Runtime Alpha 3881-3940/4021-4100 -- Electron build/package spike
+# output. Lives entirely inside packages/fedos-desktop-electron-spike/ (its
+# own, physically isolated package -- see Alpha 4021-4100's own docs for
+# why). `node_modules/`/`dist/` above already match there too (unanchored
+# patterns); `dist-package/` is this package's own packaging output
+# directory, named distinctly from `dist/` (its plain TypeScript build
+# output) to keep the two build steps' own output clearly separate. Never
+# tracked, never placed under p2p/.tmp_gen. Regenerated on demand; never a
+# required, committed configuration-only artifact.
+/packages/fedos-desktop-electron-spike/dist-package/
 
 # Imported external MeshKV browser project (real runtime for @nostr-window/meshkv).
 # Kept external per the package boundary: the host builds against packages/meshkv

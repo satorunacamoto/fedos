@@ -8,6 +8,33 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4021–4100 — Repository-Wide Node Type
+> Isolation and Electron Build Compatibility Arc (complete — type
+> isolation/build compatibility, NOT Electron application integration).**
+> Resolves the ONE blocker Alpha 3881–3940 stopped at, honestly: adding
+> Electron transitively pulled in `@types/node`, which broke `npm run
+> typecheck` repository-wide by turning ~390 pre-existing
+> `// @ts-expect-error` suppressions (this repository's own established
+> convention for `node:fs`/`node:child_process`/etc. imports, across
+> ~130 files) into "unused directive" errors — confirmed, empirically,
+> that no `tsconfig.json` setting (`types`/`typeRoots`/`paths`/
+> `moduleResolution`) can prevent this while both sides share one
+> `node_modules` tree, since TypeScript resolves `node:*` imports via
+> filesystem lookup, not tsconfig configuration. The fix: the Electron
+> spike moved to a physically separate package
+> (`packages/fedos-desktop-electron-spike/`, its own `package.json`/
+> `package-lock.json`/`node_modules`, no npm workspace hoisting) — so
+> `@types/node` (Electron's own unavoidable transitive dependency) never
+> touches the root project's own `node_modules` at all. `npm run
+> typecheck` (root) is clean again (except the one pre-existing,
+> unrelated failure every recent Arc's own baseline documents); the
+> isolated package's own typecheck/build/tests/packaging all pass
+> independently; NO postinstall deletion script, NO dependency mutation
+> after install, NO mechanical weakening of the ~130 unrelated files'
+> own suppression comments. Confirmed stable across two independent,
+> from-scratch clean installs. Full account in
+> `docs/secure_runtime_alpha_4021_4100_completion_declaration.md`.
+
 > **Status: Secure Runtime Alpha 3881–3940 — Electron Dependency and Build
 > Spike Arc (build spike, partial completion, honestly declared — NOT an
 > Electron app, NOT feature-complete).**

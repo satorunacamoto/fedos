@@ -3,23 +3,21 @@
   "appId": "com.fedos.electron-spike",
   "productName": "FedOS Desktop Build Spike",
   "directories": {
-    "output": "dist-electron-spike-package"
+    "output": "dist-package"
   },
   "files": [
-    "dist-electron-spike/fedos_electron_spike_main.cjs",
-    "dist-electron-spike/fedos_electron_spike_preload.cjs",
-    "dist-electron-spike/fedos_electron_spike_renderer.js",
-    "dist-electron-spike/fedos_electron_spike_page.html",
+    "dist/fedos_electron_spike_main.cjs",
+    "dist/fedos_electron_spike_preload.cjs",
+    "dist/fedos_electron_spike_renderer.js",
+    "dist/fedos_electron_spike_page.html",
     "package.json",
     "!**/*.map",
     "!node_modules/**/*",
     "!src/**/*",
-    "!test/**/*",
-    "!packages/**/*",
-    "!docs/**/*"
+    "!test/**/*"
   ],
   "extraMetadata": {
-    "main": "dist-electron-spike/fedos_electron_spike_main.cjs",
+    "main": "dist/fedos_electron_spike_main.cjs",
     "dependencies": {},
     "scripts": {}
   },

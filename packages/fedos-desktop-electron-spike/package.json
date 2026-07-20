@@ -1,0 +1,16 @@
+{
+  "name": "@nostr-window/fedos-desktop-electron-spike",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Secure Runtime Alpha 3881-3940/4021-4100 -- Electron dependency/build spike (Package A only), physically isolated as its own package so Electron's own transitive @types/node dependency never leaks into the root application's TypeScript graph.",
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3"
+  },
+  "scripts": {
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.test.json",
+    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json && node scripts/copy_static_assets.mjs",
+    "start": "npm run build && electron dist/fedos_electron_spike_main.cjs",
+    "package": "npm run build && node scripts/run_electron_builder_package.mjs"
+  }
+}
