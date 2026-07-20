@@ -8,6 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3401–3480 — Desktop UI Renderer Boundary
+> (complete).**
+> Implements the rendering boundary only, over the ten ViewModels Alpha
+> 3241-3320 built — pure TypeScript render-model contracts under
+> `src/desktop/renderer/`, explicitly NOT Electron/React/Tauri/browser
+> code. One shared, closed render-output shape,
+> `FedosDesktopRenderModel<T> = {kind:"idle"} | {kind:"loading"} |
+> {kind:"error",outcome,message} | {kind:"content",content:T}`
+> (`fedos_desktop_render_model.ts`), plus eight content renderers
+> (Conversation List, Conversation Detail, Message, Reply, Archive,
+> Search, Membership, Status), two shared cross-cutting ones (Error,
+> Loading), and one aggregator (`FedosDesktopRenderer`) constructed from a
+> `FedosDesktopConversationUiPresentationBoundary`. Ten ViewModels map onto
+> eight content renderers, not 1:1 — `MessageRenderer` consumes Message
+> List + Compose Message + Unread Counter together (a real message pane
+> renders exactly those three facets as one cohesive unit), each an
+> independent `FedosDesktopRenderModel` facet rather than one forced
+> top-level `kind`, since their lifecycles genuinely differ (a loaded list
+> alongside a still-`"loading"` pending send). "Empty" is represented as
+> DATA (`{items, count, isEmpty}` via `fedosRenderList()`) on a real,
+> successfully-`"content"`-kind result, never a separate `kind` and never
+> confused with `"idle"`/`"error"`. Every renderer's ONLY dependency is a
+> ViewModel's already-public getters — no `.load()`/`.send()`/`.search()`
+> call, no `FedosDesktopApplicationShell`, no persistence port, no crypto
+> authority, no rendering framework/HTML/CSS/browser global anywhere in
+> the directory (confirmed by grep). "Renderer snapshot tests" are full,
+> deterministic `toEqual()` assertions of complete render-model objects —
+> this repository's own already-established assertion style — rather than
+> a new external `__snapshots__` file convention introduced for the first
+> time. 11 new real tests against a real Renderer/ViewModel/Shell/Runtime
+> stack, covering every required category: snapshot, state transitions,
+> error, loading (a real async gap observed synchronously before
+> awaiting), empty, 30-message large-conversation rendering, search, and
+> archive. Baseline/final: typecheck clean except the one already-documented
+> pre-existing failure; full suite's failure count and file set unchanged
+> from Alpha 3241-3320's own baseline. See
+> `docs/secure_runtime_alpha_3401_3480_completion_declaration.md`.
+>
 > **Status: Secure Runtime Alpha 3241–3320 — Desktop Local Conversation
 > Management UI Prototype Arc (complete).**
 > Builds the first real Desktop Local UI boundary over the newly completed
