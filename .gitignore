@@ -4,6 +4,14 @@ dist/
 *.log
 .DS_Store
 
+# Secure Runtime Alpha 3881-3940 -- Electron build/package spike output
+# (Phase H: never tracked, never placed under p2p/.tmp_gen/a worktree's own
+# git metadata). Regenerated on demand by build:electron-spike/
+# package:electron-spike; never a required, committed configuration-only
+# artifact.
+/dist-electron-spike/
+/dist-electron-spike-package/
+
 # Imported external MeshKV browser project (real runtime for @nostr-window/meshkv).
 # Kept external per the package boundary: the host builds against packages/meshkv
 # (typed MeshKVApi) + the MeshKVBrowserClient adapter, not this browser source.

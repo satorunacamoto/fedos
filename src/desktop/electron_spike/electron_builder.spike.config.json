@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.fedos.electron-spike",
+  "productName": "FedOS Desktop Build Spike",
+  "directories": {
+    "output": "dist-electron-spike-package"
+  },
+  "files": [
+    "dist-electron-spike/fedos_electron_spike_main.cjs",
+    "dist-electron-spike/fedos_electron_spike_preload.cjs",
+    "dist-electron-spike/fedos_electron_spike_renderer.js",
+    "dist-electron-spike/fedos_electron_spike_page.html",
+    "package.json",
+    "!**/*.map",
+    "!node_modules/**/*",
+    "!src/**/*",
+    "!test/**/*",
+    "!packages/**/*",
+    "!docs/**/*"
+  ],
+  "extraMetadata": {
+    "main": "dist-electron-spike/fedos_electron_spike_main.cjs",
+    "dependencies": {},
+    "scripts": {}
+  },
+  "asar": true,
+  "win": {
+    "target": ["dir"]
+  },
+  "linux": {
+    "target": ["dir"]
+  },
+  "mac": {
+    "target": ["dir"]
+  },
+  "npmRebuild": false,
+  "compression": "store"
+}

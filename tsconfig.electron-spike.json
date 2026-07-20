@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist-electron-spike",
+    "rootDir": "src/desktop/electron_spike",
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "verbatimModuleSyntax": false,
+    "isolatedModules": false
+  },
+  "include": [
+    "src/desktop/electron_spike/fedos_electron_spike_main.cts",
+    "src/desktop/electron_spike/fedos_electron_spike_preload.cts",
+    "src/desktop/electron_spike/fedos_electron_spike_renderer.ts",
+    "src/desktop/electron_spike/fedos_electron_spike_window.d.ts",
+    "src/desktop/electron_spike/fedos_electron_spike_node_globals.d.ts"
+  ]
+}

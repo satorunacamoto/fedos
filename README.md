@@ -8,6 +8,34 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 3881–3940 — Electron Dependency and Build
+> Spike Arc (build spike, partial completion, honestly declared — NOT an
+> Electron app, NOT feature-complete).**
+> Package A only, per the Electron Dependency and Desktop Packaging V1
+> Review's own recommendation: adds `electron` (`43.1.1`) and
+> `electron-builder` (`26.15.3`, `"dir"`/unpacked target only) as
+> devDependencies, a narrow `src/desktop/electron_spike/` directory (main
+> entry, minimal preload, static local page — Electron imports exist
+> ONLY here, confirmed by grep), and proves, with real evidence, that a
+> secure, blank/static-page `BrowserWindow` (`contextIsolation: true`,
+> `nodeIntegration: false`, `sandbox: true`, `webSecurity: true`, no
+> remote content, no business IPC, exactly one immutable
+> build-metadata value exposed via `contextBridge`) launches, shows the
+> correct local page, and shuts down cleanly — both in development and
+> as a packaged, unpacked Windows directory (348 MB total; this Arc's
+> own bundled code is 12 KB). No `FedosDesktopHostBridge`/Desktop
+> Runtime/Shell/ViewModel/Renderer wiring of any kind. **Partial, not
+> full, completion**: `npm run typecheck` is NOT clean after this Arc —
+> Electron's own transitive `@types/node` dependency (unavoidable simply
+> by adding Electron) breaks ~130 existing files' own
+> `// @ts-expect-error` conventions repository-wide, a mitigation for
+> which (a drafted, tested `postinstall` cleanup script) was rejected by
+> this environment's own permission classifier and, when presented
+> directly, the user chose to stop here rather than authorize it. `npm
+> test` and every existing test suite are unaffected (77/77 existing
+> Desktop tests, 25/25 new spike tests, both passing). Full account in
+> `docs/secure_runtime_alpha_3881_3940_completion_declaration.md`.
+
 > **Status: Secure Runtime Alpha 3561–3640 — Desktop Electron Host Boundary
 > Arc (partial completion, honestly declared).**
 > Creates the first Desktop Host boundary around the completed Runtime →
