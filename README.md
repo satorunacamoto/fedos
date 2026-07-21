@@ -8,6 +8,48 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4661–4740 — Master Seed Unlock, First-Run
+> Onboarding, and Local Profile Initialization Arc (honest partial —
+> production Master Seed unlock blocked by the existing dev-only crypto
+> gate).**
+> Architecture frozen: no crypto/Runtime/Registry/Shell/Host/Electron
+> redesign. Ten new files under `src/desktop/onboarding/` compose the
+> EXISTING authorities through the EXISTING
+> `FedosDesktopRuntimeConfig`/`startFedosDesktopRuntime()` surface — zero
+> existing source file modified except this README, no config field added.
+> A fresh install now reaches a safe, explicit usable state through ONE new
+> application coordinator (`FedosProfileInitializationCoordinator`): detect
+> profile → first-run create OR existing-profile unlock → seal/restore the
+> Master Seed authority → resolve account identity → register the local
+> Device with REAL BIP-340 account + Device Schnorr proofs
+> (`runtime.devicePairing()`, reaching `"trusted"`, never a caller-supplied
+> `trusted=true`) → initialize durable per-profile paths → start the real
+> Desktop Runtime → lock/relaunch. New: a versioned NON-SECRET profile
+> descriptor + strict validator + deterministic codec + in-memory/file
+> persistence (fail-closed on corruption, never overwrites); a closed
+> 8-state profile lifecycle machine (no partial ready; wrong-unlock →
+> locked; corruption/identity-mismatch → recovery-required, never a silent
+> new profile); a one-profile-root durable path authority (traversal-proof,
+> isolated, Japanese/OneDrive long-path tested); a one-shot self-redacting
+> unlock-secret payload; an honest recovery-material notice (no plaintext
+> seed display; forgotten-secret-is-unrecoverable stated); a closed
+> onboarding command vocabulary (secret redacted from every diagnostic, no
+> response echoes it); and framework-neutral onboarding presentation view
+> models. **Honestly blocked (per the spec's own Phase D fallback):** the
+> ONE real `FedosMasterSeedAuthority` (`FedosWasmMasterSeedAuthority`) is
+> unreachable here — no compiled WASM `pkg/`, and the dev-only crypto gate
+> (`fedos_dynamic_loader_gate.ts`) is hardcoded shut — so the Arc ships a
+> clearly-labeled DEVELOPMENT-ONLY seed double (a non-cryptographic
+> lifecycle simulator: no seed byte, no plaintext passphrase) and STOPS
+> before claiming user-ready production unlock. Real acceptance suite
+> (`test/secure_runtime_alpha_4661_4740_first_run_onboarding.test.ts`):
+> **40/40 passing** against the REAL runtime + REAL BIP-340 proofs; the
+> immediately-prior Arc's 39/39 pairing suite unchanged; `tsc` adds zero
+> new errors (only the one long-pre-existing scheduler failure remains).
+> Development-runtime real coordination is proven; production crypto
+> availability is NOT claimed. Recommended next Arc: Desktop Settings,
+> Relay Configuration, and User Preferences.
+>
 > **Status: Secure Runtime Alpha 4581–4660 — Desktop Device Registration,
 > Pairing, and Durable Sync Journal Arc (complete).**
 > Architecture frozen: no Registration/Registry/Sync/Electron redesign.
