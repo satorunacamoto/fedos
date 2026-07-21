@@ -8,6 +8,54 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5321–5400 — FedOS Desktop Beta 0.1 Canonical
+> Release Hosting, Manual Publication, and Signing Readiness Arc (FULL
+> completion).** Turns the locally-built NSIS/ZIP/checksum artifacts from
+> the prior Arc into a complete, reviewable, manually-publishable
+> release-candidate set — without publishing, signing, or touching any
+> remote system. New, additive modules
+> (`scripts/lib/publication_bundle.mjs`, `signing_readiness.mjs`,
+> `revocation_status.mjs`, `tag_format.mjs`,
+> `remote_download_verification.mjs`, `generate_release_staging.mjs`,
+> `verify_release_staging.mjs`, `publication_dry_run.mjs`,
+> `generate_public_beta_gate.mjs`) implement: a canonical-host policy
+> (`"local-only"` — honest, since no git remote is configured anywhere in
+> this repository); a local publication-bundle format referencing
+> artifacts by filename+hash only, never bytes; a human-executed manual
+> publication workflow; a local release verifier that re-derives every
+> fact from real bytes on disk; deterministic release notes/known
+> limitations/install/verify/security-notice/announcement documents; a
+> revocation/advisory record format with no application dependency on live
+> status (no remote kill-switch); a tag-format policy that forbids
+> retagging; a zero-side-effect publication dry run that fails closed on
+> an invalid bundle; a remote-download verifier proven against a real
+> local HTTP server; a safe, non-secret signing-toolchain inventory (real
+> finding: no `signtool.exe`/Windows SDK/`winCodeSign` cache present in
+> this environment) plus a pure signing-readiness decision function; a
+> certificate-custody policy and a documented (unimplemented) future
+> signing seam, proven not to silently accept stale checksums across a
+> simulated signing mutation; and a closed public-Beta release gate whose
+> final state is `"ready-for-human-publication"` — never `"published"`.
+> Two real, previously-latent defects were found and fixed this session
+> via direct execution (not assumed): `buildFedosBetaPublicationBundleV1`'s
+> own valid output failed its own strict validator (an `unsigned` field it
+> produced was missing from the validator's known-field set, and
+> `deepFreeze` was mutating the caller's own shared `identity` object in
+> place, breaking a second call with the same identity); and
+> `verify_release_staging.mjs` ran an exact-directory-inventory checksum
+> check against a staging directory that legitimately holds more files
+> than `SHA256SUMS.txt` lists, always failing on a real bundle. Honest
+> environment disclosure: `vitest` itself fails to parse every test file
+> in this worktree — including the prior Arc's own unmodified, previously-
+> accepted suite — a worktree-environment artifact confirmed by A/B
+> testing against a sibling worktree, not a regression; real verification
+> of every new module was instead performed via a plain-Node harness
+> script (deleted before commit) exercising the same assertions as the
+> durable `.test.ts` suite left in place. See
+> `docs/secure_runtime_alpha_5321_5400_release_publication_reconciliation_report.md`,
+> `..._certificate_custody_and_signing_seam.md`,
+> `..._manual_publication_workflow.md`, and `..._completion_declaration.md`.
+
 > **Status: Secure Runtime Alpha 5241–5320 — FedOS Desktop Beta 0.1 NSIS
 > Installer, Portable ZIP, and Checksum Publication Arc (FULL completion).**
 > Implements the normative distribution review's own V1 policy

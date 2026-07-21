@@ -27,6 +27,14 @@ dist/
 /packages/fedos-desktop-electron-spike/dist-package-beta/
 /packages/fedos-desktop-electron-spike/release/
 
+# Secure Runtime Alpha 5321-5400 -- `release-staging/` is this Arc's own
+# curated, human-reviewable publication-bundle directory (a superset of
+# `release/`'s own contents: the two artifacts + manifest + checksums, plus
+# `publication-bundle.json` and the generated release docs). Never
+# committed, never tracked, never placed under p2p/.tmp_gen; regenerated on
+# demand by `generate_release_staging.mjs`.
+/packages/fedos-desktop-electron-spike/release-staging/
+
 # Imported external MeshKV browser project (real runtime for @nostr-window/meshkv).
 # Kept external per the package boundary: the host builds against packages/meshkv
 # (typed MeshKVApi) + the MeshKVBrowserClient adapter, not this browser source.
