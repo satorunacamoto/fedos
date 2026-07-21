@@ -1,6 +1,6 @@
 {
   "name": "@nostr-window/fedos-desktop-electron-spike",
-  "version": "0.0.1",
+  "version": "0.1.0-beta.1",
   "private": true,
   "description": "Secure Runtime Alpha 3881-3940/4021-4100 -- Electron dependency/build spike (Package A only), physically isolated as its own package so Electron's own transitive @types/node dependency never leaks into the root application's TypeScript graph.",
   "devDependencies": {
