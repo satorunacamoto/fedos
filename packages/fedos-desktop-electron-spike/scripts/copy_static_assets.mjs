@@ -28,3 +28,5 @@ copyFileSync(join(srcDir, "fedos_electron_badge_page.html"), join(outDir, "fedos
 copyFileSync(join(srcDir, "fedos_electron_unlock_page.html"), join(outDir, "fedos_electron_unlock_page.html"));
 // Secure Runtime Alpha 4901-4980 -- the Desktop Settings Arc's own settings page.
 copyFileSync(join(srcDir, "fedos_electron_settings_page.html"), join(outDir, "fedos_electron_settings_page.html"));
+// Secure Runtime Alpha 5061-5160 -- the Beta 0.1 Integration Arc's own composed status/onboarding page.
+copyFileSync(join(srcDir, "fedos_electron_beta_page.html"), join(outDir, "fedos_electron_beta_page.html"));

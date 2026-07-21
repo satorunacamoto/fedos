@@ -506,6 +506,37 @@ export class FedosProfileInitializationCoordinator {
     return this.#state === "ready" ? this.#runtime : null;
   }
 
+  /**
+   * Secure Runtime Alpha 5061-5160 (FedOS Desktop Beta 0.1 Integration Arc) —
+   * additive Phase E hook for a CONFIRMED Runtime-restart flow (e.g.
+   * `FedosDesktopBetaApplicationAssembly`, `../beta/fedos_desktop_beta_application_assembly.ts`).
+   *
+   * A Runtime-only restart (relay list / archive directory / other
+   * construction-time Settings) must replace the ONE Runtime this Coordinator
+   * itself started during unlock/create, WITHOUT re-running unlock and WITHOUT
+   * clearing the Master Seed authority (`lock()` does both — wrong for this
+   * case; Phase E requires "preserve profile unlocked state"). Without this
+   * method, the composed assembly would have to keep its own duplicate
+   * Runtime pointer, and `runningRuntime()`/`status().runtimeRunning` would
+   * silently go stale (still describing the OLD, now-stopped Runtime) after a
+   * confirmed restart — an honesty defect this Coordinator's own guardrails
+   * (never a false `ready`, never stale state) exist specifically to prevent.
+   *
+   * Callable ONLY while `ready` (a confirmed restart is meaningless before a
+   * successful unlock/create, and never while locked). The caller is solely
+   * responsible for having already stopped the OLD Runtime and started the
+   * NEW one through the existing `startFedosDesktopRuntime()` entry point —
+   * this method performs no I/O and constructs nothing itself.
+   */
+  adoptReplacementRuntime(runtime: FedosRunningDesktopRuntime): FedosProfileCoordinatorResult<null> {
+    if (this.#state !== "ready") {
+      return fail("not-ready", "cannot adopt a replacement Runtime unless the profile is ready/unlocked");
+    }
+    this.#runtime = runtime;
+    this.#stopped = false;
+    return ok(null);
+  }
+
   recoveryNotice(): FedosProfileRecoveryNotice {
     return buildFedosProfileRecoveryNotice(this.#deps.paths, {
       conversationArchiveExportAvailable: this.#deps.archiveEnabled === true,

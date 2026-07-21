@@ -94,6 +94,19 @@ export class FedosDesktopConversationUiPresentationBoundary {
     return new FedosDesktopConversationUiPresentationBoundary(createFedosDesktopApplicationShell());
   }
 
+  /**
+   * Secure Runtime Alpha 5061-5160 (FedOS Desktop Beta 0.1 Integration Arc) —
+   * additive Phase C factory. Wraps an ALREADY-STARTED `FedosDesktopApplicationShell`
+   * (typically one built via `FedosDesktopApplicationShell.fromRunningRuntime()`)
+   * instead of constructing a fresh, unstarted one. Composes the SAME ten+
+   * ViewModels over it as `create()` does — never a second, divergent Shell.
+   * See `FedosDesktopApplicationShell.fromRunningRuntime()`'s own header for why
+   * this exists (the single-Runtime composition gap this Arc closes).
+   */
+  static fromShell(shell: FedosDesktopApplicationShell): FedosDesktopConversationUiPresentationBoundary {
+    return new FedosDesktopConversationUiPresentationBoundary(shell);
+  }
+
   /** Never exposed to a future UI beyond this file's own constructor use -- present only so tests can assert every ViewModel shares the identical Shell instance. */
   get shell(): FedosDesktopApplicationShell {
     return this.#shell;

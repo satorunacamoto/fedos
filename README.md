@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5061–5160 — FedOS Desktop Beta 0.1
+> Integration, Release Candidate, and Acceptance Freeze Arc (honest partial
+> completion — release freeze blocked by one named, disclosed composition
+> gap).**
+> Architecture frozen and strictly additive: the only production-source
+> touches are THREE new, single-method additive factories/hooks on
+> already-open Beta-lineage classes
+> (`FedosDesktopApplicationShell.fromRunningRuntime()`,
+> `FedosDesktopConversationUiPresentationBoundary.fromShell()`,
+> `FedosProfileInitializationCoordinator.adoptReplacementRuntime()`) — zero
+> existing method signature or behavior changed for any existing caller.
+> Closes the exact gap the prior Arc's own Completion Declaration named as its
+> recommended next Arc: no Electron main previously composed the real
+> production-unlock chain AND a live Presentation/Settings boundary over the
+> SAME Desktop Runtime (doing so naively would construct two independent
+> Runtimes over the same durable paths — a real duplicate-ownership defect).
+> New `FedosDesktopBetaApplicationAssembly`
+> (`src/desktop/beta/fedos_desktop_beta_application_assembly.ts`) composes
+> exactly one Shell/Boundary over the Coordinator's own Runtime, wires the
+> Alpha 4981–5060 Settings Application Coordinator's startup application for
+> the first time in any Electron main, and provides a generic, tested
+> confirmed-Runtime-restart primitive. New canonical Electron entry point
+> `fedos_electron_beta_main.cts` (+ preload/page/renderer) reuses the
+> `fedos-profile:*` IPC contract verbatim (Phase P surface freeze) and adds a
+> new `fedos-beta:*` namespace (status/settings-plan/settings-apply) — all
+> seven pre-existing Electron main files remain byte-for-byte unmodified,
+> preserved as accepted test/harness entry points. REAL, PACKAGED-ADJACENT
+> VERIFICATION this session (genuine internet + Rust toolchain access): a real
+> WASM `pkg/` was built; an unpackaged real Electron process completed a full
+> create → real WASM Master Seed generation/sealing → ready → lock → relaunch
+> → wrong-passphrase-denied → correct-passphrase-unlock round trip with
+> IDENTICAL account/device identity across three separate process launches;
+> `electron-builder` packaging succeeded end-to-end (new, additive
+> `electron_builder.beta.config.json`, correctly relocating the root `dist/`
+> graph and WASM `pkg/` to the packaged app's own expected paths) though the
+> packaged `.exe`'s own direct launch hung before `app.whenReady()` in this
+> sandboxed, display-less environment (disclosed, not root-caused — the
+> IDENTICAL unpackaged code path is fully verified). Named, disclosed,
+> release-blocking gap: Navigation/Tray/Badge/Device-Sync-event-wiring are
+> NOT yet composed into this same canonical entry point (they remain real and
+> reachable only via `fedos_electron_badge_main.cts`) — full completion is
+> not declared. New suite
+> (`test/secure_runtime_alpha_5061_5160_beta_application_assembly.test.ts`):
+> **7/7** against real boundaries; `typecheck:core` unchanged (2 pre-existing
+> errors); `typecheck:electron` **0 errors**; full `vitest run` unchanged from
+> the documented fresh-worktree baseline. See
+> `docs/secure_runtime_alpha_5061_5160_reconciliation_report.md` for the full
+> Phase A–R inventory and blocker table. Recommended next Arc: **FedOS Desktop
+> Beta 0.1 Composition Completion and Packaged Acceptance Arc.**
+
 > **Status: Secure Runtime Alpha 4981–5060 — Desktop Settings Runtime
 > Application and Safe Reconfiguration Arc (FULL completion — persisted
 > settings now visibly affect real live application behavior through accepted

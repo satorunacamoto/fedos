@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.fedos.desktop.beta",
+  "productName": "FedOS Desktop Beta",
+  "directories": {
+    "output": "dist-package-beta"
+  },
+  "files": [
+    "dist/fedos_electron_beta_main.cjs",
+    "dist/fedos_electron_beta_preload.cjs",
+    "dist/fedos_electron_beta_renderer.js",
+    "dist/fedos_electron_beta_page.html",
+    "package.json",
+    "!**/*.map",
+    "!node_modules/**/*",
+    "!src/**/*",
+    "!test/**/*"
+  ],
+  "extraMetadata": {
+    "main": "dist/fedos_electron_beta_main.cjs",
+    "dependencies": {},
+    "scripts": {}
+  },
+  "extraFiles": [
+    { "from": "../../dist", "to": "dist" }
+  ],
+  "extraResources": [
+    { "from": "../fedos-core-rust/pkg", "to": "fedos-core-rust/pkg" }
+  ],
+  "asar": true,
+  "win": {
+    "target": ["dir"]
+  },
+  "linux": {
+    "target": ["dir"]
+  },
+  "mac": {
+    "target": ["dir"]
+  },
+  "npmRebuild": false,
+  "compression": "store"
+}

@@ -223,6 +223,35 @@ export class FedosDesktopApplicationShell {
     return new FedosDesktopApplicationShell();
   }
 
+  /**
+   * Secure Runtime Alpha 5061-5160 (FedOS Desktop Beta 0.1 Integration Arc) —
+   * additive Phase C factory. Wraps an ALREADY-RUNNING `FedosRunningDesktopRuntime`
+   * (e.g. one `FedosProfileInitializationCoordinator` started during unlock/create,
+   * `../onboarding/fedos_profile_initialization_coordinator.ts`) instead of
+   * starting a second, independent one via `start()`.
+   *
+   * WHY THIS EXISTS: `start()` unconditionally calls `startFedosDesktopRuntime()`
+   * itself, and the Coordinator's own `unlockProfile()`/`createProfile()` ALSO
+   * unconditionally starts its own Runtime (it has no "skip Runtime start" mode).
+   * Composing both into one real Electron process without this factory would
+   * mean two independent `FedosRunningDesktopRuntime` instances constructed
+   * from the same durable paths — a real "duplicate Runtime ownership" defect
+   * (divergent in-memory Board/Conversation state, and, for file-backed logs,
+   * two independent writers on the same append-only files), not a stylistic one.
+   *
+   * This is a pure, additive wrapper: it does not change `start()`/`stop()`/
+   * `status()`/any existing method's behavior for any existing caller. A Shell
+   * built this way behaves identically to one built via `create()` + `start()`
+   * from the caller's perspective (`status()` reports `"running"` immediately;
+   * `stop()` stops the SAME wrapped Runtime; a second `start()` call correctly
+   * fails with `"conflict"`, exactly as it already does for a doubly-started Shell).
+   */
+  static fromRunningRuntime(runtime: FedosRunningDesktopRuntime): FedosDesktopApplicationShell {
+    const shell = new FedosDesktopApplicationShell();
+    shell.#runtime = runtime;
+    return shell;
+  }
+
   status(): "stopped" | "running" {
     return this.#runtime === null ? "stopped" : "running";
   }
