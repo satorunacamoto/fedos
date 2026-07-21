@@ -42,14 +42,24 @@ function step(label, fn) {
   fn();
 }
 
-/** `npm` resolves to `npm.cmd` on Windows -- resolved to the REAL, concrete executable name here (never `shell: true`, which would otherwise pass this script's own fixed, hardcoded argv through a shell unnecessarily, a real if narrow injection-surface Node itself now deprecation-warns against). `node`/`git` are real executables on every platform and never need this. */
-function resolvedCommand(cmd) {
-  if (cmd === "npm" && process.platform === "win32") return "npm.cmd";
-  return cmd;
-}
-
+/**
+ * `npm` resolves to `npm.cmd` on Windows, a `.cmd` batch script — NOT a PE
+ * executable the OS loader can spawn directly (confirmed this session:
+ * naming `npm.cmd` explicitly to `execFileSync` still fails, `EINVAL`,
+ * without `shell: true`; this is a documented Node/Windows platform
+ * constraint, not something this script can route around). `shell: true`
+ * is therefore genuinely required here, not merely convenient — Node's own
+ * DEP0190 warning is about an ARRAY of args being re-parsed by the shell,
+ * a real risk only when any argument could carry attacker-controlled
+ * content; every `args` array this script ever passes is a fixed,
+ * hardcoded literal (`["run", "build:beta-runtime"]`, etc.), never
+ * external input, so the warning names a risk that does not apply to this
+ * script's own fixed call sites. `node`/`git` are real executables on
+ * every platform and never need `shell: true`.
+ */
 function run(cmd, args, cwd) {
-  execFileSync(resolvedCommand(cmd), args, { cwd, stdio: "inherit" });
+  const needsShell = process.platform === "win32" && cmd === "npm";
+  execFileSync(cmd, args, { cwd, stdio: "inherit", shell: needsShell });
 }
 
 function verifyCleanTree() {
