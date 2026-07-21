@@ -42,10 +42,14 @@ function step(label, fn) {
   fn();
 }
 
-/** `npm` resolves to `npm.cmd` on Windows -- `execFileSync` (unlike a shell) does not apply `PATHEXT` resolution on its own, so an `npm` invocation needs `shell: true` there. `node`/`git` are real executables on every platform and never need it. */
+/** `npm` resolves to `npm.cmd` on Windows -- resolved to the REAL, concrete executable name here (never `shell: true`, which would otherwise pass this script's own fixed, hardcoded argv through a shell unnecessarily, a real if narrow injection-surface Node itself now deprecation-warns against). `node`/`git` are real executables on every platform and never need this. */
+function resolvedCommand(cmd) {
+  if (cmd === "npm" && process.platform === "win32") return "npm.cmd";
+  return cmd;
+}
+
 function run(cmd, args, cwd) {
-  const needsShell = process.platform === "win32" && cmd === "npm";
-  execFileSync(cmd, args, { cwd, stdio: "inherit", shell: needsShell });
+  execFileSync(resolvedCommand(cmd), args, { cwd, stdio: "inherit" });
 }
 
 function verifyCleanTree() {
