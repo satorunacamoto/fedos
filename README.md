@@ -8,6 +8,54 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5161–5240 — Canonical Desktop Composition
+> and FedOS Beta 0.1 Release-Blocker Closure Arc (FULL completion — BLK-1
+> closed).**
+> Architecture frozen and strictly additive: the only production-source
+> touches beyond `FedosDesktopBetaApplicationAssembly` itself are THREE new
+> optional dependencies on `FedosProfileInitializationCoordinator`
+> (`deviceSyncSchedulerEnabled`/`deviceSyncAbandonmentPolicy`/
+> `deviceSyncAttemptFn`), mirroring the existing `archiveEnabled` toggle's
+> own pattern byte-for-byte — omitted, behavior is unchanged for every
+> existing caller. Closes BLK-1 from the prior Arc: `fedos_electron_beta_main.cts`
+> now composes Navigation (`FedosDesktopConversationWindowRegistry`),
+> Notification/Tray/Badge Coordinators, Background Lifecycle, and Device
+> Sync (Operational Facade + Scheduler + Event Bridge + Presentation Wiring)
+> into the SAME canonical `FedosDesktopBetaApplicationAssembly`/Runtime —
+> every one of these was ALREADY real, framework-neutral, and
+> port-based (Alpha 4181-4500, UNMODIFIED); this Arc only composes them,
+> reusing the SAME real Electron-side adapters
+> (`FedosElectronTrayAdapter`/`FedosElectronBadgeAdapter`/
+> `FedosElectronNotificationAdapter`) `fedos_electron_badge_main.cts` already
+> proves work. A confirmed Runtime restart rebuilds the Runtime-bound
+> subset (Navigation/Tray/Badge/DeviceSyncWiring) while explicitly NOT
+> rebuilding the Electron-global subset (Notification/Background-Lifecycle)
+> — proven by reference-identity assertions. REAL, PACKAGED-ADJACENT
+> VERIFICATION this session (genuine internet + Rust toolchain access
+> again available): an unpackaged real Electron process completed create →
+> real WASM Master Seed → full composition verified live
+> (`{"navigation":true,"badge":true,"tray":true,"deviceSyncStatus":"Idle"}`)
+> → lock → relaunch → wrong-passphrase-denied (composition honestly
+> `false`/`false`/`false`/`null`) → relaunch → correct-passphrase-unlock
+> (identical identity, composition freshly rebuilt); `electron-builder`
+> packaging succeeded end-to-end against the larger `dist/` graph. New suite
+> (`test/secure_runtime_alpha_5161_5240_canonical_desktop_composition.test.ts`):
+> **9/9** against real boundaries, including a real Device Sync Scheduler
+> genuinely started/stopped through Settings for the first time, and a
+> 5-cycle lock/unlock duplication check (5 distinct Runtimes, never fewer,
+> never more). `typecheck` green (2 pre-existing errors, unchanged); full
+> `vitest run` failure set unchanged from the documented fresh-worktree
+> baseline. Honest, disclosed, non-release-blocking limitations unchanged
+> from the prior Arc: the packaged `.exe`'s own direct launch still hangs in
+> this sandboxed, display-less environment (a packaged-Electron GPU/
+> compositor-init issue, not a code defect — the identical code is fully
+> verified unpackaged); Relay/Archive-directory Settings still have no
+> Runtime-config field to feed. See
+> `docs/secure_runtime_alpha_5161_5240_ownership_inventory.md` and
+> `..._completion_declaration.md` for the full Phase A ownership table and
+> evidence. Recommended next Arc: **FedOS Desktop Beta 0.1 Installer,
+> Signing, Distribution, and Update Policy Review.**
+
 > **Status: Secure Runtime Alpha 5061–5160 — FedOS Desktop Beta 0.1
 > Integration, Release Candidate, and Acceptance Freeze Arc (honest partial
 > completion — release freeze blocked by one named, disclosed composition

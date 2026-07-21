@@ -78,6 +78,8 @@ import {
   buildFedosProfileRecoveryNotice,
   type FedosProfileRecoveryNotice,
 } from "./fedos_profile_recovery_notice.js";
+import type { FedosDeviceSyncAbandonmentPolicy } from "../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos_device_sync_attempt.js";
 
 export type FedosProfileCoordinatorOutcome =
   | "ok"
@@ -150,6 +152,23 @@ export interface FedosProfileInitializationDependencies {
   readonly startRuntime?: (config: FedosDesktopRuntimeConfig) => Promise<FedosRunningDesktopRuntime>;
   /** Whether to enable the Archive capability (requires a REAL Master Seed authority for archive crypto). Default false — the dev double cannot back real archive crypto. */
   readonly archiveEnabled?: boolean;
+  /**
+   * Secure Runtime Alpha 5161-5240 (Canonical Desktop Composition Arc) —
+   * mirrors `archiveEnabled`'s own established "optional capability toggle,
+   * threaded straight into `#buildRuntimeConfig()`" pattern exactly. Whether
+   * to enable the Device Sync Scheduler on the Runtime this Coordinator
+   * starts. Default false (unchanged prior behavior for every existing
+   * caller) — this Coordinator constructs no Scheduler/attempt logic of its
+   * own; `deviceSyncAttemptFn` is the caller's own, already-real
+   * `FedosDeviceSyncEventBridge.wrapAttemptFn()` (or any other
+   * `FedosDeviceSyncAttemptFn`), unchanged in kind from
+   * `startFedosDesktopRuntime()`'s own existing contract.
+   */
+  readonly deviceSyncSchedulerEnabled?: boolean;
+  /** REQUIRED when `deviceSyncSchedulerEnabled` is `true` — this Coordinator constructs no abandonment policy of its own (mirrors `FedosDeviceSyncScheduler`'s own existing required-dependency discipline). */
+  readonly deviceSyncAbandonmentPolicy?: FedosDeviceSyncAbandonmentPolicy;
+  /** Optional; omitted, every Scheduler tick's own attempt fails closed with `"failed"` — the SAME existing `FedosDesktopRuntimeConfig.deviceSyncAttemptFn` default. */
+  readonly deviceSyncAttemptFn?: FedosDeviceSyncAttemptFn;
 }
 
 export class FedosProfileInitializationCoordinator {
@@ -605,6 +624,13 @@ export class FedosProfileInitializationCoordinator {
       archiveEnabled: this.#deps.archiveEnabled === true,
       conversationArchiveMasterSeedAuthority:
         this.#deps.archiveEnabled === true ? this.#deps.masterSeedAuthority : undefined,
+      deviceSyncSchedulerEnabled: this.#deps.deviceSyncSchedulerEnabled === true,
+      deviceSyncAbandonmentPolicy:
+        this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAbandonmentPolicy : undefined,
+      deviceSyncAttemptFn:
+        this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAttemptFn : undefined,
+      deviceSyncScheduleLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncScheduleLogFile : undefined,
+      deviceSyncConflictLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncConflictLogFile : undefined,
     };
   }
 

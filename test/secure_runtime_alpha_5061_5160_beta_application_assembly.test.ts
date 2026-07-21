@@ -40,6 +40,8 @@ import { createFileBackedFedosDesktopSettingsController, createInMemoryFedosDesk
 import { defaultFedosSettingsDescriptorV1, type FedosSettingsDescriptorV1 } from "../src/settings/fedos_settings_descriptor.js";
 import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/desktop/notification/fedos_desktop_notification_port.js";
 import type { FedosDesktopNotificationView } from "../src/desktop/notification/fedos_desktop_notification_types.js";
+import type { FedosDesktopBadgePort, FedosDesktopBadgePortStatus } from "../src/desktop/badge/fedos_desktop_badge_port.js";
+import type { FedosDesktopBadgeView } from "../src/desktop/badge/fedos_desktop_badge_types.js";
 
 import { FedosDesktopBetaApplicationAssembly } from "../src/desktop/beta/fedos_desktop_beta_application_assembly.js";
 import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
@@ -97,11 +99,28 @@ class RecordingNotificationPort implements FedosDesktopNotificationPort {
   }
 }
 
+/** Secure Runtime Alpha 5161-5240 — a real, in-process badge port double (mirrors `RecordingNotificationPort`'s own style). */
+class RecordingBadgePort implements FedosDesktopBadgePort {
+  rendered: FedosDesktopBadgeView[] = [];
+  status(): FedosDesktopBadgePortStatus {
+    return "available";
+  }
+  render(view: FedosDesktopBadgeView): void {
+    this.rendered.push(view);
+  }
+}
+
 function withFedosSettings(base: FedosSettingsDescriptorV1, overrides: Partial<FedosSettingsDescriptorV1>): FedosSettingsDescriptorV1 {
   return { ...base, ...overrides };
 }
 
 const COUNTERPARTY = Object.freeze({ authority: "nostr" as const, publicIdentifier: "c".repeat(64) });
+const LOCAL_VIEWER = Object.freeze({ authority: "nostr" as const, publicIdentifier: "a".repeat(64), identityId: null });
+
+/** Secure Runtime Alpha 5161-5240 — the three new required Phase B/C deps every `FedosDesktopBetaApplicationAssembly.start()` call now needs, factored out so every existing call site stays a minimal, additive diff. */
+function navigationDeps(root: string): { badgePort: RecordingBadgePort; viewerParticipant: typeof LOCAL_VIEWER; navigationLogPath: string } {
+  return { badgePort: new RecordingBadgePort(), viewerParticipant: LOCAL_VIEWER, navigationLogPath: join(root, "navigation.log") };
+}
 
 // ---------------------------------------------------------------------
 // Phase C — single-Runtime composition.
@@ -115,6 +134,7 @@ describe("Phase C — FedosDesktopBetaApplicationAssembly single-Runtime composi
       coordinator,
       settingsController: createInMemoryFedosDesktopSettingsController(),
       notificationPort: new RecordingNotificationPort(),
+      ...navigationDeps(root),
     });
     expect(result.outcome).toBe("coordinator-not-ready");
   });
@@ -126,6 +146,7 @@ describe("Phase C — FedosDesktopBetaApplicationAssembly single-Runtime composi
       coordinator,
       settingsController: createInMemoryFedosDesktopSettingsController(),
       notificationPort: new RecordingNotificationPort(),
+      ...navigationDeps(root),
     });
     expect(result.outcome).toBe("ok");
     if (result.outcome !== "ok") return;
@@ -151,6 +172,7 @@ describe("Phase C — FedosDesktopBetaApplicationAssembly single-Runtime composi
       coordinator,
       settingsController: createInMemoryFedosDesktopSettingsController(),
       notificationPort: new RecordingNotificationPort(),
+      ...navigationDeps(root),
     });
     expect(result.outcome).toBe("ok");
     if (result.outcome !== "ok") return;
@@ -175,7 +197,7 @@ describe("Phase D — Settings Application Coordinator wired at assembly startup
 
     const coordinator = await readyCoordinator(root);
     const notificationPort = new RecordingNotificationPort();
-    const result = FedosDesktopBetaApplicationAssembly.start({ coordinator, settingsController, notificationPort });
+    const result = FedosDesktopBetaApplicationAssembly.start({ coordinator, settingsController, notificationPort, ...navigationDeps(root) });
     expect(result.outcome).toBe("ok");
     if (result.outcome !== "ok") return;
     const assembly = result.value;
@@ -203,7 +225,7 @@ describe("Phase D — Settings Application Coordinator wired at assembly startup
     // Force a corrupt/invalid load by importing malformed serialized content.
     settingsController.import("{not json");
     const coordinator = await readyCoordinator(root);
-    const result = FedosDesktopBetaApplicationAssembly.start({ coordinator, settingsController, notificationPort: new RecordingNotificationPort() });
+    const result = FedosDesktopBetaApplicationAssembly.start({ coordinator, settingsController, notificationPort: new RecordingNotificationPort(), ...navigationDeps(root) });
     // A corrupt import() call itself fails closed and never mutates the store, so this actually still
     // loads the default descriptor -- assert the store's own honest outcome either way, never a throw.
     expect(["ok", "settings-load-failed"]).toContain(result.outcome);
@@ -236,6 +258,7 @@ describe("Phase E — confirmed Runtime restart (generic primitive)", () => {
       coordinator,
       settingsController: createInMemoryFedosDesktopSettingsController(),
       notificationPort: new RecordingNotificationPort(),
+      ...navigationDeps(root),
     });
     expect(result.outcome).toBe("ok");
     if (result.outcome !== "ok") return;
@@ -270,6 +293,7 @@ describe("Phase E — confirmed Runtime restart (generic primitive)", () => {
       coordinator,
       settingsController: createInMemoryFedosDesktopSettingsController(),
       notificationPort: new RecordingNotificationPort(),
+      ...navigationDeps(root),
     });
     expect(result.outcome).toBe("ok");
     if (result.outcome !== "ok") return;

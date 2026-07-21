@@ -10,30 +10,52 @@
  * `docs/secure_runtime_alpha_5061_5160_reconciliation_report.md`): no prior
  * Electron main composed BOTH the real production unlock chain
  * (`fedos_electron_unlock_main.cts`'s own pattern) AND a live
- * Presentation/Settings-application boundary over the SAME Runtime. This
- * file does, via the additive Phase C/D/E composition module
- * `FedosDesktopBetaApplicationAssembly`
- * (`../../../src/desktop/beta/fedos_desktop_beta_application_assembly.ts`):
+ * Presentation/Settings-application boundary over the SAME Runtime.
+ *
+ * -----------------------------------------------------------------------
+ * Secure Runtime Alpha 5161-5240 ("Canonical Desktop Composition and Beta
+ * Release-Blocker Closure Arc") — EXTENDS this file (never replaces it) to
+ * also compose the already-accepted Navigation / Notification / Tray /
+ * Badge / Background-Lifecycle / Device-Sync-Event layer into this SAME
+ * canonical entry point, closing BLK-1 the immediately-prior Arc's own
+ * reconciliation report disclosed:
  *
  *   packaged Electron main
  *     -> production activation authority (host attestation + pinned manifest)
  *     -> real WASM Master Seed generate/restore (NO dev seed double)
- *     -> the UNCHANGED FedosProfileInitializationCoordinator
+ *     -> the UNCHANGED FedosProfileInitializationCoordinator (now ALSO given
+ *        the additive `deviceSyncSchedulerEnabled`/`deviceSyncAttemptFn`
+ *        dependency, mirroring `archiveEnabled`'s own established pattern)
  *     -> Desktop Runtime starts EXACTLY ONCE
- *     -> FedosDesktopBetaApplicationAssembly composes ONE Shell/Boundary over
- *        that SAME Runtime (never a second one) + wires the Alpha 4981-5060
- *        Settings Application Coordinator's own startup application
+ *     -> FedosDesktopBetaApplicationAssembly composes ONE Shell/Boundary,
+ *        ONE Navigation Registry, ONE Tray/Badge/Notification/Background-
+ *        Lifecycle Coordinator, and ONE Device Sync Presentation Wiring over
+ *        that SAME Runtime — plus the Alpha 4981-5060 Settings Application
+ *        Coordinator's own startup application
  *     -> ready / locked application state
  *
- * DISCLOSED SCOPE BOUNDARY (Phase C, honest): this file does NOT construct
- * Navigation/Notification-adapter/Tray/Badge/Device-Sync-event-wiring —
- * those remain real, tested, and reachable ONLY through
- * `fedos_electron_badge_main.cts`'s own separate Boundary/Runtime, not this
- * canonical entry point. Composing them into the SAME entry point as this
- * file's own unlock+settings composition is the named, disclosed remaining
- * gap for the next Arc (see the reconciliation report's own Phase R). This
- * file's own real notification port is `FedosElectronNotificationAdapter`
- * (Alpha 4261-4340, UNMODIFIED) directly — no Tray/Badge in this file.
+ * ELECTRON-SIDE ADAPTERS REUSED VERBATIM (Alpha 4261-4340/4341-4420,
+ * UNMODIFIED): `FedosElectronNotificationAdapter`, `FedosElectronTrayAdapter`,
+ * `FedosElectronBadgeAdapter` — the SAME classes `fedos_electron_badge_main.cts`
+ * already proves work; this file constructs exactly one of each and hands
+ * them to the assembly as ports, mirroring that file's own established
+ * "Electron only hosts UI" discipline. `FedosDeviceSyncEventBridge` is
+ * constructed BEFORE `unlockProfile()`/`createProfile()` so its own
+ * `wrapAttemptFn()` can be threaded into the Coordinator's Runtime-
+ * construction config — its `listener` closure reads the module-level
+ * `activeAssembly` (set only AFTER a successful unlock), the IDENTICAL
+ * indirection technique `fedos_electron_badge_main.cts` already established
+ * for its own `wiring`/`eventBridge` pair.
+ *
+ * DISCLOSED SCOPE BOUNDARY (Phase C, honest, restated from this Arc's own
+ * reconciliation report): this file composes ONE window's own Navigation
+ * controller and the Tray/Badge/Notification layer over it; it does not
+ * (yet) build a full multi-window conversation UI — that remains
+ * `fedos_electron_badge_main.cts`'s own more developed renderer surface.
+ * Real, tested, and reachable through IPC here: Navigation Registry session
+ * state, Tray dispatch, Badge refresh/mark-viewed, Background Lifecycle,
+ * Device Sync operational status/start/stop — the SAME real objects a
+ * richer renderer would consume.
  *
  * OWNERSHIP (mirrors `fedos_electron_unlock_main.cts`'s own discipline
  * exactly): at most ONE ready coordinator (`activeCoordinator`) + ONE
@@ -56,6 +78,8 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { FedosElectronNotificationAdapter } from "./fedos_electron_notification_adapter.js";
+import { FedosElectronTrayAdapter } from "./fedos_electron_tray_adapter.js";
+import { FedosElectronBadgeAdapter, type FedosElectronBadgeTrayMenuItemLike } from "./fedos_electron_badge_adapter.js";
 
 const APP_ID = "com.fedos.desktop.beta";
 const APP_VERSION = "0.1.0-beta.1";
@@ -67,6 +91,10 @@ const AUTOTEST_SECRET = process.env.FEDOS_BETA_AUTOTEST_SECRET ?? "";
 
 const MAX_LABEL_CHARS = 128;
 const MAX_SECRET_BYTES = 1024;
+const MAX_ID_LENGTH = 512;
+
+/** Secure Runtime Alpha 5161-5240 — mirrors `fedos_electron_badge_main.cts`'s own identical policy value (`DEVICE_SYNC_ABANDONMENT_POLICY`). */
+const DEVICE_SYNC_ABANDONMENT_POLICY = Object.freeze({ maxAttempts: 5, laterDelaySeconds: 30 });
 
 function dataDir(): string {
   const override = process.env.FEDOS_ELECTRON_BETA_DATA_DIR;
@@ -84,6 +112,11 @@ function artifactDir(): string {
   const override = process.env.FEDOS_ELECTRON_BETA_ARTIFACT_DIR;
   if (override !== undefined && override.length > 0) return override;
   return path.join(__dirname, "..", "..", "fedos-core-rust", "pkg");
+}
+
+/** Secure Runtime Alpha 5161-5240 — the ONE Navigation session-state log for this process (mirrors every other `*.log` leaf's own explicit-path discipline). */
+function navigationLogPath(): string {
+  return path.join(dataDir(), "..", "navigation.log");
 }
 
 const rootDistDir = path.join(__dirname, "..", "..", "..", "dist");
@@ -137,6 +170,34 @@ interface PathsLike {
 interface AssemblyEffectiveStateLike {
   readonly [key: string]: unknown;
 }
+interface NavigationRegistryLike {
+  readonly recentConversationIds: readonly string[];
+  readonly lastOpenedConversationId: string | null;
+  createWindow(windowId: string): unknown;
+  disposeWindow(windowId: string): boolean;
+  recordConversationOpened(conversationId: string): void;
+  sessionState(): unknown;
+}
+interface TrayCoordinatorLike {
+  dispatch(candidate: unknown): Promise<{ readonly action: string; readonly outcome: string; readonly [key: string]: unknown }>;
+}
+interface BadgeCoordinatorLike {
+  refresh(): Promise<{ readonly state: string; readonly count: number; readonly reason: string }>;
+  readonly lastView: { readonly state: string; readonly count: number; readonly reason: string } | null;
+  readonly renderCount: number;
+}
+interface BackgroundLifecycleLike {
+  windowOpened(): string;
+  windowClosed(): string;
+  requestShutdown(): string;
+  confirmShutdown(): string;
+  canRunBackgroundSync(): boolean;
+  canDeliverBackgroundNotifications(): boolean;
+}
+interface DeviceSyncWiringLike {
+  handleEvent(event: unknown): Promise<void>;
+  readonly currentTrayStatus: string;
+}
 interface AssemblyLike {
   readonly settingsCoordinator: {
     previewPlan(candidate: unknown): unknown;
@@ -144,6 +205,11 @@ interface AssemblyLike {
     effectiveState(): AssemblyEffectiveStateLike | null;
   };
   readonly notificationCoordinator: { notify(candidate: unknown): Promise<unknown> };
+  readonly navigationRegistry: NavigationRegistryLike;
+  readonly trayCoordinator: TrayCoordinatorLike;
+  readonly badgeCoordinator: BadgeCoordinatorLike;
+  readonly backgroundLifecycle: BackgroundLifecycleLike;
+  readonly deviceSyncPresentationWiring: DeviceSyncWiringLike;
   shutdown(): Promise<void>;
 }
 type AssemblyResult = { readonly outcome: "ok"; readonly value: AssemblyLike } | { readonly outcome: string; readonly reason: string };
@@ -153,6 +219,21 @@ interface SettingsControllerLike {
 interface NotificationPortLike {
   status(): "available" | "unavailable";
   notify(view: unknown): Promise<{ readonly delivered: boolean; readonly reason: string }>;
+}
+interface BadgePortLike {
+  status(): "available" | "unavailable";
+  render(view: unknown): void;
+}
+interface TrayStatusSinkLike {
+  setTooltip(text: string): void;
+}
+interface ParticipantRefLike {
+  readonly authority: "nostr";
+  readonly publicIdentifier: string;
+  readonly identityId: null;
+}
+interface DeviceSyncEventBridgeLike {
+  wrapAttemptFn(real?: (request: unknown) => Promise<unknown>): (request: unknown) => Promise<unknown>;
 }
 
 interface RootModules {
@@ -171,11 +252,21 @@ interface RootModules {
   readonly UnlockSecret: new (bytes: Uint8Array) => UnlockSecretLike;
   readonly createFileBackedSettingsController: (filePath: string) => SettingsControllerLike;
   readonly BetaApplicationAssembly: {
-    start(deps: { coordinator: CoordinatorLike; settingsController: SettingsControllerLike; notificationPort: NotificationPortLike }): AssemblyResult;
+    start(deps: {
+      coordinator: CoordinatorLike;
+      settingsController: SettingsControllerLike;
+      notificationPort: NotificationPortLike;
+      badgePort: BadgePortLike;
+      trayStatusSink?: TrayStatusSinkLike;
+      viewerParticipant: ParticipantRefLike;
+      navigationLogPath: string;
+    }): AssemblyResult;
   };
   readonly betaCapabilityManifestV1: () => unknown;
   readonly betaReleaseConfigurationV1: () => unknown;
   readonly betaLimitationsV1: () => unknown;
+  readonly DeviceSyncEventBridge: new (deps: { listener: (event: unknown) => void; abandonmentMaxAttempts?: number }) => DeviceSyncEventBridgeLike;
+  readonly fedosDesktopTrayMenuItems: (disabled?: ReadonlySet<string>) => readonly FedosElectronBadgeTrayMenuItemLike[];
 }
 
 async function loadRootModules(): Promise<RootModules> {
@@ -219,6 +310,12 @@ async function loadRootModules(): Promise<RootModules> {
   const limitations = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_limitations.js"))) as {
     fedosDesktopBetaLimitationsV1: RootModules["betaLimitationsV1"];
   };
+  const deviceSyncEventBridgeModule = (await import(distUrl("device", "sync_events", "fedos_device_sync_event_bridge.js"))) as {
+    FedosDeviceSyncEventBridge: RootModules["DeviceSyncEventBridge"];
+  };
+  const trayTypes = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_types.js"))) as {
+    fedosDesktopTrayMenuItems: RootModules["fedosDesktopTrayMenuItems"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -234,11 +331,15 @@ async function loadRootModules(): Promise<RootModules> {
     betaCapabilityManifestV1: capabilityManifest.fedosDesktopBetaCapabilityManifestV1,
     betaReleaseConfigurationV1: releaseConfiguration.fedosDesktopBetaReleaseConfigurationV1,
     betaLimitationsV1: limitations.fedosDesktopBetaLimitationsV1,
+    DeviceSyncEventBridge: deviceSyncEventBridgeModule.FedosDeviceSyncEventBridge,
+    fedosDesktopTrayMenuItems: trayTypes.fedosDesktopTrayMenuItems,
   };
 }
 
 // ---------------------------------------------------------------------
-// Ownership state — mirrors fedos_electron_unlock_main.cts exactly.
+// Ownership state — mirrors fedos_electron_unlock_main.cts /
+// fedos_electron_badge_main.cts exactly. Exactly ONE of each real
+// Electron-side adapter for the lifetime of this process.
 // ---------------------------------------------------------------------
 
 let modules: RootModules | null = null;
@@ -246,15 +347,53 @@ let mainWindow: BrowserWindow | null = null;
 let activeCoordinator: CoordinatorLike | null = null;
 let activeAssembly: AssemblyLike | null = null;
 const notificationAdapter = new FedosElectronNotificationAdapter();
+const trayAdapter = new FedosElectronTrayAdapter();
+let badgeAdapter: FedosElectronBadgeAdapter | null = null;
 let inFlight = false;
 let shutdownInitiated = false;
+let trayCreated = false;
 
 function requireModules(): RootModules {
   if (modules === null) throw new Error("fedos-beta: root modules not loaded");
   return modules;
 }
 
-async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; masterSeedAuthority: MasterSeedAuthorityLike } | null> {
+function baseTrayMenuItems(): readonly FedosElectronBadgeTrayMenuItemLike[] {
+  return requireModules().fedosDesktopTrayMenuItems();
+}
+
+/** Forwards a clicked Tray action's own string to `TrayCoordinator.dispatch()`, then refreshes the badge (mirrors `fedos_electron_badge_main.cts`'s own `handleTrayAction`). */
+async function handleTrayAction(candidate: unknown): Promise<unknown> {
+  if (activeAssembly === null) return { action: "rejected", outcome: "unavailable", reason: "no profile is unlocked" };
+  const outcome = await activeAssembly.trayCoordinator.dispatch(candidate);
+  if (outcome.action === "exit") {
+    await performCleanShutdown();
+  } else {
+    void activeAssembly.badgeCoordinator.refresh();
+  }
+  return outcome;
+}
+
+function onTrayMenuAction(action: string): void {
+  void handleTrayAction({ action });
+}
+
+function refreshTrayMenu(): void {
+  if (!trayCreated) return;
+  trayAdapter.render(baseTrayMenuItems(), onTrayMenuAction);
+}
+
+/**
+ * Secure Runtime Alpha 5161-5240 — builds a fresh, independent Coordinator
+ * (mirrors `fedos_electron_unlock_main.cts`'s own `buildFreshCoordinator()`
+ * exactly), NOW ALSO constructing the ONE `FedosDeviceSyncEventBridge` for
+ * this attempt and threading its `wrapAttemptFn()` into the Coordinator's
+ * own additive `deviceSyncSchedulerEnabled`/`deviceSyncAttemptFn`
+ * dependencies (Phase E) — so the Runtime this Coordinator starts during
+ * `createProfile()`/`unlockProfile()` has the Scheduler enabled from the
+ * very first construction, never a second, later Runtime just to turn it on.
+ */
+async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; masterSeedAuthority: MasterSeedAuthorityLike; eventBridge: DeviceSyncEventBridgeLike } | null> {
   const m = requireModules();
   const attestation = m.createElectronMainHostAttestation({ appId: APP_ID, appVersion: APP_VERSION });
   const activation = await m.activateFedosProductionProfileMasterSeed({
@@ -271,21 +410,43 @@ async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; 
   const paths = m.planFedosLocalProfilePaths(dataDir());
   if (paths === null) return null;
   m.ensureFedosLocalProfileDirectories(paths);
+  // The event bridge's own listener reads `activeAssembly` (set only AFTER a successful
+  // create/unlock + startAssembly()) -- identical indirection to `fedos_electron_badge_main.cts`'s
+  // own `wiring`/`eventBridge` pair, since the Wiring itself cannot exist before the assembly does.
+  const eventBridge = new m.DeviceSyncEventBridge({
+    listener: (event) => {
+      if (activeAssembly !== null) void activeAssembly.deviceSyncPresentationWiring.handleEvent(event);
+    },
+    abandonmentMaxAttempts: DEVICE_SYNC_ABANDONMENT_POLICY.maxAttempts,
+  });
   const coordinator = new m.Coordinator({
     paths,
     profilePersistence: new m.ProfilePersistence(paths.profileDescriptorFile),
     sealedSeedPersistence: new m.SealedSeedPersistence(paths.sealedMasterSeedFile),
     masterSeedAuthority,
     accountSigningAuthority: signer,
+    deviceSyncSchedulerEnabled: true,
+    deviceSyncAbandonmentPolicy: DEVICE_SYNC_ABANDONMENT_POLICY,
+    deviceSyncAttemptFn: eventBridge.wrapAttemptFn(),
   });
-  return { coordinator, masterSeedAuthority };
+  return { coordinator, masterSeedAuthority, eventBridge };
 }
 
-/** Phase C/D — composes the ONE Shell/Boundary + Settings Application Coordinator over the just-unlocked Runtime. Never called before a successful create/unlock. */
-function startAssembly(coordinator: CoordinatorLike): AssemblyLike | null {
+/** Phase C/D/E — composes the ONE Shell/Boundary/Navigation/Tray/Badge/Background/DeviceSyncWiring + Settings Application Coordinator over the just-unlocked Runtime. Never called before a successful create/unlock. */
+function startAssembly(coordinator: CoordinatorLike, readyView: ReadyView): AssemblyLike | null {
   const m = requireModules();
   const settingsController = m.createFileBackedSettingsController(settingsFilePath());
-  const result = m.BetaApplicationAssembly.start({ coordinator, settingsController, notificationPort: notificationAdapter });
+  badgeAdapter = new FedosElectronBadgeAdapter(trayAdapter, () => BrowserWindow.getAllWindows(), baseTrayMenuItems, onTrayMenuAction);
+  const viewerParticipant: ParticipantRefLike = { authority: "nostr", publicIdentifier: readyView.accountPublicIdentifier, identityId: null };
+  const result = m.BetaApplicationAssembly.start({
+    coordinator,
+    settingsController,
+    notificationPort: notificationAdapter,
+    badgePort: badgeAdapter,
+    trayStatusSink: trayAdapter,
+    viewerParticipant,
+    navigationLogPath: navigationLogPath(),
+  });
   if (result.outcome !== "ok" || !("value" in result)) {
     console.error(`fedos-beta: application assembly failed to start (${result.outcome})`);
     return null;
@@ -320,6 +481,10 @@ function validatedSecretBytes(payload: unknown, allowedKeys: readonly string[]):
     return null;
   }
   return bytes;
+}
+
+function isSafeId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_ID_LENGTH;
 }
 
 // ---------------------------------------------------------------------
@@ -363,6 +528,19 @@ function sanitizeStatus(view: StatusView): StatusView {
   };
 }
 
+/** Secure Runtime Alpha 5161-5240 — registers the ONE existing Beta window with the fresh Navigation Registry, creates the ONE shared Tray icon (idempotent), and renders its initial menu + badge. Called exactly once per successful create/unlock. */
+async function attachPresentationLayer(assembly: AssemblyLike): Promise<void> {
+  if (mainWindow !== null) {
+    assembly.navigationRegistry.createWindow(String(mainWindow.id));
+  }
+  if (!trayCreated) {
+    trayAdapter.create("FedOS Desktop Beta");
+    trayCreated = true;
+  }
+  refreshTrayMenu();
+  await assembly.badgeCoordinator.refresh();
+}
+
 async function handleCreate(payload: unknown) {
   if (inFlight) return { outcome: "busy", reason: "another command is in progress" };
   if (activeCoordinator !== null) return { outcome: "already-exists", reason: "a profile is already active" };
@@ -382,13 +560,14 @@ async function handleCreate(payload: unknown) {
     const secret = new (requireModules().UnlockSecret)(secretBytes);
     const result = await built.coordinator.createProfile({ displayLabel: label }, secret);
     if (result.outcome === "ok" && "value" in result) {
-      const assembly = startAssembly(built.coordinator);
+      const assembly = startAssembly(built.coordinator, result.value);
       if (assembly === null) {
         await built.coordinator.lock();
         return { outcome: "failed", reason: "profile created but application assembly failed to start" };
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      await attachPresentationLayer(assembly);
       return readyResult(result.value);
     }
     await built.masterSeedAuthority.clear();
@@ -414,13 +593,14 @@ async function handleUnlock(payload: unknown) {
     const secret = new (requireModules().UnlockSecret)(secretBytes);
     const result = await built.coordinator.unlockProfile(secret);
     if (result.outcome === "ok" && "value" in result) {
-      const assembly = startAssembly(built.coordinator);
+      const assembly = startAssembly(built.coordinator, result.value);
       if (assembly === null) {
         await built.coordinator.lock();
         return { outcome: "failed", reason: "unlocked but application assembly failed to start" };
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      await attachPresentationLayer(assembly);
       return readyResult(result.value);
     }
     await built.masterSeedAuthority.clear();
@@ -430,6 +610,7 @@ async function handleUnlock(payload: unknown) {
   }
 }
 
+/** Phase G — Lock: stops background sync + the ONE Runtime (via the assembly), clears badge/tray to their inert "no active sensitive work" state, THEN the Coordinator's own lock() (safe second call). */
 async function handleLock() {
   if (inFlight) return { outcome: "busy", reason: "another command is in progress" };
   if (activeCoordinator === null) return { outcome: "ok", reason: "already locked" };
@@ -439,11 +620,12 @@ async function handleLock() {
     const assembly = activeAssembly;
     activeCoordinator = null;
     activeAssembly = null;
-    // Stop background sync + the ONE Runtime via the assembly FIRST, then the coordinator's own
-    // lock() (safe to call second -- a non-idempotent Runtime.stop() throw is caught and treated as
-    // already-stopped, mirroring fedos_electron_unlock_main.cts's own documented discipline).
     if (assembly !== null) await assembly.shutdown();
     await coordinator.lock();
+    if (badgeAdapter !== null) {
+      badgeAdapter.render({ state: "none", count: 0, reason: "profile locked" });
+    }
+    refreshTrayMenu();
     return { outcome: "ok" };
   } finally {
     inFlight = false;
@@ -455,9 +637,27 @@ async function handleBetaStatus() {
   const m = requireModules();
   const profileStatus = await handleStatus();
   const settingsEffectiveState = activeAssembly?.settingsCoordinator.effectiveState() ?? null;
+  let navigation: unknown = null;
+  let badge: unknown = null;
+  let background: { canRunBackgroundSync: boolean; canDeliverBackgroundNotifications: boolean } | null = null;
+  let deviceSyncStatus: string | null = null;
+  if (activeAssembly !== null) {
+    navigation = activeAssembly.navigationRegistry.sessionState();
+    badge = activeAssembly.badgeCoordinator.lastView;
+    background = {
+      canRunBackgroundSync: activeAssembly.backgroundLifecycle.canRunBackgroundSync(),
+      canDeliverBackgroundNotifications: activeAssembly.backgroundLifecycle.canDeliverBackgroundNotifications(),
+    };
+    deviceSyncStatus = activeAssembly.deviceSyncPresentationWiring.currentTrayStatus;
+  }
   return {
     profile: profileStatus,
     settingsEffectiveState,
+    navigation,
+    badge,
+    background,
+    trayActive: trayCreated,
+    deviceSyncStatus,
     capabilities: m.betaCapabilityManifestV1(),
     release: m.betaReleaseConfigurationV1(),
     limitations: m.betaLimitationsV1(),
@@ -471,7 +671,18 @@ async function handleSettingsPlan(candidate: unknown) {
 
 async function handleSettingsApply(candidate: unknown) {
   if (activeAssembly === null) return { outcome: "unavailable", reason: "no profile is unlocked" };
-  return activeAssembly.settingsCoordinator.apply(candidate);
+  const result = await activeAssembly.settingsCoordinator.apply(candidate);
+  refreshTrayMenu();
+  return result;
+}
+
+async function handleBadgeMarkViewed(payload: unknown) {
+  if (activeAssembly === null) return { outcome: "unavailable", reason: "no profile is unlocked" };
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isSafeId(conversationId)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  activeAssembly.navigationRegistry.recordConversationOpened(conversationId);
+  const view = await activeAssembly.badgeCoordinator.refresh();
+  return { outcome: "ok", view };
 }
 
 async function performCleanShutdown(): Promise<void> {
@@ -489,13 +700,17 @@ async function performCleanShutdown(): Promise<void> {
       /* never throws */
     }
   }
+  if (badgeAdapter !== null) {
+    badgeAdapter.render({ state: "none", count: 0, reason: "process shutting down" });
+  }
+  trayAdapter.destroy();
   console.log("fedos-beta: shutdown clean");
   app.quit();
 }
 
 // ---------------------------------------------------------------------
-// IPC — `fedos-profile:*` REUSED verbatim (Phase P). New, additive
-// `fedos-beta:*` namespace for status + settings-application only.
+// IPC — `fedos-profile:*` REUSED verbatim (Phase P). Additive `fedos-beta:*`
+// namespace for status/settings-application/tray/badge/background.
 // ---------------------------------------------------------------------
 
 function registerIpcHandlers(): void {
@@ -511,6 +726,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-beta:status", async () => handleBetaStatus());
   ipcMain.handle("fedos-beta:settings-plan", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleSettingsPlan(candidate));
   ipcMain.handle("fedos-beta:settings-apply", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleSettingsApply(candidate));
+  ipcMain.handle("fedos-beta:tray-action", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleTrayAction(candidate));
+  ipcMain.handle("fedos-beta:badge-mark-viewed", async (_e: IpcMainInvokeEvent, payload: unknown) => handleBadgeMarkViewed(payload));
 }
 
 // ---------------------------------------------------------------------
@@ -546,8 +763,16 @@ function createBetaWindow(): BrowserWindow {
   applySecureWindowPolicy(window);
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
+    if (activeAssembly !== null) {
+      activeAssembly.navigationRegistry.disposeWindow(String(window.id));
+      activeAssembly.backgroundLifecycle.windowClosed();
+      void activeAssembly.badgeCoordinator.refresh();
+    }
   });
   void window.loadFile(path.join(__dirname, "fedos_electron_beta_page.html"));
+  if (activeAssembly !== null) {
+    activeAssembly.backgroundLifecycle.windowOpened();
+  }
   return window;
 }
 
@@ -569,10 +794,8 @@ app.whenReady().then(async () => {
   }
 
   if (AUTOTEST_MODE === "create" || AUTOTEST_MODE === "unlock") {
-    // Reuses the unlock package's own renderer self-test technique is out of this Arc's own scope
-    // (its selftest module is package-private to that main); this file's own autotest mode simply
-    // exercises the same IPC commands directly, headless, and logs a coarse pass/fail marker the
-    // acceptance harness can grep for.
+    // This file's own autotest mode exercises the real IPC commands directly, headless, and logs a
+    // coarse pass/fail marker the acceptance harness can grep for.
     void (async () => {
       try {
         const secretPayload = { label: "Beta Autotest", secret: AUTOTEST_SECRET };
@@ -580,6 +803,7 @@ app.whenReady().then(async () => {
         console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_RESULT:${result.outcome}`);
         const status = await handleBetaStatus();
         console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_STATUS:${JSON.stringify(status.profile)}`);
+        console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_COMPOSITION:${JSON.stringify({ navigation: status.navigation !== null, badge: status.badge !== null, tray: status.trayActive, deviceSyncStatus: status.deviceSyncStatus })}`);
       } catch (err) {
         console.error("fedos-beta: autotest error", err instanceof Error ? err.message : String(err));
       } finally {
