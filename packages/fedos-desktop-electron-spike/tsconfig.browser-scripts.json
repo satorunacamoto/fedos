@@ -25,6 +25,8 @@
     "src/fedos_electron_badge_renderer.ts",
     "src/fedos_electron_badge_window.d.ts",
     "src/fedos_electron_unlock_renderer.ts",
-    "src/fedos_electron_unlock_window.d.ts"
+    "src/fedos_electron_unlock_window.d.ts",
+    "src/fedos_electron_settings_selftest.ts",
+    "src/fedos_electron_settings_window.d.ts"
   ]
 }

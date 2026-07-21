@@ -8,6 +8,50 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4901–4980 — Desktop Settings, Relay
+> Configuration, and User Preferences Arc (FULL completion of the additive
+> settings feature; real packaged-Electron round trip environment-blocked by a
+> missing Electron binary, not code).**
+> Architecture frozen and strictly additive: no Runtime / Persistence-mechanism
+> / Crypto / Search / Archive / Device-Sync / Conversation-Runtime source
+> touched, Shell not broken, no new dependency (Electron already present). Zero
+> existing production source file modified — the only existing-file edits are
+> additive script/tsconfig/asset registrations plus this README. A complete,
+> closed-vocabulary settings subsystem was added: `src/settings/`
+> (`FedosSettingsDescriptorV1` / codec / validator / file-backed persistence /
+> authority — REUSING the `FileFedosLocalProfilePersistence` one-JSON-file
+> fail-closed pattern, not a new mechanism), a `FedosDesktopSettingsController`
+> (load/save/reset/validate/export/import), a Settings ViewModel + Renderer
+> over the eight closed screens (General/Appearance/Relay/Notification/Privacy/
+> Archive/Advanced/About), a SEPARATE closed-five-command Host Bridge
+> (`settings-load`/`settings-save`/`settings-reset`/`settings-export`/
+> `settings-import`, reusing the unmodified `FedosDesktopHostResponse`
+> vocabulary), and a preload-only Electron adapter
+> (`fedos_electron_settings_*`: main/preload/dispatch-translation/loader/page/
+> renderer/self-test/window.d.ts — one frozen `window.fedosSettings.invoke`, no
+> `ipcRenderer`/`require`/fs; `contextIsolation:true`/`nodeIntegration:false`/
+> `sandbox:true`/`webSecurity:true` unchanged). The settings vocabulary is
+> closed — Theme / Language / Relay List / Default Relay / Notification Enabled
+> / Background Sync Enabled / Archive Directory / Auto Start / Auto Lock Timeout
+> / Window Layout — with NO free-form key/value (an exact-key-count validator
+> rejects extras) and fail-closed decode (corrupt/tampered/unknown-key/
+> version-mismatch all reject, writing nothing). Phase H acceptance
+> (`test/secure_runtime_alpha_4901_4980_desktop_settings.test.ts`): **31/31**
+> against REAL temp-directory JSON files, NO mocks — first load, save, restart
+> (fresh controller/same file) → exact restore, relay/theme/notification
+> changes, reset, export/import round trip, corrupted file, unknown key,
+> version mismatch, validation error, fail-closed, tampered JSON, the closed
+> host command set, and the Electron dispatch translation. `typecheck:electron`
+> green; `typecheck:core` only the two pre-existing baseline errors (untouched
+> prior-arc test files, measured A/B). Honest Blocker: the Electron `.exe`
+> binary is not downloaded in this worktree, so `electron dist/…settings_main.cjs`
+> cannot launch a real process — the adapter is fully typechecked and its
+> compiled bridge/controller emit to the exact dynamic-import paths, but the
+> real packaged round trip is deferred (same environment class the prior Arc
+> disclosed). `p2p/`/`.tmp_gen/` untouched. Next: Desktop Settings ↔ Runtime
+> Application Arc (apply the durable settings to relay set / notifications /
+> sync / auto-lock / theme behind existing ports).
+
 > **Status: Secure Runtime Alpha 4821–4900 — Packaged Electron Real-Unlock
 > Acceptance and GUI Passphrase-Input Boundary Arc (FULL completion — real
 > packaged renderer→preload→main unlock through real WASM).**

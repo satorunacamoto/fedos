@@ -26,3 +26,5 @@ copyFileSync(join(srcDir, "fedos_electron_notifications_tray_page.html"), join(o
 copyFileSync(join(srcDir, "fedos_electron_badge_page.html"), join(outDir, "fedos_electron_badge_page.html"));
 // Secure Runtime Alpha 4821-4900 -- the Packaged Real-Unlock Arc's own onboarding page.
 copyFileSync(join(srcDir, "fedos_electron_unlock_page.html"), join(outDir, "fedos_electron_unlock_page.html"));
+// Secure Runtime Alpha 4901-4980 -- the Desktop Settings Arc's own settings page.
+copyFileSync(join(srcDir, "fedos_electron_settings_page.html"), join(outDir, "fedos_electron_settings_page.html"));

@@ -17,6 +17,7 @@
     "build:unlock-runtime": "tsc -p tsconfig.unlock-runtime.json",
     "start:runtime": "npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js",
     "build:host-bridge": "tsc -p tsconfig.host-bridge.json",
+    "build:settings-host-bridge": "tsc -p tsconfig.settings-host-bridge.json",
     "build:electron-spike": "npm run build --prefix packages/fedos-desktop-electron-spike",
     "start:electron-spike": "npm run start --prefix packages/fedos-desktop-electron-spike",
     "package:electron-spike": "npm run package --prefix packages/fedos-desktop-electron-spike",
@@ -25,7 +26,8 @@
     "start:electron-navigation": "npm run start:navigation --prefix packages/fedos-desktop-electron-spike",
     "start:electron-notifications-tray": "npm run start:notifications-tray --prefix packages/fedos-desktop-electron-spike",
     "start:electron-badge": "npm run start:badge --prefix packages/fedos-desktop-electron-spike",
-    "start:electron-unlock": "npm run start:unlock --prefix packages/fedos-desktop-electron-spike"
+    "start:electron-unlock": "npm run start:unlock --prefix packages/fedos-desktop-electron-spike",
+    "start:electron-settings": "npm run start:settings --prefix packages/fedos-desktop-electron-spike"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist"
+  },
+  "include": [
+    "src/desktop/settings/fedos_desktop_settings_host_bridge.ts",
+    "src/desktop/settings/fedos_desktop_settings_controller.ts"
+  ]
+}
