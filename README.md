@@ -8,6 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4981–5060 — Desktop Settings Runtime
+> Application and Safe Reconfiguration Arc (FULL completion — persisted
+> settings now visibly affect real live application behavior through accepted
+> boundaries).**
+> Architecture frozen and strictly additive: ZERO existing production source
+> file modified (only new files under `src/settings/application/`,
+> `src/desktop/settings/`, `src/desktop/presentation/`, a new test, docs, and
+> this README). No Runtime / Relay-transport / Device-Sync-Scheduler /
+> Notification / Tray / Badge / Archive / Conversation / Electron-IPC redesign;
+> no new dependency; no Rust/Cargo change; `p2p/`/`.tmp_gen/` untouched. This
+> Arc closes the chain the prior Settings Arc left open: Settings persistence →
+> Authority → **Application Planner** → classified decision → immediate update
+> OR safe subsystem reconfiguration OR runtime-restart-required OR blocked →
+> honest **effective state** the UI renders. The Settings store is NOT a
+> generic remote-control surface: every one of the ten fields is classified
+> into exactly ONE application class, derived from real source inspection —
+> **IMMEDIATE** (theme, windowLayout, notificationsEnabled — applied without
+> reconstructing the Runtime), **SUBSYSTEM** (backgroundSyncEnabled — via the
+> existing `FedosDeviceSyncOperationalFacade.startSync()/stopSync()`, one
+> scheduler, no second timer), **RUNTIME-RESTART** (relays, defaultRelay,
+> archiveDirectory — bound at Runtime construction, no dishonest hot reload),
+> and **UNSUPPORTED/BLOCKED** (language — no localization boundary; autoStart —
+> no OS auto-start boundary; autoLockTimeoutMinutes — no idle/activity
+> boundary; persisted, never falsely claimed applied). WIRED TO REAL LIVE
+> BEHAVIOR (proven with real boundaries, no mocks): theme/windowLayout mutate a
+> live presentation sink; notificationsEnabled gates a real
+> `GatedFedosDesktopNotificationPort` so presentation is suppressed while the
+> canonical event still flows; backgroundSyncEnabled flips a REAL
+> `FedosDeviceSyncScheduler`'s `isRunning()`. New (all additive):
+> `src/settings/application/` (application class table, `FedosSettingsApplicationPlanner`,
+> effective-state model + boundary-safe view), `FedosDesktopSettingsApplicationCoordinator`
+> (validate → persist desired → apply supported actions in operation order →
+> honest per-field effective delta; transaction semantics = persist-then-apply,
+> closed outcome vocabulary distinguishing rejected-before-persist /
+> persisted-and-applied / pending-runtime-restart / persisted-but-blocked /
+> partially-applied / application-failed / rolled-back / rollback-failed), the
+> narrow live-subsystem application ports, a SEPARATE closed four-command
+> application Host Bridge (`settings-application-plan`/`settings-apply`/
+> `settings-effective-state`/`settings-reload-effective-state`, reusing the
+> unmodified `FedosDesktopHostResponse` vocabulary and sending only sanitized,
+> secret-free views toward the renderer), and an application ViewModel/renderer
+> projection. No secret, relay credential, or filesystem path ever crosses the
+> host/renderer boundary (proven). Acceptance
+> (`test/secure_runtime_alpha_4981_5060_settings_runtime_application.test.ts`):
+> **50/50** against REAL file-backed persistence, a REAL notification
+> coordinator/gate, and a REAL device-sync scheduler; `typecheck` green (only
+> the two documented pre-existing baseline errors, measured A/B); full
+> `vitest run` failure set unchanged from base (the documented fresh-worktree
+> raw-import / source-alignment / missing-WASM-`pkg/` failures, none in the
+> settings subsystem). Recommended next Arc: **FedOS Desktop Beta 0.1
+> Integration, Release Candidate, and Acceptance Freeze Arc.**
+
 > **Status: Secure Runtime Alpha 4901–4980 — Desktop Settings, Relay
 > Configuration, and User Preferences Arc (FULL completion of the additive
 > settings feature; real packaged-Electron round trip environment-blocked by a
