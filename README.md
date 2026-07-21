@@ -8,6 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4581–4660 — Desktop Device Registration,
+> Pairing, and Durable Sync Journal Arc (complete).**
+> Architecture frozen: no Registration/Registry/Sync/Electron redesign.
+> Closes both blockers Alpha 4501-4580 named. New `FedosDevicePairingFacade`
+> (`src/desktop/runtime/fedos_device_pairing_facade.ts`) composes the
+> EXISTING Alpha 3161-3240 `FedosDeviceBindingBoundary`/Alpha 2921-3000
+> `FedosDeviceTrustRuntime` — zero owned crypto, zero owned trust truth —
+> reachable end to end: Electron IPC → Host Bridge → Shell (7 new methods)
+> → Facade → real BIP-340 Schnorr account authorization + Device proof of
+> possession → Device Registry. New, versioned, secret-free pairing
+> exchange format (`FedosDevicePairingRequestV1`/`ApprovalV1`) is the
+> transport-neutral port itself — no QR/Bluetooth/LAN/Relay implementation.
+> Electron IPC needed ZERO changes: `fedosElectronHandleInvoke()` was
+> already a generic command-forwarding multiplexer, verified by reading it
+> in full before writing any Electron-adjacent code. Sync Journal gains a
+> real, durable, NDJSON append-only backend (`src/sync/persistence/`),
+> optionally injected with zero behavior change to any pre-existing call
+> site. Real, non-obvious gap found only by testing: making the Journal
+> durable did not, by itself, make Sync-fabric ELIGIBILITY survive a
+> restart (`FedosSyncState`'s own Device Registry is a separate,
+> always-in-memory structure) — fixed with an explicit restart-hydration
+> step re-admitting every durably-`"trusted"` Device via the existing
+> `registerSyncDevice()`. Exact protocol semantics (never overclaimed):
+> registration and revocation are each LOCAL to whichever machine's own
+> Device Registry a call reaches — the Authorizing Device also locally,
+> immediately records the identical verified binding into its OWN
+> Registry (two independent local writes, never a network call, never
+> cryptographic bidirectional trust) — proven via a real two-Shell,
+> two-durable-directory, two-real-process-restart end-to-end test. 11
+> files modified, 8 new production files, 1 new 39-test acceptance suite
+> (no mocks for the headline flow), 2 historical Alpha 3941-4020 tests
+> updated (genuinely stale `available: false` → `true`, unweakened
+> otherwise). Full root suite 1014 files/810 passed/204 failed, 13308
+> tests/13047 passed/261 failed (+1 file/+1 test vs. the immediately-prior
+> Arc's own 1013/810/203, 13269/13009/260 baseline — traced to
+> `test/reviews/**`'s own documented uncommitted-worktree effect, resolves
+> on commit); real Electron subprocess suite unchanged at 108/4/0.
+> Recommended next Arc: Master Seed Unlock, First-Run Onboarding, and
+> Local Profile Initialization.
+>
 > **Status: Secure Runtime Alpha 4501–4580 — Desktop Device Sync Electron
 > Main Integration Arc (complete).**
 > Architecture frozen: no Runtime/Scheduler/Notification/Tray/Badge/Electron

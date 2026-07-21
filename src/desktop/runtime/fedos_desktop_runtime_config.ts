@@ -391,4 +391,47 @@ export interface FedosDesktopRuntimeConfig {
   readonly deviceSyncTransferSessionLogPath?: string;
   /** Explicit, caller-supplied path to the Relay Sync Observation append-only log file. Omitted, in-memory. Used ONLY to distinguish `relayAccepted` from `deviceImported` on a Transfer Session view -- never to reconstruct a raw Relay event. */
   readonly deviceSyncRelaySyncObservationLogPath?: string;
+
+  /**
+   * Secure Runtime Alpha 4581–4660 ("Desktop Device Registration, Pairing,
+   * and Durable Sync Journal Arc"). Meaningful ONLY when `deviceTrustEnabled`
+   * is also `true` -- the Pairing Boundary (`runtime.deviceBinding()`)
+   * reuses the SAME `deviceRegistryLogPath`/in-memory Device Registry
+   * backend `FedosDeviceTrustRuntime` already owns (Phase A §8's own
+   * "stateless read-through orchestrator, safe to construct a second thin
+   * instance over the identical durable backend" finding) -- never a
+   * second Device Registry. Omitted or `deviceTrustEnabled: false`,
+   * `runtime.deviceBinding()` throws `"not enabled"`, the SAME two-state
+   * fail-closed contract `deviceTrust()` itself already uses.
+   */
+  readonly deviceBindingChallengeReplayLogPath?: string;
+  /** Optional; omitted, `FEDOS_DEVICE_BINDING_DEFAULT_LIMITS` (300s challenge TTL) applies -- see `../../device/binding_challenge/fedos_device_binding_boundary_factory.ts`. */
+  readonly deviceBindingChallengeTtlSeconds?: number;
+  /**
+   * OPTIONAL — this runtime constructs no Signing Authority of its own
+   * (mirrors `conversationTransportSigningAuthority`'s/
+   * `conversationPrivateNostrSigningAuthority`'s own identical "the caller
+   * supplies a real, already-constructed one" discipline). Required only to
+   * ACT as the Authorizing Device in a real pairing exchange
+   * (`runtime.devicePairing().approvePairingRequest()`/`revokeDevice()`).
+   * Omitted, those two methods report `"disabled"`; every other
+   * `FedosDevicePairingFacade` method (`createPairingRequest`,
+   * `inspectPairingRequest`, `completePairing`, `registrationStatus`,
+   * `listPendingPairings`) needs no account signing capability at all and
+   * remains fully available regardless.
+   */
+  readonly deviceBindingAccountSigningAuthority?: FedosNostrSigningAuthority;
+  /** Optional; omitted, account index `0` applies (mirrors `nostrAccountIndex`/`conversationTransportAccountIndex`). */
+  readonly deviceBindingAccountIndex?: number;
+  /**
+   * Explicit, caller-supplied path to the durable Sync Journal append-only
+   * log file (Phase F). Meaningful ONLY when `deviceTrustEnabled` is also
+   * `true` -- the SAME `FedosSyncState`/`FedosSyncJournal` instance the
+   * Scheduler/Import Coordinator already share. Omitted, the Sync Journal
+   * remains exactly what it always was on this base: a pure in-memory
+   * ledger, lost on every restart (see `./fedos_device_trust_runtime.ts`'s
+   * own long-documented restart limitation, now closable by supplying this
+   * field).
+   */
+  readonly deviceSyncJournalLogPath?: string;
 }

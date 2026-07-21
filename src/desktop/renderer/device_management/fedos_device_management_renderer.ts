@@ -154,7 +154,7 @@ export class FedosDeviceManagementRenderer {
   // Phase F — Registration / Revocation confirmation.
   // ---------------------------------------------------------------------
 
-  renderRegistration(): FedosDesktopRenderModel<{ readonly title: string; readonly available: false; readonly reason: string }> {
+  renderRegistration(): FedosDesktopRenderModel<{ readonly title: string; readonly available: true; readonly reason: string }> {
     const content = this.#controller.registrationContent;
     return Object.freeze({ kind: "content", content: { title: "Device Registration", available: content.available, reason: content.reason } });
   }

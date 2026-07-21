@@ -38,6 +38,10 @@ import { FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES, type FedosConversationParti
 import { FEDOS_CONVERSATION_DIRECT_MESSAGE_MAX_BODY_LENGTH } from "../../conversation/messaging/fedos_conversation_direct_message_plaintext_policy.js";
 import type { CreateDirectDraftCommand, CreatePrivateGroupDraftCommand } from "../../conversation/construction/fedos_private_conversation_construction_command.js";
 import type { FedosConversationListFilter } from "../shell/fedos_desktop_shell_view_models.js";
+// Secure Runtime Alpha 4581-4660 -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring this file's own established pattern.
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import { FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH } from "../../device/binding_challenge/fedos_device_binding_pairing_exchange.js";
 
 /** This layer's own bound for id-shaped strings (conversation/message ids) -- mirrors the "512, non-empty" bound this codebase's own domain validators already apply pervasively to ids (e.g. `fedos_group_message.ts`/`fedos_group_direct_path.ts`'s own `MAX_STRING_LENGTH`), restated here since this Host layer sits ABOVE those domains and must reject an oversized/malformed id before it ever reaches them. */
 export const FEDOS_DESKTOP_HOST_MAX_ID_LENGTH = 512;
@@ -47,6 +51,9 @@ export const FEDOS_DESKTOP_HOST_MAX_QUERY_LENGTH = 500;
 
 /** This layer's own bound for a filesystem path string passed to `archive-inspect` -- generous enough for a real path, still a hard ceiling against an unbounded string. */
 export const FEDOS_DESKTOP_HOST_MAX_PATH_LENGTH = 4096;
+
+/** This layer's own bound for an encoded pairing exchange record -- mirrors `FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH` (Phase C's own hard ceiling), restated here as a STRING length bound (UTF-8 byte length is checked again, and authoritatively, by `decodeFedosDevicePairing*V1()` itself) so an absurdly long string can never even reach `JSON.parse()` inside this layer's own downstream call. */
+export const FEDOS_DESKTOP_HOST_MAX_PAIRING_RECORD_LENGTH = FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH;
 
 export type FedosDesktopHostCommand =
   | { readonly type: "runtime-status"; readonly requestId?: string }
@@ -69,7 +76,15 @@ export type FedosDesktopHostCommand =
   | { readonly type: "membership-list"; readonly conversationId: string; readonly requestId?: string }
   | { readonly type: "invitation-descriptor"; readonly conversationId: string; readonly issuer: FedosConversationParticipantReference; readonly requestId?: string }
   | { readonly type: "search"; readonly query: string; readonly requestId?: string }
-  | { readonly type: "archive-inspect"; readonly sourcePath: string; readonly requestId?: string };
+  | { readonly type: "archive-inspect"; readonly sourcePath: string; readonly requestId?: string }
+  // Secure Runtime Alpha 4581-4660 -- Device Registration/Pairing commands.
+  | { readonly type: "device-pairing-create"; readonly deviceId: string; readonly expectedAccountRef: FedosDeviceBindingAccountRef; readonly requestId?: string }
+  | { readonly type: "device-pairing-inspect"; readonly encodedRequest: string; readonly requestId?: string }
+  | { readonly type: "device-pairing-approve"; readonly encodedRequest: string; readonly requestId?: string }
+  | { readonly type: "device-pairing-complete"; readonly pairingId: string; readonly encodedApproval: string; readonly requestId?: string }
+  | { readonly type: "device-pairings-list"; readonly requestId?: string }
+  | { readonly type: "device-revoke"; readonly deviceId: string; readonly devicePublicKeyHex: string; readonly requestId?: string }
+  | { readonly type: "device-registration-status"; readonly deviceId: string; readonly requestId?: string };
 
 function isNonEmptyBoundedString(value: unknown, maxLength: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= maxLength;
@@ -98,6 +113,20 @@ function isSafeArchivePath(value: unknown): value is string {
 
 function optionalRequestId(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 && value.length <= FEDOS_DESKTOP_HOST_MAX_ID_LENGTH ? value : undefined;
+}
+
+/** Structural shape check only -- mirrors `isParticipantReference()`'s own discipline, but `authority` is NOT restricted to `FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES` (a Device Binding account authority is a separate, Device-Registry-scoped concept, see `../../device/fedos_device_binding.ts`) -- structural non-empty-bounded-string only. */
+function isDeviceBindingAccountRef(value: unknown): value is FedosDeviceBindingAccountRef {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  if (!isNonEmptyBoundedString(candidate.authority, FEDOS_DESKTOP_HOST_MAX_ID_LENGTH)) return false;
+  if (!isNonEmptyBoundedString(candidate.publicIdentifier, FEDOS_DESKTOP_HOST_MAX_ID_LENGTH)) return false;
+  if (candidate.identityId !== null && !isNonEmptyBoundedString(candidate.identityId, FEDOS_DESKTOP_HOST_MAX_ID_LENGTH)) return false;
+  return true;
+}
+
+function isPairingRecord(value: unknown): value is string {
+  return isNonEmptyBoundedString(value, FEDOS_DESKTOP_HOST_MAX_PAIRING_RECORD_LENGTH);
 }
 
 /**
@@ -210,6 +239,55 @@ export function validateFedosDesktopHostCommand(candidate: unknown): FedosDeskto
       if (!isSafeArchivePath(c.sourcePath)) return null;
       const sourcePath = c.sourcePath;
       return requestId === undefined ? { type: "archive-inspect", sourcePath } : { type: "archive-inspect", sourcePath, requestId };
+    }
+
+    // Secure Runtime Alpha 4581-4660 -- Device Registration/Pairing commands.
+    case "device-pairing-create": {
+      if (!isId(c.deviceId)) return null;
+      if (!isDeviceBindingAccountRef(c.expectedAccountRef)) return null;
+      const deviceId = c.deviceId;
+      const expectedAccountRef = c.expectedAccountRef;
+      return requestId === undefined
+        ? { type: "device-pairing-create", deviceId, expectedAccountRef }
+        : { type: "device-pairing-create", deviceId, expectedAccountRef, requestId };
+    }
+
+    case "device-pairing-inspect":
+    case "device-pairing-approve": {
+      if (!isPairingRecord(c.encodedRequest)) return null;
+      const encodedRequest = c.encodedRequest;
+      return requestId === undefined ? { type: c.type, encodedRequest } : { type: c.type, encodedRequest, requestId };
+    }
+
+    case "device-pairing-complete": {
+      if (!isId(c.pairingId)) return null;
+      if (!isPairingRecord(c.encodedApproval)) return null;
+      const pairingId = c.pairingId;
+      const encodedApproval = c.encodedApproval;
+      return requestId === undefined
+        ? { type: "device-pairing-complete", pairingId, encodedApproval }
+        : { type: "device-pairing-complete", pairingId, encodedApproval, requestId };
+    }
+
+    case "device-pairings-list":
+      return requestId === undefined ? { type: "device-pairings-list" } : { type: "device-pairings-list", requestId };
+
+    case "device-revoke": {
+      if (!isId(c.deviceId)) return null;
+      if (!isId(c.devicePublicKeyHex)) return null;
+      const deviceId = c.deviceId;
+      const devicePublicKeyHex = c.devicePublicKeyHex;
+      return requestId === undefined
+        ? { type: "device-revoke", deviceId, devicePublicKeyHex }
+        : { type: "device-revoke", deviceId, devicePublicKeyHex, requestId };
+    }
+
+    case "device-registration-status": {
+      if (!isId(c.deviceId)) return null;
+      const deviceId = c.deviceId;
+      return requestId === undefined
+        ? { type: "device-registration-status", deviceId }
+        : { type: "device-registration-status", deviceId, requestId };
     }
 
     default:

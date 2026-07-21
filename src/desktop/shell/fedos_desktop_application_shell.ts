@@ -85,6 +85,19 @@ import type {
 } from "../runtime/fedos_device_sync_operational_facade.js";
 import type { FedosDeviceSyncTickEntry } from "../../device/sync_scheduler/fedos_device_sync_scheduler.js";
 import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+// Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
+// Durable Sync Journal Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 3801-3880 boundary above.
+import type {
+  FedosDevicePairingApprovalOutcomeView,
+  FedosDevicePairingBindingView,
+  FedosDevicePairingOutcomeKind,
+  FedosDevicePairingRequestInspectionView,
+  FedosDevicePairingRequestSummary,
+  FedosDevicePairingResult,
+} from "../runtime/fedos_device_pairing_facade.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import { generateFedosDeviceSigningKeypair, type FedosDeviceSigningKeypair } from "../../device/crypto/fedos_device_signing_keypair.js";
 
 /** A bare `FedosDesktopShellFailure` object — unlike `fedosDesktopShellFailure()`, whose return type is the full `FedosDesktopShellResult<T>` union, for the internal call sites below that need exactly this narrower shape (e.g. `#validateSendPreconditions`'s own `FedosDesktopShellFailure | null` return). */
 function shellFailure(outcome: FedosDesktopShellOutcomeKind, reason: string): FedosDesktopShellFailure {
@@ -117,6 +130,36 @@ const DEVICE_SYNC_OUTCOME_TO_SHELL_OUTCOME: Readonly<Record<Exclude<FedosDeviceS
 function mapDeviceSyncFacadeResult<T>(result: FedosDeviceSyncOperationalResult<T>): FedosDesktopShellResult<T> {
   if (result.outcome === "ok") return fedosDesktopShellOk(result.value);
   return fedosDesktopShellFailure(DEVICE_SYNC_OUTCOME_TO_SHELL_OUTCOME[result.outcome], result.reason);
+}
+
+/**
+ * Secure Runtime Alpha 4581-4660 -- maps `FedosDevicePairingResult<T>`'s own
+ * closed, pairing-specific outcome vocabulary onto the Shell's EXISTING
+ * `FedosDesktopShellOutcomeKind` (unmodified, per this Arc's own "do not
+ * widen a shared, previously-accepted vocabulary" discipline) -- several
+ * pairing outcomes collapse onto the SAME existing Shell bucket; the
+ * fine-grained distinction (`"expired"`/`"replayed"`/`"revoked"`/
+ * `"wrong-account"`) is NEVER lost, only carried forward verbatim inside
+ * `result.reason`'s own already-descriptive text, exactly like every other
+ * mapping function in this file already does for its own source union.
+ */
+const DEVICE_PAIRING_OUTCOME_TO_SHELL_OUTCOME: Readonly<Record<Exclude<FedosDevicePairingOutcomeKind, "ok">, FedosDesktopShellOutcomeKind>> = Object.freeze({
+  disabled: "unsupported",
+  unavailable: "unavailable",
+  "not-found": "not-found",
+  "invalid-input": "invalid-input",
+  malformed: "invalid-input",
+  expired: "invalid-input",
+  replayed: "conflict",
+  revoked: "conflict",
+  "wrong-account": "unauthorized",
+  conflict: "conflict",
+  failed: "failed",
+});
+
+function mapDevicePairingFacadeResult<T>(result: FedosDevicePairingResult<T>): FedosDesktopShellResult<T> {
+  if (result.outcome === "ok") return fedosDesktopShellOk(result.value);
+  return fedosDesktopShellFailure(DEVICE_PAIRING_OUTCOME_TO_SHELL_OUTCOME[result.outcome], result.reason);
 }
 
 function toShellMessageView(view: FedosContentAccessorMessageView): FedosMessageView {
@@ -159,6 +202,19 @@ function participantsEqual(a: FedosConversationParticipantReference, b: FedosCon
 export class FedosDesktopApplicationShell {
   #runtime: FedosRunningDesktopRuntime | null = null;
   readonly #knownConversationIds = new Set<string>();
+  /**
+   * Secure Runtime Alpha 4581-4660 -- the ONE place a JOINING Device's own
+   * ephemeral `FedosDeviceSigningKeypair` is held in-process, keyed by
+   * `pairingId`. This is the boundary that makes Phase J's "never expose
+   * Device private keys" true across a REAL Electron IPC hop: a renderer
+   * only ever sends/receives `deviceId`/`pairingId`/encoded-record strings
+   * -- the raw keypair object never crosses `dispatch()` in either
+   * direction. Cleared unconditionally once `devicePairingComplete()` has
+   * been attempted for a given `pairingId`, mirroring
+   * `FedosDevicePairingFacade`'s own identical "consumed regardless of
+   * outcome" bookkeeping discipline.
+   */
+  readonly #pairingKeypairsByPairingId = new Map<string, FedosDeviceSigningKeypair>();
 
   private constructor() {}
 
@@ -465,6 +521,96 @@ export class FedosDesktopApplicationShell {
       return mapDeviceSyncFacadeResult(this.#runtime.deviceSyncOperational().acknowledgeConflict(conflictId, action));
     } catch {
       return fedosDesktopShellFailure("unsupported", "Device Sync is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 4581-4660 -- Device Registration/Pairing commands.
+  // Every method below delegates ENTIRELY to
+  // `FedosRunningDesktopRuntime.devicePairing()` -- this Shell owns no
+  // cryptographic implementation or independent trust truth, only maps that
+  // facade's own closed outcomes onto this Shell's existing result
+  // vocabulary (see `mapDevicePairingFacadeResult()` above) and owns the
+  // one thing the facade deliberately does NOT: the ephemeral in-process
+  // Device keypair a real Electron IPC caller can never itself hold
+  // (`#pairingKeypairsByPairingId` above).
+  // ---------------------------------------------------------------------
+
+  /** JOINING Device: generates a fresh, independent Device keypair, mints a real challenge + this Device's own proof of possession, and returns the encoded, bounded pairing request string ready for manual transfer to the Authorizing Device. */
+  devicePairingCreate(deviceId: string, expectedAccountRef: FedosDeviceBindingAccountRef): FedosDesktopShellResult<{ readonly pairingId: string; readonly encoded: string }> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      const keypair = generateFedosDeviceSigningKeypair();
+      const result = this.#runtime.devicePairing().createPairingRequest(deviceId, keypair, expectedAccountRef);
+      if (result.outcome === "ok") {
+        this.#pairingKeypairsByPairingId.set(result.value.pairingId, keypair);
+      }
+      return mapDevicePairingFacadeResult(result);
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** Ephemeral, in-process bookkeeping only -- see `FedosDevicePairingFacade.listPendingPairings()`'s own header. Never the source of registration truth. */
+  devicePairingsList(): FedosDesktopShellResult<readonly FedosDevicePairingRequestSummary[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDevicePairingFacadeResult(this.#runtime.devicePairing().listPendingPairings());
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** AUTHORIZING Device: safe, read-only inspection of an inbound encoded pairing request -- re-verifies the embedded Device proof of possession (no secret required), never mutates anything. */
+  devicePairingInspect(encodedRequest: string): FedosDesktopShellResult<FedosDevicePairingRequestInspectionView> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDevicePairingFacadeResult(this.#runtime.devicePairing().inspectPairingRequest(encodedRequest));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** AUTHORIZING Device: signs a real account authorization over the inbound request's own challenge and returns the encoded approval for manual transfer back to the Joining Device. Requires `config.deviceBindingAccountSigningAuthority`. */
+  async devicePairingApprove(encodedRequest: string): Promise<FedosDesktopShellResult<FedosDevicePairingApprovalOutcomeView>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDevicePairingFacadeResult(await this.#runtime.devicePairing().approvePairingRequest(encodedRequest));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** JOINING Device: completes registration using the in-process keypair this Shell generated in `devicePairingCreate()`. Consumes (removes) that keypair regardless of outcome. */
+  async devicePairingComplete(pairingId: string, encodedApproval: string): Promise<FedosDesktopShellResult<FedosDevicePairingBindingView>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const keypair = this.#pairingKeypairsByPairingId.get(pairingId);
+    this.#pairingKeypairsByPairingId.delete(pairingId);
+    if (keypair === undefined) return fedosDesktopShellFailure("not-found", `no in-process Device keypair for pairingId "${pairingId}" -- either unknown, already completed, or created in a different process`);
+    try {
+      return mapDevicePairingFacadeResult(await this.#runtime.devicePairing().completePairing(pairingId, keypair, encodedApproval));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** AUTHORIZING Device: revokes a Device binding by account authorization alone. Requires `config.deviceBindingAccountSigningAuthority`. Terminal on this Runtime's own local Registry. */
+  async deviceRevoke(deviceId: string, devicePublicKeyHex: string): Promise<FedosDesktopShellResult<FedosDevicePairingBindingView>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDevicePairingFacadeResult(await this.#runtime.devicePairing().revokeDevice(deviceId, devicePublicKeyHex));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
+    }
+  }
+
+  /** Either Device: the real, current registration/trust/sync-eligibility status for `deviceId` on THIS local Registry. */
+  deviceRegistrationStatus(deviceId: string): FedosDesktopShellResult<FedosDevicePairingBindingView> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    try {
+      return mapDevicePairingFacadeResult(this.#runtime.devicePairing().registrationStatus(deviceId));
+    } catch {
+      return fedosDesktopShellFailure("unsupported", "Device Pairing is not enabled on this Runtime -- see config.deviceTrustEnabled");
     }
   }
 

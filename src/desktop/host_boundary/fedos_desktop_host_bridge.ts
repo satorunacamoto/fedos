@@ -228,6 +228,38 @@ export class FedosDesktopHostBridge implements FedosDesktopHostPort {
           const state = await boundary.archive.inspect(validated.sourcePath);
           return fedosHostResponseFromViewModelState(state, requestId);
         }
+        // Secure Runtime Alpha 4581-4660 -- Device Registration/Pairing
+        // commands. Each delegates DIRECTLY to `boundary.shell`, the SAME
+        // pattern `conversation-create-direct`/`conversation-create-group`
+        // above already use for a Shell method with no dedicated ViewModel.
+        case "device-pairing-create": {
+          const result = boundary.shell.devicePairingCreate(validated.deviceId, validated.expectedAccountRef);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "device-pairing-inspect": {
+          const result = boundary.shell.devicePairingInspect(validated.encodedRequest);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "device-pairing-approve": {
+          const result = await boundary.shell.devicePairingApprove(validated.encodedRequest);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "device-pairing-complete": {
+          const result = await boundary.shell.devicePairingComplete(validated.pairingId, validated.encodedApproval);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "device-pairings-list": {
+          const result = boundary.shell.devicePairingsList();
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "device-revoke": {
+          const result = await boundary.shell.deviceRevoke(validated.deviceId, validated.devicePublicKeyHex);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "device-registration-status": {
+          const result = boundary.shell.deviceRegistrationStatus(validated.deviceId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
       }
     } catch {
       return fedosHostFailure("failed", "command failed", requestId);

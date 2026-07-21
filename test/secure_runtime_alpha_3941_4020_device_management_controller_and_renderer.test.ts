@@ -259,7 +259,22 @@ describe("Secure Runtime Alpha 3941-4020 -- 8/9/33. Device list filters, detail,
 });
 
 describe("Secure Runtime Alpha 3941-4020 -- 10/11/12/13/14. registration and revocation flows", () => {
-  it("10. registration is honestly unavailable on this base -- no fabricated challenge/success", async () => {
+  // NOTE (genuinely stale, updated per Alpha 4101-4180's own "update
+  // historical exact-shape tests only when genuinely stale" instruction --
+  // mirrors the identical precedent in
+  // `secure_runtime_alpha_3941_4020_security_boundary_guards.test.ts`'s own
+  // #13/#14 comments): tests 10 and 13 below originally asserted
+  // `available`/`confirmAvailable` were honestly `false` on Alpha 3941-4020's
+  // OWN base, since no real Shell/Facade registration command existed yet
+  // (that Arc's own documented finding). Secure Runtime Alpha 4581-4660
+  // (Desktop Device Registration, Pairing, and Durable Sync Journal Arc)
+  // closes exactly that gap -- `FedosDesktopApplicationShell.devicePairingCreate()`/
+  // `devicePairingInspect()`/`devicePairingApprove()`/`devicePairingComplete()`/
+  // `deviceRevoke()` now exist for real. `available`/`confirmAvailable` are
+  // updated to their new, honest value; every OTHER assertion in these two
+  // tests (screen identity, exact Device, exact warning text) is preserved
+  // unweakened.
+  it("10. registration is available for real -- a real Shell/Facade pairing command exists (Alpha 4581-4660)", async () => {
     const dir = makeTmpDir();
     try {
       const { boundary, renderer } = await startAndTrust(dir);
@@ -267,7 +282,7 @@ describe("Secure Runtime Alpha 3941-4020 -- 10/11/12/13/14. registration and rev
       const rendered = renderer.deviceManagement.renderRegistration();
       expect(rendered.kind).toBe("content");
       if (rendered.kind === "content") {
-        expect(rendered.content.available).toBe(false);
+        expect(rendered.content.available).toBe(true);
         expect(rendered.content.reason.length).toBeGreaterThan(0);
       }
       expect(boundary.deviceManagement.navigation.screen).toBe("registration");
@@ -277,7 +292,7 @@ describe("Secure Runtime Alpha 3941-4020 -- 10/11/12/13/14. registration and rev
     }
   });
 
-  it("13. revocation confirmation -- identifies the exact Device, states terminality and non-erasure, confirm is honestly unavailable", async () => {
+  it("13. revocation confirmation -- identifies the exact Device, states terminality and non-erasure, confirm is available for real (Alpha 4581-4660)", async () => {
     const dir = makeTmpDir();
     try {
       await seedDevices(dir, [{ deviceId: "dev-B", label: "laptop", confirm: true }]);
@@ -292,7 +307,7 @@ describe("Secure Runtime Alpha 3941-4020 -- 10/11/12/13/14. registration and rev
         expect(rendered.content.confirmationText).toContain("laptop");
         expect(rendered.content.terminalWarning.toLowerCase()).toContain("terminal");
         expect(rendered.content.noRemoteErasureWarning.toLowerCase()).toContain("not remotely erased");
-        expect(rendered.content.confirmAvailable).toBe(false);
+        expect(rendered.content.confirmAvailable).toBe(true);
       }
       await boundary.runtimeStatus.stop();
     } finally {

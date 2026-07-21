@@ -121,25 +121,29 @@ export function fedosDeviceManagementFilterDevices(devices: readonly FedosDevice
 // ---------------------------------------------------------------------
 
 /**
- * Honest, real fact (Phase A §20 / Phase F's own "if no complete Shell
- * registration command exists, complete the screen models that can be
- * real and stop at the exact missing command boundary"): no
- * `registerDevice`/`mintChallenge`/`confirmTrust` command exists anywhere
- * on `FedosDesktopApplicationShell`/`FedosDeviceSyncOperationalFacade` on
- * this base. This screen therefore always reports `available: false` —
- * mirroring `deviceStatus()`'s own established "real, intentional,
- * non-placeholder unavailable" precedent, never a fabricated challenge or
- * a fake success.
+ * Secure Runtime Alpha 4581–4660 ("Desktop Device Registration, Pairing,
+ * and Durable Sync Journal Arc") — Phase I: closes the exact gap Alpha
+ * 3941-4020 Phase A named. `FedosDesktopApplicationShell.devicePairingCreate()`/
+ * `devicePairingInspect()`/`devicePairingApprove()`/`devicePairingComplete()`/
+ * `deviceRevoke()` now exist for real (`../../shell/fedos_desktop_application_shell.ts`).
+ * `available`/`confirmAvailable` report `true` unconditionally here — the
+ * ACTION is always offered by this screen; whether a specific attempt
+ * actually succeeds depends on live Runtime state (`config.deviceTrustEnabled`,
+ * whether an account signing capability was configured for this Runtime)
+ * that only becomes known once the action is actually invoked (mirrors every OTHER action in this
+ * file, e.g. `"start-sync"`: always offered, its own real outcome surfaces
+ * through the ViewModel's own error state on an actual attempt, never a
+ * static pre-check here).
  */
 export interface FedosDeviceManagementRegistrationContent {
-  readonly available: false;
+  readonly available: true;
   readonly reason: string;
 }
 
 export function fedosDeviceManagementBuildRegistration(): FedosDeviceManagementRegistrationContent {
   return Object.freeze({
-    available: false,
-    reason: "Device registration has no Shell/Facade command on this base -- see Alpha 3941-4020 Phase A finding.",
+    available: true,
+    reason: "Device registration is available through FedosDesktopApplicationShell.devicePairingCreate()/devicePairingInspect()/devicePairingApprove()/devicePairingComplete() -- see Alpha 4581-4660.",
   });
 }
 
@@ -149,9 +153,8 @@ export interface FedosDeviceManagementRevocationConfirmationContent {
   readonly confirmationText: string;
   readonly terminalWarning: string;
   readonly noRemoteErasureWarning: string;
-  /** `false` on this base -- no `revokeDevice()` command exists on the Shell/Facade (only `runtime.deviceTrust().revokeDevice()`, unreachable from this presentation layer without a new Shell command this Arc does not add). */
-  readonly confirmAvailable: false;
-  readonly confirmUnavailableReason: string;
+  readonly confirmAvailable: true;
+  readonly confirmUnavailableReason: string | null;
 }
 
 export function fedosDeviceManagementBuildRevocationConfirmation(device: FedosDeviceSyncDeviceView): FedosDeviceManagementRevocationConfirmationContent {
@@ -161,8 +164,8 @@ export function fedosDeviceManagementBuildRevocationConfirmation(device: FedosDe
     confirmationText: `Revoke Device "${device.label ?? device.deviceId}"? This cannot be undone.`,
     terminalWarning: "Revocation is terminal -- a revoked Device can never be trusted again under this same Device id.",
     noRemoteErasureWarning: "Data already delivered to this Device before revocation is not remotely erased.",
-    confirmAvailable: false,
-    confirmUnavailableReason: "Device revocation has no Shell/Facade command on this base -- see Alpha 3941-4020 Phase A finding.",
+    confirmAvailable: true,
+    confirmUnavailableReason: null,
   });
 }
 

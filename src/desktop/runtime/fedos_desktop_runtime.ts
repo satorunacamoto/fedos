@@ -212,6 +212,18 @@ import { AppendOnlyFedosDeviceRelaySyncObservationRepository } from "../../devic
 import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
 import { FedosDeviceSyncOperationalFacade, type FedosDeviceSyncOperationalFacadeDeps } from "./fedos_device_sync_operational_facade.js";
 
+// Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
+// Durable Sync Journal Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1471-1540 boundary comment above.
+import { createFedosDeviceBindingBoundary } from "../../device/binding_challenge/fedos_device_binding_boundary_factory.js";
+import type { FedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/fedos_device_binding_challenge_replay_persistence.js";
+import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { FedosDevicePairingFacade } from "./fedos_device_pairing_facade.js";
+import type { FedosSyncJournalPersistence } from "../../sync/persistence/fedos_sync_journal_persistence.js";
+import { AppendOnlyFedosSyncJournalPersistence } from "../../sync/persistence/append_only_fedos_sync_journal_persistence.js";
+import { InMemoryFedosSyncJournalPersistence } from "../../sync/persistence/in_memory_fedos_sync_journal_persistence.js";
+
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
 /** Alpha 1471-1540 -- Mailbox Delivery's own default tick cadence when `conversationTransportIntervalMs` is omitted. Mirrors the Board delivery loop's own `DEFAULT_DELIVERY_INTERVAL_MS` (`../host/fedos_desktop_host.ts`, Alpha 507) — same value, a separate constant since that one is not exported. */
@@ -319,6 +331,20 @@ export interface FedosRunningDesktopRuntime {
    */
   deviceSyncOperational(): FedosDeviceSyncOperationalFacade;
   /**
+   * Secure Runtime Alpha 4581–4660 — the `FedosDevicePairingFacade`
+   * (`./fedos_device_pairing_facade.js`) this running Local Runtime owns,
+   * constructed ONLY when `config.deviceTrustEnabled` was `true` (the SAME
+   * gate `deviceTrust()`/`deviceSyncOperational()` themselves use — this
+   * facade composes the SAME `FedosDeviceTrustRuntime` instance plus a
+   * `FedosDeviceBindingBoundary` built over the SAME Device Registry
+   * persistence backend, never a second Device Registry — see Phase A §8 of
+   * this Arc's own execution spec). Throws `"not enabled"` if it was never
+   * configured, and throws `"inaccessible after stop"` once `stop()` has
+   * been called — the SAME two-state fail-closed contract every other
+   * accessor on this handle already uses.
+   */
+  devicePairing(): FedosDevicePairingFacade;
+  /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
    * `host.stopDelivery()` first (itself already guarantees "no new
@@ -424,6 +450,14 @@ export async function startFedosDesktopRuntime(
   }
   if (config.deviceRegistryLogPath !== undefined) {
     ensureParentDirectoryExists(config.deviceRegistryLogPath);
+  }
+  // Secure Runtime Alpha 4581-4660 -- the Pairing Boundary's replay log and
+  // the durable Sync Journal log.
+  if (config.deviceBindingChallengeReplayLogPath !== undefined) {
+    ensureParentDirectoryExists(config.deviceBindingChallengeReplayLogPath);
+  }
+  if (config.deviceSyncJournalLogPath !== undefined) {
+    ensureParentDirectoryExists(config.deviceSyncJournalLogPath);
   }
   // Alpha 923 -- the private-Conversation draft runtime's own logs.
   for (const path of [
@@ -688,6 +722,10 @@ export async function startFedosDesktopRuntime(
   // binding and must not be created before it exists in this function's
   // scope.
   let deviceSyncFacadeDeps: Omit<FedosDeviceSyncOperationalFacadeDeps, "isRuntimeRunning"> | undefined;
+  // Secure Runtime Alpha 4581-4660 -- mirrors deviceSyncFacadeDeps's own
+  // "assembled inside the deviceTrustEnabled gate, constructed further below
+  // once `stopped` exists" pattern exactly.
+  let devicePairingBoundary: ReturnType<typeof createFedosDeviceBindingBoundary> | undefined;
   if (config.deviceTrustEnabled) {
     const deviceRegistryPersistence: FedosDeviceRegistryPersistence =
       config.deviceRegistryLogPath !== undefined
@@ -698,18 +736,66 @@ export async function startFedosDesktopRuntime(
       registrationAuthority: config.deviceRegistrationAuthority ?? new UnavailableFedosDeviceRegistrationAuthority(),
     });
     const syncAccountKey = `${config.localAccountRef!.authority}:${config.localAccountRef!.publicIdentifier}`;
+    // Secure Runtime Alpha 4581-4660 (Phase F) -- the durable Sync Journal
+    // backend, following the SAME "AppendOnly when a log path is supplied,
+    // else InMemory" discipline every other backend in this function already
+    // uses. Injected into `FedosSyncState` below -- `FedosSyncJournal` hydrates
+    // from it at construction and write-throughs every successful append.
+    const journalPersistence: FedosSyncJournalPersistence =
+      config.deviceSyncJournalLogPath !== undefined
+        ? new AppendOnlyFedosSyncJournalPersistence(config.deviceSyncJournalLogPath)
+        : new InMemoryFedosSyncJournalPersistence();
     // Alpha 3801-3880 -- hoisted into a named instance (rather than the
     // inline `new FedosSyncState(...)` this field held before this Arc) so
     // the Scheduler/Import Coordinator below can share the EXACT SAME Sync
     // Journal instance FedosDeviceTrustRuntime itself owns -- never a
     // second, divergent Journal.
-    const syncStateInstance = new FedosSyncState(syncAccountKey);
+    const syncStateInstance = new FedosSyncState(syncAccountKey, { journalPersistence });
+    // Secure Runtime Alpha 4581-4660 (Phase E) -- the ONE Pairing Boundary
+    // this Arc wires in, over the EXACT SAME `deviceRegistryPersistence`
+    // instance `deviceTrustAuthority` above already uses -- never a second
+    // Device Registry (Phase A §8's own "stateless read-through
+    // orchestrator, safe over an identical durable backend" finding). The
+    // replay persistence follows the SAME AppendOnly/InMemory discipline.
+    const deviceBindingReplayPersistence: FedosDeviceBindingChallengeReplayPersistence =
+      config.deviceBindingChallengeReplayLogPath !== undefined
+        ? new AppendOnlyFedosDeviceBindingChallengeReplayPersistence(config.deviceBindingChallengeReplayLogPath)
+        : new InMemoryFedosDeviceBindingChallengeReplayPersistence();
+    devicePairingBoundary = createFedosDeviceBindingBoundary({
+      registryPersistence: deviceRegistryPersistence,
+      replayPersistence: deviceBindingReplayPersistence,
+      limits: config.deviceBindingChallengeTtlSeconds !== undefined ? { challengeTtlSeconds: config.deviceBindingChallengeTtlSeconds } : undefined,
+      now: config.clock,
+    });
     deviceTrustRuntimeInstance = new FedosDeviceTrustRuntime({
       localDeviceId: config.localDeviceId!,
       localAccountRef: config.localAccountRef!,
       trustAuthority: deviceTrustAuthority,
       syncState: syncStateInstance,
     });
+
+    // Secure Runtime Alpha 4581-4660 (Phase L) -- restart hydration for Sync
+    // fabric ELIGIBILITY. `FedosSyncState`'s own Device Registry
+    // (`FedosSyncDeviceRegistry`, Alpha 2421-2500, unmodified) is a SEPARATE,
+    // always-in-memory structure from the durable Device Trust Registry this
+    // block already constructed above -- a fresh `syncStateInstance` starts
+    // with an EMPTY set on every `startFedosDesktopRuntime()` call, even when
+    // `deviceRegistryLogPath` durably remembers a Device as `"trusted"`.
+    // Without this, "restart preserves eligibility" (Phase L's own explicit
+    // requirement) would be false: `syncReadiness().ready` would report
+    // `false` for an already-trusted Device immediately after a real restart,
+    // until SOME caller happened to re-call `registerSyncDevice()` by hand.
+    // This re-derives sync-fabric membership from the durable trust facts
+    // ALONE, using the SAME public `FedosDeviceTrustRuntime.registerSyncDevice()`
+    // method every other caller already uses -- no new Sync Foundation
+    // semantics, no second Device Registry, just restoring what a durable
+    // Device Trust Registry already answers authoritatively.
+    const syncEligibilityHydrationNow = (config.clock ?? defaultFedosBoardRuntimeClock)();
+    for (const binding of deviceTrustAuthority.listBindingsForAccount(config.localAccountRef!)) {
+      if (binding.trustState === "trusted") {
+        deviceTrustRuntimeInstance.registerSyncDevice(binding.deviceId, syncEligibilityHydrationNow);
+      }
+    }
 
     // Secure Runtime Alpha 3801-3880 -- the Runtime Operational Facade
     // (`./fedos_device_sync_operational_facade.ts`). ALWAYS constructed once
@@ -815,6 +901,24 @@ export async function startFedosDesktopRuntime(
   const deviceSyncOperationalFacadeInstance: FedosDeviceSyncOperationalFacade | undefined =
     deviceSyncFacadeDeps !== undefined
       ? new FedosDeviceSyncOperationalFacade({ ...deviceSyncFacadeDeps, isRuntimeRunning: () => !stopped })
+      : undefined;
+
+  // Secure Runtime Alpha 4581-4660 -- exactly one FedosDevicePairingFacade per
+  // running runtime, constructed ONLY when devicePairingBoundary/
+  // deviceTrustRuntimeInstance were assembled above (i.e. config.deviceTrustEnabled
+  // was true). Composes the SAME FedosDeviceBindingBoundary/FedosDeviceTrustRuntime
+  // instances -- constructs nothing new itself. `isRuntimeRunning` closes over the
+  // SAME `stopped` flag every other accessor on this handle already uses.
+  const devicePairingFacadeInstance: FedosDevicePairingFacade | undefined =
+    devicePairingBoundary !== undefined && deviceTrustRuntimeInstance !== undefined
+      ? new FedosDevicePairingFacade({
+          bindingBoundary: devicePairingBoundary,
+          deviceTrust: deviceTrustRuntimeInstance,
+          accountSigningAuthority: config.deviceBindingAccountSigningAuthority ?? null,
+          accountIndex: config.deviceBindingAccountIndex ?? 0,
+          isRuntimeRunning: () => !stopped,
+          now: config.clock,
+        })
       : undefined;
 
   // Secure Runtime Alpha 1691-1760 -- exactly one FedosConversationArchiveRuntime
@@ -923,6 +1027,15 @@ export async function startFedosDesktopRuntime(
         throw new Error("FedosRunningDesktopRuntime.deviceSyncOperational() is not enabled -- see config.deviceTrustEnabled.");
       }
       return deviceSyncOperationalFacadeInstance;
+    },
+    devicePairing(): FedosDevicePairingFacade {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.devicePairing() is inaccessible after stop().");
+      }
+      if (devicePairingFacadeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.devicePairing() is not enabled -- see config.deviceTrustEnabled.");
+      }
+      return devicePairingFacadeInstance;
     },
     async stop(): Promise<void> {
       if (stopped) {

@@ -43,6 +43,10 @@ import { FedosDesktopSyncConflictViewModel } from "./fedos_desktop_sync_conflict
 // Operations UI Renderer Arc) -- every import/addition below this comment
 // is ADDITIVE ONLY, mirroring this file's own established pattern above.
 import { FedosDeviceManagementController } from "./device_management/fedos_device_management_controller.js";
+// Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
+// Durable Sync Journal Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring this file's own established pattern above.
+import { FedosDesktopDevicePairingViewModel } from "./fedos_desktop_device_pairing_view_model.js";
 
 export class FedosDesktopConversationUiPresentationBoundary {
   readonly #shell: FedosDesktopApplicationShell;
@@ -61,6 +65,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
   readonly syncSchedule: FedosDesktopSyncScheduleViewModel;
   readonly transferSession: FedosDesktopTransferSessionViewModel;
   readonly syncConflict: FedosDesktopSyncConflictViewModel;
+  readonly devicePairing: FedosDesktopDevicePairingViewModel;
   readonly deviceManagement: FedosDeviceManagementController;
 
   private constructor(shell: FedosDesktopApplicationShell) {
@@ -80,6 +85,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
     this.syncSchedule = new FedosDesktopSyncScheduleViewModel(shell);
     this.transferSession = new FedosDesktopTransferSessionViewModel(shell);
     this.syncConflict = new FedosDesktopSyncConflictViewModel(shell);
+    this.devicePairing = new FedosDesktopDevicePairingViewModel(shell);
     this.deviceManagement = new FedosDeviceManagementController(this);
   }
 

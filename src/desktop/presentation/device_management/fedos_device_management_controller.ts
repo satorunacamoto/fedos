@@ -41,6 +41,17 @@ import type {
   FedosDeviceSyncScheduleView,
   FedosDeviceSyncTransferSessionView,
 } from "../../runtime/fedos_device_sync_operational_facade.js";
+// Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
+// Durable Sync Journal Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring this file's own established pattern above.
+import type { FedosDesktopDevicePairingViewModel } from "../fedos_desktop_device_pairing_view_model.js";
+import type {
+  FedosDevicePairingApprovalOutcomeView,
+  FedosDevicePairingBindingView,
+  FedosDevicePairingRequestInspectionView,
+  FedosDevicePairingRequestSummary,
+} from "../../runtime/fedos_device_pairing_facade.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
 import { fedosViewModelIdle, fedosViewModelLoaded, fedosViewModelLoading, fedosViewModelError, type FedosDesktopViewModelState } from "../fedos_desktop_view_model_state.js";
 import { FedosDeviceManagementNavigationState } from "./fedos_device_management_navigation_state.js";
 import {
@@ -74,9 +85,11 @@ export class FedosDeviceManagementController {
   readonly #syncSchedule: FedosDesktopSyncScheduleViewModel;
   readonly #transferSession: FedosDesktopTransferSessionViewModel;
   readonly #syncConflict: FedosDesktopSyncConflictViewModel;
+  readonly #devicePairing: FedosDesktopDevicePairingViewModel;
 
   #syncStartStopInFlight: "start" | "stop" | null = null;
   #triggerInFlight = false;
+  #revokeInFlight = false;
 
   constructor(boundary: FedosDesktopConversationUiPresentationBoundary) {
     this.#deviceInventory = boundary.deviceInventory;
@@ -84,6 +97,7 @@ export class FedosDeviceManagementController {
     this.#syncSchedule = boundary.syncSchedule;
     this.#transferSession = boundary.transferSession;
     this.#syncConflict = boundary.syncConflict;
+    this.#devicePairing = boundary.devicePairing;
   }
 
   // ---------------------------------------------------------------------
@@ -174,6 +188,97 @@ export class FedosDeviceManagementController {
     if (state.status !== "loaded") return state;
     if (state.data.deviceId !== deviceId) return fedosViewModelError("invalid-input", "selected Device id is stale");
     return fedosViewModelLoaded(fedosDeviceManagementBuildRevocationConfirmation(state.data));
+  }
+
+  /**
+   * Secure Runtime Alpha 4581-4660 -- carries out the revocation the
+   * `"revocation-confirmation"` screen (above) offered, using the CURRENTLY
+   * selected Device's own `devicePublicKeyRef` (already loaded by
+   * `requestRevokeDeviceConfirmation()`'s own `#deviceInventory.selectDevice()`
+   * call). Duplicate submission is prevented -- a second call while one is
+   * already in flight is a silent no-op, mirroring `confirmStopSync()`'s
+   * own established discipline. Refreshes the Device list on any outcome so
+   * a real terminal-state change is immediately visible.
+   */
+  async confirmRevokeDevice(): Promise<void> {
+    if (this.#revokeInFlight) return;
+    const deviceId = this.navigation.selectedDeviceId;
+    const selected = this.#deviceInventory.selectedState;
+    if (deviceId === null || selected.status !== "loaded" || selected.data.deviceId !== deviceId || selected.data.devicePublicKeyRef === null) {
+      return;
+    }
+    this.#revokeInFlight = true;
+    try {
+      await this.#devicePairing.revokeDevice(deviceId, selected.data.devicePublicKeyRef);
+      await this.refreshDeviceList();
+    } finally {
+      this.#revokeInFlight = false;
+      this.navigation.clearConfirmation();
+    }
+  }
+
+  get revocationResultState(): FedosDesktopViewModelState<FedosDevicePairingBindingView> {
+    return this.#devicePairing.revocationState;
+  }
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 4581-4660 -- real Device Pairing actions. Every
+  // method below delegates ENTIRELY to `FedosDesktopDevicePairingViewModel`
+  // (`../fedos_desktop_device_pairing_view_model.ts`) -- this controller
+  // owns no cryptographic implementation or Registry logic of its own.
+  // ---------------------------------------------------------------------
+
+  /** JOINING Device: creates a fresh pairing request. The resulting `encoded` string is the ONE artifact a real UI must surface to the user for manual out-of-band transfer -- labeled sensitive pairing data (Phase I), even though it contains no private key. */
+  async createPairingRequest(deviceId: string, expectedAccountRef: FedosDeviceBindingAccountRef): Promise<void> {
+    await this.#devicePairing.createPairingRequest(deviceId, expectedAccountRef);
+  }
+
+  get pairingCreatedState(): FedosDesktopViewModelState<{ readonly pairingId: string; readonly encoded: string }> {
+    return this.#devicePairing.createdState;
+  }
+
+  async refreshPendingPairings(): Promise<void> {
+    await this.#devicePairing.refreshPendingList();
+  }
+
+  get pendingPairingsState(): FedosDesktopViewModelState<readonly FedosDevicePairingRequestSummary[]> {
+    return this.#devicePairing.pendingListState;
+  }
+
+  /** AUTHORIZING Device: safe, read-only inspection of an inbound encoded pairing request. */
+  async inspectPairingRequest(encodedRequest: string): Promise<void> {
+    await this.#devicePairing.inspectPairingRequest(encodedRequest);
+  }
+
+  get pairingInspectionState(): FedosDesktopViewModelState<FedosDevicePairingRequestInspectionView> {
+    return this.#devicePairing.inspectionState;
+  }
+
+  /** AUTHORIZING Device: approves an inbound pairing request, producing the encoded approval to transfer back. */
+  async approvePairingRequest(encodedRequest: string): Promise<void> {
+    await this.#devicePairing.approvePairingRequest(encodedRequest);
+  }
+
+  get pairingApprovalState(): FedosDesktopViewModelState<FedosDevicePairingApprovalOutcomeView> {
+    return this.#devicePairing.approvalState;
+  }
+
+  /** JOINING Device: completes registration using an inbound encoded approval. Refreshes the Device list on success so the newly trusted Device is immediately visible. */
+  async completePairing(pairingId: string, encodedApproval: string): Promise<void> {
+    await this.#devicePairing.completePairing(pairingId, encodedApproval);
+    await this.refreshDeviceList();
+  }
+
+  get pairingCompletionState(): FedosDesktopViewModelState<FedosDevicePairingBindingView> {
+    return this.#devicePairing.completionState;
+  }
+
+  async refreshRegistrationStatus(deviceId: string): Promise<void> {
+    await this.#devicePairing.refreshStatus(deviceId);
+  }
+
+  get registrationStatusState(): FedosDesktopViewModelState<FedosDevicePairingBindingView> {
+    return this.#devicePairing.statusState;
   }
 
   // ---------------------------------------------------------------------

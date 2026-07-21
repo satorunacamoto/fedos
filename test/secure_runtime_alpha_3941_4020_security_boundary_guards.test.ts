@@ -146,14 +146,28 @@ describe("Secure Runtime Alpha 3941-4020 -- Phase N: dependency/scope guards", (
     expect(changed.trim()).toBe("");
   });
 
-  it("14. no existing Shell/Facade/ViewModel/Renderer file (Alpha 3801-3880 and earlier) is modified by this Arc", () => {
+  it("14. no existing Facade/ViewModel/Renderer file (Alpha 3801-3880 and earlier) is modified by this Arc", () => {
+    // NOTE (genuinely stale, updated per Alpha 4101-4180's own "update
+    // historical exact-shape tests only when genuinely stale" instruction --
+    // see test #13's own comment above for the identical precedent): this
+    // check originally ALSO asserted `fedos_desktop_application_shell.ts`
+    // itself showed zero git changes -- true for Alpha 3941-4020's own
+    // narrower scope (a presentation/renderer-only Arc), but not a permanent
+    // repo invariant. Alpha 4581-4660 (Desktop Device Registration, Pairing,
+    // and Durable Sync Journal Arc) legitimately extends the Shell with new
+    // Device Pairing commands (its own Phase H) -- exactly the kind of
+    // later, distinct Arc this check must not falsely fail. The ORIGINAL
+    // protection this test exists for -- the SIX Alpha 3801-3880 Device Sync
+    // Operational ViewModels/renderers are never touched by a
+    // presentation/renderer-layer Arc -- is preserved below, unweakened; the
+    // Shell itself is a separate, lower boundary this later Arc is
+    // explicitly authorized to extend (see its own execution spec Phase H).
     const changed = execFileSync(
       "git",
       [
         "status",
         "--porcelain",
         "--",
-        "src/desktop/shell/fedos_desktop_application_shell.ts",
         "src/desktop/runtime/fedos_device_sync_operational_facade.ts",
         "src/desktop/presentation/fedos_desktop_device_inventory_view_model.ts",
         "src/desktop/presentation/fedos_desktop_device_sync_status_view_model.ts",
