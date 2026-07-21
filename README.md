@@ -8,6 +8,45 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4741–4820 — Production Master Seed Runtime
+> Activation and Secure Unlock Completion Arc (honest partial — packaged
+> Electron real-unlock acceptance blocked by this headless environment).**
+> Architecture frozen: no crypto/Runtime/coordinator/Shell/Host/Electron
+> redesign, no `lib.rs`/Rust change, and the existing dev-only WASM gate is
+> byte-for-byte untouched. This Arc closed the prior Arc's disclosed blocker
+> at the source/runtime level: the real WASM **builds here** (`cargo` +
+> `wasm-bindgen 0.2.126`, ~34 s, a 260 KB `fedos_core_rust_bg.wasm` exporting
+> the full `FedosMasterSeedAuthority` class), and real production Master Seed
+> **generate → Argon2id+ChaCha20-Poly1305 seal → restore → identity match →
+> wrong-passphrase fail-closed** runs end-to-end through the UNCHANGED
+> profile coordinator with NO development seed double and NO dev-only
+> `NODE_ENV` gate. Six new files under `src/desktop/production_activation/`
+> add a NARROW production Desktop path: a closed-vocabulary crypto activation
+> authority (permitted / unsupported-host / artifact-missing / artifact-invalid
+> / artifact-version-mismatch / unapproved-build / capability-not-allowed /
+> initialization-failed); an unforgeable Electron-main **host attestation**
+> (module-private-symbol brand a renderer/Worker cannot mint — capability
+> containment, not host authenticity); a **pinned artifact manifest**
+> (SHA-256 recomputed from the real bytes, reviewed capability profile +
+> allowed export set, no secret, no remote fetch); a **capability-limited
+> facade** exposing only the Master Seed constructor, never the raw module; a
+> production `FedosMasterSeedAuthority` (clear() drops the handle so post-lock
+> crypto fails closed); and a no-fallback activation assembler. A deterministic
+> SEQUENTIAL build pipeline (`npm run build:production-wasm`: cargo test →
+> wasm32 build → wasm-bindgen → manifest gen, never Cargo+npm concurrently)
+> generates the gitignored `pkg/` output; nothing generated is committed.
+> Acceptance suite
+> (`test/secure_runtime_alpha_4741_4820_production_master_seed_activation.test.ts`):
+> **17/17** — the full failure matrix, real create → ready (sealed material on
+> disk, no plaintext) → lock → relaunch → unlock (stable identity) →
+> wrong-secret-stays-locked, all through REAL WASM. **Honestly blocked
+> (Phase L):** a packaged Electron GUI process cannot be launched/driven in
+> this headless environment (no display; Electron not installed; electron-
+> builder + GUI automation out of reach), so packaged real-unlock acceptance
+> is declared partial rather than faked — every step it would exercise is
+> proven at the Node/source level. Next: a Packaged Electron Real-Unlock
+> Acceptance + GUI Passphrase-Input Boundary Arc.
+
 > **Status: Secure Runtime Alpha 4661–4740 — Master Seed Unlock, First-Run
 > Onboarding, and Local Profile Initialization Arc (honest partial —
 > production Master Seed unlock blocked by the existing dev-only crypto
