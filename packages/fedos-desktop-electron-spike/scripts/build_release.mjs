@@ -42,8 +42,10 @@ function step(label, fn) {
   fn();
 }
 
+/** `npm` resolves to `npm.cmd` on Windows -- `execFileSync` (unlike a shell) does not apply `PATHEXT` resolution on its own, so an `npm` invocation needs `shell: true` there. `node`/`git` are real executables on every platform and never need it. */
 function run(cmd, args, cwd) {
-  execFileSync(cmd, args, { cwd, stdio: "inherit" });
+  const needsShell = process.platform === "win32" && cmd === "npm";
+  execFileSync(cmd, args, { cwd, stdio: "inherit", shell: needsShell });
 }
 
 function verifyCleanTree() {
