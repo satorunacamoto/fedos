@@ -8,6 +8,45 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 4821–4900 — Packaged Electron Real-Unlock
+> Acceptance and GUI Passphrase-Input Boundary Arc (FULL completion — real
+> packaged renderer→preload→main unlock through real WASM).**
+> Architecture frozen: no crypto/Runtime/coordinator/Shell/Host redesign, no
+> `lib.rs`/Rust change, no prior `*_main.cts` touched, the dev-only WASM gate
+> byte-for-byte untouched. This Arc closes the ONLY blocker Alpha 4741–4820
+> disclosed. Re-verified firsthand (the prior Arc's "headless, no Electron"
+> finding was measured in a DIFFERENT worktree): in THIS worktree Electron
+> **installs** (`electron.exe`, 225 MB) and an **offscreen** BrowserWindow
+> (`show:false`, `offscreen:true`, `contextIsolation:true`/`nodeIntegration:false`/
+> `sandbox:true`) starts a **real renderer process** — so packaged acceptance
+> is achievable, not blocked. A NEW, additive sibling Electron package
+> (`fedos_electron_unlock_*`: main/preload/onboarding page/renderer/self-test)
+> exposes a closed, dedicated secret-input contract — `window.fedosProfile`
+> (`status`/`create`/`unlock`/`lock`/`quit`, one frozen object, five
+> `fedos-profile:*` channels, no generic `invoke`, no `ipcRenderer`) — into
+> the UNCHANGED production activation authority and profile coordinator. ONE
+> strictly-necessary production-source addition
+> (`src/desktop/production_activation/fedos_production_nostr_signing_authority.ts`):
+> a `FedosNostrSigningAuthority` that derives the account identity / signs
+> **directly on the production WASM facade handle** (NOT the dev-gated
+> loader), sharing the same handle as the Master Seed authority so identity is
+> **stable across a real relaunch** (the prior Arc's test double could not be).
+> PROVEN through TWO real, offscreen-rendered Electron processes: first-run
+> welcome → real `type=password` input → real WASM generate+seal → account +
+> `trusted` local Device → **ready**; then a separate process → locked →
+> **wrong secret stays locked (no Runtime)** → correct secret restores the
+> **identical** account through real WASM → lock → re-unlock. Secret leak scan
+> (unique per-run secret): absent from renderer DOM/storage/URL, main stdout,
+> the profile descriptor, and every sealed file (sealed material is real
+> `{"v":1,"kdf":"argon2id"...`); the passphrase field is cleared after submit.
+> No dev seed double, no dev-only loader, no new dependency (Playwright NOT
+> added — reuses the repo's own subprocess/marked-stdout self-test convention,
+> driving the REAL renderer via `webContents.executeJavaScript`). Acceptance
+> suite (`packages/fedos-desktop-electron-spike/test/secure_runtime_alpha_4821_4900_unlock_electron_acceptance.test.ts`):
+> **15/15** — structural guards + real packaged create + real packaged unlock
+> + missing-artifact-fails-closed. `p2p/`/`.tmp_gen/` untouched. Next:
+> Desktop Settings, Relay Configuration, and User Preferences Arc.
+
 > **Status: Secure Runtime Alpha 4741–4820 — Production Master Seed Runtime
 > Activation and Secure Unlock Completion Arc (honest partial — packaged
 > Electron real-unlock acceptance blocked by this headless environment).**

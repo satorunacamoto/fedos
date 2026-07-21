@@ -24,3 +24,5 @@ copyFileSync(join(srcDir, "fedos_electron_navigation_page.html"), join(outDir, "
 copyFileSync(join(srcDir, "fedos_electron_notifications_tray_page.html"), join(outDir, "fedos_electron_notifications_tray_page.html"));
 // Secure Runtime Alpha 4341-4420 -- the Unread Badge/Menu Bar Count Arc's own status page.
 copyFileSync(join(srcDir, "fedos_electron_badge_page.html"), join(outDir, "fedos_electron_badge_page.html"));
+// Secure Runtime Alpha 4821-4900 -- the Packaged Real-Unlock Arc's own onboarding page.
+copyFileSync(join(srcDir, "fedos_electron_unlock_page.html"), join(outDir, "fedos_electron_unlock_page.html"));
