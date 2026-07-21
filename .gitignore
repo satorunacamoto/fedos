@@ -15,6 +15,18 @@ dist/
 # required, committed configuration-only artifact.
 /packages/fedos-desktop-electron-spike/dist-package/
 
+# Secure Runtime Alpha 5241-5320 -- Beta packaging output. `dist-package-beta/`
+# (electron-builder's own raw output for the canonical Beta target: the
+# unpacked app, the NSIS installer, the portable ZIP) and `release/` (this
+# Arc's own curated copy: the two artifacts plus the generated release
+# manifest and SHA256SUMS file) are both named distinctly from the
+# `dist-package/` pattern above (that one covers only the Package-A spike
+# target) -- an existing, disclosed gap from the prior distribution review
+# (`docs/reviews/fedos_beta_distribution_v1/01_current_packaging_inventory.md`)
+# this Arc closes. Neither is ever committed; both regenerate on demand.
+/packages/fedos-desktop-electron-spike/dist-package-beta/
+/packages/fedos-desktop-electron-spike/release/
+
 # Imported external MeshKV browser project (real runtime for @nostr-window/meshkv).
 # Kept external per the package boundary: the host builds against packages/meshkv
 # (typed MeshKVApi) + the MeshKVBrowserClient adapter, not this browser source.

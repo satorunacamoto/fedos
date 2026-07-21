@@ -23,6 +23,7 @@
     "start:electron-spike": "npm run start --prefix packages/fedos-desktop-electron-spike",
     "package:electron-spike": "npm run package --prefix packages/fedos-desktop-electron-spike",
     "package:electron-beta": "npm run package:beta --prefix packages/fedos-desktop-electron-spike",
+    "release:electron-beta": "npm run release:beta --prefix packages/fedos-desktop-electron-spike",
     "test:electron-spike": "vitest run --config vitest.electron-spike.config.ts",
     "start:electron-host-adapter": "npm run start:host-adapter --prefix packages/fedos-desktop-electron-spike",
     "start:electron-navigation": "npm run start:navigation --prefix packages/fedos-desktop-electron-spike",

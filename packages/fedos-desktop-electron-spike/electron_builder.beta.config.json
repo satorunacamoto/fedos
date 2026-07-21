@@ -29,13 +29,24 @@
   ],
   "asar": true,
   "win": {
-    "target": ["dir"]
+    "target": ["nsis", "zip"]
   },
   "linux": {
     "target": ["dir"]
   },
   "mac": {
     "target": ["dir"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": false,
+    "deleteAppDataOnUninstall": false,
+    "artifactName": "FedOS-Desktop-Beta-Setup-${version}.${ext}"
   },
   "npmRebuild": false,
   "compression": "store"

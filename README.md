@@ -8,6 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5241–5320 — FedOS Desktop Beta 0.1 NSIS
+> Installer, Portable ZIP, and Checksum Publication Arc (FULL completion).**
+> Implements the normative distribution review's own V1 policy
+> (`docs/reviews/fedos_beta_distribution_v1/20_normative_recommendation.md`):
+> the canonical Beta application now builds a real NSIS installer
+> (primary) and a real portable ZIP (secondary, same profile location as
+> the installed build), plus a versioned release manifest and a
+> SHA-256 checksum file, all additive — the canonical Beta entry point,
+> Runtime, Settings, and WASM manifest verification code are byte-for-byte
+> unmodified. Closes ONE real, previously-latent defect found and fixed
+> this session: `run_electron_builder_package_beta.mjs` hardcoded a
+> `--dir` electron-builder CLI flag that silently overrode the configured
+> `win.target` (harmless while the config was ALSO `["dir"]`, but once
+> this Arc changed it to `["nsis", "zip"]` it discarded both real targets
+> with exit code 0 and no error) — isolated via a methodical, reproducible
+> temporary-config test and fixed with a one-line change (`--dir` →
+> `--win`). New, additive packaging scripts
+> (`scripts/lib/release_identity.mjs`, `generate_release_manifest.mjs`,
+> `generate_release_checksums.mjs`, `verify_release_checksums.mjs`
+> — tamper-detecting, hash-recomputing, never trusting a stored value
+> alone — `scan_release_artifacts_for_secrets.mjs`, and
+> `verify_release_package_allowlist.mjs`) compose into ONE deterministic
+> `build_release.mjs` pipeline, gated by a real, tested, fail-closed
+> "dirty-tree public release artifacts are forbidden" check (verified
+> this session: it correctly refused against this Arc's own
+> not-yet-committed tree). REAL EVIDENCE this session (genuine internet +
+> Rust toolchain access again available): a real WASM artifact was built;
+> a real NSIS installer (101,407,959 bytes) and a real portable ZIP
+> (366,955,240 bytes) were produced in ONE electron-builder invocation
+> after the fix; the real staging-input secret scan reported 538 files
+> scanned, 0 findings; the packaged `.exe`'s own direct-launch hang was
+> re-tested (not assumed) and remains unchanged across three consecutive
+> Arcs now — an environment-specific limitation, not a product defect
+> (the identical application, unpackaged, continues to work completely).
+> New suite (`test/secure_runtime_alpha_5241_5320_packaging.test.ts`):
+> **21/21** passing against real accepted source plus deterministic
+> fixtures, requiring no Electron/Rust toolchain to run. `typecheck`
+> green (2 pre-existing errors, unchanged); full `vitest run` failure set
+> unchanged from the documented fresh-worktree baseline. No signing, no
+> auto-update, no hosting, no CI/release-upload was implemented (all
+> remain out of this Arc's own scope per the normative review). See
+> `docs/secure_runtime_alpha_5241_5320_packaging_reconciliation_report.md`
+> and `..._packaging_completion_declaration.md` for the full Phase A-Q
+> evidence and disclosed limitations. Recommended next Arc: **FedOS
+> Desktop Beta 0.1 Canonical Release Hosting, Manual Publication, and
+> Signing Readiness Arc.**
+
 > **Status: Secure Runtime Alpha 5161–5240 — Canonical Desktop Composition
 > and FedOS Beta 0.1 Release-Blocker Closure Arc (FULL completion — BLK-1
 > closed).**
