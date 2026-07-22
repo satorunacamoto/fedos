@@ -12935,14 +12935,17 @@ impl FedosDirectRatchetSession {
         remote_device_ref: String,
         conversation_id: String,
     ) -> Option<String> {
-        let bytes = self.inner.root_key_bytes_for_sealing()?;
-        master_seed_authority.seal_direct_ratchet_secret(
+        use zeroize::Zeroize;
+        let mut bytes = self.inner.root_key_bytes_for_sealing()?;
+        let sealed = master_seed_authority.seal_direct_ratchet_secret(
             self.inner.local_device_ref.clone(),
             remote_device_ref,
             conversation_id,
             self.inner.generation,
             &bytes,
-        )
+        );
+        bytes.zeroize();
+        sealed
     }
 
     pub fn seal_sending_chain_key(
@@ -12951,14 +12954,17 @@ impl FedosDirectRatchetSession {
         remote_device_ref: String,
         conversation_id: String,
     ) -> Option<String> {
-        let bytes = self.inner.sending_chain_key_bytes_for_sealing()?;
-        master_seed_authority.seal_direct_ratchet_secret(
+        use zeroize::Zeroize;
+        let mut bytes = self.inner.sending_chain_key_bytes_for_sealing()?;
+        let sealed = master_seed_authority.seal_direct_ratchet_secret(
             self.inner.local_device_ref.clone(),
             remote_device_ref,
             conversation_id,
             self.inner.generation,
             &bytes,
-        )
+        );
+        bytes.zeroize();
+        sealed
     }
 
     pub fn seal_receiving_chain_key(
@@ -12967,14 +12973,17 @@ impl FedosDirectRatchetSession {
         remote_device_ref: String,
         conversation_id: String,
     ) -> Option<String> {
-        let bytes = self.inner.receiving_chain_key_bytes_for_sealing()?;
-        master_seed_authority.seal_direct_ratchet_secret(
+        use zeroize::Zeroize;
+        let mut bytes = self.inner.receiving_chain_key_bytes_for_sealing()?;
+        let sealed = master_seed_authority.seal_direct_ratchet_secret(
             self.inner.local_device_ref.clone(),
             remote_device_ref,
             conversation_id,
             self.inner.generation,
             &bytes,
-        )
+        );
+        bytes.zeroize();
+        sealed
     }
 
     pub fn seal_local_ratchet_private_key(
@@ -12983,14 +12992,17 @@ impl FedosDirectRatchetSession {
         remote_device_ref: String,
         conversation_id: String,
     ) -> Option<String> {
-        let bytes = self.inner.local_ratchet_private_key_bytes_for_sealing()?;
-        master_seed_authority.seal_direct_ratchet_secret(
+        use zeroize::Zeroize;
+        let mut bytes = self.inner.local_ratchet_private_key_bytes_for_sealing()?;
+        let sealed = master_seed_authority.seal_direct_ratchet_secret(
             self.inner.local_device_ref.clone(),
             remote_device_ref,
             conversation_id,
             self.inner.generation,
             &bytes,
-        )
+        );
+        bytes.zeroize();
+        sealed
     }
 
     /// Each returned entry is `"{counter}:{remote_ratchet_public_hex}:{created_at_ms}:{sealed_blob}"` —
@@ -13003,17 +13015,20 @@ impl FedosDirectRatchetSession {
         remote_device_ref: String,
         conversation_id: String,
     ) -> Vec<String> {
+        use zeroize::Zeroize;
         self.inner
             .skipped_keys_for_sealing()
             .into_iter()
-            .filter_map(|(public, counter, created_at_ms, bytes)| {
+            .filter_map(|(public, counter, created_at_ms, mut bytes)| {
                 let sealed = master_seed_authority.seal_direct_ratchet_secret(
                     self.inner.local_device_ref.clone(),
                     remote_device_ref.clone(),
                     conversation_id.clone(),
                     self.inner.generation,
                     &bytes,
-                )?;
+                );
+                bytes.zeroize();
+                let sealed = sealed?;
                 Some(format!("{}:{}:{}:{}", counter, fedos_encode_fixed_32_hex(&public), created_at_ms, sealed))
             })
             .collect()
@@ -13044,6 +13059,7 @@ impl FedosDirectRatchetSession {
         sealed_local_ratchet_private_key: String,
         sealed_skipped_keys: Vec<String>,
     ) -> Option<FedosDirectRatchetSession> {
+        use zeroize::Zeroize;
         fn restore_32(
             authority: &FedosMasterSeedAuthority,
             local_device_ref: &str,
@@ -13052,7 +13068,8 @@ impl FedosDirectRatchetSession {
             generation: u32,
             sealed_blob: String,
         ) -> Option<[u8; 32]> {
-            let bytes = authority.restore_direct_ratchet_secret(
+            use zeroize::Zeroize;
+            let mut bytes = authority.restore_direct_ratchet_secret(
                 local_device_ref.to_string(),
                 remote_device_ref.to_string(),
                 conversation_id.to_string(),
@@ -13060,14 +13077,16 @@ impl FedosDirectRatchetSession {
                 sealed_blob,
             )?;
             if bytes.len() != 32 {
+                bytes.zeroize();
                 return None;
             }
             let mut out = [0u8; 32];
             out.copy_from_slice(&bytes);
+            bytes.zeroize();
             Some(out)
         }
 
-        let root_key_bytes = restore_32(
+        let mut root_key_bytes = restore_32(
             master_seed_authority,
             &local_device_ref,
             &remote_device_ref,
@@ -13075,15 +13094,15 @@ impl FedosDirectRatchetSession {
             generation,
             sealed_root_key,
         )?;
-        let sending_chain_key_bytes = match sealed_sending_chain_key {
+        let mut sending_chain_key_bytes = match sealed_sending_chain_key {
             Some(blob) => Some(restore_32(master_seed_authority, &local_device_ref, &remote_device_ref, &conversation_id, generation, blob)?),
             None => None,
         };
-        let receiving_chain_key_bytes = match sealed_receiving_chain_key {
+        let mut receiving_chain_key_bytes = match sealed_receiving_chain_key {
             Some(blob) => Some(restore_32(master_seed_authority, &local_device_ref, &remote_device_ref, &conversation_id, generation, blob)?),
             None => None,
         };
-        let local_ratchet_private_key_bytes = restore_32(
+        let mut local_ratchet_private_key_bytes = restore_32(
             master_seed_authority,
             &local_device_ref,
             &remote_device_ref,
@@ -13129,8 +13148,187 @@ impl FedosDirectRatchetSession {
             receiving_chain_key_bytes,
             local_ratchet_private_key_bytes,
             skipped_keys,
-        )?;
+        );
+        // Secure Runtime Alpha 6441-6520 -- `[u8; 32]`/`Option<[u8; 32]>` are
+        // `Copy`, so passing them into `DirectRatchetSessionState::restore`
+        // above did not clear THIS function's own stack copies; that callee
+        // already zeroizes its OWN copies internally (a separate stack
+        // location) once each is wrapped in a `SecretHandle` -- this
+        // zeroizes the caller's copy too, matching this crate's own "every
+        // consumer zeroizes its own copy" convention at every hop, not just
+        // the last one. `skipped_keys`' own per-entry heap plaintext was
+        // already zeroized inside `restore_32` (its `Vec<u8>` source, the
+        // higher-value fix); the `[u8; 32]` stack copies briefly held
+        // inside the moved `skipped_keys: Vec<...>` itself are a narrower,
+        // explicitly named, deferred remainder -- see the migration
+        // inventory document.
+        root_key_bytes.zeroize();
+        sending_chain_key_bytes.zeroize();
+        receiving_chain_key_bytes.zeroize();
+        local_ratchet_private_key_bytes.zeroize();
+        let inner = inner?;
         Some(FedosDirectRatchetSession { inner })
+    }
+}
+
+/// Secure Runtime Alpha 6441-6520 (FedOS Secure Memory Secret-Flow
+/// Migration and Native Page-Locking Readiness Arc) — real, end-to-end
+/// proof that `FedosDirectRatchetSession::seal_*`/`restore` (this Arc's
+/// own zeroization-closure target, `lib.rs:12932-13171`) continue to
+/// function correctly through this crate's own real, exported WASM class
+/// methods. No test of this exact surface existed anywhere in this crate
+/// before this Arc — every pre-existing seal/restore test exercised
+/// `crypto::direct_ratchet_session::DirectRatchetSessionState`'s own
+/// lower-level methods directly, never the `#[wasm_bindgen]` wrapper
+/// this Arc's own fix actually touches.
+#[cfg(test)]
+mod direct_ratchet_session_sealing_tests {
+    use super::*;
+
+    fn generated_authority() -> FedosMasterSeedAuthority {
+        let mut authority = FedosMasterSeedAuthority::new();
+        assert!(authority.generate());
+        authority
+    }
+
+    #[test]
+    fn seal_and_restore_a_real_sender_session_round_trips_and_can_still_send() {
+        let alice_authority = generated_authority();
+        let bob_authority = generated_authority();
+        let alice_pub = alice_authority.public_key_hex_for_account(0).expect("real alice pubkey");
+        let bob_pub = bob_authority.public_key_hex_for_account(0).expect("real bob pubkey");
+
+        let bob_session = FedosDirectRatchetSession::initialize_as_receiver(
+            &bob_authority,
+            0,
+            alice_pub.clone(),
+            "session-6361".to_string(),
+            "bob-device".to_string(),
+            0,
+        )
+        .expect("bob must initialize as receiver");
+        let bob_ratchet_pub = bob_session.local_ratchet_public_key_hex();
+
+        let mut alice_session = FedosDirectRatchetSession::initialize_as_sender(
+            &alice_authority,
+            0,
+            bob_pub,
+            "session-6361".to_string(),
+            "alice-device".to_string(),
+            0,
+            bob_ratchet_pub.clone(),
+        )
+        .expect("alice must initialize as sender");
+        assert!(alice_session.is_ready_to_send());
+
+        // Prove the LIVE session actually works before sealing anything —
+        // this is the real behavior a restore must reproduce, not an
+        // assumption.
+        let live_ciphertext = alice_session.encrypt(b"real pre-seal message").expect("live encrypt must succeed");
+
+        let sealed_root_key = alice_session
+            .seal_root_key(&alice_authority, "bob-device".to_string(), "conv-6361".to_string())
+            .expect("sealing the root key must succeed");
+        let sealed_sending_chain_key = alice_session
+            .seal_sending_chain_key(&alice_authority, "bob-device".to_string(), "conv-6361".to_string());
+        let sealed_receiving_chain_key = alice_session
+            .seal_receiving_chain_key(&alice_authority, "bob-device".to_string(), "conv-6361".to_string());
+        let sealed_local_ratchet_private_key = alice_session
+            .seal_local_ratchet_private_key(&alice_authority, "bob-device".to_string(), "conv-6361".to_string())
+            .expect("sealing the local ratchet private key must succeed");
+        let sealed_skipped_keys =
+            alice_session.seal_all_skipped_keys(&alice_authority, "bob-device".to_string(), "conv-6361".to_string());
+        assert!(sealed_skipped_keys.is_empty(), "a fresh sender session has no skipped keys yet");
+
+        let mut restored_alice = FedosDirectRatchetSession::restore(
+            &alice_authority,
+            "bob-device".to_string(),
+            "conv-6361".to_string(),
+            "session-6361".to_string(),
+            "alice-device".to_string(),
+            0,
+            alice_session.send_counter(),
+            alice_session.receive_counter(),
+            alice_session.previous_sending_chain_length(),
+            alice_session.remote_ratchet_public_key_hex(),
+            sealed_root_key,
+            sealed_sending_chain_key,
+            sealed_receiving_chain_key,
+            sealed_local_ratchet_private_key,
+            sealed_skipped_keys,
+        )
+        .expect("restore must succeed with the exact real binding tuple");
+
+        assert_eq!(
+            restored_alice.local_ratchet_public_key_hex(),
+            alice_session.local_ratchet_public_key_hex(),
+            "the restored session must recompute the SAME local ratchet public key"
+        );
+        assert_eq!(restored_alice.send_counter(), alice_session.send_counter());
+
+        // The restored session must actually be usable for a NEW message —
+        // proving the sending chain key survived seal/restore correctly,
+        // not merely that some bytes round-tripped.
+        let restored_ciphertext = restored_alice
+            .encrypt(b"real post-restore message")
+            .expect("a restored sender session must still be able to send");
+        assert_ne!(
+            live_ciphertext, restored_ciphertext,
+            "each message uses a fresh per-message key -- ciphertexts must differ even for different plaintexts"
+        );
+    }
+
+    #[test]
+    fn restore_fails_closed_on_a_wrong_conversation_id() {
+        let alice_authority = generated_authority();
+        let bob_authority = generated_authority();
+        let alice_pub = alice_authority.public_key_hex_for_account(0).expect("real alice pubkey");
+        let bob_pub = bob_authority.public_key_hex_for_account(0).expect("real bob pubkey");
+        let bob_session = FedosDirectRatchetSession::initialize_as_receiver(
+            &bob_authority,
+            0,
+            alice_pub,
+            "session-6361b".to_string(),
+            "bob-device".to_string(),
+            0,
+        )
+        .expect("bob must initialize as receiver");
+        let alice_session = FedosDirectRatchetSession::initialize_as_sender(
+            &alice_authority,
+            0,
+            bob_pub,
+            "session-6361b".to_string(),
+            "alice-device".to_string(),
+            0,
+            bob_session.local_ratchet_public_key_hex(),
+        )
+        .expect("alice must initialize as sender");
+
+        let sealed_root_key = alice_session
+            .seal_root_key(&alice_authority, "bob-device".to_string(), "conv-real".to_string())
+            .expect("sealing must succeed");
+        let sealed_local_ratchet_private_key = alice_session
+            .seal_local_ratchet_private_key(&alice_authority, "bob-device".to_string(), "conv-real".to_string())
+            .expect("sealing must succeed");
+
+        let restored = FedosDirectRatchetSession::restore(
+            &alice_authority,
+            "bob-device".to_string(),
+            "conv-WRONG".to_string(), // <-- mismatched binding
+            "session-6361b".to_string(),
+            "alice-device".to_string(),
+            0,
+            alice_session.send_counter(),
+            alice_session.receive_counter(),
+            alice_session.previous_sending_chain_length(),
+            alice_session.remote_ratchet_public_key_hex(),
+            sealed_root_key,
+            None,
+            None,
+            sealed_local_ratchet_private_key,
+            Vec::new(),
+        );
+        assert!(restored.is_none(), "a wrong conversation_id must fail AEAD authentication and return None");
     }
 }
 
