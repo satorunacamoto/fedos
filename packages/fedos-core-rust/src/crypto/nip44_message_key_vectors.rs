@@ -98,8 +98,9 @@ fn valid_get_message_keys_vectors_all_match_chacha_key_chacha_nonce_and_hmac_key
         let chacha_key = decisions
             .iter()
             .find(|d| d.kind == Nip44DerivedKeyKind::ChachaKey)
-            .and_then(|d| d.bytes.as_ref())
-            .expect("Ready ChachaKey decision must carry bytes");
+            .and_then(|d| d.handle.as_ref())
+            .and_then(|h| h.expose_bytes_for_internal_nip44_message_key())
+            .expect("Ready ChachaKey decision must carry a handle");
         let chacha_nonce = decisions
             .iter()
             .find(|d| d.kind == Nip44DerivedKeyKind::ChachaNonce)
@@ -108,8 +109,9 @@ fn valid_get_message_keys_vectors_all_match_chacha_key_chacha_nonce_and_hmac_key
         let hmac_key = decisions
             .iter()
             .find(|d| d.kind == Nip44DerivedKeyKind::HmacKey)
-            .and_then(|d| d.bytes.as_ref())
-            .expect("Ready HmacKey decision must carry bytes");
+            .and_then(|d| d.handle.as_ref())
+            .and_then(|h| h.expose_bytes_for_internal_nip44_message_key())
+            .expect("Ready HmacKey decision must carry a handle");
 
         assert_eq!(
             hex::encode(chacha_key),

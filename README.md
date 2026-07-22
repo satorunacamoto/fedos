@@ -8,6 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6281–6360 — FedOS Secure Memory Secret
+> Buffer and Zeroization Foundation Arc (FULL completion of this Arc's own
+> deliberately bounded scope).** Phase A inventory found the normative
+> `docs/runtime_secure_memory.md` architecture (written on an older,
+> never-merged lineage) stale: on the real, selected Rust/crypto lineage
+> (`b8e9e062`), `SecretHandle` is already a mature, production, non-Clone,
+> zeroizing secret owner — already load-bearing for the Master Seed, the
+> Identity/Application/Protocol Root hierarchy, Nostr signing, NIP-44
+> conversation keys, and the entire Direct Ratchet Cryptographic Core.
+> Rather than duplicating it with a redundant `FedosSecretBuffer` type,
+> this Arc built the one piece genuinely missing — `SecretHandleStore`, a
+> bounded (64), generation-safe, opaque-ID handle registry with
+> use-after-destroy/wrong-kind/stale-generation denial, idempotent
+> double-destroy, and shutdown cleanup, none of which existed anywhere in
+> this crate before — and closed a real, previously-undetected
+> zeroization gap: NIP-44's own per-message `chacha_key`/`hmac_key`
+> (32 bytes each) lived in plain, never-zeroized `Vec<u8>` since the code
+> was written; both are now `SecretHandle`-backed, with both live
+> consumers (`nip44_wire_encrypt`/`nip44_wire_decrypt`) explicitly
+> zeroizing their own local copies after use, including on an early-return
+> failure path. All 163 pre-existing NIP-44 tests, including every RFC/
+> NIP-44 reference vector, pass unchanged — proving the migration changed
+> ownership, not output. Also adds an honest page-locking capability
+> status (`Unsupported`/`NotRequested` — no native Desktop Rust host
+> exists yet; never `mlock`/`VirtualLock`) and safe, non-sensitive
+> diagnostics (live handle count, capacity, limit-reached, page-locking
+> status). Zero new `Cargo.toml` dependency (`zeroize`/`secrecy` already
+> production since Stage 78); zero new `#[wasm_bindgen]` export surface
+> (verified against the real `wasm32-unknown-unknown --release` build's
+> own generated `.d.ts`); zero Desktop/Electron/UI/Identity-Transition/
+> Ratchet-protocol/NIP change. One real regression caught by this Arc's
+> own new structural guard suite before it shipped: an early draft's own
+> classification-label name leaked a concrete cipher name into the
+> algorithm-agnostic `secret_handle` vocabulary — renamed and fixed. See
+> `docs/secure_runtime_alpha_6281_6360_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6281_6360_execution_spec.md`,
+> `docs/secure_runtime_alpha_6281_6360_ownership_and_lifetime.md`,
+> `docs/secure_runtime_alpha_6281_6360_zeroization_assurance.md`,
+> `docs/secure_runtime_alpha_6281_6360_migration_inventory.md`, and
+> `docs/secure_runtime_alpha_6281_6360_completion_declaration.md`. Next
+> Arc: FedOS Secure Memory Secret-Flow Migration and Native Page-Locking
+> Readiness Arc.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6201–6280 — FedOS Desktop Beta Privacy
 > Controls and Safety Center Arc (FULL completion, four disclosed
 > boundaries, all matching established precedent or explicitly scoped
