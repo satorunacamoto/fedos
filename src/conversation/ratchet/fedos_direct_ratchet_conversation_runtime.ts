@@ -48,6 +48,7 @@ import {
 import {
   FedosDirectRatchetOutboundIntegration,
   type FedosDirectRatchetCounterpartyResolution,
+  type FedosDirectRatchetEstablishOptions,
   type FedosDirectRatchetEstablishOutcome,
   type FedosDirectRatchetSendOutcome,
 } from "./fedos_direct_ratchet_outbound_integration.js";
@@ -56,6 +57,8 @@ import {
   type FedosDirectRatchetInboundReceiveResult,
 } from "./fedos_direct_ratchet_inbound_integration.js";
 import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import { FedosDirectRatchetResetCoordinator } from "./fedos_direct_ratchet_reset_coordinator.js";
+import type { FedosDirectRatchetSessionResetRecordPersistence } from "./persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
 
 /** Phase N — the ONE closed, safe status vocabulary a Desktop/UI surface may show. Never raw counters, never keys. */
 export type FedosDirectRatchetSafeStatus =
@@ -78,6 +81,7 @@ export interface FedosDirectRatchetConversationRuntimeDependencies {
   readonly sealedSecretPersistence: FedosSealedDirectRatchetSecretPersistence;
   readonly remotePublicKeyPersistence: FedosDirectRatchetRemotePublicKeyPersistence;
   readonly snapshotPersistence: FedosDirectRatchetLiveStateSnapshotPersistence;
+  readonly resetRecordPersistence: FedosDirectRatchetSessionResetRecordPersistence;
   readonly sealingAuthority: FedosDirectRatchetSealingAuthority | null;
   readonly masterSeedAuthority: FedosMasterSeedAuthority;
   readonly accountIndex: number;
@@ -127,6 +131,7 @@ export class FedosDirectRatchetConversationRuntime {
   readonly #deps: FedosDirectRatchetConversationRuntimeDependencies;
   readonly #stateRuntime: FedosDirectRatchetStateRuntime;
   readonly #liveSessionCache: FedosDirectRatchetLiveSessionCache;
+  readonly #resetCoordinator: FedosDirectRatchetResetCoordinator;
   readonly #outbound: FedosDirectRatchetOutboundIntegration;
   readonly #inbound: FedosDirectRatchetInboundIntegration;
 
@@ -139,12 +144,18 @@ export class FedosDirectRatchetConversationRuntime {
       now: deps.clock,
     });
     this.#liveSessionCache = new FedosDirectRatchetLiveSessionCache();
+    this.#resetCoordinator = new FedosDirectRatchetResetCoordinator({
+      stateRuntime: this.#stateRuntime,
+      resetRecordPersistence: deps.resetRecordPersistence,
+      now: deps.clock,
+    });
 
     this.#outbound = new FedosDirectRatchetOutboundIntegration({
       deviceRegistry: deps.deviceRegistry,
       sessionPersistence: deps.sessionPersistence,
       sealedSecretPersistence: deps.sealedSecretPersistence,
       stateRuntime: this.#stateRuntime,
+      resetCoordinator: this.#resetCoordinator,
       masterSeedAuthority: deps.masterSeedAuthority,
       accountIndex: deps.accountIndex,
       localDeviceRef: deps.localDeviceRef,
@@ -167,6 +178,7 @@ export class FedosDirectRatchetConversationRuntime {
       remotePublicKeyPersistence: deps.remotePublicKeyPersistence,
       snapshotPersistence: deps.snapshotPersistence,
       stateRuntime: this.#stateRuntime,
+      resetCoordinator: this.#resetCoordinator,
       masterSeedAuthority: deps.masterSeedAuthority,
       accountIndex: deps.accountIndex,
       localDeviceRef: deps.localDeviceRef,
@@ -181,9 +193,38 @@ export class FedosDirectRatchetConversationRuntime {
     });
   }
 
-  /** Phase D — establishes (or re-establishes, on a new generation) a ratchet session as the RECEIVER role, publishing this Runtime's own fresh ratchet public key over the SAME authenticated NIP-17 path. */
-  async initializeDirectRatchetSession(conversationId: string, remoteDeviceRef: string): Promise<FedosDirectRatchetEstablishOutcome> {
-    return this.#outbound.establishSession(conversationId as FedosConversationId, remoteDeviceRef);
+  /**
+   * Phase D — establishes (or re-establishes, on a new generation) a
+   * ratchet session as the RECEIVER role, publishing this Runtime's own
+   * fresh ratchet public key over the SAME authenticated NIP-17 path.
+   *
+   * FedOS Ratchet Device Lifecycle and Authenticated Session Reset
+   * Foundation Arc — `options.reason` is REQUIRED whenever a session
+   * already exists for this tuple (a real reset); `options.deviceSigningKeypair`
+   * is always optional (see `FedosDirectRatchetEstablishOptions`'s own
+   * doc comment for why it can never be required in this codebase today).
+   */
+  async initializeDirectRatchetSession(
+    conversationId: string,
+    remoteDeviceRef: string,
+    options?: FedosDirectRatchetEstablishOptions,
+  ): Promise<FedosDirectRatchetEstablishOutcome> {
+    return this.#outbound.establishSession(conversationId as FedosConversationId, remoteDeviceRef, options);
+  }
+
+  /**
+   * Device-revocation quarantine sweep (review §06) — transitions every
+   * non-terminal ratchet session record where `deviceId` is either the
+   * local or the remote Device to `"revoked"`. A caller invokes this
+   * explicitly after revoking a Device binding
+   * (`FedosDeviceBindingRegistrationAuthority.revokeDevice()`/
+   * `FedosDevicePairingFacade.revokeDevice()`) — nothing in this codebase
+   * automatically triggers it (no cross-subsystem event bus links Device
+   * Trust and the Ratchet Runtime today, a disclosed, honest boundary,
+   * not an oversight). Returns the session ids actually transitioned.
+   */
+  applyDeviceRevocationToSessions(deviceId: string): readonly string[] {
+    return this.#resetCoordinator.applyDeviceRevocation(deviceId, this.#deps.sessionPersistence) as unknown as readonly string[];
   }
 
   /** Phase I — transitions the CURRENT session (if any) to `reset-required`; the next `initializeDirectRatchetSession()` call creates a NEW, independent generation. Never mutates a `"revoked"`/`"corrupt"` (already-terminal) session. */

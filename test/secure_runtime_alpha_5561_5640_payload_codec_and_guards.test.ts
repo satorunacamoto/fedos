@@ -24,12 +24,16 @@ function sessionInit(): FedosDirectRatchetSessionInitPayloadV1 {
     kind: "session-init",
     suite: "fedos-direct-ratchet-v1",
     generation: 0,
+    previousGeneration: null,
+    resetReason: null,
+    resetNonce: "a".repeat(32),
     senderAccountRef: { authority: "nostr", publicIdentifier: PUBKEY_A, identityId: null },
     senderDeviceRef: "alice-device",
     recipientAccountRef: { authority: "nostr", publicIdentifier: PUBKEY_B, identityId: null },
     recipientDeviceRef: "bob-device",
     conversationId: "private-draft::direct::abc",
     ratchetPublicKeyHex: PUBKEY_A,
+    deviceSignatureHex: null,
   };
 }
 

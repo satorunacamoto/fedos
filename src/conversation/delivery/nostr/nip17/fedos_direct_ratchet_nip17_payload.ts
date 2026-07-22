@@ -44,6 +44,8 @@
  */
 import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
 import type { FedosDirectRatchetSuite } from "../../../ratchet/fedos_direct_ratchet_session_id.js";
+import { isWellFormedFedosDirectRatchetSessionResetReason, type FedosDirectRatchetSessionResetReason } from "../../../ratchet/fedos_direct_ratchet_session_reset_reason.js";
+import { isWellFormedFedosDeviceSchnorrSignatureHex } from "../../../../device/crypto/fedos_device_signing_keypair.js";
 
 // @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
@@ -53,6 +55,8 @@ const MAX_ID_FIELD_LENGTH = 512;
 /** Bounded — a real ratchet wire message (secp256k1 header + short chat ciphertext) is always well under this; never unbounded. */
 const MAX_WIRE_MESSAGE_BASE64_LENGTH = 65536;
 const NOSTR_HEX_PUBLIC_KEY_PATTERN = /^[0-9a-f]{64}$/;
+/** Mirrors `fedos_device_binding_challenge.ts`'s own `NONCE_HEX_PATTERN` exactly — the same replay-protection nonce shape this codebase already established for an authenticated challenge/response artifact. */
+const RESET_NONCE_HEX_PATTERN = /^[0-9a-f]{32,64}$/;
 
 function isSafeIdField(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= MAX_ID_FIELD_LENGTH;
@@ -85,12 +89,40 @@ function isWellFormedAccountRef(candidate: unknown): candidate is FedosDeviceBin
  * Phase D — public initialization facts ONLY. See this file's own header
  * for the hard guarantee that no field here can ever carry secret
  * material.
+ *
+ * FedOS Ratchet Device Lifecycle and Authenticated Session Reset
+ * Foundation Arc — four ADDITIVE fields turn this same shape into the
+ * "authenticated Session Reset message"
+ * `docs/reviews/fedos_ratchet_multidevice_identity_rotation_v1/09_session_reset_and_reestablishment.md`
+ * named as PROPOSED, never a new control-message kind (that review's own
+ * explicit instruction): `previousGeneration`/`resetReason` are `null` for
+ * a tuple's very first session (`generation === 0`), and non-null for
+ * every reset of an existing generation; `resetNonce` is ALWAYS present
+ * (harmless, consistent replay-protection key even at generation `0`);
+ * `deviceSignatureHex` is an OPTIONAL, additive Device-level signature —
+ * present only when the caller supplied a `FedosDeviceSigningKeypair`
+ * (`../../../../device/crypto/fedos_device_signing_keypair.ts`, Alpha
+ * 3161–3240) at the moment of establishing/resetting — this file's own
+ * codec never requires one, matching that review's own "no NEW
+ * authentication mechanism is required" conclusion: the existing NIP-17
+ * envelope (a real Nostr-signed Rumor) already authenticates the sending
+ * ACCOUNT; this field is a strictly-optional, additive strengthening that
+ * additionally authenticates the sending DEVICE when a verifiable key is
+ * on file for it (`FedosDirectRatchetSessionResetAuthority`, in
+ * `../../../ratchet/fedos_direct_ratchet_session_reset_authority.ts`,
+ * decides how to weigh its presence/absence — never this codec's job).
  */
 export interface FedosDirectRatchetSessionInitPayloadV1 {
   readonly schemaVersion: 1;
   readonly kind: "session-init";
   readonly suite: FedosDirectRatchetSuite;
   readonly generation: number;
+  /** `null` iff `generation === 0` (this tuple's very first session) — non-null names the EXACT generation this session-init supersedes. Structural-only here; `FedosDirectRatchetSessionResetAuthority` is the one place that checks it actually equals `generation - 1` and matches a real prior local record. */
+  readonly previousGeneration: number | null;
+  /** `null` iff `previousGeneration` is `null` — a reset always names why; a fresh, first-ever session never does. */
+  readonly resetReason: FedosDirectRatchetSessionResetReason | null;
+  /** Always present, even at `generation === 0` — the one replay-protection key `FedosDirectRatchetSessionResetAuthority`'s own nonce ledger is keyed by. */
+  readonly resetNonce: string;
   /** The SENDER's own account/Device — from the RECEIVER's perspective, this is "remote". */
   readonly senderAccountRef: FedosDeviceBindingAccountRef;
   readonly senderDeviceRef: string;
@@ -100,6 +132,8 @@ export interface FedosDirectRatchetSessionInitPayloadV1 {
   readonly conversationId: string;
   /** The sender's freshly-generated ratchet DH PUBLIC key — public by definition, never a private key. */
   readonly ratchetPublicKeyHex: string;
+  /** `null` when no local Device signing keypair was supplied to sign with — see this interface's own header. Never a raw key, never a private-key-bearing field. */
+  readonly deviceSignatureHex: string | null;
 }
 
 /** Phase F — the ratchet wire message (header + ciphertext), opaque and already-encrypted. */
@@ -121,12 +155,16 @@ const SESSION_INIT_FIELDS = new Set<string>([
   "kind",
   "suite",
   "generation",
+  "previousGeneration",
+  "resetReason",
+  "resetNonce",
   "senderAccountRef",
   "senderDeviceRef",
   "recipientAccountRef",
   "recipientDeviceRef",
   "conversationId",
   "ratchetPublicKeyHex",
+  "deviceSignatureHex",
 ]);
 
 const MESSAGE_FIELDS = new Set<string>([
@@ -146,12 +184,23 @@ function isWellFormedSessionInit(candidate: unknown): candidate is FedosDirectRa
   if (p.kind !== "session-init") return false;
   if (typeof p.suite !== "string" || p.suite.length === 0) return false;
   if (!Number.isInteger(p.generation) || (p.generation as number) < 0) return false;
+  if (p.previousGeneration !== null && (!Number.isInteger(p.previousGeneration) || (p.previousGeneration as number) < 0)) {
+    return false;
+  }
+  if (p.previousGeneration !== null && (p.previousGeneration as number) >= (p.generation as number)) return false;
+  // A reset always names why; a fresh, first-ever session never does —
+  // structural correlation only, `FedosDirectRatchetSessionResetAuthority`
+  // owns every business-logic check beyond this.
+  if ((p.previousGeneration === null) !== (p.resetReason === null)) return false;
+  if (p.resetReason !== null && !isWellFormedFedosDirectRatchetSessionResetReason(p.resetReason)) return false;
+  if (typeof p.resetNonce !== "string" || !RESET_NONCE_HEX_PATTERN.test(p.resetNonce)) return false;
   if (!isWellFormedAccountRef(p.senderAccountRef)) return false;
   if (!isSafeIdField(p.senderDeviceRef)) return false;
   if (!isWellFormedAccountRef(p.recipientAccountRef)) return false;
   if (!isSafeIdField(p.recipientDeviceRef)) return false;
   if (!isSafeIdField(p.conversationId)) return false;
   if (typeof p.ratchetPublicKeyHex !== "string" || !NOSTR_HEX_PUBLIC_KEY_PATTERN.test(p.ratchetPublicKeyHex)) return false;
+  if (p.deviceSignatureHex !== null && !isWellFormedFedosDeviceSchnorrSignatureHex(p.deviceSignatureHex)) return false;
   return true;
 }
 

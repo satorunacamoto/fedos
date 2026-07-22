@@ -192,6 +192,8 @@ import {
   type FedosDirectRatchetLiveStateSnapshotPersistence,
   InMemoryFedosDirectRatchetLiveStateSnapshotPersistence,
 } from "../ratchet/persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
+import type { FedosDirectRatchetSessionResetRecordPersistence } from "../ratchet/persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
+import { InMemoryFedosDirectRatchetSessionResetRecordPersistence } from "../ratchet/persistence/in_memory_fedos_direct_ratchet_session_reset_record_persistence.js";
 import type { FedosDirectRatchetSealingAuthority } from "../ratchet/fedos_direct_ratchet_sealing_authority.js";
 import {
   FedosDirectRatchetConversationRuntime,
@@ -327,6 +329,14 @@ export interface FedosConversationDirectRatchetIntegrationDependencies {
   readonly remotePublicKeyPersistence?: FedosDirectRatchetRemotePublicKeyPersistence;
   /** Optional — default in-memory. See `fedos_direct_ratchet_secret_checkpoint.ts`'s own header for why this is a SEPARATE, current-value port from `sealedSecretPersistence` above. */
   readonly snapshotPersistence?: FedosDirectRatchetLiveStateSnapshotPersistence;
+  /**
+   * FedOS Ratchet Device Lifecycle and Authenticated Session Reset
+   * Foundation Arc — OPTIONAL, default in-memory. The durable Session
+   * Reset audit ledger (`fedos_direct_ratchet_session_reset_record.ts`'s
+   * own header) — a DEDICATED port, never shared with any other Direct
+   * Ratchet persistence port above.
+   */
+  readonly resetRecordPersistence?: FedosDirectRatchetSessionResetRecordPersistence;
   /** `null` reports every ratchet session-readiness call as `"sealing-authority-unavailable"` — never a thrown error. */
   readonly sealingAuthority: FedosDirectRatchetSealingAuthority | null;
   readonly masterSeedAuthority: FedosMasterSeedAuthority;
@@ -512,6 +522,8 @@ export class FedosConversationRuntime {
               deps.directRatchet.remotePublicKeyPersistence ?? new InMemoryFedosDirectRatchetRemotePublicKeyPersistence(),
             snapshotPersistence:
               deps.directRatchet.snapshotPersistence ?? new InMemoryFedosDirectRatchetLiveStateSnapshotPersistence(),
+            resetRecordPersistence:
+              deps.directRatchet.resetRecordPersistence ?? new InMemoryFedosDirectRatchetSessionResetRecordPersistence(),
             sealingAuthority: deps.directRatchet.sealingAuthority,
             masterSeedAuthority: deps.directRatchet.masterSeedAuthority,
             accountIndex: accountIndexAuthority.localAccountIndex(),

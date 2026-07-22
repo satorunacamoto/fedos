@@ -64,6 +64,14 @@ import {
   type FedosDirectRatchetMessagePayloadV1,
   type FedosDirectRatchetSessionInitPayloadV1,
 } from "../delivery/nostr/nip17/fedos_direct_ratchet_nip17_payload.js";
+import type { FedosDeviceSigningKeypair } from "../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDirectRatchetSessionResetReason } from "./fedos_direct_ratchet_session_reset_reason.js";
+import {
+  createFedosDirectRatchetSessionResetDeviceSignature,
+  type FedosDirectRatchetSessionResetSignableContent,
+} from "./fedos_direct_ratchet_session_reset_authentication.js";
+import type { FedosDirectRatchetResetCoordinator } from "./fedos_direct_ratchet_reset_coordinator.js";
+import { generateFedosDirectRatchetSessionResetNonce } from "./fedos_direct_ratchet_session_reset_nonce.js";
 
 export type FedosDirectRatchetCounterpartyResolution =
   | { readonly outcome: "resolved"; readonly localAccountRef: FedosDeviceBindingAccountRef; readonly remoteAccountRef: FedosDeviceBindingAccountRef; readonly remoteAccountPublicKeyHex: string }
@@ -79,7 +87,16 @@ export type FedosDirectRatchetEstablishOutcome =
   | { readonly outcome: "remote-device-unknown" | "remote-device-revoked" | "remote-device-not-trusted" }
   | { readonly outcome: "invalid-binding" }
   | { readonly outcome: "crypto-unavailable" }
-  | { readonly outcome: "persistence-failed" };
+  | { readonly outcome: "persistence-failed" }
+  /** A tuple with an existing generation was asked to establish again (a real reset, `current !== null`) without naming a `reason` — review §09's own "a reset always names why" decision, enforced here as a hard, structural requirement rather than a silently-defaulted one. */
+  | { readonly outcome: "reason-required" };
+
+export interface FedosDirectRatchetEstablishOptions {
+  /** REQUIRED whenever a session already exists for this tuple (a real reset) — omitted (or supplied regardless, harmlessly ignored) for a tuple's very first establishment. */
+  readonly reason?: FedosDirectRatchetSessionResetReason;
+  /** OPTIONAL — see `./fedos_direct_ratchet_session_reset_authentication.ts`'s own header for why this can never be a hard requirement: this Runtime never durably holds a Device signing keypair, so a caller that currently has one available (e.g. mid-session in an unlocked Desktop process) may supply it per-call to additionally authenticate this specific reset at the Device level, on top of the existing, always-real NIP-17 envelope-level account authentication. */
+  readonly deviceSigningKeypair?: FedosDeviceSigningKeypair;
+}
 
 export type FedosDirectRatchetSendOutcome =
   | { readonly outcome: "queued"; readonly sessionId: FedosDirectRatchetSessionId; readonly queue: FedosPrivateWireDeliveryQueueOutcome }
@@ -100,6 +117,9 @@ export interface FedosDirectRatchetOutboundIntegrationDependencies {
   readonly liveSessionCache: FedosDirectRatchetLiveSessionCache;
   readonly remotePublicKeyPersistence: FedosDirectRatchetRemotePublicKeyPersistence;
   readonly snapshotPersistence: FedosDirectRatchetLiveStateSnapshotPersistence;
+  readonly resetCoordinator: FedosDirectRatchetResetCoordinator;
+  /** Overridable for tests only — defaults to `generateFedosDirectRatchetSessionResetNonce()`. */
+  readonly resetNonceGenerator?: () => string;
   readonly resolveCounterparty: (conversationId: FedosConversationId) => FedosDirectRatchetCounterpartyResolution;
   readonly sendMailboxNip17Control: (
     controlId: string,
@@ -120,7 +140,11 @@ export class FedosDirectRatchetOutboundIntegration {
   }
 
   /** Phase D — the local Runtime that calls this becomes the RECEIVER role (publishes its own fresh ratchet public key; see `fedos_direct_ratchet_cryptographic_session.js`'s own header for why only the receiver role needs no remote public key up front). */
-  async establishSession(conversationId: FedosConversationId, remoteDeviceRef: string): Promise<FedosDirectRatchetEstablishOutcome> {
+  async establishSession(
+    conversationId: FedosConversationId,
+    remoteDeviceRef: string,
+    options?: FedosDirectRatchetEstablishOptions,
+  ): Promise<FedosDirectRatchetEstablishOutcome> {
     const counterparty = this.#deps.resolveCounterparty(conversationId);
     if (counterparty.outcome === "not-direct") return { outcome: "not-direct" };
     if (counterparty.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
@@ -133,10 +157,27 @@ export class FedosDirectRatchetOutboundIntegration {
       conversationId,
       suite: FEDOS_DIRECT_RATCHET_DEFAULT_SUITE,
     });
-    if (current !== null && (current.lifecycleState === "active" || current.lifecycleState === "initialized")) {
+    // A `reason` supplied by the caller is an explicit request for a real
+    // reset (a NEW generation) even though the current one is still
+    // active/initialized — the "already-active" idempotent short-circuit
+    // below applies ONLY when no reset was actually requested; otherwise
+    // every reset would be silently swallowed as a no-op the very first
+    // time it mattered (the current session being active is precisely
+    // the normal case a reset supersedes).
+    if (
+      current !== null &&
+      (current.lifecycleState === "active" || current.lifecycleState === "initialized") &&
+      options?.reason === undefined
+    ) {
       return { outcome: "already-active", sessionId: current.binding.sessionId };
     }
+    const previousGeneration = current === null ? null : current.binding.generation;
+    if (previousGeneration !== null && options?.reason === undefined) {
+      return { outcome: "reason-required" };
+    }
+    const reason = previousGeneration === null ? null : (options!.reason as FedosDirectRatchetSessionResetReason);
     const generation = current === null ? 0 : current.binding.generation + 1;
+    const resetNonce = (this.#deps.resetNonceGenerator ?? generateFedosDirectRatchetSessionResetNonce)();
 
     const resolution = resolveFedosDirectRatchetDevicePair(this.#deps.deviceRegistry, this.#deps.sessionPersistence, {
       localAccountRef: counterparty.localAccountRef,
@@ -172,6 +213,22 @@ export class FedosDirectRatchetOutboundIntegration {
     const activated = this.#deps.stateRuntime.markActive(resolution.sessionId);
     if (activated.outcome !== "transitioned") return { outcome: "persistence-failed" };
 
+    this.#deps.resetCoordinator.applyConsequences({
+      localAccountRef: counterparty.localAccountRef,
+      localDeviceRef: this.#deps.localDeviceRef,
+      remoteAccountRef: counterparty.remoteAccountRef,
+      remoteDeviceRef,
+      conversationId: conversationId as unknown as string,
+      suite: FEDOS_DIRECT_RATCHET_DEFAULT_SUITE,
+      previousGeneration,
+      newGeneration: generation,
+      reason,
+      nonce: resetNonce,
+      initiator: "local",
+      outcome: previousGeneration === null ? "accepted-initial" : "accepted-reset",
+      previousSessionId: current?.binding.sessionId ?? null,
+    });
+
     this.#deps.liveSessionCache.set(resolution.sessionId, session);
 
     const sealedState = await session.sealState(this.#deps.masterSeedAuthority, remoteDeviceRef, conversationId as unknown as string);
@@ -190,17 +247,29 @@ export class FedosDirectRatchetOutboundIntegration {
     const ratchetPublicKeyHex = await session.localRatchetPublicKeyHex();
     if (ratchetPublicKeyHex === null) return { outcome: "crypto-unavailable" };
 
-    const initPayload: FedosDirectRatchetSessionInitPayloadV1 = {
-      schemaVersion: 1,
-      kind: "session-init",
+    const signableContent: FedosDirectRatchetSessionResetSignableContent = {
       suite: FEDOS_DIRECT_RATCHET_DEFAULT_SUITE,
       generation,
+      previousGeneration,
+      resetReason: reason,
+      resetNonce,
       senderAccountRef: counterparty.localAccountRef,
       senderDeviceRef: this.#deps.localDeviceRef,
       recipientAccountRef: counterparty.remoteAccountRef,
       recipientDeviceRef: remoteDeviceRef,
       conversationId: conversationId as unknown as string,
       ratchetPublicKeyHex,
+    };
+    const deviceSignatureHex =
+      options?.deviceSigningKeypair !== undefined
+        ? createFedosDirectRatchetSessionResetDeviceSignature(options.deviceSigningKeypair, signableContent)
+        : null;
+
+    const initPayload: FedosDirectRatchetSessionInitPayloadV1 = {
+      schemaVersion: 1,
+      kind: "session-init",
+      ...signableContent,
+      deviceSignatureHex,
     };
     const controlId = `direct-ratchet-init##${resolution.sessionId}`;
     const now = this.#deps.now();

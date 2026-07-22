@@ -8,6 +8,43 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: FedOS Ratchet Device Lifecycle and Authenticated Session
+> Reset Foundation Arc (FULL completion).** Implements the Runtime
+> foundation the FedOS Direct Ratchet Multi-Device Session Lifecycle and
+> Identity Rotation V1 Review (`3ebfa37`) named as the exact next Arc, on
+> top of the completed Direct Ratchet + NIP-17 Integration (`b8e9e06`).
+> New, all additive: an authenticated Session Reset message (four new
+> fields on the existing `session-init` NIP-17 payload — `previousGeneration`/
+> `resetReason`/`resetNonce`/`deviceSignatureHex` — never a new
+> control-message kind); the FIRST real consumption of the existing
+> per-Device signing keypair (Alpha 3161–3240) by the Ratchet, via a
+> best-effort, optional Device-level signature (never a hard requirement,
+> since no durable Device-key storage exists anywhere in this codebase,
+> and this Arc does not invent one); a Session Reset Authority (Device
+> Trust integration, generation-integrity check, replay protection) and a
+> Runtime Reset Coordinator that supersedes the prior generation via the
+> ALREADY-LIVE `"reset-required"` lifecycle state (Alpha 5401–5480 — no
+> new state was needed; a real discrepancy the source review itself
+> missed); durable, restart-safe, nonce-keyed reset audit records; a
+> Device Lifecycle derivation (`pending`/`active`/`replaced`/`revoked`/
+> `unavailable`) and a formalized Device Replacement Coordinator
+> (register-then-revoke, real Nostr + real Device signatures, never
+> inherits the old Device's identity or key); and Device-revocation
+> quarantine wired to the Ratchet (`applyDeviceRevocationToSessions()`).
+> Proven with a real, no-fake-crypto vertical slice: generation 0 →
+> authenticated, Device-signed, reasoned reset → generation 1, superseded
+> + restart-safe on both sides, a real second Device pair (Alice's
+> tablet) proven isolated and unaffected, and "a reset always names why"
+> enforced structurally end-to-end through a second real reset to
+> generation 2. See
+> `docs/fedos_ratchet_device_lifecycle_session_reset_foundation_completion_declaration.md`.
+> No account/Nostr identity rotation, Master Seed replacement, PQ, MLS,
+> Sender-Key redesign, group messaging, UI, Electron, or remote
+> synchronization touched. Recommended next Arc: **FedOS Ratchet Peer
+> Notification and Capability Advertisement Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5561–5640 — FedOS Direct Double Ratchet
 > Conversation Runtime and NIP-17 Integration Arc (FULL completion).**
 > Wires the already-real Ratchet State Foundation (`be1bc0d`) and

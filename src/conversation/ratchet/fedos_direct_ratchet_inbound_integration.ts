@@ -78,8 +78,11 @@ import {
 } from "../delivery/nostr/nip17/fedos_direct_ratchet_nip17_payload.js";
 import {
   resolveFedosDirectRatchetDevicePair,
+  findCurrentFedosDirectRatchetSession,
   FEDOS_DIRECT_RATCHET_DEFAULT_SUITE,
 } from "./fedos_direct_ratchet_device_pair_resolver.js";
+import type { FedosDirectRatchetSessionResetSignableContent } from "./fedos_direct_ratchet_session_reset_authentication.js";
+import type { FedosDirectRatchetResetCoordinator } from "./fedos_direct_ratchet_reset_coordinator.js";
 import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
 import type { FedosSealedDirectRatchetSecretPersistence } from "./persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
 import type { FedosDirectRatchetRemotePublicKeyPersistence } from "./persistence/fedos_direct_ratchet_remote_public_key_persistence.js";
@@ -108,6 +111,8 @@ export type FedosDirectRatchetInboundReceiveResult =
   | { readonly outcome: "crypto-unavailable" }
   | { readonly outcome: "session-established"; readonly sessionId: string }
   | { readonly outcome: "already-initialized"; readonly sessionId: string }
+  /** `FedosDirectRatchetSessionResetAuthority` denied this claimed reset/establishment — no session was created, no state changed beyond the durable reset audit record (skipped for a "rejected-replayed" attempt, matching a consumed-nonce ledger's own convention of never recording a conflicting duplicate). */
+  | { readonly outcome: "reset-rejected"; readonly reason: string }
   | { readonly outcome: "unknown-session" }
   | { readonly outcome: "session-not-active" }
   | { readonly outcome: "decrypt-failed" }
@@ -125,6 +130,7 @@ export interface FedosDirectRatchetInboundIntegrationDependencies {
   readonly remotePublicKeyPersistence: FedosDirectRatchetRemotePublicKeyPersistence;
   readonly snapshotPersistence: FedosDirectRatchetLiveStateSnapshotPersistence;
   readonly stateRuntime: FedosDirectRatchetStateRuntime;
+  readonly resetCoordinator: FedosDirectRatchetResetCoordinator;
   readonly masterSeedAuthority: FedosMasterSeedAuthority;
   readonly accountIndex: number;
   readonly localDeviceRef: string;
@@ -220,6 +226,69 @@ export class FedosDirectRatchetInboundIntegration {
       return { outcome: "already-initialized", sessionId: resolution.sessionId as unknown as string };
     }
 
+    // FedOS Ratchet Device Lifecycle and Authenticated Session Reset
+    // Foundation Arc — Session Reset Authority evaluation, BEFORE any
+    // session is ever created. `priorRecord` is this local side's OWN
+    // ground truth for "the highest generation we already know about for
+    // this exact tuple" (independent of what `payload.generation` claims),
+    // resolved WITHOUT pinning a `generation`, unlike `resolution` above.
+    const priorRecord = findCurrentFedosDirectRatchetSession(this.#deps.sessionPersistence, {
+      localAccountRef,
+      localDeviceRef: this.#deps.localDeviceRef,
+      remoteAccountRef,
+      remoteDeviceRef: payload.senderDeviceRef,
+      conversationId: conversationId as FedosConversationId,
+      suite: FEDOS_DIRECT_RATCHET_DEFAULT_SUITE,
+    });
+    const signableContent: FedosDirectRatchetSessionResetSignableContent = {
+      suite: payload.suite,
+      generation: payload.generation,
+      previousGeneration: payload.previousGeneration,
+      resetReason: payload.resetReason,
+      resetNonce: payload.resetNonce,
+      senderAccountRef: payload.senderAccountRef,
+      senderDeviceRef: payload.senderDeviceRef,
+      recipientAccountRef: payload.recipientAccountRef,
+      recipientDeviceRef: payload.recipientDeviceRef,
+      conversationId: payload.conversationId,
+      ratchetPublicKeyHex: payload.ratchetPublicKeyHex,
+    };
+    const evaluation = this.#deps.resetCoordinator.evaluate({
+      content: signableContent,
+      deviceSignatureHex: payload.deviceSignatureHex,
+      senderDeviceBinding: this.#deps.deviceRegistry.getBinding(payload.senderDeviceRef),
+      locallyKnownPreviousGeneration: priorRecord?.binding.generation ?? null,
+    });
+    if (evaluation.outcome === "rejected-replayed") {
+      this.#recordImport(rumor, relaySource);
+      return { outcome: "reset-rejected", reason: "rejected-replayed" };
+    }
+    if (
+      evaluation.outcome === "rejected-device-untrusted" ||
+      evaluation.outcome === "rejected-generation-mismatch" ||
+      evaluation.outcome === "rejected-signature"
+    ) {
+      this.#deps.resetCoordinator.applyConsequences({
+        localAccountRef,
+        localDeviceRef: this.#deps.localDeviceRef,
+        remoteAccountRef,
+        remoteDeviceRef: payload.senderDeviceRef,
+        conversationId,
+        suite: payload.suite,
+        previousGeneration: payload.previousGeneration,
+        newGeneration: payload.generation,
+        reason: payload.resetReason,
+        nonce: payload.resetNonce,
+        initiator: "remote",
+        outcome: evaluation.outcome,
+        previousSessionId: null,
+      });
+      this.#recordImport(rumor, relaySource);
+      return { outcome: "reset-rejected", reason: evaluation.outcome };
+    }
+    const skipResetRecord = evaluation.outcome === "accepted-idempotent-repeat";
+    const resetOutcome = evaluation.outcome === "accepted-idempotent-repeat" ? evaluation.recordedOutcome : evaluation.outcome;
+
     const session = await FedosDirectRatchetCryptographicSession.createAsSender(
       this.#deps.masterSeedAuthority,
       this.#deps.accountIndex,
@@ -246,6 +315,23 @@ export class FedosDirectRatchetInboundIntegration {
       const activated = this.#deps.stateRuntime.markActive(resolution.sessionId);
       if (activated.outcome !== "transitioned") return { outcome: "persistence-failed" };
     }
+
+    this.#deps.resetCoordinator.applyConsequences({
+      localAccountRef,
+      localDeviceRef: this.#deps.localDeviceRef,
+      remoteAccountRef,
+      remoteDeviceRef: payload.senderDeviceRef,
+      conversationId,
+      suite: payload.suite,
+      previousGeneration: payload.previousGeneration,
+      newGeneration: payload.generation,
+      reason: payload.resetReason,
+      nonce: payload.resetNonce,
+      initiator: "remote",
+      outcome: resetOutcome,
+      previousSessionId: priorRecord?.binding.sessionId ?? null,
+      skipRecord: skipResetRecord,
+    });
 
     this.#deps.liveSessionCache.set(resolution.sessionId, session);
     this.#deps.remotePublicKeyPersistence.putRemoteRatchetPublicKeyHex(resolution.sessionId as unknown as string, payload.ratchetPublicKeyHex);
