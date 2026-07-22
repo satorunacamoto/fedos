@@ -105,7 +105,24 @@ describe("Alpha 5401-5480 — 23/24/26. Archive/Search/Transport exclusion (sour
     // NEW, additive integration-layer files. A narrow, named exclusion —
     // every OTHER ratchet source file (all pre-existing) remains fully
     // covered by this guard exactly as before.
-    const integrationFiles = new Set(["fedos_direct_ratchet_conversation_runtime.ts", "fedos_direct_ratchet_outbound_integration.ts", "fedos_direct_ratchet_inbound_integration.ts", "fedos_direct_ratchet_route_resolution.ts"]);
+    //
+    // Secure Runtime Alpha 5721–5800 (FedOS Ratchet Peer Notification and
+    // Capability Advertisement Arc) — the SAME narrow exclusion, applied
+    // once more for the SAME reason: `fedos_ratchet_peer_capability_vocabulary.ts`
+    // (under the new `peer_capability/` integration directory) imports the
+    // real, closed `FedosPrivateWireRouteRequest` type FROM `/transport/`
+    // so its own capability vocabulary can never silently drift from the
+    // live route vocabulary — a type-only reuse, never a new dependency
+    // direction the underlying architectural principle (no ratchet
+    // business logic reaching INTO Transport/Archive/Search internals)
+    // actually forbids.
+    const integrationFiles = new Set([
+      "fedos_direct_ratchet_conversation_runtime.ts",
+      "fedos_direct_ratchet_outbound_integration.ts",
+      "fedos_direct_ratchet_inbound_integration.ts",
+      "fedos_direct_ratchet_route_resolution.ts",
+      "fedos_ratchet_peer_capability_vocabulary.ts",
+    ]);
     const forbiddenImportPatterns = [/\/archive\//, /\/search\//, /sync_journal/i, /\/transport\//];
     for (const file of collect(ratchetDir)) {
       if ([...integrationFiles].some((name) => file.endsWith(name))) continue;

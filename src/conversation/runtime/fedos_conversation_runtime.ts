@@ -200,6 +200,12 @@ import {
 } from "../ratchet/fedos_direct_ratchet_conversation_runtime.js";
 import type { FedosDirectRatchetInboundReceiveResult } from "../ratchet/fedos_direct_ratchet_inbound_integration.js";
 import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosRatchetPeerCapabilityEntry } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
+import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
+import { FedosRatchetPeerCapabilityRuntime } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
+import type { FedosRatchetPeerCapabilityInboundOutcome } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
 
 /**
  * The full injected dependency set — the construction coordinator's own
@@ -316,7 +322,33 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
    * exactly like every other optional dependency on this type.
    */
   readonly directRatchet?: FedosConversationDirectRatchetIntegrationDependencies;
+  /**
+   * Secure Runtime Alpha 5721–5800 (FedOS Ratchet Peer Notification and
+   * Capability Advertisement Arc) — OPTIONAL; omitted, `peerCapability()`
+   * returns `null` and `receiveNip17Rumor()` remains byte-for-byte
+   * unchanged for this attempt (the ratchet decode attempt and legacy
+   * chat fallback are both untouched either way). Independent of
+   * `directRatchet` above — a caller may supply one, both, or neither.
+   */
+  readonly peerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
 };
+
+/** See `FedosConversationRuntimeDependencies.peerCapability`'s own doc comment. */
+export interface FedosConversationPeerCapabilityIntegrationDependencies {
+  readonly deviceRegistry: FedosDeviceRegistryPersistence;
+  readonly signingAuthority: FedosNostrSigningAuthority;
+  readonly localAccountRef: FedosDeviceBindingAccountRef;
+  readonly localDeviceRef: string;
+  readonly locallySupportedCapabilities: readonly FedosRatchetPeerCapabilityEntry[];
+  /** Optional — default in-memory. */
+  readonly observationPersistence?: FedosRatchetPeerCapabilityObservationPersistence;
+  readonly sendMailboxNip17Control: (
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+}
 
 /** See `FedosConversationRuntimeDependencies.directRatchet`'s own doc comment. */
 export interface FedosConversationDirectRatchetIntegrationDependencies {
@@ -388,6 +420,8 @@ export class FedosConversationRuntime {
   readonly #nip17InboundImportCoordinator: FedosNip17InboundImportCoordinator;
   /** Secure Runtime Alpha 5561–5640 — `null` when `deps.directRatchet` was not supplied. See this class's own constructor comment. */
   readonly #directRatchetRuntime: FedosDirectRatchetConversationRuntime | null;
+  /** Secure Runtime Alpha 5721–5800 — `null` when `deps.peerCapability` was not supplied. See this class's own constructor comment. */
+  readonly #peerCapabilityRuntime: FedosRatchetPeerCapabilityRuntime | null;
   /** Alpha 2041–2120 — see `../activation/fedos_conversation_reactivation_coordinator.ts`'s own header. */
   readonly #reactivationCoordinator: FedosConversationReactivationCoordinator;
   /**
@@ -537,6 +571,29 @@ export class FedosConversationRuntime {
               deps.directRatchet.importRecordPersistence ?? new InMemoryFedosPrivateNostrImportRecordPersistence(),
             sendMailboxNip17Control: deps.directRatchet.sendMailboxNip17Control,
             clock: deps.clock,
+          });
+
+    // Secure Runtime Alpha 5721–5800 (FedOS Ratchet Peer Notification and
+    // Capability Advertisement Arc) — `null` when `deps.peerCapability`
+    // was not supplied. Entirely independent of `#directRatchetRuntime`
+    // above (a caller may supply either, both, or neither) — this Runtime
+    // never mutates the Device Registry, never activates a route, and
+    // never shares a persistence instance with the Ratchet domain (a new,
+    // dedicated Observation store, per this Arc's own established
+    // "always a new parallel type" convention).
+    this.#peerCapabilityRuntime =
+      deps.peerCapability === undefined
+        ? null
+        : new FedosRatchetPeerCapabilityRuntime({
+            deviceRegistry: deps.peerCapability.deviceRegistry,
+            signingAuthority: deps.peerCapability.signingAuthority,
+            accountIndex: accountIndexAuthority.localAccountIndex(),
+            localAccountRef: deps.peerCapability.localAccountRef,
+            localDeviceRef: deps.peerCapability.localDeviceRef,
+            clock: deps.clock,
+            sendMailboxNip17Control: deps.peerCapability.sendMailboxNip17Control,
+            observationPersistence: deps.peerCapability.observationPersistence ?? new InMemoryFedosRatchetPeerCapabilityObservationPersistence(),
+            locallySupportedCapabilities: deps.peerCapability.locallySupportedCapabilities,
           });
 
     // Secure Runtime Alpha 5561–5640 Phase E — the ratchet route's own
@@ -1098,7 +1155,7 @@ export class FedosConversationRuntime {
   async receiveNip17Rumor(
     rumor: FedosPrivateWireParsedRumor,
     relaySource: string | null,
-  ): Promise<FedosNip17InboundReceiveResult | FedosDirectRatchetInboundReceiveResult> {
+  ): Promise<FedosNip17InboundReceiveResult | FedosDirectRatchetInboundReceiveResult | FedosRatchetPeerCapabilityInboundOutcome> {
     // Secure Runtime Alpha 5561–5640 Phase G — tried FIRST, exactly like
     // the payload codec's own header requires: a ratchet payload must
     // never be mislabeled as a legacy/static NIP-17 chat message.
@@ -1109,6 +1166,17 @@ export class FedosConversationRuntime {
     if (this.#directRatchetRuntime !== null) {
       const ratchetResult = await this.#directRatchetRuntime.importRatchetPrivatePayload(rumor, relaySource);
       if (ratchetResult.outcome !== "not-ratchet-payload") return ratchetResult;
+    }
+    // Secure Runtime Alpha 5721–5800 — tried SECOND, before the legacy
+    // chat fallback: a peer-capability control payload must never be
+    // imported as an ordinary chat message either (this Arc's own
+    // Absolute Prohibition). `"not-peer-capability-payload"` (the ONLY
+    // outcome possible when `#peerCapabilityRuntime` is `null`, or when a
+    // real, non-peer-capability Rumor arrives) falls through to the
+    // EXISTING, UNCHANGED legacy coordinator below — never the reverse.
+    if (this.#peerCapabilityRuntime !== null) {
+      const peerCapabilityResult = await this.#peerCapabilityRuntime.importPeerCapabilityPayload(rumor.content);
+      if (peerCapabilityResult.outcome !== "not-peer-capability-payload") return peerCapabilityResult;
     }
     return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
   }
@@ -1122,6 +1190,17 @@ export class FedosConversationRuntime {
    */
   directRatchet(): FedosDirectRatchetConversationRuntime | null {
     return this.#directRatchetRuntime;
+  }
+
+  /**
+   * Secure Runtime Alpha 5721–5800 (FedOS Ratchet Peer Notification and
+   * Capability Advertisement Arc) — the additive peer-capability facade.
+   * `null` when `deps.peerCapability` was not supplied at construction
+   * (mirrors `directRatchet()`'s own "null when not assembled"
+   * precedent).
+   */
+  peerCapability(): FedosRatchetPeerCapabilityRuntime | null {
+    return this.#peerCapabilityRuntime;
   }
 }
 

@@ -8,6 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5721–5800 — FedOS Ratchet Peer
+> Notification and Capability Advertisement Arc (FULL completion).**
+> Implements the authenticated peer-notification and capability-advertisement
+> foundation the FedOS Ratchet Device Lifecycle and Authenticated Session
+> Reset Foundation Arc (`f80889d`) named as its own recommended next Arc.
+> New, all additive, under `src/conversation/ratchet/peer_capability/`: a
+> closed, versioned capability vocabulary (reusing, never widening, the
+> existing private-message-route and ratchet-suite vocabularies); a
+> signed Peer Capability Advertisement record and six closed, authenticated
+> Device Lifecycle Notification facts (`device-added`/`device-revoked`/
+> `device-replaced`/`ratchet-session-reset-required`/
+> `ratchet-session-generation-advanced`/`capability-superseded` — NOT
+> `device-key-updated`, since no in-place Device key-rotation primitive
+> exists anywhere in this codebase); real account-level signing (reusing
+> the Device Binding kind-1-event pattern) plus optional, best-effort
+> Device-level signing (reusing the Session Reset pattern), modeled as
+> three distinct, never-silently-upgraded evidence states; both record
+> types carried through the EXISTING `"nostr-nip17-v1"` Gift Wrap
+> transport via the existing `sendMailboxNip17Control()` seam — no new
+> Nostr kind, no new NIP, no public unencrypted event; a pure, 13-outcome
+> local acceptance policy and a pure session-action-recommendation layer
+> that never itself resets/establishes/copies a session; a dedicated,
+> append-only-capable, per-local-Device peer-capability Observation
+> domain; and a narrow safe facade
+> (`FedosRatchetPeerCapabilityRuntime`) wired into `FedosConversationRuntime`
+> via one optional dependency bundle and one narrow, additive
+> inbound-dispatch hook. Proven with a real, no-fake-crypto vertical
+> slice: a real signed advertisement published through the real NIP-17
+> transport and a real in-process Relay, durably observed, restart-safe,
+> with independent per-Device state (Alice's second Device announced and
+> recorded with no inherited session) and a Device-revocation
+> notification whose `"revoked"` status a later, conflicting, stale
+> re-advertisement can never silently overwrite. Three real bugs found
+> and fixed via this real testing: an exact-nonce-replay false conflict,
+> lifecycle-notification observations keyed by the wrong Device, and
+> cross-`sourceKind` revision-counter mixing. See
+> `docs/secure_runtime_alpha_5721_5800_completion_declaration.md`.
+> Peer advertisement is evidence, not trust; one Device observation is
+> never account-wide; no capability fact ever activates a route, mutates
+> the Device Registry, or resets a session automatically; no account/Nostr
+> identity rotation is implemented. Recommended next Arc: **FedOS Account
+> and Nostr Identity Rotation V1 Specification Review**.
+>
+> Prior status:
+>
 > **Status: FedOS Ratchet Device Lifecycle and Authenticated Session
 > Reset Foundation Arc (FULL completion).** Implements the Runtime
 > foundation the FedOS Direct Ratchet Multi-Device Session Lifecycle and
