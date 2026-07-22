@@ -354,6 +354,45 @@ export class FedosDesktopHostBridge implements FedosDesktopHostPort {
           });
           return fedosHostResponseFromResult(result, requestId);
         }
+        // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy
+        // Controls and Safety Center Arc). Every case delegates to
+        // `boundary.safetyCenter` (the Controller) -- this Bridge invents
+        // no aggregation/business logic of its own.
+        case "safety-center-overview": {
+          await boundary.safetyCenter.refreshOverview(validated.ratchetPairs);
+          return fedosHostResponseFromViewModelState(boundary.safetyCenter.overviewState, requestId);
+        }
+        case "safety-center-events": {
+          await boundary.safetyCenter.refreshEvents(validated.limit, validated.offset);
+          return fedosHostResponseFromViewModelState(boundary.safetyCenter.eventsState, requestId);
+        }
+        case "safety-center-section": {
+          const ok = boundary.safetyCenter.goto(validated.section);
+          return ok ? fedosHostOk(null, requestId) : fedosHostFailure("invalid-input", "unknown section", requestId);
+        }
+        case "safety-center-device-action": {
+          boundary.safetyCenter.requestRevokeDeviceConfirmation(validated.deviceId, validated.devicePublicKeyHex);
+          return fedosHostResponseFromViewModelState(boundary.safetyCenter.confirmationState, requestId);
+        }
+        case "safety-center-ratchet-action": {
+          boundary.safetyCenter.requestAuthorizeRatchetResetConfirmation(validated.conversationId, validated.remoteDeviceRef);
+          return fedosHostResponseFromViewModelState(boundary.safetyCenter.confirmationState, requestId);
+        }
+        case "safety-center-confirm-action": {
+          await boundary.safetyCenter.confirmPendingAction();
+          return fedosHostResponseFromViewModelState(boundary.safetyCenter.confirmationState, requestId);
+        }
+        case "safety-center-cancel-action": {
+          boundary.safetyCenter.cancelPendingConfirmation();
+          return fedosHostOk(null, requestId);
+        }
+        case "safety-center-settings-action": {
+          const applied =
+            validated.field === "notifications"
+              ? await boundary.safetyCenter.updateNotificationsEnabled(validated.enabled)
+              : await boundary.safetyCenter.updateBackgroundSyncEnabled(validated.enabled);
+          return applied ? fedosHostOk(null, requestId) : fedosHostFailure("unavailable", "settings are not wired into this build", requestId);
+        }
       }
     } catch {
       return fedosHostFailure("failed", "command failed", requestId);

@@ -74,6 +74,7 @@ import {
   type FedosDeletionRecipientPolicy,
 } from "./fedos_deletion_recipient_policy.js";
 import type { FedosDeletionRequestInboxSummaryPersistence, FedosDeletionRequestInboxSummaryV1 } from "./fedos_deletion_request_inbox_summary.js";
+import type { FedosDeletionRequestPendingReviewPersistence } from "./fedos_deletion_request_pending_review_persistence.js";
 
 export interface FedosDeletionRequestInboundDependencies {
   readonly authorization: FedosDeletionRequestAuthorizationAssessmentDependencies;
@@ -97,6 +98,20 @@ export interface FedosDeletionRequestInboundDependencies {
    * byte-for-byte unchanged from `5881-5960`.
    */
   readonly inboxSummaryPersistence?: FedosDeletionRequestInboxSummaryPersistence;
+  /**
+   * Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+   * Safety Center Arc) — OPTIONAL, additive. When supplied, closes this
+   * domain's own previously-disclosed limitation: a `"policy-pending"`
+   * item's real signed body is ALSO durably recorded here (in addition to
+   * the existing, unmodified in-memory `#pendingReviewCache`), so
+   * `executeApprovedLocalDeletionById()`/`rejectReceivedDeletionRequest()`
+   * remain actionable after a restart without requiring the sender's own
+   * redelivery. Omitted, this coordinator's own behavior is byte-for-byte
+   * unchanged from `6041-6120`/`50f80e8`. Never widens what any policy
+   * grants and never changes validation — see
+   * `docs/secure_runtime_alpha_6201_6280_pending_review_durability.md`.
+   */
+  readonly pendingReviewPersistence?: FedosDeletionRequestPendingReviewPersistence;
 }
 
 export type FedosDeletionRequestInboundOutcome =
@@ -148,9 +163,10 @@ export class FedosDeletionRequestInboundCoordinator {
     this.#deps = deps;
   }
 
-  /** `true` only while this process still holds the signed request in memory for a `"policy-pending"` item -- never a durable fact. */
+  /** True while this process holds the signed request either in memory or (`6201-6280`, when configured) in the durable pending-review side-channel. */
   hasPendingReviewRequest(requestId: string): boolean {
-    return this.#pendingReviewCache.has(requestId);
+    if (this.#pendingReviewCache.has(requestId)) return true;
+    return (this.#deps.pendingReviewPersistence?.getPendingReview(requestId) ?? null) !== null;
   }
 
   /** `content` is the already-unwrapped Rumor's own `content: string` — the ONE inbound dispatch point (mirrors `FedosRatchetPeerCapabilityInboundCoordinator.importRumorContent()`). */
@@ -206,15 +222,15 @@ export class FedosDeletionRequestInboundCoordinator {
       return { outcome: "recorded", requestId, decisionState: rejected.decisionState, requestedScope: signed.record.scope, grantedScope: null };
     }
     if (decision.decision === "await-review") {
-      // Secure Runtime Alpha 6041-6120 -- held IN-MEMORY ONLY (never written to disk) so a
-      // later explicit human approval can look the signed request back up by `requestId` alone
-      // (Host/Renderer boundary: "no raw signatures in UI" -- a caller-facing approval command
-      // carries only the canonical id, never this object). Disclosed limitation: an item still
-      // awaiting review does not survive a process restart -- the DISPLAY (Inbox summary +
-      // decision state) is fully restart-safe; only the "click approve" action itself is not,
-      // until the request is naturally redelivered (safe/idempotent by this protocol's own
-      // design).
+      // Secure Runtime Alpha 6041-6120 -- held in-memory so a later explicit human approval can
+      // look the signed request back up by `requestId` alone (Host/Renderer boundary: "no raw
+      // signatures in UI" -- a caller-facing approval command carries only the canonical id,
+      // never this object).
       this.#pendingReviewCache.set(requestId, signed);
+      // Secure Runtime Alpha 6201-6280 -- ALSO durably recorded (when configured), closing the
+      // prior restart limitation: best-effort, a write failure here never blocks the real
+      // evaluation pipeline (mirrors this file's own `inboxSummaryPersistence` write above).
+      this.#deps.pendingReviewPersistence?.putPendingReview(requestId, signed, this.#deps.clock());
       return { outcome: "recorded", requestId, decisionState: "policy-pending", requestedScope: signed.record.scope, grantedScope: null };
     }
 
@@ -269,12 +285,18 @@ export class FedosDeletionRequestInboundCoordinator {
    * `"unknown-request"` if this process never received/no longer holds a
    * `"policy-pending"` copy for `requestId` (including after a restart —
    * see this file's own disclosed limitation). Consumed exactly once: the
-   * cache entry is removed regardless of outcome.
+   * cache entry (and, `6201-6280`, the durable side-channel entry when
+   * configured) is removed regardless of outcome. A durably-recovered
+   * entry whose own `expiresAt` has since passed is treated exactly like
+   * `"unknown-request"` -- a restart never grants a stale approval a live
+   * one would not itself have received.
    */
   async executeApprovedLocalDeletionById(requestId: string): Promise<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }> {
-    const signed = this.#pendingReviewCache.get(requestId);
-    if (signed === undefined) return { outcome: "unknown-request" };
+    const signed = this.#pendingReviewCache.get(requestId) ?? this.#deps.pendingReviewPersistence?.getPendingReview(requestId) ?? undefined;
     this.#pendingReviewCache.delete(requestId);
+    this.#deps.pendingReviewPersistence?.tombstonePendingReview(requestId, this.#deps.clock());
+    if (signed === undefined) return { outcome: "unknown-request" };
+    if (signed.record.expiresAt < this.#deps.clock()) return { outcome: "unknown-request" };
     return this.executeApprovedLocalDeletion(signed);
   }
 
@@ -293,9 +315,10 @@ export class FedosDeletionRequestInboundCoordinator {
     const current = this.#deps.recipientDecisionPersistence.getRecord(requestId);
     if (current === null || current.decisionState !== "policy-pending") return { outcome: "unknown-request" };
     const summary = this.#deps.inboxSummaryPersistence?.getSummary(requestId) ?? null;
-    const cached = this.#pendingReviewCache.get(requestId);
+    const cached = this.#pendingReviewCache.get(requestId) ?? this.#deps.pendingReviewPersistence?.getPendingReview(requestId) ?? null;
     const requestedScope = summary?.scope ?? cached?.record.scope ?? "local-history";
     this.#pendingReviewCache.delete(requestId);
+    this.#deps.pendingReviewPersistence?.tombstonePendingReview(requestId, this.#deps.clock());
     const rejected = recordFedosDeletionRecipientPolicyRejection(requestId, this.#deps.recipientDecisionPersistence, this.#deps.clock);
     if (rejected.outcome !== "recorded") return { outcome: "persistence-failed" };
     return { outcome: "recorded", requestId, decisionState: rejected.decisionState, requestedScope, grantedScope: null };

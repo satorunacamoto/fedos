@@ -55,6 +55,10 @@ import { FedosDeletionRequestController } from "./deletion_request/fedos_deletio
 // Verification and Conversation Continuity UI Arc) -- additive only,
 // mirroring this file's own established pattern.
 import { FedosIdentityTransitionController } from "./identity_transition/fedos_identity_transition_controller.js";
+// Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+// Safety Center Arc) -- additive only, mirroring this file's own
+// established pattern.
+import { FedosSafetyCenterController } from "./safety_center/fedos_safety_center_controller.js";
 
 export class FedosDesktopConversationUiPresentationBoundary {
   readonly #shell: FedosDesktopApplicationShell;
@@ -77,6 +81,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
   readonly deviceManagement: FedosDeviceManagementController;
   readonly deletionRequests: FedosDeletionRequestController;
   readonly identityTransitions: FedosIdentityTransitionController;
+  readonly safetyCenter: FedosSafetyCenterController;
 
   private constructor(shell: FedosDesktopApplicationShell) {
     this.#shell = shell;
@@ -99,6 +104,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
     this.deviceManagement = new FedosDeviceManagementController(this);
     this.deletionRequests = new FedosDeletionRequestController(shell);
     this.identityTransitions = new FedosIdentityTransitionController(shell);
+    this.safetyCenter = new FedosSafetyCenterController(shell);
   }
 
   /** Thin factory — mirrors `createFedosDesktopApplicationShell()`'s own style. No side effect (no Runtime started) until `runtimeStatus.start()` is called. */

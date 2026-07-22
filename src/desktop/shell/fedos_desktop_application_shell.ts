@@ -107,6 +107,11 @@ import {
 } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_impact_view.js";
 import type { FedosIdentityTransitionConversationContinuityRecordV1 } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
 import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+// Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and Safety Center Arc) -- narrow additive accessors the Safety Center needs, none of which existed on this Shell before.
+import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
+import type { FedosDirectRatchetSafeStatus } from "../../conversation/ratchet/fedos_direct_ratchet_conversation_runtime.js";
+import type { FedosRatchetPeerCapabilitySafeStatus } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
+import type { FedosRatchetPeerCapabilityPeerDeviceStatus } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
 // Durable Sync Journal Arc) -- every import/addition below this comment is
 // ADDITIVE ONLY, mirroring the Alpha 3801-3880 boundary above.
@@ -970,6 +975,47 @@ export class FedosDesktopApplicationShell {
     });
     if (result.outcome === "not-accepted") return fedosDesktopShellFailure("conflict", "transition is not accepted");
     return fedosDesktopShellOk(result);
+  }
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+  // Safety Center Arc) -- four narrow, additive, read-only accessors the
+  // Safety Center's own aggregation needs and this Shell did not expose
+  // before. Every one of them delegates entirely to an ALREADY-PUBLIC
+  // Runtime/sub-Runtime method -- no new business logic, no new mutation.
+  // `"unavailable"` on a stopped Shell or an unconfigured optional
+  // sub-Runtime -- the SAME honest terminus every other optional
+  // integration on this Shell already uses.
+  // ---------------------------------------------------------------------
+
+  /** Whether real (non-development-double) encryption is active for this Runtime -- never a claim about any specific Conversation's own readiness. */
+  productionCryptoStatus(): FedosDesktopShellResult<FedosConversationProductionCryptoCapabilityOutcome> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    return fedosDesktopShellOk(this.#runtime.conversationProductionCryptoCapability());
+  }
+
+  /** Read-only Ratchet safe status for one already-known `(conversationId, remoteDeviceRef)` pair -- mirrors `identityTransitionAssessContinuity()`'s own established "no session-listing query exists, caller names the pairs" precedent, since no such listing exists here either. */
+  directRatchetStatus(conversationId: string, remoteDeviceRef: string): FedosDesktopShellResult<FedosDirectRatchetSafeStatus> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const dr = this.#runtime.conversationRuntime().directRatchet();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
+    return fedosDesktopShellOk(dr.getDirectRatchetStatus(conversationId, remoteDeviceRef));
+  }
+
+  /** Every peer Device this local Device has ever observed a capability advertisement from -- a real listing query DOES exist here (unlike Direct Ratchet above). */
+  peerCapabilityListObserved(): FedosDesktopShellResult<readonly FedosRatchetPeerCapabilityPeerDeviceStatus[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const pc = this.#runtime.conversationRuntime().peerCapability();
+    if (pc === null) return fedosDesktopShellFailure("unavailable", "peer capability Runtime is not configured");
+    return fedosDesktopShellOk(pc.listObservedPeerDevices());
+  }
+
+  /** Read-only peer capability safe status for one named peer Device. */
+  peerCapabilityStatus(peerAccountRef: FedosDeviceBindingAccountRef, peerDeviceRef: string): FedosDesktopShellResult<FedosRatchetPeerCapabilitySafeStatus> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const pc = this.#runtime.conversationRuntime().peerCapability();
+    if (pc === null) return fedosDesktopShellFailure("unavailable", "peer capability Runtime is not configured");
+    return fedosDesktopShellOk(pc.getPeerDeviceCapabilityStatus(peerAccountRef, peerDeviceRef));
   }
 
   #toSummaryView(conversationId: string): FedosConversationSummaryView | null {

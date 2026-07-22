@@ -222,6 +222,7 @@ import { InMemoryFedosDeletionExecutionPersistence } from "../deletion/in_memory
 import type { FedosDeletionRecipientPolicy } from "../deletion_request/fedos_deletion_recipient_policy.js";
 import { FedosDeletionRequestConversationExistenceAdapter } from "../deletion_request/fedos_deletion_request_conversation_existence_adapter.js";
 import type { FedosDeletionRequestInboxSummaryPersistence } from "../deletion_request/fedos_deletion_request_inbox_summary.js";
+import type { FedosDeletionRequestPendingReviewPersistence } from "../deletion_request/fedos_deletion_request_pending_review_persistence.js";
 import type { FedosConversationParticipantAuthority } from "../membership/fedos_conversation_participant_reference.js";
 
 // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User Verification and Conversation Continuity UI Arc).
@@ -431,6 +432,8 @@ export interface FedosConversationDeletionRequestIntegrationDependencies {
   readonly localExecutionPersistence?: FedosDeletionExecutionPersistence;
   /** Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device Aggregation and User Consent UI Arc) — OPTIONAL, additive. Omitted, the recipient-side consent Inbox has nothing durable to read (`FedosDeletionRequestRuntime.listReceivedRequestSummaries()` returns `[]`) — every OTHER `5881-5960` behavior is unaffected. */
   readonly inboxSummaryPersistence?: FedosDeletionRequestInboxSummaryPersistence;
+  /** Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and Safety Center Arc) — OPTIONAL, additive. Omitted, a `"policy-pending"` item's real signed body remains in-memory-only exactly as `6041-6120`/`50f80e8` left it (see `fedos_deletion_request_inbound_coordinator.ts`'s own header). */
+  readonly pendingReviewPersistence?: FedosDeletionRequestPendingReviewPersistence;
   readonly sendMailboxNip17Control: (
     controlId: string,
     conversationId: FedosConversationId,
@@ -760,6 +763,7 @@ export class FedosConversationRuntime {
           localExecutionPersistence,
           localAccountRef: deletionRequestDeps.localAccountRef,
           inboxSummaryPersistence: deletionRequestDeps.inboxSummaryPersistence,
+          pendingReviewPersistence: deletionRequestDeps.pendingReviewPersistence,
         },
         acknowledgementOutbound: {
           signingAuthority: deletionRequestDeps.signingAuthority,

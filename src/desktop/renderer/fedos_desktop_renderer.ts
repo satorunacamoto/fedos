@@ -49,6 +49,9 @@ import { FedosDeletionRequestRenderer } from "./deletion_request/fedos_deletion_
 // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
 // Verification and Conversation Continuity UI Arc) -- additive only.
 import { FedosIdentityTransitionRenderer } from "./identity_transition/fedos_identity_transition_renderer.js";
+// Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+// Safety Center Arc) -- additive only.
+import { FedosSafetyCenterRenderer } from "./safety_center/fedos_safety_center_renderer.js";
 
 export class FedosDesktopRenderer {
   readonly conversationList: FedosDesktopConversationListRenderer;
@@ -67,6 +70,7 @@ export class FedosDesktopRenderer {
   readonly deviceManagement: FedosDeviceManagementRenderer;
   readonly deletionRequests: FedosDeletionRequestRenderer;
   readonly identityTransitions: FedosIdentityTransitionRenderer;
+  readonly safetyCenter: FedosSafetyCenterRenderer;
 
   constructor(boundary: FedosDesktopConversationUiPresentationBoundary) {
     this.conversationList = new FedosDesktopConversationListRenderer(boundary.conversationList);
@@ -85,6 +89,7 @@ export class FedosDesktopRenderer {
     this.deviceManagement = new FedosDeviceManagementRenderer(boundary.deviceManagement);
     this.deletionRequests = new FedosDeletionRequestRenderer(boundary.deletionRequests);
     this.identityTransitions = new FedosIdentityTransitionRenderer(boundary.identityTransitions);
+    this.safetyCenter = new FedosSafetyCenterRenderer(boundary.safetyCenter);
   }
 }
 

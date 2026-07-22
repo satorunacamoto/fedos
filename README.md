@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6201–6280 — FedOS Desktop Beta Privacy
+> Controls and Safety Center Arc (FULL completion, four disclosed
+> boundaries, all matching established precedent or explicitly scoped
+> out).** Merges the diverged Identity Replacement UI (`9cdd74ec`) and
+> Signed Deletion gap-closure (`50f80e8`) lineages (merge commit
+> `85c64304`) and builds one canonical, user-facing Safety Center
+> aggregating every existing security capability: a closed, 13-section
+> model (profile/unlock, Devices, Device Sync, secure messaging, peer
+> capabilities, Identity Replacement, Deletion Requests, Retention/Search,
+> Archive/Backups, Notifications, Security Events, Limitations), each with
+> its own independent state — never a single numeric "security score,"
+> never a fabricated "100% safe." A real bug found in the prior Arc's own
+> Signed Deletion Request lineage — a `"policy-pending"` review item's
+> signed body was held in memory only, so a restart before human approval
+> lost it — is fixed via a new, additive, tombstone-based append-only
+> durable side-channel (`FedosDeletionRequestPendingReviewPersistence`),
+> proven with real BIP-340 Schnorr crypto and a real process restart. Four
+> new narrow, additive Shell accessors
+> (`productionCryptoStatus`/`directRatchetStatus`/`peerCapabilityListObserved`/
+> `peerCapabilityStatus`) expose facts the Shell never surfaced before; 8
+> new closed Host Commands, one new Controller/Renderer/Navigation state,
+> wired into the EXISTING, unmodified Shell/Presentation Boundary/Renderer/
+> Host Bridge — no second Shell, Runtime, Presentation Boundary, Renderer,
+> Navigation Registry, Notification Coordinator, or Electron Main owner. 5
+> new closed notification kinds fire at most once per fact, never
+> double-firing an already-existing per-domain notification. 12
+> centralized warning codes cover every non-guarantee named in the
+> mission, including an intentionally non-committal Secure Memory
+> zeroization warning (a separate, parallel Arc owns that domain and is
+> never touched here). Real vertical slice: 100% real Schnorr crypto
+> throughout, a genuinely real `FedosConversationRuntime`/
+> `FedosDesktopApplicationShell`/`FedosDesktopConversationUiPresentationBoundary`/
+> `FedosSafetyCenterController`/`FedosSafetyCenterRenderer` stack, a real
+> restart proving both the aggregation and the pending-review durability
+> fix. Four disclosed boundaries, all either matching established
+> precedent (Device Trust/Sync/live-Ratchet unconfigured on this slice's
+> own Runtime, matching every prior Arc's own "optional integration a
+> slice doesn't need" precedent; a compiled Ratchet WASM artifact remains
+> absent, universal precedent) or explicitly scoped out (a manual
+> Ratchet-reset confirmation outside the Identity Replacement flow honestly
+> reports `"unsupported"` rather than inventing a second reset mechanism;
+> the Electron spike package's own typecheck could not run to completion
+> in this worktree due to a pre-existing, unrelated missing-`node_modules`
+> environment gap). See
+> `docs/secure_runtime_alpha_6201_6280_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Security Acceptance,
+> Threat-Scenario Testing, and Release Freeze Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6121–6200 — FedOS Identity Replacement
 > User Verification and Conversation Continuity UI Arc (FULL completion,
 > two disclosed pre-existing boundaries matching established precedent).**

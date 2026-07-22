@@ -63,7 +63,19 @@ export type FedosDesktopNotificationKind =
   | "deletion-request-expired"
   | "deletion-request-responded"
   | "deletion-request-pending-devices"
-  | "deletion-request-partial";
+  | "deletion-request-partial"
+  // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+  // Safety Center Arc) -- five new, additive, FIXED-template kinds for
+  // attention-worthy Safety Center facts that had NO existing per-domain
+  // notification anywhere in this codebase (confirmed by this Arc's own
+  // inventory) -- never a double-fire of an existing deletion-request kind
+  // above. `detail` (when present) remains the SAME bounded, policy-checked,
+  // non-sensitive string every other kind already uses.
+  | "device-revoked"
+  | "ratchet-reset-required"
+  | "peer-capability-conflict"
+  | "identity-replacement-pending-review"
+  | "safety-center-attention-summary";
 
 export const FEDOS_DESKTOP_NOTIFICATION_KINDS: readonly FedosDesktopNotificationKind[] = [
   "conversation-message",
@@ -80,6 +92,11 @@ export const FEDOS_DESKTOP_NOTIFICATION_KINDS: readonly FedosDesktopNotification
   "deletion-request-responded",
   "deletion-request-pending-devices",
   "deletion-request-partial",
+  "device-revoked",
+  "ratchet-reset-required",
+  "peer-capability-conflict",
+  "identity-replacement-pending-review",
+  "safety-center-attention-summary",
 ];
 
 /** This layer's own bound for id-shaped/detail strings — mirrors `FEDOS_DESKTOP_HOST_MAX_ID_LENGTH`'s own "512, non-empty" convention (`../host_boundary/fedos_desktop_host_command.ts`), restated here since this boundary sits beside, not under, the Host layer. */
@@ -118,6 +135,11 @@ const FEDOS_DESKTOP_NOTIFICATION_TEMPLATES: Readonly<Record<FedosDesktopNotifica
   "deletion-request-responded": Object.freeze({ title: "Deletion request update", body: "A recipient Device responded to your deletion request" }),
   "deletion-request-pending-devices": Object.freeze({ title: "Deletion request pending", body: "Some recipient Devices have not yet responded" }),
   "deletion-request-partial": Object.freeze({ title: "Deletion request partial", body: "A deletion request was only partially applied" }),
+  "device-revoked": Object.freeze({ title: "Device revoked", body: "A Device on this account was revoked" }),
+  "ratchet-reset-required": Object.freeze({ title: "Secure session reset required", body: "A secure messaging session needs to be reset" }),
+  "peer-capability-conflict": Object.freeze({ title: "Conflicting capability observed", body: "A peer Device reported a conflicting capability" }),
+  "identity-replacement-pending-review": Object.freeze({ title: "Identity replacement pending", body: "An identity replacement is awaiting your review" }),
+  "safety-center-attention-summary": Object.freeze({ title: "Safety Center", body: "There are items that may need your attention" }),
 });
 
 export function fedosDesktopNotificationTemplateFor(kind: FedosDesktopNotificationKind): FedosDesktopNotificationTemplate {

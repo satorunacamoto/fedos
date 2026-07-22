@@ -244,7 +244,7 @@ describe("Secure Runtime Alpha 4101-4180 -- real process acceptance (Phase F)", 
       const { steps, pid, stayedAlive } = await runAdapterAndCollectSelftestSteps();
       spawnedElectronPid = pid;
       expect(stayedAlive).toBe(true);
-      expect(steps.length).toBe(9);
+      expect(steps.length).toBe(10);
 
       const byStep = new Map(steps.map((s) => [s.step, s.result]));
 
@@ -272,6 +272,16 @@ describe("Secure Runtime Alpha 4101-4180 -- real process acceptance (Phase F)", 
         expect(result!.outcome).toBe("error");
         expect(result!.code).toBe("unavailable");
       }
+
+      // Secure Runtime Alpha 6201-6280 -- the SAME real, unmodified generic
+      // `window.fedos.invoke()` transport carries this Arc's own new Safety
+      // Center overview command end to end. Unlike deletion-request/identity-
+      // transition above, this command aggregates real facts even with every
+      // optional sub-Runtime unconfigured -- a genuine "ok" is the expected,
+      // non-fabricated response here.
+      const safetyCenterOverviewResult = byStep.get("dispatch-safety-center-overview") as { outcome: string; value?: { sections?: unknown } };
+      expect(safetyCenterOverviewResult.outcome).toBe("ok");
+      expect(safetyCenterOverviewResult.value).toHaveProperty("sections");
 
       const renderResult = byStep.get("render") as { outcome: string; value: Record<string, unknown> };
       expect(renderResult.outcome).toBe("ok");
@@ -316,13 +326,13 @@ describe("Secure Runtime Alpha 4101-4180 -- real process acceptance (Phase F)", 
       const first = await runAdapterAndCollectSelftestSteps();
       spawnedElectronPid = first.pid;
       expect(first.stayedAlive).toBe(true);
-      expect(first.steps.length).toBe(9);
+      expect(first.steps.length).toBe(10);
       spawnedElectronPid = undefined;
 
       const second = await runAdapterAndCollectSelftestSteps();
       spawnedElectronPid = second.pid;
       expect(second.stayedAlive).toBe(true);
-      expect(second.steps.length).toBe(9);
+      expect(second.steps.length).toBe(10);
       spawnedElectronPid = undefined;
 
       const firstStatus = first.steps.find((s) => s.step === "status");

@@ -57,6 +57,18 @@ async function runSelfTest(): Promise<void> {
   const deletionApproveResult = await window.fedos.invoke({ op: "dispatch", command: { type: "deletion-request-approve", deletionRequestId: "selftest-request-id", requestId: "selftest-deletion-approve" } });
   logStep("dispatch-deletion-request-approve", deletionApproveResult);
 
+  // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+  // Safety Center Arc) -- proves the REAL Renderer -> Preload -> IPC ->
+  // Main -> FedosDesktopHostBridge round trip for this Arc's own new
+  // Safety Center overview command, through the SAME existing, unmodified,
+  // generic `window.fedos.invoke()` transport (no new Electron entry
+  // point). A real, non-fabricated "loaded" response is expected here (the
+  // overview aggregates even with every optional sub-Runtime unconfigured
+  // -- unlike deletion-request/identity-transition above, this command has
+  // no single Runtime it depends on being wired to return real content).
+  const safetyCenterOverviewResult = await window.fedos.invoke({ op: "dispatch", command: { type: "safety-center-overview", ratchetPairs: [], requestId: "selftest-safety-center-overview" } });
+  logStep("dispatch-safety-center-overview", safetyCenterOverviewResult);
+
   const renderResult = await window.fedos.invoke({ op: "render" });
   logStep("render", renderResult);
 

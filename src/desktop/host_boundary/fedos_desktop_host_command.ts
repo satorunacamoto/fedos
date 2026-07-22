@@ -56,6 +56,10 @@ import {
   type FedosIdentityTransitionManualVerificationNoteCode,
 } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
 import { FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES, type FedosIdentityTransitionAcceptanceState } from "../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
+// Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and
+// Safety Center Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring this file's own established pattern above.
+import { FEDOS_SAFETY_CENTER_SECTIONS, type FedosSafetyCenterSection } from "../presentation/safety_center/fedos_safety_center_state.js";
 
 /** This layer's own bound for id-shaped strings (conversation/message ids) -- mirrors the "512, non-empty" bound this codebase's own domain validators already apply pervasively to ids (e.g. `fedos_group_message.ts`/`fedos_group_direct_path.ts`'s own `MAX_STRING_LENGTH`), restated here since this Host layer sits ABOVE those domains and must reject an oversized/malformed id before it ever reaches them. */
 export const FEDOS_DESKTOP_HOST_MAX_ID_LENGTH = 512;
@@ -184,7 +188,21 @@ export type FedosDesktopHostCommand =
       readonly peerDeviceRef: string;
       readonly transitionId: string;
       readonly requestId?: string;
-    };
+    }
+  // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and Safety Center Arc).
+  // Eight new, narrow, closed commands -- deliberately NOT a ninth
+  // "identity-action"/"deletion-action" duplicate of the existing
+  // `identity-transition-*`/`deletion-request-*` commands above, which
+  // already cover those two domains' own mutations (this Arc's own
+  // reconciliation/execution spec documents this choice).
+  | { readonly type: "safety-center-overview"; readonly ratchetPairs: readonly { readonly conversationId: string; readonly remoteDeviceRef: string }[]; readonly requestId?: string }
+  | { readonly type: "safety-center-events"; readonly limit: number; readonly offset: number; readonly requestId?: string }
+  | { readonly type: "safety-center-section"; readonly section: FedosSafetyCenterSection; readonly requestId?: string }
+  | { readonly type: "safety-center-device-action"; readonly action: "request-revoke"; readonly deviceId: string; readonly devicePublicKeyHex: string; readonly requestId?: string }
+  | { readonly type: "safety-center-ratchet-action"; readonly action: "request-reset"; readonly conversationId: string; readonly remoteDeviceRef: string; readonly requestId?: string }
+  | { readonly type: "safety-center-confirm-action"; readonly requestId?: string }
+  | { readonly type: "safety-center-cancel-action"; readonly requestId?: string }
+  | { readonly type: "safety-center-settings-action"; readonly field: "notifications" | "background-sync"; readonly enabled: boolean; readonly requestId?: string };
 
 function isNonEmptyBoundedString(value: unknown, maxLength: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= maxLength;
@@ -552,6 +570,59 @@ export function validateFedosDesktopHostCommand(candidate: unknown): FedosDeskto
       return requestId === undefined
         ? { type: "identity-transition-authorize-ratchet-reset", transitionId, acceptanceState, affectedSessions }
         : { type: "identity-transition-authorize-ratchet-reset", transitionId, acceptanceState, affectedSessions, requestId };
+    }
+
+    case "safety-center-overview": {
+      if (!isSessionPairList(c.ratchetPairs)) return null;
+      const ratchetPairs = c.ratchetPairs;
+      return requestId === undefined ? { type: "safety-center-overview", ratchetPairs } : { type: "safety-center-overview", ratchetPairs, requestId };
+    }
+
+    case "safety-center-events": {
+      if (!isNonNegativeInteger(c.limit) || !isNonNegativeInteger(c.offset)) return null;
+      const limit = c.limit;
+      const offset = c.offset;
+      return requestId === undefined ? { type: "safety-center-events", limit, offset } : { type: "safety-center-events", limit, offset, requestId };
+    }
+
+    case "safety-center-section": {
+      if (typeof c.section !== "string" || !(FEDOS_SAFETY_CENTER_SECTIONS as readonly string[]).includes(c.section)) return null;
+      const section = c.section as FedosSafetyCenterSection;
+      return requestId === undefined ? { type: "safety-center-section", section } : { type: "safety-center-section", section, requestId };
+    }
+
+    case "safety-center-device-action": {
+      if (c.action !== "request-revoke") return null;
+      if (!isId(c.deviceId) || !isId(c.devicePublicKeyHex)) return null;
+      const deviceId = c.deviceId;
+      const devicePublicKeyHex = c.devicePublicKeyHex;
+      return requestId === undefined
+        ? { type: "safety-center-device-action", action: "request-revoke", deviceId, devicePublicKeyHex }
+        : { type: "safety-center-device-action", action: "request-revoke", deviceId, devicePublicKeyHex, requestId };
+    }
+
+    case "safety-center-ratchet-action": {
+      if (c.action !== "request-reset") return null;
+      if (!isId(c.conversationId) || !isId(c.remoteDeviceRef)) return null;
+      const conversationId = c.conversationId;
+      const remoteDeviceRef = c.remoteDeviceRef;
+      return requestId === undefined
+        ? { type: "safety-center-ratchet-action", action: "request-reset", conversationId, remoteDeviceRef }
+        : { type: "safety-center-ratchet-action", action: "request-reset", conversationId, remoteDeviceRef, requestId };
+    }
+
+    case "safety-center-confirm-action":
+    case "safety-center-cancel-action":
+      return requestId === undefined ? { type: c.type } : { type: c.type, requestId };
+
+    case "safety-center-settings-action": {
+      if (c.field !== "notifications" && c.field !== "background-sync") return null;
+      if (typeof c.enabled !== "boolean") return null;
+      const field = c.field;
+      const enabled = c.enabled;
+      return requestId === undefined
+        ? { type: "safety-center-settings-action", field, enabled }
+        : { type: "safety-center-settings-action", field, enabled, requestId };
     }
 
     default:
