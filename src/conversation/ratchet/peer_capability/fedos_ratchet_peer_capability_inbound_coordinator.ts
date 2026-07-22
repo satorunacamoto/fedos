@@ -313,7 +313,13 @@ export class FedosRatchetPeerCapabilityInboundCoordinator {
     const payload = decodeFedosRatchetPeerCapabilityControlPayloadFromContent(content);
     if (payload === null) return { outcome: "not-peer-capability-payload" };
     if (payload.kind === "peer-capability-advertisement") return this.#importAdvertisement(payload.advertisement);
-    return this.#importNotification(payload.notification);
+    if (payload.kind === "peer-lifecycle-notification") return this.#importNotification(payload.notification);
+    // Secure Runtime Alpha 5961-6040 added a THIRD control-payload kind,
+    // `"identity-transition-notification"` — handled by its own dedicated
+    // `FedosIdentityTransitionInboundNotificationCoordinator`
+    // (`../../identity_transition/peer_integration/`), never by this one.
+    // This coordinator simply does not recognize it.
+    return { outcome: "not-peer-capability-payload" };
   }
 }
 

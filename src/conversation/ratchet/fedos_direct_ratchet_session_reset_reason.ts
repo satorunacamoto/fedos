@@ -14,19 +14,31 @@
  * one suite exists), "identity rotation" and "rollback detection" (neither
  * is a live concept in this codebase — inventing a trigger for either
  * would be inventing the feature itself, which this Arc does not do).
+ *
+ * Secure Runtime Alpha 5961-6040 (FedOS Identity Transition Peer
+ * Notification and Ratchet Reset Integration Arc) is exactly the trigger
+ * this header named as not-yet-invented for "identity rotation" — it adds
+ * `"identity-transition"` below. This is a purely additive widening of a
+ * closed string union: `resetReason` is already typed
+ * `FedosDirectRatchetSessionResetReason | null` everywhere it flows
+ * (`fedos_direct_ratchet_session_reset_authentication.ts`'s signable
+ * content, the reset record, the reset authority), so no field, no array
+ * position, and no existing signature/digest shape changes.
  */
 
 export type FedosDirectRatchetSessionResetReason =
   | "missing-sealed-state"
   | "corrupt-sealed-state"
   | "excessive-skipped-key-gap"
-  | "suspected-compromise";
+  | "suspected-compromise"
+  | "identity-transition";
 
 export const FEDOS_DIRECT_RATCHET_SESSION_RESET_REASONS: readonly FedosDirectRatchetSessionResetReason[] = [
   "missing-sealed-state",
   "corrupt-sealed-state",
   "excessive-skipped-key-gap",
   "suspected-compromise",
+  "identity-transition",
 ];
 
 export function isWellFormedFedosDirectRatchetSessionResetReason(

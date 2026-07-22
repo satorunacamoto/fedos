@@ -32,18 +32,34 @@ import {
   isWellFormedFedosRatchetPeerLifecycleNotificationV1,
   type FedosRatchetPeerLifecycleNotificationV1,
 } from "./fedos_ratchet_peer_lifecycle_notification.js";
+import {
+  isWellFormedFedosIdentityTransitionNotificationV1,
+  type FedosIdentityTransitionNotificationV1,
+} from "../../identity_transition/peer_integration/fedos_identity_transition_notification.js";
 
 export const FEDOS_RATCHET_PEER_CAPABILITY_CONTROL_PAYLOAD_SCHEMA_VERSION = 1 as const;
 
 /** A concrete size bound on the encoded control plaintext, enforced by the decoder before any JSON.parse (Phase F's own "size bounds" requirement). */
 export const FEDOS_RATCHET_PEER_CAPABILITY_CONTROL_PAYLOAD_MAX_BYTES = 65536;
 
+/**
+ * Secure Runtime Alpha 5961–6040 (FedOS Identity Transition Peer
+ * Notification and Ratchet Reset Integration Arc) added the third `kind`
+ * below, `"identity-transition-notification"` — the exact extension
+ * point this file's own header describes ("a new `kind`, never a new
+ * Nostr kind"). It carries the Identity Transition Foundation's
+ * (`b4aaab9`) own evidence artifacts, never a Ratchet message; the
+ * Ratchet's own frozen `fedos_direct_ratchet_nip17_payload.ts` codec
+ * remains completely untouched by this addition.
+ */
 export type FedosRatchetPeerCapabilityControlPayloadV1 =
   | { readonly schemaVersion: 1; readonly kind: "peer-capability-advertisement"; readonly advertisement: FedosRatchetPeerCapabilityAdvertisementV1 }
-  | { readonly schemaVersion: 1; readonly kind: "peer-lifecycle-notification"; readonly notification: FedosRatchetPeerLifecycleNotificationV1 };
+  | { readonly schemaVersion: 1; readonly kind: "peer-lifecycle-notification"; readonly notification: FedosRatchetPeerLifecycleNotificationV1 }
+  | { readonly schemaVersion: 1; readonly kind: "identity-transition-notification"; readonly notification: FedosIdentityTransitionNotificationV1 };
 
 const ADVERTISEMENT_FIELDS = new Set(["schemaVersion", "kind", "advertisement"]);
 const NOTIFICATION_FIELDS = new Set(["schemaVersion", "kind", "notification"]);
+const IDENTITY_TRANSITION_NOTIFICATION_FIELDS = new Set(["schemaVersion", "kind", "notification"]);
 
 /** Total, never-throwing structural classifier — exact field set per `kind`, unknown `kind` or unknown/extra field fails closed to `null`. */
 export function isWellFormedFedosRatchetPeerCapabilityControlPayload(
@@ -61,6 +77,11 @@ export function isWellFormedFedosRatchetPeerCapabilityControlPayload(
     const keys = Object.keys(r);
     if (keys.length !== NOTIFICATION_FIELDS.size || !keys.every((k) => NOTIFICATION_FIELDS.has(k))) return false;
     return isWellFormedFedosRatchetPeerLifecycleNotificationV1(r.notification);
+  }
+  if (r.kind === "identity-transition-notification") {
+    const keys = Object.keys(r);
+    if (keys.length !== IDENTITY_TRANSITION_NOTIFICATION_FIELDS.size || !keys.every((k) => IDENTITY_TRANSITION_NOTIFICATION_FIELDS.has(k))) return false;
+    return isWellFormedFedosIdentityTransitionNotificationV1(r.notification);
   }
   return false;
 }

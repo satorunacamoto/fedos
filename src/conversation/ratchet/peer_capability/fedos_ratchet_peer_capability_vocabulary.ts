@@ -69,13 +69,20 @@ export type FedosRatchetLifecycleCapabilityId =
   | "device-notification-v1"
   | "session-initialization-v1"
   | "authenticated-session-reset-v1"
-  | "capability-advertisement-v1";
+  | "capability-advertisement-v1"
+  | "identity-transition-v1";
 
 export const FEDOS_RATCHET_KNOWN_LIFECYCLE_CAPABILITIES: readonly FedosRatchetLifecycleCapabilityId[] = Object.freeze([
   "device-notification-v1",
   "session-initialization-v1",
   "authenticated-session-reset-v1",
   "capability-advertisement-v1",
+  // Secure Runtime Alpha 5961-6040 (FedOS Identity Transition Peer
+  // Notification and Ratchet Reset Integration Arc) — lets a peer
+  // advertise it understands identity-transition notifications through
+  // the EXISTING, unmodified advertisement pipeline; no new coordinator
+  // needed for this half of that Arc's own Phase H.
+  "identity-transition-v1",
 ]);
 
 export function isKnownFedosRatchetLifecycleCapability(value: unknown): value is FedosRatchetLifecycleCapabilityId {

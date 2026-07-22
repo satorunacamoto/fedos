@@ -63,12 +63,34 @@ describe("Alpha 5801-5880 — domain-wide import exclusions", () => {
     expect(files.length).toBeGreaterThan(5);
   });
 
+  // Secure Runtime Alpha 5961-6040 (FedOS Identity Transition Peer
+  // Notification and Ratchet Reset Integration Arc) — added
+  // `peer_integration/` under this SAME domain directory, with two
+  // narrow, legitimate exceptions to the `fedos_nostr_signing_authority`
+  // pattern below: a TYPE-ONLY import of the real
+  // `FedosNostrSigningAuthority` interface (never the WASM-backed
+  // concrete implementation, which remains fully forbidden), needed to
+  // sign a real account-level notification exactly the way the live
+  // peer-capability Outbound Coordinator already does. No other
+  // forbidden pattern gets an exception.
+  const NOSTR_SIGNING_AUTHORITY_TYPE_IMPORT_ALLOWLIST = new Set([
+    "fedos_identity_transition_outbound_notification_coordinator.ts",
+    "fedos_identity_transition_peer_runtime.ts",
+  ]);
+
   it("no source file in the Identity Transition domain imports Transport/Archive/Search/Sync/Electron/Desktop or any live signing/Master-Seed/Ratchet-mutation authority", () => {
     for (const file of files) {
       const source = readFileSync(file, "utf8") as string;
       const importLines = source.split("\n").filter((line) => line.trim().startsWith("import"));
       for (const pattern of FORBIDDEN_IMPORT_PATTERNS) {
         for (const line of importLines) {
+          if (
+            pattern.source === /fedos_nostr_signing_authority/.source &&
+            [...NOSTR_SIGNING_AUTHORITY_TYPE_IMPORT_ALLOWLIST].some((name) => file.endsWith(name)) &&
+            line.trim().startsWith("import type")
+          ) {
+            continue;
+          }
           expect(pattern.test(line), `${file} imports something matching ${pattern} in line: ${line}`).toBe(false);
         }
       }
@@ -89,8 +111,13 @@ describe("Alpha 5801-5880 — domain-wide import exclusions", () => {
     }
   });
 
-  it("no source file touches node:fs directly except the two named persistence backends (append-only I/O is confined)", () => {
-    const allowedFsFiles = new Set(["append_only_fedos_identity_transition_fact_persistence.ts"]);
+  it("no source file touches node:fs directly except the named persistence backends (append-only I/O is confined)", () => {
+    const allowedFsFiles = new Set([
+      "append_only_fedos_identity_transition_fact_persistence.ts",
+      // Secure Runtime Alpha 5961-6040's own two new append-only backends, same discipline.
+      "append_only_fedos_identity_transition_peer_observation_persistence.ts",
+      "append_only_fedos_identity_transition_ratchet_reset_link_persistence.ts",
+    ]);
     for (const file of files) {
       if ([...allowedFsFiles].some((name) => file.endsWith(name))) continue;
       const source = readFileSync(file, "utf8") as string;

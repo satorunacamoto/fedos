@@ -8,6 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5961–6040 — FedOS Identity Transition
+> Peer Notification and Ratchet Reset Integration Arc (FULL completion,
+> one disclosed pre-existing WASM boundary).** Wires the Identity
+> Transition evidence foundation (`b4aaab9`) into the live peer-capability
+> private-transport pipeline (`d825aa0`) and the live authenticated
+> Ratchet Session Reset foundation (`f80889d`). New, additive bridge
+> domain under `src/conversation/identity_transition/peer_integration/`:
+> a strict notification schema riding the EXISTING `"nostr-nip17-v1"`
+> route through a new, additive third `kind` on the peer-capability
+> control payload (no new Nostr kind); real BIP-340 Schnorr signatures
+> throughout (account authorization, new-key proof, old-key continuity —
+> all independently reverified by the receiver, never trusted from the
+> sender's own claims); a durable, restart-safe, multi-Device-isolated
+> Peer Transition Observation store with idempotent/conflicting-duplicate,
+> rollback, broken-predecessor, and cycle detection; local acceptance
+> reusing the Foundation's own evidence/acceptance vocabularies directly
+> (no third vocabulary); a new `"identity-transition-v1"` peer capability
+> advertisement value through the existing, unmodified advertisement
+> pipeline; and an explicit, `"accepted"`-gated Ratchet reset
+> authorization that dispatches the REAL, existing
+> `FedosDirectRatchetOutboundIntegration.establishSession()` with one new,
+> additive `"identity-transition"` reason — never a new reset message
+> type, never automatic, never rebinding old root/chain keys. Transition
+> ID is bound to the resulting session via a separate, additive local
+> correlation record rather than widening the frozen, positional-array
+> Session Reset wire tuple (a deliberate, documented scope decision).
+> Real vertical slice with 100% real Identity Transition crypto through
+> its own Ratchet-authorization boundary; the one genuinely WASM-gated
+> piece (a real `establishSession()` Double-Ratchet round trip) is
+> `describe.skip`'d here exactly like the two earlier Arcs' own real
+> vertical slices already are, for the same pre-existing reason (no
+> compiled `pkg/` in this worktree). No live account/Nostr identity
+> replaced, no automatic peer trust, no Device Registry/Membership/
+> Archive/Search mutation anywhere in this codebase as a result of this
+> Arc. See `docs/secure_runtime_alpha_5961_6040_completion_declaration.md`.
+> Recommended next Arc: **FedOS Identity Replacement User Verification
+> and Conversation Continuity UI Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5801–5880 — FedOS Identity Transition
 > Types, Validation, and Durable Evidence Foundation Arc (FULL
 > completion).** Implements the non-network foundation the FedOS Account

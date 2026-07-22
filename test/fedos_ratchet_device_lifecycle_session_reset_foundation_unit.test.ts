@@ -98,9 +98,15 @@ function basePayload(overrides: Partial<FedosDirectRatchetSessionInitPayloadV1> 
 }
 
 describe("Session Reset reason vocabulary", () => {
-  it("is a closed, four-value set, excluding rotation/rollback/peer-requested/device-lifecycle reasons", () => {
+  // Secure Runtime Alpha 5961-6040 (FedOS Identity Transition Peer
+  // Notification and Ratchet Reset Integration Arc) added
+  // "identity-transition" — exactly the trigger this Foundation Arc's
+  // own reason-vocabulary file named as not-yet-built for "identity
+  // rotation". A purely additive widening; every other reason and every
+  // still-forbidden value below is unchanged.
+  it("is a closed, five-value set, excluding rotation/rollback/peer-requested/device-lifecycle reasons", () => {
     expect([...FEDOS_DIRECT_RATCHET_SESSION_RESET_REASONS].sort()).toEqual(
-      ["missing-sealed-state", "corrupt-sealed-state", "excessive-skipped-key-gap", "suspected-compromise"].sort(),
+      ["missing-sealed-state", "corrupt-sealed-state", "excessive-skipped-key-gap", "suspected-compromise", "identity-transition"].sort(),
     );
     for (const forbidden of ["identity-rotation", "rollback-detected", "peer-requested", "device-revocation", "device-replacement"]) {
       expect(isWellFormedFedosDirectRatchetSessionResetReason(forbidden)).toBe(false);
