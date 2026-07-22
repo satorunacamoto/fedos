@@ -244,7 +244,7 @@ describe("Secure Runtime Alpha 4101-4180 -- real process acceptance (Phase F)", 
       const { steps, pid, stayedAlive } = await runAdapterAndCollectSelftestSteps();
       spawnedElectronPid = pid;
       expect(stayedAlive).toBe(true);
-      expect(steps.length).toBe(5);
+      expect(steps.length).toBe(9);
 
       const byStep = new Map(steps.map((s) => [s.step, s.result]));
 
@@ -257,6 +257,21 @@ describe("Secure Runtime Alpha 4101-4180 -- real process acceptance (Phase F)", 
 
       const unknownCommandResult = byStep.get("dispatch-unknown-command");
       expect(unknownCommandResult).toEqual({ outcome: "error", code: "unknown-command", message: "malformed or unrecognized command" });
+
+      // Secure Runtime Alpha 6041-6120 -- the SAME real, unmodified generic
+      // `window.fedos.invoke()` transport already carries this Arc's own new
+      // deletion-request commands end to end (Renderer -> Preload -> IPC ->
+      // Main -> FedosDesktopHostBridge -> Shell). This spike's own minimal
+      // config never wires `conversationDeletionRequest`, so an honest
+      // `"unavailable"` is the REAL response -- never fabricated, and
+      // structurally the SAME shape `dispatch-runtime-status`'s own
+      // `deviceStatus` field already proves for a different gated capability.
+      for (const step of ["dispatch-deletion-request-list-received", "dispatch-deletion-request-list-sent", "dispatch-deletion-request-status", "dispatch-deletion-request-approve"]) {
+        const result = byStep.get(step) as { outcome: string; code?: string } | undefined;
+        expect(result, `missing self-test step: ${step}`).toBeDefined();
+        expect(result!.outcome).toBe("error");
+        expect(result!.code).toBe("unavailable");
+      }
 
       const renderResult = byStep.get("render") as { outcome: string; value: Record<string, unknown> };
       expect(renderResult.outcome).toBe("ok");
@@ -301,13 +316,13 @@ describe("Secure Runtime Alpha 4101-4180 -- real process acceptance (Phase F)", 
       const first = await runAdapterAndCollectSelftestSteps();
       spawnedElectronPid = first.pid;
       expect(first.stayedAlive).toBe(true);
-      expect(first.steps.length).toBe(5);
+      expect(first.steps.length).toBe(9);
       spawnedElectronPid = undefined;
 
       const second = await runAdapterAndCollectSelftestSteps();
       spawnedElectronPid = second.pid;
       expect(second.stayedAlive).toBe(true);
-      expect(second.steps.length).toBe(5);
+      expect(second.steps.length).toBe(9);
       spawnedElectronPid = undefined;
 
       const firstStatus = first.steps.find((s) => s.step === "status");

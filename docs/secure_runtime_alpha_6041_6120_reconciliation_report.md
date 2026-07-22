@@ -44,7 +44,7 @@ and real.
 | `FedosConversationRuntime.deletionRequest()` | Yes, real (`5881-5960`) | Six new read-only/id-based methods (aggregation + Host-safe approve/reject) |
 | Per-Device request/acknowledgement facts | Yes, real, durable | NOTHING new is persisted about the PROTOCOL itself |
 | Recipient Inbox display facts | **No** — `5641-5720`'s own decision record carries state only, never the request's own safe display fields | A new, additive, insert-only `FedosDeletionRequestInboxSummaryPersistence` port (Phase D) |
-| Desktop Runtime production bootstrap (`fedos_desktop_runtime.ts`) wiring `deletionRequest` deps | **No** — `directRatchet`/`peerCapability` (prior Arcs' own equally-optional capabilities) are ALSO not wired there; this is this codebase's own established, standing precedent ("Desktop wiring... left for a follow-on") | Not added this Arc either — see completion declaration's own disclosed-limitation section and the "next Arc" pointer |
+| Desktop Runtime production bootstrap (`fedos_desktop_runtime.ts`) wiring `deletionRequest` deps | **Yes, real, as of the gap-closing follow-up** — `FedosDesktopRuntimeConfig` gained one new optional `conversationDeletionRequest` field, threaded straight to `createFedosConversationRuntime({..., deletionRequest: ...})`; omitted, byte-identical to prior behavior | See completion declaration's own "Gap-closing follow-up" section — `test/secure_runtime_alpha_6041_6120_desktop_runtime_config_threading.test.ts` proves it through the real production `startFedosDesktopRuntime()`/`FedosDesktopApplicationShell.start()` path |
 
 ## 3. Conflict classification
 

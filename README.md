@@ -44,13 +44,21 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > round trip, a real full restart of both sides with byte-identical
 > Shell/Renderer status reconstruction, and an honest
 > `"some-devices-applied"` aggregate — explicitly never a completion
-> claim. Named, honest limitations: Electron subprocess acceptance and
-> Notification Coordinator wiring were not reached (both narrow,
-> non-redesign follow-ons); `fedos_desktop_runtime.ts`'s own full
-> production bootstrap does not yet thread `deletionRequest` config
-> through, matching this codebase's own STANDING precedent for
-> `directRatchet`/`peerCapability` (prior Arcs' own equally-optional
-> capabilities). See
+> claim. **Gap-closing follow-up (same commit lineage):** Electron
+> subprocess acceptance is now proven for real through the existing,
+> unmodified `window.fedos.invoke()` transport (4 new self-test steps,
+> a real spawned Electron subprocess, 21/21 passing); the Notification
+> Coordinator is now wired (5 new fixed-template kinds, once-per-item
+> firing discipline, 8 new tests proving no request id/requester
+> ref/reason code ever leaks into a notification); and
+> `fedos_desktop_runtime.ts`'s own full production bootstrap now
+> threads `conversationDeletionRequest` through (one new optional
+> config field, proven live via the real production
+> `startFedosDesktopRuntime()`/`FedosDesktopApplicationShell.start()`
+> path, 4 new tests). One narrower, still-standing limitation:
+> `refreshSentStatus()`'s own per-Device trust-fact lookup needs
+> `deviceSyncOperational()`, which the minimal-config production paths
+> above do not construct — out of scope for this follow-up. See
 > `docs/secure_runtime_alpha_6041_6120_reconciliation_report.md`,
 > `docs/secure_runtime_alpha_6041_6120_execution_spec.md`,
 > `docs/secure_runtime_alpha_6041_6120_aggregation_truth.md`,
