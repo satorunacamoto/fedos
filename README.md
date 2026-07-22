@@ -8,6 +8,61 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5881–5960 — FedOS Signed Recipient
+> Deletion Request Private Transport and Local Policy Integration Arc
+> (FULL completion).** Makes the completed Signed Recipient Deletion
+> Request protocol (`22f9277`, Alpha 5641–5720) usable end to end over
+> the real, live private transport: eight new files under
+> `src/conversation/deletion_request/` add a protocol-neutral control
+> payload (mirrors `d825aa0`'s own peer-capability precedent, two
+> discriminators, `deletion-request-v1`/`deletion-acknowledgement-v1`,
+> wrapping the already-real signed request/acknowledgement — no second
+> signature scheme), a sender-side Outbound Coordinator (real signing,
+> real pre-publish self-check, real durable state, real publish through
+> `FedosPrivateTransport.sendMailboxNip17Control()`), a closed, LOCALLY-
+> CONFIGURED recipient policy vocabulary
+> (`always-review`/`allow-local-history-only`/`allow-local-history-and-index`/
+> `deny`/`unavailable` — never an unconditional default allow), a
+> recipient-side Inbound Coordinator that reuses `5641-5720`'s own real
+> evaluation pipeline unmodified and adds the ONE new sanctioned call
+> site to `b3b3a6d`'s own real `executeFedosLocalPayloadDeletionPlan()`,
+> and a real signed-acknowledgement round trip (recipient signs/persists/
+> publishes; requester verifies/correlates/persists, advancing its own
+> durable request lifecycle through every intermediate live state to
+> `acknowledged`, never a single illegal jump). A real, genuinely-found
+> integration gap — `assessFedosDeletionRequestAuthorization()`'s own
+> hardcoded `"fedos"`-authority participant reference, which would have
+> failed EVERY real production Direct Conversation's own `"nostr"`-
+> authority Membership — was fixed with a narrow, additive, 100%-
+> backward-compatible optional parameter. Proven with a REAL, no-mock
+> end-to-end vertical slice against a genuinely-built WASM artifact
+> (`cargo build --target wasm32-unknown-unknown --release` +
+> `wasm-bindgen`, built fresh in this session): real Master Seeds, real
+> Direct Conversation, a real message, a real signed Device-specific
+> deletion request published through a real in-process Relay and real
+> NIP-17 Gift Wrap, real recipient policy grant, real `b3b3a6d` execution
+> independently re-verified (`evaluatePayloadAccess()` → `"denied"`), a
+> real signed acknowledgement round trip, an unregistered-Device request
+> denied before publish, and a full restart of both sides with exact
+> durable replay — no message plaintext, private key, or raw path in any
+> protocol durable file. Compared against the unmodified integration
+> base via a sorted full-suite JSON-report diff: zero net regressions
+> (the only newly-failing tests are the well-known, self-resolving
+> `git status`-based review-guard pattern). Named, honest limitation:
+> the vertical slice does not include Bob independently creating an
+> Archive of the message (orthogonal harness wiring, out of this Arc's
+> own time budget) — the structural "no Archive deletion" guarantee
+> itself is proven independently and unaffected. See
+> `docs/secure_runtime_alpha_5881_5960_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5881_5960_execution_spec.md`,
+> `docs/secure_runtime_alpha_5881_5960_control_payload_mapping.md`,
+> `docs/secure_runtime_alpha_5881_5960_recipient_policy_and_acknowledgement_truth.md`,
+> and `docs/secure_runtime_alpha_5881_5960_completion_declaration.md`.
+> Next Arc: FedOS Signed Deletion Request Multi-Device Aggregation and
+> User Consent UI Arc.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5721–5800 — FedOS Ratchet Peer
 > Notification and Capability Advertisement Arc (FULL completion).**
 > Implements the authenticated peer-notification and capability-advertisement

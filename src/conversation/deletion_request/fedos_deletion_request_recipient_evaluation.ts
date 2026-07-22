@@ -126,6 +126,26 @@ export function markFedosDeletionRecipientLocalPlanReady(
 }
 
 /**
+ * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion Request
+ * Private Transport and Local Policy Integration Arc) — records a
+ * `"policy-pending"` request `"policy-rejected"`. The CALLER (the Inbound
+ * Coordinator, `fedos_deletion_request_inbound_coordinator.ts`) has
+ * already evaluated the real LOCAL recipient policy
+ * (`fedos_deletion_recipient_policy.ts`, deliberately absent from
+ * `5641-5720`'s own scope) and it denied the request. This function
+ * records that fact only — it never decides policy itself, mirroring
+ * `markFedosDeletionRecipientLocalPlanReady()`'s own "records, never
+ * decides" discipline below.
+ */
+export function recordFedosDeletionRecipientPolicyRejection(
+  requestId: string,
+  persistence: FedosDeletionRecipientDecisionPersistence,
+  clock: () => number,
+): FedosDeletionRequestRecipientEvaluationOutcome {
+  return writeSnapshot(persistence, requestId, "policy-rejected", null, clock());
+}
+
+/**
  * Records an ALREADY-PRODUCED local deletion outcome (the caller ran
  * `b3b3a6d`'s own real `executeFedosLocalPayloadDeletionPlan()` itself
  * and supplies its real terminal status here) — this Arc's own code

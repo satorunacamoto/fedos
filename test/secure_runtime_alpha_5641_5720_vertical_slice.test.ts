@@ -165,6 +165,7 @@ describe("Secure Runtime Alpha 5641-5720 -- Phase O real vertical slice", () => 
       bodyHash,
       requesterAccountRef: record.requesterAccountRef,
       recipientAccountRef: record.recipientAccountRef,
+      recipientDeviceRef: record.recipientDeviceRef,
       conversationId: record.conversationId,
       targetEnvelopeId: record.targetEnvelopeId,
       scope: record.scope,

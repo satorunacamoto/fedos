@@ -50,13 +50,38 @@ import type { FedosConversationId } from "../fedos_conversation_id.js";
 import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationParticipantAuthority, FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 import { getFedosDeletionCapabilityDescriptor } from "../deletion/fedos_deletion_capability_descriptor.js";
 import { verifyFedosSignedDeletionRequestV1, type FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
 import type { FedosDeletionRequestAuthorizationOutcome } from "./fedos_deletion_request_authorization_outcome.js";
 
-export function participantReferenceForFedosDeletionRequestAccountRef(accountRef: string): FedosConversationParticipantReference {
-  return { authority: "fedos", publicIdentifier: accountRef, identityId: null };
+/**
+ * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
+ * Request Private Transport and Local Policy Integration Arc) —
+ * `accountAuthority` is an ADDITIVE, OPTIONAL second parameter,
+ * defaulting to this file's own original hardcoded `"fedos"` literal
+ * (every existing `5641-5720` call site and test omits it and is
+ * therefore byte-for-byte unaffected). This is this Arc's own real
+ * answer to this file's own header, which explicitly named the gap
+ * ("this Arc claims no deeper cryptographic binding between a Nostr
+ * pubkey and a `publicIdentifier`... a future transport-integration Arc
+ * may revisit it"): a REAL Direct Conversation's own Membership
+ * (`fedos_conversation_direct_activation_coordinator.ts`, unmodified)
+ * uses `authority: "nostr"` participant references (the real resolved
+ * Nostr pubkey), never `"fedos"` — this Arc's own real transport
+ * integration (`fedos_deletion_request_outbound_coordinator.ts` /
+ * `fedos_deletion_request_inbound_coordinator.ts`) supplies `"nostr"`
+ * here so a real signed request's own `requesterAccountRef`/
+ * `recipientAccountRef` strings (the real pubkey hex) resolve against
+ * the REAL Membership record, never a parallel, disconnected identity
+ * space. No Membership/Participant type itself changes — only which
+ * literal this ONE call site's own synthesized reference carries.
+ */
+export function participantReferenceForFedosDeletionRequestAccountRef(
+  accountRef: string,
+  accountAuthority: FedosConversationParticipantAuthority = "fedos",
+): FedosConversationParticipantReference {
+  return { authority: accountAuthority, publicIdentifier: accountRef, identityId: null };
 }
 
 export interface FedosDeletionRequestAuthorizationAssessmentDependencies {
@@ -66,6 +91,8 @@ export interface FedosDeletionRequestAuthorizationAssessmentDependencies {
   readonly clock: () => number;
   /** This evaluating instance's own opaque, advisory local Device label — `null` if this build tracks no Device identity. Never cryptographically verified (Doc 08 — no real Device key exists). */
   readonly localDeviceRef: string | null;
+  /** OPTIONAL — omitted, defaults to `"fedos"` (byte-for-byte unchanged from this file's own original behavior). See `participantReferenceForFedosDeletionRequestAccountRef()`'s own header. */
+  readonly accountAuthority?: FedosConversationParticipantAuthority;
 }
 
 export function assessFedosDeletionRequestAuthorization(
@@ -100,7 +127,7 @@ export function assessFedosDeletionRequestAuthorization(
   const authoringMembership = deps.membershipAuthority.listMemberships(conversationId).find((m) => m.id === envelope.senderMembershipId);
   if (authoringMembership === undefined) return "target-unavailable";
 
-  const claimedRequester = participantReferenceForFedosDeletionRequestAccountRef(record.requesterAccountRef);
+  const claimedRequester = participantReferenceForFedosDeletionRequestAccountRef(record.requesterAccountRef, deps.accountAuthority);
   const isAuthor =
     authoringMembership.participant.authority === claimedRequester.authority &&
     authoringMembership.participant.publicIdentifier === claimedRequester.publicIdentifier &&
@@ -114,7 +141,7 @@ export function assessFedosDeletionRequestAuthorization(
   // Step 11 — recipient binding: the LOCAL account/Device this evaluation is running as
   // must match the request's own claimed recipient. Device is advisory-only (no real key,
   // Doc 08) -- a mismatch is still reported, distinctly from account mismatch.
-  const recipientMembership = deps.membershipAuthority.findMembership(conversationId, participantReferenceForFedosDeletionRequestAccountRef(record.recipientAccountRef));
+  const recipientMembership = deps.membershipAuthority.findMembership(conversationId, participantReferenceForFedosDeletionRequestAccountRef(record.recipientAccountRef, deps.accountAuthority));
   if (recipientMembership === null || recipientMembership.state !== "active") return "recipient-mismatch";
 
   // Device is advisory-only (no real per-Device key, Doc 08) -- a KNOWN mismatch is still

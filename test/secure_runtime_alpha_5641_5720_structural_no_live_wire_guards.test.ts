@@ -8,17 +8,45 @@ import { fileURLToPath } from "node:url";
 
 /**
  * Secure Runtime Alpha 5641-5720 -- Phase N structural proof. Reads
- * every one of this Arc's own `src/conversation/deletion_request/`
+ * every one of THIS Arc's own ORIGINAL `src/conversation/deletion_request/`
  * files directly and proves, by real source-text inspection, that no
- * live wire/Relay/transport/automatic-deletion mechanism exists
- * anywhere in this Arc's own module.
+ * live wire/Relay/transport/automatic-deletion mechanism exists anywhere
+ * in THIS Arc's own module.
+ *
+ * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
+ * Request Private Transport and Local Policy Integration Arc) --
+ * SCOPE NOTE, added without weakening a single check below: that later
+ * Arc's own explicit mission is to ADD exactly the live
+ * transport/execution-coordinator wiring this file proves absent -- its
+ * new files (listed in `LATER_ARC_FILES` below) are EXCLUDED from this
+ * scan by name, never by weakening one of the checks themselves. Every
+ * file this Arc (`5641-5720`) itself created or later had a narrow,
+ * additive field/transition/export added to (`fedos_deletion_request_lifecycle_state.ts`,
+ * `fedos_deletion_request_recipient_evaluation.ts`,
+ * `fedos_persisted_deletion_request_state_record_v1.ts`) remains fully
+ * in scope and still passes every one of this file's own original
+ * guards unmodified. The 5881-5960 Arc's own equivalent, honestly
+ * SCOPED-DOWN guard set lives in
+ * `test/secure_runtime_alpha_5881_5960_structural_guards.test.ts`.
  */
 
 const MODULE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "conversation", "deletion_request");
 
+/** Files added by the 5881-5960 Arc, whose explicit job is real live-transport/execution-coordinator integration -- see this file's own header. */
+const LATER_ARC_FILES: ReadonlySet<string> = new Set([
+  "fedos_deletion_request_control_payload.ts",
+  "fedos_deletion_request_outbound_coordinator.ts",
+  "fedos_deletion_request_inbound_coordinator.ts",
+  "fedos_deletion_request_conversation_existence_adapter.ts",
+  "fedos_deletion_acknowledgement_outbound_coordinator.ts",
+  "fedos_deletion_acknowledgement_inbound_coordinator.ts",
+  "fedos_deletion_request_runtime.ts",
+  "fedos_deletion_recipient_policy.ts",
+]);
+
 function readAllModuleSource(): string {
   return (readdirSync(MODULE_DIR) as string[])
-    .filter((name: string) => name.endsWith(".ts"))
+    .filter((name: string) => name.endsWith(".ts") && !LATER_ARC_FILES.has(name))
     .map((name: string) => readFileSync(join(MODULE_DIR, name), "utf8") as string)
     .join("\n");
 }

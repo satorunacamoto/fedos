@@ -207,6 +207,22 @@ import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../rat
 import { FedosRatchetPeerCapabilityRuntime } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
 import type { FedosRatchetPeerCapabilityInboundOutcome } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
 
+// Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion Request Private Transport and Local Policy Integration Arc).
+import { FedosDeletionRequestRuntime } from "../deletion_request/fedos_deletion_request_runtime.js";
+import type { FedosDeletionRequestInboundOutcome } from "../deletion_request/fedos_deletion_request_inbound_coordinator.js";
+import type { FedosDeletionAcknowledgementInboundOutcome } from "../deletion_request/fedos_deletion_acknowledgement_inbound_coordinator.js";
+import type { FedosDeletionRequestStatePersistence } from "../deletion_request/fedos_deletion_request_state_persistence.js";
+import { InMemoryFedosDeletionRequestStatePersistence } from "../deletion_request/in_memory_fedos_deletion_request_state_persistence.js";
+import type { FedosDeletionRecipientDecisionPersistence } from "../deletion_request/fedos_deletion_recipient_decision_persistence.js";
+import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
+import type { FedosDeletionAcknowledgementPersistence } from "../deletion_request/fedos_deletion_acknowledgement_persistence.js";
+import { InMemoryFedosDeletionAcknowledgementPersistence } from "../deletion_request/in_memory_fedos_deletion_acknowledgement_persistence.js";
+import type { FedosDeletionExecutionPersistence } from "../deletion/fedos_deletion_execution_persistence.js";
+import { InMemoryFedosDeletionExecutionPersistence } from "../deletion/in_memory_fedos_deletion_execution_persistence.js";
+import type { FedosDeletionRecipientPolicy } from "../deletion_request/fedos_deletion_recipient_policy.js";
+import { FedosDeletionRequestConversationExistenceAdapter } from "../deletion_request/fedos_deletion_request_conversation_existence_adapter.js";
+import type { FedosConversationParticipantAuthority } from "../membership/fedos_conversation_participant_reference.js";
+
 /**
  * The full injected dependency set — the construction coordinator's own
  * fields, reused verbatim (so reads/writes share one backend set), PLUS
@@ -331,7 +347,45 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
    * `directRatchet` above — a caller may supply one, both, or neither.
    */
   readonly peerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
+  /**
+   * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
+   * Request Private Transport and Local Policy Integration Arc) —
+   * OPTIONAL; omitted, `deletionRequest()` returns `null` and
+   * `receiveNip17Rumor()` remains byte-for-byte unchanged (the ratchet,
+   * peer-capability, and legacy-chat attempts are all untouched either
+   * way). Independent of `directRatchet`/`peerCapability` above — a
+   * caller may supply any combination.
+   */
+  readonly deletionRequest?: FedosConversationDeletionRequestIntegrationDependencies;
 };
+
+/** See `FedosConversationRuntimeDependencies.deletionRequest`'s own doc comment. */
+export interface FedosConversationDeletionRequestIntegrationDependencies {
+  readonly deviceRegistry: FedosDeviceRegistryPersistence;
+  readonly signingAuthority: FedosNostrSigningAuthority;
+  /** This local account's own identifier in whatever `accountAuthority` space this Runtime's own real Membership uses (a real production Direct Conversation's own Membership uses `"nostr"` — the real resolved pubkey hex; a synthetic/test harness may use `"fedos"`). */
+  readonly localAccountRef: string;
+  readonly localDeviceRef: string | null;
+  /** OPTIONAL — omitted, defaults to `"fedos"` (`assessFedosDeletionRequestAuthorization`'s own original behavior). A real production wiring supplies `"nostr"` — see that file's own header for why. */
+  readonly accountAuthority?: FedosConversationParticipantAuthority;
+  readonly searchIndex: Pick<FedosConversationSearchIndex, "reconcilePayloadRetention">;
+  /** Phase E — LOCAL configuration only. Never derived from a request. */
+  readonly resolveLocalPolicy: (requesterAccountRef: string) => FedosDeletionRecipientPolicy;
+  /** Optional — default in-memory. */
+  readonly requestStatePersistence?: FedosDeletionRequestStatePersistence;
+  /** Optional — default in-memory. */
+  readonly recipientDecisionPersistence?: FedosDeletionRecipientDecisionPersistence;
+  /** Optional — default in-memory. Shared for both this account's own sent and received acknowledgement facts (one local account, one durable view). */
+  readonly acknowledgementPersistence?: FedosDeletionAcknowledgementPersistence;
+  /** Optional — default in-memory. */
+  readonly localExecutionPersistence?: FedosDeletionExecutionPersistence;
+  readonly sendMailboxNip17Control: (
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+}
 
 /** See `FedosConversationRuntimeDependencies.peerCapability`'s own doc comment. */
 export interface FedosConversationPeerCapabilityIntegrationDependencies {
@@ -422,6 +476,8 @@ export class FedosConversationRuntime {
   readonly #directRatchetRuntime: FedosDirectRatchetConversationRuntime | null;
   /** Secure Runtime Alpha 5721–5800 — `null` when `deps.peerCapability` was not supplied. See this class's own constructor comment. */
   readonly #peerCapabilityRuntime: FedosRatchetPeerCapabilityRuntime | null;
+  /** Secure Runtime Alpha 5881-5960 — `null` when `deps.deletionRequest` was not supplied. See this class's own constructor comment. */
+  readonly #deletionRequestRuntime: FedosDeletionRequestRuntime | null;
   /** Alpha 2041–2120 — see `../activation/fedos_conversation_reactivation_coordinator.ts`'s own header. */
   readonly #reactivationCoordinator: FedosConversationReactivationCoordinator;
   /**
@@ -595,6 +651,78 @@ export class FedosConversationRuntime {
             observationPersistence: deps.peerCapability.observationPersistence ?? new InMemoryFedosRatchetPeerCapabilityObservationPersistence(),
             locallySupportedCapabilities: deps.peerCapability.locallySupportedCapabilities,
           });
+
+    // Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
+    // Request Private Transport and Local Policy Integration Arc) —
+    // `null` when `deps.deletionRequest` was not supplied. Reuses the
+    // SAME `membershipAuthority`/`envelopePersistence`/`retentionAuthority`/
+    // `accountIndexAuthority` instances already built above — never a
+    // second, divergent graph. `conversationPersistence` is a narrow
+    // read-only adapter over this Runtime's own real
+    // `resolveActiveConversation()` (see that adapter's own header for
+    // why `FedosConversationRuntime` has no native `FedosConversationPersistence`
+    // of its own to inject directly).
+    this.#deletionRequestRuntime = ((): FedosDeletionRequestRuntime | null => {
+      if (deps.deletionRequest === undefined) return null;
+      const deletionRequestDeps = deps.deletionRequest;
+      // Resolved ONCE — shared across every sub-coordinator below. Constructing a
+      // fresh `?? new InMemory...()` default separately at each use site would silently
+      // split one logical durable domain into several disconnected in-memory stores.
+      const requestStatePersistence = deletionRequestDeps.requestStatePersistence ?? new InMemoryFedosDeletionRequestStatePersistence();
+      const recipientDecisionPersistence = deletionRequestDeps.recipientDecisionPersistence ?? new InMemoryFedosDeletionRecipientDecisionPersistence();
+      const acknowledgementPersistence = deletionRequestDeps.acknowledgementPersistence ?? new InMemoryFedosDeletionAcknowledgementPersistence();
+      const localExecutionPersistence = deletionRequestDeps.localExecutionPersistence ?? new InMemoryFedosDeletionExecutionPersistence();
+      const conversationExistenceAdapter = new FedosDeletionRequestConversationExistenceAdapter((id) => this.resolveActiveConversation(id));
+      const accountIndex = accountIndexAuthority.localAccountIndex();
+
+      return new FedosDeletionRequestRuntime({
+        outbound: {
+          conversationPersistence: conversationExistenceAdapter,
+          envelopePersistence,
+          membershipAuthority: deps.membershipAuthority,
+          deviceRegistry: deletionRequestDeps.deviceRegistry,
+          signingAuthority: deletionRequestDeps.signingAuthority,
+          requesterAccountIndex: accountIndex,
+          localDeviceRef: deletionRequestDeps.localDeviceRef,
+          requestStatePersistence,
+          clock: deps.clock,
+          accountAuthority: deletionRequestDeps.accountAuthority,
+          sendMailboxNip17Control: deletionRequestDeps.sendMailboxNip17Control,
+        },
+        inbound: {
+          authorization: {
+            conversationPersistence: conversationExistenceAdapter,
+            envelopePersistence,
+            membershipAuthority: deps.membershipAuthority,
+            clock: deps.clock,
+            localDeviceRef: deletionRequestDeps.localDeviceRef,
+            accountAuthority: deletionRequestDeps.accountAuthority,
+          },
+          recipientDecisionPersistence,
+          resolveLocalPolicy: deletionRequestDeps.resolveLocalPolicy,
+          clock: deps.clock,
+          retentionAuthority,
+          searchIndex: deletionRequestDeps.searchIndex,
+          localExecutionPersistence,
+          localAccountRef: deletionRequestDeps.localAccountRef,
+        },
+        acknowledgementOutbound: {
+          signingAuthority: deletionRequestDeps.signingAuthority,
+          recipientAccountIndex: accountIndex,
+          acknowledgementPersistence,
+          clock: deps.clock,
+          sendMailboxNip17Control: deletionRequestDeps.sendMailboxNip17Control,
+        },
+        acknowledgementInbound: {
+          requestStatePersistence,
+          acknowledgementPersistence,
+          clock: deps.clock,
+        },
+        requestStatePersistence,
+        recipientAccountIndex: accountIndex,
+        clock: deps.clock,
+      });
+    })();
 
     // Secure Runtime Alpha 5561–5640 Phase E — the ratchet route's own
     // `ratchetDelivery` thunk for `FedosConversationDirectMessagingCoordinator`,
@@ -1155,7 +1283,13 @@ export class FedosConversationRuntime {
   async receiveNip17Rumor(
     rumor: FedosPrivateWireParsedRumor,
     relaySource: string | null,
-  ): Promise<FedosNip17InboundReceiveResult | FedosDirectRatchetInboundReceiveResult | FedosRatchetPeerCapabilityInboundOutcome> {
+  ): Promise<
+    | FedosNip17InboundReceiveResult
+    | FedosDirectRatchetInboundReceiveResult
+    | FedosRatchetPeerCapabilityInboundOutcome
+    | FedosDeletionRequestInboundOutcome
+    | FedosDeletionAcknowledgementInboundOutcome
+  > {
     // Secure Runtime Alpha 5561–5640 Phase G — tried FIRST, exactly like
     // the payload codec's own header requires: a ratchet payload must
     // never be mislabeled as a legacy/static NIP-17 chat message.
@@ -1177,6 +1311,24 @@ export class FedosConversationRuntime {
     if (this.#peerCapabilityRuntime !== null) {
       const peerCapabilityResult = await this.#peerCapabilityRuntime.importPeerCapabilityPayload(rumor.content);
       if (peerCapabilityResult.outcome !== "not-peer-capability-payload") return peerCapabilityResult;
+    }
+    // Secure Runtime Alpha 5881-5960 — tried THIRD, before the legacy
+    // chat fallback: a deletion-request/acknowledgement control payload
+    // must never be imported as an ordinary chat message either (this
+    // Arc's own Absolute Prohibition, restated from `5641-5720`'s own
+    // structural guard). `"not-deletion-request-payload"` (the ONLY
+    // outcome possible when `#deletionRequestRuntime` is `null`, or when
+    // a real, non-deletion-request/acknowledgement Rumor arrives) falls
+    // through to the EXISTING, UNCHANGED legacy coordinator below —
+    // never the reverse.
+    if (this.#deletionRequestRuntime !== null) {
+      const deletionRequestResult = await this.#deletionRequestRuntime.importDeletionRequestOrAcknowledgementPayload(rumor.content);
+      if (
+        deletionRequestResult.outcome !== "not-deletion-request-payload" &&
+        deletionRequestResult.outcome !== "not-deletion-acknowledgement-payload"
+      ) {
+        return deletionRequestResult;
+      }
     }
     return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
   }
@@ -1201,6 +1353,17 @@ export class FedosConversationRuntime {
    */
   peerCapability(): FedosRatchetPeerCapabilityRuntime | null {
     return this.#peerCapabilityRuntime;
+  }
+
+  /**
+   * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
+   * Request Private Transport and Local Policy Integration Arc) — the
+   * additive deletion-request facade. `null` when `deps.deletionRequest`
+   * was not supplied at construction (mirrors `peerCapability()`'s own
+   * "null when not assembled" precedent).
+   */
+  deletionRequest(): FedosDeletionRequestRuntime | null {
+    return this.#deletionRequestRuntime;
   }
 }
 

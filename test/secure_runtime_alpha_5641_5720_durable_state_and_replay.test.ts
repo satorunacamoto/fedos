@@ -40,6 +40,7 @@ function requestSnapshot(overrides: Partial<FedosPersistedDeletionRequestStateRe
     bodyHash: "body-hash-1",
     requesterAccountRef: "alice-account",
     recipientAccountRef: "bob-account",
+    recipientDeviceRef: "bob-device-a",
     conversationId: "conv-1",
     targetEnvelopeId: "envelope-1",
     scope: "local-history-and-index",

@@ -13,6 +13,19 @@
  *     plaintext canonical bytes themselves, and never `reasonCode`
  *     beyond the already-coarse closed code the record itself carries.
  *   - No raw path, no private key, no message plaintext.
+ *
+ * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion Request
+ * Private Transport and Local Policy Integration Arc) — additive field
+ * `recipientDeviceRef`. `5641-5720`'s own original snapshot carried no
+ * Device-level fact at all (it had no transport to correlate an
+ * acknowledgement's own claimed Device against); this Arc's own
+ * Acknowledgement Inbound Coordinator (`fedos_deletion_acknowledgement_inbound_coordinator.ts`)
+ * needs a DURABLE (restart-safe) record of which Device the request was
+ * originally addressed to, to honestly deny an acknowledgement claiming
+ * a DIFFERENT Device than the one this requester actually sent to —
+ * without this field, that check could only ever be an in-memory fact,
+ * lost across a restart. Opaque, advisory-only (mirrors every other
+ * `*DeviceRef` field in this domain — no real per-Device key exists).
  */
 
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -29,6 +42,8 @@ export interface FedosPersistedDeletionRequestStateRecordV1 {
   readonly bodyHash: string;
   readonly requesterAccountRef: string;
   readonly recipientAccountRef: string;
+  /** Additive, Secure Runtime Alpha 5881-5960 — see this file's own header. `null` only for a snapshot written before this Arc's own outbound coordinator existed. */
+  readonly recipientDeviceRef: string | null;
   readonly conversationId: string;
   readonly targetEnvelopeId: string;
   readonly scope: FedosDeletionRequestScope;
@@ -55,6 +70,7 @@ export function fedosPersistedDeletionRequestStateRecordsAreEqual(
     a.bodyHash === b.bodyHash &&
     a.requesterAccountRef === b.requesterAccountRef &&
     a.recipientAccountRef === b.recipientAccountRef &&
+    a.recipientDeviceRef === b.recipientDeviceRef &&
     a.conversationId === b.conversationId &&
     a.targetEnvelopeId === b.targetEnvelopeId &&
     a.scope === b.scope &&

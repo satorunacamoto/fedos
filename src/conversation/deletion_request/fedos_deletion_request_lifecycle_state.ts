@@ -49,14 +49,20 @@ export function isFedosDeletionRequestLifecycleState(value: unknown): value is F
 /**
  * The closed set of `(from, to)` transitions this Arc's own local
  * planner/durable-state layer (`fedos_deletion_request_state_persistence.ts`,
- * `fedos_deletion_request_retry_plan.ts`) can ACTUALLY produce, with no
- * live transport. `"pending-delivery"`/`"delivered"`/
- * `"recipient-evaluating"` never appear as a `to` value here — reaching
- * them requires a real transport send/receive this Arc does not build.
- * `"acknowledged"` IS reachable, but ONLY via the test-only
- * `recordSuppliedLocalDeletionOutcome`-shaped path (Phase J/O) that
- * records an ALREADY-PRODUCED local outcome — never a live
- * acknowledgement received over a wire.
+ * `fedos_deletion_request_retry_plan.ts`) can ACTUALLY produce.
+ *
+ * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion Request
+ * Private Transport and Local Policy Integration Arc) — the "future
+ * transport Arc" this file's own original header named: `"pending-delivery"`,
+ * `"delivered"`, and `"recipient-evaluating"` are now real, live-transport-
+ * reachable `to` values (`fedos_deletion_request_outbound_coordinator.ts`
+ * / `fedos_deletion_acknowledgement_inbound_coordinator.ts`), additively
+ * extending — never replacing or renumbering — every transition this
+ * file already named reachable. `"acknowledged"` remains reachable both
+ * ways: the pre-existing `"signed->acknowledged"` test-only shortcut
+ * (Phase J/O of `5641-5720`, unmodified) AND the new live
+ * `"recipient-evaluating->acknowledged"` path a real received
+ * acknowledgement now produces.
  */
 const REACHABLE_TRANSITIONS: ReadonlySet<string> = new Set([
   "draft->signed",
@@ -65,6 +71,17 @@ const REACHABLE_TRANSITIONS: ReadonlySet<string> = new Set([
   "signed->expired",
   "signed->acknowledged",
   "signed->failed",
+  "signed->pending-delivery",
+  "pending-delivery->delivered",
+  "pending-delivery->expired",
+  "pending-delivery->failed",
+  "pending-delivery->cancelled",
+  "delivered->recipient-evaluating",
+  "delivered->expired",
+  "delivered->failed",
+  "recipient-evaluating->acknowledged",
+  "recipient-evaluating->expired",
+  "recipient-evaluating->failed",
 ]);
 
 export function isFedosDeletionRequestLifecycleTransitionReachableByThisArc(
