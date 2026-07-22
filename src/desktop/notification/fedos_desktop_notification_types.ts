@@ -52,7 +52,18 @@ export type FedosDesktopNotificationKind =
   | "archive-complete"
   | "archive-failed"
   | "warning"
-  | "error";
+  | "error"
+  // Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-
+  // Device Aggregation and User Consent UI Arc) -- five new, additive,
+  // FIXED-template kinds. Never carries message plaintext, a requester
+  // identity, or a Conversation title -- `detail` (when present) is the
+  // SAME bounded, policy-checked, non-sensitive string every other kind
+  // already uses (e.g. "1 device pending"), never request/ack content.
+  | "deletion-request-received"
+  | "deletion-request-expired"
+  | "deletion-request-responded"
+  | "deletion-request-pending-devices"
+  | "deletion-request-partial";
 
 export const FEDOS_DESKTOP_NOTIFICATION_KINDS: readonly FedosDesktopNotificationKind[] = [
   "conversation-message",
@@ -64,6 +75,11 @@ export const FEDOS_DESKTOP_NOTIFICATION_KINDS: readonly FedosDesktopNotification
   "archive-failed",
   "warning",
   "error",
+  "deletion-request-received",
+  "deletion-request-expired",
+  "deletion-request-responded",
+  "deletion-request-pending-devices",
+  "deletion-request-partial",
 ];
 
 /** This layer's own bound for id-shaped/detail strings — mirrors `FEDOS_DESKTOP_HOST_MAX_ID_LENGTH`'s own "512, non-empty" convention (`../host_boundary/fedos_desktop_host_command.ts`), restated here since this boundary sits beside, not under, the Host layer. */
@@ -97,6 +113,11 @@ const FEDOS_DESKTOP_NOTIFICATION_TEMPLATES: Readonly<Record<FedosDesktopNotifica
   "archive-failed": Object.freeze({ title: "Archive failed", body: "Archive did not complete" }),
   warning: Object.freeze({ title: "Warning", body: "A warning occurred" }),
   error: Object.freeze({ title: "Error", body: "An error occurred" }),
+  "deletion-request-received": Object.freeze({ title: "Deletion request", body: "A deletion request is awaiting your review" }),
+  "deletion-request-expired": Object.freeze({ title: "Deletion request expired", body: "A deletion request expired before it was reviewed" }),
+  "deletion-request-responded": Object.freeze({ title: "Deletion request update", body: "A recipient Device responded to your deletion request" }),
+  "deletion-request-pending-devices": Object.freeze({ title: "Deletion request pending", body: "Some recipient Devices have not yet responded" }),
+  "deletion-request-partial": Object.freeze({ title: "Deletion request partial", body: "A deletion request was only partially applied" }),
 });
 
 export function fedosDesktopNotificationTemplateFor(kind: FedosDesktopNotificationKind): FedosDesktopNotificationTemplate {

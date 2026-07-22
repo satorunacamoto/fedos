@@ -55,21 +55,37 @@ See the consent/warning UX document.
 values/bounded strings — never a raw path, raw signature, or the execution coordinator directly.
 Device-id lists are bounded to 64 entries.
 
+## Phase K — Notifications
+
+Closed in the gap-closing follow-up — see the completion declaration's own "Gap-closing
+follow-up" section. Five new, additive, fixed-template `FedosDesktopNotificationKind` values;
+`FedosDeletionRequestController` composes the existing, unmodified
+`FedosDesktopNotificationCoordinator` (defaulting to the safe Noop backend), firing
+once-per-newly-seen-item on Inbox refresh plus three explicit sender-side triggers. No
+notification ever carries a request id, requester ref, reason code, or content — only the closed
+kind, an opaque `targetConversationId`, and a short bounded `detail`.
+
 ## Phase M — Electron
 
-Not reached this Arc — see the completion declaration's own disclosed-limitation section. The
-existing frozen preload/Main pattern (`packages/fedos-desktop-electron-spike/`, one acceptance-
-harness sibling per feature) was inspected and is directly reusable by a follow-on Arc without
-any redesign.
+Closed in the gap-closing follow-up — see the completion declaration's own "Gap-closing
+follow-up" section. The existing frozen preload/Main pattern
+(`packages/fedos-desktop-electron-spike/`) required no redesign: the generic
+`window.fedos.invoke()` transport already dispatched any validated Host Command, including this
+Arc's own nine. Four new self-test steps and a real spawned Electron subprocess assertion now
+prove all nine commands are reachable end to end.
 
 ## Verification
 
 - `npx tsc --noEmit -p .` — clean except the two pre-existing baseline errors, confirmed
   identical on the unmodified `8981f81` base.
-- This Arc's own 4 new test files: aggregation/screen-model unit tests (21), Host command/
+- This Arc's own 4 original test files: aggregation/screen-model unit tests (21), Host command/
   structural-guard tests (14), and the REAL end-to-end multi-Device vertical slice (1) — **all
   passing**, the vertical slice against a genuinely-built WASM artifact.
+- Gap-closing follow-up: Notification Coordinator wiring tests (8), desktop-runtime
+  `conversationDeletionRequest` config-threading tests (4, through the real production
+  `startFedosDesktopRuntime()`/`FedosDesktopApplicationShell.start()` path), and the pre-existing
+  Electron adapter acceptance file's 4 new self-test assertions (folded into its own 21, run
+  against a real spawned Electron subprocess) — **all passing**.
 - Every pre-existing `5641-5720`/`5881-5960`/`5721-5800` test file (including their own real WASM
   vertical slices) and every pre-existing Desktop Shell/Presentation/Renderer/Host-Bridge test
-  file (98 tests across 6 files) — unchanged, all still passing (one self-resolving
-  `git status`-based review guard aside — see the completion declaration).
+  file (98 tests across 6 files) — unchanged, all still passing.

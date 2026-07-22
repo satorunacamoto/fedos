@@ -37,41 +37,73 @@ making every `"always-review"` item permanently un-approvable — caught by this
 vertical slice, not by inspection. Fixed narrowly and documented in three places (the
 reconciliation report, the execution spec, and the consent/warning UX document).
 
-## Named, honest limitations (not silently dropped)
+## Gap-closing follow-up (same Arc, same commit lineage)
 
-1. **Electron subprocess acceptance (Phase O item 26) is out of this Arc's own time budget.**
-   The existing frozen preload/Main pattern was inspected and requires no redesign for a
-   follow-on Arc to wire — nine Host commands are already dispatch-ready.
-2. **Notification Coordinator integration (Phase K) was not reached.** The existing Notification
-   Coordinator (`src/notification/`) was inspected; wiring safe, plaintext-free notification
-   triggers into `FedosDeletionRequestController` is a narrow follow-on, not a redesign.
-3. **`fedos_desktop_runtime.ts`'s own full production bootstrap does not thread `deletionRequest`
-   config through.** This matches this codebase's own STANDING precedent — `directRatchet`/
-   `peerCapability` (prior Arcs' own equally-optional capabilities) are ALSO not wired there. This
-   Arc's own real vertical slice instead used a minimal, real `FedosRunningDesktopRuntime` wrapper
-   (`conversationRuntime()` genuinely real; every other accessor honestly `"not enabled"`, since
-   this Arc's own Shell calls never reach them) — proving the Shell/Controller/Renderer stack for
-   real without the invasive change of threading eight new config fields through an 1157-line
-   production assembly function this Arc's own mission explicitly asked to avoid redesigning.
+The three limitations originally numbered 1–3 below were closed in a follow-up pass, at the
+user's explicit request, without redesigning anything this Arc already declared frozen:
+
+1. **Electron subprocess acceptance is now proven for real.** The existing, unmodified,
+   generic `window.fedos.invoke()` transport (`fedos_electron_host_adapter_main.cts`/
+   `_preload.cts`) already routed any validated Host Command, including this Arc's own nine —
+   no new Electron entry point was needed. The self-test page
+   (`packages/fedos-desktop-electron-spike/src/fedos_electron_host_adapter_selftest.ts`) gained
+   four new steps dispatching `deletion-request-list-received`/`-list-sent`/`-status`/`-approve`,
+   and `secure_runtime_alpha_4101_4180_electron_host_adapter.test.ts` now asserts all four return
+   the honest `{outcome:"error", code:"unavailable"}` shape through a REAL spawned Electron
+   subprocess (this spike's own minimal `hostRuntimeConfig()` still never sets
+   `conversationDeletionRequest` — the same honest-`"unavailable"` precedent `device-status`
+   already established in this same adapter). 21/21 tests pass.
+2. **Notification Coordinator integration (Phase K) is now wired.** `FedosDesktopNotificationKind`
+   (`src/desktop/notification/fedos_desktop_notification_types.ts`) gained five new, additive,
+   fixed-template kinds (`deletion-request-received/-expired/-responded/-pending-devices/-partial`).
+   `FedosDeletionRequestController` now owns a `FedosDesktopNotificationCoordinator` (defaulting to
+   the safe `NoopFedosDesktopNotificationPort`, swappable via `setNotificationPort()`), fires
+   `"deletion-request-received"`/`"-expired"` once per newly-seen Inbox item (in-memory
+   `#notifiedRequestIds` tracking — never a duplicate within one process lifetime), and exposes
+   explicit sender-side triggers (`notifyRecipientResponded`/`notifySomeDevicesPending`/
+   `notifyPartiallyApplied`). `test/secure_runtime_alpha_6041_6120_notification_coordinator_wiring.test.ts`
+   (8 tests) proves the once-only firing discipline and that no notification ever carries a
+   request id, requester ref, reason code, or anything content-shaped — only the closed kind + an
+   opaque `targetConversationId` + a short bounded `detail`.
+3. **`fedos_desktop_runtime.ts`'s own full production bootstrap now threads `conversationDeletionRequest`
+   through.** `FedosDesktopRuntimeConfig` gained one new optional field
+   (`conversationDeletionRequest?: FedosConversationDeletionRequestIntegrationDependencies`),
+   passed straight to `createFedosConversationRuntime({..., deletionRequest: config.conversationDeletionRequest})` —
+   omitted, behavior is byte-identical to before (`deletionRequest()` stays `null`).
+   `test/secure_runtime_alpha_6041_6120_desktop_runtime_config_threading.test.ts` (4 tests) proves,
+   through the REAL `startFedosDesktopRuntime()`/`FedosDesktopApplicationShell.start()` production
+   path (a real BIP-340 `FedosNobleTestNostrSigningAuthority`, no WASM artifact required): omitted
+   stays `null`; supplied is real, non-null, and singleton-per-run; and the Shell's own
+   `deletionRequestListReceived()` goes from `"unavailable"` to live `{outcome:"ok", value:[]}`
+   through this exact config path.
+
+## Named, honest limitations still standing (not silently dropped)
+
 4. **`deletionRequestListSentForTarget()`'s own per-Device trust-fact lookup
    (`FedosDeletionRequestController.refreshSentStatus()`) needs `deviceSyncOperational()`**, which
-   the minimal wrapper above (limitation 3) does not construct. The real vertical slice instead
-   feeds this Arc's own already-unit-tested pure aggregation functions directly from real Shell
-   facts, proving the SAME math without requiring that additional Device Sync facade wiring.
+   remains unconstructed by the minimal-config production paths exercised above. The real vertical
+   slice instead feeds this Arc's own already-unit-tested pure aggregation functions directly from
+   real Shell facts, proving the SAME math without requiring that additional Device Sync facade
+   wiring. Out of scope for this gap-closing pass (the user's own selection named only the three
+   items above).
 5. **Pending-review durability** — see the consent/warning UX document's own final section.
 
 ## Verification run (this worktree)
 
-1. `npx tsc --noEmit -p .` — clean except the two pre-existing, unrelated baseline errors.
-2. This Arc's own 4 new test files, 36 tests — all passing, including the real WASM vertical
-   slice.
+1. `npx tsc --noEmit -p .` — clean except the two pre-existing, unrelated baseline errors
+   (`4741-4820` production Master Seed activation, `477` scheduler lifecycle model — neither file
+   touched by this Arc or its gap-closing follow-up; reproduced identically against a clean
+   `git stash` of this Arc's own changes).
+2. This Arc's own 4 original test files (36 tests) plus 3 gap-closing follow-up test files (16
+   tests: 8 Notification Coordinator, 4 desktop-runtime config threading, plus the pre-existing
+   Electron adapter file's 4 new self-test assertions folded into its own 21) — all passing,
+   including the real WASM vertical slice and a real spawned Electron subprocess round trip.
 3. Every pre-existing `5641-5720`/`5721-5800`/`5881-5960` test file (248 tests total across 19
    files, including their own three real WASM vertical slices) — unchanged, all still passing.
 4. Every pre-existing Desktop Shell/Host-Bridge/Presentation-Boundary/Renderer-Boundary/Device-
-   Management test file (98 tests across 6 files) — unchanged, all still passing; one
-   self-resolving `git status`-based prior-review guard fails only while this Arc's own
-   legitimate `src/` changes sit uncommitted (resolves the instant this commit lands).
-5. No file under `p2p/` or `.tmp_gen/` was read, written, or referenced by this Arc.
+   Management test file (98 tests across 6 files) — unchanged, all still passing.
+5. No file under `p2p/` or `.tmp_gen/` was read, written, or referenced by this Arc or its
+   gap-closing follow-up.
 
 ## Files changed
 

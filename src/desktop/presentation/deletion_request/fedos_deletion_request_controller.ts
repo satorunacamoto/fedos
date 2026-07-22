@@ -24,6 +24,14 @@ import {
   type FedosDeletionRequestInboxItem,
   type FedosDeletionRequestConsentDetailContent,
 } from "./fedos_deletion_request_screen_model.js";
+// Secure Runtime Alpha 6041-6120 -- Phase K: Notification integration, over
+// the EXISTING `FedosDesktopNotificationCoordinator` (`4261-4340`,
+// unmodified) -- this Controller never sends anything itself, and every
+// notification carries only the closed, fixed-template kind + an opaque
+// `targetConversationId` + a bounded, policy-checked `detail` string, never
+// message plaintext or a requester identity.
+import { FedosDesktopNotificationCoordinator } from "../../notification/fedos_desktop_notification_coordinator.js";
+import { NoopFedosDesktopNotificationPort, type FedosDesktopNotificationPort } from "../../notification/fedos_desktop_notification_port.js";
 
 export class FedosDeletionRequestController {
   readonly navigation = new FedosDeletionRequestNavigationState();
@@ -34,9 +42,22 @@ export class FedosDeletionRequestController {
   #consentDetailState: FedosDesktopViewModelState<FedosDeletionRequestConsentDetailContent> = fedosViewModelIdle();
   #createState: FedosDesktopViewModelState<{ readonly requestId: string }> = fedosViewModelIdle();
   #actionInFlight = false;
+  #notificationCoordinator: FedosDesktopNotificationCoordinator;
+  /** Restart-non-durable, in-memory only -- which requestIds this process has already raised a `"deletion-request-received"` notification for, so a repeated `refreshReceivedInbox()` call never re-notifies for the SAME item. */
+  readonly #notifiedRequestIds = new Set<string>();
 
-  constructor(shell: FedosDesktopApplicationShell) {
+  constructor(shell: FedosDesktopApplicationShell, notificationPort: FedosDesktopNotificationPort = new NoopFedosDesktopNotificationPort()) {
     this.#shell = shell;
+    this.#notificationCoordinator = new FedosDesktopNotificationCoordinator(notificationPort);
+  }
+
+  /** Swaps in a real notification backend (e.g. a real Electron `Notification` port) after construction -- mirrors this codebase's own "always a safe Noop default, real backend injected once available" convention. Never creates a second, parallel notification subsystem. */
+  setNotificationPort(port: FedosDesktopNotificationPort): void {
+    this.#notificationCoordinator = new FedosDesktopNotificationCoordinator(port);
+  }
+
+  get notificationCoordinator(): FedosDesktopNotificationCoordinator {
+    return this.#notificationCoordinator;
   }
 
   // ---------------------------------------------------------------------
@@ -111,6 +132,41 @@ export class FedosDeletionRequestController {
     const sorted = fedosDeletionRequestSortInboxItems(items);
     const { items: truncated } = fedosDeletionRequestTruncateInboxItems(sorted);
     this.#inboxState = fedosViewModelLoaded(truncated);
+    await this.#notifyNewInboxItems(truncated);
+  }
+
+  /** Phase K — fires `"deletion-request-received"`/`"deletion-request-expired"` for any item this process has not already notified about. In-memory-only tracking (`#notifiedRequestIds`) -- never re-notifies for the same requestId within one process lifetime; a restart may re-notify once, which is safe (never a duplicate DELETION, only a duplicate coarse signal). */
+  async #notifyNewInboxItems(items: readonly FedosDeletionRequestInboxItem[]): Promise<void> {
+    for (const item of items) {
+      if (this.#notifiedRequestIds.has(item.requestId)) continue;
+      this.#notifiedRequestIds.add(item.requestId);
+      if (item.displayStatus === "pending-review") {
+        await this.#notificationCoordinator.notify({ kind: "deletion-request-received", targetConversationId: item.conversationId });
+      } else if (item.displayStatus === "expired") {
+        await this.#notificationCoordinator.notify({ kind: "deletion-request-expired", targetConversationId: item.conversationId });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Phase E/K — sender side: explicit notification triggers. The Sender
+  // Status model (`refreshSentStatus()`, above) is this Arc's own read
+  // path; a caller that independently detects a real status change (e.g.
+  // after a real `deletionRequestAcknowledgementOutcome()` read) may
+  // explicitly raise the matching safe signal — never automatic, never
+  // polling, never message content.
+  // ---------------------------------------------------------------------
+
+  async notifyRecipientResponded(conversationId: string): Promise<void> {
+    await this.#notificationCoordinator.notify({ kind: "deletion-request-responded", targetConversationId: conversationId });
+  }
+
+  async notifySomeDevicesPending(conversationId: string, pendingCount: number): Promise<void> {
+    await this.#notificationCoordinator.notify({ kind: "deletion-request-pending-devices", targetConversationId: conversationId, detail: `${pendingCount} device(s) pending` });
+  }
+
+  async notifyPartiallyApplied(conversationId: string): Promise<void> {
+    await this.#notificationCoordinator.notify({ kind: "deletion-request-partial", targetConversationId: conversationId });
   }
 
   // ---------------------------------------------------------------------

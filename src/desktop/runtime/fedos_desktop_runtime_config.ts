@@ -76,6 +76,10 @@ import type { FedosDeviceRegistrationAuthority } from "../../device/fedos_device
 import type { FedosDeviceSyncAbandonmentPolicy } from "../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
 import type { FedosDeviceSyncResourceLimits } from "../../device/sync_scheduler/fedos_device_sync_resource_limits.js";
 import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos_device_sync_attempt.js";
+// Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device
+// Aggregation and User Consent UI Arc) -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring this file's own established pattern.
+import type { FedosConversationDeletionRequestIntegrationDependencies } from "../../conversation/runtime/fedos_conversation_runtime.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -478,4 +482,18 @@ export interface FedosDesktopRuntimeConfig {
    * field).
    */
   readonly deviceSyncJournalLogPath?: string;
+  /**
+   * Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-
+   * Device Aggregation and User Consent UI Arc) — OPTIONAL, additive.
+   * Passed straight through, unmodified, to `createFedosConversationRuntime()`'s
+   * own already-real, already-optional `deletionRequest` dependency
+   * bundle (`5881-5960`) — this file interprets NOTHING in it, exactly
+   * like `conversationDirectMessageDeliveryRoute`'s own sibling
+   * `directMessageDelivery` object above. Omitted,
+   * `FedosConversationRuntime.deletionRequest()` returns `null` and
+   * every `FedosDesktopApplicationShell.deletionRequest*()` method
+   * reports `"unavailable"` — the SAME honest, pre-existing fail-closed
+   * contract this Arc's own Shell methods already implement.
+   */
+  readonly conversationDeletionRequest?: FedosConversationDeletionRequestIntegrationDependencies;
 }

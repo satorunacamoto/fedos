@@ -747,6 +747,9 @@ export async function startFedosDesktopRuntime(
       privateNostrDefaultRelayUrls: config.conversationPrivateNostrDefaultRelayUrls,
     }),
     directMessageDelivery,
+    // Secure Runtime Alpha 6041-6120 -- passed straight through, unmodified; see
+    // `FedosDesktopRuntimeConfig.conversationDeletionRequest`'s own doc comment.
+    deletionRequest: config.conversationDeletionRequest,
   });
 
   // Secure Runtime Alpha 2921-3000 -- exactly one FedosDeviceTrustRuntime
