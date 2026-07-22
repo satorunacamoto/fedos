@@ -157,6 +157,50 @@ export function listFedosConversationArchiveCliDirectory(
   return manifest === null ? null : manifest.entries;
 }
 
+export type FedosConversationArchiveCliDirectoryRemovalOutcome = "removed" | "not-found" | "index-unavailable" | "failed";
+
+/**
+ * Secure Runtime Alpha 5401–5480 ("FedOS Local Deletion Capability and
+ * Deletion-State Foundation Arc") — the missing local capability the
+ * Secret Capability Deletion review (`cf5b870`) identified: removes
+ * exactly the ONE tracked Package file named `fileName` (never a
+ * directory scan, never a wildcard, never a second file), then rewrites
+ * this directory's own index without that entry. `fileName` must already
+ * be named by the index — never a caller-supplied raw path; a name the
+ * index does not currently carry returns `"not-found"`, which is the
+ * IDEMPOTENT outcome a retry after a prior successful removal converges
+ * to (the underlying `fileSystem.deleteFile` is itself missing-file
+ * idempotent, so a crash between unlinking the Package and rewriting the
+ * index self-heals on the next call: the file is already gone, `deleteFile`
+ * reports `true` again, and the index is rewritten without the stale
+ * entry). Never throws.
+ */
+export function removeFedosConversationArchiveCliDirectoryEntry(
+  directoryPath: string,
+  fileName: string,
+  fileSystem: FedosConversationArchiveCliFileSystem = fedosConversationArchiveCliNodeFileSystem,
+): FedosConversationArchiveCliDirectoryRemovalOutcome {
+  const bytes = fileSystem.readFile(joinFedosConversationArchiveCliPath(directoryPath, FEDOS_CONVERSATION_ARCHIVE_CLI_DIRECTORY_MANIFEST_FILE_NAME));
+  if (bytes === null) return "index-unavailable";
+  const manifest = deserializeDirectoryManifest(bytes);
+  if (manifest === null) return "index-unavailable";
+
+  const entry = manifest.entries.find((candidate) => candidate.fileName === fileName);
+  if (entry === undefined) return "not-found";
+
+  const deleted = fileSystem.deleteFile(joinFedosConversationArchiveCliPath(directoryPath, fileName));
+  if (!deleted) return "failed";
+
+  const remaining = manifest.entries.filter((candidate) => candidate.fileName !== fileName);
+  const rewritten = fileSystem.writeFile(
+    joinFedosConversationArchiveCliPath(directoryPath, FEDOS_CONVERSATION_ARCHIVE_CLI_DIRECTORY_MANIFEST_FILE_NAME),
+    serializeDirectoryManifest({ formatVersion: manifest.formatVersion, generatedAt: manifest.generatedAt, entries: remaining }),
+  );
+  if (!rewritten) return "failed";
+
+  return "removed";
+}
+
 export interface FedosConversationArchiveCliDirectoryImportOpenParams {
   readonly suite: FedosConversationEnvelopeEncryptionSuite;
   readonly localAccountIndex: number;

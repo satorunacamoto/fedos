@@ -8,6 +8,69 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5401–5480 — FedOS Local Deletion
+> Capability and Deletion-State Foundation Arc (complete).**
+> Architecture frozen: no remote deletion request, no wire protocol, no
+> Relay deletion, no new NIP, no recipient acknowledgement, no physical/
+> secure-erase or SSD-overwrite guarantee, no cloud/OneDrive
+> version-history deletion, no automatic backup deletion, no new crypto
+> primitive, no new dependency, `p2p/`/`.tmp_gen/` untouched. **Local-only
+> V1** over the normative design review (`cf5b870`,
+> `review/fedos-secret-capability-deletion-v1`): ten new files under
+> `src/conversation/deletion/` implement a closed, versioned target
+> vocabulary (10 values), operation vocabulary (8 values), evidence
+> vocabulary (4 values), a fixed-registry `FedosDeletionCapabilityDescriptor`
+> (never caller-self-declared, unknown target fails closed), a 15-value
+> `FedosDeletionStatus` mapped onto the EXISTING `FedosPayloadDeletionMeaning`
+> (Alpha 792), read-only assessment, deterministic pure plans, a narrow
+> four-entry-point execution coordinator, and a dedicated append-only
+> durable execution record (mirrors `AppendOnlyFedosPayloadRetentionPersistence`'s
+> own corruption-fails-closed convention) — because no existing record
+> captured one plan's cross-cutting Retention+Search+Archive outcome as a
+> single restart-recoverable fact. Reuses the EXISTING
+> `FedosPayloadRetentionAuthority`, `FedosConversationSearchIndex.reconcilePayloadRetention()`,
+> `FedosSyncDeviceRegistry.revokeDevice()`, and
+> `FedosConversationMembershipAuthority.revoke()` verbatim — zero redesign
+> of any of the four. Implements the ONE local capability the review found
+> genuinely missing: tracked Archive-file removal, added as one new
+> method (`deleteFile`) on `FedosConversationArchiveCliFileSystem` (refuses
+> a symlink/reparse-point target, treats a missing target as already
+> removed) and one new function
+> (`removeFedosConversationArchiveCliDirectoryEntry`) on the Archive CLI
+> directory module (removes exactly one tracked file via the directory's
+> own trusted index, never a raw path, never a directory, never a
+> wildcard) — resolved only through a canonical
+> `FedosDeletionArchiveFileHandle` that re-checks its own conversation
+> identity at removal time. Archive-file removal and payload deletion are
+> structurally separated: the payload executor's own dependency type
+> carries no filesystem; the Archive-file executor's own dependency type
+> carries no Retention/Search authority — deleting an Archive file never
+> changes live Conversation history, and deleting live history never
+> silently removes an Archive file. Device and Membership revocation are
+> exposed as their own separate plan/outcome, never implicitly combined
+> with payload deletion. Seven new test files (82 new tests) cover the
+> full required matrix — vocabulary/capability, read-only assessment,
+> deterministic planning, real Retention+Search execution (including
+> duplicate execution, conflicting-plan rejection, and partial-Search-
+> failure honesty), trusted Archive-file removal (traversal denial,
+> wrong-identity refusal, missing-file idempotency, symlink refusal, exact-
+> one-file removal), restart/interruption/corruption recovery against the
+> REAL append-only log backend, structural non-guarantee proof (no
+> network transport, no Relay/NIP vocabulary, no raw path or plaintext in
+> any public summary), and a real Phase O vertical slice (real Direct
+> Conversation, real payload, real Search index, real Archive export to a
+> real temp directory, real deletion, real restart, real idempotent
+> reconvergence) — no mock for the headline flow. Two pre-existing Archive
+> CLI test files' own in-memory fixture gained a four-line `deleteFile`
+> stub to satisfy the interface's new method; no other change, no new test
+> case in either. See
+> `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5401_5480_execution_spec.md`, and
+> `docs/secure_runtime_alpha_5401_5480_completion_declaration.md`. Next
+> Arc: FedOS Signed Recipient Deletion Request Protocol Foundation Review.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2581–2620 — Conversation Search
 > Retention Authority and Index Purge Hardening Arc (complete).**
 > Architecture frozen: no redesign of the accepted Search Runtime, no
