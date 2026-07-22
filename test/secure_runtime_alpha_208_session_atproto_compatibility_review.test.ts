@@ -92,6 +92,7 @@ describe("Secure Runtime Alpha 208 -- Future Session/ATProto Compatibility Revie
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
   });

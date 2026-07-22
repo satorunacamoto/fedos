@@ -179,7 +179,7 @@ describe("secp256k1 dependency adoption + capability/diagnostics + guards (Stage
 
   it("12. the crate's public pub fn surface is unchanged at twenty-seven — no public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
     for (const name of pubFnNames) {
       // Alpha 869 -- FedosMasterSeedAuthority::resolve_conversation_key is
       // lib.rs-level wiring only; it delegates its ECDH math to the one

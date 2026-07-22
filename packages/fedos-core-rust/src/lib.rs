@@ -2568,6 +2568,16 @@ mod kdf_core {
         /// `Wallet Root` as a Master-Seed-direct sibling of `Application
         /// Root`, not a Protocol Root nested under it.
         Wallet,
+        /// Secure Runtime Alpha 5401-5480 — the Direct Ratchet State and
+        /// Sealed Persistence Foundation Arc's own sealing-root domain:
+        /// derives a fixed root secret from the Master Seed that this
+        /// Arc's own per-call, per-session context-expand step (never
+        /// through this shared fixed-domain helper, which never accepts
+        /// caller-supplied salt/info) further separates by session
+        /// binding. Deliberately its own domain — this Arc's own secret
+        /// class gets its own label, the same reason every other domain
+        /// here has its own.
+        DirectRatchetSealing,
         /// Reserved for this module's own tests / future test-only fixtures
         /// — never used by production call sites.
         TestOnly,
@@ -2591,6 +2601,7 @@ mod kdf_core {
                 HkdfDomain::Session => b"fedos-hkdf-salt-session-v1",
                 HkdfDomain::ATProto => b"fedos-hkdf-salt-atproto-v1",
                 HkdfDomain::Wallet => b"fedos-hkdf-salt-wallet-v1",
+                HkdfDomain::DirectRatchetSealing => b"fedos-hkdf-salt-direct-ratchet-sealing-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-salt-test-only-v1",
             }
         }
@@ -2608,6 +2619,7 @@ mod kdf_core {
                 HkdfDomain::Session => b"fedos-hkdf-info-session-v1",
                 HkdfDomain::ATProto => b"fedos-hkdf-info-atproto-v1",
                 HkdfDomain::Wallet => b"fedos-hkdf-info-wallet-v1",
+                HkdfDomain::DirectRatchetSealing => b"fedos-hkdf-info-direct-ratchet-sealing-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-info-test-only-v1",
             }
         }
@@ -2878,9 +2890,11 @@ mod kdf_core {
         /// named itself "...the_six_specified"; Alpha 152 added `Nostr`
         /// (a seventh variant, briefly) and this Stage adds `Session`,
         /// `ATProto`, and `Wallet` (three more), for TEN variants total —
-        /// renamed and re-verified against the CURRENT state.
+        /// renamed and re-verified against the CURRENT state. Secure
+        /// Runtime Alpha 5401-5480 adds an ELEVENTH, `DirectRatchetSealing`
+        /// — re-verified again against the CURRENT state.
         #[test]
-        fn hkdf_domain_has_no_variant_other_than_the_ten_specified() {
+        fn hkdf_domain_has_no_variant_other_than_the_eleven_specified() {
             let domain = HkdfDomain::TestOnly;
             match domain {
                 HkdfDomain::RootKey => {}
@@ -2892,6 +2906,7 @@ mod kdf_core {
                 HkdfDomain::Session => {}
                 HkdfDomain::ATProto => {}
                 HkdfDomain::Wallet => {}
+                HkdfDomain::DirectRatchetSealing => {}
                 HkdfDomain::TestOnly => {}
             }
         }
@@ -10638,6 +10653,137 @@ impl FedosMasterSeedAuthority {
             inner: FedosAeadKeyHandle { inner },
         })
     }
+
+    /// Secure Runtime Alpha 5401-5480 — Direct Ratchet State and Sealed
+    /// Persistence Foundation Arc. Seals `secret_bytes` (opaque
+    /// placeholder material this Arc's own tests use — never a real
+    /// derived ratchet key, since no ratchet math exists yet) at rest,
+    /// under a key that is a pure function of the FULL session-binding
+    /// tuple (`local_device_ref`, `remote_device_ref`, `conversation_id`,
+    /// `generation`) — never the passphrase-wrapped Master Seed envelope
+    /// format [`FedosMasterSeedAuthority::seal`] uses (that format is
+    /// reserved for the Master Seed itself), and never
+    /// [`FedosMasterSeedAuthority::resolve_conversation_key`]'s
+    /// ECDH-based derivation (this Arc has no counterparty EC public key
+    /// to agree on; binding here is by opaque identity/session context
+    /// alone).
+    ///
+    /// Because [`fedos_derive_direct_ratchet_session_sealing_key_internal`]
+    /// derives a key that is a pure function of the binding tuple,
+    /// sealing/restoring under a DIFFERENT `local_device_ref`/
+    /// `remote_device_ref`/`conversation_id`/`generation` derives a
+    /// DIFFERENT key — restoration then fails by AEAD authentication
+    /// (never by a TypeScript-side string comparison alone). Returns a
+    /// lowercase-hex `nonce || ciphertext‖tag` string on success, `None`
+    /// on ANY failure (no Master Seed held, CSPRNG failure, internal AEAD
+    /// failure) — fail closed, never a panic. Does NOT implement DH
+    /// ratchet cryptography, root/chain-key KDF evolution, or
+    /// message-key derivation — this is at-rest sealing infrastructure
+    /// only.
+    pub fn seal_direct_ratchet_secret(
+        &self,
+        local_device_ref: String,
+        remote_device_ref: String,
+        conversation_id: String,
+        generation: u32,
+        secret_bytes: &[u8],
+    ) -> Option<String> {
+        use zeroize::Zeroize;
+
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let mut session_key_bytes = fedos_derive_direct_ratchet_session_sealing_key_internal(
+            handle,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+        )?;
+        let session_key = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            crate::secret_handle::SecretHandleKind::AeadKeyMaterial,
+            session_key_bytes,
+        );
+        session_key_bytes.zeroize();
+
+        let nonce_decision = fedos_aead_nonce_96();
+        if nonce_decision.state != FedosNonceState::Ready {
+            return None;
+        }
+        let nonce_bytes = nonce_decision.nonce?;
+
+        let seal_decision = crate::crypto::aead_internal::seal_internal(
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305,
+            &session_key,
+            &nonce_decision,
+            crate::crypto::aead_internal::AeadAadDomain::DirectRatchetSealing,
+            secret_bytes,
+        );
+        if seal_decision.status != crate::crypto::aead_internal::AeadStatus::Ready {
+            return None;
+        }
+        let ciphertext = seal_decision.ciphertext?;
+
+        Some(fedos_encode_direct_ratchet_sealed_blob(&nonce_bytes, &ciphertext))
+    }
+
+    /// The restoring counterpart to
+    /// [`FedosMasterSeedAuthority::seal_direct_ratchet_secret`] — see
+    /// that method's own header for the full design rationale. Requires
+    /// the EXACT SAME binding tuple `seal_direct_ratchet_secret` was
+    /// called with; any difference (wrong device, wrong peer, wrong
+    /// conversation, wrong generation) re-derives a different session
+    /// key and this returns `None` by AEAD authentication failure, not
+    /// by comparing the tuple's fields directly. Also returns `None` for
+    /// a structurally malformed `sealed_blob`, no Master Seed held, or a
+    /// tampered ciphertext. Never panics.
+    pub fn restore_direct_ratchet_secret(
+        &self,
+        local_device_ref: String,
+        remote_device_ref: String,
+        conversation_id: String,
+        generation: u32,
+        sealed_blob: String,
+    ) -> Option<Vec<u8>> {
+        use zeroize::Zeroize;
+
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let (nonce_bytes, ciphertext) = fedos_decode_direct_ratchet_sealed_blob(&sealed_blob)?;
+
+        let mut session_key_bytes = fedos_derive_direct_ratchet_session_sealing_key_internal(
+            handle,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+        )?;
+        let session_key = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            crate::secret_handle::SecretHandleKind::AeadKeyMaterial,
+            session_key_bytes,
+        );
+        session_key_bytes.zeroize();
+
+        let nonce_decision = FedosAeadNonceDecision {
+            kind: FedosAeadNonceKind::NinetySixBit,
+            state: FedosNonceState::Ready,
+            nonce: Some(nonce_bytes),
+        };
+        let open_decision = crate::crypto::aead_internal::open_internal(
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305,
+            &session_key,
+            &nonce_decision,
+            crate::crypto::aead_internal::AeadAadDomain::DirectRatchetSealing,
+            &ciphertext,
+        );
+        if open_decision.status != crate::crypto::aead_internal::AeadStatus::Ready {
+            return None;
+        }
+        open_decision.plaintext
+    }
 }
 
 /// Secure Runtime Alpha 869 — a minimal, fail-closed, fixed-length (64
@@ -10670,6 +10816,138 @@ fn fedos_decode_fixed_32_hex(hex: &str) -> Option<[u8; 32]> {
         out[i] = (high << 4) | low;
     }
     Some(out)
+}
+
+/// Secure Runtime Alpha 5401-5480 — the two-stage derivation
+/// [`FedosMasterSeedAuthority::seal_direct_ratchet_secret`]/
+/// [`FedosMasterSeedAuthority::restore_direct_ratchet_secret`] share.
+/// Stage 1: a FIXED, existing-pattern `HkdfDomain::DirectRatchetSealing`
+/// extract-and-expand from the Master Seed (mirrors
+/// `master_root::derive_identity_root_internal`'s own shape exactly)
+/// produces this authority's own sealing root. Stage 2: a SECOND,
+/// per-call HKDF-expand from that root, keyed by the session-binding
+/// context as HKDF `info` (never as `salt`, and never through the
+/// shared fixed-domain helper, which never accepts caller-supplied
+/// info) produces the actual session-bound sealing key. `None` on ANY
+/// failure — no Master Seed held, an internal HKDF failure, or an
+/// invalid PRK length (unreachable in practice: stage 1's own output is
+/// always exactly 32 bytes, a valid SHA-256 PRK length).
+fn fedos_derive_direct_ratchet_session_sealing_key_internal(
+    master_seed: &crate::master_root::FedosMasterSeedHandle,
+    local_device_ref: &str,
+    remote_device_ref: &str,
+    conversation_id: &str,
+    generation: u32,
+) -> Option<[u8; 32]> {
+    use hkdf::Hkdf;
+    use sha2::Sha256;
+    use zeroize::Zeroize;
+
+    let seed_bytes = master_seed.expose_bytes_for_internal_sealing()?;
+    let root_input = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+        crate::secret_handle::SecretHandleKind::HkdfInputMaterial,
+        seed_bytes,
+    );
+    let root_decision = crate::kdf_core::derive_secret_handle_internal(
+        &root_input,
+        crate::kdf_core::HkdfDomain::DirectRatchetSealing,
+    );
+    if root_decision.status != crate::kdf_core::HkdfStatus::Ready {
+        return None;
+    }
+    let root_handle = root_decision.output?;
+    let mut root_bytes = root_handle.expose_bytes_for_internal_derivation()?;
+
+    let context = fedos_direct_ratchet_sealing_context_bytes(
+        local_device_ref,
+        remote_device_ref,
+        conversation_id,
+        generation,
+    );
+    let hk = match Hkdf::<Sha256>::from_prk(&root_bytes) {
+        Ok(hk) => hk,
+        Err(_) => {
+            root_bytes.zeroize();
+            return None;
+        }
+    };
+    root_bytes.zeroize();
+    let mut session_key = [0u8; 32];
+    match hk.expand(&context, &mut session_key) {
+        Ok(()) => Some(session_key),
+        Err(_) => None,
+    }
+}
+
+/// Deterministic, delimiter-safe binding context: each field is
+/// length-prefixed (4-byte big-endian length) before concatenation, so
+/// no ambiguous-boundary collision is possible between e.g.
+/// (`"ab"`,`"c"`) and (`"a"`,`"bc"`) the way a plain separator-joined
+/// string could produce. This is HKDF `info` material only — never a
+/// secret, never persisted, never returned to any caller.
+fn fedos_direct_ratchet_sealing_context_bytes(
+    local_device_ref: &str,
+    remote_device_ref: &str,
+    conversation_id: &str,
+    generation: u32,
+) -> Vec<u8> {
+    let mut out = Vec::new();
+    for part in [local_device_ref, remote_device_ref, conversation_id] {
+        let bytes = part.as_bytes();
+        out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+        out.extend_from_slice(bytes);
+    }
+    out.extend_from_slice(&generation.to_be_bytes());
+    out
+}
+
+/// Encodes `nonce || ciphertext‖tag` as lowercase hex — this crate's own
+/// existing `fedos_decode_fixed_32_hex` precedent is a fixed-width
+/// DECODER only; this Arc needs a variable-length ENCODER too (the
+/// ciphertext length varies with `secret_bytes`), hand-rolled the same
+/// way rather than adding a `base64`/`hex` production dependency (this
+/// Arc's own "no new Cargo dependency" instruction).
+fn fedos_encode_direct_ratchet_sealed_blob(nonce: &[u8; 12], ciphertext: &[u8]) -> String {
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity((nonce.len() + ciphertext.len()) * 2);
+    for byte in nonce.iter().chain(ciphertext.iter()) {
+        out.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        out.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+/// The decoding counterpart to [`fedos_encode_direct_ratchet_sealed_blob`].
+/// Rejects (`None`) an odd-length string, a non-lowercase-hex character,
+/// or fewer than 12 decoded bytes (too short to hold a nonce at all) —
+/// never panics, never partially decodes.
+fn fedos_decode_direct_ratchet_sealed_blob(sealed_blob: &str) -> Option<([u8; 12], Vec<u8>)> {
+    let bytes = sealed_blob.as_bytes();
+    if bytes.is_empty() || bytes.len() % 2 != 0 {
+        return None;
+    }
+    fn nibble(byte: u8) -> Option<u8> {
+        match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            _ => None,
+        }
+    }
+    let mut decoded = Vec::with_capacity(bytes.len() / 2);
+    let mut i = 0;
+    while i < bytes.len() {
+        let high = nibble(bytes[i])?;
+        let low = nibble(bytes[i + 1])?;
+        decoded.push((high << 4) | low);
+        i += 2;
+    }
+    if decoded.len() < 12 {
+        return None;
+    }
+    let mut nonce = [0u8; 12];
+    nonce.copy_from_slice(&decoded[..12]);
+    let ciphertext = decoded[12..].to_vec();
+    Some((nonce, ciphertext))
 }
 
 #[cfg(test)]
@@ -11277,6 +11555,155 @@ mod master_seed_authority_tests {
         assert!(authority
             .resolve_conversation_key(0, counterparty_hex)
             .is_none());
+    }
+
+    // -- Secure Runtime Alpha 5401-5480 -- Direct Ratchet sealed-secret --
+
+    #[test]
+    fn seal_direct_ratchet_secret_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .is_none());
+    }
+
+    #[test]
+    fn seal_direct_ratchet_secret_never_touches_a_cleared_authority() {
+        let mut authority = generated_authority();
+        authority.clear();
+        assert!(authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .is_none());
+    }
+
+    #[test]
+    fn seal_then_restore_direct_ratchet_secret_round_trips_the_exact_plaintext() {
+        let authority = generated_authority();
+        let secret = b"placeholder ratchet secret material, never a real derived key";
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 3, secret)
+            .expect("must seal");
+        let restored = authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 3, sealed)
+            .expect("must restore");
+        assert_eq!(restored, secret);
+    }
+
+    #[test]
+    fn seal_direct_ratchet_secret_never_reveals_the_plaintext_in_the_sealed_blob() {
+        let authority = generated_authority();
+        let secret = b"do-not-leak-this-marker-into-the-sealed-blob";
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, secret)
+            .expect("must seal");
+        assert!(!sealed.contains("do-not-leak-this-marker-into-the-sealed-blob"));
+        // The sealed blob is lowercase hex only -- structurally opaque.
+        assert!(sealed.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_local_device() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-WRONG".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_remote_device() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-WRONG".to_string(), "conv-1".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_conversation() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-WRONG".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_generation() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 1, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_a_tampered_sealed_blob() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        let mut bytes: Vec<u8> = sealed.into_bytes();
+        // Flip one hex character deep in the ciphertext region (past the
+        // 24-hex-character/12-byte nonce prefix).
+        let flip_at = 30.min(bytes.len() - 1);
+        bytes[flip_at] = if bytes[flip_at] == b'0' { b'1' } else { b'0' };
+        let tampered = String::from_utf8(bytes).expect("must remain valid utf8");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, tampered)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_a_malformed_sealed_blob() {
+        let authority = generated_authority();
+        for malformed in ["", "not-hex-zz", "abc", "0123456789"] {
+            assert!(
+                authority
+                    .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, malformed.to_string())
+                    .is_none(),
+                "malformed blob {malformed:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_never_touches_a_cleared_authority() {
+        let mut authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        authority.clear();
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn seal_direct_ratchet_secret_is_deterministic_in_key_but_not_in_ciphertext() {
+        // Same binding tuple -> same derived key -> cross-open works, but
+        // each seal draws a fresh random nonce, so the two sealed blobs
+        // themselves must differ (never a fixed/reused nonce).
+        let authority = generated_authority();
+        let first = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        let second = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert_ne!(first, second);
+        let restored_from_second = authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, second)
+            .expect("must restore");
+        assert_eq!(restored_from_second, b"secret");
     }
 }
 

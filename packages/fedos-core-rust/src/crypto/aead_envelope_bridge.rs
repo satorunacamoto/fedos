@@ -73,6 +73,11 @@ fn aad_domain_to_envelope_domain(aad_domain: AeadAadDomain) -> Option<AeadEnvelo
         AeadAadDomain::Conversation => Some(AeadEnvelopeAadDomain::Conversation),
         AeadAadDomain::TestOnly => Some(AeadEnvelopeAadDomain::TestOnly),
         AeadAadDomain::MasterSeedSealing => None,
+        // Secure Runtime Alpha 5401-5480 — same reasoning as
+        // `MasterSeedSealing` immediately above: the Direct Ratchet
+        // sealed-secret path calls `aead_internal::seal_internal`/
+        // `open_internal` directly and never constructs an envelope.
+        AeadAadDomain::DirectRatchetSealing => None,
     }
 }
 

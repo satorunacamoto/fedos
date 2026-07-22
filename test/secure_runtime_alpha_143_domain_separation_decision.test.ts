@@ -126,6 +126,7 @@ describe("Secure Runtime Alpha 143 -- Domain Separation Decision", () => {
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
   });

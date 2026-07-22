@@ -89,6 +89,7 @@ describe("Secure Runtime Alpha 157 -- Nostr Root Derivation", () => {
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
   });
@@ -102,7 +103,7 @@ describe("Secure Runtime Alpha 157 -- Nostr Root Derivation", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
   });
 
   // ---------------------------------------------------------------------

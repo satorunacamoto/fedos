@@ -103,7 +103,7 @@ describe("Secure Runtime Alpha 159 -- Nostr Root Foundation Review", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
   });
 
   it("10. structural: AppRuntime carries no derived-key/root field of any kind, confirmed directly against the actual interface", () => {

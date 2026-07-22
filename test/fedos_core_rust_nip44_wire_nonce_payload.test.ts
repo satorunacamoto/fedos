@@ -186,7 +186,7 @@ describe("NIP-44 wire nonce generation + payload skeleton + diagnostics (Stage 2
 
   it("12. the crate's public pub fn surface is unchanged at twenty-seven — no public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
     for (const name of pubFnNames) {
       expect(name.toLowerCase()).not.toContain("nip44");
       expect(name.toLowerCase()).not.toContain("wirenonce");

@@ -1634,6 +1634,22 @@ export interface FedosMasterSeedAuthorityHandle {
   readonly public_key_hex_for_account: (accountIndex: number) => string | undefined;
   /** Secure Runtime Alpha 869 — resolves the Direct-mode pairwise conversation key (an opaque `AeadKeyHandle`) for `accountIndex` and one counterparty's public key hex. Never a raw key byte. */
   readonly resolve_conversation_key: (accountIndex: number, counterpartyPublicKeyHex: string) => unknown;
+  /** Secure Runtime Alpha 5401-5480 — seals opaque `secretBytes` at rest under a key bound to the full Direct Ratchet session-identity tuple. Returns opaque hex `nonce||ciphertext`, never plaintext. */
+  readonly seal_direct_ratchet_secret: (
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    secretBytes: Uint8Array,
+  ) => string | undefined;
+  /** Secure Runtime Alpha 5401-5480 — the restoring counterpart. `undefined` on ANY failure, including a binding-tuple mismatch or a tampered blob. */
+  readonly restore_direct_ratchet_secret: (
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    sealedBlob: string,
+  ) => Uint8Array | undefined;
 }
 
 /**
@@ -1655,7 +1671,9 @@ function isFedosMasterSeedAuthorityShape(value: unknown): value is FedosMasterSe
     typeof candidate.clear === "function" &&
     typeof candidate.sign_nostr_event === "function" &&
     typeof candidate.public_key_hex_for_account === "function" &&
-    typeof candidate.resolve_conversation_key === "function"
+    typeof candidate.resolve_conversation_key === "function" &&
+    typeof candidate.seal_direct_ratchet_secret === "function" &&
+    typeof candidate.restore_direct_ratchet_secret === "function"
   );
 }
 
@@ -1757,6 +1775,34 @@ export interface FedosWasmLoaderConversationKeyResolutionExecution {
     | "Succeeded"
     | "DerivationFailed"
     | "InvalidHandleShape"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 5401-5480 — `attemptDevOnlyMasterSeedSealDirectRatchetSecretCall()`'s own result. `sealedBlob` is opaque hex `nonce||ciphertext`, never plaintext ratchet-secret material. */
+export interface FedosWasmLoaderDirectRatchetSecretSealExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly sealedBlob: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "SealFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 5401-5480 — `attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall()`'s own result. `secretBytes` is the recovered opaque secret, `null` on ANY failure including a binding-tuple mismatch or a tampered blob (Rust's `restore_direct_ratchet_secret` never distinguishes which, same AEAD guidance as Master Seed restore). */
+export interface FedosWasmLoaderDirectRatchetSecretRestoreExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly secretBytes: Uint8Array | null;
+  readonly reason:
+    | "Succeeded"
+    | "RestoreFailed"
     | "InvalidAuthorityHandle"
     | "NotInitialized"
     | "CallFailed"
@@ -1955,6 +2001,12 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   /** Secure Runtime Alpha 869 — most recent `attemptDevOnlyMasterSeedResolveConversationKeyCall()` result, or `null` before it has ever been called. Read via `masterSeedResolveConversationKeyExecution()`. */
   #masterSeedResolveConversationKeyExecution: FedosWasmLoaderConversationKeyResolutionExecution | null = null;
+
+  /** Secure Runtime Alpha 5401-5480 — most recent `attemptDevOnlyMasterSeedSealDirectRatchetSecretCall()` result, or `null` before it has ever been called. Read via `directRatchetSecretSealExecution()`. */
+  #directRatchetSecretSealExecution: FedosWasmLoaderDirectRatchetSecretSealExecution | null = null;
+
+  /** Secure Runtime Alpha 5401-5480 — most recent `attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall()` result, or `null` before it has ever been called. Read via `directRatchetSecretRestoreExecution()`. */
+  #directRatchetSecretRestoreExecution: FedosWasmLoaderDirectRatchetSecretRestoreExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -2383,6 +2435,16 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   /** Secure Runtime Alpha 869 — read-only accessor for `#masterSeedResolveConversationKeyExecution`. */
   masterSeedResolveConversationKeyExecution(): FedosWasmLoaderConversationKeyResolutionExecution | null {
     return this.#masterSeedResolveConversationKeyExecution;
+  }
+
+  /** Secure Runtime Alpha 5401-5480 — read-only accessor for `#directRatchetSecretSealExecution`. */
+  directRatchetSecretSealExecution(): FedosWasmLoaderDirectRatchetSecretSealExecution | null {
+    return this.#directRatchetSecretSealExecution;
+  }
+
+  /** Secure Runtime Alpha 5401-5480 — read-only accessor for `#directRatchetSecretRestoreExecution`. */
+  directRatchetSecretRestoreExecution(): FedosWasmLoaderDirectRatchetSecretRestoreExecution | null {
+    return this.#directRatchetSecretRestoreExecution;
   }
 
   /**
@@ -3549,6 +3611,128 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#masterSeedResolveConversationKeyExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 5401-5480 (FedOS Direct Ratchet State and Sealed
+   * Persistence Foundation Arc) — PUBLIC, ASYNC. Calls
+   * `authority.seal_direct_ratchet_secret(localDeviceRef, remoteDeviceRef,
+   * conversationId, generation, secretBytes)` — mirrors
+   * `attemptDevOnlyMasterSeedSealCall()`'s own gating exactly (same
+   * artifact/dev-gate/readiness/import/init checks, same
+   * `isFedosMasterSeedAuthorityShape()` validation). `secretBytes` is
+   * opaque placeholder material this Arc's own callers use for testing —
+   * never a real derived ratchet key, since no ratchet math exists yet.
+   */
+  async attemptDevOnlyMasterSeedSealDirectRatchetSecretCall(
+    authority: unknown,
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    secretBytes: Uint8Array,
+  ): Promise<FedosWasmLoaderDirectRatchetSecretSealExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderDirectRatchetSecretSealExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, sealedBlob: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, sealedBlob: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, sealedBlob: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.seal_direct_ratchet_secret(
+          localDeviceRef,
+          remoteDeviceRef,
+          conversationId,
+          generation,
+          secretBytes,
+        );
+        if (typeof value === "string") {
+          result = { attempted: true, succeeded: true, sealedBlob: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, sealedBlob: null, reason: "SealFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, sealedBlob: null, reason: "CallFailed" };
+      }
+    }
+    this.#directRatchetSecretSealExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 5401-5480 — PUBLIC, ASYNC. Calls
+   * `authority.restore_direct_ratchet_secret(localDeviceRef,
+   * remoteDeviceRef, conversationId, generation, sealedBlob)`. Returns
+   * `succeeded: false` (never throws upward) on a binding-tuple mismatch
+   * or a tampered/malformed `sealedBlob` — Rust's own fail-closed
+   * `restore_direct_ratchet_secret()` never distinguishes which, matching
+   * AEAD guidance already applied elsewhere in this file.
+   */
+  async attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall(
+    authority: unknown,
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    sealedBlob: string,
+  ): Promise<FedosWasmLoaderDirectRatchetSecretRestoreExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderDirectRatchetSecretRestoreExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, secretBytes: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, secretBytes: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, secretBytes: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.restore_direct_ratchet_secret(
+          localDeviceRef,
+          remoteDeviceRef,
+          conversationId,
+          generation,
+          sealedBlob,
+        );
+        if (value instanceof Uint8Array) {
+          result = { attempted: true, succeeded: true, secretBytes: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, secretBytes: null, reason: "RestoreFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, secretBytes: null, reason: "CallFailed" };
+      }
+    }
+    this.#directRatchetSecretRestoreExecution = result;
     return result;
   }
 

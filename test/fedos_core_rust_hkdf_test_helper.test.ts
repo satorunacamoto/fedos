@@ -161,8 +161,10 @@ describe("FedOS Rust crate — test-only HKDF-SHA256 helper", () => {
       "sign_nostr_event",
       "public_key_hex_for_account",
       "resolve_conversation_key",
+      "seal_direct_ratchet_secret",
+      "restore_direct_ratchet_secret",
     ];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

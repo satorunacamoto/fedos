@@ -98,7 +98,7 @@ describe("Secure Runtime Alpha 177 -- Nostr Runtime Canonical Identifier Decisio
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(15);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
   });
 
   it("10. structural: FedosIdentityDescriptor is untouched by this Stage's own canonical choice", () => {

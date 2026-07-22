@@ -7,7 +7,7 @@ import libRaw from "../packages/fedos-core-rust/src/lib.rs?raw";
 const lib: string = (libRaw as string).replace(/\r\n/g, "\n");
 
 describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation", () => {
-  it("FedosMasterSeedAuthority exposes exactly the seven lifecycle methods plus sign_nostr_event, (Alpha 684/685) public_key_hex_for_account, and (Alpha 869) resolve_conversation_key, no more", () => {
+  it("FedosMasterSeedAuthority exposes exactly the seven lifecycle methods plus sign_nostr_event, (Alpha 684/685) public_key_hex_for_account, (Alpha 869) resolve_conversation_key, and (Alpha 5401-5480) seal_direct_ratchet_secret/restore_direct_ratchet_secret, no more", () => {
     // Matches up to the impl block's OWN closing brace (column 0) rather than
     // requiring `#[cfg(test)]` to immediately follow it -- Alpha 869 added a
     // free function (`fedos_decode_fixed_32_hex`) between this impl block and
@@ -26,11 +26,13 @@ describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation"
       "pub fn sign_nostr_event(",
       "pub fn public_key_hex_for_account(",
       "pub fn resolve_conversation_key(",
+      "pub fn seal_direct_ratchet_secret(",
+      "pub fn restore_direct_ratchet_secret(",
     ]) {
       expect(implBlock).toContain(method);
     }
     const pubFnCount = (implBlock.match(/pub fn /g) ?? []).length;
-    expect(pubFnCount).toBe(10);
+    expect(pubFnCount).toBe(12);
   });
 
   it("no method returns raw seed bytes to the caller", () => {

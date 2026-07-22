@@ -238,7 +238,7 @@ describe("FedOS initializeCrypto API Contract, PlanningOnly/denied, no side effe
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
 
     const cargoCode = cargoTomlSource

@@ -81,6 +81,7 @@ describe("Secure Runtime Alpha 199 -- Nostr Event Protocol Extensibility Review"
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
 

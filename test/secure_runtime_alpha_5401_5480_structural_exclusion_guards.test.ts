@@ -1,0 +1,151 @@
+/**
+ * Secure Runtime Alpha 5401-5480 — Phase J/structural. Covers test
+ * requirements 23 (Archive exclusion), 24 (Search exclusion), 25 (Sync
+ * exclusion), 26 (Transport exclusion), 30 (structural no-crypto-operation
+ * guard). Source-text assertions mirror this codebase's own established
+ * exclusion-test style (e.g. `test/reviews/private_conversation_search_runtime_v1/encryption_boundary_invariants.test.ts`'s
+ * own "no import from retention" check) rather than modifying any
+ * Archive/Search/Sync/Transport file to add an exclusion marker.
+ */
+import { describe, it, expect } from "vitest";
+// @ts-expect-error node:fs has no type declarations without @types/node in this tsconfig.
+import { readFileSync, readdirSync } from "node:fs";
+// @ts-expect-error see above.
+import { join } from "node:path";
+
+import {
+  FEDOS_SYNC_ALLOWED_RECORD_TYPES,
+  reviewFedosSyncRecordForJournal,
+} from "../src/sync/fedos_sync_record_allowlist.js";
+
+declare const process: { cwd(): string };
+
+function readAllSourceFiles(dir: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const absoluteDir = join(process.cwd(), dir);
+  let entries: string[];
+  try {
+    entries = readdirSync(absoluteDir) as string[];
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const fullPath = join(absoluteDir, entry);
+    if (entry.endsWith(".ts")) {
+      out.set(join(dir, entry), readFileSync(fullPath, "utf8") as string);
+    }
+  }
+  return out;
+}
+
+describe("Alpha 5401-5480 — 25. Device Sync allowlist exclusion", () => {
+  it("the closed allowlist does not include any ratchet record type", () => {
+    for (const recordType of FEDOS_SYNC_ALLOWED_RECORD_TYPES) {
+      expect(recordType.toLowerCase()).not.toContain("ratchet");
+    }
+  });
+
+  it("a ratchet-shaped record type is rejected by the existing, unmodified allowlist", () => {
+    const result = reviewFedosSyncRecordForJournal("ratchet-session-secret" as never, { sealedBlob: "irrelevant" });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("ratchet secret metadata under an ALLOWED record type is still rejected by the sensitive-marker scan", () => {
+    const result = reviewFedosSyncRecordForJournal("conversation-identity-metadata", { ratchetSecret: "irrelevant" });
+    expect(result.allowed).toBe(false);
+  });
+});
+
+describe("Alpha 5401-5480 — 23/24/26. Archive/Search/Transport exclusion (source-text)", () => {
+  it("23. no Conversation Archive source file imports the ratchet module", () => {
+    const archiveFiles = readAllSourceFiles("src/conversation/archive");
+    for (const [path, source] of archiveFiles) {
+      expect(source, `${path} must not import the ratchet module`).not.toMatch(/from ["'].*\/ratchet\//);
+    }
+    expect(archiveFiles.size).toBeGreaterThan(0);
+  });
+
+  it("24. no Search source file imports the ratchet module", () => {
+    const searchFiles = readAllSourceFiles("src/conversation/search");
+    for (const [path, source] of searchFiles) {
+      expect(source, `${path} must not import the ratchet module`).not.toMatch(/from ["'].*\/ratchet\//);
+    }
+    expect(searchFiles.size).toBeGreaterThan(0);
+  });
+
+  it("26. no Transport source file imports the ratchet module -- local session-state records are never serialized onto the wire", () => {
+    const transportFiles = readAllSourceFiles("src/conversation/transport");
+    for (const [path, source] of transportFiles) {
+      expect(source, `${path} must not import the ratchet module`).not.toMatch(/from ["'].*\/ratchet\//);
+    }
+    expect(transportFiles.size).toBeGreaterThan(0);
+  });
+
+  it("no ratchet source file imports Archive, Search, Sync-journal, or Transport modules (the exclusion holds in both directions)", () => {
+    const ratchetDir = join(process.cwd(), "src", "conversation", "ratchet");
+    function collect(dir: string): string[] {
+      const out: string[] = [];
+      for (const entry of readdirSync(dir) as string[]) {
+        const full = join(dir, entry);
+        if ((entry as string).endsWith(".ts")) out.push(full);
+        else {
+          try {
+            out.push(...collect(full));
+          } catch {
+            /* not a directory */
+          }
+        }
+      }
+      return out;
+    }
+    const forbiddenImportPatterns = [/\/archive\//, /\/search\//, /sync_journal/i, /\/transport\//];
+    for (const file of collect(ratchetDir)) {
+      const source = readFileSync(file, "utf8") as string;
+      for (const pattern of forbiddenImportPatterns) {
+        const importLines = source.split("\n").filter((line) => line.trim().startsWith("import"));
+        for (const line of importLines) {
+          expect(pattern.test(line), `${file} imports something matching ${pattern} in line: ${line}`).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+describe("Alpha 5401-5480 — 30. structural no-crypto-operation guard", () => {
+  it("the Runtime facade defines no method named encrypt/decrypt/send/publish/negotiate", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src", "conversation", "ratchet", "fedos_direct_ratchet_state_runtime.ts"),
+      "utf8",
+    ) as string;
+    const forbiddenMethodNames = [
+      "encryptMessage",
+      "decryptMessage",
+      "sendMessage",
+      "publishRelayEvent",
+      "constructNip17Event",
+      "negotiateWithPeer",
+      "migrateConversation",
+    ];
+    for (const name of forbiddenMethodNames) {
+      expect(source).not.toContain(name);
+    }
+    // No generic crypto.execute-style operation either.
+    expect(source).not.toMatch(/\bcrypto\.execute\b/);
+  });
+
+  it("the Rust sealing functions perform no DH ratchet, root/chain-key KDF evolution, or message-key derivation", () => {
+    const source = readFileSync(
+      join(process.cwd(), "packages", "fedos-core-rust", "src", "lib.rs"),
+      "utf8",
+    ) as string;
+    // Locate just the two new functions' own bodies to scope this check narrowly.
+    const sealStart = source.indexOf("pub fn seal_direct_ratchet_secret");
+    const restoreEnd = source.indexOf("fn fedos_decode_direct_ratchet_sealed_blob");
+    expect(sealStart).toBeGreaterThan(-1);
+    expect(restoreEnd).toBeGreaterThan(sealStart);
+    const region = source.slice(sealStart, restoreEnd);
+    for (const forbidden of ["diffie_hellman", "dh_ratchet", "derive_message_key", "derive_root_key", "derive_chain_key"]) {
+      expect(region).not.toContain(forbidden);
+    }
+  });
+});

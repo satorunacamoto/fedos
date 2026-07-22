@@ -8,6 +8,68 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5401–5480 — FedOS Direct Ratchet State and
+> Sealed Persistence Foundation Arc (FULL completion).** Implements the
+> complete NON-CRYPTOGRAPHIC foundation the normative forward-secrecy
+> review (`review/fedos-forward-secrecy-double-ratchet-v1`) names as its
+> own recommended next Arc — no DH ratchet step, no root/chain-key KDF
+> evolution, no message-key derivation, and no NIP-17 wiring exist
+> anywhere in this Arc. A new, additive domain, `src/conversation/ratchet/`
+> (14 files): a versioned, Device-pair-bound, collision-safe session
+> identity (deliberately wider than the review's own 3-component model —
+> this codebase's own multi-device-per-account reality requires binding
+> local Device identity too, not just local account); a closed lifecycle
+> vocabulary (`initialized`/`active`/`suspended`/`reset-required`/
+> `expired`/`revoked`/`corrupt`/`unavailable`) with validated transitions
+> and fully-terminal `revoked`/`corrupt`; monotonic counters; a bounded
+> (1000 keys/chain-gap, 14-day retention — the review's own exact
+> figures) skipped-message-key reference index, never an unbounded map;
+> a versioned sealed-secret record (one opaque `sealedBlob` field,
+> modeled on the Sender-Key sealed-persistence lineage's own precedent);
+> event-sourced append-only persistence for session metadata and
+> insert-only persistence for sealed secrets; and a narrow Runtime
+> facade (create/inspect/readiness/suspend/reset-required/expire/revoke/
+> counters/skipped-key register-remove/seal/recover/lock/stop) exposing
+> closed outcomes throughout. The EXISTING Master Seed WASM Rust Boundary
+> (`FedosMasterSeedAuthority`, Alpha 436/869) gains two new, narrow
+> methods — `seal_direct_ratchet_secret`/`restore_direct_ratchet_secret`
+> — deriving a session-bound AEAD key via a two-stage HKDF (one new
+> `HkdfDomain`/`AeadAadDomain` variant each, zero new Cargo dependencies)
+> so that sealing/restoring under the wrong Device, account, conversation,
+> or generation fails by REAL AEAD authentication, never a string
+> comparison; the new sealing port is deliberately kept OFF the shared
+> `FedosMasterSeedAuthority` interface (widening it was tried and reverted
+> after it broke ~20 unrelated fixtures) — `FedosWasmMasterSeedAuthority`
+> implements it additionally. The headline sealed-persistence proof runs
+> against REAL cryptography and REAL durable files, not a mock: two
+> Device identities, one Direct Conversation, a real CSPRNG placeholder
+> secret, a real seal, real append-only persistence, a Runtime `stop()`,
+> a FRESH Runtime restoring the SAME Master Seed from its own sealed
+> envelope, genuine restart recovery, genuine wrong-Device/tamper
+> rejection (AEAD authentication failure), `lock()` disposal, and a
+> direct read of the durable files confirming no raw secret byte ever
+> appears in either log. 122 new tests across 9 files, all passing (12
+> more real Rust unit tests, plus a WASM build). Two real design bugs
+> were found and fixed during implementation, both caught by this Arc's
+> own tests: the session-id delimiter originally rejected `"::"`, which
+> a real `FedosConversationId` always itself contains; and session
+> persistence was originally treated as mutable "upsert" against an
+> insert-only backend, corrected to the event-sourced-by-revision design
+> described above. Full `npx vitest run` failing-file set is IDENTICAL to
+> this worktree's own pre-existing baseline (~242 files, confirmed via
+> `git stash` to predate this Arc) — verified by a sorted-file-list diff,
+> not inspection alone; ~96 historical structural "exact `pub fn`/
+> `HkdfDomain` count" tests (a long-established per-Arc convention across
+> this crate's history) were updated accordingly. No file under
+> `src/conversation/archive/`, `search/`, `retention/`, `src/sync/`, or
+> `src/conversation/transport/` was modified — the exclusion is structural
+> absence, proven by reading real source. No forward secrecy or
+> cryptographic messaging claim is made anywhere in this Arc. See
+> `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md`,
+> `..._execution_spec.md`, and `..._completion_declaration.md`.
+> Recommended next Arc: **FedOS Direct Double Ratchet Cryptographic Core
+> Arc.**
+
 > **Status: Secure Runtime Alpha 5321–5400 — FedOS Desktop Beta 0.1 Canonical
 > Release Hosting, Manual Publication, and Signing Readiness Arc (FULL
 > completion).** Turns the locally-built NSIS/ZIP/checksum artifacts from

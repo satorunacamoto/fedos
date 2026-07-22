@@ -536,7 +536,7 @@ describe("Secure Runtime Alpha 061 -- Identity Bootstrap Idempotency, fedos_runt
 
   it("42. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- still 36 pub fn, thirteen #[wasm_bindgen], no reference to this Stage's own doc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
+    expect(pubFnNames.length).toBe(48);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_061/);
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_061/);

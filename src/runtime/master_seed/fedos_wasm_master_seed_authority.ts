@@ -22,10 +22,13 @@ import {
   type FedosWasmLoaderMasterSeedRestoreSealedExecution,
   type FedosWasmLoaderMasterSeedSealExecution,
   type FedosWasmLoaderConversationKeyResolutionExecution,
+  type FedosWasmLoaderDirectRatchetSecretSealExecution,
+  type FedosWasmLoaderDirectRatchetSecretRestoreExecution,
   type FedosMasterSeedAuthorityHandle,
   type AeadKeyHandle,
 } from "../fedos_wasm_loader.js";
 import type { FedosMasterSeedAuthority } from "./fedos_master_seed_authority.js";
+import type { FedosDirectRatchetSealingAuthority } from "../../conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
 import {
   toSealedMasterSeedEnvelopeV1,
   type FedosSealedMasterSeedEnvelopeV1,
@@ -50,9 +53,25 @@ export interface FedosMasterSeedWasmLoaderBoundary {
     accountIndex: number,
     counterpartyPublicKeyHex: string,
   ): Promise<FedosWasmLoaderConversationKeyResolutionExecution>;
+  attemptDevOnlyMasterSeedSealDirectRatchetSecretCall(
+    authority: unknown,
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    secretBytes: Uint8Array,
+  ): Promise<FedosWasmLoaderDirectRatchetSecretSealExecution>;
+  attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall(
+    authority: unknown,
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    sealedBlob: string,
+  ): Promise<FedosWasmLoaderDirectRatchetSecretRestoreExecution>;
 }
 
-export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority {
+export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority, FedosDirectRatchetSealingAuthority {
   readonly #loaderBoundary: FedosMasterSeedWasmLoaderBoundary;
   #authority: FedosMasterSeedAuthorityHandle | null = null;
 
@@ -137,6 +156,46 @@ export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority {
       counterpartyPublicKeyHex,
     );
     return result.succeeded ? result.keyHandle : null;
+  }
+
+  async sealDirectRatchetSecret(
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    secretBytes: Uint8Array,
+  ): Promise<string | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyMasterSeedSealDirectRatchetSecretCall(
+      authority,
+      localDeviceRef,
+      remoteDeviceRef,
+      conversationId,
+      generation,
+      secretBytes,
+    );
+    return result.succeeded ? result.sealedBlob : null;
+  }
+
+  async restoreDirectRatchetSecret(
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    sealedBlob: string,
+  ): Promise<Uint8Array | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall(
+      authority,
+      localDeviceRef,
+      remoteDeviceRef,
+      conversationId,
+      generation,
+      sealedBlob,
+    );
+    return result.succeeded ? result.secretBytes : null;
   }
 
   /**

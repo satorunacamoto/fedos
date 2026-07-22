@@ -77,6 +77,7 @@ describe("Secure Runtime Alpha 188 -- Session/ATProto Signing Extensibility Revi
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
 
