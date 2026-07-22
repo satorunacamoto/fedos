@@ -4019,6 +4019,12 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
     return typeof result === "number" ? result : null;
   }
 
+  /** Secure Runtime Alpha 5561-5640 — the additive `previous_sending_chain_length()` bridge (see the Rust boundary's own header comment on that method for why this Arc added it). */
+  async attemptDevOnlyDirectRatchetPreviousSendingChainLengthCall(session: unknown): Promise<number | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "previous_sending_chain_length", []);
+    return typeof result === "number" ? result : null;
+  }
+
   async attemptDevOnlyDirectRatchetSealRootKeyCall(
     session: unknown,
     masterSeedAuthority: unknown,

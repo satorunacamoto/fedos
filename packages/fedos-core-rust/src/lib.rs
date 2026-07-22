@@ -12012,6 +12012,21 @@ impl FedosDirectRatchetSession {
         self.inner.skipped_key_count()
     }
 
+    /// Secure Runtime Alpha 5561-5640 (FedOS Direct Double Ratchet
+    /// Conversation Runtime and NIP-17 Integration Arc) — the ONE
+    /// additive getter this Arc's own real restart-recovery integration
+    /// needs and no earlier Arc exposed: `send_counter`/`receive_counter`/
+    /// `skipped_key_count` were already real, public facts (review §10 §2)
+    /// but `previous_sending_chain_length` (consulted by `encrypt()` for
+    /// every outgoing header's own `previous_chain_length` field, and by
+    /// the RECEIVER side's `decrypt()` own skip-gap validation across a DH
+    /// step) had no public accessor, so a restored session always fell
+    /// back to a caller-supplied value with no way to read the real one
+    /// first. Purely additive — no existing method's behavior changes.
+    pub fn previous_sending_chain_length(&self) -> u32 {
+        self.inner.previous_sending_chain_length()
+    }
+
     /// Encrypts `plaintext`. Returns the combined opaque wire message on
     /// success, `None` if the session is not yet ready to send (no
     /// established sending chain) or on send-counter overflow.

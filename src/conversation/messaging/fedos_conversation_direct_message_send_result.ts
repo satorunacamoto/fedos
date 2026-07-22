@@ -23,11 +23,25 @@
  * `FedosConversationDirectMessagingCoordinatorDependencies`) — omitted
  * entirely for every caller that did not, so this remains 100%
  * source-compatible with every existing caller/test.
+ *
+ * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet Conversation
+ * Runtime and NIP-17 Integration Arc) — `delivery` ADDITIVELY widened to
+ * also accept `FedosDirectRatchetSendOutcome`
+ * (`../ratchet/fedos_direct_ratchet_outbound_integration.js`), the
+ * ratchet route's own closed outcome vocabulary — still a SEPARATE fact
+ * from local storage, present only when `ratchetDelivery` was
+ * configured. Every existing caller that never configures either
+ * `delivery`/`ratchetDelivery` still sees `delivery` entirely absent.
  */
 import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
 
 export type FedosConversationDirectMessageSendResult =
-  | { readonly outcome: "sent-locally"; readonly envelopeId: string; readonly delivery?: FedosPrivateWireDeliveryQueueOutcome }
+  | {
+      readonly outcome: "sent-locally";
+      readonly envelopeId: string;
+      readonly delivery?: FedosPrivateWireDeliveryQueueOutcome | FedosDirectRatchetSendOutcome;
+    }
   | { readonly outcome: "invalid-input" }
   | { readonly outcome: "conversation-not-found" }
   | { readonly outcome: "conversation-not-active" }

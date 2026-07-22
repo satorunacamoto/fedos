@@ -132,7 +132,7 @@ describe("Secure Runtime Alpha 190 -- Nostr Schnorr Signing Foundation Completio
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("9. structural: FedosNostrSignatureHandle and derive_nostr_signature_internal both exist, pub(crate) only, no wasm_bindgen", () => {
     expect(libRsSource).toMatch(/pub\(crate\) struct FedosNostrSignatureHandle \{/);

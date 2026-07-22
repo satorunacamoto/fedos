@@ -335,7 +335,7 @@ describe("Runtime FedOS provider integration, opt-in and safe-by-default (Stage 
 
   it("13. public pub fn surface is unchanged at twenty-seven", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("14. Cargo.toml and package.json dependency counts are unchanged", () => {
     const cargoCode = cargoTomlSource

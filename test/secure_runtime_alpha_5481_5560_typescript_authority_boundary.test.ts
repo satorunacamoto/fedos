@@ -61,6 +61,7 @@ function mockRatchetLoaderBoundary(overrides: Partial<FedosDirectRatchetWasmLoad
     attemptDevOnlyDirectRatchetSendCounterCall: vi.fn(async () => null),
     attemptDevOnlyDirectRatchetReceiveCounterCall: vi.fn(async () => null),
     attemptDevOnlyDirectRatchetSkippedKeyCountCall: vi.fn(async () => null),
+    attemptDevOnlyDirectRatchetPreviousSendingChainLengthCall: vi.fn(async () => null),
     attemptDevOnlyDirectRatchetSealRootKeyCall: vi.fn(async () => null),
     attemptDevOnlyDirectRatchetSealSendingChainKeyCall: vi.fn(async () => null),
     attemptDevOnlyDirectRatchetSealReceivingChainKeyCall: vi.fn(async () => null),

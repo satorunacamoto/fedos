@@ -166,7 +166,7 @@ describe("FedOS Rust crate — internal ciphertext envelope skeleton (Stage 157�
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(68);    expect(pubFnNames).not.toContain("validate_envelope_internal");
+    expect(pubFnNames.length).toBe(69);    expect(pubFnNames).not.toContain("validate_envelope_internal");
   });
 
   it("12. Cargo.toml is unchanged — no new dependency, still 9 production dependencies", () => {

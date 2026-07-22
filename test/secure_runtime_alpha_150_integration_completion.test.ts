@@ -92,7 +92,7 @@ describe("Secure Runtime Alpha 150 -- Integration Completion", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("8. RIPPLE (Secure Runtime Alpha 151, 163): SecretHandleKind gained exactly three new variants across the Alpha 146-150 Arc's own scope -- MasterSeedMaterial, IdentityRootMaterial, ApplicationRootMaterial; Stage 1016 (Secure Runtime Alpha 151) legitimately added a FOURTH, ProtocolRootMaterial, and Stage 1020 (Secure Runtime Alpha 163) legitimately added a FIFTH, NostrSecretKeyMaterial, reconfirmed here as the CURRENT state", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum SecretHandleKind \{([\s\S]*?)\n {4}\}/) ?? [])[1] ?? "";

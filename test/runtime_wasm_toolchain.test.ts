@@ -295,7 +295,7 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("16. Allowed is still unreachable from either activation policy, even with both locks open", () => {
     const runtimeDecision = evaluateRuntimeCryptoActivation(

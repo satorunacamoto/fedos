@@ -177,7 +177,7 @@ describe("FedOS provider internal execution design, blocked (Stage 313-320)", ()
 
   it("13. dependency counts unchanged -- Cargo.toml (10) and package.json (2) dependencies, Rust pub fn surface (27)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(68);
+    expect(pubFnNames.length).toBe(69);
     const cargoCode = cargoTomlSource
       .split("\n")
       .map((line: string) => line.replace(/#.*$/, ""))

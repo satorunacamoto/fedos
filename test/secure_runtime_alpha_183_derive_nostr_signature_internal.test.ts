@@ -97,7 +97,7 @@ describe("Secure Runtime Alpha 183 -- derive_nostr_signature_internal()", () => 
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   // ---------------------------------------------------------------------
   // Regression

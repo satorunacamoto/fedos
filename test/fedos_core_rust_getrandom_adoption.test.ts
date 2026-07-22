@@ -193,8 +193,9 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
       "decrypt_nip44_wire",
       "sign_nostr_event_with_fresh_ephemeral_key",
       "build_and_sign_nip17_gift_wrap",
+      "previous_sending_chain_length",
     ];
-    expect(pubFnNames.length).toBe(68);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(69);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
   it("6. production API placeholders are unchanged, including random_bytes_placeholder", () => {

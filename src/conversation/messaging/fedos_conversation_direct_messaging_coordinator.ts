@@ -77,6 +77,7 @@ import type { FedosConversationDirectMessageSendResult } from "./fedos_conversat
 import type { FedosConversationDirectMessageReadResult } from "./fedos_conversation_direct_message_read_result.js";
 import type { FedosConversationDirectMessageSummary } from "./fedos_conversation_direct_message_summary.js";
 import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
 
 /** The ONE encryption suite this facade ever selects — never caller-chosen (Alpha 1127). */
 export const FIXED_DIRECT_MESSAGE_SUITE: FedosConversationEnvelopeEncryptionSuite = "ChaCha20Poly1305";
@@ -112,6 +113,32 @@ export interface FedosConversationDirectMessageDeliveryDependencies {
   ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
 }
 
+/**
+ * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet Conversation
+ * Runtime and NIP-17 Integration Arc) — the ratchet-route counterpart of
+ * `FedosConversationDirectMessageDeliveryDependencies` above, ADDITIVE and
+ * structurally SEPARATE (never a widened `route` union on the existing
+ * frozen type — the two routes remain type-level distinguishable, never
+ * conflated). `remoteDeviceRef` is explicit, caller/local-policy-selected
+ * configuration (Phase B's own "explicit caller/local-policy selection"
+ * requirement) — this coordinator never infers which remote Device to
+ * target from a display name, array index, or Relay identity.
+ * `sendRatchetMailboxNip17` performs the FULL Phase E pipeline (route
+ * resolution, session-readiness gate, real Ratchet Core encrypt, durable
+ * state commit, ratchet payload construction) internally, opaque to this
+ * coordinator, exactly like the static route's own `sendMailboxNip17`
+ * thunk is opaque to it.
+ */
+export interface FedosConversationDirectMessageRatchetDeliveryDependencies {
+  readonly route: "nostr-nip17-v1-ratchet";
+  readonly remoteDeviceRef: string;
+  readonly sendRatchetMailboxNip17: (
+    envelopeId: string,
+    conversationId: string,
+    plaintext: Uint8Array,
+  ) => Promise<FedosDirectRatchetSendOutcome>;
+}
+
 export interface FedosConversationDirectMessagingCoordinatorDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;
   readonly activationPersistence: FedosConversationActivationPersistence;
@@ -123,6 +150,16 @@ export interface FedosConversationDirectMessagingCoordinatorDependencies {
   readonly decryptionCoordinator: FedosConversationDecryptionCoordinator;
   /** OPTIONAL — omitted, `sendDirectMessage()` behaves byte-for-byte as before this Arc (local storage only). See this file's own header. */
   readonly delivery?: FedosConversationDirectMessageDeliveryDependencies;
+  /**
+   * OPTIONAL, and MUTUALLY EXCLUSIVE in practice with `delivery` above —
+   * omitted, zero behavior change (Phase M's own "keep existing Direct
+   * messaging behavior unchanged unless an explicit ratchet route is
+   * selected"). When BOTH are supplied, `ratchetDelivery` takes
+   * precedence (the more specific, explicitly-selected route) — this is
+   * a caller/local-policy construction-time choice, never a per-message
+   * heuristic.
+   */
+  readonly ratchetDelivery?: FedosConversationDirectMessageRatchetDeliveryDependencies;
 }
 
 export class FedosConversationDirectMessagingCoordinator {
@@ -170,6 +207,17 @@ export class FedosConversationDirectMessagingCoordinator {
     // ("sent-locally") ALWAYS happens first and independently — a
     // delivery failure here is reported as a SEPARATE fact (Alpha 1851),
     // never downgrades or erases the local-storage outcome.
+    //
+    // Secure Runtime Alpha 5561–5640 Phase E — `ratchetDelivery`, when
+    // configured, takes precedence over the static `delivery` (see this
+    // file's own `FedosConversationDirectMessageRatchetDeliveryDependencies`
+    // doc comment for why the two are mutually exclusive in practice,
+    // never a per-message heuristic). Omitting BOTH leaves this method
+    // byte-for-byte unchanged from before this Arc.
+    if (result.outcome === "sent-locally" && this.#deps.ratchetDelivery !== undefined) {
+      const delivery = await this.#deps.ratchetDelivery.sendRatchetMailboxNip17(result.envelopeId, conversationId, plaintext);
+      return { ...result, delivery };
+    }
     if (result.outcome === "sent-locally" && this.#deps.delivery !== undefined) {
       const delivery = await this.#deps.delivery.sendMailboxNip17(result.envelopeId, conversationId, plaintext);
       return { ...result, delivery };

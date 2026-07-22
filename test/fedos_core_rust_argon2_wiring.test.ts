@@ -203,8 +203,9 @@ describe("FedOS Rust crate — RFC 9106 Argon2id vectors wired to cargo test", (
       "decrypt_nip44_wire",
       "sign_nostr_event_with_fresh_ephemeral_key",
       "build_and_sign_nip17_gift_wrap",
+      "previous_sending_chain_length",
     ];
-    expect(pubFnNames.length).toBe(68);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(69);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
     // The #[cfg(test)] module's own test/helper functions are not `pub`.
     expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+rfc9106/);
     // Stage 86 extracts the Argon2id derivation logic into

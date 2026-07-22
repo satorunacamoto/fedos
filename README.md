@@ -8,6 +8,63 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5561–5640 — FedOS Direct Double Ratchet
+> Conversation Runtime and NIP-17 Integration Arc (FULL completion).**
+> Wires the already-real Ratchet State Foundation (`be1bc0d`) and
+> Cryptographic Core (`080cb99`) into the already-real NIP-17 Rumor/Seal/
+> Gift Wrap wire-adapter lineage (`100c231`, merged as this Arc's own
+> prerequisite) and the existing Direct Conversation send/receive path —
+> real product-level forward secrecy, not merely a standalone crypto core.
+> New: a closed route-vocabulary extension (`"nostr-nip17-v1-ratchet"`,
+> additive, never replacing the two existing routes, with an explicit
+> `"downgrade-detected"` outcome so an already-active ratchet session can
+> never be silently bypassed); a canonical, side-independent Device-pair
+> session-id resolver (both participants must derive the byte-identical
+> id — the Rust ratchet core's own HKDF context binding input); a strict,
+> closed `"session-init"`/`"message"` inner payload carried through the
+> UNMODIFIED NIP-17/NIP-59 outer framing (never a new NIP, never a new
+> public event kind); real outbound/inbound integration composing the
+> real Ratchet Core `encrypt()`/`decrypt()` with durable state commits,
+> the real `FedosPrivateTransport` (one additive `sendMailboxNip17Control()`
+> method for session-establishment control facts), and the existing,
+> unmodified Conversation Envelope/Payload/Retention/Search import path;
+> and a narrow Runtime facade (`directRatchet()` on `FedosConversationRuntime`)
+> exposing only safe operations. Two real bugs in the real cryptographic
+> restart-recovery path were found and fixed during this Arc's own
+> development (not present before it): the Rust ratchet header's 256-byte
+> session-id bound was silently exceeded by a naive full-pubkey encoding
+> (fixed by a compact, canonically-ordered encoding), and
+> `send_counter`/`previous_sending_chain_length` reset on a real DH
+> ratchet step but were never read back correctly on restore (fixed by one
+> additive Rust getter, `FedosDirectRatchetSession::previous_sending_chain_length()`,
+> and one additive `FedosDirectRatchetStateRuntime.commitCounters()`
+> method). The headline proof
+> (`test/secure_runtime_alpha_5561_5640_real_vertical_slice.test.ts`) runs
+> two independent real identities/Devices through real session
+> establishment, real bidirectional messaging, duplicate rejection, a full
+> stop/restart of both Runtimes from durable files, and a post-restart
+> message exchange on the restored session — with no known plaintext or
+> root/chain/private-key fixture ever appearing in the durable files. A
+> second file
+> (`test/secure_runtime_alpha_5561_5640_failure_matrix.test.ts`) proves
+> tampered-ciphertext rejection, unsupported-suite rejection, and
+> unknown-session rejection, all with real crypto. See
+> `docs/secure_runtime_alpha_5561_5640_execution_spec.md`,
+> `docs/secure_runtime_alpha_5561_5640_ratchet_nip17_payload_mapping.md`,
+> `docs/secure_runtime_alpha_5561_5640_atomic_state_outbox_retry.md`, and
+> `docs/secure_runtime_alpha_5561_5640_completion_declaration.md` (which
+> also discloses several narrower, non-blocking test-coverage boundaries:
+> out-of-order/skipped-key recovery and a live three-simultaneous-session
+> proof were not separately re-demonstrated at this Arc's own integration
+> layer beyond what the already-real Cryptographic Core Arc's own test
+> already proves, and Desktop/Electron wiring of the new optional
+> `directRatchet` dependency bundle was left for a follow-on, mirroring how
+> the static NIP-17 route's own Desktop wiring landed one Arc at a time).
+> Recommended next Arc: **FedOS Direct Ratchet Multi-Device Session
+> Lifecycle and Identity Rotation Decision Review**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5481–5560 — FedOS Direct Double Ratchet
 > Cryptographic Core Arc (FULL completion).** Implements the real,
 > pure cryptographic core the normative forward-secrecy review delegates to

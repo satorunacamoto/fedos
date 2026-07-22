@@ -158,7 +158,7 @@ describe("FedOS Rust crate — SecretHandle real-byte storage (Stage 144–146)"
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(68);    expect(pubFnNames).not.toContain("new_from_32_bytes_for_internal_use");
+    expect(pubFnNames.length).toBe(69);    expect(pubFnNames).not.toContain("new_from_32_bytes_for_internal_use");
   });
 
   it("10. not connected to HKDF/AEAD/random/nonce: no call to fedos_random_bytes_32 or fedos_aead_nonce_96 from within secret_handle", () => {

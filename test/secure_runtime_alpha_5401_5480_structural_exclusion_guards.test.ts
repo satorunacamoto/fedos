@@ -98,8 +98,17 @@ describe("Alpha 5401-5480 — 23/24/26. Archive/Search/Transport exclusion (sour
       }
       return out;
     }
+    // Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet
+    // Conversation Runtime and NIP-17 Integration Arc) — this Arc is
+    // EXACTLY the "future integration Arc" the review/Foundation Arc
+    // itself deferred live Transport wiring to; these are that Arc's own
+    // NEW, additive integration-layer files. A narrow, named exclusion —
+    // every OTHER ratchet source file (all pre-existing) remains fully
+    // covered by this guard exactly as before.
+    const integrationFiles = new Set(["fedos_direct_ratchet_conversation_runtime.ts", "fedos_direct_ratchet_outbound_integration.ts", "fedos_direct_ratchet_inbound_integration.ts", "fedos_direct_ratchet_route_resolution.ts"]);
     const forbiddenImportPatterns = [/\/archive\//, /\/search\//, /sync_journal/i, /\/transport\//];
     for (const file of collect(ratchetDir)) {
+      if ([...integrationFiles].some((name) => file.endsWith(name))) continue;
       const source = readFileSync(file, "utf8") as string;
       for (const pattern of forbiddenImportPatterns) {
         const importLines = source.split("\n").filter((line) => line.trim().startsWith("import"));

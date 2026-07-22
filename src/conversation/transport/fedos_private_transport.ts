@@ -41,6 +41,7 @@
  *     anywhere in this file.
  */
 
+import type { FedosConversationMessageEnvelope } from "../envelope/fedos_conversation_message_envelope.js";
 import type { FedosConversationRelaySet } from "./relay/fedos_conversation_relay_set.js";
 import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
 import type { FedosPrivateWireAdapter } from "./fedos_private_wire_adapter.js";
@@ -326,6 +327,78 @@ export class FedosPrivateTransport {
     if (write === "failed" || write === "conflict") return { outcome: "persistence-failed" };
 
     return { outcome: "queued", envelopeId };
+  }
+
+  /**
+   * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet
+   * Conversation Runtime and NIP-17 Integration Arc) — the control-message
+   * counterpart of `sendMailboxNip17()` above, for ratchet-protocol
+   * facts (Phase D session-establishment, Phase F ratchet message
+   * payloads) that are NOT backed by an already-persisted Conversation
+   * Envelope. Byte-for-byte the SAME route/adapter/Outbox mechanics —
+   * still the SAME real NIP-17 Rumor -> Seal -> Gift Wrap pipeline, still
+   * an additive `schemaVersion: 2` Outbox record, still published on the
+   * existing Scheduler's own next tick — the ONE difference is that
+   * `createdAt` and the outbox record id are supplied directly by the
+   * caller (`controlId`) rather than resolved from a persisted Envelope
+   * (there is none to resolve for a control fact). `envelope.id`/
+   * `envelope.createdAt` are the ONLY two fields `NostrNip17V1WireAdapter.build()`
+   * ever reads from its own `envelope` parameter (see that adapter's own
+   * `build()` body) — every other field on the minimal stand-in object
+   * below is inert and never inspected.
+   */
+  async sendMailboxNip17Control(
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ): Promise<FedosPrivateWireDeliveryQueueOutcome> {
+    if (!(plaintext instanceof Uint8Array) || plaintext.length === 0) return { outcome: "invalid-input" };
+    if (typeof controlId !== "string" || controlId.length === 0) return { outcome: "invalid-input" };
+
+    const adapter = this.#wireAdapter;
+    if (adapter === undefined || adapter.route !== "nostr-nip17-v1" || !adapter.isAvailable()) {
+      return { outcome: "route-unavailable" };
+    }
+
+    const memberships = this.#membershipsForConversation(conversationId);
+    const route = await resolveFedosConversationTransportRoute({
+      memberships,
+      signingAuthority: this.#signingAuthority,
+      localAccountIndex: this.#localAccountIndex,
+    });
+    if (route.outcome === "local-membership-unresolved") return { outcome: "identity-unavailable" };
+    if (route.outcome === "not-direct") return { outcome: "unauthorized" };
+    if (route.outcome === "counterparty-not-nostr" || route.outcome === "invalid-counterparty-key") {
+      return { outcome: "unsupported-recipient" };
+    }
+
+    const stubEnvelope = {
+      id: controlId,
+      conversationId,
+      createdAt,
+    } as unknown as FedosConversationMessageEnvelope;
+
+    const built = await adapter.build({
+      envelope: stubEnvelope,
+      ciphertext: new Uint8Array(0),
+      plaintext,
+      counterpartyPublicKeyHex: route.counterpartyPublicKeyHex,
+      localAccountIndex: route.localAccountIndex,
+    });
+    if (built.outcome !== "built-signed") return { outcome: "crypto-unavailable" };
+
+    const record = serializeFedosConversationTransportOutboxRecordV2({
+      envelopeId: controlId as unknown as FedosConversationEnvelopeId,
+      conversationId,
+      createdAt,
+      recipientPublicKeyHex: route.counterpartyPublicKeyHex,
+      nativeEvent: built.event,
+    });
+    const write = this.#outboxPersistence.putIntent(record);
+    if (write === "failed" || write === "conflict") return { outcome: "persistence-failed" };
+
+    return { outcome: "queued", envelopeId: controlId };
   }
 
   /** Best-effort, one-attempt delivery — see `./fedos_conversation_ephemeral_transport.ts`'s own header for why this never touches the Outbox or Retry Registry. */

@@ -97,7 +97,7 @@ describe("Secure Runtime Alpha 220 -- Relay Foundation Completion", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("8. structural: Cargo.toml and package.json carry no reference to any of the ten Arc-stage docs -- zero dependency change", () => {
     for (let stage = 211; stage <= 220; stage++) {

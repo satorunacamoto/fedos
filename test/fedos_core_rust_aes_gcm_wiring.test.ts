@@ -229,8 +229,9 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "decrypt_nip44_wire",
       "sign_nostr_event_with_fresh_ephemeral_key",
       "build_and_sign_nip17_gift_wrap",
+      "previous_sending_chain_length",
     ];
-    expect(pubFnNames.length).toBe(68);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(69);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
   it("8. production API placeholders are unchanged, including encrypt_placeholder/decrypt_placeholder", () => {
@@ -408,6 +409,7 @@ describe("FedOS Rust crate — AES-256-GCM dependency adoption + NIST vector wir
       "decrypt_nip44_wire",
       "sign_nostr_event_with_fresh_ephemeral_key",
       "build_and_sign_nip17_gift_wrap",
+      "previous_sending_chain_length",
     ]);
     for (const name of pubFns) {
       expect(allowedPubFns.has(name), `unexpected public function: ${name}`).toBe(true);

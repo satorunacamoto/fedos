@@ -29,22 +29,22 @@ describe("Secure Runtime Alpha 1611-1690 -- Alpha 1613: Canonical Route Decision
 
   it("2. resolving with no request returns the fixed default (available)", () => {
     const table = adapters();
-    expect(resolveFedosPrivateWireRoute(undefined, (route) => table[route])).toBe("fedos-private-v1");
+    expect(resolveFedosPrivateWireRoute(undefined, (route) => table[route as "fedos-private-v1" | "nostr-nip17-v1"])).toBe("fedos-private-v1");
   });
 
   it("3. explicitly requesting fedos-private-v1 resolves to fedos-private-v1", () => {
     const table = adapters();
-    expect(resolveFedosPrivateWireRoute("fedos-private-v1", (route) => table[route])).toBe("fedos-private-v1");
+    expect(resolveFedosPrivateWireRoute("fedos-private-v1", (route) => table[route as "fedos-private-v1" | "nostr-nip17-v1"])).toBe("fedos-private-v1");
   });
 
   it("4. explicitly requesting nostr-nip17-v1 resolves to nostr-nip17-v1 -- real as of Secure Runtime Alpha 1761-1840's own Phase B/G, never a silent fallback to fedos-private-v1 either way (Alpha 1648 No-Downgrade Rule)", () => {
     const table = adapters();
-    expect(resolveFedosPrivateWireRoute("nostr-nip17-v1", (route) => table[route])).toBe("nostr-nip17-v1");
+    expect(resolveFedosPrivateWireRoute("nostr-nip17-v1", (route) => table[route as "fedos-private-v1" | "nostr-nip17-v1"])).toBe("nostr-nip17-v1");
   });
 
   it("5. the default does not depend on which adapters are constructed/passed in -- same fixed value regardless (Alpha 1613's own 'never silently changes based on available files')", () => {
     const table = adapters();
-    const a = resolveFedosPrivateWireRoute(undefined, (route) => table[route]);
+    const a = resolveFedosPrivateWireRoute(undefined, (route) => table[route as "fedos-private-v1" | "nostr-nip17-v1"]);
     const b = resolveFedosPrivateWireRoute(undefined, () => ({ isAvailable: () => true }));
     expect(a).toBe(b);
   });

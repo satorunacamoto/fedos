@@ -531,7 +531,7 @@ describe("Secure Runtime Alpha 070 -- Identity Bootstrap Entry Consolidation", (
 
   it("41. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- no reference to this Stage's own doc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);
+    expect(pubFnNames.length).toBe(69);
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(21);    expect(libRsSource).not.toMatch(/secure_runtime_alpha_070/);
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_070/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_070/);

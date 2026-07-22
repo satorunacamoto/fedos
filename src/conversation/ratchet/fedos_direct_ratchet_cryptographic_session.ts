@@ -56,6 +56,7 @@ export interface FedosDirectRatchetWasmLoaderBoundary {
   attemptDevOnlyDirectRatchetSendCounterCall(session: unknown): Promise<number | null>;
   attemptDevOnlyDirectRatchetReceiveCounterCall(session: unknown): Promise<number | null>;
   attemptDevOnlyDirectRatchetSkippedKeyCountCall(session: unknown): Promise<number | null>;
+  attemptDevOnlyDirectRatchetPreviousSendingChainLengthCall(session: unknown): Promise<number | null>;
   attemptDevOnlyDirectRatchetSealRootKeyCall(
     session: unknown,
     masterSeedAuthority: unknown,
@@ -251,6 +252,11 @@ export class FedosDirectRatchetCryptographicSession {
 
   async skippedKeyCount(): Promise<number | null> {
     return this.#loaderBoundary.attemptDevOnlyDirectRatchetSkippedKeyCountCall(this.#handle);
+  }
+
+  /** Secure Runtime Alpha 5561-5640 — the real, currently-committed value the NEXT `restore()` of this exact session must be given (see this Arc's own `docs/secure_runtime_alpha_5561_5640_atomic_state_outbox_retry.md` for the restart-recovery bug this closes). */
+  async previousSendingChainLength(): Promise<number | null> {
+    return this.#loaderBoundary.attemptDevOnlyDirectRatchetPreviousSendingChainLengthCall(this.#handle);
   }
 
   /** Returns the combined opaque wire message (header + ciphertext), or `null` if not yet ready to send. */

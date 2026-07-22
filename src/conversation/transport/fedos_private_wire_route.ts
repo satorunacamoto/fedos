@@ -33,13 +33,27 @@
  *     own "No-Downgrade Rule": failing the requested route is reported
  *     as `"unsupported"`, never silently swapped for a different route
  *     the caller did not ask for).
+ *
+ * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet Conversation
+ * Runtime and NIP-17 Integration Arc) — ADDITIVE: `"nostr-nip17-v1-ratchet"`
+ * is a NEW route value, never a rename or repurposing of either existing
+ * value (see the Arc's own Phase A reconciliation report §7 — "the
+ * existing closed... vocabulary is additive-extensible"). This file's own
+ * `resolveFedosPrivateWireRoute()` is UNCHANGED and still resolves only
+ * between the original two values — the ratchet route additionally
+ * requires Device-pair session readiness, a question this function's own
+ * narrow `adapterFor`-capability-probe shape cannot express; see the new,
+ * separate `resolveFedosDirectRatchetRoute()`
+ * (`../ratchet/fedos_direct_ratchet_route_resolution.ts`) for that
+ * resolution, which reuses this same closed vocabulary rather than
+ * inventing a parallel one.
  */
 
-/** The one closed route-selection vocabulary (Alpha 1613). */
-export type FedosPrivateWireRouteRequest = "fedos-private-v1" | "nostr-nip17-v1";
+/** The closed route-selection vocabulary. `"nostr-nip17-v1-ratchet"` is Alpha 5561–5640's own additive extension — see this file's own header. */
+export type FedosPrivateWireRouteRequest = "fedos-private-v1" | "nostr-nip17-v1" | "nostr-nip17-v1-ratchet";
 
 /** `resolveFedosPrivateWireRoute()`'s own closed outcome vocabulary — `"unsupported"` is a first-class outcome, never an exception. */
-export type FedosPrivateWireRoute = "fedos-private-v1" | "nostr-nip17-v1" | "unsupported";
+export type FedosPrivateWireRoute = "fedos-private-v1" | "nostr-nip17-v1" | "nostr-nip17-v1-ratchet" | "unsupported";
 
 /** The one fixed default (Alpha 1613) — never derived from filesystem/module probing. */
 export const FEDOS_PRIVATE_WIRE_ROUTE_DEFAULT: FedosPrivateWireRouteRequest = "fedos-private-v1";

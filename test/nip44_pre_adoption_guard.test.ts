@@ -217,7 +217,7 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
 
   it("11. the crate's public pub fn surface is unchanged at twenty-seven", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(68);    for (const name of pubFnNames) {
+    expect(pubFnNames.length).toBe(69);    for (const name of pubFnNames) {
       // Alpha 869 -- see KNOWN_ALPHA_869_CONVERSATION_KEY_WIRING_FNS above:
       // wiring only, delegates its ECDH math to the one pre-existing,
       // dedicated `crypto::conversation_key` module.

@@ -223,7 +223,7 @@ describe("FedOS Rust crate — ciphertext transport descriptor + NIP-44/storage 
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(68);    expect(pubFnNames).not.toContain("ciphertext_transport_descriptor");
+    expect(pubFnNames.length).toBe(69);    expect(pubFnNames).not.toContain("ciphertext_transport_descriptor");
     for (const name of pubFnNames) {
       // Secure Runtime Alpha 1761-1840 Phase B -- real, reviewed NIP-44
       // wire additions, not this stage's own concern.

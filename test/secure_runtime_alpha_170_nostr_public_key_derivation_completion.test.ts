@@ -148,7 +148,7 @@ describe("Secure Runtime Alpha 170 -- Nostr Public Key Derivation Completion", (
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("11. RIPPLE (Secure Runtime Alpha 173, 183): no npub/nsec/bech32/schnorr/Relay/WebSocket CODE existed anywhere in master_root AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1025-1027 (Secure Runtime Alpha 173) legitimately added a real npub/bech32 Encoder Boundary and Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature CODE in LATER Arcs -- nsec/Relay/WebSocket remain absent, reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/mod master_root \{([\s\S]*?)\r?\n\}\r?\n\r?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";

@@ -177,6 +177,27 @@ import {
   type FedosNip17InboundReceiveResult,
 } from "../delivery/nostr/nip17/fedos_nip17_inbound_import_coordinator.js";
 import type { FedosPrivateWireParsedRumor } from "../transport/fedos_private_wire_adapter.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosDirectRatchetSessionPersistence } from "../ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
+import { InMemoryFedosDirectRatchetSessionPersistence } from "../ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
+import type { FedosSealedDirectRatchetSecretPersistence } from "../ratchet/persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
+import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
+import {
+  type FedosDirectRatchetRemotePublicKeyPersistence,
+  InMemoryFedosDirectRatchetRemotePublicKeyPersistence,
+} from "../ratchet/persistence/fedos_direct_ratchet_remote_public_key_persistence.js";
+import {
+  type FedosDirectRatchetLiveStateSnapshotPersistence,
+  InMemoryFedosDirectRatchetLiveStateSnapshotPersistence,
+} from "../ratchet/persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
+import type { FedosDirectRatchetSealingAuthority } from "../ratchet/fedos_direct_ratchet_sealing_authority.js";
+import {
+  FedosDirectRatchetConversationRuntime,
+} from "../ratchet/fedos_direct_ratchet_conversation_runtime.js";
+import type { FedosDirectRatchetInboundReceiveResult } from "../ratchet/fedos_direct_ratchet_inbound_integration.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
 
 /**
  * The full injected dependency set — the construction coordinator's own
@@ -283,7 +304,63 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
    * why the two must never collapse into one dedup namespace).
    */
   readonly nip17ImportRecordPersistence?: FedosPrivateNostrImportRecordPersistence;
+  /**
+   * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet
+   * Conversation Runtime and NIP-17 Integration Arc) — OPTIONAL; omitted,
+   * `directRatchet()` returns `null` and `sendDirectMessage()`/
+   * `receiveNip17Rumor()` remain byte-for-byte unchanged from before this
+   * Arc. Bundled into one sub-object (rather than a dozen new flat
+   * fields) purely for readability — every field here is still injected
+   * exactly like every other optional dependency on this type.
+   */
+  readonly directRatchet?: FedosConversationDirectRatchetIntegrationDependencies;
 };
+
+/** See `FedosConversationRuntimeDependencies.directRatchet`'s own doc comment. */
+export interface FedosConversationDirectRatchetIntegrationDependencies {
+  readonly deviceRegistry: FedosDeviceRegistryPersistence;
+  /** Optional — default in-memory. */
+  readonly sessionPersistence?: FedosDirectRatchetSessionPersistence;
+  /** Optional — default in-memory. */
+  readonly sealedSecretPersistence?: FedosSealedDirectRatchetSecretPersistence;
+  /** Optional — default in-memory. */
+  readonly remotePublicKeyPersistence?: FedosDirectRatchetRemotePublicKeyPersistence;
+  /** Optional — default in-memory. See `fedos_direct_ratchet_secret_checkpoint.ts`'s own header for why this is a SEPARATE, current-value port from `sealedSecretPersistence` above. */
+  readonly snapshotPersistence?: FedosDirectRatchetLiveStateSnapshotPersistence;
+  /** `null` reports every ratchet session-readiness call as `"sealing-authority-unavailable"` — never a thrown error. */
+  readonly sealingAuthority: FedosDirectRatchetSealingAuthority | null;
+  readonly masterSeedAuthority: FedosMasterSeedAuthority;
+  /** Explicit, already-registered local Device identity — never fabricated from a display name, array index, Relay identity, or process id. */
+  readonly localDeviceRef: string;
+  /** Optional — default in-memory, a namespace DEDICATED to ratchet control/message dedup, never shared with `nip17ImportRecordPersistence`/`privateNostrImportRecordPersistence` above. */
+  readonly importRecordPersistence?: FedosPrivateNostrImportRecordPersistence;
+  /** Bound to a real `FedosPrivateTransport.sendMailboxNip17Control()` by a production caller — never the whole Transport type imported here. */
+  readonly sendMailboxNip17Control: (
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+  /**
+   * OPTIONAL — omitted, `sendDirectMessage()`'s ratchet route is never
+   * selected (identical to omitting `directMessageDelivery` for the
+   * static route). `remoteDeviceRef` is the explicit, caller/local-policy
+   * chosen target Device for THIS Runtime's own outbound ratchet sends
+   * (see `FedosConversationDirectMessageRatchetDeliveryDependencies`'s
+   * own doc comment for why this is a construction-time choice, never a
+   * per-message heuristic). `sendMailboxNip17` is bound to a real
+   * `FedosPrivateTransport.sendMailboxNip17()` — the SAME real-Envelope
+   * thunk shape the static route already uses.
+   */
+  readonly messageDelivery?: {
+    readonly remoteDeviceRef: string;
+    readonly sendMailboxNip17: (
+      envelopeId: FedosConversationEnvelopeId,
+      conversationId: FedosConversationId,
+      plaintext: Uint8Array,
+    ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+  };
+}
 
 export class FedosConversationRuntime {
   readonly #deps: FedosConversationRuntimeDependencies;
@@ -299,6 +376,8 @@ export class FedosConversationRuntime {
   readonly #groupRuntime: FedosConversationGroupRuntime;
   readonly #privateNostrDeliveryRuntime: FedosConversationPrivateNostrDeliveryRuntime;
   readonly #nip17InboundImportCoordinator: FedosNip17InboundImportCoordinator;
+  /** Secure Runtime Alpha 5561–5640 — `null` when `deps.directRatchet` was not supplied. See this class's own constructor comment. */
+  readonly #directRatchetRuntime: FedosDirectRatchetConversationRuntime | null;
   /** Alpha 2041–2120 — see `../activation/fedos_conversation_reactivation_coordinator.ts`'s own header. */
   readonly #reactivationCoordinator: FedosConversationReactivationCoordinator;
   /**
@@ -407,6 +486,70 @@ export class FedosConversationRuntime {
       clock: deps.clock,
     });
 
+    // Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet
+    // Conversation Runtime and NIP-17 Integration Arc) — `null` when
+    // `deps.directRatchet` was not supplied (every ratchet-specific
+    // method then simply does not exist on this Runtime; `sendDirectMessage()`/
+    // `receiveNip17Rumor()` remain byte-for-byte unchanged). Reuses the
+    // SAME identityResolver/encryptionAuthority/envelopePersistence/
+    // payloadStorage/id-generator/activationPersistence instances already
+    // built above — never a second, divergent graph. Constructed BEFORE
+    // the direct-messaging facade below so its own `sendDirectRatchetMessage()`
+    // can be wired into that facade's own optional `ratchetDelivery` seam.
+    this.#directRatchetRuntime =
+      deps.directRatchet === undefined
+        ? null
+        : new FedosDirectRatchetConversationRuntime({
+            draftPersistence: deps.draftPersistence,
+            activationPersistence,
+            membershipAuthority: deps.membershipAuthority,
+            identityResolver,
+            deviceRegistry: deps.directRatchet.deviceRegistry,
+            sessionPersistence: deps.directRatchet.sessionPersistence ?? new InMemoryFedosDirectRatchetSessionPersistence(),
+            sealedSecretPersistence:
+              deps.directRatchet.sealedSecretPersistence ?? new InMemoryFedosSealedDirectRatchetSecretPersistence(),
+            remotePublicKeyPersistence:
+              deps.directRatchet.remotePublicKeyPersistence ?? new InMemoryFedosDirectRatchetRemotePublicKeyPersistence(),
+            snapshotPersistence:
+              deps.directRatchet.snapshotPersistence ?? new InMemoryFedosDirectRatchetLiveStateSnapshotPersistence(),
+            sealingAuthority: deps.directRatchet.sealingAuthority,
+            masterSeedAuthority: deps.directRatchet.masterSeedAuthority,
+            accountIndex: accountIndexAuthority.localAccountIndex(),
+            localDeviceRef: deps.directRatchet.localDeviceRef,
+            encryptionAuthority,
+            envelopePersistence,
+            payloadStorage,
+            envelopeIdGenerator,
+            payloadIdGenerator,
+            importRecordPersistence:
+              deps.directRatchet.importRecordPersistence ?? new InMemoryFedosPrivateNostrImportRecordPersistence(),
+            sendMailboxNip17Control: deps.directRatchet.sendMailboxNip17Control,
+            clock: deps.clock,
+          });
+
+    // Secure Runtime Alpha 5561–5640 Phase E — the ratchet route's own
+    // `ratchetDelivery` thunk for `FedosConversationDirectMessagingCoordinator`,
+    // constructed ONLY when BOTH `deps.directRatchet` and its own
+    // `messageDelivery` (the real-Envelope `sendMailboxNip17` thunk +
+    // target `remoteDeviceRef`) were supplied. Delegates the ENTIRE
+    // Phase E pipeline to `#directRatchetRuntime.sendDirectRatchetMessage()`
+    // — this Runtime performs no ratchet crypto/route decision of its own.
+    const ratchetDelivery =
+      this.#directRatchetRuntime === null || deps.directRatchet?.messageDelivery === undefined
+        ? undefined
+        : {
+            route: "nostr-nip17-v1-ratchet" as const,
+            remoteDeviceRef: deps.directRatchet.messageDelivery.remoteDeviceRef,
+            sendRatchetMailboxNip17: (envelopeId: string, conversationId: string, plaintext: Uint8Array) =>
+              this.#directRatchetRuntime!.sendDirectRatchetMessage(
+                conversationId,
+                envelopeId,
+                deps.directRatchet!.messageDelivery!.remoteDeviceRef,
+                plaintext,
+                deps.directRatchet!.messageDelivery!.sendMailboxNip17,
+              ),
+          };
+
     // Alpha 1126 — the direct-messaging facade delegates every crypto/
     // Envelope/Payload decision to the SAME two Coordinators above; it
     // owns only input validation, authorization, and the retention gate
@@ -421,6 +564,7 @@ export class FedosConversationRuntime {
       encryptionCoordinator: this.#encryptionCoordinator,
       decryptionCoordinator: this.#decryptionCoordinator,
       delivery: deps.directMessageDelivery,
+      ratchetDelivery,
     });
 
     // Secure Runtime Alpha 1841–1920 Phase D (Alpha 1856–1861) — reuses
@@ -939,8 +1083,33 @@ export class FedosConversationRuntime {
    * exact division of labor). Delegates entirely; this Runtime performs
    * no crypto/admission/import logic of its own.
    */
-  async receiveNip17Rumor(rumor: FedosPrivateWireParsedRumor, relaySource: string | null): Promise<FedosNip17InboundReceiveResult> {
+  async receiveNip17Rumor(
+    rumor: FedosPrivateWireParsedRumor,
+    relaySource: string | null,
+  ): Promise<FedosNip17InboundReceiveResult | FedosDirectRatchetInboundReceiveResult> {
+    // Secure Runtime Alpha 5561–5640 Phase G — tried FIRST, exactly like
+    // the payload codec's own header requires: a ratchet payload must
+    // never be mislabeled as a legacy/static NIP-17 chat message.
+    // `"not-ratchet-payload"` (the ONLY outcome possible when
+    // `#directRatchetRuntime` is `null`, or when a real, non-ratchet
+    // Rumor arrives) falls through to the EXISTING, UNCHANGED legacy
+    // coordinator below — never the reverse.
+    if (this.#directRatchetRuntime !== null) {
+      const ratchetResult = await this.#directRatchetRuntime.importRatchetPrivatePayload(rumor, relaySource);
+      if (ratchetResult.outcome !== "not-ratchet-payload") return ratchetResult;
+    }
     return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
+  }
+
+  /**
+   * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet
+   * Conversation Runtime and NIP-17 Integration Arc) — the additive
+   * ratchet facade. `null` when `deps.directRatchet` was not supplied at
+   * construction (mirrors `#invitationTransport`/`#draftManager`'s own
+   * "null when not assembled" precedent).
+   */
+  directRatchet(): FedosDirectRatchetConversationRuntime | null {
+    return this.#directRatchetRuntime;
   }
 }
 

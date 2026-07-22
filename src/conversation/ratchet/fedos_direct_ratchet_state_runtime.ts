@@ -24,7 +24,12 @@ import {
   type FedosDirectRatchetSessionLifecycleState,
 } from "./fedos_direct_ratchet_session_lifecycle.js";
 import { fedosDirectRatchetSealingDeviceContext, type FedosDirectRatchetSessionBinding } from "./fedos_direct_ratchet_session_binding.js";
-import { advanceFedosDirectRatchetCounters, FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "./fedos_direct_ratchet_counters.js";
+import {
+  advanceFedosDirectRatchetCounters,
+  isWellFormedFedosDirectRatchetCounters,
+  FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS,
+  type FedosDirectRatchetCounters,
+} from "./fedos_direct_ratchet_counters.js";
 import { FedosDirectRatchetSkippedKeyIndex, type FedosDirectRatchetSkippedKeyRejectionReason } from "./fedos_direct_ratchet_skipped_key_index.js";
 import type { FedosDirectRatchetSessionId } from "./fedos_direct_ratchet_session_id.js";
 import type { FedosDirectRatchetSessionRecordV1 } from "./fedos_direct_ratchet_session_record.js";
@@ -204,9 +209,22 @@ export class FedosDirectRatchetStateRuntime {
     return this.#transition(sessionId, "corrupt");
   }
 
+  /**
+   * Secure Runtime Alpha 5561–5640 — `previousChainCounter` is an
+   * ADDITIVE optional field on `next`, applied AFTER the frozen, pure
+   * `advanceFedosDirectRatchetCounters()` (Alpha 5401–5480, UNCHANGED —
+   * that function's own contract explicitly never touches this field;
+   * see its own doc comment). This Runtime layer is the correct, narrow
+   * seam for a caller that has a REAL chain-reset event (this Arc's own
+   * real Ratchet Core integration, via
+   * `FedosDirectRatchetCryptographicSession.previousSendingChainLength()`)
+   * to record it — no validation beyond a non-negative integer, since the
+   * Rust ratchet core is the sole source of truth for when this value
+   * changes.
+   */
   updateCounters(
     sessionId: FedosDirectRatchetSessionId,
-    next: { readonly sendCounter?: number; readonly receiveCounter?: number },
+    next: { readonly sendCounter?: number; readonly receiveCounter?: number; readonly previousChainCounter?: number },
   ): FedosDirectRatchetCounterUpdateOutcome {
     if (this.#stopped) return { outcome: "rejected", reason: "runtime-stopped" };
     const record = this.#sessionPersistence.getSession(sessionId);
@@ -214,10 +232,55 @@ export class FedosDirectRatchetStateRuntime {
     if (record.lifecycleState !== "active") return { outcome: "rejected", reason: "session-not-active" };
     const advanced = advanceFedosDirectRatchetCounters(record.counters, next);
     if (advanced === null) return { outcome: "rejected", reason: "counter-rollback-or-overflow" };
+    if (
+      next.previousChainCounter !== undefined &&
+      (!Number.isInteger(next.previousChainCounter) || next.previousChainCounter < 0)
+    ) {
+      return { outcome: "rejected", reason: "counter-rollback-or-overflow" };
+    }
+    const finalCounters =
+      next.previousChainCounter === undefined ? advanced : { ...advanced, previousChainCounter: next.previousChainCounter };
     const updated: FedosDirectRatchetSessionRecordV1 = Object.freeze({
       ...record,
       revision: record.revision + 1,
-      counters: advanced,
+      counters: finalCounters,
+      lastActivityAt: this.#now(),
+    });
+    const result = this.#sessionPersistence.putSession(updated);
+    if (result !== "inserted" && result !== "already-present") return { outcome: "failed" };
+    return { outcome: "updated", record: updated };
+  }
+
+  /**
+   * Secure Runtime Alpha 5561–5640 — the ONE additive counter-write path
+   * that DELIBERATELY skips `advanceFedosDirectRatchetCounters()`'s own
+   * monotonic-non-decrease check. A real DH ratchet step
+   * (`packages/fedos-core-rust/src/crypto/direct_ratchet_session.rs`'s own
+   * `decrypt()`) genuinely RESETS `send_counter` to `0` when the remote
+   * party's ratchet public key changes — a legitimate, real-protocol
+   * event `updateCounters()`'s own rollback guard would otherwise reject
+   * as corruption. This method exists ONLY for a caller that reads
+   * `counters` directly from the authoritative, already-Rust-validated
+   * live `FedosDirectRatchetCryptographicSession` (this Arc's own
+   * outbound/inbound integrations, immediately after a successful
+   * `encrypt()`/`decrypt()`) — never from untrusted wire input. The real
+   * replay/rollback security boundary is the Rust ratchet core's own
+   * `decrypt()` (duplicate/replay rejection, proven in
+   * `test/secure_runtime_alpha_5481_5560_real_vertical_slice.test.ts`);
+   * this TS-side counter record is observability/restore-state, not
+   * itself a second security boundary once the Rust core has already
+   * authenticated the message.
+   */
+  commitCounters(sessionId: FedosDirectRatchetSessionId, counters: FedosDirectRatchetCounters): FedosDirectRatchetCounterUpdateOutcome {
+    if (this.#stopped) return { outcome: "rejected", reason: "runtime-stopped" };
+    const record = this.#sessionPersistence.getSession(sessionId);
+    if (!record) return { outcome: "rejected", reason: "session-not-found" };
+    if (record.lifecycleState !== "active") return { outcome: "rejected", reason: "session-not-active" };
+    if (!isWellFormedFedosDirectRatchetCounters(counters)) return { outcome: "rejected", reason: "counter-rollback-or-overflow" };
+    const updated: FedosDirectRatchetSessionRecordV1 = Object.freeze({
+      ...record,
+      revision: record.revision + 1,
+      counters,
       lastActivityAt: this.#now(),
     });
     const result = this.#sessionPersistence.putSession(updated);

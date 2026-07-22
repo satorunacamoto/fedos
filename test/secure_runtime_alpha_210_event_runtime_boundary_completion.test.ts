@@ -93,7 +93,7 @@ describe("Secure Runtime Alpha 210 -- Event Runtime Boundary Completion", () => 
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
     expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(68);  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("8. structural: serde_json remains dev-dependencies-only, and package.json's dependency count is unchanged", () => {
     const devDepsSection = (cargoTomlSource.match(/^\[dev-dependencies\]$([\s\S]*)/m) ?? [])[1] ?? "";
