@@ -70,6 +70,7 @@ use super::nip44_message_keys::{
 use super::nip44_padding::{unpad_message, PadStatus};
 use super::nip44_stream_cipher::decrypt_stream_internal;
 use super::nip44_wire_encoding::{decode_wire_payload_internal, Nip44WireEncodingStatus};
+use zeroize::Zeroize;
 
 /// Coarse observable outcome of a [`decrypt_wire_internal`]/
 /// [`decrypt_wire_from_bytes_internal`]/[`decrypt_wire_payload_internal`]/
@@ -113,6 +114,9 @@ pub(crate) struct Nip44WireDecryptDecision {
 /// `derive_message_keys_exact_*`-produced triple, converting to a fixed-
 /// size array. Returns `None` for anything other than an exact-length
 /// `Ready` match — never panics, never `.unwrap()`s.
+///
+/// ONLY for `ChachaNonce` since Secure Runtime Alpha 6281-6360 — see
+/// [`extract_handle_bytes`] for the two genuinely-secret kinds.
 fn extract_fixed_bytes<const N: usize>(
     decisions: &[Nip44MessageKeyDecision; 3],
     kind: Nip44DerivedKeyKind,
@@ -122,6 +126,26 @@ fn extract_fixed_bytes<const N: usize>(
         return None;
     }
     decision.bytes.as_deref()?.try_into().ok()
+}
+
+/// Secure Runtime Alpha 6281-6360 (FedOS Secure Memory Secret Buffer and
+/// Zeroization Foundation Arc) — the `ChachaKey`/`HmacKey` counterpart of
+/// [`extract_fixed_bytes`] above, identical in shape and rationale to
+/// `crypto::nip44_wire_encrypt`'s own sibling of the same name (kept
+/// separate per this file's own "no cross-module private helper sharing"
+/// convention).
+fn extract_handle_bytes(
+    decisions: &[Nip44MessageKeyDecision; 3],
+    kind: Nip44DerivedKeyKind,
+) -> Option<[u8; 32]> {
+    let decision = decisions.iter().find(|d| d.kind == kind)?;
+    if decision.status != Nip44MessageKeyStatus::Ready {
+        return None;
+    }
+    decision
+        .handle
+        .as_ref()?
+        .expose_bytes_for_internal_nip44_message_key()
 }
 
 fn invalid_conversation_key_decision() -> Nip44WireDecryptDecision {
@@ -156,31 +180,42 @@ fn decrypt_wire_from_key_decisions(
     ciphertext: &[u8],
     mac: &[u8; 32],
 ) -> Nip44WireDecryptDecision {
-    let chacha_key: [u8; 32] =
-        match extract_fixed_bytes(key_decisions, Nip44DerivedKeyKind::ChachaKey) {
-            Some(bytes) => bytes,
-            None => return invalid_conversation_key_decision(),
-        };
+    // Secure Runtime Alpha 6281-6360 — `chacha_nonce` (not confidential)
+    // is extracted first, unchanged. `hmac_key` is extracted and zeroized
+    // around ONLY the HMAC verification call — `chacha_key` is not even
+    // read out of its handle until authentication has already succeeded,
+    // narrowing each secret's own live window to exactly the one
+    // operation that needs it (mirrors `docs/runtime_secure_memory.md`
+    // §3's "Use" phase: "exposed... only for the duration of one AEAD/HKDF
+    // call").
     let chacha_nonce: [u8; 12] =
         match extract_fixed_bytes(key_decisions, Nip44DerivedKeyKind::ChachaNonce) {
             Some(bytes) => bytes,
             None => return invalid_conversation_key_decision(),
         };
-    let hmac_key: [u8; 32] =
-        match extract_fixed_bytes(key_decisions, Nip44DerivedKeyKind::HmacKey) {
+    let mut hmac_key: [u8; 32] =
+        match extract_handle_bytes(key_decisions, Nip44DerivedKeyKind::HmacKey) {
             Some(bytes) => bytes,
             None => return invalid_conversation_key_decision(),
         };
 
     // Step 1: verify HMAC BEFORE any decryption is attempted.
-    match verify_hmac_internal(&hmac_key, nonce, ciphertext, mac) {
+    let verify_status = verify_hmac_internal(&hmac_key, nonce, ciphertext, mac);
+    hmac_key.zeroize();
+    match verify_status {
         Nip44HmacVerifyStatus::AuthenticationFailed => return authentication_failed_decision(),
         Nip44HmacVerifyStatus::Verified => {}
     }
 
     // Step 2: decrypt the ChaCha20 stream — only ever reached after
     // authentication already succeeded.
+    let mut chacha_key: [u8; 32] =
+        match extract_handle_bytes(key_decisions, Nip44DerivedKeyKind::ChachaKey) {
+            Some(bytes) => bytes,
+            None => return invalid_conversation_key_decision(),
+        };
     let padded = decrypt_stream_internal(&chacha_key, &chacha_nonce, ciphertext);
+    chacha_key.zeroize();
 
     // Step 3: unpad — a structurally malformed result here still
     // collapses into the SAME AuthenticationFailed label, never a
@@ -322,12 +357,12 @@ mod tests {
     fn encrypt_fixture(conversation_key_bytes: &[u8; 32], nonce: &[u8; 32]) -> (Vec<u8>, [u8; 32]) {
         let key_decisions = derive_message_keys_exact_from_bytes_internal(conversation_key_bytes, nonce);
         let chacha_key: [u8; 32] =
-            extract_fixed_bytes(&key_decisions, Nip44DerivedKeyKind::ChachaKey).expect("chacha_key");
+            extract_handle_bytes(&key_decisions, Nip44DerivedKeyKind::ChachaKey).expect("chacha_key");
         let chacha_nonce: [u8; 12] =
             extract_fixed_bytes(&key_decisions, Nip44DerivedKeyKind::ChachaNonce)
                 .expect("chacha_nonce");
         let hmac_key: [u8; 32] =
-            extract_fixed_bytes(&key_decisions, Nip44DerivedKeyKind::HmacKey).expect("hmac_key");
+            extract_handle_bytes(&key_decisions, Nip44DerivedKeyKind::HmacKey).expect("hmac_key");
 
         let padded = pad_message(TEST_PLAINTEXT).output.expect("padded plaintext");
         let ciphertext = encrypt_stream_internal(&chacha_key, &chacha_nonce, &padded);
@@ -423,12 +458,12 @@ mod tests {
         let key_decisions =
             derive_message_keys_exact_from_bytes_internal(&TEST_CONVERSATION_KEY_BYTES, &TEST_NONCE);
         let chacha_key: [u8; 32] =
-            extract_fixed_bytes(&key_decisions, Nip44DerivedKeyKind::ChachaKey).expect("chacha_key");
+            extract_handle_bytes(&key_decisions, Nip44DerivedKeyKind::ChachaKey).expect("chacha_key");
         let chacha_nonce: [u8; 12] =
             extract_fixed_bytes(&key_decisions, Nip44DerivedKeyKind::ChachaNonce)
                 .expect("chacha_nonce");
         let hmac_key: [u8; 32] =
-            extract_fixed_bytes(&key_decisions, Nip44DerivedKeyKind::HmacKey).expect("hmac_key");
+            extract_handle_bytes(&key_decisions, Nip44DerivedKeyKind::HmacKey).expect("hmac_key");
 
         let malformed_padded = vec![0xFFu8; 10];
         let ciphertext = encrypt_stream_internal(&chacha_key, &chacha_nonce, &malformed_padded);

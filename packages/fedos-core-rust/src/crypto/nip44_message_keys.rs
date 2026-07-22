@@ -47,6 +47,7 @@
 #![allow(dead_code)]
 
 use super::conversation_key::ConversationKey;
+use crate::secret_handle::{SecretHandle, SecretHandleKind};
 use hkdf::Hkdf;
 use sha2::Sha256;
 use zeroize::Zeroize;
@@ -89,10 +90,23 @@ pub(crate) enum Nip44MessageKeyStatus {
 /// [`derive_message_keys_exact_from_bytes_internal`] call for ONE of the
 /// three derived values. Crate-private only; not part of this crate's
 /// public API.
+///
+/// Secure Runtime Alpha 6281-6360 (FedOS Secure Memory Secret Buffer and
+/// Zeroization Foundation Arc) — `bytes`/`handle` are now mutually
+/// exclusive, split by which of the three derived values is genuinely
+/// confidential: `ChachaKey`/`HmacKey` are real symmetric key material
+/// and are now `SecretHandle`-backed (never a raw, never-zeroized
+/// `Vec<u8>`, closing this Arc's own Phase A inventory finding);
+/// `ChachaNonce` is transmitted on NIP-44's own wire payload and is not
+/// confidential (ChaCha20's security depends on nonce UNIQUENESS, never
+/// nonce secrecy) — it deliberately stays a plain `Vec<u8>`, unchanged.
 pub(crate) struct Nip44MessageKeyDecision {
     pub(crate) kind: Nip44DerivedKeyKind,
     pub(crate) status: Nip44MessageKeyStatus,
+    /// Populated ONLY for `ChachaNonce`.
     pub(crate) bytes: Option<Vec<u8>>,
+    /// Populated ONLY for `ChachaKey`/`HmacKey`.
+    pub(crate) handle: Option<SecretHandle>,
 }
 
 fn invalid_conversation_key_all() -> [Nip44MessageKeyDecision; 3] {
@@ -101,16 +115,19 @@ fn invalid_conversation_key_all() -> [Nip44MessageKeyDecision; 3] {
             kind: Nip44DerivedKeyKind::ChachaKey,
             status: Nip44MessageKeyStatus::InvalidConversationKey,
             bytes: None,
+            handle: None,
         },
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::ChachaNonce,
             status: Nip44MessageKeyStatus::InvalidConversationKey,
             bytes: None,
+            handle: None,
         },
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::HmacKey,
             status: Nip44MessageKeyStatus::InvalidConversationKey,
             bytes: None,
+            handle: None,
         },
     ]
 }
@@ -121,16 +138,19 @@ fn internal_failure_all() -> [Nip44MessageKeyDecision; 3] {
             kind: Nip44DerivedKeyKind::ChachaKey,
             status: Nip44MessageKeyStatus::InternalFailure,
             bytes: None,
+            handle: None,
         },
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::ChachaNonce,
             status: Nip44MessageKeyStatus::InternalFailure,
             bytes: None,
+            handle: None,
         },
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::HmacKey,
             status: Nip44MessageKeyStatus::InternalFailure,
             bytes: None,
+            handle: None,
         },
     ]
 }
@@ -160,21 +180,32 @@ pub(crate) fn derive_message_keys_exact_from_bytes_internal(
         okm.zeroize();
         return internal_failure_all();
     }
+    let chacha_key_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+        SecretHandleKind::Nip44StreamKeyMaterial,
+        okm[0..32].try_into().expect("exactly 32 bytes"),
+    );
+    let hmac_key_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+        SecretHandleKind::Nip44HmacKeyMaterial,
+        okm[44..76].try_into().expect("exactly 32 bytes"),
+    );
     let decisions = [
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::ChachaKey,
             status: Nip44MessageKeyStatus::Ready,
-            bytes: Some(okm[0..32].to_vec()),
+            bytes: None,
+            handle: Some(chacha_key_handle),
         },
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::ChachaNonce,
             status: Nip44MessageKeyStatus::Ready,
             bytes: Some(okm[32..44].to_vec()),
+            handle: None,
         },
         Nip44MessageKeyDecision {
             kind: Nip44DerivedKeyKind::HmacKey,
             status: Nip44MessageKeyStatus::Ready,
-            bytes: Some(okm[44..76].to_vec()),
+            bytes: None,
+            handle: Some(hmac_key_handle),
         },
     ];
     okm.zeroize();
@@ -211,6 +242,18 @@ mod tests {
 
     const TEST_NONCE: [u8; 32] = [0x24; 32];
 
+    /// Test-only helper: exposes a `ChachaKey`/`HmacKey` decision's own
+    /// handle-backed bytes for equality/length assertions below — mirrors
+    /// the SAME narrow accessor `crypto::nip44_wire_encrypt`/
+    /// `crypto::nip44_wire_decrypt`'s own real extraction helper uses in
+    /// production.
+    fn exposed_handle_bytes(decision: &Nip44MessageKeyDecision) -> Option<[u8; 32]> {
+        decision
+            .handle
+            .as_ref()?
+            .expose_bytes_for_internal_nip44_message_key()
+    }
+
     fn real_conversation_key() -> ConversationKey {
         let secret = SecretHandle::new_from_32_bytes_for_internal_use(
             SecretHandleKind::NostrKeyMaterial,
@@ -235,9 +278,16 @@ mod tests {
         for decision in &decisions {
             assert_eq!(decision.status, Nip44MessageKeyStatus::Ready);
         }
-        assert_eq!(decisions[0].bytes.as_ref().map(Vec::len), Some(32));
+        // ChachaKey/HmacKey are now SecretHandle-backed (Secure Runtime
+        // Alpha 6281-6360) -- `.bytes` stays `None` for both; `.handle`
+        // carries the real 32-byte material instead. ChachaNonce is
+        // unchanged (not confidential -- see this file's own module doc).
+        assert!(decisions[0].bytes.is_none());
+        assert_eq!(exposed_handle_bytes(&decisions[0]).map(|b| b.len()), Some(32));
         assert_eq!(decisions[1].bytes.as_ref().map(Vec::len), Some(12));
-        assert_eq!(decisions[2].bytes.as_ref().map(Vec::len), Some(32));
+        assert!(decisions[1].handle.is_none());
+        assert!(decisions[2].bytes.is_none());
+        assert_eq!(exposed_handle_bytes(&decisions[2]).map(|b| b.len()), Some(32));
     }
 
     #[test]
@@ -247,6 +297,7 @@ mod tests {
         for decision in &decisions {
             assert_eq!(decision.status, Nip44MessageKeyStatus::InvalidConversationKey);
             assert!(decision.bytes.is_none());
+            assert!(decision.handle.is_none());
         }
     }
 
@@ -272,9 +323,12 @@ mod tests {
         let key = real_conversation_key();
         let first = derive_message_keys_exact_internal(&key, &TEST_NONCE);
         let second = derive_message_keys_exact_internal(&key, &TEST_NONCE);
-        for (a, b) in first.iter().zip(second.iter()) {
-            assert_eq!(a.bytes, b.bytes);
-        }
+        // ChachaKey/HmacKey: compare via the handle-exposed bytes (the
+        // `.bytes` field is always `None` for these two now).
+        assert_eq!(exposed_handle_bytes(&first[0]), exposed_handle_bytes(&second[0]));
+        assert_eq!(exposed_handle_bytes(&first[2]), exposed_handle_bytes(&second[2]));
+        // ChachaNonce: unchanged, still `.bytes`-backed.
+        assert_eq!(first[1].bytes, second[1].bytes);
     }
 
     #[test]
@@ -282,7 +336,7 @@ mod tests {
         let key = real_conversation_key();
         let first = derive_message_keys_exact_internal(&key, &TEST_NONCE);
         let second = derive_message_keys_exact_internal(&key, &[0x99; 32]);
-        assert_ne!(first[0].bytes, second[0].bytes);
+        assert_ne!(exposed_handle_bytes(&first[0]), exposed_handle_bytes(&second[0]));
     }
 
     #[test]
@@ -294,9 +348,9 @@ mod tests {
             .expect("expected real bytes");
         let via_bytes = derive_message_keys_exact_from_bytes_internal(&bytes, &TEST_NONCE);
         let via_key = derive_message_keys_exact_internal(&key, &TEST_NONCE);
-        for (a, b) in via_bytes.iter().zip(via_key.iter()) {
-            assert_eq!(a.bytes, b.bytes);
-        }
+        assert_eq!(exposed_handle_bytes(&via_bytes[0]), exposed_handle_bytes(&via_key[0]));
+        assert_eq!(via_bytes[1].bytes, via_key[1].bytes);
+        assert_eq!(exposed_handle_bytes(&via_bytes[2]), exposed_handle_bytes(&via_key[2]));
     }
 
     #[test]

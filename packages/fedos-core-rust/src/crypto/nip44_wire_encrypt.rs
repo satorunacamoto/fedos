@@ -56,6 +56,7 @@ use super::nip44_padding::{pad_message, PadStatus};
 use super::nip44_stream_cipher::encrypt_stream_internal;
 use super::nip44_wire_encoding::encode_wire_payload_internal;
 use super::nip44_wire_nonce::{generate_wire_nonce_internal, Nip44WireNonceStatus};
+use zeroize::Zeroize;
 
 /// Coarse observable outcome of an [`encrypt_wire_internal`] call.
 /// Crate-private only.
@@ -95,6 +96,9 @@ pub(crate) struct Nip44WireEncryptDecision {
 /// shape (kept separate rather than shared, per this crate's "no
 /// cross-module private helper sharing" convention for `fn`s that are
 /// not part of either module's own public-within-crate surface).
+///
+/// ONLY for `ChachaNonce` since Secure Runtime Alpha 6281-6360 — see
+/// [`extract_handle_bytes`] for the two genuinely-secret kinds.
 fn extract_fixed_bytes<const N: usize>(
     decisions: &[Nip44MessageKeyDecision; 3],
     kind: Nip44DerivedKeyKind,
@@ -104,6 +108,29 @@ fn extract_fixed_bytes<const N: usize>(
         return None;
     }
     decision.bytes.as_deref()?.try_into().ok()
+}
+
+/// Secure Runtime Alpha 6281-6360 (FedOS Secure Memory Secret Buffer and
+/// Zeroization Foundation Arc) — the `ChachaKey`/`HmacKey` counterpart of
+/// [`extract_fixed_bytes`] above: these two are now `SecretHandle`-backed
+/// (this file's own Phase A gap closure), so extraction goes through the
+/// handle's own narrow `expose_bytes_for_internal_nip44_message_key`
+/// accessor instead of `.bytes`. Returns a COPY — the caller
+/// (`encrypt_wire_from_key_decisions`) zeroizes it once the one-shot
+/// ChaCha20/HMAC call that needs it is done, mirroring every other
+/// `expose_bytes_for_internal_*` consumer in this crate.
+fn extract_handle_bytes(
+    decisions: &[Nip44MessageKeyDecision; 3],
+    kind: Nip44DerivedKeyKind,
+) -> Option<[u8; 32]> {
+    let decision = decisions.iter().find(|d| d.kind == kind)?;
+    if decision.status != Nip44MessageKeyStatus::Ready {
+        return None;
+    }
+    decision
+        .handle
+        .as_ref()?
+        .expose_bytes_for_internal_nip44_message_key()
 }
 
 fn invalid_conversation_key_decision() -> Nip44WireEncryptDecision {
@@ -122,18 +149,13 @@ fn encrypt_wire_from_key_decisions(
     nonce: &[u8; 32],
     plaintext: &[u8],
 ) -> Nip44WireEncryptDecision {
-    let chacha_key: [u8; 32] =
-        match extract_fixed_bytes(key_decisions, Nip44DerivedKeyKind::ChachaKey) {
-            Some(bytes) => bytes,
-            None => return invalid_conversation_key_decision(),
-        };
+    // Secure Runtime Alpha 6281-6360 — `chacha_nonce` (not confidential)
+    // and plaintext padding are both checked BEFORE `chacha_key`/`hmac_key`
+    // are ever copied out of their handles, so a padding/nonce-derivation
+    // failure never leaves an un-zeroized secret copy on this function's
+    // own stack frame on an early-return path.
     let chacha_nonce: [u8; 12] =
         match extract_fixed_bytes(key_decisions, Nip44DerivedKeyKind::ChachaNonce) {
-            Some(bytes) => bytes,
-            None => return invalid_conversation_key_decision(),
-        };
-    let hmac_key: [u8; 32] =
-        match extract_fixed_bytes(key_decisions, Nip44DerivedKeyKind::HmacKey) {
             Some(bytes) => bytes,
             None => return invalid_conversation_key_decision(),
         };
@@ -156,9 +178,29 @@ fn encrypt_wire_from_key_decisions(
         }
     };
 
+    let mut chacha_key: [u8; 32] =
+        match extract_handle_bytes(key_decisions, Nip44DerivedKeyKind::ChachaKey) {
+            Some(bytes) => bytes,
+            None => return invalid_conversation_key_decision(),
+        };
+    let mut hmac_key: [u8; 32] =
+        match extract_handle_bytes(key_decisions, Nip44DerivedKeyKind::HmacKey) {
+            Some(bytes) => bytes,
+            None => {
+                chacha_key.zeroize();
+                return invalid_conversation_key_decision();
+            }
+        };
+
     let ciphertext = encrypt_stream_internal(&chacha_key, &chacha_nonce, &padded);
     let mac = compute_hmac_internal(&hmac_key, nonce, &ciphertext);
     let payload = encode_wire_payload_internal(nonce, &ciphertext, &mac);
+    // Secure Runtime Alpha 6281-6360 — zeroize this function's own local
+    // copies once the one-shot ChaCha20/HMAC calls that needed them are
+    // done, mirroring every other `expose_bytes_for_internal_*` consumer's
+    // "caller zeroizes its own copy" discipline.
+    chacha_key.zeroize();
+    hmac_key.zeroize();
 
     Nip44WireEncryptDecision {
         status: Nip44WireEncryptStatus::Ready,

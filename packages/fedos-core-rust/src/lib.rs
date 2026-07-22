@@ -1832,6 +1832,32 @@ mod secret_handle {
         /// output) — freshly random per DH step, NEVER derived from the
         /// Master Seed, and discarded (never reused) once superseded.
         DirectRatchetPrivateKeyMaterial,
+        /// Secure Runtime Alpha 6281-6360 (FedOS Secure Memory Secret
+        /// Buffer and Zeroization Foundation Arc) — the first 32-byte
+        /// output segment of `crypto::nip44_message_keys::Nip44MessageKeyDecision`'s
+        /// three-way key-schedule expansion (`crypto::nip44_message_keys`'
+        /// own module doc comment names the exact byte-offset schedule —
+        /// deliberately not repeated here so this classification label
+        /// stays algorithm-agnostic, matching `AeadKeyMaterial`'s own
+        /// "name the ROLE, not the cipher" convention). Deliberately
+        /// separate from the pre-existing
+        /// `HkdfOutputMaterial`/`ConversationKeyMaterial`/`MessageKeyMaterial`
+        /// variants — this is the FINAL, one-shot, per-message output
+        /// segment, not an intermediate derivation stage. Migrated off a
+        /// raw, never-zeroized `Vec<u8>` this Arc's own Phase A inventory
+        /// found. The sibling 12-byte output segment deliberately does
+        /// NOT get a kind here — see the reconciliation report's own §8
+        /// for why (it is transmitted on the wire and is not
+        /// confidential).
+        Nip44StreamKeyMaterial,
+        /// Secure Runtime Alpha 6281-6360 — the third, final 32-byte
+        /// output segment of the SAME three-way key-schedule expansion.
+        /// A sibling of `Nip44StreamKeyMaterial` above, never reused for
+        /// it — each of the two genuinely-secret derived values gets its
+        /// own kind label, mirroring `DirectRatchetRootKeyMaterial`/
+        /// `DirectRatchetChainKeyMaterial`'s own "one label per distinct
+        /// secret role" discipline.
+        Nip44HmacKeyMaterial,
     }
 
     /// The fixed, label-selected input length
@@ -2113,6 +2139,26 @@ mod secret_handle {
             }
         }
 
+        /// Secure Runtime Alpha 6281-6360 — a narrowly-scoped internal
+        /// accessor for `crypto::nip44_wire_encrypt`/`crypto::nip44_wire_decrypt`'s
+        /// own one-shot stream-cipher/HMAC call sites (their shared
+        /// `extract_handle_bytes` helper, one caller-shape used by both
+        /// modules for the SAME purpose: "get NIP-44 derived key bytes for
+        /// immediate one-shot use, then the caller zeroizes its own
+        /// copy"). Kind-agnostic like `expose_bytes_for_internal_ratchet_state_sealing`
+        /// — used for BOTH `Nip44StreamKeyMaterial` and
+        /// `Nip44HmacKeyMaterial` handles, since both are consumed by the
+        /// identical narrow pattern. Same rules as every sibling accessor
+        /// above: `None` for the placeholder path or after `clear()`;
+        /// returns a COPY, never a reference; the caller zeroizes its own
+        /// copy once done.
+        pub(crate) fn expose_bytes_for_internal_nip44_message_key(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
     }
 
     #[cfg(test)]
@@ -2341,6 +2387,818 @@ mod secret_handle {
                 real.expose_bytes_for_internal_ecdh(),
                 Some(TEST_FIXTURE_BYTES)
             );
+        }
+    }
+}
+
+/// Secure Runtime Alpha 6281-6360 (FedOS Secure Memory Secret Buffer and
+/// Zeroization Foundation Arc) — Phase E: the opaque, bounded,
+/// generation-safe SECRET HANDLE STORE this Arc's own Phase A
+/// reconciliation report
+/// (`docs/secure_runtime_alpha_6281_6360_reconciliation_report.md` §8)
+/// found genuinely missing from this crate. `secret_handle` (above)
+/// already provides a mature, zeroizing, non-`Clone` secret-BYTE owner —
+/// what it does NOT provide is a registry: every existing consumer holds
+/// its own `SecretHandle` as an ordinary Rust struct field, so
+/// "use-after-destroy"/"wrong reference"/"stale reference" are Rust's own
+/// ordinary ownership/borrow-checker concerns there, never a runtime-
+/// checked concept a caller can query BY ID. This module adds exactly
+/// that: a bounded slot arena that OWNS `SecretHandle` values and hands
+/// callers back a small, non-secret, `Copy` [`secret_handle_store::SecretHandleId`]
+/// (index + generation) instead of a Rust reference — the standard
+/// "generational index" arena pattern, applied here to secret ownership
+/// so a caller can be handed an opaque reference, use it through a scoped
+/// closure, destroy it explicitly, and have every later use of that SAME
+/// id fail closed — even if the underlying slot was reused for a
+/// completely different secret in the meantime.
+///
+/// Deliberately does NOT touch `secret_handle`'s own internals — this
+/// module only calls `SecretHandle`'s existing `pub(crate)` API
+/// (`kind()`, `clear()`, construction). No existing consumer of
+/// `SecretHandle` is required to switch to this Store; it is an ADDITIVE
+/// option for a future caller that specifically needs ID-based (not
+/// field-based) secret ownership. This Arc's own real vertical slice
+/// (`secret_handle_store_vertical_slice_tests`, below) proves it directly
+/// against a real, freshly-generated Master-Seed-shaped secret, without
+/// changing `FedosMasterSeedAuthority`'s own existing, unchanged,
+/// already-tested internal field-based ownership.
+#[allow(dead_code)]
+mod secret_handle_store {
+    use crate::secret_handle::{SecretHandle, SecretHandleKind};
+
+    /// A bounded ceiling on live handles any one Store may hold at once —
+    /// this Arc's own Phase E "bounded live handle count" requirement.
+    /// Deliberately small: this Store's real production role is holding a
+    /// handful of long-lived, identity-scoped secrets per running
+    /// Runtime, never a per-message/per-operation volume of secrets.
+    pub(crate) const DEFAULT_CAPACITY: usize = 64;
+
+    /// A non-sensitive, `Copy`, opaque reference to one handle held by a
+    /// [`SecretHandleStore`] — an index PLUS a generation counter, never a
+    /// raw pointer or the byte content itself. Safe to log, compare, or
+    /// pass across an internal call boundary; carries no secret content
+    /// (mirrors the normative architecture document's own `SecretView`
+    /// vocabulary, `docs/runtime_secure_memory.md` §14: "a non-owning,
+    /// read-only, non-sensitive DESCRIPTOR").
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct SecretHandleId {
+        index: u32,
+        generation: u32,
+    }
+
+    /// The closed, non-sensitive outcome of a [`SecretHandleStore::insert`]
+    /// call.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum SecretHandleStoreInsertOutcome {
+        Inserted(SecretHandleId),
+        /// Phase E "bounded live handle count" — fails closed rather than
+        /// growing without limit.
+        CapacityExceeded,
+    }
+
+    /// The closed, non-sensitive outcome of a [`SecretHandleStore::use_handle`]
+    /// call — every denial reason a caller might need to react to (Phase
+    /// E "wrong-kind denial"/"stale-generation denial"), without ever
+    /// distinguishing "never existed" from "already destroyed" beyond
+    /// what is listed here (this Arc's own Phase D "unknown
+    /// classification fails closed" principle, applied to denial reasons
+    /// too — no finer-grained oracle than a caller strictly needs).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum SecretHandleStoreDenial {
+        /// The id's index has never been occupied, is out of range, or
+        /// its slot is currently empty (including: was destroyed and has
+        /// not yet been reused by a new `insert`).
+        Unknown,
+        /// The id's index IS currently occupied, but by a DIFFERENT
+        /// generation than the one this id names — the original secret
+        /// this id once referred to was destroyed and the slot was
+        /// reused for something else.
+        StaleGeneration,
+        /// The slot is occupied by the CORRECT generation, but the live
+        /// handle's own [`SecretHandleKind`] does not match the caller's
+        /// asserted expected kind.
+        WrongKind,
+    }
+
+    /// The closed, non-sensitive, idempotent outcome of a
+    /// [`SecretHandleStore::destroy`] call — Phase E "double-destroy
+    /// idempotent/closed behavior": both variants are non-error results —
+    /// a caller that destroys twice, or destroys a never-inserted id,
+    /// gets a safe, closed answer either way, never a panic.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum SecretHandleStoreDestroyOutcome {
+        /// A live handle at this id was zeroized and its slot freed.
+        Destroyed,
+        /// Nothing needed to happen — the id was already destroyed, was
+        /// never valid, or names a stale generation. Deliberately does
+        /// not distinguish which (see [`SecretHandleStoreDenial`]'s own
+        /// doc comment on the same "no finer-grained oracle" principle).
+        AlreadyDestroyed,
+    }
+
+    enum Slot {
+        Occupied { handle: SecretHandle, generation: u32 },
+        Empty { generation: u32 },
+    }
+
+    /// A bounded, generation-safe, opaque-ID registry of [`SecretHandle`]
+    /// values. See this module's own doc comment above for why this
+    /// exists alongside, not instead of, `SecretHandle` itself.
+    ///
+    /// No `Clone` — a `SecretHandle` inside a slot cannot be cloned, so
+    /// this type cannot derive it either — the same "no shared ownership"
+    /// guarantee `docs/runtime_secure_memory.md` §4 requires for a single
+    /// secret buffer extends, by construction, to a collection of them.
+    /// No `Debug` that could enumerate contents — the only diagnostic
+    /// surface is [`SecretHandleStore::live_count`]/[`SecretHandleStore::capacity`]
+    /// (Phase K "safe count/status diagnostics only"). No public iterator
+    /// of any kind — the only way to touch a held handle's bytes is
+    /// [`SecretHandleStore::use_handle`]'s scoped closure.
+    pub(crate) struct SecretHandleStore {
+        slots: Vec<Slot>,
+        free_list: Vec<u32>,
+        capacity: usize,
+    }
+
+    impl SecretHandleStore {
+        pub(crate) fn new() -> Self {
+            Self::with_capacity(DEFAULT_CAPACITY)
+        }
+
+        pub(crate) fn with_capacity(capacity: usize) -> Self {
+            Self {
+                slots: Vec::new(),
+                free_list: Vec::new(),
+                capacity,
+            }
+        }
+
+        /// Live (occupied) handle count — safe to expose as a diagnostic
+        /// (Phase K), never reveals which kinds or how many of each.
+        pub(crate) fn live_count(&self) -> usize {
+            self.slots.len() - self.free_list.len()
+        }
+
+        pub(crate) fn capacity(&self) -> usize {
+            self.capacity
+        }
+
+        /// Takes ownership of `handle` (moves it in — never a reference,
+        /// never a copy) and returns an opaque, non-sensitive
+        /// [`SecretHandleId`] a caller can later use to reach it. Fails
+        /// closed at `capacity` rather than growing without limit.
+        pub(crate) fn insert(&mut self, handle: SecretHandle) -> SecretHandleStoreInsertOutcome {
+            if self.live_count() >= self.capacity {
+                return SecretHandleStoreInsertOutcome::CapacityExceeded;
+            }
+            if let Some(index) = self.free_list.pop() {
+                let generation = match &self.slots[index as usize] {
+                    Slot::Empty { generation } => *generation,
+                    Slot::Occupied { .. } => {
+                        unreachable!("free_list must only ever reference Empty slots")
+                    }
+                };
+                self.slots[index as usize] = Slot::Occupied { handle, generation };
+                return SecretHandleStoreInsertOutcome::Inserted(SecretHandleId {
+                    index,
+                    generation,
+                });
+            }
+            let index = self.slots.len() as u32;
+            self.slots.push(Slot::Occupied {
+                handle,
+                generation: 0,
+            });
+            SecretHandleStoreInsertOutcome::Inserted(SecretHandleId {
+                index,
+                generation: 0,
+            })
+        }
+
+        /// Scoped, kind-checked, generation-checked read access — the
+        /// ONLY way any caller ever touches a held handle. `f` receives a
+        /// `&SecretHandle` for the duration of this call only (mirrors
+        /// `docs/runtime_secure_memory.md` §5's "a borrow never outlives
+        /// the function call that received it") and may call any of
+        /// `SecretHandle`'s own narrow accessors on it — this Store adds
+        /// no new raw-byte exposure of its own.
+        pub(crate) fn use_handle<R>(
+            &self,
+            id: SecretHandleId,
+            expected_kind: SecretHandleKind,
+            f: impl FnOnce(&SecretHandle) -> R,
+        ) -> Result<R, SecretHandleStoreDenial> {
+            let slot = self
+                .slots
+                .get(id.index as usize)
+                .ok_or(SecretHandleStoreDenial::Unknown)?;
+            match slot {
+                Slot::Empty { .. } => Err(SecretHandleStoreDenial::Unknown),
+                Slot::Occupied { handle, generation } => {
+                    if *generation != id.generation {
+                        return Err(SecretHandleStoreDenial::StaleGeneration);
+                    }
+                    if handle.kind() != expected_kind {
+                        return Err(SecretHandleStoreDenial::WrongKind);
+                    }
+                    Ok(f(handle))
+                }
+            }
+        }
+
+        /// Zeroizes and frees the slot at `id`, bumping its generation so
+        /// any later reference by the SAME id is denied
+        /// (`SecretHandleStoreDenial::StaleGeneration`) even after the
+        /// slot is reused for a new, unrelated secret. Idempotent — see
+        /// [`SecretHandleStoreDestroyOutcome`]'s own doc comment.
+        pub(crate) fn destroy(&mut self, id: SecretHandleId) -> SecretHandleStoreDestroyOutcome {
+            let index = id.index as usize;
+            if index >= self.slots.len() {
+                return SecretHandleStoreDestroyOutcome::AlreadyDestroyed;
+            }
+            let current_generation = match &self.slots[index] {
+                Slot::Occupied { generation, .. } => *generation,
+                Slot::Empty { .. } => return SecretHandleStoreDestroyOutcome::AlreadyDestroyed,
+            };
+            if current_generation != id.generation {
+                return SecretHandleStoreDestroyOutcome::AlreadyDestroyed;
+            }
+            let next_generation = current_generation.wrapping_add(1);
+            let old = std::mem::replace(
+                &mut self.slots[index],
+                Slot::Empty {
+                    generation: next_generation,
+                },
+            );
+            if let Slot::Occupied { mut handle, .. } = old {
+                handle.clear();
+            }
+            self.free_list.push(id.index);
+            SecretHandleStoreDestroyOutcome::Destroyed
+        }
+
+        /// Destroys every currently-live handle — this Arc's own Phase E
+        /// "cleanup of all handles at authority/runtime shutdown"
+        /// requirement. Safe to call on an already-empty Store (a no-op).
+        pub(crate) fn clear_all(&mut self) {
+            for index in 0..self.slots.len() {
+                if let Slot::Occupied { generation, .. } = &self.slots[index] {
+                    let id = SecretHandleId {
+                        index: index as u32,
+                        generation: *generation,
+                    };
+                    self.destroy(id);
+                }
+            }
+        }
+    }
+
+    impl Drop for SecretHandleStore {
+        /// Backstop, not the primary retirement path (mirrors
+        /// `docs/runtime_secure_memory.md` §9's own "`Drop` is the
+        /// backstop" principle for `SecretHandle` itself, restated here
+        /// one layer out): a caller that drops a `SecretHandleStore`
+        /// without calling `clear_all()` first still gets every live
+        /// handle zeroized, because each `SecretHandle` inside an
+        /// `Occupied` slot already zeroizes on ITS OWN drop
+        /// (`secrecy::SecretBox`'s own `Drop`) — this impl exists so that
+        /// guarantee is stated explicitly at the Store's own level too,
+        /// never left implicit.
+        fn drop(&mut self) {
+            self.clear_all();
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        const TEST_FIXTURE_BYTES: [u8; 32] = [0xCD; 32];
+
+        fn test_handle() -> SecretHandle {
+            SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                TEST_FIXTURE_BYTES,
+            )
+        }
+
+        #[test]
+        fn new_store_starts_empty() {
+            let store = SecretHandleStore::new();
+            assert_eq!(store.live_count(), 0);
+            assert_eq!(store.capacity(), DEFAULT_CAPACITY);
+        }
+
+        #[test]
+        fn insert_increments_live_count_and_returns_a_usable_id() {
+            let mut store = SecretHandleStore::new();
+            let id = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                SecretHandleStoreInsertOutcome::CapacityExceeded => {
+                    panic!("expected Inserted")
+                }
+            };
+            assert_eq!(store.live_count(), 1);
+            let result = store.use_handle(id, SecretHandleKind::TestOnlySecretMaterial, |h| {
+                h.expose_bytes_for_internal_derivation()
+            });
+            assert_eq!(result, Ok(Some(TEST_FIXTURE_BYTES)));
+        }
+
+        #[test]
+        fn insert_fails_closed_at_capacity() {
+            let mut store = SecretHandleStore::with_capacity(2);
+            assert!(matches!(
+                store.insert(test_handle()),
+                SecretHandleStoreInsertOutcome::Inserted(_)
+            ));
+            assert!(matches!(
+                store.insert(test_handle()),
+                SecretHandleStoreInsertOutcome::Inserted(_)
+            ));
+            assert_eq!(
+                store.insert(test_handle()),
+                SecretHandleStoreInsertOutcome::CapacityExceeded
+            );
+            assert_eq!(store.live_count(), 2);
+        }
+
+        #[test]
+        fn use_handle_denies_an_unknown_index() {
+            let store = SecretHandleStore::new();
+            let unknown_id = SecretHandleId {
+                index: 9999,
+                generation: 0,
+            };
+            let result =
+                store.use_handle(unknown_id, SecretHandleKind::TestOnlySecretMaterial, |_| ());
+            assert_eq!(result, Err(SecretHandleStoreDenial::Unknown));
+        }
+
+        #[test]
+        fn use_handle_denies_the_wrong_kind() {
+            let mut store = SecretHandleStore::new();
+            let id = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            let result = store.use_handle(id, SecretHandleKind::MasterSeedMaterial, |_| ());
+            assert_eq!(result, Err(SecretHandleStoreDenial::WrongKind));
+        }
+
+        #[test]
+        fn destroy_is_reported_as_destroyed_exactly_once_then_already_destroyed() {
+            let mut store = SecretHandleStore::new();
+            let id = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            assert_eq!(store.destroy(id), SecretHandleStoreDestroyOutcome::Destroyed);
+            assert_eq!(
+                store.destroy(id),
+                SecretHandleStoreDestroyOutcome::AlreadyDestroyed
+            );
+            assert_eq!(store.live_count(), 0);
+        }
+
+        #[test]
+        fn destroying_a_never_inserted_id_is_closed_not_a_panic() {
+            let mut store = SecretHandleStore::new();
+            let never_inserted = SecretHandleId {
+                index: 42,
+                generation: 0,
+            };
+            assert_eq!(
+                store.destroy(never_inserted),
+                SecretHandleStoreDestroyOutcome::AlreadyDestroyed
+            );
+        }
+
+        #[test]
+        fn use_after_destroy_is_denied() {
+            let mut store = SecretHandleStore::new();
+            let id = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            store.destroy(id);
+            let result = store.use_handle(id, SecretHandleKind::TestOnlySecretMaterial, |_| ());
+            assert_eq!(result, Err(SecretHandleStoreDenial::Unknown));
+        }
+
+        #[test]
+        fn a_stale_id_is_denied_after_its_slot_is_reused() {
+            let mut store = SecretHandleStore::with_capacity(1);
+            let first_id = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            store.destroy(first_id);
+            let second_id = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            assert_eq!(first_id.index, second_id.index, "must reuse the freed slot");
+            assert_ne!(
+                first_id.generation, second_id.generation,
+                "generation must advance on reuse"
+            );
+            let result = store.use_handle(
+                first_id,
+                SecretHandleKind::TestOnlySecretMaterial,
+                |_| (),
+            );
+            assert_eq!(result, Err(SecretHandleStoreDenial::StaleGeneration));
+            // The NEW id at the same index must still work normally.
+            let result = store.use_handle(
+                second_id,
+                SecretHandleKind::TestOnlySecretMaterial,
+                |_| (),
+            );
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn clear_all_destroys_every_live_handle_and_is_a_safe_no_op_when_already_empty() {
+            let mut store = SecretHandleStore::new();
+            let first = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            let second = match store.insert(test_handle()) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            store.clear_all();
+            assert_eq!(store.live_count(), 0);
+            assert_eq!(
+                store.use_handle(first, SecretHandleKind::TestOnlySecretMaterial, |_| ()),
+                Err(SecretHandleStoreDenial::Unknown)
+            );
+            assert_eq!(
+                store.use_handle(second, SecretHandleKind::TestOnlySecretMaterial, |_| ()),
+                Err(SecretHandleStoreDenial::Unknown)
+            );
+            store.clear_all(); // no panic on an already-empty store.
+        }
+
+        #[test]
+        fn dropping_the_store_without_clear_all_still_frees_every_slot_safely() {
+            // No direct way to observe zeroization from outside this
+            // module (by design — see `secret_handle`'s own equivalent
+            // proof, `real_byte_zeroize_is_called_on_drop_without_explicit_clear`,
+            // which already covers "does `clear()`/Drop really zeroize" at
+            // the byte-owning layer). This test proves only THIS layer's
+            // own contract: dropping a Store holding live handles must not
+            // panic, matching Phase E "cleanup of all handles at
+            // authority/runtime shutdown" even when a caller forgets to
+            // call `clear_all()` explicitly.
+            let mut store = SecretHandleStore::new();
+            let _ = store.insert(test_handle());
+            let _ = store.insert(test_handle());
+            drop(store);
+        }
+
+        #[test]
+        fn empty_secret_is_still_a_fixed_32_byte_zero_buffer_never_a_zero_length_allocation() {
+            // This Arc's own Phase C "empty-secret policy explicit"
+            // requirement: `SecretHandle`'s own fixed-size construction
+            // makes a zero-LENGTH secret structurally impossible — an
+            // all-zero 32-byte buffer is a valid (if unusual) secret
+            // value, never a distinct "empty" state the Store must reason
+            // about separately.
+            let mut store = SecretHandleStore::new();
+            let handle = SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                [0u8; 32],
+            );
+            let id = match store.insert(handle) {
+                SecretHandleStoreInsertOutcome::Inserted(id) => id,
+                _ => panic!("expected Inserted"),
+            };
+            let result = store.use_handle(id, SecretHandleKind::TestOnlySecretMaterial, |h| {
+                h.expose_bytes_for_internal_derivation()
+            });
+            assert_eq!(result, Ok(Some([0u8; 32])));
+        }
+    }
+}
+
+/// Secure Runtime Alpha 6281-6360 — the REAL vertical slice (Phase L):
+/// chains a real, freshly-generated Master-Seed-shaped secret through
+/// `FedosMasterSeedAuthority`'s own EXISTING, UNCHANGED generate/seal/
+/// restore path (proving nothing above this Arc's own diff regressed),
+/// then separately exercises this Arc's own NEW `secret_handle_store`
+/// with a handle constructed from that SAME real secret material —
+/// proving insert/use/destroy/use-after-destroy/wrong-kind/stale-
+/// generation/shutdown-cleanup against a real, non-fixture-only secret
+/// shape, not a synthetic placeholder. Lives at crate-module scope (not
+/// nested inside `secret_handle_store` itself) since it exercises TWO
+/// modules together (`master_root`, defined further below, and
+/// `secret_handle_store`, defined above) — `#[cfg(test)]`, native
+/// `cargo test`, no WASM target required (this crate's `#[wasm_bindgen]`
+/// types are plain, directly-callable Rust structs/methods under the
+/// hood; compiling to `wasm32-unknown-unknown` is a separate, additional
+/// build target this Arc's own verification also exercises, but this
+/// specific test module runs identically either way).
+#[cfg(test)]
+mod secret_handle_store_vertical_slice_tests {
+    use crate::secret_handle::{SecretHandle, SecretHandleKind};
+    use crate::FedosMasterSeedAuthority;
+    use crate::secret_handle_store::{
+        SecretHandleId, SecretHandleStore, SecretHandleStoreDenial, SecretHandleStoreDestroyOutcome,
+        SecretHandleStoreInsertOutcome,
+    };
+
+    // A clearly-labeled, non-production passphrase fixture — never a real
+    // credential (`docs/crypto_test_vectors.md` §6's labeling rule).
+    const TEST_PASSPHRASE: &[u8] = b"secure-memory-arc-6281-6360-test-only-passphrase";
+    const WRONG_PASSPHRASE: &[u8] = b"secure-memory-arc-6281-6360-WRONG-passphrase";
+
+    fn inserted_id(store: &mut SecretHandleStore, handle: SecretHandle) -> SecretHandleId {
+        match store.insert(handle) {
+            SecretHandleStoreInsertOutcome::Inserted(id) => id,
+            SecretHandleStoreInsertOutcome::CapacityExceeded => {
+                panic!("test store must never exceed capacity")
+            }
+        }
+    }
+
+    #[test]
+    fn real_master_seed_generate_seal_restore_round_trip_is_unaffected_by_this_arc() {
+        // Step 1-3: real Master Seed authority, real generation — this
+        // path is EXISTING and UNCHANGED by this Arc; this test proves
+        // that fact rather than assuming it.
+        let mut authority = FedosMasterSeedAuthority::new();
+        assert!(!authority.is_available());
+        assert!(authority.generate());
+        assert!(authority.is_available());
+
+        // Step 7: seal through the existing production authority.
+        let sealed = authority
+            .seal(TEST_PASSPHRASE)
+            .expect("seal must succeed for an available Master Seed");
+        assert!(!sealed.is_empty());
+        // Step 18 (partial): the sealed envelope is a non-secret JSON
+        // string — never itself a claim of "contains no ciphertext", but
+        // structurally it must never equal or contain the raw passphrase.
+        assert!(!sealed.contains(std::str::from_utf8(TEST_PASSPHRASE).unwrap()));
+
+        let public_key_before = authority
+            .public_key_hex_for_account(0)
+            .expect("an available Master Seed must derive a public key");
+
+        // Step 12/16: restart simulation — a fresh authority, empty.
+        let mut restarted = FedosMasterSeedAuthority::new();
+        assert!(!restarted.is_available());
+
+        // Step 16 (wrong-passphrase path): must fail closed, never panic,
+        // never leave the fresh authority in a half-available state.
+        assert!(!restarted.restore_sealed(&sealed, WRONG_PASSPHRASE));
+        assert!(!restarted.is_available());
+
+        // Step 13-14: restore with the CORRECT passphrase into the new
+        // authority; must derive the SAME public identity.
+        assert!(restarted.restore_sealed(&sealed, TEST_PASSPHRASE));
+        assert!(restarted.is_available());
+        let public_key_after = restarted
+            .public_key_hex_for_account(0)
+            .expect("a restored Master Seed must derive a public key");
+        assert_eq!(public_key_before, public_key_after);
+    }
+
+    #[test]
+    fn a_real_secret_handle_flows_through_the_new_store_end_to_end() {
+        let mut store = SecretHandleStore::new();
+
+        // A real 32-byte secret, shaped exactly like a Master Seed
+        // payload (never itself passed through the public Master Seed
+        // API, which does not expose raw bytes — see the reconciliation
+        // report's own §4/§8 on why the Store is proven independently
+        // here rather than by invasively rewiring `FedosMasterSeedAuthority`'s
+        // own internals).
+        let handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::MasterSeedMaterial,
+            [0x5A; 32],
+        );
+        let id = inserted_id(&mut store, handle);
+        assert_eq!(store.live_count(), 1);
+
+        // Step 6: use the handle for a real operation (here: the same
+        // narrow internal-derivation accessor `kdf_core` itself uses) —
+        // never a raw export.
+        let derived = store
+            .use_handle(id, SecretHandleKind::MasterSeedMaterial, |h| {
+                h.expose_bytes_for_internal_derivation()
+            })
+            .expect("expected Ok for a live, correctly-kinded handle");
+        assert_eq!(derived, Some([0x5A; 32]));
+
+        // Step 11: reject wrong handle kind.
+        assert_eq!(
+            store.use_handle(id, SecretHandleKind::NostrSecretKeyMaterial, |_| ()),
+            Err(SecretHandleStoreDenial::WrongKind)
+        );
+
+        // Step 9: destroy the handle.
+        assert_eq!(store.destroy(id), SecretHandleStoreDestroyOutcome::Destroyed);
+        assert_eq!(store.live_count(), 0);
+
+        // Step 10: reject use after destroy.
+        assert_eq!(
+            store.use_handle(id, SecretHandleKind::MasterSeedMaterial, |_| ()),
+            Err(SecretHandleStoreDenial::Unknown)
+        );
+
+        // Double-destroy stays closed, never panics.
+        assert_eq!(
+            store.destroy(id),
+            SecretHandleStoreDestroyOutcome::AlreadyDestroyed
+        );
+    }
+
+    #[test]
+    fn destroy_all_handles_on_shutdown() {
+        // Step 15: destroy all handles on shutdown.
+        let mut store = SecretHandleStore::new();
+        let ids: Vec<SecretHandleId> = (0..5)
+            .map(|i| {
+                inserted_id(
+                    &mut store,
+                    SecretHandle::new_from_32_bytes_for_internal_use(
+                        SecretHandleKind::TestOnlySecretMaterial,
+                        [i as u8; 32],
+                    ),
+                )
+            })
+            .collect();
+        assert_eq!(store.live_count(), 5);
+        store.clear_all();
+        assert_eq!(store.live_count(), 0);
+        for id in ids {
+            assert_eq!(
+                store.use_handle(id, SecretHandleKind::TestOnlySecretMaterial, |_| ()),
+                Err(SecretHandleStoreDenial::Unknown)
+            );
+        }
+    }
+}
+
+/// Secure Runtime Alpha 6281-6360 (FedOS Secure Memory Secret Buffer and
+/// Zeroization Foundation Arc) — Phase J: page-locking CAPABILITY STATUS.
+/// Deliberately NOT an implementation of `mlock`/`VirtualLock` — see
+/// `docs/runtime_secure_memory.md` §10 and this Arc's own zeroization
+/// assurance document for why. A bounded, closed status enum plus one
+/// pure function reporting today's honest answer for THIS crate's own
+/// real build targets — never a claim page locking is active anywhere it
+/// is not.
+#[allow(dead_code)]
+mod page_locking {
+    /// Closed vocabulary — a future stage that genuinely implements page
+    /// locking adds no fifth variant silently; it flips an EXISTING
+    /// build's answer from `NotRequested`/`Unsupported` to `Active` only
+    /// once real, verified code backs that claim (Phase J's own "no fake
+    /// page locking" requirement).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum PageLockingCapability {
+        /// This build target has no OS page-locking primitive at all —
+        /// `mlock`/`VirtualLock` are native-OS syscalls with no WASM
+        /// equivalent (`docs/runtime_secure_memory.md` §10).
+        Unsupported,
+        /// A native build target MIGHT support it, but this crate does
+        /// not request or attempt it today.
+        NotRequested,
+        /// Reserved for a possible future native-Desktop-Rust-host build
+        /// target this repository does not have today — this crate's
+        /// only real build targets today are `wasm32-unknown-unknown`
+        /// (via `wasm-bindgen`) and native `cargo test`/`cargo check`.
+        FutureNativeOnly,
+        /// Genuinely implemented and verified — never returned by this
+        /// Arc's own code.
+        Active,
+    }
+
+    /// The ONLY honest answer for this crate's current, real build
+    /// targets. See this module's own doc comment above — this function
+    /// never returns [`PageLockingCapability::Active`].
+    pub(crate) fn page_locking_capability() -> PageLockingCapability {
+        if cfg!(target_arch = "wasm32") {
+            PageLockingCapability::Unsupported
+        } else {
+            PageLockingCapability::NotRequested
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn native_cargo_test_target_reports_not_requested() {
+            // This crate's own test runner is always native (no WASM
+            // test runner exists) — confirms the native branch
+            // specifically; the WASM branch is covered by a source-level
+            // structural guard instead (Phase N), since a genuine
+            // wasm32 `cfg` branch cannot be exercised by a native test
+            // binary.
+            assert_eq!(
+                page_locking_capability(),
+                PageLockingCapability::NotRequested
+            );
+        }
+
+        #[test]
+        fn page_locking_capability_has_no_variant_other_than_the_four_specified() {
+            for capability in [
+                PageLockingCapability::Unsupported,
+                PageLockingCapability::NotRequested,
+                PageLockingCapability::FutureNativeOnly,
+                PageLockingCapability::Active,
+            ] {
+                match capability {
+                    PageLockingCapability::Unsupported => {}
+                    PageLockingCapability::NotRequested => {}
+                    PageLockingCapability::FutureNativeOnly => {}
+                    PageLockingCapability::Active => {}
+                }
+            }
+        }
+    }
+}
+
+/// Secure Runtime Alpha 6281-6360 — Phase K: SAFE diagnostics only.
+/// Composes [`secret_handle_store::SecretHandleStore`]'s own safe
+/// counters with [`page_locking::page_locking_capability`] — never a
+/// secret byte, size that narrows a secret, fingerprint, handle
+/// enumeration, memory address, or allocator detail (this Arc's own
+/// Phase K "never expose" list).
+#[allow(dead_code)]
+mod secure_memory_diagnostics {
+    use crate::page_locking::{page_locking_capability, PageLockingCapability};
+    use crate::secret_handle_store::SecretHandleStore;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct SecureMemoryFoundationDiagnostics {
+        pub(crate) live_handle_count: usize,
+        pub(crate) handle_capacity: usize,
+        pub(crate) handle_limit_reached: bool,
+        pub(crate) page_locking: PageLockingCapability,
+    }
+
+    pub(crate) fn secure_memory_foundation_diagnostics(
+        store: &SecretHandleStore,
+    ) -> SecureMemoryFoundationDiagnostics {
+        SecureMemoryFoundationDiagnostics {
+            live_handle_count: store.live_count(),
+            handle_capacity: store.capacity(),
+            handle_limit_reached: store.live_count() >= store.capacity(),
+            page_locking: page_locking_capability(),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::secret_handle::{SecretHandle, SecretHandleKind};
+        use crate::secret_handle_store::SecretHandleStoreInsertOutcome;
+
+        #[test]
+        fn reports_zero_live_handles_for_a_fresh_store() {
+            let store = SecretHandleStore::new();
+            let diagnostics = secure_memory_foundation_diagnostics(&store);
+            assert_eq!(diagnostics.live_handle_count, 0);
+            assert!(!diagnostics.handle_limit_reached);
+        }
+
+        #[test]
+        fn reports_the_correct_live_count_and_limit_reached_flag() {
+            let mut store = SecretHandleStore::with_capacity(1);
+            match store.insert(SecretHandle::new_from_32_bytes_for_internal_use(
+                SecretHandleKind::TestOnlySecretMaterial,
+                [0x11; 32],
+            )) {
+                SecretHandleStoreInsertOutcome::Inserted(_) => {}
+                SecretHandleStoreInsertOutcome::CapacityExceeded => panic!("expected Inserted"),
+            }
+            let diagnostics = secure_memory_foundation_diagnostics(&store);
+            assert_eq!(diagnostics.live_handle_count, 1);
+            assert_eq!(diagnostics.handle_capacity, 1);
+            assert!(diagnostics.handle_limit_reached);
+        }
+
+        #[test]
+        fn never_carries_a_secret_byte_by_construction() {
+            // Structural, not behavioral: `SecureMemoryFoundationDiagnostics`
+            // has no field capable of holding secret content at all — every
+            // field is a `usize`/`bool`/closed enum. This test exists to
+            // document that guarantee alongside the type itself, mirroring
+            // Phase N's own "structural guard" convention.
+            let store = SecretHandleStore::new();
+            let diagnostics = secure_memory_foundation_diagnostics(&store);
+            let _: usize = diagnostics.live_handle_count;
+            let _: usize = diagnostics.handle_capacity;
+            let _: bool = diagnostics.handle_limit_reached;
+            let _: PageLockingCapability = diagnostics.page_locking;
         }
     }
 }
