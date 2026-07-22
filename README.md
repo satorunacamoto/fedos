@@ -8,6 +8,42 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5801–5880 — FedOS Identity Transition
+> Types, Validation, and Durable Evidence Foundation Arc (FULL
+> completion).** Implements the non-network foundation the FedOS Account
+> and Nostr Identity Rotation V1 Specification Review (`45e0fce`) named as
+> its own recommended next Arc. New, standalone, additive domain under
+> `src/conversation/identity_transition/`: closed transition/reason/
+> evidence-kind/evidence-status vocabularies; a strict, versioned
+> transition record (`authority: "nostr"` required for both identities —
+> the only account/Nostr mapping this codebase's architecture supports);
+> deterministic, domain-separated canonical serialization for the body and
+> all three evidence artifacts (mutation invalidates every attached
+> proof); a real BIP-340-Schnorr-verified new-key proof of possession; old
+> -identity continuity evidence whose own verifier NEVER returns an
+> acceptance-flavored status (only the pure evidence evaluator may); optional
+> Device corroboration reusing the live Device Binding trust/revocation
+> boundary; a pure evidence evaluator enforcing both of this review's hard
+> invariants — no auto-accept from parsing signatures alone, and a
+> compromise-confirmed reason never treats an old-key signature as
+> sufficient even with the new-key proof valid; durable, restart-safe,
+> append-only transition facts with idempotent-duplicate, conflicting-
+> duplicate, revision-rollback, broken-predecessor, and predecessor-cycle
+> detection (supersession and conflict state are derived at read time,
+> never backfilled onto an already-inserted fact); local peer acceptance
+> state; and two read-only impact plans (Ratchet reset, Conversation/
+> Archive/Search) that are never applied. Real vertical slice with two
+> genuine independent Schnorr identities, a real Device, restart/replay,
+> and 20 of Phase O's own named checks, all passing. No live account/Nostr
+> identity is replaced anywhere in this codebase by this Arc; no Device
+> Registry, Conversation Membership, Ratchet session, Archive, or Search
+> state is mutated. See
+> `docs/secure_runtime_alpha_5801_5880_completion_declaration.md`.
+> Recommended next Arc: **FedOS Identity Transition Peer Notification and
+> Ratchet Reset Integration Arc**.
+>
+> Prior status:
+>
 > **Status: FedOS Account and Nostr Identity Rotation V1 Specification
 > Review (specification-only, empty production diff).** The canonical V1
 > decision review the FedOS Ratchet Peer Notification and Capability
