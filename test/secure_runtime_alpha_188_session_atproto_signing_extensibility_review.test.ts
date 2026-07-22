@@ -83,7 +83,7 @@ describe("Secure Runtime Alpha 188 -- Session/ATProto Signing Extensibility Revi
 
     const kindBody = (libRsSource.match(/pub\(crate\) enum SecretHandleKind \{([\s\S]*?)\r?\n {4}\}/) ?? [])[1] ?? "";
     const kindVariants = [...kindBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(kindVariants.length).toBe(13);
+    expect(kindVariants.length).toBe(16);
     expect(kindVariants.some((v: string | undefined) => /Session|ATProto|Wallet/.test(v ?? ""))).toBe(false);
   });
 
@@ -107,7 +107,7 @@ describe("Secure Runtime Alpha 188 -- Session/ATProto Signing Extensibility Revi
 
   it("10. structural: wasm_bindgen count remains fixed at 13, unchanged by this REVIEW-ONLY Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
   });
 
   // ---------------------------------------------------------------------

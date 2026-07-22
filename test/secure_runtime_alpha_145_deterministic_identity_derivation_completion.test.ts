@@ -131,9 +131,9 @@ describe("Secure Runtime Alpha 145 -- Deterministic Identity Derivation Completi
 
   it("14. RIPPLE (Secure Runtime Alpha 146): Rust and Cargo/package sources were BYTE-FOR-BYTE UNCHANGED across this Arc's own scope; a LATER Arc (Alpha 146-150) legitimately touched Rust, so this count is now measured with a line-anchored regex (a later doc comment can otherwise mention the literal string `#[wasm_bindgen]` in prose without adding a real annotation) -- the real annotation count remains 13, reconfirmed here as the CURRENT state", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     // RIPPLE (Secure Runtime Alpha 148): lib.rs carried no reference to
     // ANY of this Arc's own five docs AS OF this Stage's own review-only
     // scope; Stage 1014 (Secure Runtime Alpha 148) legitimately cites

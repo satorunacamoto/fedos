@@ -1811,6 +1811,27 @@ mod secret_handle {
         NostrSecretKeyMaterial,
         /// A test-fixture-only secret — never real production material.
         TestOnlySecretMaterial,
+        /// Secure Runtime Alpha 5481-5560 (FedOS Direct Double Ratchet
+        /// Cryptographic Core Arc) — a Direct Ratchet session's own root
+        /// key (`crypto::direct_ratchet::direct_ratchet_root_kdf_internal`'s
+        /// output). Deliberately separate from `IdentityRootMaterial`/
+        /// `ApplicationRootMaterial`/`ProtocolRootMaterial` — those form the
+        /// unrelated Identity-derivation hierarchy; this is the ratchet's
+        /// own, per-session accumulator, re-seeded via DH output, never via
+        /// `kdf_core::HkdfDomain`.
+        DirectRatchetRootKeyMaterial,
+        /// A Direct Ratchet session's own sending- or receiving-chain key
+        /// (`direct_ratchet_root_kdf_internal`'s second output, and
+        /// `direct_ratchet_chain_kdf_internal`'s own "next chain key"
+        /// output). One kind covers both chain directions — direction is
+        /// tracked by which session-state field holds the handle, not by a
+        /// second kind label.
+        DirectRatchetChainKeyMaterial,
+        /// A Direct Ratchet session's own ephemeral local DH keypair
+        /// private half (`generate_direct_ratchet_keypair_internal`'s
+        /// output) — freshly random per DH step, NEVER derived from the
+        /// Master Seed, and discarded (never reused) once superseded.
+        DirectRatchetPrivateKeyMaterial,
     }
 
     /// The fixed, label-selected input length
@@ -2015,6 +2036,77 @@ mod secret_handle {
         /// placeholder path and after `clear()`; returns a COPY, never a
         /// reference; the caller zeroizes its own copy once done.
         pub(crate) fn expose_bytes_for_internal_ecdh(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — a narrowly-scoped accessor for
+        /// `crypto::direct_ratchet::direct_ratchet_ecdh_internal`'s own
+        /// `DirectRatchetPrivateKeyMaterial` input. A SIBLING of
+        /// `expose_bytes_for_internal_ecdh`, never a reuse of it — that one
+        /// is scoped exclusively to `crypto::conversation_key`'s own NIP-44
+        /// pipeline. Same rules: `None` for placeholder/cleared; returns a
+        /// COPY, caller zeroizes it.
+        pub(crate) fn expose_bytes_for_internal_ratchet_ecdh(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `crypto::direct_ratchet::direct_ratchet_root_kdf_internal`'s own
+        /// `DirectRatchetRootKeyMaterial` input/output. Same rules as every
+        /// sibling accessor above.
+        pub(crate) fn expose_bytes_for_internal_ratchet_root_kdf(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `crypto::direct_ratchet::direct_ratchet_chain_kdf_internal`'s own
+        /// `DirectRatchetChainKeyMaterial` input/output. Same rules as every
+        /// sibling accessor above.
+        pub(crate) fn expose_bytes_for_internal_ratchet_chain_kdf(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `crypto::direct_ratchet_session`'s OWN seal/restore integration
+        /// with the Foundation Arc's EXISTING
+        /// `FedosMasterSeedAuthority::seal_direct_ratchet_secret`/
+        /// `restore_direct_ratchet_secret` — the ONE reviewed boundary
+        /// crossing where a ratchet secret's raw bytes are handed to
+        /// another Rust function (never to WASM/JS). Kind-agnostic by
+        /// design (used for root/chain/private-key/message-key handles
+        /// alike, all for this SAME single purpose) — narrower than a
+        /// generic `expose()` because it is named for, and used by,
+        /// exactly one call site, not "whichever future caller needs
+        /// bytes."
+        pub(crate) fn expose_bytes_for_internal_ratchet_state_sealing(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `FedosDirectRatchetSession`'s own session-bootstrap seam: the
+        /// review's own recommendation (`08_dh_session_ratchet.md` §4) to
+        /// seed a NEW session's first root key from the EXISTING, real
+        /// `resolve_conversation_key()` output, rather than a fresh/random
+        /// seed. The source handle here is `AeadKeyMaterial`-kinded (that
+        /// method's own established output kind) — a different kind than
+        /// this Arc's own `DirectRatchetRootKeyMaterial`, read once at
+        /// bootstrap time only, never again afterward.
+        pub(crate) fn expose_bytes_for_internal_ratchet_bootstrap(&self) -> Option<[u8; 32]> {
             match &self.payload {
                 Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
                 _ => None,
@@ -10948,6 +11040,367 @@ fn fedos_decode_direct_ratchet_sealed_blob(sealed_blob: &str) -> Option<([u8; 12
     nonce.copy_from_slice(&decoded[..12]);
     let ciphertext = decoded[12..].to_vec();
     Some((nonce, ciphertext))
+}
+
+/// Secure Runtime Alpha 5481-5560 — a plain lowercase-hex encoder for a
+/// fixed 32-byte array (the counterpart to the Foundation Arc's own
+/// `fedos_decode_fixed_32_hex`, which only decodes). Never a secret byte
+/// in practice — this Arc's only callers pass PUBLIC ratchet keys.
+fn fedos_encode_fixed_32_hex(bytes: &[u8; 32]) -> String {
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(64);
+    for byte in bytes {
+        out.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        out.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+/// Secure Runtime Alpha 5481-5560 (FedOS Direct Double Ratchet
+/// Cryptographic Core Arc) — the narrow WASM-exported wrapper around
+/// `crypto::direct_ratchet_session::DirectRatchetSessionState`. Mirrors
+/// `FedosMasterSeedAuthority`'s own "opaque handle, minimize exports"
+/// shape. NO raw secret byte is ever returned by any method here — every
+/// fallible operation returns `Option<T>`/`None` (never a thrown
+/// exception for an ordinary cryptographic failure), matching this crate's
+/// established WASM export convention exactly.
+///
+/// `encrypt()`/`decrypt()` combine the header and ciphertext into ONE
+/// opaque wire message (`[4-byte BE header length][header bytes][ciphertext
+/// bytes]`) — this Arc remains transport-neutral (Absolute Prohibitions:
+/// no NIP-17 event, no Relay publish); a future integration Arc decides how
+/// this opaque blob actually travels.
+#[wasm_bindgen]
+pub struct FedosDirectRatchetSession {
+    inner: crate::crypto::direct_ratchet_session::DirectRatchetSessionState,
+}
+
+#[wasm_bindgen]
+impl FedosDirectRatchetSession {
+    /// Bob's role (review `08_dh_session_ratchet.md` §4): the root key is
+    /// bootstrapped from the EXISTING, real `resolve_conversation_key()`
+    /// computation (never a fresh/random seed) — `master_seed_authority`
+    /// MUST already hold a real Master Seed. Generates a fresh local
+    /// ratchet keypair immediately; derives no chain yet.
+    pub fn initialize_as_receiver(
+        master_seed_authority: &FedosMasterSeedAuthority,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        session_id: String,
+        local_device_ref: String,
+        generation: u32,
+    ) -> Option<FedosDirectRatchetSession> {
+        let conversation_key = master_seed_authority.resolve_conversation_key(account_index, counterparty_public_key_hex)?;
+        let bootstrap_bytes = conversation_key.inner().inner().expose_bytes_for_internal_ratchet_bootstrap()?;
+        let inner = crate::crypto::direct_ratchet_session::DirectRatchetSessionState::initialize_as_receiver(
+            session_id,
+            local_device_ref,
+            generation,
+            bootstrap_bytes,
+        )?;
+        Some(FedosDirectRatchetSession { inner })
+    }
+
+    /// Alice's role: already knows the peer's initial ratchet public key
+    /// (shared out-of-band -- this Arc names no signaling mechanism of its
+    /// own). Performs the first DH ratchet step immediately; ready to
+    /// encrypt right away.
+    pub fn initialize_as_sender(
+        master_seed_authority: &FedosMasterSeedAuthority,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        session_id: String,
+        local_device_ref: String,
+        generation: u32,
+        remote_ratchet_public_key_hex: String,
+    ) -> Option<FedosDirectRatchetSession> {
+        let conversation_key = master_seed_authority.resolve_conversation_key(account_index, counterparty_public_key_hex)?;
+        let bootstrap_bytes = conversation_key.inner().inner().expose_bytes_for_internal_ratchet_bootstrap()?;
+        let remote_public = fedos_decode_fixed_32_hex(&remote_ratchet_public_key_hex)?;
+        let inner = crate::crypto::direct_ratchet_session::DirectRatchetSessionState::initialize_as_sender(
+            session_id,
+            local_device_ref,
+            generation,
+            bootstrap_bytes,
+            remote_public,
+        )?;
+        Some(FedosDirectRatchetSession { inner })
+    }
+
+    /// The current local ratchet PUBLIC key, hex-encoded — non-secret wire
+    /// data, safe to share with the peer (out-of-band, this Arc's own
+    /// scope) or persist as plaintext session metadata.
+    pub fn local_ratchet_public_key_hex(&self) -> String {
+        fedos_encode_fixed_32_hex(&self.inner.local_ratchet_public_key())
+    }
+
+    pub fn remote_ratchet_public_key_hex(&self) -> Option<String> {
+        self.inner.remote_ratchet_public_key().map(|bytes| fedos_encode_fixed_32_hex(&bytes))
+    }
+
+    pub fn is_ready_to_send(&self) -> bool {
+        self.inner.is_ready_to_send()
+    }
+
+    pub fn send_counter(&self) -> u32 {
+        self.inner.send_counter()
+    }
+
+    pub fn receive_counter(&self) -> u32 {
+        self.inner.receive_counter()
+    }
+
+    pub fn skipped_key_count(&self) -> usize {
+        self.inner.skipped_key_count()
+    }
+
+    /// Encrypts `plaintext`. Returns the combined opaque wire message on
+    /// success, `None` if the session is not yet ready to send (no
+    /// established sending chain) or on send-counter overflow.
+    pub fn encrypt(&mut self, plaintext: &[u8]) -> Option<Vec<u8>> {
+        let (header, ciphertext) = self.inner.encrypt(plaintext)?;
+        let mut wire = Vec::with_capacity(4 + header.len() + ciphertext.len());
+        wire.extend_from_slice(&(header.len() as u32).to_be_bytes());
+        wire.extend_from_slice(&header);
+        wire.extend_from_slice(&ciphertext);
+        Some(wire)
+    }
+
+    /// Decrypts a combined opaque wire message. `now_ms` is caller-supplied
+    /// (this crate reads no wall clock internally, matching
+    /// `sign_nostr_event`'s own established `created_at` convention) --
+    /// used ONLY for skipped-key expiry evaluation. Returns plaintext on
+    /// success, `None` on ANY rejection reason (malformed wire message,
+    /// wrong session, invalid key, skip-limit exceeded, excessive gap,
+    /// duplicate/replay, or authentication failure) — deliberately COARSE,
+    /// never a distinguishing oracle (Phase I).
+    pub fn decrypt(&mut self, wire_message: &[u8], now_ms: f64) -> Option<Vec<u8>> {
+        if wire_message.len() < 4 {
+            return None;
+        }
+        let mut len_bytes = [0u8; 4];
+        len_bytes.copy_from_slice(&wire_message[0..4]);
+        let header_len = u32::from_be_bytes(len_bytes) as usize;
+        if wire_message.len() < 4 + header_len {
+            return None;
+        }
+        let header = &wire_message[4..4 + header_len];
+        let ciphertext = &wire_message[4 + header_len..];
+        self.inner.decrypt(header, ciphertext, now_ms as i64).ok()
+    }
+
+    // -- Phase L: sealed-persistence integration, per the Foundation Arc's
+    // own existing `FedosSealedDirectRatchetSecretRecordV1` secret-kind
+    // granularity ("root-key" / "sending-chain-key" / "receiving-chain-key" /
+    // "local-ratchet-private-key" / "skipped-message-key") — no new sealed
+    // format is invented; every seal/restore call here goes straight
+    // through to the EXISTING, unmodified
+    // `FedosMasterSeedAuthority::seal_direct_ratchet_secret`/
+    // `restore_direct_ratchet_secret`.
+
+    pub fn seal_root_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.root_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    pub fn seal_sending_chain_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.sending_chain_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    pub fn seal_receiving_chain_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.receiving_chain_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    pub fn seal_local_ratchet_private_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.local_ratchet_private_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    /// Each returned entry is `"{counter}:{remote_ratchet_public_hex}:{created_at_ms}:{sealed_blob}"` —
+    /// one per currently-held skipped key. A key whose OWN seal attempt
+    /// fails (unreachable in practice with a real, available authority) is
+    /// simply omitted, never silently fabricated.
+    pub fn seal_all_skipped_keys(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Vec<String> {
+        self.inner
+            .skipped_keys_for_sealing()
+            .into_iter()
+            .filter_map(|(public, counter, created_at_ms, bytes)| {
+                let sealed = master_seed_authority.seal_direct_ratchet_secret(
+                    self.inner.local_device_ref.clone(),
+                    remote_device_ref.clone(),
+                    conversation_id.clone(),
+                    self.inner.generation,
+                    &bytes,
+                )?;
+                Some(format!("{}:{}:{}:{}", counter, fedos_encode_fixed_32_hex(&public), created_at_ms, sealed))
+            })
+            .collect()
+    }
+
+    /// Restores a complete session from its previously-sealed constituent
+    /// parts, via the EXISTING, unmodified
+    /// `FedosMasterSeedAuthority::restore_direct_ratchet_secret` for each
+    /// one -- a wrong Device/account/Conversation/generation, or a
+    /// tampered sealed blob, fails this call closed (that method's own
+    /// AEAD-authentication guarantee, unchanged). `None` on ANY failure —
+    /// never a partial session.
+    #[allow(clippy::too_many_arguments)]
+    pub fn restore(
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+        session_id: String,
+        local_device_ref: String,
+        generation: u32,
+        send_counter: u32,
+        receive_counter: u32,
+        previous_sending_chain_length: u32,
+        remote_ratchet_public_key_hex: Option<String>,
+        sealed_root_key: String,
+        sealed_sending_chain_key: Option<String>,
+        sealed_receiving_chain_key: Option<String>,
+        sealed_local_ratchet_private_key: String,
+        sealed_skipped_keys: Vec<String>,
+    ) -> Option<FedosDirectRatchetSession> {
+        fn restore_32(
+            authority: &FedosMasterSeedAuthority,
+            local_device_ref: &str,
+            remote_device_ref: &str,
+            conversation_id: &str,
+            generation: u32,
+            sealed_blob: String,
+        ) -> Option<[u8; 32]> {
+            let bytes = authority.restore_direct_ratchet_secret(
+                local_device_ref.to_string(),
+                remote_device_ref.to_string(),
+                conversation_id.to_string(),
+                generation,
+                sealed_blob,
+            )?;
+            if bytes.len() != 32 {
+                return None;
+            }
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&bytes);
+            Some(out)
+        }
+
+        let root_key_bytes = restore_32(
+            master_seed_authority,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+            sealed_root_key,
+        )?;
+        let sending_chain_key_bytes = match sealed_sending_chain_key {
+            Some(blob) => Some(restore_32(master_seed_authority, &local_device_ref, &remote_device_ref, &conversation_id, generation, blob)?),
+            None => None,
+        };
+        let receiving_chain_key_bytes = match sealed_receiving_chain_key {
+            Some(blob) => Some(restore_32(master_seed_authority, &local_device_ref, &remote_device_ref, &conversation_id, generation, blob)?),
+            None => None,
+        };
+        let local_ratchet_private_key_bytes = restore_32(
+            master_seed_authority,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+            sealed_local_ratchet_private_key,
+        )?;
+        let remote_ratchet_public = match remote_ratchet_public_key_hex {
+            Some(hex) => Some(fedos_decode_fixed_32_hex(&hex)?),
+            None => None,
+        };
+
+        let mut skipped_keys = Vec::with_capacity(sealed_skipped_keys.len());
+        for entry in sealed_skipped_keys {
+            let parts: Vec<&str> = entry.splitn(4, ':').collect();
+            if parts.len() != 4 {
+                return None;
+            }
+            let counter: u32 = parts[0].parse().ok()?;
+            let public = fedos_decode_fixed_32_hex(parts[1])?;
+            let created_at_ms: i64 = parts[2].parse().ok()?;
+            let key_bytes = restore_32(
+                master_seed_authority,
+                &local_device_ref,
+                &remote_device_ref,
+                &conversation_id,
+                generation,
+                parts[3].to_string(),
+            )?;
+            skipped_keys.push((public, counter, created_at_ms, key_bytes));
+        }
+
+        let inner = crate::crypto::direct_ratchet_session::DirectRatchetSessionState::restore(
+            session_id,
+            local_device_ref,
+            generation,
+            send_counter,
+            receive_counter,
+            previous_sending_chain_length,
+            remote_ratchet_public,
+            root_key_bytes,
+            sending_chain_key_bytes,
+            receiving_chain_key_bytes,
+            local_ratchet_private_key_bytes,
+            skipped_keys,
+        )?;
+        Some(FedosDirectRatchetSession { inner })
+    }
 }
 
 #[cfg(test)]

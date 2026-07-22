@@ -3737,6 +3737,247 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   }
 
   /**
+   * Secure Runtime Alpha 5481-5560 (FedOS Direct Double Ratchet
+   * Cryptographic Core Arc) — PRIVATE, shared readiness gate for every new
+   * `FedosDirectRatchetSession` bridge method below. Checks the SAME six
+   * conditions every other Rust Boundary reach method in this file already
+   * checks inline; factored into one helper here ONLY because this Arc
+   * adds many operations on the same already-constructed session handle
+   * (unlike the Master Seed Authority's own handful of lifecycle methods),
+   * and duplicating the full inline check sixteen times would add far more
+   * bulk than it clarifies. Existing methods above are UNCHANGED — this
+   * helper is purely additive.
+   */
+  #directRatchetReadinessGateReason(): "PrototypeStillClosed" | "NotInitialized" | null {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      return "PrototypeStillClosed";
+    }
+    if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      return "NotInitialized";
+    }
+    return null;
+  }
+
+  /** PRIVATE — the module's own `FedosDirectRatchetSession` constructor, or `null` if the readiness gate is closed. */
+  #directRatchetSessionModule(): { FedosDirectRatchetSession?: unknown } | null {
+    if (this.#directRatchetReadinessGateReason() !== null) return null;
+    return this.#jsGlueModule as { FedosDirectRatchetSession?: unknown };
+  }
+
+  /**
+   * Secure Runtime Alpha 5481-5560 — Bob's role. `null` if the readiness
+   * gate is closed, the module export is missing, or the underlying Rust
+   * call itself fails closed (no Master Seed, invalid inputs).
+   */
+  async attemptDevOnlyDirectRatchetInitializeAsReceiverCall(
+    masterSeedAuthority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    sessionId: string,
+    localDeviceRef: string,
+    generation: number,
+  ): Promise<unknown> {
+    const module = this.#directRatchetSessionModule();
+    const Ctor = module?.FedosDirectRatchetSession as { initialize_as_receiver?: (...args: unknown[]) => unknown } | undefined;
+    if (!Ctor || typeof Ctor.initialize_as_receiver !== "function") return null;
+    try {
+      return Ctor.initialize_as_receiver(masterSeedAuthority, accountIndex, counterpartyPublicKeyHex, sessionId, localDeviceRef, generation) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Secure Runtime Alpha 5481-5560 — Alice's role. Same fail-closed shape as the receiver-role call above. */
+  async attemptDevOnlyDirectRatchetInitializeAsSenderCall(
+    masterSeedAuthority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    sessionId: string,
+    localDeviceRef: string,
+    generation: number,
+    remoteRatchetPublicKeyHex: string,
+  ): Promise<unknown> {
+    const module = this.#directRatchetSessionModule();
+    const Ctor = module?.FedosDirectRatchetSession as { initialize_as_sender?: (...args: unknown[]) => unknown } | undefined;
+    if (!Ctor || typeof Ctor.initialize_as_sender !== "function") return null;
+    try {
+      return (
+        Ctor.initialize_as_sender(
+          masterSeedAuthority,
+          accountIndex,
+          counterpartyPublicKeyHex,
+          sessionId,
+          localDeviceRef,
+          generation,
+          remoteRatchetPublicKeyHex,
+        ) ?? null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /** Secure Runtime Alpha 5481-5560 — restores a session from its sealed constituent parts. Same fail-closed shape. */
+  async attemptDevOnlyDirectRatchetRestoreCall(args: readonly unknown[]): Promise<unknown> {
+    const module = this.#directRatchetSessionModule();
+    const Ctor = module?.FedosDirectRatchetSession as { restore?: (...a: unknown[]) => unknown } | undefined;
+    if (!Ctor || typeof Ctor.restore !== "function") return null;
+    try {
+      return Ctor.restore(...[...args]) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Secure Runtime Alpha 5481-5560 — the shared, narrow passthrough every
+   * INSTANCE method on an already-constructed `FedosDirectRatchetSession`
+   * handle uses: readiness-gate check, structural method-presence check,
+   * `try`/`catch` around the real call, `undefined`/thrown-error both
+   * collapse to `null` — never a distinguishing oracle between "the gate
+   * is closed" and "the Rust call itself failed" at this layer (Phase I).
+   */
+  async #attemptDevOnlyDirectRatchetSessionMethodCall(
+    session: unknown,
+    methodName: string,
+    args: readonly unknown[],
+  ): Promise<unknown> {
+    if (this.#directRatchetReadinessGateReason() !== null) return null;
+    if (typeof session !== "object" || session === null) return null;
+    const method = (session as Record<string, unknown>)[methodName];
+    if (typeof method !== "function") return null;
+    try {
+      const result = (method as (...a: unknown[]) => unknown).apply(session, [...args]);
+      return result === undefined ? null : result;
+    } catch {
+      return null;
+    }
+  }
+
+  async attemptDevOnlyDirectRatchetEncryptCall(session: unknown, plaintext: Uint8Array): Promise<Uint8Array | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "encrypt", [plaintext]);
+    return result instanceof Uint8Array ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetDecryptCall(session: unknown, wireMessage: Uint8Array, nowMs: number): Promise<Uint8Array | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "decrypt", [wireMessage, nowMs]);
+    return result instanceof Uint8Array ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetLocalPublicKeyHexCall(session: unknown): Promise<string | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "local_ratchet_public_key_hex", []);
+    return typeof result === "string" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetRemotePublicKeyHexCall(session: unknown): Promise<string | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "remote_ratchet_public_key_hex", []);
+    return typeof result === "string" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetIsReadyToSendCall(session: unknown): Promise<boolean> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "is_ready_to_send", []);
+    return result === true;
+  }
+
+  async attemptDevOnlyDirectRatchetSendCounterCall(session: unknown): Promise<number | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "send_counter", []);
+    return typeof result === "number" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetReceiveCounterCall(session: unknown): Promise<number | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "receive_counter", []);
+    return typeof result === "number" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetSkippedKeyCountCall(session: unknown): Promise<number | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "skipped_key_count", []);
+    return typeof result === "number" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetSealRootKeyCall(
+    session: unknown,
+    masterSeedAuthority: unknown,
+    remoteDeviceRef: string,
+    conversationId: string,
+  ): Promise<string | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "seal_root_key", [
+      masterSeedAuthority,
+      remoteDeviceRef,
+      conversationId,
+    ]);
+    return typeof result === "string" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetSealSendingChainKeyCall(
+    session: unknown,
+    masterSeedAuthority: unknown,
+    remoteDeviceRef: string,
+    conversationId: string,
+  ): Promise<string | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "seal_sending_chain_key", [
+      masterSeedAuthority,
+      remoteDeviceRef,
+      conversationId,
+    ]);
+    return typeof result === "string" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetSealReceivingChainKeyCall(
+    session: unknown,
+    masterSeedAuthority: unknown,
+    remoteDeviceRef: string,
+    conversationId: string,
+  ): Promise<string | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "seal_receiving_chain_key", [
+      masterSeedAuthority,
+      remoteDeviceRef,
+      conversationId,
+    ]);
+    return typeof result === "string" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetSealLocalRatchetPrivateKeyCall(
+    session: unknown,
+    masterSeedAuthority: unknown,
+    remoteDeviceRef: string,
+    conversationId: string,
+  ): Promise<string | null> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "seal_local_ratchet_private_key", [
+      masterSeedAuthority,
+      remoteDeviceRef,
+      conversationId,
+    ]);
+    return typeof result === "string" ? result : null;
+  }
+
+  async attemptDevOnlyDirectRatchetSealAllSkippedKeysCall(
+    session: unknown,
+    masterSeedAuthority: unknown,
+    remoteDeviceRef: string,
+    conversationId: string,
+  ): Promise<readonly string[]> {
+    const result = await this.#attemptDevOnlyDirectRatchetSessionMethodCall(session, "seal_all_skipped_keys", [
+      masterSeedAuthority,
+      remoteDeviceRef,
+      conversationId,
+    ]);
+    return Array.isArray(result) ? (result as string[]) : [];
+  }
+
+  /**
    * PRIVATE — builds a `FedosWasmLoaderPlan` and calls its
    * `planImport()`. The result is discarded; it is never passed to
    * `WebAssembly.instantiate`/`compile`, `initSync`/the default init

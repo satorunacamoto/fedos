@@ -173,8 +173,24 @@ describe("FedOS Rust crate — getrandom CSPRNG adoption + RNG verification-infr
       "resolve_conversation_key",
       "seal_direct_ratchet_secret",
       "restore_direct_ratchet_secret",
+      "initialize_as_receiver",
+      "initialize_as_sender",
+      "local_ratchet_public_key_hex",
+      "remote_ratchet_public_key_hex",
+      "is_ready_to_send",
+      "send_counter",
+      "receive_counter",
+      "skipped_key_count",
+      "encrypt",
+      "decrypt",
+      "seal_root_key",
+      "seal_sending_chain_key",
+      "seal_receiving_chain_key",
+      "seal_local_ratchet_private_key",
+      "seal_all_skipped_keys",
+      "restore",
     ];
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
     expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 

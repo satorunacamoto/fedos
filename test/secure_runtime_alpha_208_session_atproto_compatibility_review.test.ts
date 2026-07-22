@@ -78,6 +78,9 @@ describe("Secure Runtime Alpha 208 -- Future Session/ATProto Compatibility Revie
       "ProtocolRootMaterial",
       "NostrSecretKeyMaterial",
       "TestOnlySecretMaterial",
+      "DirectRatchetRootKeyMaterial",
+      "DirectRatchetChainKeyMaterial",
+      "DirectRatchetPrivateKeyMaterial",
     ]);
 
     const domainBody = (libRsSource.match(/pub\(crate\) enum HkdfDomain \{([\s\S]*?)\r?\n {4}\}/) ?? [])[1] ?? "";

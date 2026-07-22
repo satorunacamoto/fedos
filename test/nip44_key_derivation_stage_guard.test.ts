@@ -215,7 +215,7 @@ describe("NIP-44 conversation/message key derivation (Stage 198-201, updated Sta
 
   it("14. the crate's public pub fn surface is unchanged at twenty-seven — no public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
     for (const name of pubFnNames) {
       // Alpha 869 -- FedosMasterSeedAuthority::resolve_conversation_key is
       // lib.rs-level wiring only; it delegates its ECDH math to this exact

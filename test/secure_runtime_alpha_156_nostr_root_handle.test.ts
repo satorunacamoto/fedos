@@ -97,9 +97,9 @@ describe("Secure Runtime Alpha 156 -- Nostr Root Handle", () => {
 
   it("11. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 -- confirming zero API surface change", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
   });
 
   // ---------------------------------------------------------------------

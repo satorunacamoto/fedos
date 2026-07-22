@@ -93,8 +93,8 @@ describe("Secure Runtime Alpha 204 -- Event Ownership Review", () => {
 
   it("10. Regression: lib.rs #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
   });
 });

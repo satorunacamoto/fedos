@@ -321,7 +321,7 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
     // -- reusing the existing derivation chain, no signing, no secret
     // exposure. 44 -> 45.
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
   });
 
   it("16. Cargo.toml and package.json dependency counts are unchanged", () => {

@@ -8,6 +8,71 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5481–5560 — FedOS Direct Double Ratchet
+> Cryptographic Core Arc (FULL completion).** Implements the real,
+> pure cryptographic core the normative forward-secrecy review delegates to
+> this exact Arc, built entirely on top of the completed, unmodified
+> Ratchet State Foundation Arc (`be1bc0d`) — no live Conversation wiring, no
+> NIP-17 mapping, no transport of any kind. Three new Rust modules
+> (`packages/fedos-core-rust/src/crypto/direct_ratchet{,_header,_session}.rs`):
+> fresh ephemeral secp256k1 keypair generation and validated ECDH agreement
+> (mirroring `conversation_key.rs`'s own reviewed point-arithmetic technique,
+> never modifying that frozen file); a root KDF and chain KDF built on raw
+> HKDF-SHA256, both session/Device-pair/Conversation/generation-bound and
+> proven deterministic-yet-context-separated; a versioned, fixed-layout,
+> transport-neutral header authenticated as AEAD Additional Authenticated
+> Data (a narrow, independent ChaCha20-Poly1305 helper, since the shared
+> `aead_internal::seal_internal` only accepts a fixed per-domain AAD label,
+> never arbitrary caller bytes — a deliberate new, narrow function rather
+> than widening that frozen shared primitive); a full session state machine
+> implementing the standard DH-ratchet-on-direction-switch transition
+> (proven by the local ratchet keypair genuinely rotating, discarding the
+> old private key for post-compromise security); bounded out-of-order/
+> skipped-key handling (1000 keys/gap, 14-day expiry — the review's own
+> exact figures); and atomic encrypt/decrypt (every fallible step computed
+> before any state mutation, committed in one place only after real AEAD
+> authentication succeeds). Sealed-persistence integration is deliberately
+> per-secret-kind, reusing the Foundation Arc's OWN already-proven
+> `FedosMasterSeedAuthority.seal_direct_ratchet_secret()`/
+> `restore_direct_ratchet_secret()` internally (Rust-to-Rust) for every
+> secret-bearing field — no new sealed bundle format, and no raw secret
+> byte ever crosses the WASM boundary into JavaScript. The headline proof
+> (`test/secure_runtime_alpha_5481_5560_real_vertical_slice.test.ts`) runs
+> against REAL cryptography and REAL durable files: two independently-
+> generated Device identities (Alice, Bob), a full real conversation
+> including a three-message send burst received out of order, one-time
+> skipped-key consumption, duplicate rejection, a genuine DH ratchet
+> transition completing Bob's reply, a real stop/seal/restore cycle,
+> continued conversation post-restart, wrong-Device rejection (a third
+> identity cannot restore another party's sealed state), ciphertext-tamper
+> rejection immediately followed by successful decryption of the genuine
+> message, an honest documented boundary around state-revision rollback
+> (a persistence-layer responsibility, not a crypto-core one), and a direct
+> read of the durable sealed-state file confirming none of the seven
+> plaintext markers used anywhere in the conversation appear in it. 78 new
+> tests (59 Rust + 14 TypeScript + structural guards), all passing, plus a
+> real WASM build. No Signal-protocol interoperability, MLS, or
+> post-quantum cryptography is claimed anywhere in this Arc — see
+> `docs/secure_runtime_alpha_5481_5560_cryptographic_construction.md`.
+> **Product-level forward secrecy is not yet claimed**: this is a
+> standalone cryptographic core with no live callers; it becomes a product
+> property only once a future Arc wires it into live message flow. See
+> `docs/secure_runtime_alpha_5481_5560_reconciliation_report.md`,
+> `..._execution_spec.md`, `..._cryptographic_construction.md`,
+> `..._test_vectors.md`, and `..._completion_declaration.md`.
+> Recommended next Arc: **FedOS Direct Double Ratchet Conversation Runtime
+> and NIP-17 Integration Arc.**
+>
+> **Note on Alpha-range numbering**: this branch's own base, `be1bc0d`
+> (Alpha 5401–5480, Direct Ratchet State and Sealed Persistence
+> Foundation), shares its Alpha label with an unrelated, independently-
+> completed sibling branch, `b3b3a6d` (Local Deletion Capability and
+> Deletion-State Foundation) — a genuine collision, recorded (never
+> silently repaired) in this Arc's own reconciliation report. Neither
+> commit was rewritten, amended, or renamed; this Arc's own range,
+> 5481–5560, is the earliest genuinely-free range as of this Arc's own
+> Phase A inventory.
+
 > **Status: Secure Runtime Alpha 5401–5480 — FedOS Direct Ratchet State and
 > Sealed Persistence Foundation Arc (FULL completion).** Implements the
 > complete NON-CRYPTOGRAPHIC foundation the normative forward-secrecy

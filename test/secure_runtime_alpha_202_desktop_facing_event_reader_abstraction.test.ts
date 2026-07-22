@@ -113,9 +113,9 @@ describe("Secure Runtime Alpha 202 -- Desktop-Facing Event Reader Abstraction", 
 
   it("10. structural: lib.rs #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
   });
 
   it("11. Regression: desktop_application.ts and create_desktop_application.ts carry no reference to this Stage's own doc or new types", () => {

@@ -126,9 +126,9 @@ describe("Secure Runtime Alpha 176 -- Nostr Public Identifier Origin Review", ()
 
   it("12. structural: wasm_bindgen count and pub fn count remain fixed at 13/36, unchanged by this Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(17);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
   });
 
   // ---------------------------------------------------------------------

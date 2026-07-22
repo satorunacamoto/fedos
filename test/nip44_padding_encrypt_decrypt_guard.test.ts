@@ -172,7 +172,7 @@ describe("NIP-44 padding/encrypt/decrypt/authentication (Stage 202-208)", () => 
 
   it("13. the crate's public pub fn surface is unchanged at twenty-seven — no public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(48);
+    expect(pubFnNames.length).toBe(64);
     for (const name of pubFnNames) {
       expect(name.toLowerCase()).not.toContain("nip44");
       expect(name.toLowerCase()).not.toContain("padding");
