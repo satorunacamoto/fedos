@@ -26,20 +26,20 @@ import {
   isValidFedosBoardOutboxPublishResult,
   type FedosBoardOutboxPublishResult,
 } from "../../board/outbox/fedos_board_outbox_publisher.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "./fedos_conversation_transport_outbox_codec.js";
+import type { FedosPersistedConversationTransportOutboxRecord } from "./fedos_conversation_transport_outbox_codec.js";
 
 /** Reused, unchanged vocabulary — see this file's own header. */
 export type FedosConversationTransportPublishResult = FedosBoardOutboxPublishResult;
 export const isValidFedosConversationTransportPublishResult = isValidFedosBoardOutboxPublishResult;
 
 export interface FedosConversationTransportPublisher {
-  publish(record: FedosPersistedConversationTransportOutboxRecordV1): Promise<FedosConversationTransportPublishResult>;
+  publish(record: FedosPersistedConversationTransportOutboxRecord): Promise<FedosConversationTransportPublishResult>;
 }
 
 export interface MockFedosConversationTransportPublisherOptions {
   readonly results?: readonly FedosConversationTransportPublishResult[];
   readonly next?: (
-    record: FedosPersistedConversationTransportOutboxRecordV1,
+    record: FedosPersistedConversationTransportOutboxRecord,
     callIndex: number,
   ) => FedosConversationTransportPublishResult;
 }
@@ -48,7 +48,7 @@ export interface MockFedosConversationTransportPublisherOptions {
 export class MockFedosConversationTransportPublisher implements FedosConversationTransportPublisher {
   readonly #results: readonly FedosConversationTransportPublishResult[];
   readonly #next?: MockFedosConversationTransportPublisherOptions["next"];
-  readonly #calls: FedosPersistedConversationTransportOutboxRecordV1[] = [];
+  readonly #calls: FedosPersistedConversationTransportOutboxRecord[] = [];
 
   constructor(options: MockFedosConversationTransportPublisherOptions = {}) {
     this.#results = options.results ?? [];
@@ -56,7 +56,7 @@ export class MockFedosConversationTransportPublisher implements FedosConversatio
   }
 
   async publish(
-    record: FedosPersistedConversationTransportOutboxRecordV1,
+    record: FedosPersistedConversationTransportOutboxRecord,
   ): Promise<FedosConversationTransportPublishResult> {
     const callIndex = this.#calls.length;
     this.#calls.push(record);
@@ -66,7 +66,7 @@ export class MockFedosConversationTransportPublisher implements FedosConversatio
     return { outcome: "delivered", retryPolicy: "never" };
   }
 
-  get calls(): readonly FedosPersistedConversationTransportOutboxRecordV1[] {
+  get calls(): readonly FedosPersistedConversationTransportOutboxRecord[] {
     return [...this.#calls];
   }
 }

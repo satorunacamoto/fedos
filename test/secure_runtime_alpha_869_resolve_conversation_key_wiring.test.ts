@@ -18,6 +18,8 @@ function fakeHandle(overrides: Partial<FedosMasterSeedAuthorityHandle> = {}): Fe
     sign_nostr_event: vi.fn(() => "{}"),
     public_key_hex_for_account: vi.fn(() => "a".repeat(64)),
     resolve_conversation_key: vi.fn(() => ({ kind: "AeadKeyHandle" }) as unknown),
+    seal_direct_ratchet_secret: vi.fn(() => "aabbccddeeff00112233445566778899aabbccdd"),
+    restore_direct_ratchet_secret: vi.fn(() => new Uint8Array([1, 2, 3])),
     ...overrides,
   };
 }
@@ -38,7 +40,20 @@ function boundaryWithResolveResult(
     attemptDevOnlyMasterSeedRestoreSealedCall: vi.fn(),
     attemptDevOnlyMasterSeedClearCall: vi.fn(),
     attemptDevOnlyMasterSeedResolveConversationKeyCall: vi.fn(async () => resolveResult),
-  };
+    attemptDevOnlyMasterSeedSealDirectRatchetSecretCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      sealedBlob: "aabbccddeeff00112233445566778899aabbccdd",
+      reason: "Succeeded" as const,
+    })),
+    attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      secretBytes: new Uint8Array([1, 2, 3]),
+      reason: "Succeeded" as const,
+    })),
+    attemptDevOnlyEncryptNip44WireCall: vi.fn(),
+    attemptDevOnlyDecryptNip44WireCall: vi.fn(),  };
 }
 
 describe("Secure Runtime Alpha 869 -- resolveConversationKey() TypeScript wiring", () => {

@@ -1,0 +1,36 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist"
+  },
+  "include": [
+    "src/desktop/beta/fedos_desktop_beta_application_assembly.ts",
+    "src/desktop/beta/fedos_desktop_beta_capability_manifest.ts",
+    "src/desktop/beta/fedos_desktop_beta_limitations.ts",
+    "src/desktop/beta/fedos_desktop_beta_release_configuration.ts",
+    "src/desktop/onboarding/fedos_profile_initialization_coordinator.ts",
+    "src/desktop/onboarding/fedos_local_profile_paths.ts",
+    "src/desktop/onboarding/fedos_local_profile_persistence.ts",
+    "src/desktop/onboarding/fedos_profile_unlock_secret.ts",
+    "src/desktop/production_activation/fedos_production_profile_activation.ts",
+    "src/desktop/production_activation/fedos_production_nostr_signing_authority.ts",
+    "src/desktop/production_activation/fedos_production_desktop_host_attestation.ts",
+    "src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.ts",
+    "src/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.ts",
+    "src/desktop/navigation/fedos_desktop_conversation_window_registry.ts",
+    "src/conversation/construction/fedos_conversation_creator_identity_authority.ts",
+    "src/desktop/notification/fedos_desktop_notification_coordinator.ts",
+    "src/desktop/tray/fedos_desktop_tray_coordinator.ts",
+    "src/desktop/tray/fedos_desktop_tray_types.ts",
+    "src/desktop/background/fedos_desktop_background_lifecycle_coordinator.ts",
+    "src/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.ts",
+    "src/desktop/badge/fedos_desktop_badge_coordinator.ts",
+    "src/device/sync_events/fedos_device_sync_event_bridge.ts",
+    "src/desktop/runtime/fedos_desktop_device_sync_presentation_wiring.ts",
+    "src/desktop/settings/fedos_desktop_settings_controller.ts",
+    "src/desktop/settings/fedos_desktop_settings_application_coordinator.ts",
+    "src/desktop/settings/fedos_desktop_settings_application_ports.ts",
+    "src/desktop/settings/fedos_desktop_settings_application_host_bridge.ts"
+  ]
+}

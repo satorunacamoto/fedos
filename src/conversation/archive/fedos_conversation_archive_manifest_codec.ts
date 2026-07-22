@@ -28,7 +28,7 @@ import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "./fedos_conversation_
 
 /** The ONLY constructor for a `FedosConversationArchiveManifestV1` — every count/hash is derived from `bundle` itself, never caller-supplied. */
 export function buildFedosConversationArchiveManifest(bundle: FedosConversationArchiveBundleV1): FedosConversationArchiveManifestV1 {
-  return {
+  const base: FedosConversationArchiveManifestV1 = {
     schemaVersion: FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION,
     conversationId: bundle.conversationId,
     exportedAt: bundle.exportedAt,
@@ -37,6 +37,22 @@ export function buildFedosConversationArchiveManifest(bundle: FedosConversationA
     envelopeCount: bundle.envelopes.length,
     payloadCount: bundle.payloads.length,
     contentHash: computeFedosConversationArchiveContentHash(bundle),
+  };
+  if (bundle.group === undefined) return base;
+
+  const group = bundle.group;
+  const groupChildRecordCount = group.childConversations.reduce(
+    (sum, child) => sum + child.memberships.length + child.capabilityEvents.length + child.envelopes.length + child.payloads.length,
+    0,
+  );
+  return {
+    ...base,
+    groupGenerationCount: group.generations.length,
+    groupPathCount: group.paths.length,
+    groupMessageCount: group.messages.length,
+    groupFanoutDeliveryCount: group.fanoutDeliveries.length,
+    groupChildConversationCount: group.childConversations.length,
+    groupChildRecordCount,
   };
 }
 
@@ -51,6 +67,17 @@ const TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
   "contentHash",
 ]);
 
+/** Secure Runtime Alpha 1921–1980 — the SIX new optional keys, present ALL-OR-NOTHING (a partial subset is malformed and rejected). */
+const GROUP_KEYS: readonly string[] = [
+  "groupGenerationCount",
+  "groupPathCount",
+  "groupMessageCount",
+  "groupFanoutDeliveryCount",
+  "groupChildConversationCount",
+  "groupChildRecordCount",
+];
+const GROUP_KEY_SET: ReadonlySet<string> = new Set(GROUP_KEYS);
+
 interface RawTopLevelFields {
   readonly schemaVersion: unknown;
   readonly conversationId: unknown;
@@ -60,6 +87,12 @@ interface RawTopLevelFields {
   readonly envelopeCount: unknown;
   readonly payloadCount: unknown;
   readonly contentHash: unknown;
+  readonly groupGenerationCount?: unknown;
+  readonly groupPathCount?: unknown;
+  readonly groupMessageCount?: unknown;
+  readonly groupFanoutDeliveryCount?: unknown;
+  readonly groupChildConversationCount?: unknown;
+  readonly groupChildRecordCount?: unknown;
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -70,10 +103,29 @@ function isNonNegativeInteger(value: unknown): value is number {
 export function deserializeFedosConversationArchiveManifest(record: unknown): FedosConversationArchiveManifestV1 | null {
   if (record === null || typeof record !== "object") return null;
   const keys = Object.keys(record);
-  if (!keys.every((key) => TOP_LEVEL_KEYS.has(key)) || keys.length !== TOP_LEVEL_KEYS.size) return null;
+  const presentGroupKeys = keys.filter((key) => GROUP_KEY_SET.has(key));
+  // All-or-nothing: a partial subset of the six Group keys is malformed, fails closed.
+  if (presentGroupKeys.length !== 0 && presentGroupKeys.length !== GROUP_KEYS.length) return null;
+  const hasGroup = presentGroupKeys.length === GROUP_KEYS.length;
+  const expectedSize = TOP_LEVEL_KEYS.size + (hasGroup ? GROUP_KEYS.length : 0);
+  if (!keys.every((key) => TOP_LEVEL_KEYS.has(key) || GROUP_KEY_SET.has(key)) || keys.length !== expectedSize) return null;
 
-  const { schemaVersion, conversationId, exportedAt, membershipCount, capabilityEventCount, envelopeCount, payloadCount, contentHash } =
-    record as RawTopLevelFields;
+  const {
+    schemaVersion,
+    conversationId,
+    exportedAt,
+    membershipCount,
+    capabilityEventCount,
+    envelopeCount,
+    payloadCount,
+    contentHash,
+    groupGenerationCount,
+    groupPathCount,
+    groupMessageCount,
+    groupFanoutDeliveryCount,
+    groupChildConversationCount,
+    groupChildRecordCount,
+  } = record as RawTopLevelFields;
 
   if (schemaVersion !== FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION) return null;
   if (typeof conversationId !== "string" || conversationId.length === 0) return null;
@@ -84,7 +136,7 @@ export function deserializeFedosConversationArchiveManifest(record: unknown): Fe
   if (!isNonNegativeInteger(payloadCount)) return null;
   if (typeof contentHash !== "string" || contentHash.length === 0) return null;
 
-  return {
+  const base: FedosConversationArchiveManifestV1 = {
     schemaVersion: FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION,
     conversationId,
     exportedAt,
@@ -93,5 +145,23 @@ export function deserializeFedosConversationArchiveManifest(record: unknown): Fe
     envelopeCount,
     payloadCount,
     contentHash,
+  };
+  if (!hasGroup) return base;
+
+  if (!isNonNegativeInteger(groupGenerationCount)) return null;
+  if (!isNonNegativeInteger(groupPathCount)) return null;
+  if (!isNonNegativeInteger(groupMessageCount)) return null;
+  if (!isNonNegativeInteger(groupFanoutDeliveryCount)) return null;
+  if (!isNonNegativeInteger(groupChildConversationCount)) return null;
+  if (!isNonNegativeInteger(groupChildRecordCount)) return null;
+
+  return {
+    ...base,
+    groupGenerationCount,
+    groupPathCount,
+    groupMessageCount,
+    groupFanoutDeliveryCount,
+    groupChildConversationCount,
+    groupChildRecordCount,
   };
 }

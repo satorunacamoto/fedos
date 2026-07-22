@@ -104,14 +104,34 @@ describe("Secure Runtime Alpha 606 -- Runtime Assembly (Board/Outbox Wiring, Alp
     expect(existsSync(outboxLogPath)).toBe(false);
   });
 
-  it("5. the returned handle exposes ONLY {host, boardRuntime, conversationRuntime, stop} -- no low-level Persistence/Scheduler leaked (Secure Runtime Alpha 671-673 add boardRuntime(); Alpha 921/923 add conversationRuntime() -- see docs/secure_runtime_alpha_671_running_runtime_ownership_decision.md)", async () => {
+  it("5. the returned handle exposes ONLY {host, boardRuntime, conversationRuntime, privateTransport, conversationArchiveRuntime, conversationContentAccessor, conversationProductionCryptoCapability, stop} -- no low-level Persistence/Scheduler leaked (Secure Runtime Alpha 671-673 add boardRuntime(); Alpha 921/923 add conversationRuntime(); Alpha 1471-1540 adds privateTransport(); Alpha 1691-1760 adds conversationArchiveRuntime(); Alpha 1261-1320/1391-1470 (merged this Arc) adds conversationProductionCryptoCapability(); Alpha 3081-3160 adds conversationContentAccessor() -- see docs/secure_runtime_alpha_671_running_runtime_ownership_decision.md)", async () => {
     const dir = freshDir();
     const runtime: FedosRunningDesktopRuntime = await startFedosDesktopRuntime({
       boardLogPath: join(dir, "board.jsonl"),
       outboxLogPath: join(dir, "outbox.jsonl"),
       deliveryEnabled: false,
     });
-    expect(Object.keys(runtime).sort()).toEqual(["boardRuntime", "conversationRuntime", "host", "stop"]);
+    // Secure Runtime Alpha 1263/1291 -- conversationProductionCryptoCapability()
+    // adds ONE coarse, non-secret capability-outcome accessor (Alpha
+    // 1261-1320); no persistence port, encryption handle, or Host internal
+    // is exposed by it. Secure Runtime Alpha 3081-3160 -- conversationContentAccessor()
+    // adds ONE narrow application-layer accessor, itself exposing no persistence
+    // port, crypto authority, or secret handle (see its own file header).
+    // is exposed by it. Secure Runtime Alpha 1471-1540's own `privateTransport()`
+    // accessor is ALSO present here (`privateTransportEnabled` was not
+    // supplied above, so it throws "not enabled" when called, but the key
+    // itself is unconditionally exposed) -- reconciled onto this same
+    // Alpha 1263/1291 assertion during the Alpha 1611-1690 integration merge.
+    expect(Object.keys(runtime).sort()).toEqual([
+      "boardRuntime",
+      "conversationArchiveRuntime",
+      "conversationContentAccessor",
+      "conversationProductionCryptoCapability",
+      "conversationRuntime",
+      "host",
+      "privateTransport",
+      "stop",
+    ]);
     await runtime.stop();
   });
 

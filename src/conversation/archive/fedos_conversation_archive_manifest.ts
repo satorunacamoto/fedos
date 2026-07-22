@@ -36,4 +36,21 @@ export interface FedosConversationArchiveManifestV1 {
   readonly envelopeCount: number;
   readonly payloadCount: number;
   readonly contentHash: string;
+  /**
+   * Secure Runtime Alpha 1921–1980 — OPTIONAL, ALL present together iff
+   * the bundle this Manifest describes carries a Group Section
+   * (`./fedos_conversation_archive_group_section.ts`); absent for a
+   * Direct-only bundle, identical to every Manifest this codebase
+   * produced before this Arc. `groupChildRecordCount` is the SUM of
+   * membership+capabilityEvent+envelope+payload counts across every
+   * child Direct Conversation bundle — a cleartext, pre-decrypt bound on
+   * the fanout multiplication (N generations x M paths x K messages x
+   * recipients) this Arc's own resource bounds must account for.
+   */
+  readonly groupGenerationCount?: number;
+  readonly groupPathCount?: number;
+  readonly groupMessageCount?: number;
+  readonly groupFanoutDeliveryCount?: number;
+  readonly groupChildConversationCount?: number;
+  readonly groupChildRecordCount?: number;
 }

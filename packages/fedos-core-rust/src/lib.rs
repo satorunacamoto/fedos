@@ -1811,6 +1811,27 @@ mod secret_handle {
         NostrSecretKeyMaterial,
         /// A test-fixture-only secret — never real production material.
         TestOnlySecretMaterial,
+        /// Secure Runtime Alpha 5481-5560 (FedOS Direct Double Ratchet
+        /// Cryptographic Core Arc) — a Direct Ratchet session's own root
+        /// key (`crypto::direct_ratchet::direct_ratchet_root_kdf_internal`'s
+        /// output). Deliberately separate from `IdentityRootMaterial`/
+        /// `ApplicationRootMaterial`/`ProtocolRootMaterial` — those form the
+        /// unrelated Identity-derivation hierarchy; this is the ratchet's
+        /// own, per-session accumulator, re-seeded via DH output, never via
+        /// `kdf_core::HkdfDomain`.
+        DirectRatchetRootKeyMaterial,
+        /// A Direct Ratchet session's own sending- or receiving-chain key
+        /// (`direct_ratchet_root_kdf_internal`'s second output, and
+        /// `direct_ratchet_chain_kdf_internal`'s own "next chain key"
+        /// output). One kind covers both chain directions — direction is
+        /// tracked by which session-state field holds the handle, not by a
+        /// second kind label.
+        DirectRatchetChainKeyMaterial,
+        /// A Direct Ratchet session's own ephemeral local DH keypair
+        /// private half (`generate_direct_ratchet_keypair_internal`'s
+        /// output) — freshly random per DH step, NEVER derived from the
+        /// Master Seed, and discarded (never reused) once superseded.
+        DirectRatchetPrivateKeyMaterial,
     }
 
     /// The fixed, label-selected input length
@@ -2015,6 +2036,77 @@ mod secret_handle {
         /// placeholder path and after `clear()`; returns a COPY, never a
         /// reference; the caller zeroizes its own copy once done.
         pub(crate) fn expose_bytes_for_internal_ecdh(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — a narrowly-scoped accessor for
+        /// `crypto::direct_ratchet::direct_ratchet_ecdh_internal`'s own
+        /// `DirectRatchetPrivateKeyMaterial` input. A SIBLING of
+        /// `expose_bytes_for_internal_ecdh`, never a reuse of it — that one
+        /// is scoped exclusively to `crypto::conversation_key`'s own NIP-44
+        /// pipeline. Same rules: `None` for placeholder/cleared; returns a
+        /// COPY, caller zeroizes it.
+        pub(crate) fn expose_bytes_for_internal_ratchet_ecdh(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `crypto::direct_ratchet::direct_ratchet_root_kdf_internal`'s own
+        /// `DirectRatchetRootKeyMaterial` input/output. Same rules as every
+        /// sibling accessor above.
+        pub(crate) fn expose_bytes_for_internal_ratchet_root_kdf(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `crypto::direct_ratchet::direct_ratchet_chain_kdf_internal`'s own
+        /// `DirectRatchetChainKeyMaterial` input/output. Same rules as every
+        /// sibling accessor above.
+        pub(crate) fn expose_bytes_for_internal_ratchet_chain_kdf(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `crypto::direct_ratchet_session`'s OWN seal/restore integration
+        /// with the Foundation Arc's EXISTING
+        /// `FedosMasterSeedAuthority::seal_direct_ratchet_secret`/
+        /// `restore_direct_ratchet_secret` — the ONE reviewed boundary
+        /// crossing where a ratchet secret's raw bytes are handed to
+        /// another Rust function (never to WASM/JS). Kind-agnostic by
+        /// design (used for root/chain/private-key/message-key handles
+        /// alike, all for this SAME single purpose) — narrower than a
+        /// generic `expose()` because it is named for, and used by,
+        /// exactly one call site, not "whichever future caller needs
+        /// bytes."
+        pub(crate) fn expose_bytes_for_internal_ratchet_state_sealing(&self) -> Option<[u8; 32]> {
+            match &self.payload {
+                Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
+                _ => None,
+            }
+        }
+
+        /// Secure Runtime Alpha 5481-5560 — scoped to
+        /// `FedosDirectRatchetSession`'s own session-bootstrap seam: the
+        /// review's own recommendation (`08_dh_session_ratchet.md` §4) to
+        /// seed a NEW session's first root key from the EXISTING, real
+        /// `resolve_conversation_key()` output, rather than a fresh/random
+        /// seed. The source handle here is `AeadKeyMaterial`-kinded (that
+        /// method's own established output kind) — a different kind than
+        /// this Arc's own `DirectRatchetRootKeyMaterial`, read once at
+        /// bootstrap time only, never again afterward.
+        pub(crate) fn expose_bytes_for_internal_ratchet_bootstrap(&self) -> Option<[u8; 32]> {
             match &self.payload {
                 Some(SecretPayload::Real(boxed)) => Some(boxed.expose_secret().0),
                 _ => None,
@@ -2568,6 +2660,16 @@ mod kdf_core {
         /// `Wallet Root` as a Master-Seed-direct sibling of `Application
         /// Root`, not a Protocol Root nested under it.
         Wallet,
+        /// Secure Runtime Alpha 5401-5480 — the Direct Ratchet State and
+        /// Sealed Persistence Foundation Arc's own sealing-root domain:
+        /// derives a fixed root secret from the Master Seed that this
+        /// Arc's own per-call, per-session context-expand step (never
+        /// through this shared fixed-domain helper, which never accepts
+        /// caller-supplied salt/info) further separates by session
+        /// binding. Deliberately its own domain — this Arc's own secret
+        /// class gets its own label, the same reason every other domain
+        /// here has its own.
+        DirectRatchetSealing,
         /// Reserved for this module's own tests / future test-only fixtures
         /// — never used by production call sites.
         TestOnly,
@@ -2591,6 +2693,7 @@ mod kdf_core {
                 HkdfDomain::Session => b"fedos-hkdf-salt-session-v1",
                 HkdfDomain::ATProto => b"fedos-hkdf-salt-atproto-v1",
                 HkdfDomain::Wallet => b"fedos-hkdf-salt-wallet-v1",
+                HkdfDomain::DirectRatchetSealing => b"fedos-hkdf-salt-direct-ratchet-sealing-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-salt-test-only-v1",
             }
         }
@@ -2608,6 +2711,7 @@ mod kdf_core {
                 HkdfDomain::Session => b"fedos-hkdf-info-session-v1",
                 HkdfDomain::ATProto => b"fedos-hkdf-info-atproto-v1",
                 HkdfDomain::Wallet => b"fedos-hkdf-info-wallet-v1",
+                HkdfDomain::DirectRatchetSealing => b"fedos-hkdf-info-direct-ratchet-sealing-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-info-test-only-v1",
             }
         }
@@ -2878,9 +2982,11 @@ mod kdf_core {
         /// named itself "...the_six_specified"; Alpha 152 added `Nostr`
         /// (a seventh variant, briefly) and this Stage adds `Session`,
         /// `ATProto`, and `Wallet` (three more), for TEN variants total —
-        /// renamed and re-verified against the CURRENT state.
+        /// renamed and re-verified against the CURRENT state. Secure
+        /// Runtime Alpha 5401-5480 adds an ELEVENTH, `DirectRatchetSealing`
+        /// — re-verified again against the CURRENT state.
         #[test]
-        fn hkdf_domain_has_no_variant_other_than_the_ten_specified() {
+        fn hkdf_domain_has_no_variant_other_than_the_eleven_specified() {
             let domain = HkdfDomain::TestOnly;
             match domain {
                 HkdfDomain::RootKey => {}
@@ -2892,6 +2998,7 @@ mod kdf_core {
                 HkdfDomain::Session => {}
                 HkdfDomain::ATProto => {}
                 HkdfDomain::Wallet => {}
+                HkdfDomain::DirectRatchetSealing => {}
                 HkdfDomain::TestOnly => {}
             }
         }
@@ -3463,10 +3570,15 @@ mod master_root {
     }
 
     impl FedosNostrSecretKeyHandle {
-        /// Private to this module — the only production caller is
-        /// [`derive_nostr_secret_key_internal`] below, and only once its
-        /// HKDF candidate bytes have already been confirmed a valid
-        /// secp256k1 scalar.
+        /// Private to this module. Two reviewed production callers:
+        /// [`derive_nostr_secret_key_internal`] below (once its HKDF
+        /// candidate bytes have already been confirmed a valid secp256k1
+        /// scalar), and, as of Secure Runtime Alpha 1761–1840 Phase E
+        /// (Alpha 1777), [`sign_nostr_event_with_fresh_ephemeral_key_internal`]
+        /// (fresh CSPRNG bytes, never HKDF-derived, never Master-Seed
+        /// derived) — the Gift-Wrap ephemeral signing key. Both callers
+        /// already validate their own input before calling this
+        /// constructor; it does not re-validate the scalar itself.
         fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
             Self {
                 inner: SecretHandle::new_from_32_bytes_for_internal_use(
@@ -4926,11 +5038,683 @@ mod master_root {
         conversation_key_bytes
     }
 
+    /// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+    /// Standard Delivery Arc") Phase B (Alpha 1764–1768) — the crate's
+    /// FIRST bridge from an account-derived Master Seed secret key all
+    /// the way to a genuine NIP-44 v2 WIRE payload (ECDH -> HKDF-extract
+    /// -> exact message-key derivation -> pad -> ChaCha20 -> HMAC-SHA256
+    /// -> base64), as distinct from
+    /// [`derive_conversation_key_bytes_from_master_seed_internal`]'s own
+    /// FedOS-generic-Envelope-AEAD-key output (Alpha 869) — that
+    /// function's resulting bytes are wrapped into an `AeadKeyHandle` and
+    /// fed to THIS crate's own `encrypt_aead`/`decrypt_aead`, which is
+    /// NEVER interoperable NIP-44 wire ciphertext. This function instead
+    /// calls `crypto::nip44_wire_encrypt::encrypt_wire_internal` (Stage
+    /// 236, UNCHANGED, official-vector-verified) directly, so its output
+    /// is a real, standard NIP-44 v2 wire string any genuine Nostr client
+    /// can decrypt.
+    ///
+    /// Reuses the IDENTICAL identity -> application root -> nostr root ->
+    /// account secret key chain every sibling function in this module
+    /// already establishes (Alpha 146–200, unchanged), then bridges the
+    /// resulting secret key and `counterparty_public_key_x_only` into
+    /// `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`
+    /// (Stage 199, UNCHANGED) exactly as
+    /// [`derive_conversation_key_bytes_from_master_seed_internal`] already
+    /// does — but instead of exposing the derived conversation key as raw
+    /// bytes, keeps it as the real, opaque `ConversationKey` handle and
+    /// passes it DIRECTLY to `encrypt_wire_internal`, so no conversation
+    /// key byte is ever copied further than this function's own local
+    /// scope. `plaintext` is the caller-supplied Rumor/Seal serialization
+    /// — this function performs NO Rumor/Seal construction of its own, no
+    /// padding/nonce/HMAC/base64 logic of its own (all reused, unmodified,
+    /// from `crypto::nip44_wire_encrypt`).
+    ///
+    /// Returns the complete NIP-44 v2 wire payload string on success,
+    /// `None` on ANY failure at ANY step (no Master Seed held, an invalid
+    /// `account_index` derivation, an invalid/off-curve counterparty key,
+    /// or an internal encrypt-pipeline failure) — fail closed, never a
+    /// panic, collapsing every failure into the SAME single `None` this
+    /// module's every other `*_from_master_seed_internal` function already
+    /// uses. Every intermediate root/key/conversation-key handle is
+    /// `clear()`-ed immediately after its own single use.
+    pub(crate) fn encrypt_nip44_wire_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+        counterparty_public_key_x_only: [u8; 32],
+        plaintext: &[u8],
+    ) -> Option<String> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let mut local_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        secret_key.clear();
+
+        let local_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            local_secret_bytes,
+        );
+        local_secret_bytes.zeroize();
+        let counterparty_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            counterparty_public_key_x_only,
+        );
+
+        let conversation_decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &local_secret_handle,
+            &counterparty_handle,
+        );
+        if conversation_decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            return None;
+        }
+        let mut conversation_key = conversation_decision.output?;
+
+        let encrypt_decision =
+            crate::crypto::nip44_wire_encrypt::encrypt_wire_internal(&conversation_key, plaintext);
+        conversation_key.clear();
+
+        match encrypt_decision.status {
+            crate::crypto::nip44_wire_encrypt::Nip44WireEncryptStatus::Ready => encrypt_decision.payload,
+            _ => None,
+        }
+    }
+
+    /// The decrypt-direction sibling of
+    /// [`encrypt_nip44_wire_from_master_seed_internal`] — see that
+    /// function's own doc comment for the shared derivation-chain
+    /// rationale. Calls `crypto::nip44_wire_decrypt::decrypt_wire_payload_internal`
+    /// (Stage 232/235, UNCHANGED, official-vector-verified) instead of the
+    /// encrypt pipeline.
+    ///
+    /// Returns the original plaintext bytes on success, `None` on ANY
+    /// failure (no Master Seed held, invalid `account_index`/counterparty
+    /// key, a structurally malformed `payload`, OR a genuine
+    /// authentication failure — wrong recipient or tampered ciphertext) —
+    /// this function does NOT further distinguish those causes;
+    /// `decrypt_wire_payload_internal` itself already collapses them per
+    /// its own module doc comment's "never distinguishing why" discipline
+    /// (never returning partial/best-effort plaintext), and this function
+    /// propagates that same discipline rather than adding a new one.
+    pub(crate) fn decrypt_nip44_wire_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+        counterparty_public_key_x_only: [u8; 32],
+        payload: &str,
+    ) -> Option<Vec<u8>> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let mut local_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        secret_key.clear();
+
+        let local_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            local_secret_bytes,
+        );
+        local_secret_bytes.zeroize();
+        let counterparty_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            counterparty_public_key_x_only,
+        );
+
+        let conversation_decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &local_secret_handle,
+            &counterparty_handle,
+        );
+        if conversation_decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            return None;
+        }
+        let mut conversation_key = conversation_decision.output?;
+
+        let decrypt_decision = crate::crypto::nip44_wire_decrypt::decrypt_wire_payload_internal(
+            &conversation_key,
+            payload,
+        );
+        conversation_key.clear();
+
+        match decrypt_decision.status {
+            crate::crypto::nip44_wire_decrypt::Nip44WireDecryptStatus::Ready => decrypt_decision.plaintext,
+            _ => None,
+        }
+    }
+
+    /// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+    /// Standard Delivery Arc") Phase E (Alpha 1777–1780) — a narrow,
+    /// single-use ephemeral Nostr signing operation: draws a FRESH
+    /// CSPRNG secp256k1 secret key (via [`crate::fedos_random_bytes_32`],
+    /// the SAME entropy source `FedosMasterSeedAuthority::generate()`
+    /// itself already uses), derives its public key, signs EXACTLY ONE
+    /// caller-supplied event with it, then `clear()`s the ephemeral
+    /// secret key before returning — NO deterministic Master-Seed
+    /// derivation of any kind (this function never touches a
+    /// `FedosMasterSeedHandle`), NO durable persistence, NO raw-key
+    /// getter, and NO generic "sign with any key" API: this function
+    /// generates its own key internally every call and never accepts one
+    /// from a caller. This is the Gift-Wrap outer signing authority
+    /// NIP-59 requires (a fresh, unlinkable key per Gift Wrap) — NEVER
+    /// used for Seal signing, which uses the REAL sender identity via
+    /// [`sign_nostr_event_from_master_seed_internal`] instead, unchanged.
+    ///
+    /// Reuses the EXISTING Alpha 146-200 event/signature construction
+    /// chain ([`new_nostr_event_internal`]/[`derive_nostr_event_id_internal`]/
+    /// [`sign_nostr_event_internal`]/`nostr_event_encoding::serialize_signed_nostr_event_internal`)
+    /// verbatim — this function's only new work is drawing the ephemeral
+    /// key itself and deriving its public key, the SAME "generate, use
+    /// once, clear" discipline every other secret handle in this module
+    /// already follows.
+    ///
+    /// `kind`/`tags`/`content` are caller-supplied (the Gift-Wrap's own
+    /// `kind: 1059`/`p`-tag/NIP-44-encrypted-Seal content, per NIP-59) —
+    /// this function performs NO Gift-Wrap-specific construction of its
+    /// own; it is a general "sign one event with one fresh ephemeral
+    /// key" primitive. Returns the complete signed NIP-01-shaped event as
+    /// a JSON string on success, `None` on ANY failure (CSPRNG
+    /// unavailable, an out-of-range `created_at`, or any internal
+    /// construction/signing failure) — fail closed, never a panic, never
+    /// a partial event.
+    pub(crate) fn sign_nostr_event_with_fresh_ephemeral_key_internal(
+        created_at: u64,
+        kind: u64,
+        tags: Vec<Vec<String>>,
+        content: String,
+    ) -> Option<String> {
+        let random_decision = crate::fedos_random_bytes_32();
+        if random_decision.state != crate::FedosRandomBytesState::Ready {
+            return None;
+        }
+        let mut key_bytes = random_decision.bytes?;
+        let mut secret_key = FedosNostrSecretKeyHandle::new_from_32_bytes_for_internal_use(key_bytes);
+        key_bytes.zeroize();
+
+        let public_key = match derive_nostr_public_key_internal(&secret_key) {
+            Some(pk) => pk,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event = match new_nostr_event_internal(&public_key, created_at, kind, tags, content) {
+            Some(e) => e,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event_id = match derive_nostr_event_id_internal(&event) {
+            Some(id) => id,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let signature = sign_nostr_event_internal(&event, &secret_key);
+        secret_key.clear();
+        let signature = signature?;
+        let signature_bytes = signature.expose_bytes_for_internal_signature_encoding();
+
+        Some(nostr_event_encoding::serialize_signed_nostr_event_internal(
+            &event_id, &event, &signature_bytes,
+        ))
+    }
+
+    /// Secure Runtime Alpha 1761–1840 Phase F (Alpha 1782/1785/1786) —
+    /// the NIP-59 Gift-Wrap construction primitive. NIP-59's own Gift
+    /// Wrap encrypts to the recipient using
+    /// `conversation_key(wrapperPrivateKey, receiverPublicKey)` — an
+    /// ECDH between the FRESH EPHEMERAL secret key and the recipient's
+    /// public key, NOT a Master-Seed-derived account (unlike
+    /// [`encrypt_nip44_wire_from_master_seed_internal`], which is
+    /// therefore NOT reusable here). Since the ephemeral secret key must
+    /// never leave this function (no raw-key getter, no cross-boundary
+    /// exposure — Alpha 1777's own guardrail), the encrypt AND the sign
+    /// step must happen in the SAME call, atomically, with the SAME
+    /// transient key — this function is that atomic operation.
+    ///
+    /// Pipeline: draw a fresh CSPRNG secp256k1 key -> derive its public
+    /// key -> ECDH the ephemeral secret against `recipient_public_key_hex`
+    /// (`crypto::conversation_key::derive_conversation_key_via_ecdh_internal`,
+    /// UNCHANGED) -> NIP-44 wire encrypt `content_plaintext` under that
+    /// conversation key (`crypto::nip44_wire_encrypt::encrypt_wire_internal`,
+    /// UNCHANGED) -> build the `kind`/`["p", recipient]`-tagged event ->
+    /// sign it with the SAME ephemeral key -> clear the ephemeral key and
+    /// the conversation key -> return the complete signed event JSON.
+    /// `content_plaintext` is the caller-supplied Seal serialization —
+    /// this function performs NO Seal construction of its own.
+    ///
+    /// Returns `None` on ANY failure at ANY step (CSPRNG unavailable, a
+    /// malformed/off-curve `recipient_public_key_hex`, or any internal
+    /// ECDH/encrypt/sign failure) — fail closed, never a panic, never a
+    /// partial event.
+    pub(crate) fn build_and_sign_nip17_gift_wrap_internal(
+        recipient_public_key_hex: &str,
+        created_at: u64,
+        kind: u64,
+        content_plaintext: &[u8],
+    ) -> Option<String> {
+        let recipient_bytes = crate::fedos_decode_fixed_32_hex(recipient_public_key_hex)?;
+
+        let random_decision = crate::fedos_random_bytes_32();
+        if random_decision.state != crate::FedosRandomBytesState::Ready {
+            return None;
+        }
+        let mut key_bytes = random_decision.bytes?;
+        let mut secret_key = FedosNostrSecretKeyHandle::new_from_32_bytes_for_internal_use(key_bytes);
+        key_bytes.zeroize();
+
+        let public_key = match derive_nostr_public_key_internal(&secret_key) {
+            Some(pk) => pk,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let mut ephemeral_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        let ephemeral_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            ephemeral_secret_bytes,
+        );
+        ephemeral_secret_bytes.zeroize();
+        let recipient_handle =
+            SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::NostrKeyMaterial, recipient_bytes);
+
+        let conversation_decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &ephemeral_secret_handle,
+            &recipient_handle,
+        );
+        if conversation_decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            secret_key.clear();
+            return None;
+        }
+        let mut conversation_key = match conversation_decision.output {
+            Some(key) => key,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let encrypt_decision =
+            crate::crypto::nip44_wire_encrypt::encrypt_wire_internal(&conversation_key, content_plaintext);
+        conversation_key.clear();
+        let encrypted_content = match encrypt_decision.status {
+            crate::crypto::nip44_wire_encrypt::Nip44WireEncryptStatus::Ready => match encrypt_decision.payload {
+                Some(payload) => payload,
+                None => {
+                    secret_key.clear();
+                    return None;
+                }
+            },
+            _ => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let tags = vec![vec!["p".to_string(), recipient_public_key_hex.to_string()]];
+        let event = match new_nostr_event_internal(&public_key, created_at, kind, tags, encrypted_content) {
+            Some(e) => e,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event_id = match derive_nostr_event_id_internal(&event) {
+            Some(id) => id,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let signature = sign_nostr_event_internal(&event, &secret_key);
+        secret_key.clear();
+        let signature = signature?;
+        let signature_bytes = signature.expose_bytes_for_internal_signature_encoding();
+
+        Some(nostr_event_encoding::serialize_signed_nostr_event_internal(
+            &event_id, &event, &signature_bytes,
+        ))
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
 
         const TEST_MASTER_SEED: [u8; 32] = [0xEE; 32];
+
+        const ALICE_SEED: [u8; 32] = [0x11; 32];
+        const BOB_SEED: [u8; 32] = [0x22; 32];
+        const MALLORY_SEED: [u8; 32] = [0x33; 32];
+
+        fn public_key_bytes(master_seed_bytes: [u8; 32], account_index: u32) -> [u8; 32] {
+            let master_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(master_seed_bytes);
+            let hex = derive_nostr_public_key_hex_from_master_seed_internal(&master_seed, account_index)
+                .expect("expected a real public key hex");
+            crate::fedos_decode_fixed_32_hex(&hex).expect("expected a well-formed 32-byte hex string")
+        }
+
+        #[test]
+        fn encrypt_then_decrypt_nip44_wire_round_trips_between_two_real_identities() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub = public_key_bytes(ALICE_SEED, 0);
+
+            let payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"hello bob, real nip-44 wire")
+                .expect("expected a real NIP-44 wire payload");
+
+            let plaintext = decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, alice_pub, &payload)
+                .expect("expected Bob to decrypt Alice's payload");
+            assert_eq!(plaintext, b"hello bob, real nip-44 wire".to_vec());
+        }
+
+        #[test]
+        fn different_account_indices_derive_independent_pairwise_keys() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub_account_1 = public_key_bytes(ALICE_SEED, 1);
+
+            let payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"account-scoped secret")
+                .expect("expected a real NIP-44 wire payload");
+
+            // Bob attempting to decrypt as though the sender were Alice's
+            // account 1 (a DIFFERENT derived key pair) must fail closed —
+            // never a partial/degraded plaintext.
+            let wrong_account_result =
+                decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, alice_pub_account_1, &payload);
+            assert_eq!(wrong_account_result, None);
+        }
+
+        #[test]
+        fn wrong_recipient_cannot_decrypt_and_receives_no_partial_plaintext() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let mallory_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(MALLORY_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub = public_key_bytes(ALICE_SEED, 0);
+
+            let payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"only for bob")
+                .expect("expected a real NIP-44 wire payload");
+
+            let mallory_result =
+                decrypt_nip44_wire_from_master_seed_internal(&mallory_seed, 0, alice_pub, &payload);
+            assert_eq!(mallory_result, None);
+        }
+
+        #[test]
+        fn tampered_wire_payload_fails_closed() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub = public_key_bytes(ALICE_SEED, 0);
+
+            let mut payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"tamper me not")
+                .expect("expected a real NIP-44 wire payload");
+            // Flip the last base64 character — corrupts the trailing MAC
+            // bytes without affecting structural decodability.
+            let mut chars: Vec<char> = payload.chars().collect();
+            let last = chars.len() - 1;
+            chars[last] = if chars[last] == 'A' { 'B' } else { 'A' };
+            payload = chars.into_iter().collect();
+
+            let result = decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, alice_pub, &payload);
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn sign_nostr_event_with_fresh_ephemeral_key_internal_produces_a_signature_that_verifies_independently() {
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let json = sign_nostr_event_with_fresh_ephemeral_key_internal(
+                1_715_000_000,
+                1059,
+                vec![vec!["p".to_string(), "aa".repeat(32)]],
+                "ciphertext-shaped-content".to_string(),
+            )
+            .expect("expected a real signed event");
+
+            let pubkey_hex = extract_json_string_field_for_test(&json, "pubkey");
+            let sig_hex = extract_json_string_field_for_test(&json, "sig");
+            let id_hex = extract_json_string_field_for_test(&json, "id");
+            assert_eq!(pubkey_hex.len(), 64);
+            assert_eq!(sig_hex.len(), 128);
+            assert_eq!(id_hex.len(), 64);
+
+            let pubkey_bytes = crate::fedos_decode_fixed_32_hex(&pubkey_hex).expect("valid pubkey hex");
+            let id_bytes = crate::fedos_decode_fixed_32_hex(&id_hex).expect("valid id hex");
+            let sig_bytes = hex_decode_64_bytes_for_test(&sig_hex);
+
+            let verifying_key = SchnorrVerifyingKey::from_bytes(&pubkey_bytes)
+                .expect("expected a valid on-curve ephemeral public key");
+            let schnorr_signature =
+                SchnorrSignature::try_from(sig_bytes.as_slice()).expect("expected a well-formed signature");
+            assert!(verifying_key.verify_prehash(&id_bytes, &schnorr_signature).is_ok());
+        }
+
+        #[test]
+        fn sign_nostr_event_with_fresh_ephemeral_key_internal_draws_a_different_key_every_call() {
+            let first = sign_nostr_event_with_fresh_ephemeral_key_internal(
+                1_715_000_000,
+                1059,
+                vec![],
+                "one".to_string(),
+            )
+            .expect("expected a real signed event");
+            let second = sign_nostr_event_with_fresh_ephemeral_key_internal(
+                1_715_000_000,
+                1059,
+                vec![],
+                "one".to_string(),
+            )
+            .expect("expected a real signed event");
+
+            let first_pubkey = extract_json_string_field_for_test(&first, "pubkey");
+            let second_pubkey = extract_json_string_field_for_test(&second, "pubkey");
+            assert_ne!(first_pubkey, second_pubkey);
+        }
+
+        fn extract_json_string_field_for_test(json: &str, key: &str) -> String {
+            let needle = format!("\"{key}\":\"");
+            let start = json.find(&needle).expect("field must be present") + needle.len();
+            let end = json[start..].find('"').expect("field must be terminated") + start;
+            json[start..end].to_string()
+        }
+
+        fn hex_decode_64_bytes_for_test(hex: &str) -> Vec<u8> {
+            fn nibble(byte: u8) -> u8 {
+                match byte {
+                    b'0'..=b'9' => byte - b'0',
+                    b'a'..=b'f' => byte - b'a' + 10,
+                    b'A'..=b'F' => byte - b'A' + 10,
+                    _ => panic!("invalid hex nibble in test helper"),
+                }
+            }
+            let bytes = hex.as_bytes();
+            (0..bytes.len() / 2)
+                .map(|i| (nibble(bytes[2 * i]) << 4) | nibble(bytes[2 * i + 1]))
+                .collect()
+        }
+
+        fn hex_encode_32_bytes_for_test(bytes: &[u8; 32]) -> String {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+
+        #[test]
+        fn build_and_sign_nip17_gift_wrap_internal_round_trips_and_verifies() {
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub_bytes = public_key_bytes(BOB_SEED, 0);
+            let bob_pub_hex = hex_encode_32_bytes_for_test(&bob_pub_bytes);
+
+            let gift_wrap_json = build_and_sign_nip17_gift_wrap_internal(
+                &bob_pub_hex,
+                1_715_000_000,
+                1059,
+                b"a real signed seal json goes here",
+            )
+            .expect("expected a real signed gift wrap");
+
+            let wrapper_pubkey_hex = extract_json_string_field_for_test(&gift_wrap_json, "pubkey");
+            let sig_hex = extract_json_string_field_for_test(&gift_wrap_json, "sig");
+            let id_hex = extract_json_string_field_for_test(&gift_wrap_json, "id");
+            let wrapper_pubkey_bytes = crate::fedos_decode_fixed_32_hex(&wrapper_pubkey_hex).expect("valid pubkey hex");
+            let id_bytes = crate::fedos_decode_fixed_32_hex(&id_hex).expect("valid id hex");
+            let sig_bytes = hex_decode_64_bytes_for_test(&sig_hex);
+            let verifying_key = SchnorrVerifyingKey::from_bytes(&wrapper_pubkey_bytes)
+                .expect("expected a valid on-curve ephemeral wrapper public key");
+            let schnorr_signature =
+                SchnorrSignature::try_from(sig_bytes.as_slice()).expect("expected a well-formed signature");
+            assert!(verifying_key.verify_prehash(&id_bytes, &schnorr_signature).is_ok());
+
+            // Bob (the recipient) decrypts using his OWN Master-Seed
+            // account against the wrapper's pubkey (extracted from the
+            // wire event itself, already public) -- the SAME
+            // `decrypt_nip44_wire_from_master_seed_internal` bridge
+            // Phase B already built and verified.
+            let content_hex = extract_json_string_field_for_test(&gift_wrap_json, "content");
+            let plaintext = decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, wrapper_pubkey_bytes, &content_hex);
+            assert_eq!(plaintext, Some(b"a real signed seal json goes here".to_vec()));
+        }
+
+        #[test]
+        fn build_and_sign_nip17_gift_wrap_internal_draws_a_different_wrapper_key_every_call() {
+            let bob_pub_bytes = public_key_bytes(BOB_SEED, 0);
+            let bob_pub_hex = hex_encode_32_bytes_for_test(&bob_pub_bytes);
+
+            let first = build_and_sign_nip17_gift_wrap_internal(&bob_pub_hex, 1_715_000_000, 1059, b"one")
+                .expect("expected a real signed gift wrap");
+            let second = build_and_sign_nip17_gift_wrap_internal(&bob_pub_hex, 1_715_000_000, 1059, b"one")
+                .expect("expected a real signed gift wrap");
+
+            let first_pubkey = extract_json_string_field_for_test(&first, "pubkey");
+            let second_pubkey = extract_json_string_field_for_test(&second, "pubkey");
+            assert_ne!(first_pubkey, second_pubkey);
+        }
+
+        #[test]
+        fn build_and_sign_nip17_gift_wrap_internal_rejects_a_malformed_recipient_hex() {
+            assert_eq!(
+                build_and_sign_nip17_gift_wrap_internal("not-a-real-hex-pubkey", 1_715_000_000, 1059, b"x"),
+                None
+            );
+        }
+
+        #[test]
+        fn wrong_recipient_cannot_decrypt_a_gift_wrap() {
+            let mallory_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(MALLORY_SEED);
+            let bob_pub_bytes = public_key_bytes(BOB_SEED, 0);
+            let bob_pub_hex = hex_encode_32_bytes_for_test(&bob_pub_bytes);
+
+            let gift_wrap_json =
+                build_and_sign_nip17_gift_wrap_internal(&bob_pub_hex, 1_715_000_000, 1059, b"only for bob")
+                    .expect("expected a real signed gift wrap");
+            let wrapper_pubkey_hex = extract_json_string_field_for_test(&gift_wrap_json, "pubkey");
+            let wrapper_pubkey_bytes = crate::fedos_decode_fixed_32_hex(&wrapper_pubkey_hex).expect("valid pubkey hex");
+            let content_hex = extract_json_string_field_for_test(&gift_wrap_json, "content");
+
+            let mallory_result =
+                decrypt_nip44_wire_from_master_seed_internal(&mallory_seed, 0, wrapper_pubkey_bytes, &content_hex);
+            assert_eq!(mallory_result, None);
+        }
+
+        #[test]
+        fn no_master_seed_held_fails_closed_for_encrypt_and_decrypt() {
+            // Structural guard only, exercised via the derivation chain's
+            // own `RootDerivationStatus::InvalidInput` path: an
+            // already-`clear()`-ed Master Seed must never proceed to any
+            // ECDH/encrypt/decrypt step.
+            let mut seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            seed.clear();
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            assert_eq!(
+                encrypt_nip44_wire_from_master_seed_internal(&seed, 0, bob_pub, b"anything"),
+                None
+            );
+            assert_eq!(
+                decrypt_nip44_wire_from_master_seed_internal(&seed, 0, bob_pub, "AQ=="),
+                None
+            );
+        }
 
         #[test]
         fn master_seed_handle_holds_master_seed_material_kind() {
@@ -9720,6 +10504,103 @@ pub fn generate_aead_key_handle() -> Option<AeadKeyHandle> {
     Some(AeadKeyHandle { inner: key_handle })
 }
 
+/// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+/// Delivery Arc") Phase E (Alpha 1777–1780) — the WASM export for
+/// [`master_root::sign_nostr_event_with_fresh_ephemeral_key_internal`].
+/// See that function's own doc comment for the full design rationale: a
+/// FRESH CSPRNG secp256k1 key is drawn internally for every call, used to
+/// sign EXACTLY ONE event, then cleared — never derived from the Master
+/// Seed, never persisted, never returned to the caller in any form.
+///
+/// `kind` is restricted to NIP-59's own two Gift-Wrap kinds — `1059`
+/// (Gift Wrap) or `21059` (Ephemeral Gift Wrap) — the ONLY reviewed
+/// use for a fresh, unlinkable, per-call signing key in this crate;
+/// anything else is rejected before any key is drawn, so this function
+/// can never become a generic "sign arbitrary content with an anonymous
+/// key" oracle. `tags` uses the SAME flattened wire format
+/// `FedosMasterSeedAuthority::sign_nostr_event` already established
+/// (Secure Runtime Alpha 442, each element one NIP-01 tag with fields
+/// joined by U+0001), parsed via the SAME
+/// [`fedos_parse_nostr_tags_wire_format`], unchanged. `created_at` is
+/// Unix seconds as an `f64` — rejected (fail closed) unless finite,
+/// non-negative, and a whole number, matching `sign_nostr_event`'s own
+/// `created_at` validation exactly.
+#[wasm_bindgen]
+pub fn sign_nostr_event_with_fresh_ephemeral_key(
+    created_at: f64,
+    kind: u32,
+    tags: Vec<String>,
+    content: String,
+) -> Option<String> {
+    if kind != 1059 && kind != 21059 {
+        return None;
+    }
+    if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
+        return None;
+    }
+    if created_at > 18_446_744_073_709_551_615.0 {
+        return None;
+    }
+    let created_at_u64 = created_at as u64;
+    let parsed_tags = fedos_parse_nostr_tags_wire_format(&tags)?;
+    crate::master_root::sign_nostr_event_with_fresh_ephemeral_key_internal(
+        created_at_u64,
+        u64::from(kind),
+        parsed_tags,
+        content,
+    )
+}
+
+/// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+/// Delivery Arc") Phase F (Alpha 1782/1785/1786) — the WASM export for
+/// [`master_root::build_and_sign_nip17_gift_wrap_internal`]. See that
+/// function's own doc comment for the full design rationale: NIP-59's
+/// own Gift Wrap encrypts to the recipient via ECDH between a FRESH
+/// ephemeral secret key and the recipient's public key — never a
+/// Master-Seed-derived account — so the ephemeral key, the NIP-44
+/// encrypt, and the signature must all happen inside this ONE call; the
+/// ephemeral secret never crosses the WASM boundary in either
+/// direction.
+///
+/// `kind` is restricted to NIP-59's own two Gift-Wrap kinds (`1059`/
+/// `21059`), the SAME closed check [`sign_nostr_event_with_fresh_ephemeral_key`]
+/// applies, for the SAME reason. `recipient_public_key_hex` must be
+/// exactly 64 lowercase-or-uppercase hex characters (already-PUBLIC key
+/// material, never a secret). `content_plaintext` is the caller-supplied
+/// Seal serialization — this function performs NO Seal construction of
+/// its own. `created_at` is Unix seconds as an `f64`, validated
+/// identically to every other `created_at` field in this crate.
+///
+/// Returns the complete signed `kind:1059`/`kind:21059` event as a JSON
+/// string on success, `None` on ANY failure (malformed input, CSPRNG
+/// unavailable, an invalid/off-curve recipient key, or any internal
+/// ECDH/encrypt/sign failure) — fail closed, never a panic, never a
+/// partial event.
+#[wasm_bindgen]
+pub fn build_and_sign_nip17_gift_wrap(
+    recipient_public_key_hex: String,
+    created_at: f64,
+    kind: u32,
+    content_plaintext: &[u8],
+) -> Option<String> {
+    if kind != 1059 && kind != 21059 {
+        return None;
+    }
+    if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
+        return None;
+    }
+    if created_at > 18_446_744_073_709_551_615.0 {
+        return None;
+    }
+    let created_at_u64 = created_at as u64;
+    crate::master_root::build_and_sign_nip17_gift_wrap_internal(
+        &recipient_public_key_hex,
+        created_at_u64,
+        u64::from(kind),
+        content_plaintext,
+    )
+}
+
 /// Stage 1009 (Secure Runtime Alpha 014) — the crate's FIFTH
 /// wasm_bindgen-annotated item, and the FIRST wasm-bindgen wrapper
 /// around a real cryptographic OPERATION (as opposed to randomness/key
@@ -10541,7 +11422,24 @@ impl FedosMasterSeedAuthority {
             FedosMasterSeedAuthorityState::Available(handle) => handle,
             _ => return None,
         };
-        if kind != 1 {
+        // Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+        // Standard Delivery Arc") Phase D (Alpha 1774) — ADDITIVE:
+        // `13` (NIP-59's Seal) is now accepted, mirroring the
+        // TypeScript-facing validator's own closed allowlist
+        // (`src/nostr/sign/fedos_nostr_signing_authority.ts`'s
+        // `SUPPORTED_NOSTR_KINDS`, which already included this crate's
+        // proprietary `24700` private-delivery kind since Secure Runtime
+        // Alpha 1399/1402 — this Rust-level check was NOT previously
+        // extended to match that TypeScript-side addition, a
+        // pre-existing gap this Arc found by direct inspection but does
+        // NOT otherwise touch: fixing kind `24700`'s own Rust-level
+        // signing path, if it is genuinely unreachable today, is a
+        // separate, unrelated concern this Arc's own scope does not
+        // cover). The Seal MUST be signed by the real sender identity
+        // (NIP-17's own impersonation guard depends on it) — never the
+        // ephemeral Gift-Wrap key, which uses a wholly separate
+        // authority that never reaches this method at all.
+        if kind != 1 && kind != 13 {
             return None;
         }
         if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
@@ -10638,6 +11536,204 @@ impl FedosMasterSeedAuthority {
             inner: FedosAeadKeyHandle { inner },
         })
     }
+
+    /// Secure Runtime Alpha 5401-5480 — Direct Ratchet State and Sealed
+    /// Persistence Foundation Arc. Seals `secret_bytes` (opaque
+    /// placeholder material this Arc's own tests use — never a real
+    /// derived ratchet key, since no ratchet math exists yet) at rest,
+    /// under a key that is a pure function of the FULL session-binding
+    /// tuple (`local_device_ref`, `remote_device_ref`, `conversation_id`,
+    /// `generation`) — never the passphrase-wrapped Master Seed envelope
+    /// format [`FedosMasterSeedAuthority::seal`] uses (that format is
+    /// reserved for the Master Seed itself), and never
+    /// [`FedosMasterSeedAuthority::resolve_conversation_key`]'s
+    /// ECDH-based derivation (this Arc has no counterparty EC public key
+    /// to agree on; binding here is by opaque identity/session context
+    /// alone).
+    ///
+    /// Because [`fedos_derive_direct_ratchet_session_sealing_key_internal`]
+    /// derives a key that is a pure function of the binding tuple,
+    /// sealing/restoring under a DIFFERENT `local_device_ref`/
+    /// `remote_device_ref`/`conversation_id`/`generation` derives a
+    /// DIFFERENT key — restoration then fails by AEAD authentication
+    /// (never by a TypeScript-side string comparison alone). Returns a
+    /// lowercase-hex `nonce || ciphertext‖tag` string on success, `None`
+    /// on ANY failure (no Master Seed held, CSPRNG failure, internal AEAD
+    /// failure) — fail closed, never a panic. Does NOT implement DH
+    /// ratchet cryptography, root/chain-key KDF evolution, or
+    /// message-key derivation — this is at-rest sealing infrastructure
+    /// only.
+    pub fn seal_direct_ratchet_secret(
+        &self,
+        local_device_ref: String,
+        remote_device_ref: String,
+        conversation_id: String,
+        generation: u32,
+        secret_bytes: &[u8],
+    ) -> Option<String> {
+        use zeroize::Zeroize;
+
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let mut session_key_bytes = fedos_derive_direct_ratchet_session_sealing_key_internal(
+            handle,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+        )?;
+        let session_key = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            crate::secret_handle::SecretHandleKind::AeadKeyMaterial,
+            session_key_bytes,
+        );
+        session_key_bytes.zeroize();
+
+        let nonce_decision = fedos_aead_nonce_96();
+        if nonce_decision.state != FedosNonceState::Ready {
+            return None;
+        }
+        let nonce_bytes = nonce_decision.nonce?;
+
+        let seal_decision = crate::crypto::aead_internal::seal_internal(
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305,
+            &session_key,
+            &nonce_decision,
+            crate::crypto::aead_internal::AeadAadDomain::DirectRatchetSealing,
+            secret_bytes,
+        );
+        if seal_decision.status != crate::crypto::aead_internal::AeadStatus::Ready {
+            return None;
+        }
+        let ciphertext = seal_decision.ciphertext?;
+
+        Some(fedos_encode_direct_ratchet_sealed_blob(&nonce_bytes, &ciphertext))
+    }
+
+    /// The restoring counterpart to
+    /// [`FedosMasterSeedAuthority::seal_direct_ratchet_secret`] — see
+    /// that method's own header for the full design rationale. Requires
+    /// the EXACT SAME binding tuple `seal_direct_ratchet_secret` was
+    /// called with; any difference (wrong device, wrong peer, wrong
+    /// conversation, wrong generation) re-derives a different session
+    /// key and this returns `None` by AEAD authentication failure, not
+    /// by comparing the tuple's fields directly. Also returns `None` for
+    /// a structurally malformed `sealed_blob`, no Master Seed held, or a
+    /// tampered ciphertext. Never panics.
+    pub fn restore_direct_ratchet_secret(
+        &self,
+        local_device_ref: String,
+        remote_device_ref: String,
+        conversation_id: String,
+        generation: u32,
+        sealed_blob: String,
+    ) -> Option<Vec<u8>> {
+        use zeroize::Zeroize;
+
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let (nonce_bytes, ciphertext) = fedos_decode_direct_ratchet_sealed_blob(&sealed_blob)?;
+
+        let mut session_key_bytes = fedos_derive_direct_ratchet_session_sealing_key_internal(
+            handle,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+        )?;
+        let session_key = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            crate::secret_handle::SecretHandleKind::AeadKeyMaterial,
+            session_key_bytes,
+        );
+        session_key_bytes.zeroize();
+
+        let nonce_decision = FedosAeadNonceDecision {
+            kind: FedosAeadNonceKind::NinetySixBit,
+            state: FedosNonceState::Ready,
+            nonce: Some(nonce_bytes),
+        };
+        let open_decision = crate::crypto::aead_internal::open_internal(
+            crate::crypto::aead_internal::AeadCipher::ChaCha20Poly1305,
+            &session_key,
+            &nonce_decision,
+            crate::crypto::aead_internal::AeadAadDomain::DirectRatchetSealing,
+            &ciphertext,
+        );
+        if open_decision.status != crate::crypto::aead_internal::AeadStatus::Ready {
+            return None;
+        }
+        open_decision.plaintext
+    }
+
+    /// Secure Runtime Alpha 1761–1840 Phase B (Alpha 1764–1768) — the
+    /// narrow, purpose-specific WASM export for genuine NIP-44 v2 WIRE
+    /// encryption (see `master_root::encrypt_nip44_wire_from_master_seed_internal`'s
+    /// own doc comment for the full rationale and why this is NOT
+    /// `resolve_conversation_key`/`encrypt_aead` reused). Accepts ONLY
+    /// `account_index` (which local sub-identity encrypts),
+    /// `counterparty_public_key_hex` (the recipient's already-public
+    /// 64-hex-character x-only Nostr key — never a secret), and
+    /// `plaintext` (the caller-supplied Rumor/Seal serialization) — never
+    /// a raw seed, raw conversation key, or raw ephemeral key of any
+    /// kind. Returns the complete NIP-44 v2 wire payload string, or `None`
+    /// on ANY failure (no Master Seed held, a malformed
+    /// `counterparty_public_key_hex`, or any internal derivation/ECDH/
+    /// encrypt-pipeline failure) — fail closed, never a panic, never a
+    /// partial payload. This is NOT a generic encrypt oracle: it performs
+    /// exactly one operation (NIP-44 wire encrypt for one resolved
+    /// pairwise conversation key) and nothing else.
+    pub fn encrypt_nip44_wire(
+        &self,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        plaintext: &[u8],
+    ) -> Option<String> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let counterparty_bytes = fedos_decode_fixed_32_hex(&counterparty_public_key_hex)?;
+        crate::master_root::encrypt_nip44_wire_from_master_seed_internal(
+            handle,
+            account_index,
+            counterparty_bytes,
+            plaintext,
+        )
+    }
+
+    /// The decrypt-direction sibling of
+    /// [`FedosMasterSeedAuthority::encrypt_nip44_wire`] — see that
+    /// method's own doc comment for the shared design rationale. Calls
+    /// `master_root::decrypt_nip44_wire_from_master_seed_internal`.
+    /// Returns the original plaintext bytes on success, `None` on ANY
+    /// failure — no Master Seed held, a malformed
+    /// `counterparty_public_key_hex`, a structurally malformed `payload`,
+    /// or a genuine authentication failure (wrong recipient or tampered
+    /// ciphertext) — never distinguishing which, never returning partial
+    /// plaintext. Not a decryption oracle: it performs exactly one
+    /// operation (NIP-44 wire decrypt for one resolved pairwise
+    /// conversation key) and nothing else.
+    pub fn decrypt_nip44_wire(
+        &self,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        payload: String,
+    ) -> Option<Vec<u8>> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let counterparty_bytes = fedos_decode_fixed_32_hex(&counterparty_public_key_hex)?;
+        crate::master_root::decrypt_nip44_wire_from_master_seed_internal(
+            handle,
+            account_index,
+            counterparty_bytes,
+            &payload,
+        )
+    }
 }
 
 /// Secure Runtime Alpha 869 — a minimal, fail-closed, fixed-length (64
@@ -10670,6 +11766,514 @@ fn fedos_decode_fixed_32_hex(hex: &str) -> Option<[u8; 32]> {
         out[i] = (high << 4) | low;
     }
     Some(out)
+}
+
+/// Secure Runtime Alpha 5401-5480 — the two-stage derivation
+/// [`FedosMasterSeedAuthority::seal_direct_ratchet_secret`]/
+/// [`FedosMasterSeedAuthority::restore_direct_ratchet_secret`] share.
+/// Stage 1: a FIXED, existing-pattern `HkdfDomain::DirectRatchetSealing`
+/// extract-and-expand from the Master Seed (mirrors
+/// `master_root::derive_identity_root_internal`'s own shape exactly)
+/// produces this authority's own sealing root. Stage 2: a SECOND,
+/// per-call HKDF-expand from that root, keyed by the session-binding
+/// context as HKDF `info` (never as `salt`, and never through the
+/// shared fixed-domain helper, which never accepts caller-supplied
+/// info) produces the actual session-bound sealing key. `None` on ANY
+/// failure — no Master Seed held, an internal HKDF failure, or an
+/// invalid PRK length (unreachable in practice: stage 1's own output is
+/// always exactly 32 bytes, a valid SHA-256 PRK length).
+fn fedos_derive_direct_ratchet_session_sealing_key_internal(
+    master_seed: &crate::master_root::FedosMasterSeedHandle,
+    local_device_ref: &str,
+    remote_device_ref: &str,
+    conversation_id: &str,
+    generation: u32,
+) -> Option<[u8; 32]> {
+    use hkdf::Hkdf;
+    use sha2::Sha256;
+    use zeroize::Zeroize;
+
+    let seed_bytes = master_seed.expose_bytes_for_internal_sealing()?;
+    let root_input = crate::secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+        crate::secret_handle::SecretHandleKind::HkdfInputMaterial,
+        seed_bytes,
+    );
+    let root_decision = crate::kdf_core::derive_secret_handle_internal(
+        &root_input,
+        crate::kdf_core::HkdfDomain::DirectRatchetSealing,
+    );
+    if root_decision.status != crate::kdf_core::HkdfStatus::Ready {
+        return None;
+    }
+    let root_handle = root_decision.output?;
+    let mut root_bytes = root_handle.expose_bytes_for_internal_derivation()?;
+
+    let context = fedos_direct_ratchet_sealing_context_bytes(
+        local_device_ref,
+        remote_device_ref,
+        conversation_id,
+        generation,
+    );
+    let hk = match Hkdf::<Sha256>::from_prk(&root_bytes) {
+        Ok(hk) => hk,
+        Err(_) => {
+            root_bytes.zeroize();
+            return None;
+        }
+    };
+    root_bytes.zeroize();
+    let mut session_key = [0u8; 32];
+    match hk.expand(&context, &mut session_key) {
+        Ok(()) => Some(session_key),
+        Err(_) => None,
+    }
+}
+
+/// Deterministic, delimiter-safe binding context: each field is
+/// length-prefixed (4-byte big-endian length) before concatenation, so
+/// no ambiguous-boundary collision is possible between e.g.
+/// (`"ab"`,`"c"`) and (`"a"`,`"bc"`) the way a plain separator-joined
+/// string could produce. This is HKDF `info` material only — never a
+/// secret, never persisted, never returned to any caller.
+fn fedos_direct_ratchet_sealing_context_bytes(
+    local_device_ref: &str,
+    remote_device_ref: &str,
+    conversation_id: &str,
+    generation: u32,
+) -> Vec<u8> {
+    let mut out = Vec::new();
+    for part in [local_device_ref, remote_device_ref, conversation_id] {
+        let bytes = part.as_bytes();
+        out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+        out.extend_from_slice(bytes);
+    }
+    out.extend_from_slice(&generation.to_be_bytes());
+    out
+}
+
+/// Encodes `nonce || ciphertext‖tag` as lowercase hex — this crate's own
+/// existing `fedos_decode_fixed_32_hex` precedent is a fixed-width
+/// DECODER only; this Arc needs a variable-length ENCODER too (the
+/// ciphertext length varies with `secret_bytes`), hand-rolled the same
+/// way rather than adding a `base64`/`hex` production dependency (this
+/// Arc's own "no new Cargo dependency" instruction).
+fn fedos_encode_direct_ratchet_sealed_blob(nonce: &[u8; 12], ciphertext: &[u8]) -> String {
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity((nonce.len() + ciphertext.len()) * 2);
+    for byte in nonce.iter().chain(ciphertext.iter()) {
+        out.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        out.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+/// The decoding counterpart to [`fedos_encode_direct_ratchet_sealed_blob`].
+/// Rejects (`None`) an odd-length string, a non-lowercase-hex character,
+/// or fewer than 12 decoded bytes (too short to hold a nonce at all) —
+/// never panics, never partially decodes.
+fn fedos_decode_direct_ratchet_sealed_blob(sealed_blob: &str) -> Option<([u8; 12], Vec<u8>)> {
+    let bytes = sealed_blob.as_bytes();
+    if bytes.is_empty() || bytes.len() % 2 != 0 {
+        return None;
+    }
+    fn nibble(byte: u8) -> Option<u8> {
+        match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            _ => None,
+        }
+    }
+    let mut decoded = Vec::with_capacity(bytes.len() / 2);
+    let mut i = 0;
+    while i < bytes.len() {
+        let high = nibble(bytes[i])?;
+        let low = nibble(bytes[i + 1])?;
+        decoded.push((high << 4) | low);
+        i += 2;
+    }
+    if decoded.len() < 12 {
+        return None;
+    }
+    let mut nonce = [0u8; 12];
+    nonce.copy_from_slice(&decoded[..12]);
+    let ciphertext = decoded[12..].to_vec();
+    Some((nonce, ciphertext))
+}
+
+/// Secure Runtime Alpha 5481-5560 — a plain lowercase-hex encoder for a
+/// fixed 32-byte array (the counterpart to the Foundation Arc's own
+/// `fedos_decode_fixed_32_hex`, which only decodes). Never a secret byte
+/// in practice — this Arc's only callers pass PUBLIC ratchet keys.
+fn fedos_encode_fixed_32_hex(bytes: &[u8; 32]) -> String {
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(64);
+    for byte in bytes {
+        out.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        out.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+/// Secure Runtime Alpha 5481-5560 (FedOS Direct Double Ratchet
+/// Cryptographic Core Arc) — the narrow WASM-exported wrapper around
+/// `crypto::direct_ratchet_session::DirectRatchetSessionState`. Mirrors
+/// `FedosMasterSeedAuthority`'s own "opaque handle, minimize exports"
+/// shape. NO raw secret byte is ever returned by any method here — every
+/// fallible operation returns `Option<T>`/`None` (never a thrown
+/// exception for an ordinary cryptographic failure), matching this crate's
+/// established WASM export convention exactly.
+///
+/// `encrypt()`/`decrypt()` combine the header and ciphertext into ONE
+/// opaque wire message (`[4-byte BE header length][header bytes][ciphertext
+/// bytes]`) — this Arc remains transport-neutral (Absolute Prohibitions:
+/// no NIP-17 event, no Relay publish); a future integration Arc decides how
+/// this opaque blob actually travels.
+#[wasm_bindgen]
+pub struct FedosDirectRatchetSession {
+    inner: crate::crypto::direct_ratchet_session::DirectRatchetSessionState,
+}
+
+#[wasm_bindgen]
+impl FedosDirectRatchetSession {
+    /// Bob's role (review `08_dh_session_ratchet.md` §4): the root key is
+    /// bootstrapped from the EXISTING, real `resolve_conversation_key()`
+    /// computation (never a fresh/random seed) — `master_seed_authority`
+    /// MUST already hold a real Master Seed. Generates a fresh local
+    /// ratchet keypair immediately; derives no chain yet.
+    pub fn initialize_as_receiver(
+        master_seed_authority: &FedosMasterSeedAuthority,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        session_id: String,
+        local_device_ref: String,
+        generation: u32,
+    ) -> Option<FedosDirectRatchetSession> {
+        let conversation_key = master_seed_authority.resolve_conversation_key(account_index, counterparty_public_key_hex)?;
+        let bootstrap_bytes = conversation_key.inner().inner().expose_bytes_for_internal_ratchet_bootstrap()?;
+        let inner = crate::crypto::direct_ratchet_session::DirectRatchetSessionState::initialize_as_receiver(
+            session_id,
+            local_device_ref,
+            generation,
+            bootstrap_bytes,
+        )?;
+        Some(FedosDirectRatchetSession { inner })
+    }
+
+    /// Alice's role: already knows the peer's initial ratchet public key
+    /// (shared out-of-band -- this Arc names no signaling mechanism of its
+    /// own). Performs the first DH ratchet step immediately; ready to
+    /// encrypt right away.
+    pub fn initialize_as_sender(
+        master_seed_authority: &FedosMasterSeedAuthority,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        session_id: String,
+        local_device_ref: String,
+        generation: u32,
+        remote_ratchet_public_key_hex: String,
+    ) -> Option<FedosDirectRatchetSession> {
+        let conversation_key = master_seed_authority.resolve_conversation_key(account_index, counterparty_public_key_hex)?;
+        let bootstrap_bytes = conversation_key.inner().inner().expose_bytes_for_internal_ratchet_bootstrap()?;
+        let remote_public = fedos_decode_fixed_32_hex(&remote_ratchet_public_key_hex)?;
+        let inner = crate::crypto::direct_ratchet_session::DirectRatchetSessionState::initialize_as_sender(
+            session_id,
+            local_device_ref,
+            generation,
+            bootstrap_bytes,
+            remote_public,
+        )?;
+        Some(FedosDirectRatchetSession { inner })
+    }
+
+    /// The current local ratchet PUBLIC key, hex-encoded — non-secret wire
+    /// data, safe to share with the peer (out-of-band, this Arc's own
+    /// scope) or persist as plaintext session metadata.
+    pub fn local_ratchet_public_key_hex(&self) -> String {
+        fedos_encode_fixed_32_hex(&self.inner.local_ratchet_public_key())
+    }
+
+    pub fn remote_ratchet_public_key_hex(&self) -> Option<String> {
+        self.inner.remote_ratchet_public_key().map(|bytes| fedos_encode_fixed_32_hex(&bytes))
+    }
+
+    pub fn is_ready_to_send(&self) -> bool {
+        self.inner.is_ready_to_send()
+    }
+
+    pub fn send_counter(&self) -> u32 {
+        self.inner.send_counter()
+    }
+
+    pub fn receive_counter(&self) -> u32 {
+        self.inner.receive_counter()
+    }
+
+    pub fn skipped_key_count(&self) -> usize {
+        self.inner.skipped_key_count()
+    }
+
+    /// Secure Runtime Alpha 5561-5640 (FedOS Direct Double Ratchet
+    /// Conversation Runtime and NIP-17 Integration Arc) — the ONE
+    /// additive getter this Arc's own real restart-recovery integration
+    /// needs and no earlier Arc exposed: `send_counter`/`receive_counter`/
+    /// `skipped_key_count` were already real, public facts (review §10 §2)
+    /// but `previous_sending_chain_length` (consulted by `encrypt()` for
+    /// every outgoing header's own `previous_chain_length` field, and by
+    /// the RECEIVER side's `decrypt()` own skip-gap validation across a DH
+    /// step) had no public accessor, so a restored session always fell
+    /// back to a caller-supplied value with no way to read the real one
+    /// first. Purely additive — no existing method's behavior changes.
+    pub fn previous_sending_chain_length(&self) -> u32 {
+        self.inner.previous_sending_chain_length()
+    }
+
+    /// Encrypts `plaintext`. Returns the combined opaque wire message on
+    /// success, `None` if the session is not yet ready to send (no
+    /// established sending chain) or on send-counter overflow.
+    pub fn encrypt(&mut self, plaintext: &[u8]) -> Option<Vec<u8>> {
+        let (header, ciphertext) = self.inner.encrypt(plaintext)?;
+        let mut wire = Vec::with_capacity(4 + header.len() + ciphertext.len());
+        wire.extend_from_slice(&(header.len() as u32).to_be_bytes());
+        wire.extend_from_slice(&header);
+        wire.extend_from_slice(&ciphertext);
+        Some(wire)
+    }
+
+    /// Decrypts a combined opaque wire message. `now_ms` is caller-supplied
+    /// (this crate reads no wall clock internally, matching
+    /// `sign_nostr_event`'s own established `created_at` convention) --
+    /// used ONLY for skipped-key expiry evaluation. Returns plaintext on
+    /// success, `None` on ANY rejection reason (malformed wire message,
+    /// wrong session, invalid key, skip-limit exceeded, excessive gap,
+    /// duplicate/replay, or authentication failure) — deliberately COARSE,
+    /// never a distinguishing oracle (Phase I).
+    pub fn decrypt(&mut self, wire_message: &[u8], now_ms: f64) -> Option<Vec<u8>> {
+        if wire_message.len() < 4 {
+            return None;
+        }
+        let mut len_bytes = [0u8; 4];
+        len_bytes.copy_from_slice(&wire_message[0..4]);
+        let header_len = u32::from_be_bytes(len_bytes) as usize;
+        if wire_message.len() < 4 + header_len {
+            return None;
+        }
+        let header = &wire_message[4..4 + header_len];
+        let ciphertext = &wire_message[4 + header_len..];
+        self.inner.decrypt(header, ciphertext, now_ms as i64).ok()
+    }
+
+    // -- Phase L: sealed-persistence integration, per the Foundation Arc's
+    // own existing `FedosSealedDirectRatchetSecretRecordV1` secret-kind
+    // granularity ("root-key" / "sending-chain-key" / "receiving-chain-key" /
+    // "local-ratchet-private-key" / "skipped-message-key") — no new sealed
+    // format is invented; every seal/restore call here goes straight
+    // through to the EXISTING, unmodified
+    // `FedosMasterSeedAuthority::seal_direct_ratchet_secret`/
+    // `restore_direct_ratchet_secret`.
+
+    pub fn seal_root_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.root_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    pub fn seal_sending_chain_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.sending_chain_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    pub fn seal_receiving_chain_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.receiving_chain_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    pub fn seal_local_ratchet_private_key(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Option<String> {
+        let bytes = self.inner.local_ratchet_private_key_bytes_for_sealing()?;
+        master_seed_authority.seal_direct_ratchet_secret(
+            self.inner.local_device_ref.clone(),
+            remote_device_ref,
+            conversation_id,
+            self.inner.generation,
+            &bytes,
+        )
+    }
+
+    /// Each returned entry is `"{counter}:{remote_ratchet_public_hex}:{created_at_ms}:{sealed_blob}"` —
+    /// one per currently-held skipped key. A key whose OWN seal attempt
+    /// fails (unreachable in practice with a real, available authority) is
+    /// simply omitted, never silently fabricated.
+    pub fn seal_all_skipped_keys(
+        &self,
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+    ) -> Vec<String> {
+        self.inner
+            .skipped_keys_for_sealing()
+            .into_iter()
+            .filter_map(|(public, counter, created_at_ms, bytes)| {
+                let sealed = master_seed_authority.seal_direct_ratchet_secret(
+                    self.inner.local_device_ref.clone(),
+                    remote_device_ref.clone(),
+                    conversation_id.clone(),
+                    self.inner.generation,
+                    &bytes,
+                )?;
+                Some(format!("{}:{}:{}:{}", counter, fedos_encode_fixed_32_hex(&public), created_at_ms, sealed))
+            })
+            .collect()
+    }
+
+    /// Restores a complete session from its previously-sealed constituent
+    /// parts, via the EXISTING, unmodified
+    /// `FedosMasterSeedAuthority::restore_direct_ratchet_secret` for each
+    /// one -- a wrong Device/account/Conversation/generation, or a
+    /// tampered sealed blob, fails this call closed (that method's own
+    /// AEAD-authentication guarantee, unchanged). `None` on ANY failure —
+    /// never a partial session.
+    #[allow(clippy::too_many_arguments)]
+    pub fn restore(
+        master_seed_authority: &FedosMasterSeedAuthority,
+        remote_device_ref: String,
+        conversation_id: String,
+        session_id: String,
+        local_device_ref: String,
+        generation: u32,
+        send_counter: u32,
+        receive_counter: u32,
+        previous_sending_chain_length: u32,
+        remote_ratchet_public_key_hex: Option<String>,
+        sealed_root_key: String,
+        sealed_sending_chain_key: Option<String>,
+        sealed_receiving_chain_key: Option<String>,
+        sealed_local_ratchet_private_key: String,
+        sealed_skipped_keys: Vec<String>,
+    ) -> Option<FedosDirectRatchetSession> {
+        fn restore_32(
+            authority: &FedosMasterSeedAuthority,
+            local_device_ref: &str,
+            remote_device_ref: &str,
+            conversation_id: &str,
+            generation: u32,
+            sealed_blob: String,
+        ) -> Option<[u8; 32]> {
+            let bytes = authority.restore_direct_ratchet_secret(
+                local_device_ref.to_string(),
+                remote_device_ref.to_string(),
+                conversation_id.to_string(),
+                generation,
+                sealed_blob,
+            )?;
+            if bytes.len() != 32 {
+                return None;
+            }
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&bytes);
+            Some(out)
+        }
+
+        let root_key_bytes = restore_32(
+            master_seed_authority,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+            sealed_root_key,
+        )?;
+        let sending_chain_key_bytes = match sealed_sending_chain_key {
+            Some(blob) => Some(restore_32(master_seed_authority, &local_device_ref, &remote_device_ref, &conversation_id, generation, blob)?),
+            None => None,
+        };
+        let receiving_chain_key_bytes = match sealed_receiving_chain_key {
+            Some(blob) => Some(restore_32(master_seed_authority, &local_device_ref, &remote_device_ref, &conversation_id, generation, blob)?),
+            None => None,
+        };
+        let local_ratchet_private_key_bytes = restore_32(
+            master_seed_authority,
+            &local_device_ref,
+            &remote_device_ref,
+            &conversation_id,
+            generation,
+            sealed_local_ratchet_private_key,
+        )?;
+        let remote_ratchet_public = match remote_ratchet_public_key_hex {
+            Some(hex) => Some(fedos_decode_fixed_32_hex(&hex)?),
+            None => None,
+        };
+
+        let mut skipped_keys = Vec::with_capacity(sealed_skipped_keys.len());
+        for entry in sealed_skipped_keys {
+            let parts: Vec<&str> = entry.splitn(4, ':').collect();
+            if parts.len() != 4 {
+                return None;
+            }
+            let counter: u32 = parts[0].parse().ok()?;
+            let public = fedos_decode_fixed_32_hex(parts[1])?;
+            let created_at_ms: i64 = parts[2].parse().ok()?;
+            let key_bytes = restore_32(
+                master_seed_authority,
+                &local_device_ref,
+                &remote_device_ref,
+                &conversation_id,
+                generation,
+                parts[3].to_string(),
+            )?;
+            skipped_keys.push((public, counter, created_at_ms, key_bytes));
+        }
+
+        let inner = crate::crypto::direct_ratchet_session::DirectRatchetSessionState::restore(
+            session_id,
+            local_device_ref,
+            generation,
+            send_counter,
+            receive_counter,
+            previous_sending_chain_length,
+            remote_ratchet_public,
+            root_key_bytes,
+            sending_chain_key_bytes,
+            receiving_chain_key_bytes,
+            local_ratchet_private_key_bytes,
+            skipped_keys,
+        )?;
+        Some(FedosDirectRatchetSession { inner })
+    }
 }
 
 #[cfg(test)]
@@ -10705,6 +12309,63 @@ mod master_seed_authority_tests {
         let mut authority = FedosMasterSeedAuthority::new();
         assert!(authority.generate());
         authority
+    }
+
+    #[test]
+    fn encrypt_nip44_wire_then_decrypt_nip44_wire_round_trips_through_the_public_wasm_boundary() {
+        let alice = generated_authority();
+        let bob = generated_authority();
+        let alice_pub = alice.public_key_hex_for_account(0).expect("expected a real public key");
+        let bob_pub = bob.public_key_hex_for_account(0).expect("expected a real public key");
+
+        let payload = alice
+            .encrypt_nip44_wire(0, bob_pub, b"real end-to-end nip-44 wire payload")
+            .expect("expected a real NIP-44 wire payload");
+
+        let plaintext = bob
+            .decrypt_nip44_wire(0, alice_pub, payload)
+            .expect("expected Bob to decrypt Alice's payload");
+        assert_eq!(plaintext, b"real end-to-end nip-44 wire payload".to_vec());
+    }
+
+    #[test]
+    fn encrypt_nip44_wire_fails_closed_without_a_held_master_seed() {
+        let empty = FedosMasterSeedAuthority::new();
+        let bob = generated_authority();
+        let bob_pub = bob.public_key_hex_for_account(0).expect("expected a real public key");
+        assert_eq!(empty.encrypt_nip44_wire(0, bob_pub, b"anything"), None);
+    }
+
+    #[test]
+    fn decrypt_nip44_wire_fails_closed_without_a_held_master_seed() {
+        let empty = FedosMasterSeedAuthority::new();
+        let alice = generated_authority();
+        let alice_pub = alice.public_key_hex_for_account(0).expect("expected a real public key");
+        assert_eq!(empty.decrypt_nip44_wire(0, alice_pub, "AQ==".to_string()), None);
+    }
+
+    #[test]
+    fn encrypt_nip44_wire_rejects_a_malformed_counterparty_hex() {
+        let alice = generated_authority();
+        assert_eq!(
+            alice.encrypt_nip44_wire(0, "not-a-real-hex-pubkey".to_string(), b"anything"),
+            None
+        );
+    }
+
+    #[test]
+    fn wrong_recipient_cannot_decrypt_through_the_public_wasm_boundary() {
+        let alice = generated_authority();
+        let bob = generated_authority();
+        let mallory = generated_authority();
+        let alice_pub = alice.public_key_hex_for_account(0).expect("expected a real public key");
+        let bob_pub = bob.public_key_hex_for_account(0).expect("expected a real public key");
+
+        let payload = alice
+            .encrypt_nip44_wire(0, bob_pub, b"only for bob, never for mallory")
+            .expect("expected a real NIP-44 wire payload");
+
+        assert_eq!(mallory.decrypt_nip44_wire(0, alice_pub, payload), None);
     }
 
     #[test]
@@ -11277,6 +12938,155 @@ mod master_seed_authority_tests {
         assert!(authority
             .resolve_conversation_key(0, counterparty_hex)
             .is_none());
+    }
+
+    // -- Secure Runtime Alpha 5401-5480 -- Direct Ratchet sealed-secret --
+
+    #[test]
+    fn seal_direct_ratchet_secret_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .is_none());
+    }
+
+    #[test]
+    fn seal_direct_ratchet_secret_never_touches_a_cleared_authority() {
+        let mut authority = generated_authority();
+        authority.clear();
+        assert!(authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .is_none());
+    }
+
+    #[test]
+    fn seal_then_restore_direct_ratchet_secret_round_trips_the_exact_plaintext() {
+        let authority = generated_authority();
+        let secret = b"placeholder ratchet secret material, never a real derived key";
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 3, secret)
+            .expect("must seal");
+        let restored = authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 3, sealed)
+            .expect("must restore");
+        assert_eq!(restored, secret);
+    }
+
+    #[test]
+    fn seal_direct_ratchet_secret_never_reveals_the_plaintext_in_the_sealed_blob() {
+        let authority = generated_authority();
+        let secret = b"do-not-leak-this-marker-into-the-sealed-blob";
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, secret)
+            .expect("must seal");
+        assert!(!sealed.contains("do-not-leak-this-marker-into-the-sealed-blob"));
+        // The sealed blob is lowercase hex only -- structurally opaque.
+        assert!(sealed.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_local_device() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-WRONG".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_remote_device() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-WRONG".to_string(), "conv-1".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_conversation() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-WRONG".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_wrong_generation() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 1, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_a_tampered_sealed_blob() {
+        let authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        let mut bytes: Vec<u8> = sealed.into_bytes();
+        // Flip one hex character deep in the ciphertext region (past the
+        // 24-hex-character/12-byte nonce prefix).
+        let flip_at = 30.min(bytes.len() - 1);
+        bytes[flip_at] = if bytes[flip_at] == b'0' { b'1' } else { b'0' };
+        let tampered = String::from_utf8(bytes).expect("must remain valid utf8");
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, tampered)
+            .is_none());
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_fails_closed_on_a_malformed_sealed_blob() {
+        let authority = generated_authority();
+        for malformed in ["", "not-hex-zz", "abc", "0123456789"] {
+            assert!(
+                authority
+                    .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, malformed.to_string())
+                    .is_none(),
+                "malformed blob {malformed:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn restore_direct_ratchet_secret_never_touches_a_cleared_authority() {
+        let mut authority = generated_authority();
+        let sealed = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        authority.clear();
+        assert!(authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, sealed)
+            .is_none());
+    }
+
+    #[test]
+    fn seal_direct_ratchet_secret_is_deterministic_in_key_but_not_in_ciphertext() {
+        // Same binding tuple -> same derived key -> cross-open works, but
+        // each seal draws a fresh random nonce, so the two sealed blobs
+        // themselves must differ (never a fixed/reused nonce).
+        let authority = generated_authority();
+        let first = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        let second = authority
+            .seal_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, b"secret")
+            .expect("must seal");
+        assert_ne!(first, second);
+        let restored_from_second = authority
+            .restore_direct_ratchet_secret("local-1".to_string(), "remote-1".to_string(), "conv-1".to_string(), 0, second)
+            .expect("must restore");
+        assert_eq!(restored_from_second, b"secret");
     }
 }
 

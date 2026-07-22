@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/fedos_electron_spike_renderer.ts",
+    "src/fedos_electron_host_adapter_selftest.ts",
+    "src/fedos_electron_navigation_renderer.ts",
+    "src/fedos_electron_notifications_tray_renderer.ts",
+    "src/fedos_electron_badge_renderer.ts",
+    "src/fedos_electron_unlock_renderer.ts",
+    "src/fedos_electron_settings_selftest.ts"
+  ]
+}

@@ -60,8 +60,7 @@ describe("Secure Runtime Alpha 007 Crypto API Surface Review -- review only, no 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
-    expect(reviewDocSource).toMatch(/Legacy placeholders \(6\)/);
+    expect(pubFnNames.length).toBe(69);    expect(reviewDocSource).toMatch(/Legacy placeholders \(6\)/);
     expect(reviewDocSource).toMatch(/Boundary status\/descriptor\/policy labels \(16\)/);
     expect(reviewDocSource).toMatch(/Real cryptographic operations, already implemented and tested \(5\)/);
     expect(reviewDocSource).toMatch(/fedos_random_bytes_32/);
@@ -208,8 +207,7 @@ describe("Secure Runtime Alpha 007 Crypto API Surface Review -- review only, no 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
+    expect(pubFnNames.length).toBe(69);    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_007_crypto_api_surface_review/);
 
     const cargoCode = cargoTomlSource

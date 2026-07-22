@@ -153,9 +153,31 @@ describe("FedOS Rust crate — internal response descriptor skeleton", () => {
       "sign_nostr_event",
       "public_key_hex_for_account",
       "resolve_conversation_key",
+      "seal_direct_ratchet_secret",
+      "restore_direct_ratchet_secret",
+      "initialize_as_receiver",
+      "initialize_as_sender",
+      "local_ratchet_public_key_hex",
+      "remote_ratchet_public_key_hex",
+      "is_ready_to_send",
+      "send_counter",
+      "receive_counter",
+      "skipped_key_count",
+      "encrypt",
+      "decrypt",
+      "seal_root_key",
+      "seal_sending_chain_key",
+      "seal_receiving_chain_key",
+      "seal_local_ratchet_private_key",
+      "seal_all_skipped_keys",
+      "restore",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
+      "previous_sending_chain_length",
     ];
-    expect(pubFnNames.length).toBe(46);
-    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(69);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
   it("5. production API placeholders are unchanged", () => {

@@ -14,5 +14,6 @@
     "noEmit": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "test", "packages"]
+  "include": ["src", "test", "packages"],
+  "exclude": ["packages/fedos-desktop-electron-spike"]
 }

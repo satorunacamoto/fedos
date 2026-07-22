@@ -1,0 +1,711 @@
+/**
+ * Secure Runtime Alpha 4661-4740 — Phase E / F / H / M: the ONE
+ * application-level Profile Initialization Coordinator.
+ *
+ * This is the single deliverable that orchestrates the ALREADY-REVIEWED
+ * authorities into the three target user flows. It owns NO cryptography,
+ * persists NO private key, and constructs NO second Runtime / Registry /
+ * Master Seed authority. Every mutation delegates to an existing boundary:
+ *   - Master Seed generate/seal/restore -> the injected `FedosMasterSeedAuthority`
+ *     (real WASM in production — currently gated shut — or the
+ *     DEVELOPMENT-ONLY double for the reachable dev path; Phase D).
+ *   - sealed-envelope persistence -> `FedosSealedMasterSeedEnvelopePersistence`.
+ *   - account public identity + device authorization signatures ->
+ *     the injected `FedosNostrSigningAuthority`.
+ *   - device key + registration -> `FedosDeviceSigningKeypair` +
+ *     `runtime.devicePairing()` (real BIP-340 proofs both sides, Phase H).
+ *   - durable paths -> `FedosLocalProfilePaths` (Phase G).
+ *   - Runtime start -> the EXISTING `startFedosDesktopRuntime()` — never a
+ *     new Runtime type.
+ *
+ * Lifecycle is the closed Phase C state machine
+ * (`./fedos_profile_lifecycle_state.ts`). `markReady` is reached ONLY after
+ * every mandatory step succeeds — a failure anywhere leaves `failed` or
+ * `recovery-required`, NEVER a false `ready` and NEVER a running Runtime
+ * (Phase C: no partial ready).
+ *
+ * ROLLBACK / FORENSIC (Phase E): on a failed create, this coordinator does
+ * NOT delete the sealed file or descriptor it already wrote — a partial
+ * profile is left in place so the next launch DETECTS it (as
+ * `recovery-required`) rather than silently overwriting it. Nothing is
+ * silently deleted after failure.
+ *
+ * HARD GUARDRAILS:
+ *   - The unlock secret is only ever a `FedosProfileUnlockSecret`, consumed
+ *     once at the point of use and never returned, logged, or placed on a
+ *     result/config.
+ *   - No result value carries a secret, a sealed byte, a private key, or a
+ *     raw `Error`/stack — only the closed outcome vocabulary + a short
+ *     non-secret reason.
+ */
+
+import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosSealedMasterSeedEnvelopePersistence } from "../../runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
+import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import {
+  FedosDeviceSigningKeypair,
+  generateFedosDeviceSigningKeypair,
+} from "../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import {
+  startFedosDesktopRuntime,
+  type FedosRunningDesktopRuntime,
+} from "../runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../runtime/fedos_desktop_runtime_config.js";
+import type { FedosLocalProfilePaths } from "./fedos_local_profile_paths.js";
+import { ensureFedosLocalProfileDirectories } from "./fedos_local_profile_paths.js";
+import {
+  FedosLocalProfileCorruptError,
+  type FedosLocalProfilePersistence,
+} from "./fedos_local_profile_persistence.js";
+import {
+  createFedosLocalProfileDescriptorV1,
+  withFedosLocalProfileInitializationState,
+  type FedosLocalProfileDescriptorV1,
+} from "./fedos_local_profile_descriptor.js";
+import {
+  applyFedosProfileLifecycleTransition,
+  type FedosProfileLifecycleState,
+} from "./fedos_profile_lifecycle_state.js";
+import {
+  validateFedosUnlockSecretBytes,
+  FEDOS_DEFAULT_UNLOCK_SECRET_POLICY,
+  type FedosProfileUnlockSecret,
+  type FedosUnlockSecretPolicy,
+} from "./fedos_profile_unlock_secret.js";
+import {
+  buildFedosProfileRecoveryNotice,
+  type FedosProfileRecoveryNotice,
+} from "./fedos_profile_recovery_notice.js";
+import type { FedosDeviceSyncAbandonmentPolicy } from "../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos_device_sync_attempt.js";
+
+export type FedosProfileCoordinatorOutcome =
+  | "ok"
+  | "already-exists"
+  | "no-profile"
+  | "invalid-input"
+  | "weak-secret"
+  | "unlock-failed"
+  | "identity-mismatch"
+  | "corrupt"
+  | "recovery-required"
+  | "seed-unavailable"
+  | "device-bootstrap-incomplete"
+  | "runtime-start-failed"
+  | "not-ready"
+  | "failed";
+
+export type FedosProfileCoordinatorResult<T> =
+  | { readonly outcome: "ok"; readonly value: T }
+  | { readonly outcome: Exclude<FedosProfileCoordinatorOutcome, "ok">; readonly reason: string };
+
+function ok<T>(value: T): FedosProfileCoordinatorResult<T> {
+  return { outcome: "ok", value };
+}
+function fail<T>(
+  outcome: Exclude<FedosProfileCoordinatorOutcome, "ok">,
+  reason: string,
+): FedosProfileCoordinatorResult<T> {
+  return { outcome, reason };
+}
+
+/** The coarse durable presence of a profile, without any secret. */
+export type FedosProfilePresence = "absent" | "locked" | "recovery-required" | "in-progress";
+
+export interface FedosProfileStatusView {
+  readonly lifecycleState: FedosProfileLifecycleState;
+  readonly presence: FedosProfilePresence;
+  readonly displayLabel: string | null;
+  readonly accountPublicIdentifier: string | null;
+  readonly localDeviceId: string | null;
+  readonly runtimeRunning: boolean;
+}
+
+/** The safe, secret-free result of a completed create/unlock. */
+export interface FedosProfileReadyView {
+  readonly lifecycleState: "ready";
+  readonly displayLabel: string;
+  readonly accountPublicIdentifier: string;
+  readonly localDeviceId: string;
+  readonly deviceTrustState: string;
+  readonly recoveryNotice: FedosProfileRecoveryNotice;
+}
+
+export interface FedosProfileInitializationDependencies {
+  readonly paths: FedosLocalProfilePaths;
+  readonly profilePersistence: FedosLocalProfilePersistence;
+  readonly sealedSeedPersistence: FedosSealedMasterSeedEnvelopePersistence;
+  /** The injected Master Seed authority. Production: `FedosWasmMasterSeedAuthority` (currently gated shut). Dev: `DevelopmentFedosMasterSeedAuthority`. Never constructed here. */
+  readonly masterSeedAuthority: FedosMasterSeedAuthority;
+  /** Resolves the account public identity + signs device-binding account authorizations. In the real design this is derived from the Master Seed; here it is injected (dev: `RealFedosNostrSigningAuthority`). */
+  readonly accountSigningAuthority: FedosNostrSigningAuthority;
+  readonly accountIndex?: number;
+  readonly now?: () => number;
+  readonly generateProfileId?: () => string;
+  readonly generateDeviceKeypair?: () => FedosDeviceSigningKeypair;
+  /** Omitted, derived from the local Device public key. */
+  readonly localDeviceId?: string;
+  readonly unlockPolicy?: FedosUnlockSecretPolicy;
+  /** Omitted, the real `startFedosDesktopRuntime`. Injectable for tests. */
+  readonly startRuntime?: (config: FedosDesktopRuntimeConfig) => Promise<FedosRunningDesktopRuntime>;
+  /** Whether to enable the Archive capability (requires a REAL Master Seed authority for archive crypto). Default false — the dev double cannot back real archive crypto. */
+  readonly archiveEnabled?: boolean;
+  /**
+   * Secure Runtime Alpha 5161-5240 (Canonical Desktop Composition Arc) —
+   * mirrors `archiveEnabled`'s own established "optional capability toggle,
+   * threaded straight into `#buildRuntimeConfig()`" pattern exactly. Whether
+   * to enable the Device Sync Scheduler on the Runtime this Coordinator
+   * starts. Default false (unchanged prior behavior for every existing
+   * caller) — this Coordinator constructs no Scheduler/attempt logic of its
+   * own; `deviceSyncAttemptFn` is the caller's own, already-real
+   * `FedosDeviceSyncEventBridge.wrapAttemptFn()` (or any other
+   * `FedosDeviceSyncAttemptFn`), unchanged in kind from
+   * `startFedosDesktopRuntime()`'s own existing contract.
+   */
+  readonly deviceSyncSchedulerEnabled?: boolean;
+  /** REQUIRED when `deviceSyncSchedulerEnabled` is `true` — this Coordinator constructs no abandonment policy of its own (mirrors `FedosDeviceSyncScheduler`'s own existing required-dependency discipline). */
+  readonly deviceSyncAbandonmentPolicy?: FedosDeviceSyncAbandonmentPolicy;
+  /** Optional; omitted, every Scheduler tick's own attempt fails closed with `"failed"` — the SAME existing `FedosDesktopRuntimeConfig.deviceSyncAttemptFn` default. */
+  readonly deviceSyncAttemptFn?: FedosDeviceSyncAttemptFn;
+}
+
+export class FedosProfileInitializationCoordinator {
+  readonly #deps: FedosProfileInitializationDependencies;
+  readonly #accountIndex: number;
+  readonly #now: () => number;
+  readonly #unlockPolicy: FedosUnlockSecretPolicy;
+  readonly #startRuntime: (config: FedosDesktopRuntimeConfig) => Promise<FedosRunningDesktopRuntime>;
+
+  #state: FedosProfileLifecycleState = "absent";
+  #runtime: FedosRunningDesktopRuntime | null = null;
+  #deviceKeypair: FedosDeviceSigningKeypair | null = null;
+  #descriptor: FedosLocalProfileDescriptorV1 | null = null;
+  #stopped = false;
+
+  constructor(deps: FedosProfileInitializationDependencies) {
+    this.#deps = deps;
+    this.#accountIndex = deps.accountIndex ?? 0;
+    this.#now = deps.now ?? (() => Date.now());
+    this.#unlockPolicy = deps.unlockPolicy ?? FEDOS_DEFAULT_UNLOCK_SECRET_POLICY;
+    this.#startRuntime = deps.startRuntime ?? startFedosDesktopRuntime;
+  }
+
+  get lifecycleState(): FedosProfileLifecycleState {
+    return this.#state;
+  }
+
+  #transition(event: Parameters<typeof applyFedosProfileLifecycleTransition>[1]): void {
+    this.#state = applyFedosProfileLifecycleTransition(this.#state, event);
+  }
+
+  // ------------------------------------------------------------------
+  // Detection (Phase F: "detect profile").
+  // ------------------------------------------------------------------
+
+  /**
+   * Reads durable state and reports coarse presence, driving the lifecycle
+   * to `absent` / `locked` / `recovery-required`. Fail-closed: a corrupt
+   * descriptor or a sealed file with no descriptor (interrupted init) is
+   * `recovery-required`, NEVER silently treated as a new profile.
+   */
+  detectProfileState(): FedosProfileCoordinatorResult<FedosProfileStatusView> {
+    let descriptor: FedosLocalProfileDescriptorV1 | null;
+    try {
+      descriptor = this.#deps.profilePersistence.read();
+    } catch (error) {
+      if (error instanceof FedosLocalProfileCorruptError) {
+        this.#state = "absent";
+        this.#transition("corruption-detected");
+        return ok(this.#statusView("recovery-required"));
+      }
+      return fail("failed", "profile read failed");
+    }
+
+    if (descriptor === null) {
+      // No descriptor. Was there leftover sealed material (interrupted init)?
+      let sealedPresent = false;
+      try {
+        sealedPresent = this.#deps.sealedSeedPersistence.read() !== null;
+      } catch {
+        // A corrupt sealed file with no descriptor -> recovery-required.
+        this.#state = "absent";
+        this.#transition("corruption-detected");
+        return ok(this.#statusView("recovery-required"));
+      }
+      if (sealedPresent) {
+        this.#state = "absent";
+        this.#transition("corruption-detected");
+        return ok(this.#statusView("recovery-required"));
+      }
+      this.#state = "absent";
+      return ok(this.#statusView("absent"));
+    }
+
+    this.#descriptor = descriptor;
+    if (descriptor.initializationState === "ready") {
+      this.#state = "absent";
+      this.#transition("profile-detected-locked");
+      return ok(this.#statusView("locked"));
+    }
+    if (descriptor.initializationState === "recovery-required") {
+      this.#state = "absent";
+      this.#transition("corruption-detected");
+      return ok(this.#statusView("recovery-required"));
+    }
+    // "initializing" or "failed" -> an interrupted init. Recovery-required
+    // (never a false ready, never a silent overwrite).
+    this.#state = "absent";
+    this.#transition("corruption-detected");
+    return ok(this.#statusView("recovery-required"));
+  }
+
+  // ------------------------------------------------------------------
+  // Flow A — create a new local profile (Phase E).
+  // ------------------------------------------------------------------
+
+  async createProfile(
+    input: { readonly displayLabel: string },
+    unlockSecret: FedosProfileUnlockSecret,
+  ): Promise<FedosProfileCoordinatorResult<FedosProfileReadyView>> {
+    // 1. Validate non-secret input BEFORE entering `initializing`.
+    const label = typeof input.displayLabel === "string" ? input.displayLabel.trim() : "";
+    if (label.length === 0 || label.length > 128) {
+      return fail("invalid-input", "display label must be 1-128 characters");
+    }
+    const secretVerdict = validateFedosUnlockSecretBytes(
+      new Uint8Array(Math.max(0, unlockSecret.byteLength)),
+      this.#unlockPolicy,
+    );
+    if (secretVerdict !== "ok") {
+      unlockSecret.clear();
+      return fail("weak-secret", `unlock secret rejected: ${secretVerdict}`);
+    }
+
+    // 2. Refuse to overwrite an existing/partial profile (idempotent create guard).
+    const detect = this.detectProfileState();
+    if (detect.outcome !== "ok") {
+      unlockSecret.clear();
+      return fail("failed", "profile detection failed");
+    }
+    if (detect.value.presence === "locked") {
+      unlockSecret.clear();
+      return fail("already-exists", "a profile already exists at this location");
+    }
+    if (detect.value.presence === "recovery-required") {
+      unlockSecret.clear();
+      return fail("recovery-required", "a partial or corrupt profile exists; recover it, do not create over it");
+    }
+
+    this.#state = "absent";
+    this.#transition("begin-create");
+
+    // 3. Durable directories.
+    if (!ensureFedosLocalProfileDirectories(this.#deps.paths)) {
+      unlockSecret.clear();
+      this.#transition("initialization-failed");
+      return fail("failed", "could not create profile directories");
+    }
+
+    // 4. Generate the Master Seed through the existing authority.
+    const generated = await this.#deps.masterSeedAuthority.generate();
+    if (!generated) {
+      unlockSecret.clear();
+      this.#transition("initialization-failed");
+      return fail("seed-unavailable", "Master Seed generation is unavailable (crypto gate closed)");
+    }
+
+    // 5. Seal it (consume the secret exactly once) and persist ONLY sealed material.
+    const sealed = await unlockSecret.consume((bytes) => this.#deps.masterSeedAuthority.seal(bytes));
+    if (sealed === null) {
+      this.#transition("initialization-failed");
+      return fail("seed-unavailable", "Master Seed sealing is unavailable (crypto gate closed)");
+    }
+    const sealWrite = this.#deps.sealedSeedPersistence.writeIfAbsent(sealed);
+    if (sealWrite === "already-exists") {
+      // Leftover sealed material from an interrupted attempt — do NOT overwrite.
+      this.#transition("corruption-detected");
+      return fail("recovery-required", "sealed Master Seed material already exists; recover, do not overwrite");
+    }
+    if (sealWrite === "failed") {
+      this.#transition("initialization-failed");
+      return fail("failed", "could not persist sealed Master Seed");
+    }
+
+    // 6. Resolve the account public identity.
+    const identity = await this.#deps.accountSigningAuthority.publicIdentityForAccount(this.#accountIndex);
+    if (identity === null) {
+      this.#transition("initialization-failed");
+      return fail("failed", "could not resolve account public identity");
+    }
+
+    // 7. Local Device identity (Phase H) — a real, independent Device key.
+    const deviceKeypair = (this.#deps.generateDeviceKeypair ?? generateFedosDeviceSigningKeypair)();
+    this.#deviceKeypair = deviceKeypair;
+    const localDeviceId = this.#deps.localDeviceId ?? `device-${deviceKeypair.publicKeyHex.slice(0, 16)}`;
+
+    // 8. Persist the descriptor as `initializing` (interrupt-detectable).
+    const profileId =
+      (this.#deps.generateProfileId ?? (() => bytesToHex(randomBytes(16))))();
+    const draft = createFedosLocalProfileDescriptorV1({
+      profileId,
+      displayLabel: label,
+      accountPublicIdentity: { authority: "nostr", publicKeyHex: identity.publicKeyHex },
+      localDeviceId,
+      createdAt: this.#now(),
+      sealedMasterSeedRef: this.#deps.paths.sealedMasterSeedFile,
+      dataDirectoryRoot: this.#deps.paths.root,
+      initializationState: "initializing",
+    });
+    if (draft === null) {
+      this.#transition("initialization-failed");
+      return fail("failed", "could not construct profile descriptor");
+    }
+    const write = this.#deps.profilePersistence.writeIfAbsent(draft);
+    if (write !== "written") {
+      this.#transition("corruption-detected");
+      return fail("recovery-required", "a profile descriptor already exists; recover, do not overwrite");
+    }
+    this.#descriptor = draft;
+
+    // 9. Start the Desktop Runtime + bootstrap the local Device + Sync Journal.
+    const accountRef: FedosDeviceBindingAccountRef = {
+      authority: "nostr",
+      publicIdentifier: identity.publicKeyHex,
+      identityId: null,
+    };
+    const startResult = await this.#startAndBootstrap(accountRef, deviceKeypair, localDeviceId);
+    if (startResult.outcome !== "ok") {
+      // Mark the descriptor failed (NOT deleted) for interrupt detection.
+      this.#markDescriptorState("failed");
+      this.#transition(
+        startResult.outcome === "runtime-start-failed" ? "runtime-start-failed" : "initialization-failed",
+      );
+      return fail(startResult.outcome, startResult.reason);
+    }
+
+    // 10. Mark ready ONLY now.
+    this.#markDescriptorState("ready");
+    this.#transition("initialization-succeeded");
+    return ok(
+      this.#readyView(label, identity.publicKeyHex, localDeviceId, startResult.value.deviceTrustState),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Flow B / C — unlock an existing local profile (Phase F).
+  // ------------------------------------------------------------------
+
+  async unlockProfile(
+    unlockSecret: FedosProfileUnlockSecret,
+  ): Promise<FedosProfileCoordinatorResult<FedosProfileReadyView>> {
+    const detect = this.detectProfileState();
+    if (detect.outcome !== "ok") {
+      unlockSecret.clear();
+      return fail("failed", "profile detection failed");
+    }
+    if (detect.value.presence === "absent") {
+      unlockSecret.clear();
+      return fail("no-profile", "no profile to unlock");
+    }
+    if (detect.value.presence === "recovery-required") {
+      unlockSecret.clear();
+      return fail("recovery-required", "profile requires recovery; unlock is not possible");
+    }
+
+    const descriptor = this.#descriptor;
+    if (descriptor === null) {
+      unlockSecret.clear();
+      return fail("failed", "profile descriptor unavailable");
+    }
+
+    // Read the sealed material (fail-closed on corruption).
+    let sealed;
+    try {
+      sealed = this.#deps.sealedSeedPersistence.read();
+    } catch {
+      unlockSecret.clear();
+      this.#transition("begin-unlock");
+      this.#transition("corruption-detected");
+      return fail("corrupt", "sealed Master Seed material is corrupt");
+    }
+    if (sealed === null) {
+      unlockSecret.clear();
+      this.#transition("begin-unlock");
+      this.#transition("corruption-detected");
+      return fail("corrupt", "sealed Master Seed material is missing");
+    }
+
+    this.#transition("begin-unlock");
+
+    // Invoke the existing restore/unseal authority (consume the secret once).
+    const restored = await unlockSecret.consume((bytes) =>
+      this.#deps.masterSeedAuthority.restoreSealed(sealed!, bytes),
+    );
+    if (restored !== true) {
+      // Wrong secret is an indistinguishable coarse failure — remain locked, retry open.
+      this.#transition("unlock-failed");
+      return fail("unlock-failed", "unlock failed");
+    }
+
+    // Validate restored account identity against the persisted public identity.
+    const identity = await this.#deps.accountSigningAuthority.publicIdentityForAccount(this.#accountIndex);
+    if (identity === null || identity.publicKeyHex !== descriptor.accountPublicIdentity.publicKeyHex) {
+      await this.#deps.masterSeedAuthority.clear();
+      this.#transition("identity-mismatch");
+      return fail("identity-mismatch", "restored identity does not match the profile");
+    }
+
+    // Hydrate durable authorities + start the Runtime.
+    const deviceKeypair = (this.#deps.generateDeviceKeypair ?? generateFedosDeviceSigningKeypair)();
+    this.#deviceKeypair = deviceKeypair;
+    const accountRef: FedosDeviceBindingAccountRef = {
+      authority: "nostr",
+      publicIdentifier: identity.publicKeyHex,
+      identityId: null,
+    };
+    const startResult = await this.#startAndBootstrap(accountRef, deviceKeypair, descriptor.localDeviceId);
+    if (startResult.outcome !== "ok") {
+      await this.#deps.masterSeedAuthority.clear();
+      this.#transition("runtime-start-failed");
+      return fail(startResult.outcome, startResult.reason);
+    }
+
+    this.#markDescriptorState("ready");
+    this.#transition("unlock-succeeded");
+    return ok(
+      this.#readyView(
+        descriptor.displayLabel,
+        identity.publicKeyHex,
+        descriptor.localDeviceId,
+        startResult.value.deviceTrustState,
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Phase M — lock / shutdown (idempotent).
+  // ------------------------------------------------------------------
+
+  /**
+   * Stops the active Runtime, clears in-memory unlock material, and returns
+   * to the locked/stopped state — leaving durable encrypted state intact.
+   * Idempotent: a second call is a safe no-op `ok`.
+   */
+  async lock(): Promise<FedosProfileCoordinatorResult<{ readonly lifecycleState: FedosProfileLifecycleState }>> {
+    if (this.#runtime !== null && !this.#stopped) {
+      try {
+        await this.#runtime.stop();
+      } catch {
+        // stop() is non-idempotent at the Runtime layer; a throw here is
+        // treated as already-stopped. We never surface a raw Error.
+      }
+      this.#stopped = true;
+    }
+    this.#runtime = null;
+    if (this.#deviceKeypair !== null) {
+      // The Device keypair is an opaque handle; drop our reference.
+      this.#deviceKeypair = null;
+    }
+    // Best-effort clear of in-memory seed authority state.
+    try {
+      await this.#deps.masterSeedAuthority.clear();
+    } catch {
+      /* never throws to the caller */
+    }
+    if (this.#state === "ready") {
+      this.#transition("lock"); // ready -> stopped
+    }
+    return ok({ lifecycleState: this.#state });
+  }
+
+  /** The running Runtime handle, or `null` if not `ready`. For the Shell/host to reach conversation/device commands after unlock. Never exposes a secret. */
+  runningRuntime(): FedosRunningDesktopRuntime | null {
+    return this.#state === "ready" ? this.#runtime : null;
+  }
+
+  /**
+   * Secure Runtime Alpha 5061-5160 (FedOS Desktop Beta 0.1 Integration Arc) —
+   * additive Phase E hook for a CONFIRMED Runtime-restart flow (e.g.
+   * `FedosDesktopBetaApplicationAssembly`, `../beta/fedos_desktop_beta_application_assembly.ts`).
+   *
+   * A Runtime-only restart (relay list / archive directory / other
+   * construction-time Settings) must replace the ONE Runtime this Coordinator
+   * itself started during unlock/create, WITHOUT re-running unlock and WITHOUT
+   * clearing the Master Seed authority (`lock()` does both — wrong for this
+   * case; Phase E requires "preserve profile unlocked state"). Without this
+   * method, the composed assembly would have to keep its own duplicate
+   * Runtime pointer, and `runningRuntime()`/`status().runtimeRunning` would
+   * silently go stale (still describing the OLD, now-stopped Runtime) after a
+   * confirmed restart — an honesty defect this Coordinator's own guardrails
+   * (never a false `ready`, never stale state) exist specifically to prevent.
+   *
+   * Callable ONLY while `ready` (a confirmed restart is meaningless before a
+   * successful unlock/create, and never while locked). The caller is solely
+   * responsible for having already stopped the OLD Runtime and started the
+   * NEW one through the existing `startFedosDesktopRuntime()` entry point —
+   * this method performs no I/O and constructs nothing itself.
+   */
+  adoptReplacementRuntime(runtime: FedosRunningDesktopRuntime): FedosProfileCoordinatorResult<null> {
+    if (this.#state !== "ready") {
+      return fail("not-ready", "cannot adopt a replacement Runtime unless the profile is ready/unlocked");
+    }
+    this.#runtime = runtime;
+    this.#stopped = false;
+    return ok(null);
+  }
+
+  recoveryNotice(): FedosProfileRecoveryNotice {
+    return buildFedosProfileRecoveryNotice(this.#deps.paths, {
+      conversationArchiveExportAvailable: this.#deps.archiveEnabled === true,
+    });
+  }
+
+  status(): FedosProfileStatusView {
+    const presence: FedosProfilePresence =
+      this.#state === "ready"
+        ? "locked"
+        : this.#state === "recovery-required"
+          ? "recovery-required"
+          : this.#state === "absent"
+            ? "absent"
+            : this.#state === "initializing" || this.#state === "unlocking"
+              ? "in-progress"
+              : "locked";
+    return this.#statusView(this.#state === "ready" ? "locked" : presence, true);
+  }
+
+  // ------------------------------------------------------------------
+  // Internal helpers.
+  // ------------------------------------------------------------------
+
+  async #startAndBootstrap(
+    accountRef: FedosDeviceBindingAccountRef,
+    deviceKeypair: FedosDeviceSigningKeypair,
+    localDeviceId: string,
+  ): Promise<FedosProfileCoordinatorResult<{ readonly deviceTrustState: string }>> {
+    const config = this.#buildRuntimeConfig(accountRef, localDeviceId);
+    let runtime: FedosRunningDesktopRuntime;
+    try {
+      runtime = await this.#startRuntime(config);
+    } catch {
+      return fail("runtime-start-failed", "Desktop Runtime failed to start");
+    }
+    this.#runtime = runtime;
+    this.#stopped = false;
+
+    // Phase H — bootstrap the local Device through the real pairing proofs.
+    const deviceTrustState = await this.#bootstrapLocalDevice(runtime, deviceKeypair, accountRef, localDeviceId);
+    return ok({ deviceTrustState });
+  }
+
+  #buildRuntimeConfig(
+    accountRef: FedosDeviceBindingAccountRef,
+    localDeviceId: string,
+  ): FedosDesktopRuntimeConfig {
+    const paths = this.#deps.paths;
+    return {
+      boardLogPath: paths.boardLogFile,
+      outboxLogPath: paths.outboxLogFile,
+      deliveryEnabled: false,
+      conversationLogPath: paths.conversationLogFile,
+      conversationEnvelopeLogPath: paths.conversationEnvelopeLogFile,
+      conversationPayloadLogPath: paths.conversationPayloadLogFile,
+      conversationMembershipLogPath: paths.conversationMembershipLogFile,
+      deviceTrustEnabled: true,
+      localDeviceId,
+      localAccountRef: accountRef,
+      deviceRegistryLogPath: paths.deviceRegistryLogFile,
+      deviceBindingChallengeReplayLogPath: paths.deviceBindingReplayLogFile,
+      deviceBindingAccountSigningAuthority: this.#deps.accountSigningAuthority,
+      deviceBindingAccountIndex: this.#accountIndex,
+      deviceSyncJournalLogPath: paths.syncJournalLogFile,
+      archiveEnabled: this.#deps.archiveEnabled === true,
+      conversationArchiveMasterSeedAuthority:
+        this.#deps.archiveEnabled === true ? this.#deps.masterSeedAuthority : undefined,
+      deviceSyncSchedulerEnabled: this.#deps.deviceSyncSchedulerEnabled === true,
+      deviceSyncAbandonmentPolicy:
+        this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAbandonmentPolicy : undefined,
+      deviceSyncAttemptFn:
+        this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAttemptFn : undefined,
+      deviceSyncScheduleLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncScheduleLogFile : undefined,
+      deviceSyncConflictLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncConflictLogFile : undefined,
+    };
+  }
+
+  /**
+   * Phase H — registers THIS machine's own local Device through the real
+   * pairing exchange (createPairingRequest -> approvePairingRequest ->
+   * completePairing), with real BIP-340 proofs on both the account and
+   * Device sides. The first Device is NOT special-cased with a
+   * caller-supplied `trusted=true`; it proves possession and is authorized
+   * by the same account signature every other Device uses. If no account
+   * signing capability is available (`approvePairingRequest` -> "disabled"),
+   * the Device remains at the honest boundary and the profile still reaches
+   * ready with a `"pending"`/`"unavailable"` Device trust state (documented,
+   * never faked).
+   */
+  async #bootstrapLocalDevice(
+    runtime: FedosRunningDesktopRuntime,
+    deviceKeypair: FedosDeviceSigningKeypair,
+    accountRef: FedosDeviceBindingAccountRef,
+    localDeviceId: string,
+  ): Promise<string> {
+    let pairing;
+    try {
+      pairing = runtime.devicePairing();
+    } catch {
+      return "unavailable";
+    }
+    const created = pairing.createPairingRequest(localDeviceId, deviceKeypair, accountRef);
+    if (created.outcome !== "ok") return "failed";
+    const approval = await pairing.approvePairingRequest(created.value.encoded);
+    if (approval.outcome === "disabled") return "unavailable";
+    if (approval.outcome !== "ok") return "failed";
+    const completed = await pairing.completePairing(
+      created.value.pairingId,
+      deviceKeypair,
+      approval.value.encoded,
+    );
+    if (completed.outcome !== "ok") return "failed";
+    return completed.value.trustState;
+  }
+
+  #markDescriptorState(state: "ready" | "failed" | "recovery-required"): void {
+    if (this.#descriptor === null) return;
+    const mappedState = state === "ready" ? "ready" : state === "failed" ? "failed" : "recovery-required";
+    const next = withFedosLocalProfileInitializationState(this.#descriptor, mappedState, this.#now());
+    if (next === null) return;
+    this.#descriptor = next;
+    this.#deps.profilePersistence.update(next);
+  }
+
+  #statusView(presence: FedosProfilePresence, runtimeRunning = false): FedosProfileStatusView {
+    const descriptor = this.#descriptor;
+    return Object.freeze({
+      lifecycleState: this.#state,
+      presence,
+      displayLabel: descriptor?.displayLabel ?? null,
+      accountPublicIdentifier: descriptor?.accountPublicIdentity.publicKeyHex ?? null,
+      localDeviceId: descriptor?.localDeviceId ?? null,
+      runtimeRunning: runtimeRunning && this.#runtime !== null && !this.#stopped,
+    });
+  }
+
+  #readyView(
+    displayLabel: string,
+    accountPublicIdentifier: string,
+    localDeviceId: string,
+    deviceTrustState: string,
+  ): FedosProfileReadyView {
+    return Object.freeze({
+      lifecycleState: "ready" as const,
+      displayLabel,
+      accountPublicIdentifier,
+      localDeviceId,
+      deviceTrustState,
+      recoveryNotice: this.recoveryNotice(),
+    });
+  }
+}

@@ -85,6 +85,10 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
   // narrows nothing else these checks look for.
   const KNOWN_ALPHA_869_CONVERSATION_KEY_WIRING_FNS = [
     "resolve_conversation_key",
+    "encrypt_nip44_wire",
+    "decrypt_nip44_wire",
+    "sign_nostr_event_with_fresh_ephemeral_key",
+    "build_and_sign_nip17_gift_wrap",
     "derive_conversation_key_bytes_from_master_seed_internal",
   ];
   function withoutKnownAlpha869ConversationKeyWiring(source: string): string {
@@ -213,12 +217,14 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
 
   it("11. the crate's public pub fn surface is unchanged at twenty-seven", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(46);
-    for (const name of pubFnNames) {
+    expect(pubFnNames.length).toBe(69);    for (const name of pubFnNames) {
       // Alpha 869 -- see KNOWN_ALPHA_869_CONVERSATION_KEY_WIRING_FNS above:
       // wiring only, delegates its ECDH math to the one pre-existing,
       // dedicated `crypto::conversation_key` module.
       if (name === "resolve_conversation_key") continue;
+      // Secure Runtime Alpha 1761-1840 Phase B -- real, reviewed NIP-44
+      // wire additions, not this stage's own concern.
+      if (name === "encrypt_nip44_wire" || name === "decrypt_nip44_wire") continue;
       expect(name.toLowerCase()).not.toContain("nip44");
       expect(name.toLowerCase()).not.toContain("conversation");
       expect(name.toLowerCase()).not.toContain("secp256k1");

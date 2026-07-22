@@ -46,6 +46,8 @@ function fakeMasterSeedAuthority(resolveConversationKey: FedosMasterSeedAuthorit
     seal: vi.fn(async () => null),
     clear: vi.fn(async () => undefined),
     resolveConversationKey,
+    encryptNip44Wire: vi.fn(async () => null),
+    decryptNip44Wire: vi.fn(async () => null),
   };
 }
 

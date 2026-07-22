@@ -84,10 +84,9 @@ describe("Secure Runtime Alpha 195 -- Connect Event ID Generation to Schnorr Sig
 
   it("10. structural: wasm_bindgen count and pub fn count remain fixed at 13/36, unchanged by this Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
-  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("11. structural: no Relay/WebSocket/publish/subscribe reference exists in sign_nostr_event_internal's own body", () => {
     const fnMatch = libRsSource.match(

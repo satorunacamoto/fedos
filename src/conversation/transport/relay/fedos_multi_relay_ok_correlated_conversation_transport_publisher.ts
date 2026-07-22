@@ -46,7 +46,7 @@ import type {
   FedosConversationTransportPublisher,
   FedosConversationTransportPublishResult,
 } from "../fedos_conversation_transport_publisher.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "../fedos_conversation_transport_outbox_codec.js";
+import type { FedosPersistedConversationTransportOutboxRecord } from "../fedos_conversation_transport_outbox_codec.js";
 import type { FedosConversationRelaySet } from "./fedos_conversation_relay_set.js";
 import type { FedosRelay } from "../../../desktop/fedos_relay.js";
 import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
@@ -54,7 +54,7 @@ import type { FedosEventDescriptor } from "../../../desktop/fedos_event_descript
 import { nostrWireEventToFedosEventDescriptor } from "../../../board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
 
 export type FedosConversationTransportSignedEventSourceFn = (
-  record: FedosPersistedConversationTransportOutboxRecordV1,
+  record: FedosPersistedConversationTransportOutboxRecord,
 ) => Promise<FedosNostrWireEvent | null>;
 
 const DEFAULT_OK_CORRELATION_TIMEOUT_MS = 10_000;
@@ -124,7 +124,7 @@ export class FedosMultiRelayOkCorrelatedConversationTransportPublisher implement
   }
 
   async publish(
-    record: FedosPersistedConversationTransportOutboxRecordV1,
+    record: FedosPersistedConversationTransportOutboxRecord,
   ): Promise<FedosConversationTransportPublishResult> {
     const event = await this.#eventSource(record);
     if (event === null) return NO_EVENT_YET_RESULT;

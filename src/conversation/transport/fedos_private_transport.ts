@@ -41,8 +41,10 @@
  *     anywhere in this file.
  */
 
+import type { FedosConversationMessageEnvelope } from "../envelope/fedos_conversation_message_envelope.js";
 import type { FedosConversationRelaySet } from "./relay/fedos_conversation_relay_set.js";
 import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosPrivateWireAdapter } from "./fedos_private_wire_adapter.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
@@ -50,11 +52,13 @@ import type { FedosConversationId } from "../fedos_conversation_id.js";
 import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
 import type { FedosSubscriptionFilter } from "../../desktop/fedos_subscription_filter.js";
 
+import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
 import { FedosConversationTransportSignedEventSource } from "./fedos_conversation_transport_signed_event_source.js";
 import { FedosMultiRelayOkCorrelatedConversationTransportPublisher } from "./relay/fedos_multi_relay_ok_correlated_conversation_transport_publisher.js";
 import {
   FedosConversationInboundSubscription,
   type FedosConversationInboundEnvelopeListener,
+  type FedosConversationInboundRumorListener,
 } from "./relay/fedos_conversation_inbound_subscription.js";
 import { FedosRelayEventDeduplicator } from "./relay/fedos_relay_event_deduplicator.js";
 import type { FedosConversationTransportOutboxPersistence } from "./fedos_conversation_transport_outbox_persistence.js";
@@ -62,8 +66,13 @@ import {
   createFedosConversationTransportOutboxIntent,
   type FedosConversationTransportOutboxId,
 } from "./fedos_conversation_transport_outbox_types.js";
-import { serializeFedosConversationTransportOutboxIntent } from "./fedos_conversation_transport_outbox_codec.js";
+import {
+  serializeFedosConversationTransportOutboxIntent,
+  serializeFedosConversationTransportOutboxRecordV2,
+} from "./fedos_conversation_transport_outbox_codec.js";
 import type { FedosConversationTransportOutboxPersistenceWriteResult } from "./fedos_conversation_transport_outbox_persistence.js";
+import { resolveFedosConversationTransportRoute } from "./fedos_conversation_transport_routing.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "./fedos_private_wire_prepared_delivery.js";
 import type { FedosConversationTransportPublisher } from "./fedos_conversation_transport_publisher.js";
 import {
   FedosConversationTransportScheduler,
@@ -83,6 +92,15 @@ export interface FedosPrivateTransportInboundConfig {
   readonly filter: FedosSubscriptionFilter;
   readonly onEnvelope: FedosConversationInboundEnvelopeListener;
   readonly deduplicator?: FedosRelayEventDeduplicator;
+  /**
+   * Secure Runtime Alpha 1841–1920 Phase D (Alpha 1856) — OPTIONAL.
+   * Fires for a successfully unwrapped standard NIP-17 Rumor, classified
+   * SEPARATELY from `onEnvelope` above (disjoint Nostr kinds — see
+   * `FedosConversationInboundSubscription`'s own header). Only ever
+   * invoked if this Transport was ALSO constructed with a
+   * `wireAdapter` whose own `route` is `"nostr-nip17-v1"`.
+   */
+  readonly onRumor?: FedosConversationInboundRumorListener;
 }
 
 export interface FedosPrivateTransportDependencies {
@@ -102,6 +120,27 @@ export interface FedosPrivateTransportDependencies {
   readonly now?: () => number;
   /** OPTIONAL — Inbound Subscription is activated ONLY when this is supplied. No silent default subscription of any kind. */
   readonly inbound?: FedosPrivateTransportInboundConfig;
+  /**
+   * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+   * Standard Delivery Arc") Phase G (Alpha 1788) — OPTIONAL. Retrievable
+   * via `wireAdapter()` below.
+   *
+   * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport
+   * Integration and Group Pairwise Delivery Arc") Phase C (Alpha
+   * 1843/1850) — this is now this Transport's own PLAINTEXT-SOURCING
+   * SEAM CLOSURE point: `sendMailboxNip17()` below dispatches through
+   * this adapter LIVE, at send time, while the caller (the application
+   * send operation — `FedosConversationDirectMessagingCoordinator`,
+   * transitively `FedosGroupSendCoordinator`) still holds the original
+   * plaintext (Alpha 1842's own frozen Plaintext Ownership Decision —
+   * plaintext belongs to the application send operation, is handed
+   * ephemerally to ONE selected Wire Adapter, and is never retained by
+   * this Transport, its Outbox, or Observation). The PRE-EXISTING
+   * `sendMailbox()`/internal `FedosConversationTransportSignedEventSource`
+   * path below is UNCHANGED — it remains the `fedos-private-v1` route's
+   * own lazy, ciphertext-only resolution, exactly as before this Arc.
+   */
+  readonly wireAdapter?: FedosPrivateWireAdapter;
 }
 
 export class FedosPrivateTransport {
@@ -110,12 +149,15 @@ export class FedosPrivateTransport {
   readonly #localAccountIndex: number;
   readonly #outboxPersistence: FedosConversationTransportOutboxPersistence;
   readonly #envelopePersistence: FedosConversationMessageEnvelopePersistence;
+  readonly #payloadStorage: FedosConversationPayloadStorage;
+  readonly #membershipsForConversation: (conversationId: FedosConversationId) => readonly FedosConversationMembership[];
   readonly #publisher: FedosConversationTransportPublisher;
   readonly #validatingObservationRepository: FedosValidatingDeliveryObservationRepository;
   readonly #observationRepository: FedosDeliveryObservationRepository;
   readonly #scheduler: FedosConversationTransportScheduler;
   readonly #now: () => number;
   readonly #inboundConfig: FedosPrivateTransportInboundConfig | undefined;
+  readonly #wireAdapter: FedosPrivateWireAdapter | undefined;
 
   #inboundSubscription: FedosConversationInboundSubscription | null = null;
   #running = false;
@@ -124,8 +166,11 @@ export class FedosPrivateTransport {
     this.#relaySet = dependencies.relaySet;
     this.#signingAuthority = dependencies.signingAuthority;
     this.#localAccountIndex = dependencies.localAccountIndex;
+    this.#wireAdapter = dependencies.wireAdapter;
     this.#outboxPersistence = dependencies.outboxPersistence;
     this.#envelopePersistence = dependencies.envelopePersistence;
+    this.#payloadStorage = dependencies.payloadStorage;
+    this.#membershipsForConversation = dependencies.membershipsForConversation;
     this.#now = dependencies.now ?? Date.now;
     this.#inboundConfig = dependencies.inbound;
 
@@ -163,6 +208,18 @@ export class FedosPrivateTransport {
   }
 
   /**
+   * Secure Runtime Alpha 1761–1840 Phase G (Alpha 1788) — read-only
+   * accessor for the OPTIONAL injected `FedosPrivateWireAdapter`, or
+   * `undefined` if none was supplied at construction. See
+   * `FedosPrivateTransportDependencies.wireAdapter`'s own doc comment
+   * for the exact, honest scope of this injection today (retrievable,
+   * not yet dispatched-through internally).
+   */
+  wireAdapter(): FedosPrivateWireAdapter | undefined {
+    return this.#wireAdapter;
+  }
+
+  /**
    * Queues an envelope for Mailbox (durable) Delivery — idempotent by
    * `envelopeId` (`FedosConversationTransportOutboxPersistence.putIntent()`'s
    * own `"already-present"` semantics). Actual delivery happens on the
@@ -192,6 +249,156 @@ export class FedosPrivateTransport {
     const intent = createFedosConversationTransportOutboxIntent(envelopeId, conversationId, persistedEnvelope.createdAt);
     if (intent === null) return "failed";
     return this.#outboxPersistence.putIntent(serializeFedosConversationTransportOutboxIntent(intent));
+  }
+
+  /**
+   * Secure Runtime Alpha 1841–1920 Phase C (Alpha 1843/1850) — the
+   * standard `nostr-nip17-v1` route's own send-time preparation +
+   * durable enqueue, closing this Arc's own named plaintext-sourcing
+   * blocker. Requires `plaintext` (the caller's OWN, still-in-scope
+   * bytes — see `fedos_private_wire_prepared_delivery.ts`'s own header)
+   * and a constructor-injected `wireAdapter` whose own `route` is
+   * `"nostr-nip17-v1"` and which reports itself `isAvailable()` — an
+   * unavailable/missing/wrong-route adapter fails closed to
+   * `"route-unavailable"` BEFORE any Relay is ever reached (Alpha 1844's
+   * own "fails closed BEFORE Relay publication" rule), never a silent
+   * downgrade to `fedos-private-v1`.
+   *
+   * Sequence: read the ALREADY-persisted Envelope (fails closed if
+   * absent/mismatched, exactly like `sendMailbox()` above) -> resolve
+   * Direct-mode routing (`resolveFedosConversationTransportRoute()`,
+   * reused unchanged) -> `wireAdapter.build()` with plaintext (the ONE
+   * moment plaintext crosses this Transport, never persisted) -> persist
+   * the ALREADY-SIGNED native event as an ADDITIVE `schemaVersion: 2`
+   * Outbox record (`fedos_conversation_transport_outbox_codec.ts`) for
+   * the existing Scheduler to publish on its own next tick, exactly like
+   * any other Mailbox Delivery intent — no second Outbox domain, no
+   * second Scheduler.
+   */
+  async sendMailboxNip17(
+    envelopeId: FedosConversationEnvelopeId,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+  ): Promise<FedosPrivateWireDeliveryQueueOutcome> {
+    if (!(plaintext instanceof Uint8Array) || plaintext.length === 0) return { outcome: "invalid-input" };
+
+    const adapter = this.#wireAdapter;
+    if (adapter === undefined || adapter.route !== "nostr-nip17-v1" || !adapter.isAvailable()) {
+      return { outcome: "route-unavailable" };
+    }
+
+    const persistedEnvelope = this.#envelopePersistence.getEnvelope(envelopeId);
+    if (persistedEnvelope === null || persistedEnvelope.conversationId !== conversationId) return { outcome: "invalid-input" };
+    const envelope = deserializeFedosConversationMessageEnvelope(persistedEnvelope);
+    if (envelope === null) return { outcome: "invalid-input" };
+
+    const payload = this.#payloadStorage.getPayload(envelope.payloadId);
+    if (payload === null) return { outcome: "failed" };
+
+    const memberships = this.#membershipsForConversation(conversationId);
+    const route = await resolveFedosConversationTransportRoute({
+      memberships,
+      signingAuthority: this.#signingAuthority,
+      localAccountIndex: this.#localAccountIndex,
+    });
+    if (route.outcome === "local-membership-unresolved") return { outcome: "identity-unavailable" };
+    if (route.outcome === "not-direct") return { outcome: "unauthorized" };
+    if (route.outcome === "counterparty-not-nostr" || route.outcome === "invalid-counterparty-key") {
+      return { outcome: "unsupported-recipient" };
+    }
+
+    const built = await adapter.build({
+      envelope,
+      ciphertext: payload.bytes,
+      plaintext,
+      counterpartyPublicKeyHex: route.counterpartyPublicKeyHex,
+      localAccountIndex: route.localAccountIndex,
+    });
+    if (built.outcome !== "built-signed") return { outcome: "crypto-unavailable" };
+
+    const record = serializeFedosConversationTransportOutboxRecordV2({
+      envelopeId,
+      conversationId,
+      createdAt: persistedEnvelope.createdAt,
+      recipientPublicKeyHex: route.counterpartyPublicKeyHex,
+      nativeEvent: built.event,
+    });
+    const write = this.#outboxPersistence.putIntent(record);
+    if (write === "failed" || write === "conflict") return { outcome: "persistence-failed" };
+
+    return { outcome: "queued", envelopeId };
+  }
+
+  /**
+   * Secure Runtime Alpha 5561–5640 (FedOS Direct Double Ratchet
+   * Conversation Runtime and NIP-17 Integration Arc) — the control-message
+   * counterpart of `sendMailboxNip17()` above, for ratchet-protocol
+   * facts (Phase D session-establishment, Phase F ratchet message
+   * payloads) that are NOT backed by an already-persisted Conversation
+   * Envelope. Byte-for-byte the SAME route/adapter/Outbox mechanics —
+   * still the SAME real NIP-17 Rumor -> Seal -> Gift Wrap pipeline, still
+   * an additive `schemaVersion: 2` Outbox record, still published on the
+   * existing Scheduler's own next tick — the ONE difference is that
+   * `createdAt` and the outbox record id are supplied directly by the
+   * caller (`controlId`) rather than resolved from a persisted Envelope
+   * (there is none to resolve for a control fact). `envelope.id`/
+   * `envelope.createdAt` are the ONLY two fields `NostrNip17V1WireAdapter.build()`
+   * ever reads from its own `envelope` parameter (see that adapter's own
+   * `build()` body) — every other field on the minimal stand-in object
+   * below is inert and never inspected.
+   */
+  async sendMailboxNip17Control(
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ): Promise<FedosPrivateWireDeliveryQueueOutcome> {
+    if (!(plaintext instanceof Uint8Array) || plaintext.length === 0) return { outcome: "invalid-input" };
+    if (typeof controlId !== "string" || controlId.length === 0) return { outcome: "invalid-input" };
+
+    const adapter = this.#wireAdapter;
+    if (adapter === undefined || adapter.route !== "nostr-nip17-v1" || !adapter.isAvailable()) {
+      return { outcome: "route-unavailable" };
+    }
+
+    const memberships = this.#membershipsForConversation(conversationId);
+    const route = await resolveFedosConversationTransportRoute({
+      memberships,
+      signingAuthority: this.#signingAuthority,
+      localAccountIndex: this.#localAccountIndex,
+    });
+    if (route.outcome === "local-membership-unresolved") return { outcome: "identity-unavailable" };
+    if (route.outcome === "not-direct") return { outcome: "unauthorized" };
+    if (route.outcome === "counterparty-not-nostr" || route.outcome === "invalid-counterparty-key") {
+      return { outcome: "unsupported-recipient" };
+    }
+
+    const stubEnvelope = {
+      id: controlId,
+      conversationId,
+      createdAt,
+    } as unknown as FedosConversationMessageEnvelope;
+
+    const built = await adapter.build({
+      envelope: stubEnvelope,
+      ciphertext: new Uint8Array(0),
+      plaintext,
+      counterpartyPublicKeyHex: route.counterpartyPublicKeyHex,
+      localAccountIndex: route.localAccountIndex,
+    });
+    if (built.outcome !== "built-signed") return { outcome: "crypto-unavailable" };
+
+    const record = serializeFedosConversationTransportOutboxRecordV2({
+      envelopeId: controlId as unknown as FedosConversationEnvelopeId,
+      conversationId,
+      createdAt,
+      recipientPublicKeyHex: route.counterpartyPublicKeyHex,
+      nativeEvent: built.event,
+    });
+    const write = this.#outboxPersistence.putIntent(record);
+    if (write === "failed" || write === "conflict") return { outcome: "persistence-failed" };
+
+    return { outcome: "queued", envelopeId: controlId };
   }
 
   /** Best-effort, one-attempt delivery — see `./fedos_conversation_ephemeral_transport.ts`'s own header for why this never touches the Outbox or Retry Registry. */
@@ -244,12 +451,19 @@ export class FedosPrivateTransport {
           "FedosPrivateTransport.start(): inbound was configured but the local Nostr identity could not be resolved for localAccountIndex.",
         );
       }
+      // Alpha 1841-1920 Phase D -- the nip17 adapter is passed through
+      // ONLY when its own `route` is the standard one; a `wireAdapter`
+      // constructed for some other route is never mistakenly used to
+      // classify inbound events.
+      const nip17Adapter =
+        this.#wireAdapter !== undefined && this.#wireAdapter.route === "nostr-nip17-v1" ? this.#wireAdapter : undefined;
       const subscription = new FedosConversationInboundSubscription(
         this.#relaySet,
         identity.publicKeyHex,
         this.#inboundConfig.deduplicator,
+        nip17Adapter,
       );
-      await subscription.start(this.#inboundConfig.filter, this.#inboundConfig.onEnvelope);
+      await subscription.start(this.#inboundConfig.filter, this.#inboundConfig.onEnvelope, this.#inboundConfig.onRumor);
       this.#inboundSubscription = subscription;
     }
   }

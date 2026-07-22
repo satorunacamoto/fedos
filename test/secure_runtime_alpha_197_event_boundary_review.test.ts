@@ -96,7 +96,7 @@ describe("Secure Runtime Alpha 197 -- Nostr Event Boundary Review", () => {
 
   it("11. structural: wasm_bindgen count remains fixed at 13, unchanged by this REVIEW-ONLY Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
   });
 
   // ---------------------------------------------------------------------

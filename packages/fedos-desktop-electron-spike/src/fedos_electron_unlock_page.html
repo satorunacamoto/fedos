@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'"
+    />
+    <title>FedOS — Profile Unlock</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #14161a; color: #e8eaed; }
+      h1 { font-size: 1.3rem; }
+      section { display: none; max-width: 30rem; }
+      section.active { display: block; }
+      label { display: block; margin: 0.75rem 0 0.25rem; font-size: 0.85rem; color: #aab; }
+      input { width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 4px; border: 1px solid #333; background: #0f1114; color: #e8eaed; }
+      button { margin-top: 1rem; padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid #445; background: #1f2937; color: #e8eaed; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      .error { color: #f7a; min-height: 1.2rem; font-size: 0.85rem; margin-top: 0.5rem; }
+      .field { font-family: ui-monospace, monospace; font-size: 0.8rem; color: #9bd; word-break: break-all; }
+      .muted { color: #889; font-size: 0.8rem; }
+    </style>
+  </head>
+  <body>
+    <h1>FedOS Desktop</h1>
+    <p class="muted">Current screen: <span id="current-screen">loading</span></p>
+
+    <section id="screen-loading" class="active">
+      <p>Loading…</p>
+    </section>
+
+    <section id="screen-welcome">
+      <p>Welcome. No local profile was found on this device.</p>
+      <button id="welcome-create-btn" type="button">Create a profile</button>
+    </section>
+
+    <section id="screen-create">
+      <p>Create a new local profile. Your passphrase seals the account Master Seed; it is never stored and cannot be recovered.</p>
+      <label for="create-label">Profile label</label>
+      <input id="create-label" type="text" autocomplete="off" maxlength="128" />
+      <label for="create-pass">Passphrase</label>
+      <input id="create-pass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <label for="create-pass-confirm">Confirm passphrase</label>
+      <input id="create-pass-confirm" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <div id="create-error" class="error"></div>
+      <button id="create-submit" type="button">Create profile</button>
+    </section>
+
+    <section id="screen-unlock">
+      <p>This device has a locked profile. Enter your passphrase to unlock.</p>
+      <p class="muted">Profile: <span id="unlock-label" class="field"></span></p>
+      <label for="unlock-pass">Passphrase</label>
+      <input id="unlock-pass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <div id="unlock-error" class="error"></div>
+      <button id="unlock-submit" type="button">Unlock</button>
+    </section>
+
+    <section id="screen-initializing">
+      <p>Working…</p>
+    </section>
+
+    <section id="screen-unlock-failed">
+      <p>Unlock failed. The passphrase did not match. The profile is still locked.</p>
+      <div class="error" id="unlock-failed-reason"></div>
+      <button id="retry-btn" type="button">Try again</button>
+    </section>
+
+    <section id="screen-recovery">
+      <p>This profile requires recovery. A partial or corrupt profile was detected and cannot be unlocked.</p>
+      <p class="muted" id="recovery-reason"></p>
+      <button id="quit-btn-recovery" type="button">Quit</button>
+    </section>
+
+    <section id="screen-ready">
+      <p><strong>Profile unlocked — Runtime ready.</strong></p>
+      <p>Label: <span id="ready-label" class="field"></span></p>
+      <p>Account public identity: <span id="ready-account" class="field"></span></p>
+      <p>Local device: <span id="ready-device" class="field"></span></p>
+      <p>Device trust: <span id="ready-trust" class="field"></span></p>
+      <button id="lock-btn" type="button">Lock</button>
+      <button id="quit-btn" type="button">Quit</button>
+    </section>
+
+    <script src="fedos_electron_unlock_renderer.js"></script>
+  </body>
+</html>

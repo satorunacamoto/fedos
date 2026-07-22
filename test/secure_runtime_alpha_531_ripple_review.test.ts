@@ -64,6 +64,16 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
       "src/board/runtime/fedos_board_runtime_command_types.ts",
       "src/desktop/runtime/fedos_desktop_runtime.ts",
       "src/desktop/runtime/fedos_desktop_runtime_config.ts",
+      // Secure Runtime Alpha 5401-5480 (FedOS Direct Ratchet State and
+      // Sealed Persistence Foundation Arc) legitimately extends the
+      // existing Master Seed WASM Rust Boundary reach with two new,
+      // narrow methods (`attemptDevOnlyMasterSeedSealDirectRatchetSecretCall`/
+      // `attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall`) and the
+      // TypeScript-side `FedosWasmMasterSeedAuthority` adapter that calls
+      // them -- see
+      // docs/secure_runtime_alpha_5401_5480_reconciliation_report.md §5.
+      "src/runtime/fedos_wasm_loader.ts",
+      "src/runtime/master_seed/fedos_wasm_master_seed_authority.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);

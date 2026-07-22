@@ -473,4 +473,19 @@ export class FedosConversationSearchIndex {
   size(): number {
     return this.#incremental.size();
   }
+
+  /**
+   * Secure Runtime Alpha 3081-3160 — narrow read accessor exposing this
+   * facade's own EXISTING internal envelope -> conversation linkage
+   * (`#conversationIdByEnvelope`, already required to purge Mode/Archive
+   * metadata correctly in `#unlinkEnvelope()`/`#purgeConversationMetadataIfEmpty()`
+   * above) to an application-layer caller assembling a search result view.
+   * NOT a second index — reads the SAME map `#linkEnvelope()`/
+   * `#unlinkEnvelope()` already maintain, never a new one. `null` for an
+   * unknown or already-removed envelope id (mirrors this file's own
+   * established "fails closed to `null`" convention throughout).
+   */
+  conversationIdForEnvelope(envelopeId: FedosConversationEnvelopeId): FedosConversationId | null {
+    return this.#conversationIdByEnvelope.get(envelopeId) ?? null;
+  }
 }

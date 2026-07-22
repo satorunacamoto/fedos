@@ -9,6 +9,12 @@
  *   - Independent instances never share state — no module-level mutable
  *     state exists in this file.
  *   - `listIntents()` returns a NEW array every call.
+ *
+ * Secure Runtime Alpha 1841–1920 Phase B — widened, additively, to the
+ * `FedosPersistedConversationTransportOutboxRecord` union (V1 | V2). The
+ * `Map`-backed implementation itself needed no behavior change — it was
+ * always structurally generic over "whatever record shape the port
+ * names."
  */
 
 import {
@@ -16,12 +22,12 @@ import {
   type FedosConversationTransportOutboxPersistence,
   type FedosConversationTransportOutboxPersistenceWriteResult,
 } from "./fedos_conversation_transport_outbox_persistence.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "./fedos_conversation_transport_outbox_codec.js";
+import type { FedosPersistedConversationTransportOutboxRecord } from "./fedos_conversation_transport_outbox_codec.js";
 
 export class InMemoryFedosConversationTransportOutboxPersistence implements FedosConversationTransportOutboxPersistence {
-  readonly #records = new Map<string, FedosPersistedConversationTransportOutboxRecordV1>();
+  readonly #records = new Map<string, FedosPersistedConversationTransportOutboxRecord>();
 
-  putIntent(record: FedosPersistedConversationTransportOutboxRecordV1): FedosConversationTransportOutboxPersistenceWriteResult {
+  putIntent(record: FedosPersistedConversationTransportOutboxRecord): FedosConversationTransportOutboxPersistenceWriteResult {
     const existing = this.#records.get(record.id);
     if (existing === undefined) {
       this.#records.set(record.id, record);
@@ -33,11 +39,11 @@ export class InMemoryFedosConversationTransportOutboxPersistence implements Fedo
     return "conflict";
   }
 
-  getIntent(id: string): FedosPersistedConversationTransportOutboxRecordV1 | null {
+  getIntent(id: string): FedosPersistedConversationTransportOutboxRecord | null {
     return this.#records.get(id) ?? null;
   }
 
-  listIntents(): readonly FedosPersistedConversationTransportOutboxRecordV1[] {
+  listIntents(): readonly FedosPersistedConversationTransportOutboxRecord[] {
     return [...this.#records.values()];
   }
 }

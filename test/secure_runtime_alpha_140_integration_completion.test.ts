@@ -200,9 +200,8 @@ describe("Secure Runtime Alpha 140 -- Integration Completion", () => {
 
   it("14. RIPPLE (Secure Runtime Alpha 146): Rust and Cargo/package sources were BYTE-FOR-BYTE UNCHANGED across this Arc's own scope; a LATER Arc (Alpha 146-150) legitimately touched Rust, so this count is now measured with a line-anchored regex (a later doc comment can otherwise mention the literal string `#[wasm_bindgen]` in prose without adding a real annotation) -- the real annotation count remains 13, reconfirmed here as the CURRENT state", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
-    const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(pubFnNames.length).toBe(69);    const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
+    expect(wasmBindgenCount).toBe(19);
     for (const stage of ["136", "137", "138", "139", "140"]) {
       expect(libRsSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
       expect(cargoTomlSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));

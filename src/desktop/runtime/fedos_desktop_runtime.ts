@@ -122,6 +122,12 @@ import {
 } from "../../conversation/runtime/fedos_conversation_runtime.js";
 import { assembleFedosConversationRuntimeDependencies } from "../../conversation/runtime/fedos_conversation_runtime_assembly.js";
 import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import {
+  assembleFedosConversationProductionCryptoGraph,
+  type FedosConversationProductionCryptoConfig,
+  type FedosConversationProductionCryptoGraph,
+} from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
 
 // Secure Runtime Alpha 1471-1540 (Private Transport Boundary and
 // Multi-Relay Delivery Arc) -- every import/addition below this comment
@@ -139,6 +145,86 @@ import { InMemoryFedosConversationTransportOutboxPersistence } from "../../conve
 import { InMemoryFedosDeliveryObservationPersistence } from "../../board/observation/in_memory_fedos_delivery_observation_persistence.js";
 import { FedosConversationRelaySet } from "../../conversation/transport/relay/fedos_conversation_relay_set.js";
 import { FedosPrivateTransport } from "../../conversation/transport/fedos_private_transport.js";
+import { NostrNip17V1WireAdapter } from "../../conversation/delivery/nostr/nip17/fedos_nostr_nip17_v1_wire_adapter.js";
+import type { FedosConversationDirectMessageDeliveryDependencies } from "../../conversation/messaging/fedos_conversation_direct_messaging_coordinator.js";
+
+// Secure Runtime Alpha 1691-1760 (Conversation Archive Runtime
+// Integration and Recovery Operations Arc) -- every import/addition
+// below this comment is ADDITIVE ONLY, mirroring the Alpha 1471-1540
+// boundary comment above for the same reason.
+import type { FedosConversationMembershipPersistence } from "../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
+import { AppendOnlyFedosConversationMembershipPersistence } from "../../conversation/membership/persistence/append_only_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../../conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+import { AppendOnlyFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { assembleFedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.js";
+import type { FedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
+
+// Secure Runtime Alpha 3081-3160 (Desktop Runtime Conversation Content
+// Accessor and Application Shell Activation Arc) -- every import/addition
+// below this comment is ADDITIVE ONLY, mirroring the Alpha 1691-1760
+// boundary comment above for the same reason.
+import { FedosDesktopConversationContentAccessor } from "../content_accessor/fedos_desktop_conversation_content_accessor.js";
+
+// Secure Runtime Alpha 1921-1980 (Group Conversation Archive Integration and
+// Cross-Branch Recovery Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1691-1760 boundary comment above for the
+// same reason.
+import type { FedosGroupGenerationPersistence } from "../../conversation/group/fedos_group_generation.js";
+import { AppendOnlyFedosGroupGenerationPersistence } from "../../conversation/group/append_only_fedos_group_generation_persistence.js";
+import { InMemoryFedosGroupGenerationPersistence } from "../../conversation/group/in_memory_fedos_group_generation_persistence.js";
+import type { FedosGroupDirectPathPersistence } from "../../conversation/group/fedos_group_direct_path.js";
+import { AppendOnlyFedosGroupDirectPathPersistence } from "../../conversation/group/append_only_fedos_group_direct_path_persistence.js";
+import { InMemoryFedosGroupDirectPathPersistence } from "../../conversation/group/in_memory_fedos_group_direct_path_persistence.js";
+import type { FedosGroupMessagePersistence } from "../../conversation/group/fedos_group_message.js";
+import { AppendOnlyFedosGroupMessagePersistence } from "../../conversation/group/append_only_fedos_group_message_persistence.js";
+import { InMemoryFedosGroupMessagePersistence } from "../../conversation/group/in_memory_fedos_group_message_persistence.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../../conversation/group/fedos_group_fanout_delivery.js";
+import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/append_only_fedos_group_fanout_delivery_persistence.js";
+import { InMemoryFedosGroupFanoutDeliveryPersistence } from "../../conversation/group/in_memory_fedos_group_fanout_delivery_persistence.js";
+
+// Secure Runtime Alpha 2921-3000 (Device Trust and Multi-Device Runtime
+// Integration Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1471-1540 boundary comment above.
+import { InMemoryFedosDeviceRegistryPersistence } from "../../device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../../device/persistence/append_only_fedos_device_registry_persistence.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import { PersistedFedosDeviceTrustAuthority } from "../../device/persistence/persisted_fedos_device_trust_authority.js";
+import { UnavailableFedosDeviceRegistrationAuthority } from "../../device/unavailable_fedos_device_registration_authority.js";
+import { FedosSyncState } from "../../sync/fedos_sync_state.js";
+import { FedosDeviceTrustRuntime } from "./fedos_device_trust_runtime.js";
+
+// Secure Runtime Alpha 3801-3880 (Device Sync Operational Status and
+// Desktop Shell Integration Arc) -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring the Alpha 1691-1760 boundary
+// comment above for the same reason.
+import { FedosDeviceSyncScheduler } from "../../device/sync_scheduler/fedos_device_sync_scheduler.js";
+import type { FedosDeviceSyncSchedulePersistence } from "../../device/sync_scheduler/persistence/fedos_device_sync_schedule_persistence.js";
+import { AppendOnlyFedosDeviceSyncSchedulePersistence } from "../../device/sync_scheduler/persistence/append_only_fedos_device_sync_schedule_persistence.js";
+import { InMemoryFedosDeviceSyncSchedulePersistence } from "../../device/sync_scheduler/persistence/in_memory_fedos_device_sync_schedule_persistence.js";
+import type { FedosDeviceSyncConflictPersistence } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import { AppendOnlyFedosDeviceSyncConflictPersistence } from "../../device/sync_scheduler/persistence/append_only_fedos_device_sync_conflict_persistence.js";
+import { InMemoryFedosDeviceSyncConflictPersistence } from "../../device/sync_scheduler/persistence/in_memory_fedos_device_sync_conflict_persistence.js";
+import type { FedosDeviceTransferSessionPersistence } from "../../device/transfer/persistence/fedos_device_transfer_session_persistence.js";
+import { AppendOnlyFedosDeviceTransferSessionPersistence } from "../../device/transfer/persistence/append_only_fedos_device_transfer_session_persistence.js";
+import { InMemoryFedosDeviceTransferSessionPersistence } from "../../device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
+import type { FedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/fedos_device_relay_sync_observation.js";
+import { AppendOnlyFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/append_only_fedos_device_relay_sync_observation_repository.js";
+import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
+import { FedosDeviceSyncOperationalFacade, type FedosDeviceSyncOperationalFacadeDeps } from "./fedos_device_sync_operational_facade.js";
+
+// Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
+// Durable Sync Journal Arc) -- every import/addition below this comment is
+// ADDITIVE ONLY, mirroring the Alpha 1471-1540 boundary comment above.
+import { createFedosDeviceBindingBoundary } from "../../device/binding_challenge/fedos_device_binding_boundary_factory.js";
+import type { FedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/fedos_device_binding_challenge_replay_persistence.js";
+import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { FedosDevicePairingFacade } from "./fedos_device_pairing_facade.js";
+import type { FedosSyncJournalPersistence } from "../../sync/persistence/fedos_sync_journal_persistence.js";
+import { AppendOnlyFedosSyncJournalPersistence } from "../../sync/persistence/append_only_fedos_sync_journal_persistence.js";
+import { InMemoryFedosSyncJournalPersistence } from "../../sync/persistence/in_memory_fedos_sync_journal_persistence.js";
 
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
@@ -183,6 +269,83 @@ export interface FedosRunningDesktopRuntime {
    * configured" state this accessor alone needs.
    */
   privateTransport(): FedosPrivateTransport;
+  /**
+   * Secure Runtime Alpha 1691–1760 — the `FedosConversationArchiveRuntime`
+   * (`../../conversation/archive/runtime/fedos_conversation_archive_runtime.ts`)
+   * this running Local Runtime owns, constructed ONLY when
+   * `config.archiveEnabled` was `true`. Throws `"not enabled"` if it was
+   * never configured, and throws `"inaccessible after stop"` once
+   * `stop()` has been called — the SAME two-state fail-closed contract
+   * `privateTransport()` itself already uses. Independently of THIS
+   * accessor's own gate, the returned Runtime's own operations ALSO fail
+   * closed once `stop()` has been called (see its own "LIFECYCLE"
+   * header) — a caller that grabbed a reference before `stop()` cannot
+   * use it afterward either.
+   */
+  conversationArchiveRuntime(): FedosConversationArchiveRuntime;
+  /**
+   * Secure Runtime Alpha 3081-3160 — the `FedosDesktopConversationContentAccessor`
+   * (`../content_accessor/fedos_desktop_conversation_content_accessor.ts`)
+   * this running Local Runtime owns — ALWAYS constructed (never gated by a
+   * config flag, mirroring `conversationRuntime()`'s own "always available"
+   * discipline), over the SAME `conversationRuntimeInstance`/
+   * `archiveRuntimeInstance` this function already holds — never a second,
+   * divergent Conversation Runtime or Archive Runtime. Throws
+   * `"inaccessible after stop"` once `stop()` has been called — the SAME
+   * fail-closed contract every other accessor on this handle already uses;
+   * the accessor's OWN internal `isRuntimeRunning` closure independently
+   * enforces the identical rule for any reference a caller grabbed before
+   * `stop()` (mirrors `conversationArchiveRuntime()`'s own two-layer
+   * defense).
+   */
+  conversationContentAccessor(): FedosDesktopConversationContentAccessor;
+  /**
+   * Secure Runtime Alpha 1263/1291 — the closed, non-secret reason
+   * production Conversation crypto is (or is not) currently available.
+   * `"disabled"` when `config.conversationProductionCrypto` was never
+   * supplied; one of the other eight closed outcomes otherwise (Alpha
+   * 1263). Never a raw loader `Error`, never a provider message, never a
+   * secret byte. Readable even after `stop()` — a coarse, static fact
+   * about how THIS runtime started, not a live probe.
+   */
+  conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome;
+  /**
+   * Secure Runtime Alpha 2921–3000 — the `FedosDeviceTrustRuntime`
+   * (`./fedos_device_trust_runtime.js`) this running Local Runtime owns,
+   * constructed ONLY when `config.deviceTrustEnabled` was `true`. Throws
+   * `"not enabled"` if it was never configured, and throws
+   * `"inaccessible after stop"` once `stop()` has been called — the SAME
+   * two-state fail-closed contract `privateTransport()` itself uses.
+   */
+  deviceTrust(): FedosDeviceTrustRuntime;
+  /**
+   * Secure Runtime Alpha 3801–3880 — the `FedosDeviceSyncOperationalFacade`
+   * (`./fedos_device_sync_operational_facade.js`) this running Local Runtime
+   * owns, constructed ONLY when `config.deviceTrustEnabled` was `true` (the
+   * SAME gate `deviceTrust()` itself uses — the facade composes that SAME
+   * `FedosDeviceTrustRuntime` instance). Throws `"not enabled"` if it was
+   * never configured, and throws `"inaccessible after stop"` once `stop()`
+   * has been called — the SAME two-state fail-closed contract every other
+   * accessor on this handle already uses. The facade's OWN methods apply a
+   * SECOND, independent `isRuntimeRunning` check for a reference a caller
+   * grabbed before `stop()` (mirrors `conversationContentAccessor()`'s own
+   * two-layer defense).
+   */
+  deviceSyncOperational(): FedosDeviceSyncOperationalFacade;
+  /**
+   * Secure Runtime Alpha 4581–4660 — the `FedosDevicePairingFacade`
+   * (`./fedos_device_pairing_facade.js`) this running Local Runtime owns,
+   * constructed ONLY when `config.deviceTrustEnabled` was `true` (the SAME
+   * gate `deviceTrust()`/`deviceSyncOperational()` themselves use — this
+   * facade composes the SAME `FedosDeviceTrustRuntime` instance plus a
+   * `FedosDeviceBindingBoundary` built over the SAME Device Registry
+   * persistence backend, never a second Device Registry — see Phase A §8 of
+   * this Arc's own execution spec). Throws `"not enabled"` if it was never
+   * configured, and throws `"inaccessible after stop"` once `stop()` has
+   * been called — the SAME two-state fail-closed contract every other
+   * accessor on this handle already uses.
+   */
+  devicePairing(): FedosDevicePairingFacade;
   /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
@@ -237,6 +400,68 @@ export async function startFedosDesktopRuntime(
       );
     }
   }
+  // Secure Runtime Alpha 1691-1760 -- mirrors the privateTransportEnabled guard
+  // above exactly: a configuration error is thrown synchronously, BEFORE any
+  // Persistence backend or Host is constructed, never a silent fallback to a
+  // second, internally-constructed Master Seed Authority.
+  if (config.archiveEnabled) {
+    if (config.conversationArchiveMasterSeedAuthority === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveEnabled is true but no conversationArchiveMasterSeedAuthority was supplied — this runtime constructs no Master Seed Authority of its own.",
+      );
+    }
+  }
+  // Secure Runtime Alpha 2921-3000 -- mirrors the guards above exactly:
+  // a configuration error is thrown synchronously, BEFORE any Persistence
+  // backend or Host is constructed, never a silent in-memory/no-account fallback.
+  if (config.deviceTrustEnabled) {
+    if (config.localDeviceId === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceTrustEnabled is true but no localDeviceId was supplied — this runtime generates no device id of its own.",
+      );
+    }
+    if (config.localAccountRef === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceTrustEnabled is true but no localAccountRef was supplied.",
+      );
+    }
+  }
+  // Secure Runtime Alpha 3801-3880 -- mirrors the guards above exactly. Also
+  // requires deviceTrustEnabled, since the Scheduler reuses the SAME Device
+  // Registry/Sync Journal instances FedosDeviceTrustRuntime already owns.
+  if (config.deviceSyncSchedulerEnabled) {
+    if (!config.deviceTrustEnabled) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceSyncSchedulerEnabled is true but deviceTrustEnabled is not -- the Scheduler reuses FedosDeviceTrustRuntime's own Device Registry/Sync Journal instances.",
+      );
+    }
+    if (config.deviceSyncAbandonmentPolicy === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: deviceSyncSchedulerEnabled is true but no deviceSyncAbandonmentPolicy was supplied — this runtime constructs no default retry policy of its own.",
+      );
+    }
+  }
+  // Secure Runtime Alpha 1841-1920 Phase G (Alpha 1844/1878) -- the
+  // standard route rides the SAME Private Transport this guard block
+  // already gates; requesting it without transport enabled is a genuine
+  // configuration error, thrown synchronously, never a silent no-op.
+  if (config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && !config.privateTransportEnabled) {
+    throw new Error(
+      "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but privateTransportEnabled is not true -- the standard route requires the Private Transport queue/Scheduler/Multi-Relay plumbing.",
+    );
+  }
+  // Secure Runtime Alpha 1841-1920 Phase C (Alpha 1843) -- the standard
+  // route's own NIP-44 Seal encryption MUST use the SAME Master Seed
+  // `conversationTransportSigningAuthority`'s own real Nostr identity is
+  // derived from (NIP-44's ECDH requires the matching private key) --
+  // never a second, independent, incoherent crypto identity. A real
+  // Production Crypto Graph is therefore REQUIRED, never defaulted or
+  // silently substituted with an unrelated fresh WASM master seed.
+  if (config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && config.conversationProductionCrypto === undefined) {
+    throw new Error(
+      "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but conversationProductionCrypto was not supplied -- the standard route requires a real, coherent Master Seed graph for NIP-44/NIP-59, never a second, independent identity.",
+    );
+  }
 
   ensureParentDirectoryExists(config.boardLogPath);
   ensureParentDirectoryExists(config.outboxLogPath);
@@ -246,12 +471,42 @@ export async function startFedosDesktopRuntime(
   if (config.conversationLogPath !== undefined) {
     ensureParentDirectoryExists(config.conversationLogPath);
   }
+  if (config.deviceRegistryLogPath !== undefined) {
+    ensureParentDirectoryExists(config.deviceRegistryLogPath);
+  }
+  // Secure Runtime Alpha 4581-4660 -- the Pairing Boundary's replay log and
+  // the durable Sync Journal log.
+  if (config.deviceBindingChallengeReplayLogPath !== undefined) {
+    ensureParentDirectoryExists(config.deviceBindingChallengeReplayLogPath);
+  }
+  if (config.deviceSyncJournalLogPath !== undefined) {
+    ensureParentDirectoryExists(config.deviceSyncJournalLogPath);
+  }
   // Alpha 923 -- the private-Conversation draft runtime's own logs.
   for (const path of [
     config.conversationDraftLogPath,
     config.conversationMembershipLogPath,
     config.conversationCapabilityLogPath,
     config.conversationConstructionCoordinationLogPath,
+    // Alpha 996/1003 -- the invitation-revocation and draft-management logs.
+    config.conversationInvitationRevocationLogPath,
+    config.conversationDraftManagementLogPath,
+    // Alpha 1113/1121/1143 -- the Encryption Runtime Wiring's own logs plus
+    // the NEW Activation coordination and Payload Retention logs.
+    config.conversationEnvelopeLogPath,
+    config.conversationPayloadLogPath,
+    config.conversationEncryptionCoordinationLogPath,
+    config.conversationActivationCoordinationLogPath,
+    config.conversationPayloadRetentionLogPath,
+    // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+    config.conversationGroupGenerationLogPath,
+    config.conversationGroupDirectPathLogPath,
+    config.conversationGroupMessageLogPath,
+    config.conversationGroupFanoutDeliveryLogPath,
+    // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own logs.
+    config.conversationPrivateNostrDeliveryRequestLogPath,
+    config.conversationPrivateNostrImportRecordLogPath,
+    config.conversationPrivateNostrDeliveryObservationLogPath,
   ]) {
     if (path !== undefined) ensureParentDirectoryExists(path);
   }
@@ -301,6 +556,45 @@ export async function startFedosDesktopRuntime(
         )
       : new InMemoryFedosConversationPayloadStorage();
 
+  // Secure Runtime Alpha 1691-1760 -- constructed unconditionally (mirrors
+  // conversationEnvelopePersistence/conversationPayloadStorage's own identical
+  // discipline above), over the SAME conversationMembershipLogPath/
+  // conversationCapabilityLogPath the Conversation Runtime's own Alpha 923
+  // assembly already uses for its Membership/Capability Authorities -- two
+  // separate port instances reading/writing the SAME durable append-only log
+  // file, the same "fresh instance over the same durable backend" pattern
+  // this codebase already relies on for restart-stability (Alpha 618/589).
+  const conversationArchiveMembershipPersistence: FedosConversationMembershipPersistence =
+    config.conversationMembershipLogPath !== undefined
+      ? new AppendOnlyFedosConversationMembershipPersistence(config.conversationMembershipLogPath)
+      : new InMemoryFedosConversationMembershipPersistence();
+  const conversationArchiveCapabilityPersistence: FedosConversationCapabilityPersistence =
+    config.conversationCapabilityLogPath !== undefined
+      ? new AppendOnlyFedosConversationCapabilityPersistence(config.conversationCapabilityLogPath)
+      : new InMemoryFedosConversationCapabilityPersistence();
+
+  // Secure Runtime Alpha 1921-1980 -- mirrors conversationArchiveMembershipPersistence/
+  // conversationArchiveCapabilityPersistence's own identical discipline immediately above: a SECOND
+  // port instance over the SAME durable Group log paths the Conversation Runtime's own Group facade
+  // (assembleFedosConversationRuntimeDependencies, via groupGenerationLogPath etc.) already uses --
+  // never a second, duplicate log file, and never shared/reused across running Runtime instances.
+  const conversationArchiveGroupGenerationPersistence: FedosGroupGenerationPersistence =
+    config.conversationGroupGenerationLogPath !== undefined
+      ? new AppendOnlyFedosGroupGenerationPersistence(config.conversationGroupGenerationLogPath)
+      : new InMemoryFedosGroupGenerationPersistence();
+  const conversationArchiveGroupDirectPathPersistence: FedosGroupDirectPathPersistence =
+    config.conversationGroupDirectPathLogPath !== undefined
+      ? new AppendOnlyFedosGroupDirectPathPersistence(config.conversationGroupDirectPathLogPath)
+      : new InMemoryFedosGroupDirectPathPersistence();
+  const conversationArchiveGroupMessagePersistence: FedosGroupMessagePersistence =
+    config.conversationGroupMessageLogPath !== undefined
+      ? new AppendOnlyFedosGroupMessagePersistence(config.conversationGroupMessageLogPath)
+      : new InMemoryFedosGroupMessagePersistence();
+  const conversationArchiveGroupFanoutDeliveryPersistence: FedosGroupFanoutDeliveryPersistence =
+    config.conversationGroupFanoutDeliveryLogPath !== undefined
+      ? new AppendOnlyFedosGroupFanoutDeliveryPersistence(config.conversationGroupFanoutDeliveryLogPath)
+      : new InMemoryFedosGroupFanoutDeliveryPersistence();
+
   const host = createFedosDesktopHost({
     desktopApplication: createDesktopApplication(),
     boardPersistence,
@@ -349,6 +643,45 @@ export async function startFedosDesktopRuntime(
     conversationPersistence,
   });
 
+  // Alpha 1273/1274 -- resolve the real, WASM-backed Production Crypto
+  // Graph BEFORE Conversation Runtime assembly, so a successful
+  // resolution can supply its own real Authorities below. Never throws
+  // and never fails Runtime startup -- every internal failure mode
+  // collapses to one of the nine closed capability outcomes (Alpha 1263);
+  // Runtime startup itself never fails because production crypto could
+  // not be assembled (Alpha 1264/1275).
+  let productionCryptoCapability: FedosConversationProductionCryptoCapabilityOutcome = "disabled";
+  let productionCryptoGraph: FedosConversationProductionCryptoGraph | null = null;
+  if (config.conversationProductionCrypto !== undefined) {
+    const productionCryptoResult = await assembleFedosConversationProductionCryptoGraph(config.conversationProductionCrypto);
+    productionCryptoCapability = productionCryptoResult.outcome;
+    if (productionCryptoResult.outcome === "available") {
+      productionCryptoGraph = productionCryptoResult.graph;
+    }
+  }
+
+  // Secure Runtime Alpha 1841-1920 Phase C/G (Alpha 1843/1844/1879) --
+  // forward-declared HERE, BEFORE `conversationRuntimeInstance` is built
+  // below, so the closure handed to it can reference the Private
+  // Transport instance this function does not construct until AFTER the
+  // Conversation Runtime (mirrors `membershipsForConversation`'s own
+  // identical forward-reference-via-closure discipline a few dozen lines
+  // below, applied in the opposite direction). By the time
+  // `sendDirectMessage()` is EVER actually called (well after this whole
+  // function returns), `privateTransportInstance` is already assigned --
+  // this is a construction-order convenience, never a live race.
+  let privateTransportInstance: FedosPrivateTransport | undefined;
+  const directMessageDelivery: FedosConversationDirectMessageDeliveryDependencies | undefined =
+    config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1"
+      ? {
+          route: "nostr-nip17-v1",
+          sendMailboxNip17: async (envelopeId, conversationId, plaintext) => {
+            if (privateTransportInstance === undefined) return { outcome: "route-unavailable" };
+            return privateTransportInstance.sendMailboxNip17(envelopeId as never, conversationId as never, plaintext);
+          },
+        }
+      : undefined;
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -356,18 +689,215 @@ export async function startFedosDesktopRuntime(
   // nothing. Encryption readiness defaults to UNAVAILABLE, so every draft
   // it constructs stays "draft" -- never active, never a message (Alpha
   // 924/928).
-  const conversationRuntimeInstance = createFedosConversationRuntime(
-    assembleFedosConversationRuntimeDependencies({
+  const conversationRuntimeInstance = createFedosConversationRuntime({
+    ...assembleFedosConversationRuntimeDependencies({
       draftLogPath: config.conversationDraftLogPath,
       membershipLogPath: config.conversationMembershipLogPath,
       capabilityLogPath: config.conversationCapabilityLogPath,
       constructionCoordinationLogPath: config.conversationConstructionCoordinationLogPath,
+      invitationRevocationLogPath: config.conversationInvitationRevocationLogPath,
+      draftManagementLogPath: config.conversationDraftManagementLogPath,
       clock: config.clock ?? defaultFedosBoardRuntimeClock,
-      creatorIdentityAuthority: config.conversationCreatorIdentityAuthority,
+      // Alpha 1273 -- a real, "available" Production Crypto Graph supplies
+      // its own real creator identity/Authorities in place of these
+      // individual fields' own existing defaults; any other outcome
+      // (including "disabled" -- no config supplied at all) leaves this
+      // exactly as every prior Arc's own default (Alpha 1275).
+      creatorIdentityAuthority: productionCryptoGraph?.creatorIdentityAuthority ?? config.conversationCreatorIdentityAuthority,
       encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
       requireResolvedCreatorIdentity: config.conversationRequireResolvedCreatorIdentity,
+      // Alpha 1113/1114 -- the Encryption Runtime Wiring's own dependencies,
+      // finally threaded through from this config (previously accepted by
+      // `FedosConversationRuntimeDependencies` but unreachable from here —
+      // see `docs/secure_runtime_alpha_1111_1180_integrated_inventory.md`
+      // §7). `nostrAuthorBindingAuthority` reuses the SAME instance already
+      // passed to `createFedosBoardRuntime()` above -- one coherent graph,
+      // never a second signing/encryption identity (Alpha 1114) -- UNLESS
+      // a real Production Crypto Graph resolved, in which case ITS OWN
+      // binding authority (sharing ITS OWN Master Seed Authority instance)
+      // is the coherent one to use instead.
+      encryptionAuthority: productionCryptoGraph?.encryptionAuthority ?? config.conversationEncryptionAuthority,
+      decryptionAuthority: productionCryptoGraph?.decryptionAuthority ?? config.conversationDecryptionAuthority,
+      identityResolver: config.conversationIdentityResolver,
+      accountIndexAuthority: productionCryptoGraph?.accountIndexAuthority ?? config.conversationAccountIndexAuthority,
+      nostrAuthorBindingAuthority: productionCryptoGraph?.nostrAuthorBindingAuthority ?? config.nostrAuthorBindingAuthority,
+      envelopeLogPath: config.conversationEnvelopeLogPath,
+      payloadLogPath: config.conversationPayloadLogPath,
+      maxPayloadByteLength: config.conversationMaxPayloadByteLength,
+      encryptionCoordinationLogPath: config.conversationEncryptionCoordinationLogPath,
+      // Alpha 1121/1143 -- the NEW Activation coordination and Payload
+      // Retention logs this Arc introduces.
+      activationCoordinationLogPath: config.conversationActivationCoordinationLogPath,
+      payloadRetentionLogPath: config.conversationPayloadRetentionLogPath,
+      // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
+      groupGenerationLogPath: config.conversationGroupGenerationLogPath,
+      groupDirectPathLogPath: config.conversationGroupDirectPathLogPath,
+      groupMessageLogPath: config.conversationGroupMessageLogPath,
+      groupFanoutDeliveryLogPath: config.conversationGroupFanoutDeliveryLogPath,
+      groupParticipantLimitPolicy: config.conversationGroupParticipantLimitPolicy,
+      // Alpha 1391-1470 -- the additive Private Nostr Delivery facade's own
+      // backends. This runtime constructs no Signing Authority or
+      // Relay/Publisher of its own -- see this file's own config type header.
+      privateNostrDeliveryRequestLogPath: config.conversationPrivateNostrDeliveryRequestLogPath,
+      privateNostrImportRecordLogPath: config.conversationPrivateNostrImportRecordLogPath,
+      privateNostrDeliveryObservationLogPath: config.conversationPrivateNostrDeliveryObservationLogPath,
+      privateNostrSigningAuthority: config.conversationPrivateNostrSigningAuthority,
+      privateNostrDeliveryPublisher: config.conversationPrivateNostrDeliveryPublisher,
+      privateNostrDefaultMode: config.conversationPrivateNostrDefaultMode,
+      privateNostrDefaultRelayUrls: config.conversationPrivateNostrDefaultRelayUrls,
     }),
-  );
+    directMessageDelivery,
+  });
+
+  // Secure Runtime Alpha 2921-3000 -- exactly one FedosDeviceTrustRuntime
+  // per running runtime, constructed ONLY when config.deviceTrustEnabled
+  // was true (the guard at the top of this function already confirmed
+  // localDeviceId/localAccountRef are both present in that case). The
+  // Device Registry persistence backend follows the SAME
+  // "AppendOnly when a log path is supplied, else InMemory" discipline
+  // every other backend in this function already uses. The Sync State
+  // (Alpha 2421-2500, unmodified) is always in-memory -- this Arc adds
+  // no disk persistence for the Sync Journal/Cursor themselves (see
+  // fedos_device_trust_runtime.ts's own header).
+  let deviceTrustRuntimeInstance: FedosDeviceTrustRuntime | undefined;
+  // Alpha 3801-3880 -- deps for `FedosDeviceSyncOperationalFacade`, assembled
+  // here (inside the SAME deviceTrustEnabled gate that already constructs
+  // deviceTrustRuntimeInstance/deviceRegistryPersistence/syncStateInstance)
+  // but the facade ITSELF is constructed further below, after `let stopped`
+  // is declared -- `isRuntimeRunning: () => !stopped` closes over that
+  // binding and must not be created before it exists in this function's
+  // scope.
+  let deviceSyncFacadeDeps: Omit<FedosDeviceSyncOperationalFacadeDeps, "isRuntimeRunning"> | undefined;
+  // Secure Runtime Alpha 4581-4660 -- mirrors deviceSyncFacadeDeps's own
+  // "assembled inside the deviceTrustEnabled gate, constructed further below
+  // once `stopped` exists" pattern exactly.
+  let devicePairingBoundary: ReturnType<typeof createFedosDeviceBindingBoundary> | undefined;
+  if (config.deviceTrustEnabled) {
+    const deviceRegistryPersistence: FedosDeviceRegistryPersistence =
+      config.deviceRegistryLogPath !== undefined
+        ? new AppendOnlyFedosDeviceRegistryPersistence(config.deviceRegistryLogPath)
+        : new InMemoryFedosDeviceRegistryPersistence();
+    const deviceTrustAuthority = new PersistedFedosDeviceTrustAuthority({
+      persistence: deviceRegistryPersistence,
+      registrationAuthority: config.deviceRegistrationAuthority ?? new UnavailableFedosDeviceRegistrationAuthority(),
+    });
+    const syncAccountKey = `${config.localAccountRef!.authority}:${config.localAccountRef!.publicIdentifier}`;
+    // Secure Runtime Alpha 4581-4660 (Phase F) -- the durable Sync Journal
+    // backend, following the SAME "AppendOnly when a log path is supplied,
+    // else InMemory" discipline every other backend in this function already
+    // uses. Injected into `FedosSyncState` below -- `FedosSyncJournal` hydrates
+    // from it at construction and write-throughs every successful append.
+    const journalPersistence: FedosSyncJournalPersistence =
+      config.deviceSyncJournalLogPath !== undefined
+        ? new AppendOnlyFedosSyncJournalPersistence(config.deviceSyncJournalLogPath)
+        : new InMemoryFedosSyncJournalPersistence();
+    // Alpha 3801-3880 -- hoisted into a named instance (rather than the
+    // inline `new FedosSyncState(...)` this field held before this Arc) so
+    // the Scheduler/Import Coordinator below can share the EXACT SAME Sync
+    // Journal instance FedosDeviceTrustRuntime itself owns -- never a
+    // second, divergent Journal.
+    const syncStateInstance = new FedosSyncState(syncAccountKey, { journalPersistence });
+    // Secure Runtime Alpha 4581-4660 (Phase E) -- the ONE Pairing Boundary
+    // this Arc wires in, over the EXACT SAME `deviceRegistryPersistence`
+    // instance `deviceTrustAuthority` above already uses -- never a second
+    // Device Registry (Phase A §8's own "stateless read-through
+    // orchestrator, safe over an identical durable backend" finding). The
+    // replay persistence follows the SAME AppendOnly/InMemory discipline.
+    const deviceBindingReplayPersistence: FedosDeviceBindingChallengeReplayPersistence =
+      config.deviceBindingChallengeReplayLogPath !== undefined
+        ? new AppendOnlyFedosDeviceBindingChallengeReplayPersistence(config.deviceBindingChallengeReplayLogPath)
+        : new InMemoryFedosDeviceBindingChallengeReplayPersistence();
+    devicePairingBoundary = createFedosDeviceBindingBoundary({
+      registryPersistence: deviceRegistryPersistence,
+      replayPersistence: deviceBindingReplayPersistence,
+      limits: config.deviceBindingChallengeTtlSeconds !== undefined ? { challengeTtlSeconds: config.deviceBindingChallengeTtlSeconds } : undefined,
+      now: config.clock,
+    });
+    deviceTrustRuntimeInstance = new FedosDeviceTrustRuntime({
+      localDeviceId: config.localDeviceId!,
+      localAccountRef: config.localAccountRef!,
+      trustAuthority: deviceTrustAuthority,
+      syncState: syncStateInstance,
+    });
+
+    // Secure Runtime Alpha 4581-4660 (Phase L) -- restart hydration for Sync
+    // fabric ELIGIBILITY. `FedosSyncState`'s own Device Registry
+    // (`FedosSyncDeviceRegistry`, Alpha 2421-2500, unmodified) is a SEPARATE,
+    // always-in-memory structure from the durable Device Trust Registry this
+    // block already constructed above -- a fresh `syncStateInstance` starts
+    // with an EMPTY set on every `startFedosDesktopRuntime()` call, even when
+    // `deviceRegistryLogPath` durably remembers a Device as `"trusted"`.
+    // Without this, "restart preserves eligibility" (Phase L's own explicit
+    // requirement) would be false: `syncReadiness().ready` would report
+    // `false` for an already-trusted Device immediately after a real restart,
+    // until SOME caller happened to re-call `registerSyncDevice()` by hand.
+    // This re-derives sync-fabric membership from the durable trust facts
+    // ALONE, using the SAME public `FedosDeviceTrustRuntime.registerSyncDevice()`
+    // method every other caller already uses -- no new Sync Foundation
+    // semantics, no second Device Registry, just restoring what a durable
+    // Device Trust Registry already answers authoritatively.
+    const syncEligibilityHydrationNow = (config.clock ?? defaultFedosBoardRuntimeClock)();
+    for (const binding of deviceTrustAuthority.listBindingsForAccount(config.localAccountRef!)) {
+      if (binding.trustState === "trusted") {
+        deviceTrustRuntimeInstance.registerSyncDevice(binding.deviceId, syncEligibilityHydrationNow);
+      }
+    }
+
+    // Secure Runtime Alpha 3801-3880 -- the Runtime Operational Facade
+    // (`./fedos_device_sync_operational_facade.ts`). ALWAYS constructed once
+    // deviceTrustEnabled is true (mirrors conversationContentAccessorInstance's
+    // own "always constructed, composes what already exists" discipline);
+    // the Scheduler piece alone stays gated behind
+    // config.deviceSyncSchedulerEnabled (the guard above already confirmed
+    // deviceSyncAbandonmentPolicy is present in that case).
+    const schedulePersistence: FedosDeviceSyncSchedulePersistence | null = config.deviceSyncSchedulerEnabled
+      ? config.deviceSyncScheduleLogPath !== undefined
+        ? new AppendOnlyFedosDeviceSyncSchedulePersistence(config.deviceSyncScheduleLogPath)
+        : new InMemoryFedosDeviceSyncSchedulePersistence()
+      : null;
+    const conflictPersistence: FedosDeviceSyncConflictPersistence | null = config.deviceSyncSchedulerEnabled
+      ? config.deviceSyncConflictLogPath !== undefined
+        ? new AppendOnlyFedosDeviceSyncConflictPersistence(config.deviceSyncConflictLogPath)
+        : new InMemoryFedosDeviceSyncConflictPersistence()
+      : null;
+    let deviceSyncSchedulerInstance: FedosDeviceSyncScheduler | null = null;
+    if (config.deviceSyncSchedulerEnabled) {
+      deviceSyncSchedulerInstance = new FedosDeviceSyncScheduler({
+        schedulePersistence: schedulePersistence!,
+        registryPersistence: deviceRegistryPersistence,
+        accountRef: config.localAccountRef!,
+        sourceDeviceId: config.localDeviceId!,
+        syncState: syncStateInstance,
+        // Alpha 3801-3880 -- this runtime constructs no real Relay Sync
+        // attempt of its own (Phase A §20); omitted, every tick's own
+        // attempt fails closed, never fabricating "delivered".
+        attemptFn: config.deviceSyncAttemptFn ?? (async () => ({ outcome: "failed" })),
+        abandonmentPolicy: config.deviceSyncAbandonmentPolicy!,
+        limits: config.deviceSyncResourceLimits,
+        intervalMs: config.deviceSyncIntervalMs ?? 30_000,
+      });
+    }
+
+    const transferSessionPersistence: FedosDeviceTransferSessionPersistence =
+      config.deviceSyncTransferSessionLogPath !== undefined
+        ? new AppendOnlyFedosDeviceTransferSessionPersistence(config.deviceSyncTransferSessionLogPath)
+        : new InMemoryFedosDeviceTransferSessionPersistence();
+    const relaySyncObservationRepository: FedosDeviceRelaySyncObservationRepository =
+      config.deviceSyncRelaySyncObservationLogPath !== undefined
+        ? new AppendOnlyFedosDeviceRelaySyncObservationRepository(config.deviceSyncRelaySyncObservationLogPath)
+        : new InMemoryFedosDeviceRelaySyncObservationRepository();
+
+    deviceSyncFacadeDeps = {
+      deviceTrust: deviceTrustRuntimeInstance,
+      localAccountRef: config.localAccountRef!,
+      localDeviceId: config.localDeviceId!,
+      scheduler: deviceSyncSchedulerInstance,
+      schedulePersistence,
+      conflictPersistence,
+      transferSessionPersistence,
+      relaySyncObservationRepository,
+    };
+  }
 
   // Secure Runtime Alpha 1471-1540 -- exactly one FedosPrivateTransport
   // per running runtime, constructed ONLY when config.privateTransportEnabled
@@ -377,7 +907,14 @@ export async function startFedosDesktopRuntime(
   // Reaches into conversationRuntimeInstance for membership reads ONLY
   // (`listMemberships`), the SAME narrow-accessor discipline
   // `FedosConversationTransportSignedEventSource` itself requires.
-  let privateTransportInstance: FedosPrivateTransport | undefined;
+  //
+  // Secure Runtime Alpha 1841-1920 Phase C/G (Alpha 1843/1844) --
+  // `privateTransportInstance` itself is declared ABOVE (before
+  // `conversationRuntimeInstance`, for the closure reason documented
+  // there); this block only ASSIGNS it now. A real `NostrNip17V1WireAdapter`
+  // is constructed and injected as `wireAdapter` ONLY when
+  // `conversationDirectMessageDeliveryRoute` selected the standard route
+  // -- never unconditionally, never as a silent default.
   let privateTransportStarted = false;
   if (config.privateTransportEnabled) {
     const conversationTransportOutboxPersistence: FedosConversationTransportOutboxPersistence =
@@ -387,6 +924,41 @@ export async function startFedosDesktopRuntime(
     const conversationTransportObservationRepository = new FedosDeliveryObservationRepository(
       new AppendOnlyFedosDeliveryObservationPersistence(config.conversationTransportObservationLogPath!),
     );
+    // `nip44Wire` MUST be the SAME Master Seed `conversationTransportSigningAuthority`'s
+    // own real identity is derived from -- the top-of-function guard
+    // above already REQUIRES `conversationProductionCrypto` (hence a
+    // resolved, "available" `productionCryptoGraph`) whenever this route
+    // is selected; a caller reaching this line with the route selected
+    // but no resolved graph is a genuine, unrecoverable misconfiguration
+    // this Transport was never meant to paper over.
+    const nip17WireAdapter =
+      config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && productionCryptoGraph !== null
+        ? new NostrNip17V1WireAdapter({
+            localAccountIndex: config.conversationNip17LocalAccountIndex ?? config.conversationTransportAccountIndex ?? 0,
+            signingAuthority: config.conversationTransportSigningAuthority!,
+            nip44Wire: productionCryptoGraph.masterSeedAuthority,
+          })
+        : undefined;
+
+    // Secure Runtime Alpha 1841-1920 Phase D (Alpha 1856/1860) -- when the
+    // caller ALSO configured Inbound Subscription (`conversationTransportInbound`,
+    // still never a silent default), a standard-route Rumor is routed
+    // straight into `conversationRuntimeInstance`'s own admission/import
+    // pipeline (`receiveNip17Rumor()`) -- the SAME coherent graph, never a
+    // second, caller-owned import path the caller would otherwise have
+    // to reimplement by hand.
+    const inboundConfig =
+      config.conversationTransportInbound !== undefined
+        ? {
+            ...config.conversationTransportInbound,
+            onRumor:
+              nip17WireAdapter !== undefined
+                ? (rumor: Parameters<typeof conversationRuntimeInstance.receiveNip17Rumor>[0], relaySource: string) => {
+                    void conversationRuntimeInstance.receiveNip17Rumor(rumor, relaySource);
+                  }
+                : config.conversationTransportInbound.onRumor,
+          }
+        : undefined;
 
     privateTransportInstance = new FedosPrivateTransport({
       relaySet: new FedosConversationRelaySet(config.conversationTransportRelays!),
@@ -399,13 +971,92 @@ export async function startFedosDesktopRuntime(
       observationRepository: conversationTransportObservationRepository,
       intervalMs: config.conversationTransportIntervalMs ?? DEFAULT_CONVERSATION_TRANSPORT_INTERVAL_MS,
       publisher: config.conversationTransportPublisher,
-      inbound: config.conversationTransportInbound,
+      inbound: inboundConfig,
+      wireAdapter: nip17WireAdapter,
     });
     await privateTransportInstance.start();
     privateTransportStarted = true;
   }
 
   let stopped = false;
+
+  // Secure Runtime Alpha 3801-3880 -- exactly one FedosDeviceSyncOperationalFacade
+  // per running runtime, constructed ONLY when deviceSyncFacadeDeps was
+  // assembled above (i.e. config.deviceTrustEnabled was true). Composes
+  // deviceTrustRuntimeInstance and whatever Scheduler/Conflict/Transfer/
+  // Relay-observation pieces were built above -- constructs nothing new
+  // itself. `isRuntimeRunning` closes over this SAME `stopped` flag, mirroring
+  // conversationContentAccessorInstance's own identical pattern just below.
+  const deviceSyncOperationalFacadeInstance: FedosDeviceSyncOperationalFacade | undefined =
+    deviceSyncFacadeDeps !== undefined
+      ? new FedosDeviceSyncOperationalFacade({ ...deviceSyncFacadeDeps, isRuntimeRunning: () => !stopped })
+      : undefined;
+
+  // Secure Runtime Alpha 4581-4660 -- exactly one FedosDevicePairingFacade per
+  // running runtime, constructed ONLY when devicePairingBoundary/
+  // deviceTrustRuntimeInstance were assembled above (i.e. config.deviceTrustEnabled
+  // was true). Composes the SAME FedosDeviceBindingBoundary/FedosDeviceTrustRuntime
+  // instances -- constructs nothing new itself. `isRuntimeRunning` closes over the
+  // SAME `stopped` flag every other accessor on this handle already uses.
+  const devicePairingFacadeInstance: FedosDevicePairingFacade | undefined =
+    devicePairingBoundary !== undefined && deviceTrustRuntimeInstance !== undefined
+      ? new FedosDevicePairingFacade({
+          bindingBoundary: devicePairingBoundary,
+          deviceTrust: deviceTrustRuntimeInstance,
+          accountSigningAuthority: config.deviceBindingAccountSigningAuthority ?? null,
+          accountIndex: config.deviceBindingAccountIndex ?? 0,
+          isRuntimeRunning: () => !stopped,
+          now: config.clock,
+        })
+      : undefined;
+
+  // Secure Runtime Alpha 1691-1760 -- exactly one FedosConversationArchiveRuntime
+  // per running runtime, constructed ONLY when config.archiveEnabled was true (the
+  // guard at the top of this function already confirmed
+  // conversationArchiveMasterSeedAuthority is present in that case). Wraps the SAME
+  // conversationPersistence/conversationArchiveMembershipPersistence/
+  // conversationArchiveCapabilityPersistence/conversationEnvelopePersistence/
+  // conversationPayloadStorage instances this runtime already owns -- never a
+  // second, duplicate set of ports, and constructs no Master Seed Authority of its
+  // own (mirrors privateTransportInstance's own identical "no Signing Authority of
+  // its own" discipline just above). `isRuntimeRunning` closes over this same
+  // `stopped` flag -- lazily read only once actually invoked, so its textual
+  // position relative to `let stopped` above is not order-sensitive.
+  let archiveRuntimeInstance: FedosConversationArchiveRuntime | undefined;
+  if (config.archiveEnabled) {
+    archiveRuntimeInstance = assembleFedosConversationArchiveRuntime({
+      conversationPersistence,
+      membershipPersistence: conversationArchiveMembershipPersistence,
+      capabilityPersistence: conversationArchiveCapabilityPersistence,
+      envelopePersistence: conversationEnvelopePersistence,
+      payloadStorage: conversationPayloadStorage,
+      // Secure Runtime Alpha 1921-1980 -- the SAME "second port instance over the same durable Group
+      // log path" pattern the base five ports above already establish.
+      groupGenerationPersistence: conversationArchiveGroupGenerationPersistence,
+      groupDirectPathPersistence: conversationArchiveGroupDirectPathPersistence,
+      groupMessagePersistence: conversationArchiveGroupMessagePersistence,
+      groupFanoutDeliveryPersistence: conversationArchiveGroupFanoutDeliveryPersistence,
+      masterSeedAuthority: config.conversationArchiveMasterSeedAuthority!,
+      isRuntimeRunning: () => !stopped,
+      clock: config.clock,
+      bounds: config.conversationArchiveBounds,
+    });
+  }
+
+  // Secure Runtime Alpha 3081-3160 -- exactly one FedosDesktopConversationContentAccessor
+  // per running runtime, ALWAYS constructed (unlike privateTransportInstance/
+  // archiveRuntimeInstance above, this needs no dedicated config flag: it constructs
+  // no persistence, no crypto authority, no timer of its own -- only composes
+  // conversationRuntimeInstance/archiveRuntimeInstance, exactly like boardRuntimeInstance
+  // itself is always constructed above). `archiveRuntimeInstance` is passed through as
+  // `null` when `config.archiveEnabled` was false, matching every other optional
+  // capability's own "remains optional" discipline (this Arc's own Absolute Prohibitions).
+  const conversationContentAccessorInstance = new FedosDesktopConversationContentAccessor({
+    conversationRuntime: conversationRuntimeInstance,
+    archiveRuntime: archiveRuntimeInstance ?? null,
+    isRuntimeRunning: () => !stopped,
+  });
+
   return {
     host,
     boardRuntime(): FedosBoardRuntime {
@@ -429,17 +1080,76 @@ export async function startFedosDesktopRuntime(
       }
       return privateTransportInstance;
     },
+    conversationArchiveRuntime(): FedosConversationArchiveRuntime {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is inaccessible after stop().");
+      }
+      if (archiveRuntimeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.conversationArchiveRuntime() is not enabled -- see config.archiveEnabled.");
+      }
+      return archiveRuntimeInstance;
+    },
+    conversationContentAccessor(): FedosDesktopConversationContentAccessor {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.conversationContentAccessor() is inaccessible after stop().");
+      }
+      return conversationContentAccessorInstance;
+    },
+    /** Alpha 1263/1291 -- the closed, non-secret reason production crypto is (or is not) available. `"disabled"` when `conversationProductionCrypto` was never supplied. Readable even after `stop()`. */
+    conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome {
+      return productionCryptoCapability;
+    },
+    deviceTrust(): FedosDeviceTrustRuntime {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.deviceTrust() is inaccessible after stop().");
+      }
+      if (deviceTrustRuntimeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.deviceTrust() is not enabled -- see config.deviceTrustEnabled.");
+      }
+      return deviceTrustRuntimeInstance;
+    },
+    deviceSyncOperational(): FedosDeviceSyncOperationalFacade {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.deviceSyncOperational() is inaccessible after stop().");
+      }
+      if (deviceSyncOperationalFacadeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.deviceSyncOperational() is not enabled -- see config.deviceTrustEnabled.");
+      }
+      return deviceSyncOperationalFacadeInstance;
+    },
+    devicePairing(): FedosDevicePairingFacade {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.devicePairing() is inaccessible after stop().");
+      }
+      if (devicePairingFacadeInstance === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.devicePairing() is not enabled -- see config.deviceTrustEnabled.");
+      }
+      return devicePairingFacadeInstance;
+    },
     async stop(): Promise<void> {
       if (stopped) {
         throw new Error("FedosRunningDesktopRuntime.stop() may only be called once.");
       }
       stopped = true;
       // Newest-constructed, stopped first -- the reverse of construction order.
+      // Alpha 3801-3880 -- waits for any in-flight tick (FedosDeviceSyncScheduler.stopSync()'s
+      // own contract, unmodified) BEFORE the Host itself stops.
+      if (deviceSyncFacadeDeps?.scheduler !== null && deviceSyncFacadeDeps?.scheduler !== undefined) {
+        await deviceSyncFacadeDeps.scheduler.stopSync();
+      }
       if (privateTransportStarted && privateTransportInstance !== undefined) {
         await privateTransportInstance.stop();
       }
       if (deliveryStarted) {
         await host.stopDelivery();
+      }
+      // Alpha 1277/1278 -- clear the real Master Seed Authority (where one
+      // was assembled) BEFORE the Host itself stops: no passphrase
+      // material is retained, and every subsequent encrypt/decrypt/sign
+      // attempt against it fails closed (Alpha 438's own `clear()`
+      // contract, unmodified).
+      if (productionCryptoGraph !== null) {
+        await productionCryptoGraph.masterSeedAuthority.clear();
       }
       await host.stop();
     },

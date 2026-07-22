@@ -1,0 +1,28 @@
+{
+  "name": "@nostr-window/fedos-desktop-electron-spike",
+  "version": "0.1.0-beta.1",
+  "private": true,
+  "description": "Secure Runtime Alpha 3881-3940/4021-4100 -- Electron dependency/build spike (Package A only), physically isolated as its own package so Electron's own transitive @types/node dependency never leaks into the root application's TypeScript graph.",
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3"
+  },
+  "scripts": {
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.test.json",
+    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json && node ../../node_modules/typescript/bin/tsc -p tsconfig.browser-scripts.json && node scripts/copy_static_assets.mjs",
+    "start": "npm run build && electron dist/fedos_electron_spike_main.cjs",
+    "start:host-adapter": "npm run build:host-bridge --prefix ../.. && npm run build && electron dist/fedos_electron_host_adapter_main.cjs",
+    "start:navigation": "npm run build:runtime --prefix ../.. && npm run build && electron dist/fedos_electron_navigation_main.cjs",
+    "start:notifications-tray": "npm run build:runtime --prefix ../.. && npm run build && electron dist/fedos_electron_notifications_tray_main.cjs",
+    "start:badge": "npm run build:runtime --prefix ../.. && npm run build && electron dist/fedos_electron_badge_main.cjs",
+    "start:unlock": "npm run build:unlock-runtime --prefix ../.. && npm run build && electron dist/fedos_electron_unlock_main.cjs",
+    "start:settings": "npm run build:settings-host-bridge --prefix ../.. && npm run build && electron dist/fedos_electron_settings_main.cjs",
+    "start:beta": "npm run build:beta-runtime --prefix ../.. && npm run build && electron dist/fedos_electron_beta_main.cjs",
+    "package": "npm run build && node scripts/run_electron_builder_package.mjs",
+    "package:beta": "npm run build:beta-runtime --prefix ../.. && npm run build && node scripts/run_electron_builder_package_beta.mjs",
+    "release:beta": "node scripts/build_release.mjs",
+    "release:beta:allowlist": "node scripts/verify_release_package_allowlist.mjs",
+    "release:beta:checksums:verify": "node scripts/verify_release_checksums.mjs",
+    "release:beta:secret-scan": "node scripts/scan_release_artifacts_for_secrets.mjs"
+  }
+}

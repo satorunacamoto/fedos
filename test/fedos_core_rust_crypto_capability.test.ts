@@ -148,8 +148,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
-    expect(pubFnNames).not.toContain("crypto_diagnostics_preview");
+    expect(pubFnNames.length).toBe(69);    expect(pubFnNames).not.toContain("crypto_diagnostics_preview");
   });
 
   it("9. not connected to Runtime/Worker/Storage/Nostr in any way", () => {

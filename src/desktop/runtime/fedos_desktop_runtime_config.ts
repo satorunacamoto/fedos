@@ -61,6 +61,21 @@ import type { FedosRelay } from "../fedos_relay.js";
 import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationTransportPublisher } from "../../conversation/transport/fedos_conversation_transport_publisher.js";
 import type { FedosPrivateTransportInboundConfig } from "../../conversation/transport/fedos_private_transport.js";
+import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosConversationArchiveRuntimeBounds } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
+import type { FedosConversationEncryptionAuthority } from "../../conversation/encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority } from "../../conversation/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationIdentityResolver } from "../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationLocalAccountIndexAuthority } from "../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
+import type { FedosConversationProductionCryptoConfig } from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosGroupParticipantLimitPolicy } from "../../conversation/group/fedos_group_participant_limit.js";
+import type { FedosPrivateNostrDeliveryMode } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
+import type { FedosPrivateNostrDeliveryPublisher } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_publisher.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistrationAuthority } from "../../device/fedos_device_registration_authority.js";
+import type { FedosDeviceSyncAbandonmentPolicy } from "../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncResourceLimits } from "../../device/sync_scheduler/fedos_device_sync_resource_limits.js";
+import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos_device_sync_attempt.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -143,6 +158,10 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationCapabilityLogPath?: string;
   /** Alpha 923 — optional append-only log for the construction-coordination facts; omitted, in-memory. */
   readonly conversationConstructionCoordinationLogPath?: string;
+  /** Alpha 996 — optional append-only log for invitation-revocation facts; omitted, in-memory. */
+  readonly conversationInvitationRevocationLogPath?: string;
+  /** Alpha 1003 — optional append-only log for draft-management-state facts; omitted, in-memory. */
+  readonly conversationDraftManagementLogPath?: string;
   /** Alpha 904/923 — optional; omitted, an anonymous-local creator identity applies. */
   readonly conversationCreatorIdentityAuthority?: FedosConversationCreatorIdentityAuthority;
   /**
@@ -167,9 +186,27 @@ export interface FedosDesktopRuntimeConfig {
    * calling `.start()` on one.
    */
   readonly privateTransportEnabled?: boolean;
-  /** Explicit, caller-supplied path to the Conversation Message Envelope append-only log file (Private Delivery, Alpha 857 — reused, unchanged). Omitted, in-memory. */
+  /**
+   * Explicit, caller-supplied path to the Conversation Message Envelope
+   * append-only log file (Private Delivery, Alpha 857 — reused,
+   * unchanged). Omitted, in-memory. Shared by BOTH the Alpha 1113
+   * Encryption Runtime Wiring facade and the Alpha 1471–1540 Private
+   * Transport boundary — one Envelope backend, never two — reconciled
+   * during the Alpha 1611–1690 integration merge (both Arcs had
+   * independently declared this same field), and again during the Alpha
+   * 5561–5640 cross-lineage integration merge (same reconciliation, same
+   * field, this time across the NIP-17 and Ratchet lineages).
+   */
   readonly conversationEnvelopeLogPath?: string;
-  /** Explicit, caller-supplied path to the Conversation Payload Storage append-only log file (Private Delivery, Alpha 804 — reused, unchanged). Omitted, in-memory. */
+  /**
+   * Explicit, caller-supplied path to the Conversation Payload Storage
+   * append-only log file (Private Delivery, Alpha 804 — reused,
+   * unchanged). Omitted, in-memory. Shared by BOTH the Alpha 1113
+   * Encryption Runtime Wiring facade and the Alpha 1471–1540 Private
+   * Transport boundary — reconciled during the Alpha 1611–1690
+   * integration merge (both Arcs had independently declared this same
+   * field).
+   */
   readonly conversationPayloadLogPath?: string;
   /**
    * `AppendOnlyFedosConversationPayloadStorage`'s own REQUIRED
@@ -204,4 +241,241 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationTransportPublisher?: FedosConversationTransportPublisher;
   /** Optional — Inbound Subscription is activated ONLY when this is supplied. No silent default subscription of any kind. */
   readonly conversationTransportInbound?: FedosPrivateTransportInboundConfig;
+
+  /**
+   * Secure Runtime Alpha 1691–1760 ("Conversation Archive Runtime
+   * Integration and Recovery Operations Arc"). OPTIONAL, unlike
+   * `deliveryEnabled` — the SAME "no widened required-field surface"
+   * discipline `privateTransportEnabled` itself already established
+   * (Alpha 1471–1540). Omitted or `false`, the runtime reaches `"ready"`
+   * without ever constructing a `FedosConversationArchiveRuntime`, and
+   * `runtime.conversationArchiveRuntime()` throws `"not enabled"`.
+   */
+  readonly archiveEnabled?: boolean;
+  /**
+   * REQUIRED when `archiveEnabled` is `true` — this runtime constructs
+   * no Master Seed Authority of its own (mirrors
+   * `conversationTransportSigningAuthority`'s own identical "this
+   * runtime constructs no Signing Authority of its own" discipline). The
+   * caller supplies a real, already-constructed `FedosMasterSeedAuthority`
+   * — the SAME instance backing this account's own conversation
+   * encryption, never a second, duplicate one.
+   */
+  readonly conversationArchiveMasterSeedAuthority?: FedosMasterSeedAuthority;
+  /** Optional override of the Archive Runtime's own default byte/record bounds (`DEFAULT_FEDOS_CONVERSATION_ARCHIVE_RUNTIME_BOUNDS`). No secret, no path policy beyond what the caller-supplied destination/source path itself already is. */
+  readonly conversationArchiveBounds?: FedosConversationArchiveRuntimeBounds;
+  /**
+   * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport
+   * Integration and Group Pairwise Delivery Arc") Phase C/G (Alpha
+   * 1844/1878) — the ONE explicit, closed route-selection knob for
+   * Direct (and, transitively, Group pairwise) send delivery. Omitted
+   * (the default) — `sendDirectMessage()` behaves byte-for-byte as
+   * before this Arc: local storage only, no standard delivery attempted,
+   * no Relay event of this kind ever emitted. `"nostr-nip17-v1"` —
+   * REQUIRES `privateTransportEnabled: true` (this route rides the SAME
+   * Private Transport queue/Scheduler/Multi-Relay/Observation, never a
+   * second Outbox domain); a real `NostrNip17V1WireAdapter` is
+   * constructed and injected into `FedosPrivateTransport`'s own
+   * `wireAdapter`, and `sendDirectMessage()` additionally prepares +
+   * durably enqueues a standard Gift Wrap for every successfully
+   * locally-stored Direct message. NEVER a heuristic, NEVER a silent
+   * fallback to `fedos-private-v1` if unavailable (Alpha 1844).
+   */
+  readonly conversationDirectMessageDeliveryRoute?: "nostr-nip17-v1";
+  /** Alpha 1844 — optional; forwarded to `NostrNip17V1WireAdapter`'s own `localAccountIndex` (defaults `0`). Only meaningful with `conversationDirectMessageDeliveryRoute: "nostr-nip17-v1"`. */
+  readonly conversationNip17LocalAccountIndex?: number;
+  /**
+   * Secure Runtime Alpha 1113 ("Runtime Encryption Configuration") —
+   * Phase A of the Alpha 1111–1180 Private Conversation Activation and
+   * Direct Messaging Runtime Arc. Threads the Alpha 949 encryption
+   * dependencies — already accepted on `FedosConversationRuntimeDependencies`
+   * but never previously reachable from this config — through to
+   * `assembleFedosConversationRuntimeDependencies()`. Omitted, the SAME
+   * fail-closed `Unavailable*` defaults apply as before (Alpha 942, Alpha
+   * 1115's own "no fallback crypto" rule): direct activation and direct
+   * messaging stay unavailable; public Board and local draft management
+   * remain entirely unaffected.
+   */
+  readonly conversationEncryptionAuthority?: FedosConversationEncryptionAuthority;
+  /** Alpha 1113 — optional; omitted, fail-closed (Alpha 942/1115). */
+  readonly conversationDecryptionAuthority?: FedosConversationDecryptionAuthority;
+  /** Alpha 1113 — optional; omitted, delegates to `conversationCreatorIdentityAuthority` (Alpha 931's own default). */
+  readonly conversationIdentityResolver?: FedosConversationIdentityResolver;
+  /** Alpha 1113 — optional; omitted, fixed `0` (Alpha 933's own default). */
+  readonly conversationAccountIndexAuthority?: FedosConversationLocalAccountIndexAuthority;
+  /**
+   * Alpha 1113 — optional, only meaningful with `conversationPayloadLogPath`
+   * (declared once above, under the Alpha 1471–1540 Private Transport
+   * boundary's own fields — reconciled during the Alpha 1611–1690
+   * integration merge); omitted, `1_000_000` bytes (Alpha 949's own
+   * default).
+   */
+  readonly conversationMaxPayloadByteLength?: number;
+  /** Alpha 1113 — optional append-only log for the encryption-coordination facts; omitted, in-memory. */
+  readonly conversationEncryptionCoordinationLogPath?: string;
+  /** Alpha 1121 — optional append-only log for the Direct Activation coordination facts; omitted, in-memory. */
+  readonly conversationActivationCoordinationLogPath?: string;
+  /** Alpha 1143 — optional append-only log for the Payload Retention decision log; omitted, in-memory. */
+  readonly conversationPayloadRetentionLogPath?: string;
+  /**
+   * Secure Runtime Alpha 1274 ("Runtime Config Wiring") — Phase C of the
+   * Alpha 1261–1320 Production Conversation Crypto Runtime Activation
+   * Arc. Optional; omitted, production crypto stays entirely unconfigured
+   * (Alpha 1275's own "Default Unavailable Adapter" — identical to every
+   * prior Arc's own default). When present, resolved via
+   * `assembleFedosConversationProductionCryptoGraph()`
+   * (`../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.ts`)
+   * BEFORE Conversation Runtime assembly; a successful (`"available"`)
+   * resolution supplies its own real, WASM-backed Authorities in place of
+   * `conversationEncryptionAuthority`/`conversationDecryptionAuthority`/
+   * `conversationCreatorIdentityAuthority`/`conversationAccountIndexAuthority`/
+   * `nostrAuthorBindingAuthority` above; any OTHER outcome falls back to
+   * those individual fields' own existing defaults, unchanged — Runtime
+   * startup itself never fails because production crypto could not be
+   * assembled (Alpha 1264). No raw secret field of any kind — this object
+   * carries only a durable-file-persistence port and an injected
+   * passphrase-provider BOUNDARY (Alpha 1266/1267), never a passphrase
+   * value itself.
+   */
+  readonly conversationProductionCrypto?: FedosConversationProductionCryptoConfig;
+  /**
+   * Secure Runtime Alpha 1321–1390 ("Private Group Pairwise Fanout
+   * Foundation Arc") — the additive `groupRuntime()` facade's own
+   * backends. Every field OPTIONAL; omitted, in-memory (the same
+   * "explicit path or safe in-memory default" discipline as every field
+   * above). Never widens the Direct Activation Coordinator's own
+   * Private-Group Gate.
+   */
+  readonly conversationGroupGenerationLogPath?: string;
+  /** Alpha 1321–1390 — optional append-only log for Group Direct Path facts; omitted, in-memory. */
+  readonly conversationGroupDirectPathLogPath?: string;
+  /** Alpha 1321–1390 — optional append-only log for local canonical Group Message facts; omitted, in-memory. */
+  readonly conversationGroupMessageLogPath?: string;
+  /** Alpha 1321–1390 — optional append-only log for Fanout Delivery facts; omitted, in-memory. */
+  readonly conversationGroupFanoutDeliveryLogPath?: string;
+  /** Alpha 1321–1390 — optional; omitted, a conservative fixed OPERATIONAL limit applies (never a cryptographic one). */
+  readonly conversationGroupParticipantLimitPolicy?: FedosGroupParticipantLimitPolicy;
+  /**
+   * Secure Runtime Alpha 1391–1470 ("Nostr Private Direct and Pairwise
+   * Fanout Delivery Arc") — the additive `conversationRuntime().privateNostrDelivery()`
+   * facade's own backends. Every field OPTIONAL; omitted, private
+   * delivery stays entirely unavailable (Alpha 1440) — local Direct/Group
+   * messaging itself is unaffected. This runtime constructs no Signing
+   * Authority or Relay/Publisher of its own (mirrors `publisher`'s own
+   * established "caller supplies a real, fully-constructed" precedent,
+   * Alpha 610).
+   */
+  readonly conversationPrivateNostrDeliveryRequestLogPath?: string;
+  /** Alpha 1391–1470 — optional append-only log for Local Import Record facts; omitted, in-memory. */
+  readonly conversationPrivateNostrImportRecordLogPath?: string;
+  /** Alpha 1391–1470 — optional append-only log for Private Nostr Delivery Observation facts; omitted, in-memory. A SEPARATE log from the Board's own `observationLogPath`. */
+  readonly conversationPrivateNostrDeliveryObservationLogPath?: string;
+  /** Alpha 1391–1470 — optional; omitted, private delivery stays entirely unavailable (Alpha 1440). */
+  readonly conversationPrivateNostrSigningAuthority?: FedosNostrSigningAuthority;
+  /** Alpha 1391–1470 — optional; omitted, outbound private delivery stays unavailable. */
+  readonly conversationPrivateNostrDeliveryPublisher?: FedosPrivateNostrDeliveryPublisher;
+  /** Alpha 1391–1470 — optional; omitted, `"mailbox"` (Alpha 1434's own explicit default). */
+  readonly conversationPrivateNostrDefaultMode?: FedosPrivateNostrDeliveryMode;
+  /** Alpha 1391–1470 — optional; omitted, `[]`. */
+  readonly conversationPrivateNostrDefaultRelayUrls?: readonly string[];
+
+  /**
+   * Secure Runtime Alpha 2921–3000 ("Device Trust and Multi-Device
+   * Runtime Integration Arc"). OPTIONAL, mirroring
+   * `privateTransportEnabled`'s own "no widened required-field surface"
+   * discipline exactly — every pre-existing call site continues to
+   * compile unchanged. Omitted or `false`, the runtime reaches
+   * `"ready"` without ever constructing a `FedosDeviceTrustRuntime`
+   * (`./fedos_device_trust_runtime.js`), and `runtime.deviceTrust()`
+   * throws `"not enabled"`.
+   */
+  readonly deviceTrustEnabled?: boolean;
+  /** REQUIRED when `deviceTrustEnabled` is `true` — a stable, non-secret identifier for THIS running runtime's own local device. Never a credential; this runtime generates no device id of its own. */
+  readonly localDeviceId?: string;
+  /** REQUIRED when `deviceTrustEnabled` is `true` — the existing account identity this local device is additive beneath (Review `4672244`'s own Option B). */
+  readonly localAccountRef?: FedosDeviceBindingAccountRef;
+  /** Explicit, caller-supplied path to the Device Registry append-only log file. Omitted, in-memory (mirrors every other `*LogPath` field in this config). */
+  readonly deviceRegistryLogPath?: string;
+  /** Optional; omitted, `UnavailableFedosDeviceRegistrationAuthority` applies — this codebase has no accepted cryptographic boundary yet for independent, account-verifiable Device keys (Phase E blocker), so every registration through the default is honestly capped at `"unavailable"`, never `"trusted"`. */
+  readonly deviceRegistrationAuthority?: FedosDeviceRegistrationAuthority;
+
+  /**
+   * Secure Runtime Alpha 3801–3880 ("Device Sync Operational Status and
+   * Desktop Shell Integration Arc"). OPTIONAL and meaningful ONLY when
+   * `deviceTrustEnabled` is also `true` (the Scheduler reuses the SAME
+   * Device Registry/Sync Journal instances `FedosDeviceTrustRuntime` already
+   * owns — see `./fedos_device_sync_operational_facade.ts`'s own header).
+   * Omitted or `false`, `runtime.deviceSyncOperational().syncStatus()`
+   * reports `"disabled"`, and no `FedosDeviceSyncScheduler` is ever
+   * constructed. This Arc does not assemble a real, network-attached Relay
+   * Sync graph (Phase A §20) — `deviceSyncAttemptFn` below is the ONLY
+   * bridge to real Relay delivery, and it is entirely caller-supplied.
+   */
+  readonly deviceSyncSchedulerEnabled?: boolean;
+  /** REQUIRED when `deviceSyncSchedulerEnabled` is `true` — this runtime constructs no retry/abandonment policy of its own (`FedosDeviceSyncScheduler`'s own constructor requires one explicitly). */
+  readonly deviceSyncAbandonmentPolicy?: FedosDeviceSyncAbandonmentPolicy;
+  /** Optional; omitted, `FEDOS_DEVICE_SYNC_DEFAULT_RESOURCE_LIMITS` applies. */
+  readonly deviceSyncResourceLimits?: FedosDeviceSyncResourceLimits;
+  /** Optional; omitted, `30_000` ms (mirrors `conversationTransportIntervalMs`'s own default cadence order of magnitude). */
+  readonly deviceSyncIntervalMs?: number;
+  /**
+   * OPTIONAL — this runtime constructs no Relay Sync attempt of its own
+   * (mirrors `conversationTransportPublisher`'s/`conversationTransportSigningAuthority`'s
+   * own "this runtime constructs no Signing Authority or Relay of its own"
+   * discipline). Omitted, every Scheduler tick's own attempt fails closed
+   * with `"failed"` — the Scheduler itself still starts/stops/reports
+   * honest status.
+   */
+  readonly deviceSyncAttemptFn?: FedosDeviceSyncAttemptFn;
+  /** Explicit, caller-supplied path to the Schedule append-only log file. Omitted, in-memory. */
+  readonly deviceSyncScheduleLogPath?: string;
+  /** Explicit, caller-supplied path to the Conflict append-only log file. Omitted, in-memory. */
+  readonly deviceSyncConflictLogPath?: string;
+  /** Explicit, caller-supplied path to the Transfer Session append-only log file. Omitted, in-memory. Independent of `deviceSyncSchedulerEnabled` -- Transfer session STATUS is readable even when the Scheduler itself is disabled. */
+  readonly deviceSyncTransferSessionLogPath?: string;
+  /** Explicit, caller-supplied path to the Relay Sync Observation append-only log file. Omitted, in-memory. Used ONLY to distinguish `relayAccepted` from `deviceImported` on a Transfer Session view -- never to reconstruct a raw Relay event. */
+  readonly deviceSyncRelaySyncObservationLogPath?: string;
+
+  /**
+   * Secure Runtime Alpha 4581–4660 ("Desktop Device Registration, Pairing,
+   * and Durable Sync Journal Arc"). Meaningful ONLY when `deviceTrustEnabled`
+   * is also `true` -- the Pairing Boundary (`runtime.deviceBinding()`)
+   * reuses the SAME `deviceRegistryLogPath`/in-memory Device Registry
+   * backend `FedosDeviceTrustRuntime` already owns (Phase A §8's own
+   * "stateless read-through orchestrator, safe to construct a second thin
+   * instance over the identical durable backend" finding) -- never a
+   * second Device Registry. Omitted or `deviceTrustEnabled: false`,
+   * `runtime.deviceBinding()` throws `"not enabled"`, the SAME two-state
+   * fail-closed contract `deviceTrust()` itself already uses.
+   */
+  readonly deviceBindingChallengeReplayLogPath?: string;
+  /** Optional; omitted, `FEDOS_DEVICE_BINDING_DEFAULT_LIMITS` (300s challenge TTL) applies -- see `../../device/binding_challenge/fedos_device_binding_boundary_factory.ts`. */
+  readonly deviceBindingChallengeTtlSeconds?: number;
+  /**
+   * OPTIONAL — this runtime constructs no Signing Authority of its own
+   * (mirrors `conversationTransportSigningAuthority`'s/
+   * `conversationPrivateNostrSigningAuthority`'s own identical "the caller
+   * supplies a real, already-constructed one" discipline). Required only to
+   * ACT as the Authorizing Device in a real pairing exchange
+   * (`runtime.devicePairing().approvePairingRequest()`/`revokeDevice()`).
+   * Omitted, those two methods report `"disabled"`; every other
+   * `FedosDevicePairingFacade` method (`createPairingRequest`,
+   * `inspectPairingRequest`, `completePairing`, `registrationStatus`,
+   * `listPendingPairings`) needs no account signing capability at all and
+   * remains fully available regardless.
+   */
+  readonly deviceBindingAccountSigningAuthority?: FedosNostrSigningAuthority;
+  /** Optional; omitted, account index `0` applies (mirrors `nostrAccountIndex`/`conversationTransportAccountIndex`). */
+  readonly deviceBindingAccountIndex?: number;
+  /**
+   * Explicit, caller-supplied path to the durable Sync Journal append-only
+   * log file (Phase F). Meaningful ONLY when `deviceTrustEnabled` is also
+   * `true` -- the SAME `FedosSyncState`/`FedosSyncJournal` instance the
+   * Scheduler/Import Coordinator already share. Omitted, the Sync Journal
+   * remains exactly what it always was on this base: a pure in-memory
+   * ledger, lost on every restart (see `./fedos_device_trust_runtime.ts`'s
+   * own long-documented restart limitation, now closable by supplying this
+   * field).
+   */
+  readonly deviceSyncJournalLogPath?: string;
 }

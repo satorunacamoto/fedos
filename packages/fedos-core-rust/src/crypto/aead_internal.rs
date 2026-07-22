@@ -87,6 +87,15 @@ pub(crate) enum AeadAadDomain {
     /// not a reuse of `RootKey`/`Storage` — domain separation exists
     /// precisely so each distinct secret CLASS gets its own label.
     MasterSeedSealing,
+    /// Secure Runtime Alpha 5401-5480 — the Direct Ratchet State and
+    /// Sealed Persistence Foundation Arc's own sealed-secret-at-rest
+    /// domain, mirroring `MasterSeedSealing`'s own reasoning exactly:
+    /// binds a sealed ratchet-secret ciphertext to exactly this
+    /// purpose, so it can never be confused with a Master-Seed or
+    /// Conversation ciphertext even under an (implausible) accidental
+    /// key reuse. Deliberately its own domain, never a reuse of
+    /// `Storage`/`Conversation`.
+    DirectRatchetSealing,
 }
 
 impl AeadAadDomain {
@@ -105,6 +114,7 @@ impl AeadAadDomain {
             AeadAadDomain::Conversation => b"fedos-aead-aad-conversation-v1",
             AeadAadDomain::TestOnly => b"fedos-aead-aad-test-only-v1",
             AeadAadDomain::MasterSeedSealing => b"fedos-aead-aad-master-seed-sealing-v1",
+            AeadAadDomain::DirectRatchetSealing => b"fedos-aead-aad-direct-ratchet-sealing-v1",
         }
     }
 }

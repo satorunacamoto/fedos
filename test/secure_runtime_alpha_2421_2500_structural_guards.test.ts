@@ -78,10 +78,25 @@ describe("Secure Runtime Alpha 2421-2500 -- Multi Device Sync Structural Guards"
     expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
   });
 
-  it("7. package.json's own scripts are unchanged -- no new build/start entry point added by this arc", () => {
+  it("7. package.json's own scripts carry no entry point added by THIS arc -- genuinely stale otherwise (updated per later Arcs' own 'update historical exact-shape tests only when genuinely stale' instruction, e.g. Alpha 4101-4180): the Electron Build Spike/Node Type Isolation/Electron Host Adapter Arcs (Alpha 3881-3940/4021-4100/4101-4180) legitimately added their own build/start/typecheck entry points well after this Arc's own scope closed. This Arc's own original protection -- no entry point THIS Arc itself would have added is present -- is preserved by asserting the CURRENT real, closed list rather than a frozen pre-Electron snapshot.", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { scripts: Record<string, string> };
     expect(Object.keys(parsed.scripts).sort()).toEqual(
-      ["build:runtime", "build:wasm", "start:runtime", "test", "test:watch", "typecheck"].sort(),
+      [
+        "build:electron-spike",
+        "build:host-bridge",
+        "build:runtime",
+        "build:wasm",
+        "package:electron-spike",
+        "start:electron-host-adapter",
+        "start:electron-spike",
+        "start:runtime",
+        "test",
+        "test:electron-spike",
+        "test:watch",
+        "typecheck",
+        "typecheck:core",
+        "typecheck:electron",
+      ].sort(),
     );
   });
 
