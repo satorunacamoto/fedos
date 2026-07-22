@@ -1,75 +1,153 @@
-# Secure Runtime Alpha 5401-5480: FedOS Direct Ratchet State and Sealed Persistence Foundation — Execution Spec
+# Secure Runtime Alpha 5401–5480 — Execution Specification
 
-Architecture frozen. This Arc implements ONLY the non-cryptographic state/persistence foundation the normative review (`review/fedos-forward-secrecy-double-ratchet-v1` @ `b34d608`) names as its own recommended next Arc. It performs no DH ratchet step, no root/chain-key KDF evolution, no message-key derivation, and no NIP-17 wiring. See `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md` for Phase A.
+**FedOS Local Deletion Capability and Deletion-State Foundation Arc**
 
-Base: `81d1d73` (`arc/fedos-beta-release-publication-signing-readiness`). Worktree: `C:\wt\direct-ratchet-state-foundation`. Branch: `arc/direct-ratchet-state-sealed-persistence-foundation`.
+Base: `master @ 3eb9ead`. Normative review: `cf5b870`
+(`review/fedos-secret-capability-deletion-v1`), read via `git show`, never
+merged into this branch. Findings this spec assumes are in
+`docs/secure_runtime_alpha_5401_5480_reconciliation_report.md` (Phase A).
 
-## Phase B — session identity (`src/conversation/ratchet/fedos_direct_ratchet_session_id.ts`)
+This is a **local-only V1**. No remote deletion request, no
+acknowledgement, no Relay deletion, no wire protocol, no NIP — all remain
+unbuilt, by design, per this Arc's own Absolute Prohibitions.
 
-Binds a 7-component tuple: `localAccountRef`, `localDeviceRef`, `remoteAccountRef`, `remoteDeviceRef`, `conversationId` (`FedosConversationId`), `suite` (closed literal `"fedos-direct-ratchet-v1"`), `generation` — deliberately wider than the review's own 3-component (account, peer, peer-Device) model, per the reconciliation report's documented justification (this codebase's own Device Trust/Sync foundations already support multiple trusted devices per account).
+## 1. Module layout
 
-Delimiter is `"##"`, not `"::"` — a real `FedosConversationId` always itself contains `"::"` (`toFedosConversationId`'s `boardId::threadId` shape and `toFedosPrivateConversationId`'s `private-draft::mode::requestId` shape), so rejecting `"::"` inside every component (an early draft's mistake, caught by this Arc's own test suite) would reject every real Conversation id. Every component is validated `"##"`-free, `/`-free, `\`-free, and NUL-free before joining — collision-safe by construction, proven by an explicit collision test. Strict length limits (256/component, 1024 total) and a closed-literal suite/generation-range check reject malformed input; construction returns `null`, never throws.
+Ten new files under `src/conversation/deletion/`, one narrow addition to
+two existing Archive CLI files, zero other production changes:
 
-## Phase C/D — state model
+| File | Phase | Role |
+|---|---|---|
+| `fedos_deletion_target.ts` | B | closed target vocabulary (10 values) |
+| `fedos_deletion_operation.ts` | B | closed operation vocabulary (8 values) |
+| `fedos_deletion_evidence.ts` | B | closed evidence vocabulary (4 values) |
+| `fedos_deletion_capability_descriptor.ts` | C | static, fixed registry — one descriptor per target |
+| `fedos_deletion_status.ts` | D | closed 15-value status vocabulary + `FedosPayloadDeletionMeaning` mapping |
+| `fedos_deletion_non_guarantees.ts` | N | closed 7-code non-guarantee vocabulary + fixed text |
+| `fedos_deletion_assessment.ts` | E | four read-only assessment functions (payload, Archive-file, Device, Membership) |
+| `fedos_deletion_plan.ts` | F | four deterministic, pure plan builders |
+| `fedos_deletion_archive_path_authority.ts` | H | structural traversal/bare-root guards |
+| `fedos_deletion_archive_file_authority.ts` | H | trusted handle resolution + removal, over the existing Archive CLI directory index |
+| `fedos_deletion_execution_coordinator.ts` | G | four narrow, idempotent execution entry points |
+| `fedos_persisted_deletion_execution_record_v1.ts` | K | durable aggregate-outcome record shape |
+| `fedos_deletion_execution_persistence.ts` / `in_memory_*` / `append_only_*` | K | persistence port + two backends, mirroring `FedosPayloadRetentionPersistence`'s own convention |
+| `fedos_deletion_user_summary.ts` | M | plain DTO + builders, no framework |
 
-- `FedosDirectRatchetSessionBinding` (`fedos_direct_ratchet_session_binding.ts`): the closed public binding facts, reusing `FedosDeviceBindingAccountRef`'s existing shape for both account references.
-- `FedosDirectRatchetSessionLifecycleState` (`fedos_direct_ratchet_session_lifecycle.ts`): `initialized | active | suspended | reset-required | expired | revoked | corrupt | unavailable` — a documented superset of the review's own two adjacent vocabularies (session `expiration state`: active/stale/superseded/revoked, renamed to expired/reset-required here; migration-outcome's `corrupt`), plus two foundation-specific additions (`initialized`, `unavailable`) the review never needed since it always assumes a live session already exists. `revoked`/`corrupt` are BOTH fully terminal (zero outgoing transitions) per this Arc's own requirement — an earlier draft gave `corrupt` a `-> revoked` edge and was corrected. Transitions validated via a closed `ALLOWED_TRANSITIONS` map, mirroring `FedosDeviceTrustState`'s own precedent exactly.
-- `FedosDirectRatchetCounters` (`fedos_direct_ratchet_counters.ts`): send/receive/previous-chain counters, monotonic-advance-only, `null` (fail closed) on rollback or overflow beyond `maxCounterValue` (`0xffffffff`).
-- `FedosDirectRatchetSessionRecordV1` (`fedos_direct_ratchet_session_record.ts`): the aggregate public record — `schemaVersion`, `revision` (event-sourced snapshot counter, see Phase G), `binding`, `lifecycleState`, `counters`, timestamps, `skippedKeyReferences`, `sealedSecretRecordIds`. Strict closed-field-set validation at every nesting level (record/binding/account-ref/skipped-key-reference) — an unrecognized field anywhere fails the whole record closed.
+Existing-file changes: `fedos_conversation_archive_cli_file_system.ts`
+gains one method (`deleteFile`); `fedos_conversation_archive_cli_directory.ts`
+gains one function (`removeFedosConversationArchiveCliDirectoryEntry`).
+These are the ONE missing local capability Phase A confirmed: no
+`deleteFile`/`removeFile` existed anywhere in this codebase before this Arc.
 
-## Phase E — bounded skipped-key index (`fedos_direct_ratchet_skipped_key_index.ts`)
+## 2. Design decisions and why
 
-Limits from the review, exact figures (`fedos_direct_ratchet_limits.ts`): **1000** max skipped keys per chain (deliberately reused as the max chain-gap bound too — the review's own choice, "to avoid two numbers that could silently disagree"), **14-day** retention. Deterministic eviction (oldest by `createdAt`, ties broken by lowest `chainCounter`) once at the cap — never an unbounded `Map`. Duplicate `chainCounter` insertion is rejected outright. Stores REFERENCES only (`sealedRecordId`, an opaque pointer) — never an actual message key.
+**Four narrow execution entry points, not one polymorphic executor.**
+`executeFedosLocalPayloadDeletionPlan` / `executeFedosLocalArchiveFileRemovalPlan`
+/ `executeFedosLocalDeviceAccessRevocationPlan` /
+`executeFedosLocalMembershipAccessRevocationPlan` each declare the minimal
+real dependency set their own domain needs (`Pick<...>` of the real
+authority). This is what makes Phase N's "Archive removal never touches
+Retention/Search" and "Device/Membership revocation never implies payload
+deletion" guarantees *structural* rather than a runtime check: the payload
+executor's own dependency type has no `fileSystem`; the Archive-file
+executor's own dependency type has no `retentionAuthority`/`searchIndex`.
 
-## Phase F — sealed secret record and sealing authority
+**Idempotency via `persistence.getRecord(planId)` first, always.** Every
+entry point checks the durable record before doing anything. Re-running an
+identical `(planId, canonicalTargetRef)` pair returns the already-persisted
+outcome (`"already-executed"`), never re-invokes Retention/Search/Archive.
+A DIFFERENT `canonicalTargetRef` under the SAME `planId` is
+`"conflicting-plan"` — refused, not overwritten.
 
-`FedosSealedDirectRatchetSecretRecordV1` (`fedos_sealed_direct_ratchet_secret_record.ts`) is modeled directly on the Sender-Key sealed-persistence lineage's own precedent (`arc/sender-key-secret-persistence-restart-recovery`, read-only reference, not merged): one opaque `sealedBlob` field (Rust-produced hex `nonce||ciphertext‖tag`), every other field plain metadata (schema, session id, secret kind, generation/chain-counter binding, sealing-suite label, creation time, a non-authoritative `integrityContext` pre-check label).
+**`FedosDeletionCapabilityDescriptor` is a fixed, static, per-target
+lookup table**, never a caller-constructed value — `getFedosDeletionCapabilityDescriptor`
+always succeeds for a real `FedosDeletionTarget`;
+`resolveFedosDeletionCapabilityDescriptor` fails closed (`null`) for
+anything else. `local-cache`, `local-incremental-archive-file`, and
+`local-notification-preview` are honestly `localSupport: false` — Phase A
+found zero real producer for any of the three on this base; inventing one
+would be exactly the "unknown capabilities fail closed" violation this
+Arc's own Phase C forbids.
 
-**Real sealing authority, not a parallel architecture.** `packages/fedos-core-rust/src/lib.rs` gains two new, narrow methods on the EXISTING `FedosMasterSeedAuthority` — `seal_direct_ratchet_secret`/`restore_direct_ratchet_secret` — mirroring `seal()`/`restore_sealed()`'s own AEAD-sealing pattern and `resolve_conversation_key()`'s own "derive from the already-unlocked Master Seed" pattern, but neither Argon2id-wrapped (that format is reserved for the Master Seed itself) nor ECDH-based (no counterparty EC public key exists here). Key derivation is a two-stage HKDF: (1) a fixed, existing-pattern `HkdfDomain::DirectRatchetSealing` extract-and-expand from the Master Seed (mirrors `derive_identity_root_internal`'s own shape, one new enum variant, zero shared-logic risk — Rust's exhaustive match enforces this at compile time); (2) a second, per-call HKDF-expand from that root keyed by the FULL session-binding context as HKDF `info` (never through the shared fixed-domain helper, which never accepts caller-supplied info). Because step 2 is a pure function of the binding tuple, sealing/restoring under a different local/remote Device, conversation, or generation derives a cryptographically different key — restoration then fails by AEAD authentication, not a TypeScript-side comparison. A new `AeadAadDomain::DirectRatchetSealing` (internal-only, mirroring `MasterSeedSealing`'s own "no envelope-format equivalent needed" precedent) provides domain separation at the AEAD layer too. Zero new Cargo dependencies (`hkdf`/`sha2`/`chacha20poly1305`/`zeroize`/`getrandom` already present).
+**Assessment never mutates, never decrypts.** Every function in
+`fedos_deletion_assessment.ts` calls only a read-only method
+(`evaluatePayloadAccess`, `getDevice`, `findMembership`, the Archive
+directory's own index read) — never `tombstonePayload`/`removeLocalPayload`/
+`revokeDevice`/`revoke`/`removeFedosDeletionArchiveFile`.
 
-Account references are folded into the sealing context too, NOT via a wider Rust signature (which would have rippled needlessly) but via a TypeScript-side composite string, `fedosDirectRatchetSealingDeviceContext(accountRef, deviceRef)` (`fedos_direct_ratchet_session_binding.ts`) — Rust's `local_device_ref`/`remote_device_ref` parameters are opaque HKDF context bytes only, never interpreted or split apart, so this makes "wrong account, same Device string" a genuine cryptographic-binding failure without touching the Rust function signature. This was caught by this Arc's own test suite (an early draft bound only to Device refs, and a "wrong account recovery" test correctly failed until this fix).
+**Plans are pure functions of an assessment.** `buildFedosLocalPayloadDeletionPlan`
+etc. take an already-computed assessment and return the same plan for the
+same input, always — no authority call inside a plan builder. A payload
+plan's steps are `["retention-transition", "purge-index"]`, never
+`"remove-archive-file"`; an Archive-file plan's one step is
+`"remove-archive-file"`, never a Retention/Search step. The two plan kinds
+cannot be built together, so a caller cannot accidentally combine them into
+one confirmation prompt.
 
-The narrow port `FedosDirectRatchetSealingAuthority` (`fedos_direct_ratchet_sealing_authority.ts`) is DELIBERATELY NOT added to the shared `FedosMasterSeedAuthority` interface (`../../runtime/master_seed/fedos_master_seed_authority.ts`) — that interface is implemented by unrelated authorities (`DevelopmentFedosMasterSeedAuthority`, `FedosProductionMasterSeedAuthority`) that have no reason to know about ratchet sealing; widening it was tried first and reverted after it broke ~20 unrelated test fixtures and two unrelated production classes. `FedosWasmMasterSeedAuthority` implements this new port ADDITIONALLY, alongside its unchanged `FedosMasterSeedAuthority` implementation. Consumers take `FedosDirectRatchetSealingAuthority | null` — `null` is the "unavailable reference implementation" case (e.g. `DevelopmentFedosMasterSeedAuthority` doesn't implement it), reported as the `unavailable` lifecycle state / `sealing-authority-unavailable` readiness, never a thrown error.
+**Archive-file removal only ever accepts a `FedosDeletionArchiveFileHandle`**,
+produced exclusively by `resolveFedosDeletionArchiveFileHandle`, which
+resolves through the Archive CLI directory's own trusted index — never a
+caller-supplied path, never a directory scan. `removeFedosDeletionArchiveFile`
+re-checks the handle's own `conversationId` against the index's CURRENT
+entry at removal time (never trusting a possibly-stale earlier resolution)
+and requires a non-empty `planId` confirmation token. The underlying
+`fedosConversationArchiveCliNodeFileSystem.deleteFile` refuses a
+symlink/reparse-point target outright (`lstatSync().isSymbolicLink()`
+check) rather than following it, and treats a missing target as already
+removed (`true`) — never an error.
 
-## Phase G — persistence
+**Durable execution record is new only because nothing existing captures
+the cross-cutting outcome.** The Retention Decision Log already durably
+records a payload's own tombstone/removal transitions; this Arc's own
+`FedosPersistedDeletionExecutionRecordV1` does not duplicate that — it
+exists because no record anywhere in this codebase ties one coordinated
+plan's Retention-AND-Search-AND-(optionally)-Archive outcome to one
+restart-recoverable `planId`. Append-only, corruption fails closed
+(mirrors `AppendOnlyFedosPayloadRetentionPersistence` exactly): an
+unparseable line or a conflicting duplicate record for the same `planId`
+throws on the next read, never silently drops or merges.
 
-Four new files under `src/conversation/ratchet/persistence/`: session-metadata port + in-memory + append-only backends, and sealed-secret port + in-memory + append-only backends. Both mirror `AppendOnlyFedosConversationPersistence`'s own established NDJSON/insert-only/fail-closed-replay discipline exactly.
+**User-safe summaries are a plain DTO**, not a new presentation
+framework — this lineage has no accepted view-model boundary for
+Conversation deletion. Every warning is drawn from the closed
+`FedosDeletionNonGuaranteeCode` vocabulary's own fixed text; the universal
+`"no-deleted-everywhere"` warning is always appended last.
 
-Session records are **event-sourced by revision**, not overwritten: `FedosDirectRatchetSessionRecordV1.revision` starts at `0` and strictly increments by exactly 1 per logical state change; `putSession()` accepts only the next expected revision for a `sessionId` (or an identical repeat of an existing one, idempotently) — anything else, including a `binding` that disagrees with an earlier revision of the same session, is `"conflict"`. This was a real design correction made during implementation: an earlier draft treated the port as mutable "upsert," which cannot work against an insert-only backend and was caught immediately by lifecycle-transition tests failing with `"failed"` instead of `"transitioned"`.
+## 3. What this Arc reuses unmodified
 
-Sealed-secret records are pure insert-only, keyed by `fedosSealedDirectRatchetSecretRecordKey()` (a deterministic function of session id / secret kind / generation / chain counter) — never overwritten; a conflicting write to an existing key is rejected.
+`FedosPayloadRetentionAuthority` (`tombstonePayload`/`removeLocalPayload`/
+`evaluatePayloadAccess`), `FedosConversationSearchIndex.reconcilePayloadRetention()`,
+`FedosSyncDeviceRegistry.revokeDevice()`/`getDevice()`,
+`FedosConversationMembershipAuthority.revoke()`/`findMembership()` — every
+one of these is called through this Arc's own coordinator exactly as it
+already exists. No Search redesign, no Retention redesign, no Device/
+Membership redesign.
 
-## Phase H/I — Runtime facade and lock/stop/restart
+## 4. What this Arc does not build
 
-`FedosDirectRatchetStateRuntime` (`fedos_direct_ratchet_state_runtime.ts`) owns session persistence, sealed-secret persistence, and an injected `FedosDirectRatchetSealingAuthority | null` — nothing else. Allowed operations only: create/inspect/readiness, suspend/mark-reset-required/expire/revoke, validated counter updates, skipped-key register/remove, seal-and-persist + recover (both directions of the same injected authority), lock, stop. No method named encrypt/decrypt/send/publish/negotiate/migrate exists anywhere in this file (proven by a structural source-text guard test).
+Everything on the Absolute Prohibitions list: remote deletion request,
+deletion Relay event, new NIP, recipient acknowledgement, Relay deletion,
+remote filesystem operation, arbitrary file deletion, physical secure
+erase / SSD overwrite guarantee, cloud-history / OneDrive version-history
+deletion, backup deletion, automatic cross-deletion between message and
+Archive, cryptographic key destruction as a plaintext-deletion proof,
+moderation/legal-hold, generic capability framework, new crypto
+primitives, new dependencies, Electron IPC/UI. `p2p/` and `.tmp_gen/` are
+untouched (verified structurally in
+`test/secure_runtime_alpha_5401_5480_non_guarantees_and_structural_proof.test.ts`,
+items 14–20).
 
-`recover()` performs a sealed-reference substitution guard (the sealed record's own embedded `sessionId` must match the session being recovered for) BEFORE ever reaching the sealing authority, then calls the authority with the session's own stored binding context — never the caller's. A missing sealed record reports `"missing"/"no-sealed-record"`; a revoked/corrupt session is rejected before the authority is ever touched; every failure path returns a closed outcome, never silently creating replacement secret state.
+## 5. Test coverage
 
-Recovered secrets are held only as `FedosDirectRatchetRecoveredSecretHandle` (`fedos_direct_ratchet_recovered_secret_handle.ts`) — `lock()` best-effort zeroizes (`.fill(0)`) and drops every currently-recovered handle; `stop()` calls `lock()` and then permanently fails closed every mutating method. Honest limitation documented in that file's own header: JavaScript gives no guarantee a `Uint8Array`'s backing memory isn't copied elsewhere by the engine before `dispose()` runs — this is NOT the same guarantee Rust's `zeroize`-backed `SecretHandle` gives for WASM-resident secrets.
+Seven new test files (82 new tests):
+`..._vocabulary_and_capability` (18), `..._assessment_and_plan` (9),
+`..._execution_coordinator` (9), `..._archive_removal` (19),
+`..._restart_and_corruption` (6), `..._non_guarantees_and_structural_proof`
+(20), `..._vertical_slice` (1, the real Phase O flow). Two pre-existing
+Archive CLI test files gained a four-line `deleteFile` stub on their own
+already-existing in-memory `FedosConversationArchiveCliFileSystem` fixture,
+to satisfy the interface's new method — no other change, no new test case
+in either file.
 
-## Phase J — structural exclusion guards
-
-Source-text tests (`test/secure_runtime_alpha_5401_5480_structural_exclusion_guards.test.ts`) prove: no file under `src/conversation/archive/`, `src/conversation/search/`, or `src/conversation/transport/` imports the ratchet module (and vice versa); the Device Sync allowlist (`FEDOS_SYNC_ALLOWED_RECORD_TYPES`, unmodified) contains no ratchet record type and rejects a ratchet-shaped record type outright, and its existing sensitive-marker scan independently rejects ratchet secret metadata even under an allowed type; the Runtime facade defines no forbidden crypto-operation method name; the two new Rust functions' own source region contains no DH/root-key/chain-key/message-key derivation call. No Archive/Search/Sync/Transport file was modified to add an exclusion marker — the guard is the absence itself, proven by reading real source.
-
-## Phase K/L — corruption matrix and real vertical slice
-
-The full resource/corruption matrix (malformed session id, cross-Device/cross-Conversation/cross-account substitution, duplicate/conflicting session and sealed-secret writes, counter rollback/overflow, chain-gap/skipped-key overflow and expiry, truncated/malformed/out-of-order log lines, stopped-Runtime mutation, revoked-session recovery, unknown schema/suite) is covered across `test/secure_runtime_alpha_5401_5480_{session_identity,lifecycle_and_counters,codec_and_skipped_keys,persistence,sealed_secret_record,runtime_facade}.test.ts`.
-
-`test/secure_runtime_alpha_5401_5480_real_vertical_slice.test.ts` runs the complete Phase L slice against the REAL WASM-backed `FedosWasmMasterSeedAuthority` and REAL append-only durable files (not in-memory): two device identities, one Direct Conversation, a deterministic session id, real CSPRNG placeholder secret material (never `Math.random`), real seal via the real authority, real durable persistence, Runtime `stop()`, a FRESH Runtime restoring the SAME Master Seed from its own sealed envelope (not a fresh unrelated one — an early draft generated two independent seeds across the simulated restart and every recovery correctly failed until this fix), genuine restart recovery, genuine wrong-Device rejection, genuine tamper rejection (one hex character flipped directly in the durable file), `lock()` disposal, and a direct read of the durable files confirming the raw secret hex never appears in either.
-
-## Verification
-
-`npm run typecheck`: clean except the two pre-existing, unrelated baseline errors (`test/secure_runtime_alpha_4741_4820_production_master_seed_activation.test.ts:189`, `test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts:121` — confirmed identical on the unmodified base branch via `git stash`).
-
-`cargo test --lib` (`packages/fedos-core-rust`): 543 passed (531 baseline + 12 new), 1 failed — the SAME single pre-existing `secp256k1_dependency_guard` count-mismatch failure confirmed via `git stash` to exist on the unmodified base branch, unrelated to this Arc.
-
-`npm run build:wasm`: succeeds; the new `seal_direct_ratchet_secret`/`restore_direct_ratchet_secret` methods are correctly exported (confirmed in the generated `.d.ts`).
-
-Full `npx vitest run`: this worktree has a substantial PRE-EXISTING baseline of ~242 failing test files, confirmed via `git stash` (unrelated to this Arc — environmental/historical, matching this codebase's own established pattern of worktree-specific pre-existing failures). After this Arc's changes, the failing-file set is IDENTICAL to that baseline (a byte-for-byte `comm` diff of sorted failing-file lists shows zero new failures) — every test this Arc's own changes could plausibly have broken was found, diagnosed, and fixed:
-
-- ~96 historical structural "exact global `pub fn` count" / "exact `HkdfDomain` variant list" tests (a long-established per-Arc convention across this crate's entire history — every prior Arc that added a Rust `pub fn` or `HkdfDomain` variant was expected to, and did, bump every one of these pinned counts/lists) were updated: `pubFnNames.length` 46→48 (281 occurrences across the crate's historical test files), 24 explicit `expected` name-list arrays gained the two new function names, 18 `HkdfDomain` variant-list arrays gained `DirectRatchetSealing`, and the renamed Rust exhaustiveness-test function (`hkdf_domain_has_no_variant_other_than_the_ten_specified` → `_eleven_specified`) was re-cited in the two TS files that named it literally.
-- `test/secure_runtime_alpha_436_rust_master_seed_authority_implementation.test.ts` (the `FedosMasterSeedAuthority` impl-block-scoped method inventory) updated to include the two new methods, count 10→12.
-- `test/secure_runtime_alpha_531_ripple_review.test.ts` (a live `git status`-based "every modified tracked `src/` file must be accounted for" guard, extended by every prior Arc that legitimately touched a tracked file) gained this Arc's own two modified files with a cited justification, following the file's own established comment convention.
-- Four existing test fixtures (`secure_runtime_alpha_{438,445,684,869}_*.test.ts`) that hand-build a fake WASM authority shape gained the two new mock methods, required once the real WASM shape validator (`isFedosMasterSeedAuthorityShape`) started requiring them.
-
-No file under `src/conversation/archive/`, `src/conversation/search/`, `src/conversation/retention/`, `src/sync/`, or `src/conversation/transport/` was modified by this Arc.
+See `docs/secure_runtime_alpha_5401_5480_completion_declaration.md` for
+the verification run and completion criteria.

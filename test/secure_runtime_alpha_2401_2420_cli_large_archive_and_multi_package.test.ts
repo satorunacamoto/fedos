@@ -86,6 +86,10 @@ function fakeFileSystem(): FedosConversationArchiveCliFileSystem & { readonly fi
       return true;
     },
     listFiles: (directoryPath) => [...files.keys()].filter((key) => key.startsWith(`${directoryPath}/`)).map((key) => key.slice(directoryPath.length + 1)),
+    deleteFile: (path) => {
+      files.delete(path);
+      return true;
+    },
   };
 }
 

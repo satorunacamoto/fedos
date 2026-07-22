@@ -116,6 +116,113 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > and Durable Evidence Foundation Arc** — types/validation/durable
 > evidence only; no live migration ships until a later Arc.
 >
+> Prior status (parallel Desktop/UI lineage, merged in at this Arc):
+>
+> **Status: Secure Runtime Alpha 6041–6120 — FedOS Signed Deletion
+> Request Multi-Device Aggregation and User Consent UI Arc (FULL
+> completion).** Makes the completed Signed Deletion Request transport
+> (`8981f81`, Alpha 5881–5960) understandable and safely usable: a
+> closed, structurally-erasure-claim-free per-Device (17 values) and
+> account-aggregate (7 values) status model; an explicit recipient
+> consent boundary (opening an item never executes anything; no
+> countdown/automatic approval); a restart-safe recipient Inbox backed
+> by a new, additive, insert-only display-fact port
+> (`FedosDeletionRequestInboxSummaryPersistence` — `5641-5720`'s own
+> decision record never carried display fields); nine new
+> `FedosDesktopApplicationShell` methods and nine new closed Host
+> commands, all delegating entirely to the existing, unmodified
+> `FedosConversationRuntime.deletionRequest()` facade; one new
+> Controller/Renderer wired into the EXISTING, unmodified Presentation
+> Boundary and Renderer aggregate — no second Shell, Runtime, Host
+> Bridge, or Renderer architecture. No canonical Desktop/Electron lineage
+> merge was required — `8981f81` already contains it (`8548845`, Alpha
+> 5161–5240). A real functional gap was found and fixed during this
+> Arc's own real vertical slice: `5881-5960`'s own approval method
+> re-evaluated `"always-review"` a second time at approval, making every
+> `"always-review"` item permanently un-approvable; reaching that method
+> at all already IS the human review the policy exists to require, so it
+> now grants the request's own requested scope on explicit approval only
+> (`"deny"`/`"unavailable"` still refuse; `"allow-local-history-only"`
+> still caps every grant). Proven with a REAL, no-mock end-to-end
+> multi-Device vertical slice against a genuinely-built WASM artifact:
+> two real Device-specific requests, Bob's one real Nostr identity
+> receiving both (NIP-17 delivery is per-account) and Device A's own
+> real Runtime independently, correctly rejecting the Device-B-addressed
+> one as a device-mismatch (proving real Device isolation, never a
+> silent accept/drop), Device A's real approval and real `b3b3a6d`
+> execution independently re-verified, a real signed acknowledgement
+> round trip, a real full restart of both sides with byte-identical
+> Shell/Renderer status reconstruction, and an honest
+> `"some-devices-applied"` aggregate — explicitly never a completion
+> claim. Named, honest limitations: Electron subprocess acceptance and
+> Notification Coordinator wiring were not reached (both narrow,
+> non-redesign follow-ons); `fedos_desktop_runtime.ts`'s own full
+> production bootstrap does not yet thread `deletionRequest` config
+> through, matching this codebase's own STANDING precedent for
+> `directRatchet`/`peerCapability` (prior Arcs' own equally-optional
+> capabilities). See
+> `docs/secure_runtime_alpha_6041_6120_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6041_6120_execution_spec.md`,
+> `docs/secure_runtime_alpha_6041_6120_aggregation_truth.md`,
+> `docs/secure_runtime_alpha_6041_6120_consent_and_warning_ux.md`, and
+> `docs/secure_runtime_alpha_6041_6120_completion_declaration.md`. Next
+> Arc: FedOS Desktop Beta Privacy Controls and Safety Center Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5881–5960 — FedOS Signed Recipient
+> Deletion Request Private Transport and Local Policy Integration Arc
+> (FULL completion).** Makes the completed Signed Recipient Deletion
+> Request protocol (`22f9277`, Alpha 5641–5720) usable end to end over
+> the real, live private transport: eight new files under
+> `src/conversation/deletion_request/` add a protocol-neutral control
+> payload (mirrors `d825aa0`'s own peer-capability precedent, two
+> discriminators, `deletion-request-v1`/`deletion-acknowledgement-v1`,
+> wrapping the already-real signed request/acknowledgement — no second
+> signature scheme), a sender-side Outbound Coordinator (real signing,
+> real pre-publish self-check, real durable state, real publish through
+> `FedosPrivateTransport.sendMailboxNip17Control()`), a closed, LOCALLY-
+> CONFIGURED recipient policy vocabulary
+> (`always-review`/`allow-local-history-only`/`allow-local-history-and-index`/
+> `deny`/`unavailable` — never an unconditional default allow), a
+> recipient-side Inbound Coordinator that reuses `5641-5720`'s own real
+> evaluation pipeline unmodified and adds the ONE new sanctioned call
+> site to `b3b3a6d`'s own real `executeFedosLocalPayloadDeletionPlan()`,
+> and a real signed-acknowledgement round trip (recipient signs/persists/
+> publishes; requester verifies/correlates/persists, advancing its own
+> durable request lifecycle through every intermediate live state to
+> `acknowledged`, never a single illegal jump). A real, genuinely-found
+> integration gap — `assessFedosDeletionRequestAuthorization()`'s own
+> hardcoded `"fedos"`-authority participant reference, which would have
+> failed EVERY real production Direct Conversation's own `"nostr"`-
+> authority Membership — was fixed with a narrow, additive, 100%-
+> backward-compatible optional parameter. Proven with a REAL, no-mock
+> end-to-end vertical slice against a genuinely-built WASM artifact
+> (`cargo build --target wasm32-unknown-unknown --release` +
+> `wasm-bindgen`, built fresh in this session): real Master Seeds, real
+> Direct Conversation, a real message, a real signed Device-specific
+> deletion request published through a real in-process Relay and real
+> NIP-17 Gift Wrap, real recipient policy grant, real `b3b3a6d` execution
+> independently re-verified (`evaluatePayloadAccess()` → `"denied"`), a
+> real signed acknowledgement round trip, an unregistered-Device request
+> denied before publish, and a full restart of both sides with exact
+> durable replay — no message plaintext, private key, or raw path in any
+> protocol durable file. Compared against the unmodified integration
+> base via a sorted full-suite JSON-report diff: zero net regressions
+> (the only newly-failing tests are the well-known, self-resolving
+> `git status`-based review-guard pattern). Named, honest limitation:
+> the vertical slice does not include Bob independently creating an
+> Archive of the message (orthogonal harness wiring, out of this Arc's
+> own time budget) — the structural "no Archive deletion" guarantee
+> itself is proven independently and unaffected. See
+> `docs/secure_runtime_alpha_5881_5960_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5881_5960_execution_spec.md`,
+> `docs/secure_runtime_alpha_5881_5960_control_payload_mapping.md`,
+> `docs/secure_runtime_alpha_5881_5960_recipient_policy_and_acknowledgement_truth.md`,
+> and `docs/secure_runtime_alpha_5881_5960_completion_declaration.md`.
+> Next Arc: FedOS Signed Deletion Request Multi-Device Aggregation and
+> User Consent UI Arc.
+>
 > Prior status:
 >
 > **Status: Secure Runtime Alpha 5721–5800 — FedOS Ratchet Peer
@@ -257,6 +364,61 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status:
 >
+> **Status: Secure Runtime Alpha 5641–5720 — FedOS Signed Recipient
+> Deletion Request Types, Validation, and Durable State Foundation Arc
+> (complete).** Architecture frozen: no Relay event, no NIP-17 wiring, no
+> new Nostr kind, no live transport, no automatic local deletion, no
+> Ratchet dependency, `p2p/`/`.tmp_gen/` untouched. Implements Doc 19's
+> own Stage 1 scope of the normative review (`860a58e`,
+> `review/fedos-signed-recipient-deletion-request-v1`) over the real,
+> implemented `arc/local-deletion-capability-state-foundation @ b3b3a6d`
+> base: thirty new files under `src/conversation/deletion_request/`
+> provide closed request/acknowledgement schemas (strict, unknown-field-
+> rejecting), fixed-field-order canonical serialization, real account
+> signing/verification reusing the EXISTING `FedosNostrSigningAuthority`
+> and the EXISTING pure-TypeScript `validateInboundNostrEvent` chain (no
+> WASM needed for verification), a target-existence-oracle-safe
+> authorization assessment over real Conversation/Membership/Envelope
+> state, and three independent durable domains (outbound request
+> lifecycle, recipient decision, acknowledgement fact) — each with an
+> in-memory and a real append-only NDJSON backend sharing one
+> monotonic-transition-validating write function. `FedosNobleTestNostrSigningAuthority`
+> (mirrors `MockFedosBoardOutboxPublisher`'s own Alpha 473 precedent for
+> living in `src/`) produces genuinely real BIP-340 Schnorr signatures via
+> `@noble/curves` — an already-declared dependency, not a new primitive —
+> isolated from the absent WASM/Master-Seed production path this worktree
+> does not have. This Arc never calls `b3b3a6d`'s own execution
+> coordinator or Archive-file authority: recipient evaluation stops at
+> `"policy-pending"` (authorized) or a terminal denial; only a caller
+> explicitly supplying an already-produced local outcome can record
+> `"locally-applied"`/`"partially-applied"`/`"failed"`. Device identity
+> stays honestly advisory-only throughout (no real per-Device signing key
+> exists anywhere in this codebase — confirmed independently in this
+> Arc's own reconciliation report). Nine new test files (132 new tests)
+> cover closed vocabularies and strict record validation, real signing/
+> verification (including one-byte-mutation and content-splicing tamper
+> detection), authorization assessment (target substitution, non-author
+> denial, Device/recipient mismatch), durable state and restart replay
+> across all three domains, the expiry/retry planner and safe
+> multi-device aggregation (never account-wide), the recipient evaluation
+> pipeline, a failure matrix closing remaining gaps (future-issued
+> requests, wrong-Conversation targets, state rollback, interrupted
+> append, acknowledgement overclaim), a structural no-live-wire proof, and
+> one real Phase O vertical slice — real Alice/Bob accounts, real signing,
+> a real restart across all three durable domains, a real `b3b3a6d`
+> execution, real acknowledgement correlation, and a real check that no
+> message plaintext, private key, or raw path exists in any durable file.
+> `b3b3a6d`'s own 82 tests, plus Membership/Retention/account-signing
+> regression suites, all still pass unchanged. See
+> `docs/secure_runtime_alpha_5641_5720_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5641_5720_execution_spec.md`,
+> `docs/secure_runtime_alpha_5641_5720_request_and_acknowledgement_schema.md`,
+> and `docs/secure_runtime_alpha_5641_5720_completion_declaration.md`.
+> Next Arc: FedOS Signed Recipient Deletion Request Private Transport and
+> Local Policy Integration Arc.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5481–5560 — FedOS Direct Double Ratchet
 > Cryptographic Core Arc (FULL completion).** Implements the real,
 > pure cryptographic core the normative forward-secrecy review delegates to
@@ -321,7 +483,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > commit was rewritten, amended, or renamed; this Arc's own range,
 > 5481–5560, is the earliest genuinely-free range as of this Arc's own
 > Phase A inventory.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5401–5480 — FedOS Direct Ratchet State and
 > Sealed Persistence Foundation Arc (FULL completion).** Implements the
 > complete NON-CRYPTOGRAPHIC foundation the normative forward-secrecy
@@ -379,11 +543,77 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `src/conversation/transport/` was modified — the exclusion is structural
 > absence, proven by reading real source. No forward secrecy or
 > cryptographic messaging claim is made anywhere in this Arc. See
-> `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md`,
-> `..._execution_spec.md`, and `..._completion_declaration.md`.
+> `docs/secure_runtime_alpha_5401_5480_ratchet_state_foundation_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5401_5480_ratchet_state_foundation_execution_spec.md`, and
+> `docs/secure_runtime_alpha_5401_5480_ratchet_state_foundation_completion_declaration.md`.
 > Recommended next Arc: **FedOS Direct Double Ratchet Cryptographic Core
 > Arc.**
-
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5401–5480 — FedOS Local Deletion
+> Capability and Deletion-State Foundation Arc (complete).**
+> Architecture frozen: no remote deletion request, no wire protocol, no
+> Relay deletion, no new NIP, no recipient acknowledgement, no physical/
+> secure-erase or SSD-overwrite guarantee, no cloud/OneDrive
+> version-history deletion, no automatic backup deletion, no new crypto
+> primitive, no new dependency, `p2p/`/`.tmp_gen/` untouched. **Local-only
+> V1** over the normative design review (`cf5b870`,
+> `review/fedos-secret-capability-deletion-v1`): ten new files under
+> `src/conversation/deletion/` implement a closed, versioned target
+> vocabulary (10 values), operation vocabulary (8 values), evidence
+> vocabulary (4 values), a fixed-registry `FedosDeletionCapabilityDescriptor`
+> (never caller-self-declared, unknown target fails closed), a 15-value
+> `FedosDeletionStatus` mapped onto the EXISTING `FedosPayloadDeletionMeaning`
+> (Alpha 792), read-only assessment, deterministic pure plans, a narrow
+> four-entry-point execution coordinator, and a dedicated append-only
+> durable execution record (mirrors `AppendOnlyFedosPayloadRetentionPersistence`'s
+> own corruption-fails-closed convention) — because no existing record
+> captured one plan's cross-cutting Retention+Search+Archive outcome as a
+> single restart-recoverable fact. Reuses the EXISTING
+> `FedosPayloadRetentionAuthority`, `FedosConversationSearchIndex.reconcilePayloadRetention()`,
+> `FedosSyncDeviceRegistry.revokeDevice()`, and
+> `FedosConversationMembershipAuthority.revoke()` verbatim — zero redesign
+> of any of the four. Implements the ONE local capability the review found
+> genuinely missing: tracked Archive-file removal, added as one new
+> method (`deleteFile`) on `FedosConversationArchiveCliFileSystem` (refuses
+> a symlink/reparse-point target, treats a missing target as already
+> removed) and one new function
+> (`removeFedosConversationArchiveCliDirectoryEntry`) on the Archive CLI
+> directory module (removes exactly one tracked file via the directory's
+> own trusted index, never a raw path, never a directory, never a
+> wildcard) — resolved only through a canonical
+> `FedosDeletionArchiveFileHandle` that re-checks its own conversation
+> identity at removal time. Archive-file removal and payload deletion are
+> structurally separated: the payload executor's own dependency type
+> carries no filesystem; the Archive-file executor's own dependency type
+> carries no Retention/Search authority — deleting an Archive file never
+> changes live Conversation history, and deleting live history never
+> silently removes an Archive file. Device and Membership revocation are
+> exposed as their own separate plan/outcome, never implicitly combined
+> with payload deletion. Seven new test files (82 new tests) cover the
+> full required matrix — vocabulary/capability, read-only assessment,
+> deterministic planning, real Retention+Search execution (including
+> duplicate execution, conflicting-plan rejection, and partial-Search-
+> failure honesty), trusted Archive-file removal (traversal denial,
+> wrong-identity refusal, missing-file idempotency, symlink refusal, exact-
+> one-file removal), restart/interruption/corruption recovery against the
+> REAL append-only log backend, structural non-guarantee proof (no
+> network transport, no Relay/NIP vocabulary, no raw path or plaintext in
+> any public summary), and a real Phase O vertical slice (real Direct
+> Conversation, real payload, real Search index, real Archive export to a
+> real temp directory, real deletion, real restart, real idempotent
+> reconvergence) — no mock for the headline flow. Two pre-existing Archive
+> CLI test files' own in-memory fixture gained a four-line `deleteFile`
+> stub to satisfy the interface's new method; no other change, no new test
+> case in either. See
+> `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5401_5480_execution_spec.md`, and
+> `docs/secure_runtime_alpha_5401_5480_completion_declaration.md`. Next
+> Arc: FedOS Signed Recipient Deletion Request Protocol Foundation Review.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5321–5400 — FedOS Desktop Beta 0.1 Canonical
 > Release Hosting, Manual Publication, and Signing Readiness Arc (FULL
 > completion).** Turns the locally-built NSIS/ZIP/checksum artifacts from
@@ -431,7 +661,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `docs/secure_runtime_alpha_5321_5400_release_publication_reconciliation_report.md`,
 > `..._certificate_custody_and_signing_seam.md`,
 > `..._manual_publication_workflow.md`, and `..._completion_declaration.md`.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5241–5320 — FedOS Desktop Beta 0.1 NSIS
 > Installer, Portable ZIP, and Checksum Publication Arc (FULL completion).**
 > Implements the normative distribution review's own V1 policy
@@ -478,7 +710,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > evidence and disclosed limitations. Recommended next Arc: **FedOS
 > Desktop Beta 0.1 Canonical Release Hosting, Manual Publication, and
 > Signing Readiness Arc.**
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5161–5240 — Canonical Desktop Composition
 > and FedOS Beta 0.1 Release-Blocker Closure Arc (FULL completion — BLK-1
 > closed).**
@@ -526,7 +760,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `..._completion_declaration.md` for the full Phase A ownership table and
 > evidence. Recommended next Arc: **FedOS Desktop Beta 0.1 Installer,
 > Signing, Distribution, and Update Policy Review.**
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5061–5160 — FedOS Desktop Beta 0.1
 > Integration, Release Candidate, and Acceptance Freeze Arc (honest partial
 > completion — release freeze blocked by one named, disclosed composition
@@ -576,7 +812,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `docs/secure_runtime_alpha_5061_5160_reconciliation_report.md` for the full
 > Phase A–R inventory and blocker table. Recommended next Arc: **FedOS Desktop
 > Beta 0.1 Composition Completion and Packaged Acceptance Arc.**
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4981–5060 — Desktop Settings Runtime
 > Application and Safe Reconfiguration Arc (FULL completion — persisted
 > settings now visibly affect real live application behavior through accepted
@@ -628,7 +866,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > raw-import / source-alignment / missing-WASM-`pkg/` failures, none in the
 > settings subsystem). Recommended next Arc: **FedOS Desktop Beta 0.1
 > Integration, Release Candidate, and Acceptance Freeze Arc.**
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4901–4980 — Desktop Settings, Relay
 > Configuration, and User Preferences Arc (FULL completion of the additive
 > settings feature; real packaged-Electron round trip environment-blocked by a
@@ -672,7 +912,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > disclosed). `p2p/`/`.tmp_gen/` untouched. Next: Desktop Settings ↔ Runtime
 > Application Arc (apply the durable settings to relay set / notifications /
 > sync / auto-lock / theme behind existing ports).
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4821–4900 — Packaged Electron Real-Unlock
 > Acceptance and GUI Passphrase-Input Boundary Arc (FULL completion — real
 > packaged renderer→preload→main unlock through real WASM).**
@@ -711,7 +953,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > **15/15** — structural guards + real packaged create + real packaged unlock
 > + missing-artifact-fails-closed. `p2p/`/`.tmp_gen/` untouched. Next:
 > Desktop Settings, Relay Configuration, and User Preferences Arc.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4741–4820 — Production Master Seed Runtime
 > Activation and Secure Unlock Completion Arc (honest partial — packaged
 > Electron real-unlock acceptance blocked by this headless environment).**
@@ -750,7 +994,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > is declared partial rather than faked — every step it would exercise is
 > proven at the Node/source level. Next: a Packaged Electron Real-Unlock
 > Acceptance + GUI Passphrase-Input Boundary Arc.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4661–4740 — Master Seed Unlock, First-Run
 > Onboarding, and Local Profile Initialization Arc (honest partial —
 > production Master Seed unlock blocked by the existing dev-only crypto
@@ -793,6 +1039,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > availability is NOT claimed. Recommended next Arc: Desktop Settings,
 > Relay Configuration, and User Preferences.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4581–4660 — Desktop Device Registration,
 > Pairing, and Durable Sync Journal Arc (complete).**
 > Architecture frozen: no Registration/Registry/Sync/Electron redesign.
@@ -833,6 +1081,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Recommended next Arc: Master Seed Unlock, First-Run Onboarding, and
 > Local Profile Initialization.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4501–4580 — Desktop Device Sync Electron
 > Main Integration Arc (complete).**
 > Architecture frozen: no Runtime/Scheduler/Notification/Tray/Badge/Electron
@@ -871,6 +1121,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Recommended next Arc: a Device Sync Registration and Pairing Arc to
 > close the one remaining gap this Arc's own Phase A finding surfaced.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4421–4500 — Desktop Device Sync Badge,
 > Notification, and Operational Event Wiring Arc (complete).**
 > Architecture frozen: no Runtime/Scheduler redesign, no Sync protocol or
@@ -903,6 +1155,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Electron main-process wiring itself is named as the recommended next
 > Arc, disclosed honestly as a scope boundary of time, not feasibility.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4341–4420 — Desktop Unread Badge and Menu
 > Bar Count Integration Arc (complete).**
 > Architecture frozen: no persistence changes, no Runtime/Search/Conversation
@@ -929,6 +1183,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > 3 new root source files, 8 new Electron files, 1 new root test file (11
 > tests) plus 1 new real Electron acceptance suite (15 tests); zero
 > regression traceable to this Arc.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 4261–4340 — Desktop Notifications, System
 > Tray, and Background Operation Arc (complete).**
@@ -959,6 +1215,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > test files (31 tests) plus 1 new real Electron acceptance suite (15
 > tests); zero regression traceable to this Arc.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4181–4260 — Desktop Conversation Window
 > and Navigation Arc (complete).**
 > Architecture frozen: no redesign of Runtime/Shell/Presentation/Renderer/
@@ -983,6 +1241,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > acceptance tests (build, security baseline, closed IPC vocabulary, real
 > subprocess launch/repeat-launch/fail-closed-on-corruption); zero
 > regression traceable to this Arc.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 4101–4180 — Electron Main/Preload
 > Adapter for FedosDesktopHostBridge Arc (complete).**
@@ -1010,6 +1270,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > (34 new tests) plus the repaired historical ones; zero regression
 > traceable to this Arc.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 4021–4100 — Repository-Wide Node Type
 > Isolation and Electron Build Compatibility Arc (complete — type
 > isolation/build compatibility, NOT Electron application integration).**
@@ -1036,7 +1298,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > own suppression comments. Confirmed stable across two independent,
 > from-scratch clean installs. Full account in
 > `docs/secure_runtime_alpha_4021_4100_completion_declaration.md`.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3881–3940 — Electron Dependency and Build
 > Spike Arc (build spike, partial completion, honestly declared — NOT an
 > Electron app, NOT feature-complete).**
@@ -1064,7 +1328,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > test` and every existing test suite are unaffected (77/77 existing
 > Desktop tests, 25/25 new spike tests, both passing). Full account in
 > `docs/secure_runtime_alpha_3881_3940_completion_declaration.md`.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3941–4020 — Desktop Device Management
 > and Sync Operations UI Renderer Arc (honest partial — Device
 > registration/revocation confirmation commands unavailable).**
@@ -1097,6 +1363,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > documented run-to-run baseline variance, zero regression traceable to
 > this Arc.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3801–3880 — Device Sync Operational
 > Status and Desktop Shell Integration Arc (complete).**
 > Architecture frozen: reconciles the previously-diverged Desktop UI
@@ -1122,6 +1390,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Runtime/Shell/ViewModel/Renderer throughout; full suite failure rate
 > (≈20.0%) matches both source lineages' own independently-confirmed
 > baselines, zero regression traceable to this Arc.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 3721–3800 — Background Device Sync
 > Scheduling and Conflict Resolution Arc (complete).**
@@ -1151,7 +1421,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > at 239 pre-existing failures (both categories independently
 > re-confirmed against a clean `main` checkout), 56 new passes, zero
 > regressions.
-
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3641–3720 — Relay-Assisted Device
 > Synchronization Arc (complete).**
 > Architecture frozen: no redesign of the Device Registry, Registration
@@ -1392,6 +1664,9 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > Signature Verification Boundary**, the named prerequisite that would
 > let a real `FedosDeviceRegistrationAuthority` finally return
 > `"verified"`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3561–3640 — Desktop Electron Host Boundary
 > Arc (partial completion, honestly declared).**
 > Creates the first Desktop Host boundary around the completed Runtime →
@@ -1441,6 +1716,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `docs/secure_runtime_alpha_3561_3640_reconciliation_report.md` and
 > `docs/secure_runtime_alpha_3561_3640_completion_declaration.md`.
 >
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 3401–3480 — Desktop UI Renderer Boundary
 > (complete).**
 > Implements the rendering boundary only, over the ten ViewModels Alpha
@@ -1478,6 +1755,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > pre-existing failure; full suite's failure count and file set unchanged
 > from Alpha 3241-3320's own baseline. See
 > `docs/secure_runtime_alpha_3401_3480_completion_declaration.md`.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 3241–3320 — Desktop Local Conversation
 > Management UI Prototype Arc (complete).**
@@ -1519,6 +1798,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > assert a clean `git status` and briefly saw this Arc's own not-yet-committed
 > files — resolved once this Arc's commit landed. See
 > `docs/secure_runtime_alpha_3241_3320_completion_declaration.md`.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 3081–3160 — Desktop Runtime Conversation
 > Content Accessor and Application Shell Activation Arc (complete).**
@@ -1599,6 +1880,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > artifact) — zero traceable to this Arc's own files. Final: identical.
 > See `docs/secure_runtime_alpha_3081_3160_reconciliation_report.md` and
 > `docs/secure_runtime_alpha_3081_3160_completion_declaration.md`.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 2841–2920 — Desktop Local Application
 > Shell and Conversation Management Boundary Arc (complete).**
@@ -2081,6 +2364,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status (separate, previously-unmerged NIP-17 lineage, now merged
 > as this Arc's own prerequisite):
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 1611–1690 — Nostr Private Wire
 > Standardization and Transport Reconciliation Arc (honest partial —
@@ -3024,6 +3309,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > See `docs/secure_runtime_alpha_851_890_execution_spec.md` and
 > `docs/secure_runtime_alpha_890_completion_declaration.md` for the full
 > record.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 891–930 — Private Conversation Draft
 > Construction & Readiness Runtime Arc (complete).** Wires the

@@ -1,75 +1,140 @@
-# Secure Runtime Alpha 5401-5480: FedOS Direct Ratchet State and Sealed Persistence Foundation — Completion Declaration
+# Secure Runtime Alpha 5401–5480 — Completion Declaration
 
-## What landed
+**FedOS Local Deletion Capability and Deletion-State Foundation Arc**
 
-A new, additive domain, `src/conversation/ratchet/` (14 files, ~1700 lines), plus two narrow extensions of the existing Master Seed Rust/WASM boundary. Full design rationale and citations: `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md` (Phase A) and `docs/secure_runtime_alpha_5401_5480_execution_spec.md` (Phase B-L).
+## Declared: full completion
 
-**New production files:**
+All criteria this Arc's own instructions require for a "full completion"
+title are met:
 
-- `fedos_direct_ratchet_session_id.ts` / `fedos_direct_ratchet_session_binding.ts` — versioned, Device-pair-bound, deterministic session identity.
-- `fedos_direct_ratchet_session_lifecycle.ts` / `fedos_direct_ratchet_counters.ts` / `fedos_direct_ratchet_limits.ts` — closed lifecycle vocabulary + validated transitions, monotonic counters, exact review-sourced limits (1000 skipped keys/chain-gap, 14-day retention).
-- `fedos_direct_ratchet_skipped_key_index.ts` — bounded, session-isolated skipped-key reference index (never an unbounded map, never a real key).
-- `fedos_sealed_direct_ratchet_secret_record.ts` — versioned sealed-secret record (one opaque `sealedBlob` field, strict closed-field metadata).
-- `fedos_direct_ratchet_sealing_authority.ts` — the narrow sealing-authority port.
-- `fedos_direct_ratchet_recovered_secret_handle.ts` / `fedos_direct_ratchet_readiness.ts` / `fedos_direct_ratchet_recovery_outcome.ts` / `fedos_direct_ratchet_session_record.ts` — closed record/outcome types.
-- `persistence/{fedos_direct_ratchet_session_persistence,in_memory_fedos_direct_ratchet_session_persistence,append_only_fedos_direct_ratchet_session_persistence}.ts` — event-sourced (by revision), append-only session-metadata persistence.
-- `persistence/{fedos_sealed_direct_ratchet_secret_persistence,in_memory_fedos_sealed_direct_ratchet_secret_persistence,append_only_fedos_sealed_direct_ratchet_secret_persistence}.ts` — insert-only sealed-secret persistence.
-- `fedos_direct_ratchet_state_runtime.ts` — the narrow Runtime facade (create/inspect/readiness/suspend/reset-required/expire/revoke/counters/skipped-key register-remove/seal/recover/lock/stop).
+- [x] Closed capability/status types exist (`FedosDeletionTarget` — 10
+      values, `FedosDeletionOperation` — 8 values, `FedosDeletionEvidence`
+      — 4 values, `FedosDeletionStatus` — 15 values,
+      `FedosDeletionCapabilityDescriptor` — never a bare boolean, never
+      caller-self-declared, unknown target fails closed to `null`).
+- [x] Real Retention integration works — `executeFedosLocalPayloadDeletionPlan`
+      calls the real `FedosPayloadRetentionAuthority.tombstonePayload()`/
+      `.removeLocalPayload()`, verified by re-querying
+      `evaluatePayloadAccess()` after execution.
+- [x] Real Search purge works — the same execution path calls the real
+      `FedosConversationSearchIndex.reconcilePayloadRetention()`; a purged
+      payload's own indexed Envelope is independently re-queried as gone
+      (`searchKeyword`, `size()`), not merely claimed.
+- [x] Archive/live separation holds — structurally (the payload executor's
+      own dependency type carries no filesystem; the Archive-file
+      executor's own dependency type carries no Retention/Search
+      authority) and behaviorally (two dedicated tests, plus the Phase O
+      vertical slice, exercise both directions).
+- [x] Trusted Archive removal works — `resolveFedosDeletionArchiveFileHandle`
+      resolves only through the existing Archive CLI directory's own
+      index; `removeFedosDeletionArchiveFile` re-checks identity, refuses
+      symlinks, refuses traversal-shaped/bare-root paths, is missing-file
+      idempotent, and removes exactly one named file, never a directory.
+- [x] Restart idempotency works — verified against the REAL
+      `AppendOnlyFedosDeletionExecutionPersistence` NDJSON backend: a
+      fresh persistence instance over the same log file converges to the
+      identical durable record; a conflicting duplicate or a corrupt line
+      fails closed (throws) rather than silently resolving.
+- [x] User summaries are honest — closed non-guarantee vocabulary only,
+      universal "never presented as deleted everywhere" warning always
+      appended, no raw path, no plaintext, verified structurally.
+- [x] No remote deletion mechanism is added — no network transport, no
+      Relay event, no NIP, no recipient-acknowledgement vocabulary exists
+      anywhere in this Arc's own source (verified by direct source-text
+      scan, not merely prose claim).
+- [x] No physical-erasure guarantee is claimed — the one non-guarantee
+      code covering it (`no-physical-erasure`) states erasure is "never
+      guaranteed or claimed"; no sentence anywhere in this Arc's own
+      module affirms the opposite.
 
-**Extended (not redesigned):**
+## Local-only V1 — explicit scope statement
 
-- `packages/fedos-core-rust/src/lib.rs` — two new methods on the EXISTING `FedosMasterSeedAuthority` (`seal_direct_ratchet_secret`/`restore_direct_ratchet_secret`), one new `HkdfDomain::DirectRatchetSealing` variant, plus their own dedicated Rust unit tests (12, all real, all passing — genuine AEAD round-trip and cross-binding rejection).
-- `packages/fedos-core-rust/src/crypto/aead_internal.rs` — one new `AeadAadDomain::DirectRatchetSealing` variant (internal-only, mirrors `MasterSeedSealing`).
-- `packages/fedos-core-rust/src/crypto/aead_envelope_bridge.rs` — one new match arm (`None`, same as `MasterSeedSealing`) for the new AAD domain.
-- `src/runtime/fedos_wasm_loader.ts` / `src/runtime/master_seed/fedos_wasm_master_seed_authority.ts` — the two new methods' own WASM Boundary reach, following the existing `attemptDevOnlyMasterSeed*Call()` pattern exactly.
+This Arc implements **local deletion only**. The following remain
+deliberately, honestly **unbuilt**:
 
-**New tests (9 files, 122 tests, all passing):** session identity, lifecycle/counters, codec/skipped-keys, sealed-secret record, persistence (both backends, both domains), Runtime facade (fake authority — orchestration-level), structural exclusion guards, a real-WASM sealing-authority suite (10 tests), and the Phase L real vertical slice (1 comprehensive test, real WASM + real durable files).
+- Remote deletion request (no wire message, no protocol).
+- Recipient acknowledgement of any kind.
+- Relay deletion (no Relay event, no NIP).
+- Physical/secure erase or SSD-overwrite guarantee of any already-written
+  byte.
+- Cloud-history or OneDrive version-history deletion.
+- Automatic backup deletion.
+- Cryptographic key destruction as a substitute for plaintext deletion
+  proof.
 
-## Sealed persistence, real and honest
+A local user can, today, honestly: tombstone/remove a local payload and
+purge it from the local Search index; independently remove one tracked
+local Archive Package file; revoke a Device's or a Membership's local
+access. None of these claims — nor may they ever be presented as claiming
+— that any copy outside this local install was touched.
 
-The headline sealed-persistence proof (`test/secure_runtime_alpha_5401_5480_real_vertical_slice.test.ts`) runs against genuine cryptography, not a mock: real HKDF-derived session-bound sealing key, real ChaCha20-Poly1305 AEAD, real append-only durable files, a real Runtime stop and a fresh Runtime restoring the SAME Master Seed from its own sealed envelope. It proves, with real bytes: restart recovery, wrong-Device rejection (AEAD authentication failure, not a string comparison), tamper rejection (one flipped hex character), `lock()` disposal of the recovered handle, and — read directly from the durable files — that the raw secret hex never appears in either the session-metadata log or the sealed-secret log.
+## Archive/live separation — restated
 
-## Baseline vs. final
+Deleting an Archive file never changes live Conversation history (Retention
+state, Search index) — the Archive-file execution path imports nothing
+from `../retention/`, `../search/`, or the payload persistence layer.
+Deleting live history never silently removes an Archive file — the payload
+execution path's own dependency type carries no filesystem or Archive
+authority at all. Both are independently confirmed, separately planned,
+separately executed, separately recorded.
 
-**Baseline** (this worktree, before any production edit): `npm run typecheck` clean except two pre-existing, unrelated errors (confirmed via `git stash` against the unmodified base branch). `cargo test --lib`: 531 passed, 1 pre-existing failure (`secp256k1_dependency_guard`, a dependency-count mismatch unrelated to this Arc, confirmed via `git stash`). Full `npx vitest run`: ~242 pre-existing failing test files, confirmed via `git stash` to be environmental/historical to this worktree, unrelated to this Arc.
+## Verification run (this worktree, `C:\wt\local-deletion-foundation`)
 
-**Final:**
+1. `npm run typecheck` — clean except one PRE-EXISTING, unrelated failure
+   (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts:121`,
+   a Publish Scheduler test this Arc never touched; byte-identical to
+   `master`'s own copy of the same file).
+2. This Arc's own 7 new test files: **82/82 passed.**
+3. The two pre-existing Archive CLI test files whose own fixture needed a
+   4-line `deleteFile` stub for interface compliance: **15/15 passed**,
+   unchanged test count.
+4. Retention (`secure_runtime_alpha_795/796/799_payload_retention_*`),
+   Search (`secure_runtime_alpha_2541_2560_search_index_*`,
+   `..._2581_2600_retention_ingestion_gate_and_purge`), Archive
+   (`secure_runtime_alpha_1541–1600_archive_*`, `..._2561_2620_archive_*`),
+   Device (`..._2421_2500_device_binding_and_registry`), Membership
+   (`..._764_768/769_771/825_832/866_membership_*`) — every one of these
+   test files' own name is absent from the full `npm test` failure list;
+   zero regression.
+5. `npm test` (full suite, 947 files / 12,445 tests): 194 files / 240
+   tests fail, **none of them a regression this Arc caused**:
+   - ~160 files are Rust/WASM/crypto-runtime artifact tests
+     (`test/fedos_core_rust_*`, `test/runtime_wasm_*`,
+     `test/runtime_crypto_*`, `test/secure_runtime_alpha_0*`–`0*_*`, etc.)
+     that fail identically because this worktree — like the primary
+     checkout itself — has no compiled `pkg/` WASM artifact and no
+     top-level `Cargo.toml` (the real one lives at
+     `packages/fedos-core-rust/Cargo.toml`); pre-existing environmental
+     gap, confirmed present in the primary checkout too, not something
+     any Rust file this Arc never touches could regress.
+   - ~34 files are `test/reviews/**/boundary_guards.test.ts`-style
+     self-checks belonging to PRIOR, unrelated design reviews, which
+     literally shell out to `git status --porcelain -- src ...` and
+     assert empty output as their own "this review touched no source"
+     proof. They spuriously fail while this Arc's own legitimate,
+     intended `src/` changes sit uncommitted in the working tree — by
+     construction, resolved the moment this Arc's own commit lands and
+     the tree returns to clean.
+6. No file under `p2p/` or `.tmp_gen/` was read, written, or referenced by
+   this Arc.
 
-- `npm run typecheck`: identical to baseline.
-- `cargo test --lib`: 543 passed (12 new), the same 1 pre-existing failure.
-- `npm run build:wasm`: succeeds; new methods correctly exported.
-- New Ratchet Foundation suite: **122 passed, 0 failed** (9 files).
-- Focused regression: Device Trust (36 tests, 2 files), Conversation identity (8 tests), Master Seed/sealed-envelope/conversation-key wiring (21 tests, 3 files) — all passing.
-- Full `npx vitest run`: failing-file set identical to baseline (zero new failures) — verified by a sorted-file-list diff, not by inspection alone. Every test this Arc's own changes touched was found and fixed: ~96 historical structural "exact `pub fn`/`HkdfDomain` count" tests (a long-established per-Arc convention across this crate's history), the Alpha 436 method-inventory test, the Alpha 531 live `git status` ripple-review guard, and four fake-WASM-shape test fixtures.
+## Files changed
 
-No file under `src/conversation/archive/`, `src/conversation/search/`, `src/conversation/retention/`, `src/sync/`, or `src/conversation/transport/` was modified. `p2p/` and `.tmp_gen/` were not touched.
+Ten new files under `src/conversation/deletion/`; one new method
+(`deleteFile`) on `FedosConversationArchiveCliFileSystem`; one new function
+(`removeFedosConversationArchiveCliDirectoryEntry`) on the Archive CLI
+directory module; seven new test files (82 tests); two pre-existing test
+files' own local fixture gained the four-line `deleteFile` stub their
+already-existing interface now requires; two new docs (this one and the
+execution spec) plus the Phase A reconciliation report. No `package.json`,
+`package-lock.json`, `Cargo.toml`, `p2p/`, or `.tmp_gen/` change.
 
-## Named, deliberate boundaries (not silently dropped)
+## Next Arc
 
-- **No ratchet cryptography exists yet.** No DH ratchet step, no root-key/chain-key KDF evolution, no message-key derivation. Every "secret" this Arc seals/recovers in tests is opaque placeholder material (test CSPRNG bytes), never a real derived ratchet key — proven by a structural source-text guard (no forbidden method name, no DH/derive-key-material call in the two new Rust functions' own region).
-- **No forward secrecy or post-compromise security is claimed.** This Arc is state/persistence infrastructure only.
-- **No NIP-17 wire integration exists.** No Rumor/Seal/Gift-Wrap change, no transport publishing, no recipient delivery.
-- **Exact limits**: 1000 max skipped keys per chain (same number doubles as the max chain-gap bound, per the review's own deliberate choice), 14-day skipped-key/superseded-session retention.
-- **Exact secret-storage boundary**: the ONLY field ever carrying secret-derived bytes anywhere in this Arc's persisted state is `FedosSealedDirectRatchetSecretRecordV1.sealedBlob` — an opaque, Rust-produced hex string. No TypeScript string ever holds a raw key. No append-only log ever contains a plaintext secret byte (proven directly by reading the durable files in the real vertical slice test).
-- **Session identity elaboration**: this Arc binds local Device identity in addition to the review's own 3-component (account, peer, peer-Device) model, per a documented, cited justification (this codebase's own existing multi-device-per-account reality) — not a contradiction of the review, an extension within its own delegated scope.
-- **Account binding via composite context, not a wider Rust signature**: `local_device_ref`/`remote_device_ref` sealing-context parameters carry a composite (account, Device) string constructed TypeScript-side, deliberately avoiding a Rust signature change that would have rippled further than necessary.
-- **No Desktop Runtime wiring.** This foundation is left as a constructible standalone Runtime, per the mission's own stated preference — no Shell/UI/IPC method, no packaged Electron exposure, nothing user-visible.
-- **Archive/Search/Sync/Transport formats are byte-for-byte unmodified** — the exclusion is structural absence, proven by reading real source, never a new marker field.
-
-## Declaration
-
-**Complete** for this Arc's own stated scope:
-
-- The state model exists (closed, versioned, strictly validated types for session identity, binding, lifecycle, counters, skipped-key references, limits, readiness, and recovery outcomes).
-- Device-bound session identity exists (deterministic, collision-safe, cross-Device- and cross-Conversation-isolated).
-- Bounds exist and are enforced (skipped-key cap/expiry/chain-gap, counter overflow, closed lifecycle vocabulary).
-- Sealed persistence works — proven with real cryptography, not a mock.
-- Restart recovery works — proven with a real, fresh Runtime over real durable files.
-- Corruption fails closed — proven across the full matrix (malformed/truncated/out-of-order/conflicting log lines, unknown schema/suite, tampered sealed blobs).
-- No plaintext secret is ever persisted — proven by direct inspection of durable files.
-- Archive/Search/Sync/Transport exclusions hold — proven structurally.
-- No cryptographic messaging claim is made anywhere in this Arc's code or documentation.
-
-## Recommended next Arc
-
-**FedOS Direct Double Ratchet Cryptographic Core Arc.**
+**FedOS Signed Recipient Deletion Request Protocol Foundation Review** —
+a design-review-only Arc (no production code) to specify, subject to this
+same repository's Architecture-Frozen discipline, what a signed remote
+deletion REQUEST (never a guaranteed remote erasure) could honestly look
+like as a NEW, explicitly-versioned protocol surface, and what evidence
+class a recipient's acknowledgement could honestly carry — before any
+production implementation is attempted.

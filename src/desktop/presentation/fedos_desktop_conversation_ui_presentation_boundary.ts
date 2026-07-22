@@ -47,6 +47,10 @@ import { FedosDeviceManagementController } from "./device_management/fedos_devic
 // Durable Sync Journal Arc) -- every import/addition below this comment is
 // ADDITIVE ONLY, mirroring this file's own established pattern above.
 import { FedosDesktopDevicePairingViewModel } from "./fedos_desktop_device_pairing_view_model.js";
+// Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device
+// Aggregation and User Consent UI Arc) -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring this file's own established pattern.
+import { FedosDeletionRequestController } from "./deletion_request/fedos_deletion_request_controller.js";
 
 export class FedosDesktopConversationUiPresentationBoundary {
   readonly #shell: FedosDesktopApplicationShell;
@@ -67,6 +71,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
   readonly syncConflict: FedosDesktopSyncConflictViewModel;
   readonly devicePairing: FedosDesktopDevicePairingViewModel;
   readonly deviceManagement: FedosDeviceManagementController;
+  readonly deletionRequests: FedosDeletionRequestController;
 
   private constructor(shell: FedosDesktopApplicationShell) {
     this.#shell = shell;
@@ -87,6 +92,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
     this.syncConflict = new FedosDesktopSyncConflictViewModel(shell);
     this.devicePairing = new FedosDesktopDevicePairingViewModel(shell);
     this.deviceManagement = new FedosDeviceManagementController(this);
+    this.deletionRequests = new FedosDeletionRequestController(shell);
   }
 
   /** Thin factory — mirrors `createFedosDesktopApplicationShell()`'s own style. No side effect (no Runtime started) until `runtimeStatus.start()` is called. */

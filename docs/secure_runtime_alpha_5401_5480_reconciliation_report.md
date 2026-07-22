@@ -1,67 +1,107 @@
-# Secure Runtime Alpha 5401-5480 — FedOS Direct Ratchet State and Sealed Persistence Foundation Arc — Reconciliation Report
+# Secure Runtime Alpha 5401–5480 — Reconciliation Report
 
-## 1. Ancestry and Arc numbering
+**FedOS Local Deletion Capability and Deletion-State Foundation Arc — Phase A**
 
-- Worktree: `C:\wt\direct-ratchet-state-foundation`
-- Branch: `arc/direct-ratchet-state-sealed-persistence-foundation`
-- Base commit: `81d1d73` (`arc/fedos-beta-release-publication-signing-readiness`, 652 commits reachable) — "Fix stale electron-package version: package.json said 0.0.1, real release configuration says 0.1.0-beta.1".
-- **Arc numbering**: `git log --all --oneline` across every local branch shows the highest real Alpha range in use anywhere is **5321-5400** (`arc/runtime-secure-memory`, a read-only architecture-review branch). `master` itself is only at 2581-2620; many further sibling Arc branches (device sync, desktop, packaging, beta) exist unmerged into `master` but reach as high as 5321-5400. No branch or README status entry anywhere uses 5401+ yet. This Arc therefore takes **5401-5480** (80-wide, matching the width convention of every Arc since 3001-3080).
+Status: factual inventory, written before any production edit in this Arc's
+own worktree (`C:\wt\local-deletion-foundation`, branch
+`arc/local-deletion-capability-state-foundation`). No `src/`, `packages/`,
+`package.json`, `package-lock.json`, `Cargo.toml`, `p2p/`, or `.tmp_gen/`
+change is made by this document.
 
-## 2. Base-branch selection
+## 0. Base selection
 
-Selection criterion: the single branch with the strongest real Conversation + Master Seed + persistence foundation, per the mission's own instruction to pick one base rather than merge many.
+**Selected base: `master @ 3eb9ead`** ("Add Secure Runtime Alpha 2581-2620:
+Conversation Search Retention Authority and Index Purge Hardening Arc").
 
-- `arc/fedos-beta-release-publication-signing-readiness` is a strict descendant (verified via `git merge-base --is-ancestor`) of: `master` (2581-2620), `arc/production-master-seed-runtime-activation-secure-unlock` (4741-4820, real production Master Seed activation), `arc/conversation-identity-restoration-reactivation` (2041-2120), `arc/device-trust-runtime-integration` (2921-3000), and `arc/fedos-beta-canonical-composition` (5161-5240) — i.e. it already carries the strongest available Conversation identity, Master Seed, and Device Trust foundations in one integrated line.
-- It is **not** a descendant of `arc/sender-key-secret-persistence-restart-recovery` (2761-2840) or `arc/group-sender-key-runtime-integration` (2261-2340) — those remain genuinely separate, unmerged sibling lineages.
-- The four read-only architecture/review branches named in the mission (`b34d608`, `e4bb0b0`, `406c144`, `d227ae4`, `d62090f`) are themselves small doc-only branches off old points in `master`'s history — none is an ancestor of the chosen base and none needs to be. They were read via `git show`, never merged.
-- **Decision: no merge is performed.** Per the mission's own allowance, the Sender-Key sealed-persistence, Group Sender-Key, NIP-17, and Device Sync lineages are inspected read-only for pattern precedent only (§5 below); none is combined into this branch. No incompatible Conversation or Crypto ownership model was found, so there is nothing to stop-and-report.
+The normative review (`cf5b870`,
+`review/fedos-secret-capability-deletion-v1`) itself branched from
+`arc/nostr-secure-messaging-architecture-v1 @ d62090f`, an EARLIER point.
+Verified: `d62090f` is **not** an ancestor of `master @ 3eb9ead`
+(`git merge-base --is-ancestor d62090f HEAD` fails) — the two lineages
+diverged. However, direct inspection shows `master`'s tip contains every
+file the review cites by name (`fedos_payload_retention_authority.ts`,
+`fedos_conversation_search_index.ts`, `fedos_conversation_membership_authority.ts`,
+`fedos_sync_device_registry.ts`, `fedos_conversation_archive_collector.ts`,
+`fedos_conversation_archive_cli_file_system.ts`, etc.), and the review's own
+prose explicitly cites facts only present on `master`'s later history (the
+Alpha 2581–2620 query-time race-guard completion record, itself `master`'s
+own tip commit). **No dry reconciliation between divergent Archive/Search
+lineages is required** — `master` is a strict superset for this Arc's
+purposes: one coherent lineage already carries Retention, Search,
+Membership, Device Sync, and Archive/Archive-CLI in mutually consistent
+form. This Arc's worktree and branch are cut directly from `master @
+3eb9ead`.
 
-## 3. Read-only inventory (Phase A requirement)
+## 1. Arc number
 
-All items below were inspected via `git show <ref>:<path>` against the branches named in the mission, without checkout or merge.
+Highest `Secure Runtime Alpha` range found across **all** branches (not just
+`master`, whose own tip is only at 2581–2620): `5321-5400` (two DIFFERENT
+Arcs on two different branches both independently claimed this exact range
+— `arc/runtime-secure-memory @ 406c144` and a Desktop Beta packaging Arc —
+confirming numbering already collides across divergent lineages in this
+repository, consistent with [[project_concurrent_session_risk]]). No
+`Secure Runtime Alpha` range has been claimed yet for a "Ratchet Foundation"
+Arc — only a docs-only specification-review commit exists on
+`review/fedos-forward-secrecy-double-ratchet-v1` (`b34d608`), with no
+numeric range attached.
 
-| Concern | Branch/location | Reachable in base? | Reusability |
-|---|---|---|---|
-| Direct Conversation identity | `src/conversation/fedos_conversation_id.ts` (Alpha 743), `src/conversation/construction/fedos_private_conversation_id.ts` (Alpha 908) | Yes | Direct conversations are keyed `private-draft::direct::<requestId>` — an opaque branded `FedosConversationId`, **no device-pair concept**. Reused as-is for the `conversationId` binding field; not modified. |
-| Account/participant identity | `src/conversation/membership/fedos_conversation_participant_reference.ts` (Alpha 762) | Yes | `{authority, publicIdentifier, identityId}` — reused verbatim as the account-binding shape. |
-| Device identity / binding | `src/device/fedos_device_binding.ts` (Alpha 2921-3000) | Yes | `FedosDeviceBindingV1` — versioned, closed `pending\|trusted\|revoked\|unavailable` transition table, terminal `revoked`. Directly modeled for this Arc's own lifecycle table. |
-| Master Seed Authority | `src/runtime/master_seed/fedos_master_seed_authority.ts` + `fedos_wasm_master_seed_authority.ts` | Yes | Real, WASM-backed. Sealing is special-cased to the whole Master Seed (`seal`/`restoreSealed`) plus one hard-coded domain method (`resolveConversationKey`) — **no generic seal-any-blob method**. New, narrow methods are added (§6). |
-| Sealed-secret record precedent | `src/runtime/master_seed/fedos_sealed_master_seed_envelope.ts` + `..._persistence.ts` | Yes | Opaque single-field envelope (`{ json: string }`), Rust-authoritative, structural-only TS pre-check, write-once file port (`writeIfAbsent`, never overwrites). This is the direct model for the new sealed ratchet-secret record and its persistence port. |
-| Append-only persistence convention | `src/conversation/persistence/append_only_fedos_conversation_persistence.ts` | Yes | NDJSON, insert-only, `inserted\|already-present\|conflict\|failed`, full-log replay on read, fail-closed on malformed/duplicate-conflicting lines. Imitated verbatim for both new backends. |
-| Runtime lock/stop/restart | `src/desktop/onboarding/fedos_profile_initialization_coordinator.ts` `lock()` | Yes | Idempotent, never throws, drops in-memory secret handles by reference, calls authority `clear()`. Modeled for the new Runtime facade's `lock()`/`stop()`. |
-| Device-to-account binding enforcement | `src/sync/fedos_sync_device_registry.ts`, `src/device/fedos_device_binding.ts` | Yes | Second-index-enforced one-owner-per-device convention; reused conceptually, not modified. |
-| Sender-Key sealed persistence | `arc/sender-key-secret-persistence-restart-recovery` (2761-2840) — **NOT in base, read-only** | No | Dedicated Rust HKDF domain + dedicated AEAD AAD domain + one-opaque-field sealed record + insert-only append-only backend with an explicit "must never be written into Search/Sync/Archive/Transport" header comment, plus a restart-recovery test. This is the structural template this Arc's own sealed persistence follows (§6-7), without merging any of that branch's code. |
-| Device Sync allowlist | base branch, `src/sync/fedos_sync_record_allowlist.ts` | Yes | Closed 6-value `FedosSyncAllowedRecordType` enum + `reviewFedosSyncRecordForJournal()`, fails closed on unknown type and on sensitive-marker metadata keys. Used unmodified; a guard test proves a ratchet record type is not, and must never be, added to it. |
-| Conversation Archive exclusion | base branch, `src/conversation/archive/` | Yes | Closed-field bundle/manifest types with an explicit "no key material, no bearer secret" guardrail comment and a codec test that rejects any unrecognized extra field. Guard test modeled on this pattern; no Archive file is modified. |
-| Search exclusion | base branch (`master`), `src/conversation/search/` | Yes | Existing source-text test asserts the Search Document type's field list excludes payload/key/epoch fields, and that the search module imports nothing from Retention. Guard test modeled on this pattern; no Search file is modified. |
-| NIP-17 route/session state | `arc/nip17-standard-transport-integration-group-delivery`, `arc/nip17-group-inbound-restart-dedup-security-completion` — **read-only** | No | No ratchet-like session object exists in this lineage at all (only a fixed transport-route-request literal and event-id-keyed dedup trackers). Confirmed: the new session/state model is genuinely new, not modeled on anything found there. |
+**Chosen range for this Arc: Secure Runtime Alpha 5401–5480** — the
+immediate next free block after the highest confirmed range (5400), leaving
+no gap that would itself require justification, while remaining clear of
+every range found in any branch's commit history. Because the Ratchet
+Foundation Arc has not yet claimed a numeric range, this choice cannot
+collide with a range that does not yet exist; if a concurrent session claims
+5401–5480 for Ratchet before this Arc lands, the two sessions must
+reconcile by shifting one range at merge time — flagged here explicitly per
+this Arc's own instructions, not resolved unilaterally.
 
-## 4. The normative review (`review/fedos-forward-secrecy-double-ratchet-v1` @ `b34d608`) — what it actually specifies
+## 2. Operation inventory
 
-All 21 review documents (`docs/reviews/fedos_forward_secrecy_double_ratchet_v1/`) and all 3 review test files were read. `b34d608` sits directly on `master@3eb9ead`; it touches no `src/`, `packages/`, `p2p/`, or `.tmp_gen/` path.
+| Concern | Real? | Durable? | Idempotent? | User-controlled? | Physical/logical? | Owner | Rollback? | Status vocabulary today |
+|---|---|---|---|---|---|---|---|---|
+| Payload retention authority | Yes, `[LIVE]` | Yes (Retention Decision Log) | Yes (`already-tombstoned`/`already-removed`) | Yes, via caller-invoked `tombstonePayload`/`removeLocalPayload` | Logical (access-state transition only) | `FedosPayloadRetentionAuthority` (`src/conversation/retention/`) | No restore path (`payload-removed → active` forbidden, Alpha 798) | `FedosPayloadRetentionState`: `active`\|`tombstoned`\|`payload-removed` |
+| Payload tombstone model | Yes | Yes, append-only NDJSON or in-memory (`FedosPayloadRetentionPersistence`) | Yes | Indirect (via Authority) | Logical | Same | No (append-only, no delete) | `FedosPayloadRetentionResult` outcomes |
+| Message read behavior after tombstone | Yes | N/A | Yes | N/A | Logical (gated read) | `readPayload()`/`evaluatePayloadAccess()` | N/A | `FedosGatedPayloadReadResult` |
+| Search index ingestion gate | Yes, `[LIVE]` (Alpha 2581–2620) | No (in-process only) | Yes | N/A | Logical | `FedosConversationSearchIndex#ingest()` | N/A (index is rebuildable) | `"indexed"\|"duplicate"\|"denied"` |
+| Search purge/reconcile | Yes, `[LIVE]` | No | Yes | Caller-invoked (`reconcilePayloadRetention`) | Logical, but real `Map`/`Set` deletion (`local-verified`-strength) | `FedosConversationSearchIndex` | N/A | `removeEnvelope` outcome `"removed"\|"not-found"` |
+| Local caches/projections | None distinct from the Search index itself | — | — | — | — | — | — | No dedicated `purge-cache` producer exists |
+| Direct Archive runtime | Yes, `[LIVE]` | Yes (filesystem, via injected `FileSystem`) | N/A (export/import) | Yes | Physical (file), no in-app delete | `FedosConversationArchiveCliDirectory`/`Package`/`FileSystem` | N/A | No deletion status exists for Archive files today |
+| Group Archive runtime | Same underlying Collector/Restore, mode-agnostic | Same | Same | Same | Same | Same | N/A | Same |
+| Incremental Archive | **Not merged into this base** (`arc/incremental-archive-snapshot-chain`, not present in `src/`) | — | — | — | — | — | — | Out of scope; target named but zero real producer |
+| Archive CLI/package file ownership | Yes — `FedosConversationArchiveCliFileSystem` (`readFile`/`writeFile`/`listFiles`); tracked via ONE directory index (`FEDOS_CONVERSATION_ARCHIVE_CLI_DIRECTORY_MANIFEST_FILE_NAME`) | Yes (filesystem) | writes are, reads are | Yes | Physical | `fedos_conversation_archive_cli_file_system.ts`, `fedos_conversation_archive_cli_directory.ts` | N/A | **No `deleteFile` method exists anywhere — confirmed gap, this Arc's one new capability** |
+| Profile/data path authority | No dedicated profile-root authority found in this lineage; Archive directory path is caller-supplied at the CLI layer, trusted (in-process) input | — | — | — | — | — | — | — |
+| File-removal precedent | **None** — no `unlink`/`deleteFile` call exists anywhere under `src/conversation/` | — | — | — | — | — | — | — |
+| Device Registry revocation | Yes, `[LIVE]` | Yes (in-memory `Map`, no file backend found for this specific registry) | Yes (`revokeDevice` returns `false` if already revoked/absent) | Yes | Logical (forward-only state flip) | `FedosSyncDeviceRegistry`/`fedos_sync_device_binding.ts` | No (`bound → revoked` only; no un-revoke) | `bound\|unbound\|revoked` |
+| Membership revocation | Yes, `[LIVE]` | Depends on injected `FedosConversationMembershipPersistence` | Yes (`already-present`/`conflict` outcomes) | Yes | Logical | `FedosConversationMembershipAuthority.revoke()` | No | `FedosConversationMembershipMutationResult` |
+| Sync Journal | Yes, `[LIVE]` | Yes | N/A (append-only) | N/A | N/A (never carries bytes) | `FedosSyncJournal` (`src/sync/`) | No (no delete/rewrite method) | `"upsert"\|"tombstone"` change kind |
+| Device Sync allowlist | `listActiveDevices()` filters by binding state | Same as registry | Yes | Yes | Logical | `FedosSyncDeviceRegistry` | No | Same |
+| Notification previews | `src/notification/` exists (`NoopNotificationBridge`, `PlaceholderNotificationBridge`) but **persists nothing and sends nothing** — no notification preview content is ever stored anywhere in this lineage | No | N/A | N/A | N/A | — | N/A | Zero real producer for a `local-notification-preview` deletion target |
+| Logs/error redaction | Ad hoc; only `FedosProfileUnlockSecret`-shaped exceptions self-redact; no repo-wide log pipeline | No | N/A | No | N/A | — | N/A | No enforcement outside the guarded types |
+| Attachment placeholders | Confirmed absent — no attachment type/blob/content-key concept anywhere under `src/conversation/` on this base | — | — | — | — | — | — | Architecture boundary only |
+| `FedosPayloadDeletionMeaning` (existing, Alpha 792) | Yes, `[LIVE]`, 8 values, 3 marked `V1_ENFORCEABLE` (`application-hidden`, `logically-tombstoned`, `local-payload-removed`) | Yes | — | — | — | `src/conversation/retention/fedos_payload_retention_state.ts` | — | This Arc extends, never replaces, this vocabulary |
 
-- **Session identity**: the review's own §10 §2 names the binding tuple as **(local account, peer identity, peer Device)** plus a closed `suite/version` literal — three identity components, not the four-plus-conversation the mission text describes, and it does **not** name a canonical delimiter/encoding scheme (deliberately: "opaque, non-derived label" only).
-- **Deliberate elaboration adopted for this Arc**: the base branch's own accepted Device Trust/Sync foundations (`FedosDeviceBindingV1`, `FedosSyncDeviceRegistry`) establish genuine multi-device-per-account reality already — one account can own more than one trusted device. Collapsing "local device" into "local account" would therefore be unsound in *this* codebase even though the review's own prose never had to consider it (the review's own examples are written from a single-device vantage point). This Arc therefore binds all of **(local account, local Device, remote account, remote Device, Direct Conversation id, suite/version, generation)**, per the mission's own explicit Phase B instruction, as a documented, justified extension of the review's 3-tuple — never a contradiction of it (the review never says "do not bind the local device," it simply didn't name it).
-- **Lifecycle vocabulary**: the review's own session `expiration state` field is the closed 4-value `"active" | "stale" | "superseded" | "revoked"`, and a separate, adjacent 7-value migration-outcome vocabulary includes `"corrupt"`. Neither vocabulary alone fits a *pre-crypto foundation* object (one that can exist before any secret is ever sealed), so this Arc's own `FedosDirectRatchetSessionLifecycleState` is a superset, cited per state in §8 below, rather than a verbatim copy of either.
-- **Skipped-key limits**: exactly **1000** skipped keys per chain (the review deliberately reuses this same number as the max chain-gap bound, "to avoid two numbers that could silently disagree") and **14-day** expiration, tied to the same window a superseded session is retained before full discard. Adopted exactly as specified.
-- **Sealed ratchet-secret record shape**: the review explicitly does **not** define a field-level schema — `13_restart_and_sealed_persistence.md` §3 states sealing must happen "entirely inside the Rust boundary, reusing the SAME AEAD-sealing mechanism the Master Seed Authority already uses," with TypeScript treating the result as an inert opaque blob. The review's own §20 §11 names **this exact Arc** ("FedOS Direct Ratchet State and Sealed Persistence Foundation Arc") as the one responsible for defining that schema — confirmed verbatim, so this Arc's field-level design (§6-7) is original work within the review's own delegated scope, not a deviation from it.
-- **Runtime/facade boundary**: in scope is the type-shape + sealed-persistence mechanism only; out of scope is every DH/chain/message-key operation, third-party ratchet library selection, PQ/hybrid suite choice, identity-key rotation, Group Ratchet/MLS, and any NIP-17/Sender-Key merge — all confirmed absolute prohibitions the mission text also names independently.
-- **Archive/Search/Sync/Transport**: the review states, as a standing prohibition (not just a V1 default), that Device Sync must never carry ratchet secret state "without its own separate, explicit review," that Archive must never include message keys, that Search is unaffected in either direction, and that a ratchet dedup layer (chain id, counter) runs strictly *after* the two existing Relay/Envelope dedup layers, never replacing them.
-- **Naming**: the review reuses three existing shape conventions (opaque-handle-for-secrets, opaque deterministic branded-string IDs, closed-versioned-literal suites) and gives one example suite literal, `"fedos-direct-ratchet-v1"`, but does not mandate a specific type name — naming below follows the base branch's own `Fedos<Domain><Concept>V1` convention.
+## 3. What this confirms about scope
 
-## 5. Sealing-authority design (Phase F decision)
+- The **only genuinely missing local capability** this inventory finds,
+  matching the normative review's own §19/§20 conclusion, is a real,
+  tracked, best-effort **Archive-file `remove-file` operation** — no
+  `deleteFile` method exists anywhere in `src/conversation/archive_cli/`
+  today.
+- Every other operation this Arc must normalize (Retention transition,
+  Search purge, Device/Membership revocation) is **already real** — this
+  Arc's job for those is a thin observation/vocabulary layer over existing
+  behavior, changing none of it.
+- `local-cache` and `local-incremental-archive-file` and
+  `local-notification-preview` have **zero real producers** on this base —
+  their capability descriptors must say so honestly (`localSupport: false`),
+  never invent a fake one.
+- No reconciliation between divergent persistence models is required; no
+  stop condition from this Arc's own Phase A is triggered.
 
-Real investigation of `packages/fedos-core-rust/src/lib.rs` (via `git show`/`grep`, read-only) found:
+## See also
 
-- The real Master Seed WASM call chain is `FedosWasmMasterSeedAuthority.seal()` → `FedosWasmLoaderSkeleton.attemptDevOnlyMasterSeedSealCall()` (`src/runtime/fedos_wasm_loader.ts`) → dynamically-imported `packages/fedos-core-rust/pkg/fedos_core_rust.js` → Rust `#[wasm_bindgen] impl FedosMasterSeedAuthority::seal()`. (`packages/fedos-core-rust/src/wasm_loader.ts` is an unrelated, permanently-inert placeholder file — not the real path.)
-- `HkdfDomain` (defined inline in `lib.rs`, `mod kdf_core`) has 10 existing fixed-salt/info variants (`RootKey, Identity, Storage, Conversation, Application, Nostr, Session, ATProto, Wallet, TestOnly`). Adding an 11th variant is a plain, independent enum-arm addition (compiler-enforced exhaustive match; no shared-logic risk to existing domains).
-- A generic, already-shipping two-step pattern already exists for exactly this purpose: `resolve_conversation_key()` (HKDF/ECDH-derives an `AeadKeyHandle` from the already-unlocked Master Seed, no passphrase) followed by the generic, already-`#[wasm_bindgen]`-exported `encrypt_aead(key, algorithm, aad_domain, plaintext) -> AeadCiphertextHandle` / `decrypt_aead(...)`. Both are used today by the real Conversation encryption authority.
-- `Cargo.toml` already includes every crate a new HKDF-derive-then-AEAD-seal function needs (`hkdf`, `sha2`, `chacha20poly1305`, `zeroize`, `getrandom`) — **zero new dependencies**.
-
-**Decision**: add one new, narrow `HkdfDomain::DirectRatchetSealing` variant and one new `#[wasm_bindgen]` method, `resolve_direct_ratchet_sealing_key(local_device_ref, remote_device_ref, conversation_id, generation) -> Option<AeadKeyHandle>`, mirroring `resolve_conversation_key()`'s exact shape but deriving from the fixed HKDF domain instead of ECDH. Because the derived key is itself a pure function of the full session-identity tuple, sealing/unsealing under the wrong device, wrong peer, or wrong conversation derives a *cryptographically different key* — decryption fails by AEAD tag mismatch, not merely by a TypeScript-side string comparison. This is a real, additive, narrowly-scoped Rust change: it performs no DH step, no root/chain-key KDF evolution for the ratchet itself, and no message-key derivation — it is at-rest sealing infrastructure only, exactly the category of work Phase F calls for. The opaque secret bytes sealed by this Arc's own tests are placeholder test material (Phase L), never a real derived ratchet key, since no ratchet math exists yet.
-
-`cargo`/`rustc`/`wasm-bindgen` are all present in this environment (`cargo 1.95.0`) and no compiled `packages/fedos-core-rust/pkg/` exists yet in this fresh worktree (expected — gitignored build artifact, matching prior Arcs' own documented worktree behavior). `npm run build:wasm` will be run after the Rust change lands, and new tests follow the base branch's own established `describe.skip`-if-artifact-absent convention so they degrade honestly rather than fail if the build cannot complete in a given environment.
-
-## 6. Next steps
-
-Proceed to Phase B (session identity), then C-M as scoped by the mission. No production code has been modified as of this report.
+- `docs/secure_runtime_alpha_5401_5480_execution_spec.md` — the
+  implementation this report's findings feed into.
+- `docs/reviews/fedos_secret_capability_deletion_v1/` (read via
+  `git show cf5b870:...`, not merged into this branch) — the normative
+  design review this Arc implements Option A of.

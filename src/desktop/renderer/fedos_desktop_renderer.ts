@@ -42,6 +42,10 @@ import { FedosDesktopSyncConflictRenderer } from "./fedos_desktop_sync_conflict_
 // Operations UI Renderer Arc) -- every import/addition below this comment
 // is ADDITIVE ONLY, mirroring this file's own established pattern above.
 import { FedosDeviceManagementRenderer } from "./device_management/fedos_device_management_renderer.js";
+// Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device
+// Aggregation and User Consent UI Arc) -- every import/addition below this
+// comment is ADDITIVE ONLY, mirroring this file's own established pattern.
+import { FedosDeletionRequestRenderer } from "./deletion_request/fedos_deletion_request_renderer.js";
 
 export class FedosDesktopRenderer {
   readonly conversationList: FedosDesktopConversationListRenderer;
@@ -58,6 +62,7 @@ export class FedosDesktopRenderer {
   readonly transferSession: FedosDesktopTransferSessionRenderer;
   readonly syncConflict: FedosDesktopSyncConflictRenderer;
   readonly deviceManagement: FedosDeviceManagementRenderer;
+  readonly deletionRequests: FedosDeletionRequestRenderer;
 
   constructor(boundary: FedosDesktopConversationUiPresentationBoundary) {
     this.conversationList = new FedosDesktopConversationListRenderer(boundary.conversationList);
@@ -74,6 +79,7 @@ export class FedosDesktopRenderer {
     this.transferSession = new FedosDesktopTransferSessionRenderer(boundary.transferSession);
     this.syncConflict = new FedosDesktopSyncConflictRenderer(boundary.syncConflict);
     this.deviceManagement = new FedosDeviceManagementRenderer(boundary.deviceManagement);
+    this.deletionRequests = new FedosDeletionRequestRenderer(boundary.deletionRequests);
   }
 }
 
