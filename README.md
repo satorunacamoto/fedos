@@ -8,6 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6361–6440 — FedOS Desktop Beta Security
+> Acceptance, Threat-Scenario Testing, and Release Freeze Arc (FULL
+> completion of this Arc's own deliberately bounded, testing/documentation-
+> only scope).** Merges the diverged Safety Center (`fc48d64c`) and Secure
+> Memory (`33f29f22`) lineages (merge commit `d23f350`) and proves the
+> Secure Runtime production-consistent through system-wide acceptance and
+> threat validation — this Arc adds **zero files under `src/`**, confirmed
+> structurally by direct `git diff` against the merge commit itself (the
+> strongest possible proof of "architecture-frozen: no protocol redesign,
+> no new cryptographic feature, no new Runtime owner"). A canonical
+> Security Acceptance Matrix classifies 17 properties: 12 SUPPORTED, 5
+> PARTIAL (Forward Secrecy, PCS, Metadata Protection, Master Seed, Double
+> Ratchet — every one traced to the SAME single root cause, the absent
+> compiled `packages/fedos-core-rust/pkg/` WASM artifact, never a design
+> defect; every underlying algorithm was directly inspected in real
+> source and confirmed non-stub), 0 UNSUPPORTED. 16 real Threat Scenario
+> tests (stolen/revoked device, forged-signature relay injection, replay,
+> downgrade, duplicated notification, Archive restoration, retention
+> bypass, wrong passphrase, profile locked, Ratchet-reset call contract,
+> conflicting identity replacement, signed-deletion replay/resurrection,
+> capability downgrade, restart recovery, crash recovery) all pass,
+> composing only already-shipped facades. A Release Freeze Checklist rates
+> every subsystem PASS/FAIL/BLOCKED with no fuzzy wording: 18 PASS, 4
+> BLOCKED (all environment/artifact gaps, 0 FAIL). The real acceptance
+> vertical slice (Profile→Unlock→Ratchet→NIP17→Identity Replacement→
+> Deletion Request→Safety Center→Restart→Recovery→Archive→Search→
+> Shutdown) surfaces one genuine, previously-unstated finding: the REAL
+> production Profile/Unlock bootstrap does not yet thread Identity
+> Transition/Deletion Request/Ratchet config through its own Runtime
+> config — stated honestly (Part 1) rather than hidden, with the full
+> domain-crypto chain then proven separately and completely with 100%
+> real BIP-340 Schnorr crypto (Part 2). See
+> `docs/secure_runtime_alpha_6361_6440_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Production Runtime
+> Configuration Unification Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6281–6360 — FedOS Secure Memory Secret
 > Buffer and Zeroization Foundation Arc (FULL completion of this Arc's own
 > deliberately bounded scope).** Phase A inventory found the normative

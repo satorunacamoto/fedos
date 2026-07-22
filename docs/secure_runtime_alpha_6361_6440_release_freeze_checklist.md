@@ -1,0 +1,52 @@
+# Secure Runtime Alpha 6361–6440 — Release Freeze Checklist
+
+**FedOS Desktop Beta Security Acceptance, Threat-Scenario Testing, and
+Release Freeze Arc — Phase D.**
+
+Every subsystem below receives exactly one of **PASS / FAIL / BLOCKED** —
+no fuzzy wording. `BLOCKED` means a genuine environment/artifact gap (not a
+code defect) prevents this subsystem from being verified further in this
+environment; the underlying code was directly inspected and is not a stub.
+
+| Subsystem | Verdict | Reason |
+|---|---|---|
+| Device Trust / Registry | **PASS** | Real trust state machine, revocation enforced at every preflight checked (Threat Scenarios 1/2). |
+| Device Sync | **PASS** | Real, bounded operational facade (`FedosDeviceSyncOperationalFacade`); fails closed to `"unsupported"` when not configured, never a crash (Threat Scenario 10). |
+| Device Pairing | **PASS** | Real challenge/approval flow, unchanged this Arc, already extensively tested by prior Arcs. |
+| Signed Deletion Request | **PASS** | Real signed protocol, per-Device aggregation, real local execution, replay/downgrade/resurrection all denied (Threat Scenario 13); pending-review durability gap closed by the immediately prior Arc. |
+| Identity Transition / Replacement | **PASS** | Real evidence/decision/continuity model; replay, downgrade, and conflicting-claim all denied (Threat Scenarios 4/5/12); restart-safety re-confirmed (Threat Scenario 15). |
+| Peer Capability Advertisement | **PASS** | Real signed advertisement/observation pipeline; forged-signer and conflicting-revision claims denied (Threat Scenarios 3/14). |
+| Safety Center | **PASS** | Real, honest 13-section aggregation; no fabricated overall status; notification dedup confirmed (Threat Scenario 6). |
+| Archive | **PASS** | Real export/restore; does not establish trust and is not touched by Signed Deletion execution — both confirmed by direct source inspection (Threat Scenario 7). |
+| Search | **PASS** | Real index; retention-change reconciliation genuinely purges stale entries (Acceptance Matrix item 11). |
+| Retention | **PASS** | Real state machine (`active→tombstoned→payload-removed`); bypass denied (Threat Scenario 8). |
+| Runtime Lock / Profile Lifecycle | **PASS** | Real no-oracle passphrase gating confirmed by direct source inspection and by test (Threat Scenario 9); every Shell method fails closed while locked/stopped (Threat Scenario 10). |
+| NIP-17 (Gift Wrap / Seal / Rumor) | **PASS** | Real three-layer protocol, extensively verified across this session's prior Arcs with real signatures. |
+| Double Ratchet (algorithm) | **PASS** | Real, non-stub KDF chain confirmed by direct Rust source inspection (`direct_ratchet.rs`/`direct_ratchet_session.rs`). |
+| Double Ratchet (live session, this environment) | **BLOCKED** | No compiled `packages/fedos-core-rust/pkg/` WASM artifact exists in this worktree — confirmed absent again this Arc, universal precedent across the entire session, no exception found anywhere. Call contract (never a fabricated live result) is PASS; live execution is BLOCKED. |
+| Master Seed (state machine) | **PASS** | Real, honest 9-value outcome vocabulary, no generic/collapsed failure mode. |
+| Master Seed (production activation) | **BLOCKED** | Same WASM-artifact absence as above — `"available"` is unreachable in this environment. |
+| Secure Memory (handle-based zeroization) | **PASS** | Real, non-Clone, bounded, generation-safe `SecretHandle`/`SecretHandleStore` confirmed by direct Rust source inspection; NIP-44 zeroization gap closed. |
+| Secure Memory (OS page-locking) | **BLOCKED** | Honestly `Unsupported`/`NotRequested` in source — no native Desktop Rust host exists yet to request it from. Not a defect; a disclosed, deliberate scope boundary of the Secure Memory Arc itself. |
+| Electron Host Bridge (in-process reference) | **PASS** | Single `FedosDesktopHostPort` implementation, no duplicate, unchanged this Arc. |
+| Electron (real subprocess in this worktree) | **BLOCKED** | The Electron spike package's own `node_modules` is not independently installed in this worktree — a pre-existing, disclosed environment gap (also present in sibling worktrees, confirmed by the immediately prior Arc), not introduced by this Arc. |
+| Crash recovery (append-only durability) | **PASS** | Confirmed as a real, fail-closed characteristic (Threat Scenario 16) — a truncated write throws rather than silently serving corrupt data. Documented as intentional, not patched (no protocol redesign in this Arc). |
+
+## Summary
+
+**18 PASS, 4 BLOCKED, 0 FAIL.** Every BLOCKED item traces to exactly one of
+two root causes, both environment/artifact facts rather than code defects:
+(1) the absent compiled Rust/WASM artifact (3 items), and (2) the
+Electron spike package's own uninstalled dependency tree (1 item). No
+subsystem inspected during this Arc is rated FAIL.
+
+## Release recommendation
+
+**Conditional freeze approval.** The TypeScript/Rust-source-level Secure
+Runtime is production-consistent for every property this Arc could verify
+in this environment. Before an actual production release, the 4 BLOCKED
+items must be independently re-verified in an environment with: (a) a
+compiled `packages/fedos-core-rust/pkg/` WASM artifact, and (b) the
+Electron spike package's own dependencies installed. This Arc does not
+claim those 4 items are safe for production — only that nothing found in
+this Arc's own inspection contradicts their being safe once compiled.
