@@ -18,6 +18,10 @@ export interface FedosIdentityTransitionPeerObservationPersistence {
   listObservations(): readonly FedosIdentityTransitionPeerObservationV1[];
   getObservation(localDeviceRef: string, peerAccountRef: FedosIdentityTransitionPeerObservationV1["peerAccountRef"], peerDeviceRef: string, transitionId: string): FedosIdentityTransitionPeerObservationV1 | null;
   listLineage(localDeviceRef: string, oldAccountAuthority: string, oldAccountPublicIdentifier: string, oldAccountIdentityId: string | null): readonly FedosIdentityTransitionPeerObservationV1[];
+  /** Secure Runtime Alpha 6121-6200 — every observation THIS local Device has ever recorded, regardless of lineage. Backs the Identity Transition Inbox (Phase J). */
+  listObservationsForLocalDevice(localDeviceRef: string): readonly FedosIdentityTransitionPeerObservationV1[];
+  /** Secure Runtime Alpha 6121-6200 — every row for one transitionId (one per reporting peer Device) — backs the Peer Device Evidence display (Phase E). */
+  listObservationsForTransition(localDeviceRef: string, transitionId: string): readonly FedosIdentityTransitionPeerObservationV1[];
 }
 
 export { fedosIdentityTransitionPeerObservationKey, fedosIdentityTransitionPeerObservationLineageKeyParts, fedosIdentityTransitionPeerObservationsAreEqual };

@@ -89,10 +89,16 @@ describe("Alpha 5961-6040 — Peer Integration domain import exclusions", () => 
     }
   });
 
-  it("node:fs is confined to the three named append-only persistence backends", () => {
+  it("node:fs is confined to the named append-only persistence backends", () => {
     const allowedFsFiles = new Set([
       "append_only_fedos_identity_transition_peer_observation_persistence.ts",
       "append_only_fedos_identity_transition_ratchet_reset_link_persistence.ts",
+      // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
+      // Verification and Conversation Continuity UI Arc) — same
+      // append-only discipline, three new durable fact domains.
+      "append_only_fedos_identity_transition_manual_verification_persistence.ts",
+      "append_only_fedos_identity_transition_conversation_continuity_persistence.ts",
+      "append_only_fedos_identity_transition_local_decision_persistence.ts",
     ]);
     for (const file of files) {
       if ([...allowedFsFiles].some((name) => file.endsWith(name))) continue;

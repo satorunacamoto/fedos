@@ -224,6 +224,22 @@ import { FedosDeletionRequestConversationExistenceAdapter } from "../deletion_re
 import type { FedosDeletionRequestInboxSummaryPersistence } from "../deletion_request/fedos_deletion_request_inbox_summary.js";
 import type { FedosConversationParticipantAuthority } from "../membership/fedos_conversation_participant_reference.js";
 
+// Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User Verification and Conversation Continuity UI Arc).
+import { FedosIdentityTransitionPeerRuntime } from "../identity_transition/peer_integration/fedos_identity_transition_peer_runtime.js";
+import type { FedosIdentityTransitionInboundOutcome } from "../identity_transition/peer_integration/fedos_identity_transition_inbound_notification_coordinator.js";
+import type { FedosIdentityTransitionPeerObservationPersistence } from "../identity_transition/peer_integration/persistence/fedos_identity_transition_peer_observation_persistence.js";
+import { InMemoryFedosIdentityTransitionPeerObservationPersistence } from "../identity_transition/peer_integration/persistence/in_memory_fedos_identity_transition_peer_observation_persistence.js";
+import type { FedosIdentityTransitionRatchetResetLinkPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
+import { InMemoryFedosIdentityTransitionRatchetResetLinkPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
+import type { FedosIdentityTransitionManualVerificationPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+import { InMemoryFedosIdentityTransitionManualVerificationPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+import type { FedosIdentityTransitionConversationContinuityPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
+import { InMemoryFedosIdentityTransitionConversationContinuityPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
+import type { FedosIdentityTransitionLocalDecisionPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_local_decision.js";
+import { InMemoryFedosIdentityTransitionLocalDecisionPersistence } from "../identity_transition/peer_integration/fedos_identity_transition_local_decision.js";
+import type { FedosIdentityTransitionLocalPolicy } from "../identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import { randomBytes, bytesToHex } from "@noble/hashes/utils.js";
+
 /**
  * The full injected dependency set — the construction coordinator's own
  * fields, reused verbatim (so reads/writes share one backend set), PLUS
@@ -358,7 +374,40 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
    * caller may supply any combination.
    */
   readonly deletionRequest?: FedosConversationDeletionRequestIntegrationDependencies;
+  /**
+   * Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
+   * Verification and Conversation Continuity UI Arc) — OPTIONAL;
+   * omitted, `identityTransition()` returns `null` and
+   * `receiveNip17Rumor()` remains byte-for-byte unchanged (the ratchet,
+   * peer-capability, deletion-request, and legacy-chat attempts are all
+   * untouched either way). Independent of every other optional
+   * integration above — a caller may supply any combination.
+   */
+  readonly identityTransition?: FedosConversationIdentityTransitionIntegrationDependencies;
 };
+
+/** See `FedosConversationRuntimeDependencies.identityTransition`'s own doc comment. */
+export interface FedosConversationIdentityTransitionIntegrationDependencies {
+  readonly deviceRegistry: FedosDeviceRegistryPersistence;
+  readonly signingAuthority: FedosNostrSigningAuthority;
+  readonly localAccountRef: FedosDeviceBindingAccountRef;
+  readonly localDeviceRef: string;
+  readonly sendMailboxNip17Control: (
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+  /** Optional — default in-memory, one fresh CSPRNG nonce per notification. */
+  readonly nonceGenerator?: () => string;
+  /** Optional — default in-memory. */
+  readonly observationPersistence?: FedosIdentityTransitionPeerObservationPersistence;
+  readonly resetLinkPersistence?: FedosIdentityTransitionRatchetResetLinkPersistence;
+  readonly manualVerificationPersistence?: FedosIdentityTransitionManualVerificationPersistence;
+  readonly continuityPersistence?: FedosIdentityTransitionConversationContinuityPersistence;
+  readonly localDecisionPersistence?: FedosIdentityTransitionLocalDecisionPersistence;
+  readonly localPolicy?: FedosIdentityTransitionLocalPolicy;
+}
 
 /** See `FedosConversationRuntimeDependencies.deletionRequest`'s own doc comment. */
 export interface FedosConversationDeletionRequestIntegrationDependencies {
@@ -481,6 +530,8 @@ export class FedosConversationRuntime {
   readonly #peerCapabilityRuntime: FedosRatchetPeerCapabilityRuntime | null;
   /** Secure Runtime Alpha 5881-5960 — `null` when `deps.deletionRequest` was not supplied. See this class's own constructor comment. */
   readonly #deletionRequestRuntime: FedosDeletionRequestRuntime | null;
+  /** Secure Runtime Alpha 6121-6200 — `null` when `deps.identityTransition` was not supplied. See this class's own constructor comment. */
+  readonly #identityTransitionRuntime: FedosIdentityTransitionPeerRuntime | null;
   /** Alpha 2041–2120 — see `../activation/fedos_conversation_reactivation_coordinator.ts`'s own header. */
   readonly #reactivationCoordinator: FedosConversationReactivationCoordinator;
   /**
@@ -727,6 +778,31 @@ export class FedosConversationRuntime {
         clock: deps.clock,
       });
     })();
+
+    // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
+    // Verification and Conversation Continuity UI Arc) — `null` when
+    // `deps.identityTransition` was not supplied. Composes the
+    // already-built `FedosIdentityTransitionPeerRuntime` (Alpha
+    // 5961-6040), never a second/divergent copy of it.
+    this.#identityTransitionRuntime =
+      deps.identityTransition === undefined
+        ? null
+        : new FedosIdentityTransitionPeerRuntime({
+            deviceRegistry: deps.identityTransition.deviceRegistry,
+            signingAuthority: deps.identityTransition.signingAuthority,
+            accountIndex: accountIndexAuthority.localAccountIndex(),
+            localAccountRef: deps.identityTransition.localAccountRef,
+            localDeviceRef: deps.identityTransition.localDeviceRef,
+            clock: deps.clock,
+            nonceGenerator: deps.identityTransition.nonceGenerator ?? (() => bytesToHex(randomBytes(16))),
+            sendMailboxNip17Control: deps.identityTransition.sendMailboxNip17Control,
+            observationPersistence: deps.identityTransition.observationPersistence ?? new InMemoryFedosIdentityTransitionPeerObservationPersistence(),
+            resetLinkPersistence: deps.identityTransition.resetLinkPersistence ?? new InMemoryFedosIdentityTransitionRatchetResetLinkPersistence(),
+            manualVerificationPersistence: deps.identityTransition.manualVerificationPersistence ?? new InMemoryFedosIdentityTransitionManualVerificationPersistence(),
+            continuityPersistence: deps.identityTransition.continuityPersistence ?? new InMemoryFedosIdentityTransitionConversationContinuityPersistence(),
+            localDecisionPersistence: deps.identityTransition.localDecisionPersistence ?? new InMemoryFedosIdentityTransitionLocalDecisionPersistence(),
+            localPolicy: deps.identityTransition.localPolicy,
+          });
 
     // Secure Runtime Alpha 5561–5640 Phase E — the ratchet route's own
     // `ratchetDelivery` thunk for `FedosConversationDirectMessagingCoordinator`,
@@ -1293,6 +1369,7 @@ export class FedosConversationRuntime {
     | FedosRatchetPeerCapabilityInboundOutcome
     | FedosDeletionRequestInboundOutcome
     | FedosDeletionAcknowledgementInboundOutcome
+    | FedosIdentityTransitionInboundOutcome
   > {
     // Secure Runtime Alpha 5561–5640 Phase G — tried FIRST, exactly like
     // the payload codec's own header requires: a ratchet payload must
@@ -1334,6 +1411,20 @@ export class FedosConversationRuntime {
         return deletionRequestResult;
       }
     }
+    // Secure Runtime Alpha 6121-6200 — tried FOURTH, before the legacy
+    // chat fallback: an identity-transition control payload must never
+    // be imported as an ordinary chat message either (this Arc's own
+    // Absolute Prohibition). `"not-identity-transition-payload"` (the
+    // ONLY outcome possible when `#identityTransitionRuntime` is `null`,
+    // or when a real, non-identity-transition Rumor arrives) falls
+    // through to the EXISTING, UNCHANGED legacy coordinator below — never
+    // the reverse.
+    if (this.#identityTransitionRuntime !== null) {
+      const identityTransitionResult = await this.#identityTransitionRuntime.importIdentityTransitionNotification(rumor.content);
+      if (identityTransitionResult.outcome !== "not-identity-transition-payload" && identityTransitionResult.outcome !== "runtime-stopped") {
+        return identityTransitionResult;
+      }
+    }
     return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
   }
 
@@ -1368,6 +1459,17 @@ export class FedosConversationRuntime {
    */
   deletionRequest(): FedosDeletionRequestRuntime | null {
     return this.#deletionRequestRuntime;
+  }
+
+  /**
+   * Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
+   * Verification and Conversation Continuity UI Arc) — the additive
+   * Identity Transition Peer facade. `null` when
+   * `deps.identityTransition` was not supplied at construction (mirrors
+   * `deletionRequest()`'s own "null when not assembled" precedent).
+   */
+  identityTransition(): FedosIdentityTransitionPeerRuntime | null {
+    return this.#identityTransitionRuntime;
   }
 }
 

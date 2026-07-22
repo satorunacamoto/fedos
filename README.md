@@ -8,6 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6121–6200 — FedOS Identity Replacement
+> User Verification and Conversation Continuity UI Arc (FULL completion,
+> two disclosed pre-existing boundaries matching established precedent).**
+> Merges the diverged Identity Transition (`a5f9cca5`) and Desktop/UI
+> (`b72ca7b6`) lineages (merge commit `02845ed9`) and builds the explicit
+> user-verification/conversation-continuity experience over the completed
+> Identity Transition foundation: a closed, safe transition display model
+> combining evidence outcome, acceptance state, per-Device evidence, and
+> centralized warnings (never "verified" shown as "trusted"); a durable,
+> restart-safe manual-verification fact (3 closed methods, unknown methods
+> fail closed); explicit, durably-persisted accept/reject/defer decisions
+> (a real gap in the prior Arc — decisions were computed per-call but
+> never durably recorded — found and fixed via this Arc's own real
+> restart vertical slice); the smallest additive Conversation Continuity
+> model (the existing Direct Conversation ID is never rewritten; a new
+> local link records accepted continuity + a required new session
+> generation); a two-step Ratchet reset flow (read-only impact assessment,
+> then a separate explicit authorization, a thin adapter over the
+> existing `initializeDirectRatchetSession()`, never a new reset
+> mechanism); a bounded, deterministic Identity Transition Inbox; 10 new
+> `FedosDesktopApplicationShell` methods and 10 new closed Host commands,
+> all delegating entirely to the existing, unmodified
+> `FedosConversationRuntime.identityTransition()` (a new nullable
+> accessor mirroring `deletionRequest()` byte-for-byte) plus
+> `directRatchet()`; one new Controller/Renderer/Navigation state wired
+> into the EXISTING, unmodified Presentation Boundary, Renderer
+> aggregate, and Host Bridge — no second Shell, Runtime, Presentation
+> Boundary, Renderer, Navigation Registry, or Host Bridge. Real vertical
+> slice with 100% real BIP-340 Schnorr crypto through a genuinely real
+> `FedosConversationRuntime`/`FedosDesktopApplicationShell`/Presentation
+> Boundary stack (built via the SAME production assembly helper the real
+> Desktop Runtime itself uses) — no fake business Runtime anywhere.
+> Two disclosed, pre-existing boundaries, neither specific to this Arc:
+> Notification Coordinator wiring and Electron subprocess acceptance were
+> not reached, exactly matching `b72ca7b6`'s own disclosed scope; and a
+> genuine live Direct Ratchet session / `establishSession()` reset
+> dispatch needs a compiled `packages/fedos-core-rust/pkg/` this worktree
+> does not have — confirmed every test in this repository exercising
+> `establishSession()` is WASM-gated, no exceptions, so this Arc's own
+> reset-authorization CALL CONTRACT is proven honest (`"unavailable"`,
+> never a fabricated success) rather than faked. See
+> `docs/secure_runtime_alpha_6121_6200_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Privacy Controls and Safety
+> Center Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5961–6040 — FedOS Identity Transition
 > Peer Notification and Ratchet Reset Integration Arc (FULL completion,
 > one disclosed pre-existing WASM boundary).** Wires the Identity

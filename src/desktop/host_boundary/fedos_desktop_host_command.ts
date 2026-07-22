@@ -47,6 +47,15 @@ import { FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH } from "../../device/bind
 import { FEDOS_DELETION_REQUEST_SCOPES, type FedosDeletionRequestScope } from "../../conversation/deletion_request/fedos_deletion_request_scope.js";
 import { FEDOS_DELETION_REQUEST_REASON_CODES, type FedosDeletionRequestReasonCode } from "../../conversation/deletion_request/fedos_deletion_request_reason_code.js";
 import { FEDOS_DELETION_RECIPIENT_POLICIES, type FedosDeletionRecipientPolicy } from "../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
+// Secure Runtime Alpha 6121-6200 -- every import/addition below this comment
+// is ADDITIVE ONLY, mirroring this file's own established pattern above.
+import {
+  FEDOS_IDENTITY_TRANSITION_KNOWN_MANUAL_VERIFICATION_METHODS,
+  FEDOS_IDENTITY_TRANSITION_KNOWN_MANUAL_VERIFICATION_NOTE_CODES,
+  type FedosIdentityTransitionManualVerificationMethod,
+  type FedosIdentityTransitionManualVerificationNoteCode,
+} from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+import { FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES, type FedosIdentityTransitionAcceptanceState } from "../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
 
 /** This layer's own bound for id-shaped strings (conversation/message ids) -- mirrors the "512, non-empty" bound this codebase's own domain validators already apply pervasively to ids (e.g. `fedos_group_message.ts`/`fedos_group_direct_path.ts`'s own `MAX_STRING_LENGTH`), restated here since this Host layer sits ABOVE those domains and must reject an oversized/malformed id before it ever reaches them. */
 export const FEDOS_DESKTOP_HOST_MAX_ID_LENGTH = 512;
@@ -111,7 +120,71 @@ export type FedosDesktopHostCommand =
   | { readonly type: "deletion-request-reject"; readonly deletionRequestId: string; readonly requestId?: string }
   | { readonly type: "deletion-request-status"; readonly deletionRequestId: string; readonly requestId?: string }
   | { readonly type: "deletion-request-device-outcomes"; readonly conversationId: string; readonly targetEnvelopeId: string; readonly knownDeviceIds: readonly string[]; readonly requestId?: string }
-  | { readonly type: "deletion-request-dismiss"; readonly deletionRequestId: string; readonly requestId?: string };
+  | { readonly type: "deletion-request-dismiss"; readonly deletionRequestId: string; readonly requestId?: string }
+  // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User Verification and Conversation Continuity UI Arc).
+  | { readonly type: "identity-transition-list"; readonly limit: number; readonly offset: number; readonly requestId?: string }
+  | {
+      readonly type: "identity-transition-open";
+      readonly peerAccountRef: FedosDeviceBindingAccountRef;
+      readonly peerDeviceRef: string;
+      readonly transitionId: string;
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-inspect-evidence";
+      readonly peerAccountRef: FedosDeviceBindingAccountRef;
+      readonly peerDeviceRef: string;
+      readonly transitionId: string;
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-record-manual-verification";
+      readonly transitionId: string;
+      readonly method: FedosIdentityTransitionManualVerificationMethod;
+      readonly verifiedAt: number;
+      readonly noteCode: FedosIdentityTransitionManualVerificationNoteCode;
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-accept";
+      readonly peerAccountRef: FedosDeviceBindingAccountRef;
+      readonly peerDeviceRef: string;
+      readonly transitionId: string;
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-reject";
+      readonly peerAccountRef: FedosDeviceBindingAccountRef;
+      readonly peerDeviceRef: string;
+      readonly transitionId: string;
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-defer";
+      readonly peerAccountRef: FedosDeviceBindingAccountRef;
+      readonly peerDeviceRef: string;
+      readonly transitionId: string;
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-assess-continuity";
+      readonly pairs: readonly { readonly conversationId: string; readonly remoteDeviceRef: string }[];
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-authorize-ratchet-reset";
+      readonly transitionId: string;
+      readonly acceptanceState: FedosIdentityTransitionAcceptanceState;
+      readonly affectedSessions: readonly { readonly sessionId: string; readonly conversationId: string; readonly remoteAccountRef: FedosDeviceBindingAccountRef; readonly remoteDeviceRef: string }[];
+      readonly requestId?: string;
+    }
+  | {
+      readonly type: "identity-transition-status";
+      readonly peerAccountRef: FedosDeviceBindingAccountRef;
+      readonly peerDeviceRef: string;
+      readonly transitionId: string;
+      readonly requestId?: string;
+    };
 
 function isNonEmptyBoundedString(value: unknown, maxLength: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= maxLength;
@@ -169,6 +242,42 @@ function isFedosDeletionRecipientPolicyValue(value: unknown): value is FedosDele
 const FEDOS_DESKTOP_HOST_MAX_DEVICE_LIST_LENGTH = 64;
 function isDeviceIdList(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length <= FEDOS_DESKTOP_HOST_MAX_DEVICE_LIST_LENGTH && value.every((v) => isId(v));
+}
+
+// Secure Runtime Alpha 6121-6200 -- identity-transition structural checks.
+function isFedosIdentityTransitionManualVerificationMethodValue(value: unknown): value is FedosIdentityTransitionManualVerificationMethod {
+  return typeof value === "string" && (FEDOS_IDENTITY_TRANSITION_KNOWN_MANUAL_VERIFICATION_METHODS as readonly string[]).includes(value);
+}
+function isFedosIdentityTransitionManualVerificationNoteCodeValue(value: unknown): value is FedosIdentityTransitionManualVerificationNoteCode {
+  return typeof value === "string" && (FEDOS_IDENTITY_TRANSITION_KNOWN_MANUAL_VERIFICATION_NOTE_CODES as readonly string[]).includes(value);
+}
+function isFedosIdentityTransitionAcceptanceStateValue(value: unknown): value is FedosIdentityTransitionAcceptanceState {
+  return typeof value === "string" && (FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES as readonly string[]).includes(value);
+}
+const FEDOS_DESKTOP_HOST_MAX_SESSION_PAIR_LIST_LENGTH = 64;
+function isSessionPairList(value: unknown): value is readonly { readonly conversationId: string; readonly remoteDeviceRef: string }[] {
+  if (!Array.isArray(value) || value.length > FEDOS_DESKTOP_HOST_MAX_SESSION_PAIR_LIST_LENGTH) return false;
+  return value.every((v) => {
+    if (v === null || typeof v !== "object") return false;
+    const r = v as Record<string, unknown>;
+    return isId(r.conversationId) && isId(r.remoteDeviceRef);
+  });
+}
+function isAffectedSessionList(
+  value: unknown,
+): value is readonly { readonly sessionId: string; readonly conversationId: string; readonly remoteAccountRef: FedosDeviceBindingAccountRef; readonly remoteDeviceRef: string }[] {
+  if (!Array.isArray(value) || value.length > FEDOS_DESKTOP_HOST_MAX_SESSION_PAIR_LIST_LENGTH) return false;
+  return value.every((v) => {
+    if (v === null || typeof v !== "object") return false;
+    const r = v as Record<string, unknown>;
+    return isId(r.sessionId) && isId(r.conversationId) && isDeviceBindingAccountRef(r.remoteAccountRef) && isId(r.remoteDeviceRef);
+  });
+}
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 /**
@@ -385,6 +494,64 @@ export function validateFedosDesktopHostCommand(candidate: unknown): FedosDeskto
       if (!isId(c.deletionRequestId)) return null;
       const deletionRequestId = c.deletionRequestId;
       return requestId === undefined ? { type: c.type, deletionRequestId } : { type: c.type, deletionRequestId, requestId };
+    }
+
+    case "identity-transition-list": {
+      if (!isNonNegativeInteger(c.limit) || !isNonNegativeInteger(c.offset)) return null;
+      const limit = c.limit;
+      const offset = c.offset;
+      return requestId === undefined ? { type: "identity-transition-list", limit, offset } : { type: "identity-transition-list", limit, offset, requestId };
+    }
+
+    case "identity-transition-open":
+    case "identity-transition-inspect-evidence":
+    case "identity-transition-accept":
+    case "identity-transition-reject":
+    case "identity-transition-defer":
+    case "identity-transition-status": {
+      if (!isDeviceBindingAccountRef(c.peerAccountRef)) return null;
+      if (!isId(c.peerDeviceRef)) return null;
+      if (!isId(c.transitionId)) return null;
+      const peerAccountRef = c.peerAccountRef;
+      const peerDeviceRef = c.peerDeviceRef;
+      const transitionId = c.transitionId;
+      return requestId === undefined
+        ? { type: c.type, peerAccountRef, peerDeviceRef, transitionId }
+        : { type: c.type, peerAccountRef, peerDeviceRef, transitionId, requestId };
+    }
+
+    case "identity-transition-record-manual-verification": {
+      if (!isId(c.transitionId)) return null;
+      if (!isFedosIdentityTransitionManualVerificationMethodValue(c.method)) return null;
+      if (!isFiniteNumber(c.verifiedAt)) return null;
+      if (!isFedosIdentityTransitionManualVerificationNoteCodeValue(c.noteCode)) return null;
+      const transitionId = c.transitionId;
+      const method = c.method;
+      const verifiedAt = c.verifiedAt;
+      const noteCode = c.noteCode;
+      return requestId === undefined
+        ? { type: "identity-transition-record-manual-verification", transitionId, method, verifiedAt, noteCode }
+        : { type: "identity-transition-record-manual-verification", transitionId, method, verifiedAt, noteCode, requestId };
+    }
+
+    case "identity-transition-assess-continuity": {
+      if (!isSessionPairList(c.pairs)) return null;
+      const pairs = c.pairs;
+      return requestId === undefined
+        ? { type: "identity-transition-assess-continuity", pairs }
+        : { type: "identity-transition-assess-continuity", pairs, requestId };
+    }
+
+    case "identity-transition-authorize-ratchet-reset": {
+      if (!isId(c.transitionId)) return null;
+      if (!isFedosIdentityTransitionAcceptanceStateValue(c.acceptanceState)) return null;
+      if (!isAffectedSessionList(c.affectedSessions)) return null;
+      const transitionId = c.transitionId;
+      const acceptanceState = c.acceptanceState;
+      const affectedSessions = c.affectedSessions;
+      return requestId === undefined
+        ? { type: "identity-transition-authorize-ratchet-reset", transitionId, acceptanceState, affectedSessions }
+        : { type: "identity-transition-authorize-ratchet-reset", transitionId, acceptanceState, affectedSessions, requestId };
     }
 
     default:

@@ -94,6 +94,18 @@ import type { FedosDeletionRecipientDecisionState } from "../../conversation/del
 import type { FedosDeletionRequestInboundOutcome } from "../../conversation/deletion_request/fedos_deletion_request_inbound_coordinator.js";
 import type { FedosDeletionRecipientPolicy, FedosDeletionRecipientPolicyDecision } from "../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
 import type { FedosDeletionRequestScope } from "../../conversation/deletion_request/fedos_deletion_request_scope.js";
+// Secure Runtime Alpha 6121-6200 -- Identity Transition Shell surface.
+import type { FedosIdentityTransitionPeerRuntime, FedosIdentityTransitionPeerStatusView } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_runtime.js";
+import type { FedosIdentityTransitionSafeViewV1 } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_safe_view.js";
+import type { FedosIdentityTransitionManualVerificationMethod, FedosIdentityTransitionManualVerificationNoteCode } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+import type { FedosIdentityTransitionAcceptanceState } from "../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
+import type { FedosIdentityTransitionAffectedSession } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_authorization.js";
+import {
+  fedosIdentityTransitionBuildSessionImpactRow,
+  type FedosIdentityTransitionSessionImpactRowV1,
+  type FedosIdentityTransitionSessionPairToAssess,
+} from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_impact_view.js";
+import type { FedosIdentityTransitionConversationContinuityRecordV1 } from "../../conversation/identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
 import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
 // Durable Sync Journal Arc) -- every import/addition below this comment is
@@ -782,6 +794,182 @@ export class FedosDesktopApplicationShell {
     const dr = this.#deletionRequestRuntime();
     if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
     return fedosDesktopShellOk(dr.inspectDeletionRequestStatus(requestId));
+  }
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
+  // Verification and Conversation Continuity UI Arc) -- every method
+  // below delegates ENTIRELY to `FedosConversationRuntime.identityTransition()`
+  // (`../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_runtime.ts`,
+  // `5961-6040`) plus the ALREADY-PUBLIC `directRatchet()` accessor for
+  // the two operations that need a live Ratchet safe-status/reset call
+  // (`identityTransitionAssessContinuity`/`identityTransitionAuthorizeRatchetReset`)
+  // -- this Shell owns no identity-transition evidence/evaluation/reset
+  // logic of its own, only maps those facades' own closed outcomes onto
+  // this Shell's existing result vocabulary. `"unavailable"` when either
+  // accessor returns `null` -- the SAME honest terminus every other
+  // optional-integration section of this Shell already uses. Opening,
+  // listing, or inspecting a transition NEVER accepts or resets anything
+  // -- only `identityTransitionAccept`/`Reject` and
+  // `identityTransitionAuthorizeRatchetReset` mutate any durable state,
+  // and they remain two entirely separate calls (Phase C/H's own
+  // requirement).
+  // ---------------------------------------------------------------------
+
+  #identityTransitionRuntime(): FedosIdentityTransitionPeerRuntime | null {
+    if (this.#runtime === null) return null;
+    return this.#runtime.conversationRuntime().identityTransition();
+  }
+
+  identityTransitionList(limit: number, offset: number): FedosDesktopShellResult<readonly FedosIdentityTransitionPeerStatusView[]> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    return fedosDesktopShellOk(it.listIdentityTransitionInbox(limit, offset));
+  }
+
+  /** Opening a transition is a pure read — never accepts/rejects/resets anything. */
+  identityTransitionOpen(
+    peerAccountRef: FedosDeviceBindingAccountRef,
+    peerDeviceRef: string,
+    transitionId: string,
+  ): FedosDesktopShellResult<FedosIdentityTransitionSafeViewV1 | null> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    return fedosDesktopShellOk(it.getIdentityTransitionSafeView(peerAccountRef, peerDeviceRef, transitionId));
+  }
+
+  /** Phase K's own distinct evidence-review action — same underlying safe view as `identityTransitionOpen` (which already includes the full per-Device evidence list and centralized warnings), never a second, divergent read. */
+  identityTransitionInspectEvidence(
+    peerAccountRef: FedosDeviceBindingAccountRef,
+    peerDeviceRef: string,
+    transitionId: string,
+  ): FedosDesktopShellResult<FedosIdentityTransitionSafeViewV1 | null> {
+    return this.identityTransitionOpen(peerAccountRef, peerDeviceRef, transitionId);
+  }
+
+  /** Phase D — a local trust decision, never universal proof. Fails closed on an unknown method/note code (mapped to `"invalid-input"`, never silently accepted). */
+  identityTransitionRecordManualVerification(params: {
+    readonly transitionId: string;
+    readonly method: FedosIdentityTransitionManualVerificationMethod;
+    readonly verifiedAt: number;
+    readonly noteCode: FedosIdentityTransitionManualVerificationNoteCode;
+  }): FedosDesktopShellResult<"recorded" | "already-present"> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const outcome = it.recordManualVerification(params);
+    if (outcome === "recorded" || outcome === "already-present") return fedosDesktopShellOk(outcome);
+    if (outcome === "unavailable") return fedosDesktopShellFailure("invalid-input", "unknown manual verification method or note code");
+    if (outcome === "conflict") return fedosDesktopShellFailure("conflict", outcome);
+    if (outcome === "stale-revision") return fedosDesktopShellFailure("conflict", outcome);
+    return fedosDesktopShellFailure("failed", outcome);
+  }
+
+  identityTransitionAccept(
+    peerAccountRef: FedosDeviceBindingAccountRef,
+    peerDeviceRef: string,
+    transitionId: string,
+  ): FedosDesktopShellResult<FedosIdentityTransitionPeerStatusView> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const view = it.recordIdentityTransitionDecision(peerAccountRef, peerDeviceRef, transitionId, "accept");
+    if (view === null) return fedosDesktopShellFailure("not-found", "unknown transition");
+    return fedosDesktopShellOk(view);
+  }
+
+  identityTransitionReject(
+    peerAccountRef: FedosDeviceBindingAccountRef,
+    peerDeviceRef: string,
+    transitionId: string,
+  ): FedosDesktopShellResult<FedosIdentityTransitionPeerStatusView> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const view = it.recordIdentityTransitionDecision(peerAccountRef, peerDeviceRef, transitionId, "reject");
+    if (view === null) return fedosDesktopShellFailure("not-found", "unknown transition");
+    return fedosDesktopShellOk(view);
+  }
+
+  /** Deferring is explicitly NOT a decision — it never changes `acceptanceState` away from its evidence-only baseline (mirrors `"none"`). */
+  identityTransitionDefer(
+    peerAccountRef: FedosDeviceBindingAccountRef,
+    peerDeviceRef: string,
+    transitionId: string,
+  ): FedosDesktopShellResult<FedosIdentityTransitionPeerStatusView> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const view = it.recordIdentityTransitionDecision(peerAccountRef, peerDeviceRef, transitionId, "defer");
+    if (view === null) return fedosDesktopShellFailure("not-found", "unknown transition");
+    return fedosDesktopShellOk(view);
+  }
+
+  identityTransitionStatus(
+    peerAccountRef: FedosDeviceBindingAccountRef,
+    peerDeviceRef: string,
+    transitionId: string,
+  ): FedosDesktopShellResult<FedosIdentityTransitionPeerStatusView | null> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    return fedosDesktopShellOk(it.inspectPeerIdentityTransitionStatus(peerAccountRef, peerDeviceRef, transitionId));
+  }
+
+  /** Phase F/G — links a Direct Conversation to an ALREADY-accepted transition. Refuses (`"conflict"`, mapped from the Runtime's own `"not-accepted"`) if the transition is not yet accepted on this Device. */
+  identityTransitionRecordContinuity(params: {
+    readonly conversationId: string;
+    readonly transitionId: string;
+    readonly acceptedAt: number;
+    readonly newSessionRequired: boolean;
+  }): FedosDesktopShellResult<FedosIdentityTransitionConversationContinuityRecordV1["revision"]> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const outcome = it.recordConversationContinuity(params);
+    if (outcome === "inserted" || outcome === "already-present") {
+      const current = it.getConversationContinuity(params.conversationId);
+      return fedosDesktopShellOk(current?.revision ?? 0);
+    }
+    if (outcome === "not-accepted") return fedosDesktopShellFailure("conflict", "transition is not yet accepted on this Device");
+    if (outcome === "conflict" || outcome === "rollback-detected") return fedosDesktopShellFailure("conflict", outcome);
+    if (outcome === "unavailable") return fedosDesktopShellFailure("unavailable", outcome);
+    return fedosDesktopShellFailure("failed", outcome);
+  }
+
+  /** Phase H/I — read-only. Reports each named `(conversationId, remoteDeviceRef)` pair's ALREADY-PUBLIC Ratchet safe status; never mutates anything. */
+  identityTransitionAssessContinuity(
+    pairs: readonly FedosIdentityTransitionSessionPairToAssess[],
+  ): FedosDesktopShellResult<readonly FedosIdentityTransitionSessionImpactRowV1[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "Runtime is not started");
+    const dr = this.#runtime.conversationRuntime().directRatchet();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
+    const rows = pairs.map((pair) => fedosIdentityTransitionBuildSessionImpactRow(pair, dr.getDirectRatchetStatus(pair.conversationId, pair.remoteDeviceRef)));
+    return fedosDesktopShellOk(rows);
+  }
+
+  /**
+   * Phase H/J — the ONE method in this Shell that mutates Ratchet state,
+   * and only for an ALREADY-`"accepted"` transition (enforced by the
+   * Runtime's own `authorizeIdentityTransitionRatchetReset()`, never
+   * re-checked or second-guessed here). Constructs a THIN adapter over
+   * the ALREADY-PUBLIC `initializeDirectRatchetSession()` — never a new
+   * Ratchet-facing method, never root/chain/session secrets exposed.
+   */
+  async identityTransitionAuthorizeRatchetReset(params: {
+    readonly transitionId: string;
+    readonly acceptanceState: FedosIdentityTransitionAcceptanceState;
+    readonly affectedSessions: readonly FedosIdentityTransitionAffectedSession[];
+  }): Promise<FedosDesktopShellResult<{ readonly outcome: string }>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "Runtime is not started");
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const dr = this.#runtime.conversationRuntime().directRatchet();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
+    const result = await it.authorizeIdentityTransitionRatchetReset({
+      transitionId: params.transitionId,
+      acceptanceState: params.acceptanceState,
+      affectedSessions: params.affectedSessions,
+      outboundIntegration: {
+        establishSession: (conversationId, remoteDeviceRef, options) => dr.initializeDirectRatchetSession(conversationId, remoteDeviceRef, options),
+      },
+    });
+    if (result.outcome === "not-accepted") return fedosDesktopShellFailure("conflict", "transition is not accepted");
+    return fedosDesktopShellOk(result);
   }
 
   #toSummaryView(conversationId: string): FedosConversationSummaryView | null {

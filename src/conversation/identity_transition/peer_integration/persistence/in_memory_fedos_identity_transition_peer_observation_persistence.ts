@@ -48,4 +48,12 @@ export class InMemoryFedosIdentityTransitionPeerObservationPersistence implement
       (o) => fedosIdentityTransitionPeerObservationLineageKeyParts(o.localDeviceRef, o.oldAccountIdentity.authority, o.oldAccountIdentity.publicIdentifier, o.oldAccountIdentity.identityId) === key,
     );
   }
+
+  listObservationsForLocalDevice(localDeviceRef: string): readonly FedosIdentityTransitionPeerObservationV1[] {
+    return [...this.#observations.values()].filter((o) => o.localDeviceRef === localDeviceRef);
+  }
+
+  listObservationsForTransition(localDeviceRef: string, transitionId: string): readonly FedosIdentityTransitionPeerObservationV1[] {
+    return [...this.#observations.values()].filter((o) => o.localDeviceRef === localDeviceRef && o.transitionId === transitionId);
+  }
 }

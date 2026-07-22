@@ -306,6 +306,54 @@ export class FedosDesktopHostBridge implements FedosDesktopHostPort {
           boundary.deletionRequests.dismiss(validated.deletionRequestId);
           return fedosHostOk(null, requestId);
         }
+        // Secure Runtime Alpha 6121-6200 (FedOS Identity Replacement User
+        // Verification and Conversation Continuity UI Arc). Listing/
+        // opening go through `boundary.identityTransitions` (the
+        // Controller, `5961-6040`'s Shell facade underneath); every other
+        // action is a direct pass-through to `boundary.shell` — the SAME
+        // two dispatch idioms `deletion-request-*` already established
+        // above, never a third.
+        case "identity-transition-list": {
+          await boundary.identityTransitions.refreshInbox(validated.limit, validated.offset);
+          return fedosHostResponseFromViewModelState(boundary.identityTransitions.inboxState, requestId);
+        }
+        case "identity-transition-open":
+        case "identity-transition-inspect-evidence": {
+          await boundary.identityTransitions.openTransition(validated.peerAccountRef, validated.peerDeviceRef, validated.transitionId);
+          return fedosHostResponseFromViewModelState(boundary.identityTransitions.detailState, requestId);
+        }
+        case "identity-transition-record-manual-verification": {
+          await boundary.identityTransitions.recordManualVerification(validated.method, validated.verifiedAt, validated.noteCode);
+          return fedosHostResponseFromViewModelState(boundary.identityTransitions.manualVerificationState, requestId);
+        }
+        case "identity-transition-accept": {
+          const result = await boundary.shell.identityTransitionAccept(validated.peerAccountRef, validated.peerDeviceRef, validated.transitionId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "identity-transition-reject": {
+          const result = await boundary.shell.identityTransitionReject(validated.peerAccountRef, validated.peerDeviceRef, validated.transitionId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "identity-transition-defer": {
+          const result = await boundary.shell.identityTransitionDefer(validated.peerAccountRef, validated.peerDeviceRef, validated.transitionId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "identity-transition-status": {
+          const result = boundary.shell.identityTransitionStatus(validated.peerAccountRef, validated.peerDeviceRef, validated.transitionId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "identity-transition-assess-continuity": {
+          const result = boundary.shell.identityTransitionAssessContinuity(validated.pairs);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "identity-transition-authorize-ratchet-reset": {
+          const result = await boundary.shell.identityTransitionAuthorizeRatchetReset({
+            transitionId: validated.transitionId,
+            acceptanceState: validated.acceptanceState,
+            affectedSessions: validated.affectedSessions as never,
+          });
+          return fedosHostResponseFromResult(result, requestId);
+        }
       }
     } catch {
       return fedosHostFailure("failed", "command failed", requestId);

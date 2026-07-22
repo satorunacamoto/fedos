@@ -117,6 +117,10 @@ describe("Alpha 5801-5880 — domain-wide import exclusions", () => {
       // Secure Runtime Alpha 5961-6040's own two new append-only backends, same discipline.
       "append_only_fedos_identity_transition_peer_observation_persistence.ts",
       "append_only_fedos_identity_transition_ratchet_reset_link_persistence.ts",
+      // Secure Runtime Alpha 6121-6200's own three new append-only backends, same discipline.
+      "append_only_fedos_identity_transition_manual_verification_persistence.ts",
+      "append_only_fedos_identity_transition_conversation_continuity_persistence.ts",
+      "append_only_fedos_identity_transition_local_decision_persistence.ts",
     ]);
     for (const file of files) {
       if ([...allowedFsFiles].some((name) => file.endsWith(name))) continue;
