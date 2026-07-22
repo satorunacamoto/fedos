@@ -222,8 +222,7 @@ describe("FedOS Execution Backend, not connected, fail-closed everywhere (Stage 
     expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("20. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is untouched -- still fixed false", async () => {
     const module = await import("../src/runtime/fedos_runtime_crypto_provider.js");

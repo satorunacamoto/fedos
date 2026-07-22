@@ -149,10 +149,9 @@ describe("Secure Runtime Alpha 175 -- Nostr Public Identifier Completion", () =>
 
   it("10. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("11. RIPPLE (Secure Runtime Alpha 183, 195): no nsec/schnorr/Event/Relay/WebSocket CODE existed anywhere in master_root AS OF this Stage's own closing state -- doc-comment mentions of what does NOT exist yet are expected and excluded; Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature CODE and Stage 1035 (Secure Runtime Alpha 195) legitimately added a real Nostr Event Foundation (FedosNostrEventHandle and friends) in LATER Arcs -- nsec/Relay/WebSocket remain absent, reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/mod master_root \{([\s\S]*?)\r?\n\}\r?\n\r?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";

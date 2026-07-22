@@ -100,10 +100,9 @@ describe("Secure Runtime Alpha 169 -- Deterministic Nostr Public Key Derivation"
 
   it("11. Regression: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("12. Regression: desktop_application.ts and fedos_runtime_identity.ts carry no reference to this Stage's own doc", () => {
     expect(desktopApplicationSource).not.toMatch(/secure_runtime_alpha_169/);

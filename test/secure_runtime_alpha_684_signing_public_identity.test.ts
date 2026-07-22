@@ -40,7 +40,8 @@ function masterSeedAuthorityWithHandle(handle: FedosMasterSeedAuthorityHandle | 
     attemptDevOnlyMasterSeedResolveConversationKeyCall: vi.fn(),
     attemptDevOnlyMasterSeedSealDirectRatchetSecretCall: vi.fn(),
     attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall: vi.fn(),
-  };
+    attemptDevOnlyEncryptNip44WireCall: vi.fn(),
+    attemptDevOnlyDecryptNip44WireCall: vi.fn(),  };
   return new FedosWasmMasterSeedAuthority(boundary);
 }
 

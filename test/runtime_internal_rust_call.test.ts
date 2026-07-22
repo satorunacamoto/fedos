@@ -163,8 +163,7 @@ describe("FedOS internal Rust call planning, blocked before invocation (Stage 35
 
   it("18. Rust pub fn count is unchanged -- 27", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m: RegExpMatchArray) => m[1]);
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("19. FEDOS_RUNTIME_PROVIDER_IMPLEMENTED is unchanged -- still fixed false", () => {
     expect(FEDOS_RUNTIME_PROVIDER_IMPLEMENTED).toBe(false);

@@ -69,6 +69,18 @@ function mockLoaderBoundary(handle: FedosMasterSeedAuthorityHandle | null): Fedo
       secretBytes: new Uint8Array([1, 2, 3]),
       reason: "Succeeded" as const,
     })),
+    attemptDevOnlyEncryptNip44WireCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      payload: "AgAA",
+      reason: "Succeeded" as const,
+    })),
+    attemptDevOnlyDecryptNip44WireCall: vi.fn(async () => ({
+      attempted: true,
+      succeeded: true,
+      plaintext: new Uint8Array([1, 2, 3]),
+      reason: "Succeeded" as const,
+    })),
   };
 }
 

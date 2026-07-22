@@ -129,10 +129,9 @@ describe("Secure Runtime Alpha 200 -- Nostr Event Foundation Completion", () => 
 
   it("8. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("9. structural: all four Event Foundation functions and the Handle exist, pub(crate) only, no wasm_bindgen", () => {
     expect(libRsSource).toMatch(/pub\(crate\) struct FedosNostrEventHandle \{/);

@@ -33,6 +33,20 @@
  *   - `start()` may only be called once per instance — a second call
  *     throws, matching this repository's own "may only be called once,
  *     from the stopped state" convention (e.g. `FedosPublishScheduler.start()`).
+ *
+ * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport Integration
+ * and Group Pairwise Delivery Arc") Phase D (Alpha 1856) — ADDITIVELY
+ * accepts an OPTIONAL `nip17Adapter` (a `FedosPrivateWireAdapter`, in
+ * practice `NostrNip17V1WireAdapter`) and an OPTIONAL `onRumor` listener.
+ * For EVERY inbound event, BOTH classifiers are tried, in order, each
+ * gated on its OWN structural kind check — `parseFedosPrivateTransportEventDescriptor()`
+ * (proprietary `kind: 24700`) FIRST, `nip17Adapter.parse()` (standard
+ * `kind: 1059`/ephemeral) SECOND, ONLY if the first did not match. They
+ * can never both match the SAME event (disjoint kinds), so exactly one
+ * listener fires per genuinely-new event — public `kind: 1` matches
+ * NEITHER (Alpha 1889's own "public isolation" requirement, enforced
+ * structurally here, not by convention). Omitted `nip17Adapter`/`onRumor`
+ * → byte-for-byte the SAME behavior as before this Arc.
  */
 
 import type { FedosConversationRelaySet } from "./fedos_conversation_relay_set.js";
@@ -44,8 +58,10 @@ import {
   parseFedosPrivateTransportEventDescriptor,
   type FedosPrivateTransportParsedEvent,
 } from "../fedos_conversation_transport_event.js";
+import type { FedosPrivateWireAdapter, FedosPrivateWireParsedRumor } from "../fedos_private_wire_adapter.js";
 
 export type FedosConversationInboundEnvelopeListener = (event: FedosPrivateTransportParsedEvent) => void;
+export type FedosConversationInboundRumorListener = (rumor: FedosPrivateWireParsedRumor, relaySource: string) => void;
 
 interface OpenSubscription {
   readonly relayIndex: number;
@@ -56,19 +72,30 @@ export class FedosConversationInboundSubscription {
   readonly #relaySet: FedosConversationRelaySet;
   readonly #localPublicKeyHex: string;
   readonly #deduplicator: FedosRelayEventDeduplicator;
+  readonly #nip17Adapter: FedosPrivateWireAdapter | undefined;
   #open: readonly OpenSubscription[] | null = null;
 
-  constructor(relaySet: FedosConversationRelaySet, localPublicKeyHex: string, deduplicator?: FedosRelayEventDeduplicator) {
+  constructor(
+    relaySet: FedosConversationRelaySet,
+    localPublicKeyHex: string,
+    deduplicator?: FedosRelayEventDeduplicator,
+    nip17Adapter?: FedosPrivateWireAdapter,
+  ) {
     this.#relaySet = relaySet;
     this.#localPublicKeyHex = localPublicKeyHex;
     this.#deduplicator = deduplicator ?? new FedosRelayEventDeduplicator();
+    this.#nip17Adapter = nip17Adapter;
   }
 
   isRunning(): boolean {
     return this.#open !== null;
   }
 
-  async start(filter: FedosSubscriptionFilter, onEnvelope: FedosConversationInboundEnvelopeListener): Promise<void> {
+  async start(
+    filter: FedosSubscriptionFilter,
+    onEnvelope: FedosConversationInboundEnvelopeListener,
+    onRumor?: FedosConversationInboundRumorListener,
+  ): Promise<void> {
     if (this.#open !== null) {
       throw new Error("FedosConversationInboundSubscription.start() may only be called from the stopped state.");
     }
@@ -77,17 +104,27 @@ export class FedosConversationInboundSubscription {
     const opened: OpenSubscription[] = [];
     for (let relayIndex = 0; relayIndex < relays.length; relayIndex += 1) {
       const relay = relays[relayIndex]!;
+      const relayUrl = relay.url;
       const subscription = await relay.subscribe([filter]);
       relay.onSubscriptionMessage(subscription, (message) => {
         if (message.kind !== "event") return;
         if (!this.#deduplicator.shouldProcess(message.event.id)) return;
 
         const descriptor = nostrWireEventToFedosEventDescriptor(message.event);
-        const parsed = parseFedosPrivateTransportEventDescriptor(descriptor);
-        if (parsed === null) return;
-        if (parsed.recipientPublicKeyHex !== this.#localPublicKeyHex) return;
 
-        onEnvelope(parsed);
+        const parsed = parseFedosPrivateTransportEventDescriptor(descriptor);
+        if (parsed !== null) {
+          if (parsed.recipientPublicKeyHex !== this.#localPublicKeyHex) return;
+          onEnvelope(parsed);
+          return;
+        }
+
+        if (this.#nip17Adapter === undefined || onRumor === undefined) return;
+        void this.#nip17Adapter.parse(descriptor).then((result) => {
+          if (result.outcome !== "parsed-rumor") return;
+          if (result.rumor.recipientPublicKeyHex !== this.#localPublicKeyHex) return;
+          onRumor(result.rumor, relayUrl);
+        });
       });
       opened.push({ relayIndex, subscription });
     }

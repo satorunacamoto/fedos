@@ -52,7 +52,8 @@ function boundaryWithResolveResult(
       secretBytes: new Uint8Array([1, 2, 3]),
       reason: "Succeeded" as const,
     })),
-  };
+    attemptDevOnlyEncryptNip44WireCall: vi.fn(),
+    attemptDevOnlyDecryptNip44WireCall: vi.fn(),  };
 }
 
 describe("Secure Runtime Alpha 869 -- resolveConversationKey() TypeScript wiring", () => {

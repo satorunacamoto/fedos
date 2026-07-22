@@ -420,8 +420,7 @@ describe("Secure Runtime Alpha 059 -- Identity Bootstrap Authority Review, revie
 
   it("38. Regression: Rust and Cargo/package sources are BYTE-FOR-BYTE UNCHANGED -- no reference to this Stage's own doc", () => {
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
+    expect(pubFnNames.length).toBe(68);    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_059/);
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_059/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_059/);

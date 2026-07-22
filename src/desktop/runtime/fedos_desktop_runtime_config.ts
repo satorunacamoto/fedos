@@ -186,9 +186,27 @@ export interface FedosDesktopRuntimeConfig {
    * calling `.start()` on one.
    */
   readonly privateTransportEnabled?: boolean;
-  /** Explicit, caller-supplied path to the Conversation Message Envelope append-only log file (Private Delivery, Alpha 857 — reused, unchanged). Omitted, in-memory. */
+  /**
+   * Explicit, caller-supplied path to the Conversation Message Envelope
+   * append-only log file (Private Delivery, Alpha 857 — reused,
+   * unchanged). Omitted, in-memory. Shared by BOTH the Alpha 1113
+   * Encryption Runtime Wiring facade and the Alpha 1471–1540 Private
+   * Transport boundary — one Envelope backend, never two — reconciled
+   * during the Alpha 1611–1690 integration merge (both Arcs had
+   * independently declared this same field), and again during the Alpha
+   * 5561–5640 cross-lineage integration merge (same reconciliation, same
+   * field, this time across the NIP-17 and Ratchet lineages).
+   */
   readonly conversationEnvelopeLogPath?: string;
-  /** Explicit, caller-supplied path to the Conversation Payload Storage append-only log file (Private Delivery, Alpha 804 — reused, unchanged). Omitted, in-memory. */
+  /**
+   * Explicit, caller-supplied path to the Conversation Payload Storage
+   * append-only log file (Private Delivery, Alpha 804 — reused,
+   * unchanged). Omitted, in-memory. Shared by BOTH the Alpha 1113
+   * Encryption Runtime Wiring facade and the Alpha 1471–1540 Private
+   * Transport boundary — reconciled during the Alpha 1611–1690
+   * integration merge (both Arcs had independently declared this same
+   * field).
+   */
   readonly conversationPayloadLogPath?: string;
   /**
    * `AppendOnlyFedosConversationPayloadStorage`'s own REQUIRED
@@ -247,6 +265,26 @@ export interface FedosDesktopRuntimeConfig {
   /** Optional override of the Archive Runtime's own default byte/record bounds (`DEFAULT_FEDOS_CONVERSATION_ARCHIVE_RUNTIME_BOUNDS`). No secret, no path policy beyond what the caller-supplied destination/source path itself already is. */
   readonly conversationArchiveBounds?: FedosConversationArchiveRuntimeBounds;
   /**
+   * Secure Runtime Alpha 1841–1920 ("NIP-17 Standard Transport
+   * Integration and Group Pairwise Delivery Arc") Phase C/G (Alpha
+   * 1844/1878) — the ONE explicit, closed route-selection knob for
+   * Direct (and, transitively, Group pairwise) send delivery. Omitted
+   * (the default) — `sendDirectMessage()` behaves byte-for-byte as
+   * before this Arc: local storage only, no standard delivery attempted,
+   * no Relay event of this kind ever emitted. `"nostr-nip17-v1"` —
+   * REQUIRES `privateTransportEnabled: true` (this route rides the SAME
+   * Private Transport queue/Scheduler/Multi-Relay/Observation, never a
+   * second Outbox domain); a real `NostrNip17V1WireAdapter` is
+   * constructed and injected into `FedosPrivateTransport`'s own
+   * `wireAdapter`, and `sendDirectMessage()` additionally prepares +
+   * durably enqueues a standard Gift Wrap for every successfully
+   * locally-stored Direct message. NEVER a heuristic, NEVER a silent
+   * fallback to `fedos-private-v1` if unavailable (Alpha 1844).
+   */
+  readonly conversationDirectMessageDeliveryRoute?: "nostr-nip17-v1";
+  /** Alpha 1844 — optional; forwarded to `NostrNip17V1WireAdapter`'s own `localAccountIndex` (defaults `0`). Only meaningful with `conversationDirectMessageDeliveryRoute: "nostr-nip17-v1"`. */
+  readonly conversationNip17LocalAccountIndex?: number;
+  /**
    * Secure Runtime Alpha 1113 ("Runtime Encryption Configuration") —
    * Phase A of the Alpha 1111–1180 Private Conversation Activation and
    * Direct Messaging Runtime Arc. Threads the Alpha 949 encryption
@@ -265,7 +303,13 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationIdentityResolver?: FedosConversationIdentityResolver;
   /** Alpha 1113 — optional; omitted, fixed `0` (Alpha 933's own default). */
   readonly conversationAccountIndexAuthority?: FedosConversationLocalAccountIndexAuthority;
-  /** Alpha 1113 — optional, only meaningful with `conversationPayloadLogPath`; omitted, `1_000_000` bytes (Alpha 949's own default). */
+  /**
+   * Alpha 1113 — optional, only meaningful with `conversationPayloadLogPath`
+   * (declared once above, under the Alpha 1471–1540 Private Transport
+   * boundary's own fields — reconciled during the Alpha 1611–1690
+   * integration merge); omitted, `1_000_000` bytes (Alpha 949's own
+   * default).
+   */
   readonly conversationMaxPayloadByteLength?: number;
   /** Alpha 1113 — optional append-only log for the encryption-coordination facts; omitted, in-memory. */
   readonly conversationEncryptionCoordinationLogPath?: string;

@@ -32,10 +32,24 @@
  * durable, the route cannot be resolved, or signing itself fails — every
  * one of these is a legitimate "not ready yet, try again later"
  * condition for the Scheduler, not a permanent error.
+ *
+ * Secure Runtime Alpha 1841–1920 Phase B (Alpha 1843/1848) — ADDITIVELY
+ * handles a `schemaVersion: 2` (standard `nostr-nip17-v1`) record FIRST,
+ * BEFORE any V1 handling: it already carries an already-signed native
+ * Gift Wrap event (`FedosPreparedPrivateDelivery`, prepared once, at
+ * SEND time, while plaintext was still in scope — see
+ * `fedos_private_wire_prepared_delivery.ts`'s own header for why this is
+ * the ONLY sound retry strategy) and is returned VERBATIM — no Envelope/
+ * Payload/route re-derivation, no re-signing, ever. Every V1 record
+ * continues through the ORIGINAL, byte-for-byte unchanged lazy-resolution
+ * path below.
  */
 
-import { deserializeFedosConversationTransportOutboxIntent } from "./fedos_conversation_transport_outbox_codec.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "./fedos_conversation_transport_outbox_codec.js";
+import {
+  deserializeFedosConversationTransportOutboxIntent,
+  deserializeFedosConversationTransportOutboxRecordV2,
+} from "./fedos_conversation_transport_outbox_codec.js";
+import type { FedosPersistedConversationTransportOutboxRecord } from "./fedos_conversation_transport_outbox_codec.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
@@ -70,8 +84,13 @@ export class FedosConversationTransportSignedEventSource {
   }
 
   resolveSignedEvent = async (
-    record: FedosPersistedConversationTransportOutboxRecordV1,
+    record: FedosPersistedConversationTransportOutboxRecord,
   ): Promise<FedosNostrWireEvent | null> => {
+    if ((record as { schemaVersion?: unknown }).schemaVersion === 2) {
+      const v2 = deserializeFedosConversationTransportOutboxRecordV2(record);
+      return v2 === null ? null : v2.nativeEvent;
+    }
+
     const intent = deserializeFedosConversationTransportOutboxIntent(record);
     if (intent === null) return null;
 

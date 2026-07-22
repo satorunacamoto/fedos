@@ -41,7 +41,7 @@
  */
 
 import type { FedosConversationTransportOutboxPersistence } from "./fedos_conversation_transport_outbox_persistence.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "./fedos_conversation_transport_outbox_codec.js";
+import type { FedosPersistedConversationTransportOutboxRecord } from "./fedos_conversation_transport_outbox_codec.js";
 import {
   isValidFedosConversationTransportPublishResult,
   type FedosConversationTransportPublisher,
@@ -77,7 +77,7 @@ export interface FedosConversationTransportSchedulerDependencies {
 }
 
 export interface FedosConversationTransportSchedulerTickEntry {
-  readonly intent: FedosPersistedConversationTransportOutboxRecordV1;
+  readonly intent: FedosPersistedConversationTransportOutboxRecord;
   readonly result: FedosConversationTransportPublishResult;
 }
 
@@ -164,7 +164,7 @@ export class FedosConversationTransportScheduler {
   }
 
   async #attemptIntent(
-    intent: FedosPersistedConversationTransportOutboxRecordV1,
+    intent: FedosPersistedConversationTransportOutboxRecord,
   ): Promise<FedosConversationTransportSchedulerTickEntry> {
     const first = await this.#attemptOnce(intent);
     let result = first;
@@ -184,7 +184,7 @@ export class FedosConversationTransportScheduler {
   }
 
   /** One publish attempt: allocates a fresh attempt-scoped subject id, records `publishing` then the terminal fact. */
-  async #attemptOnce(intent: FedosPersistedConversationTransportOutboxRecordV1): Promise<FedosConversationTransportPublishResult> {
+  async #attemptOnce(intent: FedosPersistedConversationTransportOutboxRecord): Promise<FedosConversationTransportPublishResult> {
     const originalSubjectId = toFedosDeliveryObservationSubjectId(intent.id);
     if (originalSubjectId === null) return FAILED_LATER_RESULT;
 

@@ -64,10 +64,9 @@ describe("Secure Runtime Alpha 206 -- Runtime Boundary Review", () => {
 
   it("5. structural: lib.rs #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("6. the design doc's own §5 records the five-file/three-symbol grep with zero matches", () => {
     const section = (designDocSource.match(/## 5\. Structural confirmation[\s\S]*?\n\n([\s\S]*?)\n## 6\./) ?? [])[1] ?? "";

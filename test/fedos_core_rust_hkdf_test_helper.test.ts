@@ -179,9 +179,12 @@ describe("FedOS Rust crate — test-only HKDF-SHA256 helper", () => {
       "seal_local_ratchet_private_key",
       "seal_all_skipped_keys",
       "restore",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
     ];
-    expect(pubFnNames.length).toBe(64);
-    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(68);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
   it("6. production kdf_core is NOT connected to the rfc5869_vectors module's TEST-ONLY helpers (Stage 147's own real hkdf/sha2 usage is a separate, direct call, not a reuse of these test-only fns)", () => {

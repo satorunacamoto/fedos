@@ -1650,6 +1650,30 @@ export interface FedosMasterSeedAuthorityHandle {
     generation: number,
     sealedBlob: string,
   ) => Uint8Array | undefined;
+  /**
+   * Secure Runtime Alpha 1761–1840 Phase B (Alpha 1764–1768) — genuine
+   * NIP-44 v2 WIRE encrypt/decrypt (as distinct from
+   * `resolve_conversation_key`'s own FedOS-generic-Envelope-AEAD-key
+   * output). OPTIONAL on this interface (not added to
+   * `isFedosMasterSeedAuthorityShape()`'s own required-method checklist,
+   * deliberately — that checklist is shared by every pre-existing
+   * `attemptDevOnly*Call()` method, and several already-passing tests
+   * construct a hand-written mock authority object that implements only
+   * the ORIGINAL seven/nine methods; requiring these two new methods
+   * there would break those pre-existing, unrelated tests for no reason).
+   * `attemptDevOnlyEncryptNip44WireCall()`/`attemptDevOnlyDecryptNip44WireCall()`
+   * validate their presence independently, inline, before calling either.
+   */
+  readonly encrypt_nip44_wire?: (
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ) => string | undefined;
+  readonly decrypt_nip44_wire?: (
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ) => Uint8Array | undefined;
 }
 
 /**
@@ -1795,6 +1819,20 @@ export interface FedosWasmLoaderDirectRatchetSecretSealExecution {
     | "PrototypeStillClosed";
 }
 
+/** Secure Runtime Alpha 1761–1840 Phase B — `attemptDevOnlyEncryptNip44WireCall()`'s own result. `payload` is a real NIP-44 v2 wire string, never a secret Handle, never this crate's own generic Envelope-AEAD ciphertext shape. */
+export interface FedosWasmLoaderNip44WireEncryptExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly payload: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "EncryptFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
 /** Secure Runtime Alpha 5401-5480 — `attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall()`'s own result. `secretBytes` is the recovered opaque secret, `null` on ANY failure including a binding-tuple mismatch or a tampered blob (Rust's `restore_direct_ratchet_secret` never distinguishes which, same AEAD guidance as Master Seed restore). */
 export interface FedosWasmLoaderDirectRatchetSecretRestoreExecution {
   readonly attempted: boolean;
@@ -1804,6 +1842,48 @@ export interface FedosWasmLoaderDirectRatchetSecretRestoreExecution {
     | "Succeeded"
     | "RestoreFailed"
     | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 1761–1840 Phase B — `attemptDevOnlyDecryptNip44WireCall()`'s own result. `plaintext` is the original decrypted bytes, `null` on ANY failure (structural or authentication) — never distinguishing which, never a partial/best-effort value. */
+export interface FedosWasmLoaderNip44WireDecryptExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly plaintext: Uint8Array | null;
+  readonly reason:
+    | "Succeeded"
+    | "DecryptFailed"
+    | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 1761–1840 Phase F — `attemptDevOnlyBuildAndSignGiftWrapCall()`'s own result. `signedEventJson` is the complete signed Gift-Wrap event as a JSON string, never a secret key of any kind. */
+export interface FedosWasmLoaderGiftWrapBuildExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly signedEventJson: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "GiftWrapUnavailable"
+    | "GiftWrapFailed"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Secure Runtime Alpha 1761–1840 Phase E — `attemptDevOnlySignWithFreshEphemeralKeyCall()`'s own result. `signedEventJson` is the complete signed event as a JSON string, never a secret key of any kind. */
+export interface FedosWasmLoaderEphemeralSignExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly signedEventJson: string | null;
+  readonly reason:
+    | "Succeeded"
+    | "SigningUnavailable"
+    | "SigningFailed"
     | "NotInitialized"
     | "CallFailed"
     | "PrototypeStillClosed";
@@ -2007,6 +2087,18 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   /** Secure Runtime Alpha 5401-5480 — most recent `attemptDevOnlyMasterSeedRestoreDirectRatchetSecretCall()` result, or `null` before it has ever been called. Read via `directRatchetSecretRestoreExecution()`. */
   #directRatchetSecretRestoreExecution: FedosWasmLoaderDirectRatchetSecretRestoreExecution | null = null;
+
+  /** Secure Runtime Alpha 1761–1840 Phase B — most recent `attemptDevOnlyEncryptNip44WireCall()` result, or `null` before it has ever been called. Read via `nip44WireEncryptExecution()`. */
+  #nip44WireEncryptExecution: FedosWasmLoaderNip44WireEncryptExecution | null = null;
+
+  /** Secure Runtime Alpha 1761–1840 Phase B — most recent `attemptDevOnlyDecryptNip44WireCall()` result, or `null` before it has ever been called. Read via `nip44WireDecryptExecution()`. */
+  #nip44WireDecryptExecution: FedosWasmLoaderNip44WireDecryptExecution | null = null;
+
+  /** Secure Runtime Alpha 1761–1840 Phase E — most recent `attemptDevOnlySignWithFreshEphemeralKeyCall()` result, or `null` before it has ever been called. Read via `ephemeralSignExecution()`. */
+  #ephemeralSignExecution: FedosWasmLoaderEphemeralSignExecution | null = null;
+
+  /** Secure Runtime Alpha 1761–1840 Phase F — most recent `attemptDevOnlyBuildAndSignGiftWrapCall()` result, or `null` before it has ever been called. Read via `giftWrapBuildExecution()`. */
+  #giftWrapBuildExecution: FedosWasmLoaderGiftWrapBuildExecution | null = null;
 
   /**
    * Stage 945 (Prototype EXECUTION Phase 004) — the function
@@ -2445,6 +2537,26 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   /** Secure Runtime Alpha 5401-5480 — read-only accessor for `#directRatchetSecretRestoreExecution`. */
   directRatchetSecretRestoreExecution(): FedosWasmLoaderDirectRatchetSecretRestoreExecution | null {
     return this.#directRatchetSecretRestoreExecution;
+  }
+
+  /** Secure Runtime Alpha 1761–1840 Phase B — read-only accessor for `#nip44WireEncryptExecution`. */
+  nip44WireEncryptExecution(): FedosWasmLoaderNip44WireEncryptExecution | null {
+    return this.#nip44WireEncryptExecution;
+  }
+
+  /** Secure Runtime Alpha 1761–1840 Phase B — read-only accessor for `#nip44WireDecryptExecution`. */
+  nip44WireDecryptExecution(): FedosWasmLoaderNip44WireDecryptExecution | null {
+    return this.#nip44WireDecryptExecution;
+  }
+
+  /** Secure Runtime Alpha 1761–1840 Phase E — read-only accessor for `#ephemeralSignExecution`. */
+  ephemeralSignExecution(): FedosWasmLoaderEphemeralSignExecution | null {
+    return this.#ephemeralSignExecution;
+  }
+
+  /** Secure Runtime Alpha 1761–1840 Phase F — read-only accessor for `#giftWrapBuildExecution`. */
+  giftWrapBuildExecution(): FedosWasmLoaderGiftWrapBuildExecution | null {
+    return this.#giftWrapBuildExecution;
   }
 
   /**
@@ -3975,6 +4087,251 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       conversationId,
     ]);
     return Array.isArray(result) ? (result as string[]) : [];
+  }
+
+  /**
+   * Secure Runtime Alpha 1761–1840 Phase B (Alpha 1764–1768) — PUBLIC,
+   * ASYNC. Calls `authority.encrypt_nip44_wire(accountIndex,
+   * counterpartyPublicKeyHex, plaintext)` — a genuine NIP-44 v2 WIRE
+   * encrypt, never this crate's own generic Envelope AEAD. Mirrors
+   * `attemptDevOnlyMasterSeedResolveConversationKeyCall()`'s own gating
+   * exactly (same artifact/dev-gate/readiness/import/init checks), but
+   * validates `authority.encrypt_nip44_wire` is itself a function BEFORE
+   * calling it (this new method is OPTIONAL on
+   * `FedosMasterSeedAuthorityHandle`, deliberately not folded into
+   * `isFedosMasterSeedAuthorityShape()` — see that interface's own doc
+   * comment for why).
+   */
+  async attemptDevOnlyEncryptNip44WireCall(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ): Promise<FedosWasmLoaderNip44WireEncryptExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderNip44WireEncryptExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, payload: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, payload: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority) || typeof authority.encrypt_nip44_wire !== "function") {
+      result = { attempted: true, succeeded: false, payload: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.encrypt_nip44_wire(accountIndex, counterpartyPublicKeyHex, plaintext);
+        if (typeof value === "string") {
+          result = { attempted: true, succeeded: true, payload: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, payload: null, reason: "EncryptFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, payload: null, reason: "CallFailed" };
+      }
+    }
+    this.#nip44WireEncryptExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 1761–1840 Phase B (Alpha 1764–1768) — PUBLIC,
+   * ASYNC. Calls `authority.decrypt_nip44_wire(accountIndex,
+   * counterpartyPublicKeyHex, payload)`. Mirrors
+   * `attemptDevOnlyEncryptNip44WireCall()`'s own gating exactly. On ANY
+   * failure (structural OR authentication), `plaintext` is `null` —
+   * never a partial/best-effort value, never distinguishing why.
+   */
+  async attemptDevOnlyDecryptNip44WireCall(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ): Promise<FedosWasmLoaderNip44WireDecryptExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderNip44WireDecryptExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, plaintext: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, plaintext: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority) || typeof authority.decrypt_nip44_wire !== "function") {
+      result = { attempted: true, succeeded: false, plaintext: null, reason: "InvalidAuthorityHandle" };
+    } else {
+      try {
+        const value = authority.decrypt_nip44_wire(accountIndex, counterpartyPublicKeyHex, payload);
+        if (value instanceof Uint8Array) {
+          result = { attempted: true, succeeded: true, plaintext: value, reason: "Succeeded" };
+        } else {
+          result = { attempted: true, succeeded: false, plaintext: null, reason: "DecryptFailed" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, plaintext: null, reason: "CallFailed" };
+      }
+    }
+    this.#nip44WireDecryptExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+   * Delivery Arc") Phase E (Alpha 1777–1780) — PUBLIC, ASYNC. Calls the
+   * FREE module-level `module.sign_nostr_event_with_fresh_ephemeral_key(
+   * createdAt, kind, tags, content)` export — NOT an authority method (no
+   * `FedosMasterSeedAuthority` handle is involved at all; a fresh CSPRNG
+   * key is drawn INSIDE Rust for this one call and never returned to
+   * TypeScript in any form). Mirrors `attemptDevOnlyRandomBytesCall()`'s
+   * own free-function-reach gating exactly (same six previously-recorded
+   * conditions, same runtime `typeof module.sign_nostr_event_with_fresh_ephemeral_key
+   * === "function"` check — no export-list enumeration). `tags` is
+   * ALREADY this Arc's own flattened wire format (Secure Runtime Alpha
+   * 442), matching `attemptDevOnlyNostrSignEventCall()`'s own `tags`
+   * shape.
+   */
+  async attemptDevOnlySignWithFreshEphemeralKeyCall(
+    createdAt: number,
+    kind: number,
+    tags: string[],
+    content: string,
+  ): Promise<FedosWasmLoaderEphemeralSignExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderEphemeralSignExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, signedEventJson: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, signedEventJson: null, reason: "NotInitialized" };
+    } else {
+      const candidate = module as { sign_nostr_event_with_fresh_ephemeral_key?: unknown };
+      if (typeof candidate.sign_nostr_event_with_fresh_ephemeral_key !== "function") {
+        result = { attempted: true, succeeded: false, signedEventJson: null, reason: "SigningUnavailable" };
+      } else {
+        try {
+          const value: unknown = (
+            candidate.sign_nostr_event_with_fresh_ephemeral_key as (
+              createdAt: number,
+              kind: number,
+              tags: string[],
+              content: string,
+            ) => unknown
+          )(createdAt, kind, tags, content);
+          if (typeof value === "string") {
+            result = { attempted: true, succeeded: true, signedEventJson: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, signedEventJson: null, reason: "SigningFailed" };
+          } else {
+            result = { attempted: true, succeeded: false, signedEventJson: null, reason: "CallFailed" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, signedEventJson: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#ephemeralSignExecution = result;
+    return result;
+  }
+
+  /**
+   * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+   * Delivery Arc") Phase F (Alpha 1782/1785/1786) — PUBLIC, ASYNC. Calls
+   * the FREE module-level `module.build_and_sign_nip17_gift_wrap(
+   * recipientPublicKeyHex, createdAt, kind, contentPlaintext)` export —
+   * NOT an authority method (no `FedosMasterSeedAuthority` handle is
+   * involved; a fresh CSPRNG key is drawn INSIDE Rust, ECDH'd against
+   * the recipient, used to NIP-44-encrypt `contentPlaintext`, and used to
+   * sign the resulting event, all in one call — never returned to
+   * TypeScript in any form). Mirrors
+   * `attemptDevOnlySignWithFreshEphemeralKeyCall()`'s own free-function
+   * gating exactly.
+   */
+  async attemptDevOnlyBuildAndSignGiftWrapCall(
+    recipientPublicKeyHex: string,
+    createdAt: number,
+    kind: number,
+    contentPlaintext: Uint8Array,
+  ): Promise<FedosWasmLoaderGiftWrapBuildExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderGiftWrapBuildExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, signedEventJson: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, signedEventJson: null, reason: "NotInitialized" };
+    } else {
+      const candidate = module as { build_and_sign_nip17_gift_wrap?: unknown };
+      if (typeof candidate.build_and_sign_nip17_gift_wrap !== "function") {
+        result = { attempted: true, succeeded: false, signedEventJson: null, reason: "GiftWrapUnavailable" };
+      } else {
+        try {
+          const value: unknown = (
+            candidate.build_and_sign_nip17_gift_wrap as (
+              recipientPublicKeyHex: string,
+              createdAt: number,
+              kind: number,
+              contentPlaintext: Uint8Array,
+            ) => unknown
+          )(recipientPublicKeyHex, createdAt, kind, contentPlaintext);
+          if (typeof value === "string") {
+            result = { attempted: true, succeeded: true, signedEventJson: value, reason: "Succeeded" };
+          } else if (value === undefined) {
+            result = { attempted: true, succeeded: false, signedEventJson: null, reason: "GiftWrapFailed" };
+          } else {
+            result = { attempted: true, succeeded: false, signedEventJson: null, reason: "CallFailed" };
+          }
+        } catch {
+          result = { attempted: true, succeeded: false, signedEventJson: null, reason: "CallFailed" };
+        }
+      }
+    }
+    this.#giftWrapBuildExecution = result;
+    return result;
   }
 
   /**

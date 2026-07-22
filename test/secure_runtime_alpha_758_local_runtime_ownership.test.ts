@@ -99,6 +99,10 @@ describe("Secure Runtime Alpha 758 -- Local Runtime Ownership", () => {
     // integration) ADDITIVELY extends it again with
     // `conversationProductionCryptoCapability()` -- ONE coarse, non-secret
     // capability-outcome accessor. Still NO filesystem internal is exposed.
+    // Reconciled during the Alpha 1611-1690 integration merge: Alpha
+    // 1471-1540's own `privateTransport()` accessor is ALSO unconditionally
+    // exposed (it throws "not enabled" here since `privateTransportEnabled`
+    // was never supplied above).
     expect(Object.keys(runtime).sort()).toEqual(
       [
         "boardRuntime",
@@ -108,8 +112,7 @@ describe("Secure Runtime Alpha 758 -- Local Runtime Ownership", () => {
         "host",
         "privateTransport",
         "stop",
-      ].sort(),
-    );
+      ].sort(),    );
     await runtime.stop();
   });
 

@@ -132,10 +132,9 @@ describe("Secure Runtime Alpha 160 -- Integration Completion", () => {
 
   it("9. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("10. RIPPLE (Secure Runtime Alpha 164, 173, 183): no Nostr secret-key generation, npub, nsec, or signature CODE existed anywhere in the master_root module AS OF this Stage's own closing state -- doc-comment mentions of what did NOT exist yet were expected and excluded; Stage 1021 (Secure Runtime Alpha 164) legitimately added secret-key derivation, Stage 1026 (Secure Runtime Alpha 173) legitimately added npub encoding, and Stage 1029 (Secure Runtime Alpha 183) legitimately added real Schnorr signature generation in LATER Arcs -- nsec CODE remains absent, reconfirmed here as the CURRENT state", () => {
     const moduleText = (libRsSource.match(/\/\/\/ Stage 1012 \(Secure Runtime Alpha 146\)[\s\S]*?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";

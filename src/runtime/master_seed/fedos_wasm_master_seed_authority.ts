@@ -24,6 +24,8 @@ import {
   type FedosWasmLoaderConversationKeyResolutionExecution,
   type FedosWasmLoaderDirectRatchetSecretSealExecution,
   type FedosWasmLoaderDirectRatchetSecretRestoreExecution,
+  type FedosWasmLoaderNip44WireEncryptExecution,
+  type FedosWasmLoaderNip44WireDecryptExecution,
   type FedosMasterSeedAuthorityHandle,
   type AeadKeyHandle,
 } from "../fedos_wasm_loader.js";
@@ -69,6 +71,27 @@ export interface FedosMasterSeedWasmLoaderBoundary {
     generation: number,
     sealedBlob: string,
   ): Promise<FedosWasmLoaderDirectRatchetSecretRestoreExecution>;
+  /**
+   * OPTIONAL — mirrors this same pair's own optionality on
+   * `FedosMasterSeedAuthority` (`./fedos_master_seed_authority.ts`) and on
+   * the raw Rust Boundary reach interface (`../fedos_wasm_loader.ts`,
+   * Secure Runtime Alpha 1761–1840 Phase B's own doc comment): several
+   * pre-existing hand-written test mocks of this exact boundary implement
+   * only the ORIGINAL nine methods, and requiring these two here would
+   * break those pre-existing, unrelated tests for no reason.
+   */
+  attemptDevOnlyEncryptNip44WireCall?(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ): Promise<FedosWasmLoaderNip44WireEncryptExecution>;
+  attemptDevOnlyDecryptNip44WireCall?(
+    authority: unknown,
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ): Promise<FedosWasmLoaderNip44WireDecryptExecution>;
 }
 
 export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority, FedosDirectRatchetSealingAuthority {
@@ -196,6 +219,40 @@ export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority, F
       sealedBlob,
     );
     return result.succeeded ? result.secretBytes : null;
+  }
+
+  async encryptNip44Wire(
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ): Promise<string | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    if (!this.#loaderBoundary.attemptDevOnlyEncryptNip44WireCall) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyEncryptNip44WireCall(
+      authority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+      plaintext,
+    );
+    return result.succeeded ? result.payload : null;
+  }
+
+  async decryptNip44Wire(
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ): Promise<Uint8Array | null> {
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    if (!this.#loaderBoundary.attemptDevOnlyDecryptNip44WireCall) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyDecryptNip44WireCall(
+      authority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+      payload,
+    );
+    return result.succeeded ? result.plaintext : null;
   }
 
   /**

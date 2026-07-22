@@ -3570,10 +3570,15 @@ mod master_root {
     }
 
     impl FedosNostrSecretKeyHandle {
-        /// Private to this module — the only production caller is
-        /// [`derive_nostr_secret_key_internal`] below, and only once its
-        /// HKDF candidate bytes have already been confirmed a valid
-        /// secp256k1 scalar.
+        /// Private to this module. Two reviewed production callers:
+        /// [`derive_nostr_secret_key_internal`] below (once its HKDF
+        /// candidate bytes have already been confirmed a valid secp256k1
+        /// scalar), and, as of Secure Runtime Alpha 1761–1840 Phase E
+        /// (Alpha 1777), [`sign_nostr_event_with_fresh_ephemeral_key_internal`]
+        /// (fresh CSPRNG bytes, never HKDF-derived, never Master-Seed
+        /// derived) — the Gift-Wrap ephemeral signing key. Both callers
+        /// already validate their own input before calling this
+        /// constructor; it does not re-validate the scalar itself.
         fn new_from_32_bytes_for_internal_use(bytes: [u8; 32]) -> Self {
             Self {
                 inner: SecretHandle::new_from_32_bytes_for_internal_use(
@@ -5033,11 +5038,683 @@ mod master_root {
         conversation_key_bytes
     }
 
+    /// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+    /// Standard Delivery Arc") Phase B (Alpha 1764–1768) — the crate's
+    /// FIRST bridge from an account-derived Master Seed secret key all
+    /// the way to a genuine NIP-44 v2 WIRE payload (ECDH -> HKDF-extract
+    /// -> exact message-key derivation -> pad -> ChaCha20 -> HMAC-SHA256
+    /// -> base64), as distinct from
+    /// [`derive_conversation_key_bytes_from_master_seed_internal`]'s own
+    /// FedOS-generic-Envelope-AEAD-key output (Alpha 869) — that
+    /// function's resulting bytes are wrapped into an `AeadKeyHandle` and
+    /// fed to THIS crate's own `encrypt_aead`/`decrypt_aead`, which is
+    /// NEVER interoperable NIP-44 wire ciphertext. This function instead
+    /// calls `crypto::nip44_wire_encrypt::encrypt_wire_internal` (Stage
+    /// 236, UNCHANGED, official-vector-verified) directly, so its output
+    /// is a real, standard NIP-44 v2 wire string any genuine Nostr client
+    /// can decrypt.
+    ///
+    /// Reuses the IDENTICAL identity -> application root -> nostr root ->
+    /// account secret key chain every sibling function in this module
+    /// already establishes (Alpha 146–200, unchanged), then bridges the
+    /// resulting secret key and `counterparty_public_key_x_only` into
+    /// `crypto::conversation_key::derive_conversation_key_via_ecdh_internal`
+    /// (Stage 199, UNCHANGED) exactly as
+    /// [`derive_conversation_key_bytes_from_master_seed_internal`] already
+    /// does — but instead of exposing the derived conversation key as raw
+    /// bytes, keeps it as the real, opaque `ConversationKey` handle and
+    /// passes it DIRECTLY to `encrypt_wire_internal`, so no conversation
+    /// key byte is ever copied further than this function's own local
+    /// scope. `plaintext` is the caller-supplied Rumor/Seal serialization
+    /// — this function performs NO Rumor/Seal construction of its own, no
+    /// padding/nonce/HMAC/base64 logic of its own (all reused, unmodified,
+    /// from `crypto::nip44_wire_encrypt`).
+    ///
+    /// Returns the complete NIP-44 v2 wire payload string on success,
+    /// `None` on ANY failure at ANY step (no Master Seed held, an invalid
+    /// `account_index` derivation, an invalid/off-curve counterparty key,
+    /// or an internal encrypt-pipeline failure) — fail closed, never a
+    /// panic, collapsing every failure into the SAME single `None` this
+    /// module's every other `*_from_master_seed_internal` function already
+    /// uses. Every intermediate root/key/conversation-key handle is
+    /// `clear()`-ed immediately after its own single use.
+    pub(crate) fn encrypt_nip44_wire_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+        counterparty_public_key_x_only: [u8; 32],
+        plaintext: &[u8],
+    ) -> Option<String> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let mut local_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        secret_key.clear();
+
+        let local_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            local_secret_bytes,
+        );
+        local_secret_bytes.zeroize();
+        let counterparty_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            counterparty_public_key_x_only,
+        );
+
+        let conversation_decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &local_secret_handle,
+            &counterparty_handle,
+        );
+        if conversation_decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            return None;
+        }
+        let mut conversation_key = conversation_decision.output?;
+
+        let encrypt_decision =
+            crate::crypto::nip44_wire_encrypt::encrypt_wire_internal(&conversation_key, plaintext);
+        conversation_key.clear();
+
+        match encrypt_decision.status {
+            crate::crypto::nip44_wire_encrypt::Nip44WireEncryptStatus::Ready => encrypt_decision.payload,
+            _ => None,
+        }
+    }
+
+    /// The decrypt-direction sibling of
+    /// [`encrypt_nip44_wire_from_master_seed_internal`] — see that
+    /// function's own doc comment for the shared derivation-chain
+    /// rationale. Calls `crypto::nip44_wire_decrypt::decrypt_wire_payload_internal`
+    /// (Stage 232/235, UNCHANGED, official-vector-verified) instead of the
+    /// encrypt pipeline.
+    ///
+    /// Returns the original plaintext bytes on success, `None` on ANY
+    /// failure (no Master Seed held, invalid `account_index`/counterparty
+    /// key, a structurally malformed `payload`, OR a genuine
+    /// authentication failure — wrong recipient or tampered ciphertext) —
+    /// this function does NOT further distinguish those causes;
+    /// `decrypt_wire_payload_internal` itself already collapses them per
+    /// its own module doc comment's "never distinguishing why" discipline
+    /// (never returning partial/best-effort plaintext), and this function
+    /// propagates that same discipline rather than adding a new one.
+    pub(crate) fn decrypt_nip44_wire_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+        account_index: u32,
+        counterparty_public_key_x_only: [u8; 32],
+        payload: &str,
+    ) -> Option<Vec<u8>> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let nostr_root_decision = derive_nostr_root_internal(&application_root);
+        application_root.clear();
+        if nostr_root_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut nostr_root = nostr_root_decision.output?;
+
+        let secret_key_decision = derive_nostr_secret_key_internal(&nostr_root, account_index);
+        nostr_root.clear();
+        if secret_key_decision.status != NostrSecretKeyStatus::Success {
+            return None;
+        }
+        let mut secret_key = match secret_key_decision.output {
+            Some(key) => key,
+            None => return None,
+        };
+
+        let mut local_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        secret_key.clear();
+
+        let local_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            local_secret_bytes,
+        );
+        local_secret_bytes.zeroize();
+        let counterparty_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            counterparty_public_key_x_only,
+        );
+
+        let conversation_decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &local_secret_handle,
+            &counterparty_handle,
+        );
+        if conversation_decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            return None;
+        }
+        let mut conversation_key = conversation_decision.output?;
+
+        let decrypt_decision = crate::crypto::nip44_wire_decrypt::decrypt_wire_payload_internal(
+            &conversation_key,
+            payload,
+        );
+        conversation_key.clear();
+
+        match decrypt_decision.status {
+            crate::crypto::nip44_wire_decrypt::Nip44WireDecryptStatus::Ready => decrypt_decision.plaintext,
+            _ => None,
+        }
+    }
+
+    /// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+    /// Standard Delivery Arc") Phase E (Alpha 1777–1780) — a narrow,
+    /// single-use ephemeral Nostr signing operation: draws a FRESH
+    /// CSPRNG secp256k1 secret key (via [`crate::fedos_random_bytes_32`],
+    /// the SAME entropy source `FedosMasterSeedAuthority::generate()`
+    /// itself already uses), derives its public key, signs EXACTLY ONE
+    /// caller-supplied event with it, then `clear()`s the ephemeral
+    /// secret key before returning — NO deterministic Master-Seed
+    /// derivation of any kind (this function never touches a
+    /// `FedosMasterSeedHandle`), NO durable persistence, NO raw-key
+    /// getter, and NO generic "sign with any key" API: this function
+    /// generates its own key internally every call and never accepts one
+    /// from a caller. This is the Gift-Wrap outer signing authority
+    /// NIP-59 requires (a fresh, unlinkable key per Gift Wrap) — NEVER
+    /// used for Seal signing, which uses the REAL sender identity via
+    /// [`sign_nostr_event_from_master_seed_internal`] instead, unchanged.
+    ///
+    /// Reuses the EXISTING Alpha 146-200 event/signature construction
+    /// chain ([`new_nostr_event_internal`]/[`derive_nostr_event_id_internal`]/
+    /// [`sign_nostr_event_internal`]/`nostr_event_encoding::serialize_signed_nostr_event_internal`)
+    /// verbatim — this function's only new work is drawing the ephemeral
+    /// key itself and deriving its public key, the SAME "generate, use
+    /// once, clear" discipline every other secret handle in this module
+    /// already follows.
+    ///
+    /// `kind`/`tags`/`content` are caller-supplied (the Gift-Wrap's own
+    /// `kind: 1059`/`p`-tag/NIP-44-encrypted-Seal content, per NIP-59) —
+    /// this function performs NO Gift-Wrap-specific construction of its
+    /// own; it is a general "sign one event with one fresh ephemeral
+    /// key" primitive. Returns the complete signed NIP-01-shaped event as
+    /// a JSON string on success, `None` on ANY failure (CSPRNG
+    /// unavailable, an out-of-range `created_at`, or any internal
+    /// construction/signing failure) — fail closed, never a panic, never
+    /// a partial event.
+    pub(crate) fn sign_nostr_event_with_fresh_ephemeral_key_internal(
+        created_at: u64,
+        kind: u64,
+        tags: Vec<Vec<String>>,
+        content: String,
+    ) -> Option<String> {
+        let random_decision = crate::fedos_random_bytes_32();
+        if random_decision.state != crate::FedosRandomBytesState::Ready {
+            return None;
+        }
+        let mut key_bytes = random_decision.bytes?;
+        let mut secret_key = FedosNostrSecretKeyHandle::new_from_32_bytes_for_internal_use(key_bytes);
+        key_bytes.zeroize();
+
+        let public_key = match derive_nostr_public_key_internal(&secret_key) {
+            Some(pk) => pk,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event = match new_nostr_event_internal(&public_key, created_at, kind, tags, content) {
+            Some(e) => e,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event_id = match derive_nostr_event_id_internal(&event) {
+            Some(id) => id,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let signature = sign_nostr_event_internal(&event, &secret_key);
+        secret_key.clear();
+        let signature = signature?;
+        let signature_bytes = signature.expose_bytes_for_internal_signature_encoding();
+
+        Some(nostr_event_encoding::serialize_signed_nostr_event_internal(
+            &event_id, &event, &signature_bytes,
+        ))
+    }
+
+    /// Secure Runtime Alpha 1761–1840 Phase F (Alpha 1782/1785/1786) —
+    /// the NIP-59 Gift-Wrap construction primitive. NIP-59's own Gift
+    /// Wrap encrypts to the recipient using
+    /// `conversation_key(wrapperPrivateKey, receiverPublicKey)` — an
+    /// ECDH between the FRESH EPHEMERAL secret key and the recipient's
+    /// public key, NOT a Master-Seed-derived account (unlike
+    /// [`encrypt_nip44_wire_from_master_seed_internal`], which is
+    /// therefore NOT reusable here). Since the ephemeral secret key must
+    /// never leave this function (no raw-key getter, no cross-boundary
+    /// exposure — Alpha 1777's own guardrail), the encrypt AND the sign
+    /// step must happen in the SAME call, atomically, with the SAME
+    /// transient key — this function is that atomic operation.
+    ///
+    /// Pipeline: draw a fresh CSPRNG secp256k1 key -> derive its public
+    /// key -> ECDH the ephemeral secret against `recipient_public_key_hex`
+    /// (`crypto::conversation_key::derive_conversation_key_via_ecdh_internal`,
+    /// UNCHANGED) -> NIP-44 wire encrypt `content_plaintext` under that
+    /// conversation key (`crypto::nip44_wire_encrypt::encrypt_wire_internal`,
+    /// UNCHANGED) -> build the `kind`/`["p", recipient]`-tagged event ->
+    /// sign it with the SAME ephemeral key -> clear the ephemeral key and
+    /// the conversation key -> return the complete signed event JSON.
+    /// `content_plaintext` is the caller-supplied Seal serialization —
+    /// this function performs NO Seal construction of its own.
+    ///
+    /// Returns `None` on ANY failure at ANY step (CSPRNG unavailable, a
+    /// malformed/off-curve `recipient_public_key_hex`, or any internal
+    /// ECDH/encrypt/sign failure) — fail closed, never a panic, never a
+    /// partial event.
+    pub(crate) fn build_and_sign_nip17_gift_wrap_internal(
+        recipient_public_key_hex: &str,
+        created_at: u64,
+        kind: u64,
+        content_plaintext: &[u8],
+    ) -> Option<String> {
+        let recipient_bytes = crate::fedos_decode_fixed_32_hex(recipient_public_key_hex)?;
+
+        let random_decision = crate::fedos_random_bytes_32();
+        if random_decision.state != crate::FedosRandomBytesState::Ready {
+            return None;
+        }
+        let mut key_bytes = random_decision.bytes?;
+        let mut secret_key = FedosNostrSecretKeyHandle::new_from_32_bytes_for_internal_use(key_bytes);
+        key_bytes.zeroize();
+
+        let public_key = match derive_nostr_public_key_internal(&secret_key) {
+            Some(pk) => pk,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let mut ephemeral_secret_bytes = match secret_key.expose_bytes_for_internal_public_key_derivation() {
+            Some(bytes) => bytes,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+        let ephemeral_secret_handle = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::NostrKeyMaterial,
+            ephemeral_secret_bytes,
+        );
+        ephemeral_secret_bytes.zeroize();
+        let recipient_handle =
+            SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::NostrKeyMaterial, recipient_bytes);
+
+        let conversation_decision = crate::crypto::conversation_key::derive_conversation_key_via_ecdh_internal(
+            &ephemeral_secret_handle,
+            &recipient_handle,
+        );
+        if conversation_decision.status != crate::crypto::conversation_key::ConversationKeyStatus::Success {
+            secret_key.clear();
+            return None;
+        }
+        let mut conversation_key = match conversation_decision.output {
+            Some(key) => key,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let encrypt_decision =
+            crate::crypto::nip44_wire_encrypt::encrypt_wire_internal(&conversation_key, content_plaintext);
+        conversation_key.clear();
+        let encrypted_content = match encrypt_decision.status {
+            crate::crypto::nip44_wire_encrypt::Nip44WireEncryptStatus::Ready => match encrypt_decision.payload {
+                Some(payload) => payload,
+                None => {
+                    secret_key.clear();
+                    return None;
+                }
+            },
+            _ => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let tags = vec![vec!["p".to_string(), recipient_public_key_hex.to_string()]];
+        let event = match new_nostr_event_internal(&public_key, created_at, kind, tags, encrypted_content) {
+            Some(e) => e,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let event_id = match derive_nostr_event_id_internal(&event) {
+            Some(id) => id,
+            None => {
+                secret_key.clear();
+                return None;
+            }
+        };
+
+        let signature = sign_nostr_event_internal(&event, &secret_key);
+        secret_key.clear();
+        let signature = signature?;
+        let signature_bytes = signature.expose_bytes_for_internal_signature_encoding();
+
+        Some(nostr_event_encoding::serialize_signed_nostr_event_internal(
+            &event_id, &event, &signature_bytes,
+        ))
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
 
         const TEST_MASTER_SEED: [u8; 32] = [0xEE; 32];
+
+        const ALICE_SEED: [u8; 32] = [0x11; 32];
+        const BOB_SEED: [u8; 32] = [0x22; 32];
+        const MALLORY_SEED: [u8; 32] = [0x33; 32];
+
+        fn public_key_bytes(master_seed_bytes: [u8; 32], account_index: u32) -> [u8; 32] {
+            let master_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(master_seed_bytes);
+            let hex = derive_nostr_public_key_hex_from_master_seed_internal(&master_seed, account_index)
+                .expect("expected a real public key hex");
+            crate::fedos_decode_fixed_32_hex(&hex).expect("expected a well-formed 32-byte hex string")
+        }
+
+        #[test]
+        fn encrypt_then_decrypt_nip44_wire_round_trips_between_two_real_identities() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub = public_key_bytes(ALICE_SEED, 0);
+
+            let payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"hello bob, real nip-44 wire")
+                .expect("expected a real NIP-44 wire payload");
+
+            let plaintext = decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, alice_pub, &payload)
+                .expect("expected Bob to decrypt Alice's payload");
+            assert_eq!(plaintext, b"hello bob, real nip-44 wire".to_vec());
+        }
+
+        #[test]
+        fn different_account_indices_derive_independent_pairwise_keys() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub_account_1 = public_key_bytes(ALICE_SEED, 1);
+
+            let payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"account-scoped secret")
+                .expect("expected a real NIP-44 wire payload");
+
+            // Bob attempting to decrypt as though the sender were Alice's
+            // account 1 (a DIFFERENT derived key pair) must fail closed —
+            // never a partial/degraded plaintext.
+            let wrong_account_result =
+                decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, alice_pub_account_1, &payload);
+            assert_eq!(wrong_account_result, None);
+        }
+
+        #[test]
+        fn wrong_recipient_cannot_decrypt_and_receives_no_partial_plaintext() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let mallory_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(MALLORY_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub = public_key_bytes(ALICE_SEED, 0);
+
+            let payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"only for bob")
+                .expect("expected a real NIP-44 wire payload");
+
+            let mallory_result =
+                decrypt_nip44_wire_from_master_seed_internal(&mallory_seed, 0, alice_pub, &payload);
+            assert_eq!(mallory_result, None);
+        }
+
+        #[test]
+        fn tampered_wire_payload_fails_closed() {
+            let alice_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            let alice_pub = public_key_bytes(ALICE_SEED, 0);
+
+            let mut payload = encrypt_nip44_wire_from_master_seed_internal(&alice_seed, 0, bob_pub, b"tamper me not")
+                .expect("expected a real NIP-44 wire payload");
+            // Flip the last base64 character — corrupts the trailing MAC
+            // bytes without affecting structural decodability.
+            let mut chars: Vec<char> = payload.chars().collect();
+            let last = chars.len() - 1;
+            chars[last] = if chars[last] == 'A' { 'B' } else { 'A' };
+            payload = chars.into_iter().collect();
+
+            let result = decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, alice_pub, &payload);
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn sign_nostr_event_with_fresh_ephemeral_key_internal_produces_a_signature_that_verifies_independently() {
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let json = sign_nostr_event_with_fresh_ephemeral_key_internal(
+                1_715_000_000,
+                1059,
+                vec![vec!["p".to_string(), "aa".repeat(32)]],
+                "ciphertext-shaped-content".to_string(),
+            )
+            .expect("expected a real signed event");
+
+            let pubkey_hex = extract_json_string_field_for_test(&json, "pubkey");
+            let sig_hex = extract_json_string_field_for_test(&json, "sig");
+            let id_hex = extract_json_string_field_for_test(&json, "id");
+            assert_eq!(pubkey_hex.len(), 64);
+            assert_eq!(sig_hex.len(), 128);
+            assert_eq!(id_hex.len(), 64);
+
+            let pubkey_bytes = crate::fedos_decode_fixed_32_hex(&pubkey_hex).expect("valid pubkey hex");
+            let id_bytes = crate::fedos_decode_fixed_32_hex(&id_hex).expect("valid id hex");
+            let sig_bytes = hex_decode_64_bytes_for_test(&sig_hex);
+
+            let verifying_key = SchnorrVerifyingKey::from_bytes(&pubkey_bytes)
+                .expect("expected a valid on-curve ephemeral public key");
+            let schnorr_signature =
+                SchnorrSignature::try_from(sig_bytes.as_slice()).expect("expected a well-formed signature");
+            assert!(verifying_key.verify_prehash(&id_bytes, &schnorr_signature).is_ok());
+        }
+
+        #[test]
+        fn sign_nostr_event_with_fresh_ephemeral_key_internal_draws_a_different_key_every_call() {
+            let first = sign_nostr_event_with_fresh_ephemeral_key_internal(
+                1_715_000_000,
+                1059,
+                vec![],
+                "one".to_string(),
+            )
+            .expect("expected a real signed event");
+            let second = sign_nostr_event_with_fresh_ephemeral_key_internal(
+                1_715_000_000,
+                1059,
+                vec![],
+                "one".to_string(),
+            )
+            .expect("expected a real signed event");
+
+            let first_pubkey = extract_json_string_field_for_test(&first, "pubkey");
+            let second_pubkey = extract_json_string_field_for_test(&second, "pubkey");
+            assert_ne!(first_pubkey, second_pubkey);
+        }
+
+        fn extract_json_string_field_for_test(json: &str, key: &str) -> String {
+            let needle = format!("\"{key}\":\"");
+            let start = json.find(&needle).expect("field must be present") + needle.len();
+            let end = json[start..].find('"').expect("field must be terminated") + start;
+            json[start..end].to_string()
+        }
+
+        fn hex_decode_64_bytes_for_test(hex: &str) -> Vec<u8> {
+            fn nibble(byte: u8) -> u8 {
+                match byte {
+                    b'0'..=b'9' => byte - b'0',
+                    b'a'..=b'f' => byte - b'a' + 10,
+                    b'A'..=b'F' => byte - b'A' + 10,
+                    _ => panic!("invalid hex nibble in test helper"),
+                }
+            }
+            let bytes = hex.as_bytes();
+            (0..bytes.len() / 2)
+                .map(|i| (nibble(bytes[2 * i]) << 4) | nibble(bytes[2 * i + 1]))
+                .collect()
+        }
+
+        fn hex_encode_32_bytes_for_test(bytes: &[u8; 32]) -> String {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+
+        #[test]
+        fn build_and_sign_nip17_gift_wrap_internal_round_trips_and_verifies() {
+            use k256::schnorr::signature::hazmat::PrehashVerifier;
+            use k256::schnorr::{Signature as SchnorrSignature, VerifyingKey as SchnorrVerifyingKey};
+
+            let bob_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(BOB_SEED);
+            let bob_pub_bytes = public_key_bytes(BOB_SEED, 0);
+            let bob_pub_hex = hex_encode_32_bytes_for_test(&bob_pub_bytes);
+
+            let gift_wrap_json = build_and_sign_nip17_gift_wrap_internal(
+                &bob_pub_hex,
+                1_715_000_000,
+                1059,
+                b"a real signed seal json goes here",
+            )
+            .expect("expected a real signed gift wrap");
+
+            let wrapper_pubkey_hex = extract_json_string_field_for_test(&gift_wrap_json, "pubkey");
+            let sig_hex = extract_json_string_field_for_test(&gift_wrap_json, "sig");
+            let id_hex = extract_json_string_field_for_test(&gift_wrap_json, "id");
+            let wrapper_pubkey_bytes = crate::fedos_decode_fixed_32_hex(&wrapper_pubkey_hex).expect("valid pubkey hex");
+            let id_bytes = crate::fedos_decode_fixed_32_hex(&id_hex).expect("valid id hex");
+            let sig_bytes = hex_decode_64_bytes_for_test(&sig_hex);
+            let verifying_key = SchnorrVerifyingKey::from_bytes(&wrapper_pubkey_bytes)
+                .expect("expected a valid on-curve ephemeral wrapper public key");
+            let schnorr_signature =
+                SchnorrSignature::try_from(sig_bytes.as_slice()).expect("expected a well-formed signature");
+            assert!(verifying_key.verify_prehash(&id_bytes, &schnorr_signature).is_ok());
+
+            // Bob (the recipient) decrypts using his OWN Master-Seed
+            // account against the wrapper's pubkey (extracted from the
+            // wire event itself, already public) -- the SAME
+            // `decrypt_nip44_wire_from_master_seed_internal` bridge
+            // Phase B already built and verified.
+            let content_hex = extract_json_string_field_for_test(&gift_wrap_json, "content");
+            let plaintext = decrypt_nip44_wire_from_master_seed_internal(&bob_seed, 0, wrapper_pubkey_bytes, &content_hex);
+            assert_eq!(plaintext, Some(b"a real signed seal json goes here".to_vec()));
+        }
+
+        #[test]
+        fn build_and_sign_nip17_gift_wrap_internal_draws_a_different_wrapper_key_every_call() {
+            let bob_pub_bytes = public_key_bytes(BOB_SEED, 0);
+            let bob_pub_hex = hex_encode_32_bytes_for_test(&bob_pub_bytes);
+
+            let first = build_and_sign_nip17_gift_wrap_internal(&bob_pub_hex, 1_715_000_000, 1059, b"one")
+                .expect("expected a real signed gift wrap");
+            let second = build_and_sign_nip17_gift_wrap_internal(&bob_pub_hex, 1_715_000_000, 1059, b"one")
+                .expect("expected a real signed gift wrap");
+
+            let first_pubkey = extract_json_string_field_for_test(&first, "pubkey");
+            let second_pubkey = extract_json_string_field_for_test(&second, "pubkey");
+            assert_ne!(first_pubkey, second_pubkey);
+        }
+
+        #[test]
+        fn build_and_sign_nip17_gift_wrap_internal_rejects_a_malformed_recipient_hex() {
+            assert_eq!(
+                build_and_sign_nip17_gift_wrap_internal("not-a-real-hex-pubkey", 1_715_000_000, 1059, b"x"),
+                None
+            );
+        }
+
+        #[test]
+        fn wrong_recipient_cannot_decrypt_a_gift_wrap() {
+            let mallory_seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(MALLORY_SEED);
+            let bob_pub_bytes = public_key_bytes(BOB_SEED, 0);
+            let bob_pub_hex = hex_encode_32_bytes_for_test(&bob_pub_bytes);
+
+            let gift_wrap_json =
+                build_and_sign_nip17_gift_wrap_internal(&bob_pub_hex, 1_715_000_000, 1059, b"only for bob")
+                    .expect("expected a real signed gift wrap");
+            let wrapper_pubkey_hex = extract_json_string_field_for_test(&gift_wrap_json, "pubkey");
+            let wrapper_pubkey_bytes = crate::fedos_decode_fixed_32_hex(&wrapper_pubkey_hex).expect("valid pubkey hex");
+            let content_hex = extract_json_string_field_for_test(&gift_wrap_json, "content");
+
+            let mallory_result =
+                decrypt_nip44_wire_from_master_seed_internal(&mallory_seed, 0, wrapper_pubkey_bytes, &content_hex);
+            assert_eq!(mallory_result, None);
+        }
+
+        #[test]
+        fn no_master_seed_held_fails_closed_for_encrypt_and_decrypt() {
+            // Structural guard only, exercised via the derivation chain's
+            // own `RootDerivationStatus::InvalidInput` path: an
+            // already-`clear()`-ed Master Seed must never proceed to any
+            // ECDH/encrypt/decrypt step.
+            let mut seed = FedosMasterSeedHandle::new_from_32_bytes_for_internal_use(ALICE_SEED);
+            seed.clear();
+            let bob_pub = public_key_bytes(BOB_SEED, 0);
+            assert_eq!(
+                encrypt_nip44_wire_from_master_seed_internal(&seed, 0, bob_pub, b"anything"),
+                None
+            );
+            assert_eq!(
+                decrypt_nip44_wire_from_master_seed_internal(&seed, 0, bob_pub, "AQ=="),
+                None
+            );
+        }
 
         #[test]
         fn master_seed_handle_holds_master_seed_material_kind() {
@@ -9827,6 +10504,103 @@ pub fn generate_aead_key_handle() -> Option<AeadKeyHandle> {
     Some(AeadKeyHandle { inner: key_handle })
 }
 
+/// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+/// Delivery Arc") Phase E (Alpha 1777–1780) — the WASM export for
+/// [`master_root::sign_nostr_event_with_fresh_ephemeral_key_internal`].
+/// See that function's own doc comment for the full design rationale: a
+/// FRESH CSPRNG secp256k1 key is drawn internally for every call, used to
+/// sign EXACTLY ONE event, then cleared — never derived from the Master
+/// Seed, never persisted, never returned to the caller in any form.
+///
+/// `kind` is restricted to NIP-59's own two Gift-Wrap kinds — `1059`
+/// (Gift Wrap) or `21059` (Ephemeral Gift Wrap) — the ONLY reviewed
+/// use for a fresh, unlinkable, per-call signing key in this crate;
+/// anything else is rejected before any key is drawn, so this function
+/// can never become a generic "sign arbitrary content with an anonymous
+/// key" oracle. `tags` uses the SAME flattened wire format
+/// `FedosMasterSeedAuthority::sign_nostr_event` already established
+/// (Secure Runtime Alpha 442, each element one NIP-01 tag with fields
+/// joined by U+0001), parsed via the SAME
+/// [`fedos_parse_nostr_tags_wire_format`], unchanged. `created_at` is
+/// Unix seconds as an `f64` — rejected (fail closed) unless finite,
+/// non-negative, and a whole number, matching `sign_nostr_event`'s own
+/// `created_at` validation exactly.
+#[wasm_bindgen]
+pub fn sign_nostr_event_with_fresh_ephemeral_key(
+    created_at: f64,
+    kind: u32,
+    tags: Vec<String>,
+    content: String,
+) -> Option<String> {
+    if kind != 1059 && kind != 21059 {
+        return None;
+    }
+    if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
+        return None;
+    }
+    if created_at > 18_446_744_073_709_551_615.0 {
+        return None;
+    }
+    let created_at_u64 = created_at as u64;
+    let parsed_tags = fedos_parse_nostr_tags_wire_format(&tags)?;
+    crate::master_root::sign_nostr_event_with_fresh_ephemeral_key_internal(
+        created_at_u64,
+        u64::from(kind),
+        parsed_tags,
+        content,
+    )
+}
+
+/// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+/// Delivery Arc") Phase F (Alpha 1782/1785/1786) — the WASM export for
+/// [`master_root::build_and_sign_nip17_gift_wrap_internal`]. See that
+/// function's own doc comment for the full design rationale: NIP-59's
+/// own Gift Wrap encrypts to the recipient via ECDH between a FRESH
+/// ephemeral secret key and the recipient's public key — never a
+/// Master-Seed-derived account — so the ephemeral key, the NIP-44
+/// encrypt, and the signature must all happen inside this ONE call; the
+/// ephemeral secret never crosses the WASM boundary in either
+/// direction.
+///
+/// `kind` is restricted to NIP-59's own two Gift-Wrap kinds (`1059`/
+/// `21059`), the SAME closed check [`sign_nostr_event_with_fresh_ephemeral_key`]
+/// applies, for the SAME reason. `recipient_public_key_hex` must be
+/// exactly 64 lowercase-or-uppercase hex characters (already-PUBLIC key
+/// material, never a secret). `content_plaintext` is the caller-supplied
+/// Seal serialization — this function performs NO Seal construction of
+/// its own. `created_at` is Unix seconds as an `f64`, validated
+/// identically to every other `created_at` field in this crate.
+///
+/// Returns the complete signed `kind:1059`/`kind:21059` event as a JSON
+/// string on success, `None` on ANY failure (malformed input, CSPRNG
+/// unavailable, an invalid/off-curve recipient key, or any internal
+/// ECDH/encrypt/sign failure) — fail closed, never a panic, never a
+/// partial event.
+#[wasm_bindgen]
+pub fn build_and_sign_nip17_gift_wrap(
+    recipient_public_key_hex: String,
+    created_at: f64,
+    kind: u32,
+    content_plaintext: &[u8],
+) -> Option<String> {
+    if kind != 1059 && kind != 21059 {
+        return None;
+    }
+    if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
+        return None;
+    }
+    if created_at > 18_446_744_073_709_551_615.0 {
+        return None;
+    }
+    let created_at_u64 = created_at as u64;
+    crate::master_root::build_and_sign_nip17_gift_wrap_internal(
+        &recipient_public_key_hex,
+        created_at_u64,
+        u64::from(kind),
+        content_plaintext,
+    )
+}
+
 /// Stage 1009 (Secure Runtime Alpha 014) — the crate's FIFTH
 /// wasm_bindgen-annotated item, and the FIRST wasm-bindgen wrapper
 /// around a real cryptographic OPERATION (as opposed to randomness/key
@@ -10648,7 +11422,24 @@ impl FedosMasterSeedAuthority {
             FedosMasterSeedAuthorityState::Available(handle) => handle,
             _ => return None,
         };
-        if kind != 1 {
+        // Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
+        // Standard Delivery Arc") Phase D (Alpha 1774) — ADDITIVE:
+        // `13` (NIP-59's Seal) is now accepted, mirroring the
+        // TypeScript-facing validator's own closed allowlist
+        // (`src/nostr/sign/fedos_nostr_signing_authority.ts`'s
+        // `SUPPORTED_NOSTR_KINDS`, which already included this crate's
+        // proprietary `24700` private-delivery kind since Secure Runtime
+        // Alpha 1399/1402 — this Rust-level check was NOT previously
+        // extended to match that TypeScript-side addition, a
+        // pre-existing gap this Arc found by direct inspection but does
+        // NOT otherwise touch: fixing kind `24700`'s own Rust-level
+        // signing path, if it is genuinely unreachable today, is a
+        // separate, unrelated concern this Arc's own scope does not
+        // cover). The Seal MUST be signed by the real sender identity
+        // (NIP-17's own impersonation guard depends on it) — never the
+        // ephemeral Gift-Wrap key, which uses a wholly separate
+        // authority that never reaches this method at all.
+        if kind != 1 && kind != 13 {
             return None;
         }
         if !created_at.is_finite() || created_at < 0.0 || created_at.fract() != 0.0 {
@@ -10875,6 +11666,73 @@ impl FedosMasterSeedAuthority {
             return None;
         }
         open_decision.plaintext
+    }
+
+    /// Secure Runtime Alpha 1761–1840 Phase B (Alpha 1764–1768) — the
+    /// narrow, purpose-specific WASM export for genuine NIP-44 v2 WIRE
+    /// encryption (see `master_root::encrypt_nip44_wire_from_master_seed_internal`'s
+    /// own doc comment for the full rationale and why this is NOT
+    /// `resolve_conversation_key`/`encrypt_aead` reused). Accepts ONLY
+    /// `account_index` (which local sub-identity encrypts),
+    /// `counterparty_public_key_hex` (the recipient's already-public
+    /// 64-hex-character x-only Nostr key — never a secret), and
+    /// `plaintext` (the caller-supplied Rumor/Seal serialization) — never
+    /// a raw seed, raw conversation key, or raw ephemeral key of any
+    /// kind. Returns the complete NIP-44 v2 wire payload string, or `None`
+    /// on ANY failure (no Master Seed held, a malformed
+    /// `counterparty_public_key_hex`, or any internal derivation/ECDH/
+    /// encrypt-pipeline failure) — fail closed, never a panic, never a
+    /// partial payload. This is NOT a generic encrypt oracle: it performs
+    /// exactly one operation (NIP-44 wire encrypt for one resolved
+    /// pairwise conversation key) and nothing else.
+    pub fn encrypt_nip44_wire(
+        &self,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        plaintext: &[u8],
+    ) -> Option<String> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let counterparty_bytes = fedos_decode_fixed_32_hex(&counterparty_public_key_hex)?;
+        crate::master_root::encrypt_nip44_wire_from_master_seed_internal(
+            handle,
+            account_index,
+            counterparty_bytes,
+            plaintext,
+        )
+    }
+
+    /// The decrypt-direction sibling of
+    /// [`FedosMasterSeedAuthority::encrypt_nip44_wire`] — see that
+    /// method's own doc comment for the shared design rationale. Calls
+    /// `master_root::decrypt_nip44_wire_from_master_seed_internal`.
+    /// Returns the original plaintext bytes on success, `None` on ANY
+    /// failure — no Master Seed held, a malformed
+    /// `counterparty_public_key_hex`, a structurally malformed `payload`,
+    /// or a genuine authentication failure (wrong recipient or tampered
+    /// ciphertext) — never distinguishing which, never returning partial
+    /// plaintext. Not a decryption oracle: it performs exactly one
+    /// operation (NIP-44 wire decrypt for one resolved pairwise
+    /// conversation key) and nothing else.
+    pub fn decrypt_nip44_wire(
+        &self,
+        account_index: u32,
+        counterparty_public_key_hex: String,
+        payload: String,
+    ) -> Option<Vec<u8>> {
+        let handle = match &self.state {
+            FedosMasterSeedAuthorityState::Available(handle) => handle,
+            _ => return None,
+        };
+        let counterparty_bytes = fedos_decode_fixed_32_hex(&counterparty_public_key_hex)?;
+        crate::master_root::decrypt_nip44_wire_from_master_seed_internal(
+            handle,
+            account_index,
+            counterparty_bytes,
+            &payload,
+        )
     }
 }
 
@@ -11436,6 +12294,63 @@ mod master_seed_authority_tests {
         let mut authority = FedosMasterSeedAuthority::new();
         assert!(authority.generate());
         authority
+    }
+
+    #[test]
+    fn encrypt_nip44_wire_then_decrypt_nip44_wire_round_trips_through_the_public_wasm_boundary() {
+        let alice = generated_authority();
+        let bob = generated_authority();
+        let alice_pub = alice.public_key_hex_for_account(0).expect("expected a real public key");
+        let bob_pub = bob.public_key_hex_for_account(0).expect("expected a real public key");
+
+        let payload = alice
+            .encrypt_nip44_wire(0, bob_pub, b"real end-to-end nip-44 wire payload")
+            .expect("expected a real NIP-44 wire payload");
+
+        let plaintext = bob
+            .decrypt_nip44_wire(0, alice_pub, payload)
+            .expect("expected Bob to decrypt Alice's payload");
+        assert_eq!(plaintext, b"real end-to-end nip-44 wire payload".to_vec());
+    }
+
+    #[test]
+    fn encrypt_nip44_wire_fails_closed_without_a_held_master_seed() {
+        let empty = FedosMasterSeedAuthority::new();
+        let bob = generated_authority();
+        let bob_pub = bob.public_key_hex_for_account(0).expect("expected a real public key");
+        assert_eq!(empty.encrypt_nip44_wire(0, bob_pub, b"anything"), None);
+    }
+
+    #[test]
+    fn decrypt_nip44_wire_fails_closed_without_a_held_master_seed() {
+        let empty = FedosMasterSeedAuthority::new();
+        let alice = generated_authority();
+        let alice_pub = alice.public_key_hex_for_account(0).expect("expected a real public key");
+        assert_eq!(empty.decrypt_nip44_wire(0, alice_pub, "AQ==".to_string()), None);
+    }
+
+    #[test]
+    fn encrypt_nip44_wire_rejects_a_malformed_counterparty_hex() {
+        let alice = generated_authority();
+        assert_eq!(
+            alice.encrypt_nip44_wire(0, "not-a-real-hex-pubkey".to_string(), b"anything"),
+            None
+        );
+    }
+
+    #[test]
+    fn wrong_recipient_cannot_decrypt_through_the_public_wasm_boundary() {
+        let alice = generated_authority();
+        let bob = generated_authority();
+        let mallory = generated_authority();
+        let alice_pub = alice.public_key_hex_for_account(0).expect("expected a real public key");
+        let bob_pub = bob.public_key_hex_for_account(0).expect("expected a real public key");
+
+        let payload = alice
+            .encrypt_nip44_wire(0, bob_pub, b"only for bob, never for mallory")
+            .expect("expected a real NIP-44 wire payload");
+
+        assert_eq!(mallory.decrypt_nip44_wire(0, alice_pub, payload), None);
     }
 
     #[test]

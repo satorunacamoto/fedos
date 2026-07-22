@@ -7,7 +7,7 @@ import libRaw from "../packages/fedos-core-rust/src/lib.rs?raw";
 const lib: string = (libRaw as string).replace(/\r\n/g, "\n");
 
 describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation", () => {
-  it("FedosMasterSeedAuthority exposes exactly the seven lifecycle methods plus sign_nostr_event, (Alpha 684/685) public_key_hex_for_account, (Alpha 869) resolve_conversation_key, and (Alpha 5401-5480) seal_direct_ratchet_secret/restore_direct_ratchet_secret, no more", () => {
+  it("FedosMasterSeedAuthority exposes exactly the seven lifecycle methods plus sign_nostr_event, (Alpha 684/685) public_key_hex_for_account, (Alpha 869) resolve_conversation_key, (Alpha 5401-5480) seal_direct_ratchet_secret/restore_direct_ratchet_secret, and (Alpha 1761-1840, reconciled during the Alpha 5561-5640 integration merge) encrypt_nip44_wire/decrypt_nip44_wire, no more", () => {
     // Matches up to the impl block's OWN closing brace (column 0) rather than
     // requiring `#[cfg(test)]` to immediately follow it -- Alpha 869 added a
     // free function (`fedos_decode_fixed_32_hex`) between this impl block and
@@ -28,11 +28,17 @@ describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation"
       "pub fn resolve_conversation_key(",
       "pub fn seal_direct_ratchet_secret(",
       "pub fn restore_direct_ratchet_secret(",
+      // Secure Runtime Alpha 1761-1840 ("NIP-17 Rumor Seal Gift Wrap
+      // Standard Delivery Arc") Phase B -- the real NIP-44 wire bridge,
+      // additive, reusing every existing internal derivation/encrypt/
+      // decrypt function unmodified.
+      "pub fn encrypt_nip44_wire(",
+      "pub fn decrypt_nip44_wire(",
     ]) {
       expect(implBlock).toContain(method);
     }
     const pubFnCount = (implBlock.match(/pub fn /g) ?? []).length;
-    expect(pubFnCount).toBe(12);
+    expect(pubFnCount).toBe(14);
   });
 
   it("no method returns raw seed bytes to the caller", () => {

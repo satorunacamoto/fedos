@@ -237,9 +237,8 @@ describe("FedosWasmLoader.planLoad() evaluates policy().allowed, always BlockedB
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(64);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(19);
-  });
+    expect(pubFnNames.length).toBe(68);
+    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(21);  });
 
   it("17. no cycle exists: policy() never calls planLoad(), in either direction", () => {
     const loader = createFedosWasmLoader();

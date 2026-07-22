@@ -215,9 +215,12 @@ describe("FedOS Rust crate — public key-format label boundary (Stage 105)", ()
       "seal_local_ratchet_private_key",
       "seal_all_skipped_keys",
       "restore",
+      "encrypt_nip44_wire",
+      "decrypt_nip44_wire",
+      "sign_nostr_event_with_fresh_ephemeral_key",
+      "build_and_sign_nip17_gift_wrap",
     ];
-    expect(pubFnNames.length).toBe(64);
-    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(68);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
   it("7. all seventeen pre-existing public functions are byte-for-byte unchanged", () => {

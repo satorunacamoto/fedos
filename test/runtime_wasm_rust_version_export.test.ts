@@ -111,8 +111,7 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(64);
-    expect(pubFnNames).toContain("version");
+    expect(pubFnNames.length).toBe(68);    expect(pubFnNames).toContain("version");
     for (const name of PRE_EXISTING_PUB_FN_NAMES) {
       expect(pubFnNames).toContain(name);
     }

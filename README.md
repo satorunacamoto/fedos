@@ -1830,6 +1830,210 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > `docs/secure_runtime_alpha_1691_1760_completion_declaration.md` for
 > the full record.
 >
+> Prior status (separate, previously-unmerged NIP-17 lineage, now merged
+> as this Arc's own prerequisite):
+>
+> **Status: Secure Runtime Alpha 1611–1690 — Nostr Private Wire
+> Standardization and Transport Reconciliation Arc (honest partial —
+> Phase A/B safety closure complete, Phase C+ deferred).** Reconciled
+> two prerequisite branches that had diverged since Alpha 1051–1110
+> (`arc/nostr-private-direct-pairwise-fanout-delivery`, tip `71c938b`,
+> merged into this integration branch — three mechanical conflicts, full
+> detail in `docs/secure_runtime_alpha_1611_1690_phase_a_reconciliation.md`).
+> **Closed the kind-1 hole** (Alpha 1612/1615): `FedosPrivateTransport`'s
+> own wire event builder (`fedos_conversation_transport_event.ts`)
+> previously hard-fixed `kind: 1` for private ciphertext — closed by a
+> failing-regression-test-first fix, now hard-fixed to the SAME disclosed
+> `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND` (`24700`) the `privateNostrDelivery()`
+> facade (Alpha 1391–1470) already used; public Board `kind: 1` behavior
+> is byte-for-byte unchanged. Froze the `FedosPrivateWireAdapter`
+> boundary (Alpha 1616 — Transport owns Relay/mailbox/multi-Relay/retry/
+> dedup, unchanged; a Wire Adapter owns event shape/kind/tags/unwrap) with
+> two real implementations: `FedosPrivateV1WireAdapter` (thin wrapper
+> around the existing, now kind-1615-closed, proprietary wire functions)
+> and `NostrNip17V1WireAdapter` (`src/conversation/delivery/nostr/nip17/`,
+> real module, honestly `isAvailable() === false` today — NOT because
+> normative material is missing, see below, but because Rumor/Seal/
+> Gift-Wrap construction itself is real, deferred, new protocol work).
+> Added the closed `"fedos-private-v1" | "nostr-nip17-v1" | "unsupported"`
+> route vocabulary (Alpha 1613) with one fixed, never file-probed
+> default. **Fetched and checked in real, byte-verbatim NIP-17/NIP-44/
+> NIP-59 text** (Alpha 1617 — `docs/normative/nostr-protocol-nips/`,
+> pinned to `nostr-protocol/nips@bdfa7e62ef87fcfcb992b1a27aee49d36b0b4f91`,
+> fetched directly rather than through any summarizing tool), resolving
+> every prior Arc's own "zero normative material" finding and confirming
+> directly from source (never guessed) that kind 14/15/13/1059/21059/10050
+> are Chat Message/File Message/Seal/Gift Wrap/Ephemeral Gift Wrap/DM
+> relay list respectively. Confirmed, by actually running `cargo test` in
+> this exact worktree (531 passed / 1 pre-existing unrelated failure),
+> that `packages/fedos-core-rust/src/crypto/`'s own existing 5,463-line
+> NIP-44 v2 implementation already matches the normative pipeline exactly
+> (Alpha 1618) — untouched by this Arc. **Deliberately deferred, not
+> blocked**: Phase C (real Rumor/Seal/Gift-Wrap construction) and every
+> phase after it, plus the NIP-44 narrow-WASM-export boundary (Alpha
+> 1619–1621) — genuine new security-sensitive protocol work, scoped to
+> a recommended next Arc rather than rushed inside this one. See
+> `docs/secure_runtime_alpha_1611_1690_phase_a_reconciliation.md`,
+> `_phase_b_normative_source_gate.md`, `_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
+> and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
+> crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
+> Worker wiring. Builds `FedosPrivateTransport`
+> (`src/conversation/transport/`, 18 new files) — the boundary that
+> actually moves an already-encrypted `FedosConversationMessageEnvelope`
+> (Private Delivery, Alpha 851–890, UNCHANGED) over one or more Nostr
+> relays, closing the gap every prior Arc left open: nothing before this
+> one ever sent a Conversation Envelope anywhere. Reuses, by direct
+> import, the fully generic `FedosDeliveryObservation`/
+> `FedosDeliveryObservationRepository`/`FedosValidatingDeliveryObservationRepository`
+> and `FedosDeliveryRetryRegistry`/`makeFedosDeliveryAttemptSubjectId`
+> (`src/board/observation/*`, Alpha 461–470/521–540, UNCHANGED) for both
+> Mailbox (durable) and Ephemeral (best-effort, no Outbox row, no Retry
+> Registry) Delivery; mirrors — never redesigns — Board's own Outbox/
+> Publisher/Scheduler architecture as a new, parallel
+> `FedosConversationTransportOutbox`/`FedosConversationTransportPublisher`/
+> `FedosConversationTransportScheduler` set, since Board's own types are
+> `postId`-bound and this Arc's instruction forbids touching them.
+> Multiple Relay fan-out (`FedosConversationRelaySet` +
+> `FedosMultiRelayOkCorrelatedConversationTransportPublisher`) reruns the
+> SAME per-relay OK-correlation idiom `FedosRelayOkCorrelatedNostrBoardPublisher`
+> (Alpha 710/711/724) already established, once per relay, in parallel —
+> `"delivered"` if ANY relay accepts, `"rejected"` only if EVERY relay
+> explicitly does. Inbound Subscription + Relay Deduplication
+> (`FedosConversationInboundSubscription`/`FedosRelayEventDeduplicator`)
+> opens every relay's own subscription simultaneously and funnels every
+> inbound event through ONE shared, bounded, FIFO-evicted dedup gate
+> keyed by the Nostr event's own deterministic id, so a caller's envelope
+> callback fires exactly once per event no matter how many relays
+> deliver it. Wire packaging is constrained to `kind: 1` (Alpha 424's own
+> V1 signing policy, unmodified) — a private-transport event is
+> distinguished from a public Board post purely by tags
+> (`fedos-private`/`p`/`e-envelope`), never a new Nostr kind; `content` is
+> base64 ciphertext, mirroring `fedos_conversation_payload_codec.ts`'s
+> (Alpha 806) own encoding-only boundary discipline. Identity Resolution
+> reuse: `fedos_conversation_transport_routing.ts` resolves the still-open
+> Alpha 890 `localAccountIndex`/`counterpartyPublicKeyHex` blocker for
+> Direct conversations ONLY, by applying the exact verification idiom
+> `FedosSigningAuthorityNostrAuthorBinding` (Alpha 688) already
+> established for Board Authors to Conversation Membership instead — a
+> group conversation fails closed to `"not-direct"`, not silently routed.
+> Named, real (not glossed-over) limitation: `FedosSubscriptionFilter`
+> has no server-side tag filter, so Inbound Subscription filters by
+> `authors`/`kinds` server-side and does the `#p`-equivalent recipient
+> check client-side. Runtime wiring: `FedosRunningDesktopRuntime` gains a
+> new `privateTransport()` sibling accessor to `boardRuntime()`/
+> `conversationRuntime()`, gated by an OPTIONAL `privateTransportEnabled`
+> config field (kept optional, unlike `deliveryEnabled`, so every
+> pre-existing `FedosDesktopRuntimeConfig` call site keeps compiling
+> unchanged) with the same synchronous fail-closed guard
+> `deliveryEnabled` already established; this Arc also wires Private
+> Delivery's own Envelope/Payload durable backends (Alpha 857/804) into
+> the runtime for the first time — no prior Arc ever constructed them
+> there. Eight new test files (59 new tests), including one full
+> end-to-end test exercising two independent `FedosPrivateTransport`
+> instances (sender + receiver) over two independent relay connections
+> each to two shared in-process relay servers: real Mailbox queueing, a
+> real Scheduler tick, real Multi-Relay fan-out publish + OK correlation
+> on BOTH relays, a real canonical Observation showing `"accepted"`, a
+> real Inbound Subscription receiving the identical event from BOTH
+> relays with the envelope callback firing EXACTLY ONCE, and the opaque
+> payload bytes surviving the full sign→publish→OK-correlate→subscribe→
+> dedup→parse→decode pipeline byte-for-byte. **Verification**: `npm run
+> typecheck` clean except the same one PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`)
+> every recent Arc has already confirmed predates it; `npx vitest run`
+> baseline (before this Arc's own files existed) already showed 18
+> failing test files / 29 failing tests, every one of them a
+> `git status`-cleanliness check unrelated to Transport (the untracked
+> `p2p/` directory and the then-uncommitted Alpha 1541–1610 Archive
+> work, both already present in this working tree before this Arc
+> began) — this Arc's own 59 new tests all pass, and it introduces zero
+> new failures beyond that pre-existing baseline. See
+> `docs/secure_runtime_alpha_1471_1540_private_transport_boundary_and_multi_relay_delivery_arc.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1541–1610 — Conversation Export,
+> Restore, Archive Foundation Arc (complete).** Architecture frozen: no
+> new Rust/WASM primitive, no new `AeadAadDomain` variant, no Host/GUI
+> wiring, no network transport of any kind (No Cloud, No Sync, No GUI).
+> A pure TypeScript orchestration layer, `src/conversation/archive/`
+> (11 new files), built entirely on five already-existing, unmodified
+> domains — Conversation Persistence (Alpha 749/750), Envelope (Alpha
+> 854/858), Payload (Alpha 803/804/806), Membership (Alpha 825/827),
+> Capability (Alpha 833/836/837) — implementing Encrypted Export,
+> Encrypted Import, Manifest, Integrity, Schema Version, Restore, and
+> Duplicate Detection. An Archive is sealed under the SAME per-
+> conversation `AeadKeyHandle` `FedosMasterSeedAuthority.resolveConversationKey()`
+> already derives for that conversation's own Envelopes (Alpha 869) —
+> never a new passphrase or key-derivation domain; identity binding
+> reuses Alpha 856's own prefix-then-encrypt technique
+> (`fedos_conversation_archive_header.ts`) rather than native AAD, and
+> the `"Conversation"` `AeadAadDomain` label is reused verbatim, never
+> extended. Integrity is a SHA-256 content hash (`@noble/hashes`, an
+> existing dependency) over the canonical Bundle bytes, carried in a
+> cleartext Manifest and independently re-verified after decrypt — a
+> distinct `"manifest-mismatch"` outcome, kept separate from AEAD's own
+> undifferentiated `"failed"`. Restore replays a decrypted Bundle back
+> into the five EXISTING ports' own `put*` methods, reusing each
+> domain's own EXISTING `deserializeX`/`serializeX` codec pair for deep
+> per-record validation rather than re-implementing any check; Duplicate
+> Detection is not a new outcome vocabulary — `"already-present"`/
+> `"conflict"` are this codebase's own pre-existing write-result
+> vocabulary (Alpha 315/749/804/827/837/857), surfaced either as
+> Restore's own write-outcome tally or, read-only, via a dedicated
+> preflight report over each port's existing `get*`/`has*` methods. ONE
+> additive port method, `FedosConversationCapabilityPersistence.listConversationCapabilityEvents()`
+> (plus both its backends), mirrors `hasRedeemedEvent()`'s own Alpha 841
+> additive-port precedent: Capability is exported/restored via RAW
+> `"issued"`/`"redeemed"` events rather than the lossy reconstructed
+> `currentUses`-only record, since replaying just a count back into a
+> fresh backend would lose WHICH distinct redeemers already used a slot,
+> silently permitting a double-redemption after restore. Membership
+> export uses the CURRENT record per id (`listConversationMemberships()`)
+> — that port exposes no raw-event listing, and the current record alone
+> is sufficient to reconstruct correct present-day status. Four new test
+> files, `test/secure_runtime_alpha_1541_1560_archive_manifest_integrity.test.ts`,
+> `test/secure_runtime_alpha_1561_1580_archive_encrypted_export_import.test.ts`,
+> `test/secure_runtime_alpha_1581_1600_archive_restore_duplicate_detection.test.ts`,
+> `test/secure_runtime_alpha_1601_1610_capability_event_listing.test.ts`
+> (48 new tests): Bundle codec round-trip/order-independence/
+> fail-closed rejection; Manifest build/codec round-trip/fail-closed
+> rejection; Header encode/split/mismatch-detection; a full injected-
+> boundary Export→Import round trip plus every coarse failure branch
+> (`invalid-input`/`key-unavailable`/`failed`/`manifest-mismatch`);
+> Restore's insert/duplicate/conflict/invalid tally against real
+> in-memory backends; the read-only Duplicate Detection report; and the
+> new `listConversationCapabilityEvents()` port method against both the
+> in-memory and append-only Capability backends. **Verification**:
+> `npm run typecheck` clean except one PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> confirmed via `git log` to predate this Arc entirely); `npx vitest run`
+> (915 files / 12,119 tests): 48/48 new tests pass, and every one of the
+> 31 pre-existing failing assertions falls into a category this
+> codebase's own prior Arcs already documented as expected — ten
+> Rust-source static-analysis files this Arc's own `git diff` confirms
+> zero touch to `packages/fedos-core-rust/`, the same four files the
+> Alpha 1051–1110 completion declaration already named verbatim as
+> pre-existing (`publish_pipeline_host_ownership_review_current_state`,
+> `secure_runtime_alpha_405/472/543`), one `src/board/`-scoped ripple
+> check this Arc never touches, and three review docs' own
+> "git working tree is clean" checks that are by construction red while
+> this Arc's own new files sit uncommitted — each of those three docs'
+> own header already states this check "is expected to be red only
+> until this Arc's own single commit lands." Draft (private,
+> not-yet-active) conversations, any Host/file-path/GUI wiring for where
+> Export/Import bytes are read from or written to, passphrase-protected
+> export independent of live conversation-key availability, and any
+> Cloud/Sync/network transport are all explicitly named OUT of this
+> Arc's scope, not silently dropped — see
+> `docs/secure_runtime_alpha_1541_1610_execution_spec.md`/
+> `_completion_declaration.md`.
+>
 > Prior status:
 >
 > **Status: Secure Runtime Alpha 1391–1470 — Nostr Private Direct and

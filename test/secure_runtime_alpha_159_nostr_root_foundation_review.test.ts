@@ -101,10 +101,9 @@ describe("Secure Runtime Alpha 159 -- Nostr Root Foundation Review", () => {
 
   it("9. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 -- confirming zero WASM exposure across Alpha 146-159", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(64);
-  });
+    expect(pubFnNames.length).toBe(68);  });
 
   it("10. structural: AppRuntime carries no derived-key/root field of any kind, confirmed directly against the actual interface", () => {
     expect(runtimeTypesSource).not.toMatch(/deriveKey:|nostrRoot|protocolRoot|identityRoot|applicationRoot/i);

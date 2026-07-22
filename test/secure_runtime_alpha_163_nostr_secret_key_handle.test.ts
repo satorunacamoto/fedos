@@ -104,7 +104,7 @@ describe("Secure Runtime Alpha 163 -- Nostr Secret Key Handle", () => {
 
   it("9. Regression: the crate's #[wasm_bindgen] count remains fixed at 13", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(17);
+    expect(wasmBindgenCount).toBe(19);
   });
 
   it("10. Regression: desktop_application.ts, fedos_runtime_identity.ts, and worker.ts carry no reference to this Stage's own doc", () => {

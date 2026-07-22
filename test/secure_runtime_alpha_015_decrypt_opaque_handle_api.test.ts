@@ -806,8 +806,7 @@ describe("Secure Runtime Alpha 015 -- decrypt() Public Runtime API (Opaque Handl
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(64);
-    expect(pubFnNames).toContain("decrypt_aead");
+    expect(pubFnNames.length).toBe(68);    expect(pubFnNames).toContain("decrypt_aead");
     expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
 
     const cargoCode = cargoTomlSource
