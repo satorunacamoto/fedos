@@ -8,6 +8,40 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: FedOS Account and Nostr Identity Rotation V1 Specification
+> Review (specification-only, empty production diff).** The canonical V1
+> decision review the FedOS Ratchet Peer Notification and Capability
+> Advertisement Arc (`d825aa0`) named as its own recommended next step,
+> and the terminal link in the review chain `b34d608` → `3ebfa37` →
+> `f80889d` → `d825aa0` started. Twenty docs under
+> `docs/reviews/fedos_account_nostr_identity_rotation_v1/`. Verdict:
+> account identity and Nostr identity do **not** rotate in V1 — they
+> remain the single, immutable value they are today (reaffirming
+> `3ebfa37`'s own Option 1). What changes is a complete specification for
+> **Replacement**: a brand-new identity, never an in-place key change,
+> optionally carrying an explicit, evidence-leveled continuity claim
+> (old-identity signature alone is explicitly insufficient under a
+> compromised-old-key assumption — reusing the account's independent
+> per-Device signing keypair, Alpha 3161–3240, as the strongest available
+> corroborating evidence). Device migration is explicit rebind-through-
+> reauthorization, reusing `f80889d`'s own register-then-revoke Device
+> Replacement pattern at account scope. Ratchet sessions always reset,
+> never rebind root/chain keys to a new identity. Direct Conversation
+> identity/history is preserved and never rewritten; Archive Restore
+> never establishes identity trust; Group continuity is deferred. Master
+> Seed replacement while preserving account identity is not possible in
+> this architecture (they are the same event); passphrase rotation is
+> named as a separate, low-risk, future Arc. Peer notification reuses
+> `d825aa0`'s live, authenticated, evidence-only private-transport
+> pipeline with new additive fact kinds — no new Nostr kind, no public
+> event. Self-declared rotation is never automatic trust. See
+> `docs/reviews/fedos_account_nostr_identity_rotation_v1/20_normative_recommendation.md`.
+> Recommended next Arc: **FedOS Identity Transition Types, Validation,
+> and Durable Evidence Foundation Arc** — types/validation/durable
+> evidence only; no live migration ships until a later Arc.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5721–5800 — FedOS Ratchet Peer
 > Notification and Capability Advertisement Arc (FULL completion).**
 > Implements the authenticated peer-notification and capability-advertisement
