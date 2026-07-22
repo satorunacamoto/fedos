@@ -8,6 +8,61 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 5641–5720 — FedOS Signed Recipient
+> Deletion Request Types, Validation, and Durable State Foundation Arc
+> (complete).** Architecture frozen: no Relay event, no NIP-17 wiring, no
+> new Nostr kind, no live transport, no automatic local deletion, no
+> Ratchet dependency, `p2p/`/`.tmp_gen/` untouched. Implements Doc 19's
+> own Stage 1 scope of the normative review (`860a58e`,
+> `review/fedos-signed-recipient-deletion-request-v1`) over the real,
+> implemented `arc/local-deletion-capability-state-foundation @ b3b3a6d`
+> base: thirty new files under `src/conversation/deletion_request/`
+> provide closed request/acknowledgement schemas (strict, unknown-field-
+> rejecting), fixed-field-order canonical serialization, real account
+> signing/verification reusing the EXISTING `FedosNostrSigningAuthority`
+> and the EXISTING pure-TypeScript `validateInboundNostrEvent` chain (no
+> WASM needed for verification), a target-existence-oracle-safe
+> authorization assessment over real Conversation/Membership/Envelope
+> state, and three independent durable domains (outbound request
+> lifecycle, recipient decision, acknowledgement fact) — each with an
+> in-memory and a real append-only NDJSON backend sharing one
+> monotonic-transition-validating write function. `FedosNobleTestNostrSigningAuthority`
+> (mirrors `MockFedosBoardOutboxPublisher`'s own Alpha 473 precedent for
+> living in `src/`) produces genuinely real BIP-340 Schnorr signatures via
+> `@noble/curves` — an already-declared dependency, not a new primitive —
+> isolated from the absent WASM/Master-Seed production path this worktree
+> does not have. This Arc never calls `b3b3a6d`'s own execution
+> coordinator or Archive-file authority: recipient evaluation stops at
+> `"policy-pending"` (authorized) or a terminal denial; only a caller
+> explicitly supplying an already-produced local outcome can record
+> `"locally-applied"`/`"partially-applied"`/`"failed"`. Device identity
+> stays honestly advisory-only throughout (no real per-Device signing key
+> exists anywhere in this codebase — confirmed independently in this
+> Arc's own reconciliation report). Nine new test files (132 new tests)
+> cover closed vocabularies and strict record validation, real signing/
+> verification (including one-byte-mutation and content-splicing tamper
+> detection), authorization assessment (target substitution, non-author
+> denial, Device/recipient mismatch), durable state and restart replay
+> across all three domains, the expiry/retry planner and safe
+> multi-device aggregation (never account-wide), the recipient evaluation
+> pipeline, a failure matrix closing remaining gaps (future-issued
+> requests, wrong-Conversation targets, state rollback, interrupted
+> append, acknowledgement overclaim), a structural no-live-wire proof, and
+> one real Phase O vertical slice — real Alice/Bob accounts, real signing,
+> a real restart across all three durable domains, a real `b3b3a6d`
+> execution, real acknowledgement correlation, and a real check that no
+> message plaintext, private key, or raw path exists in any durable file.
+> `b3b3a6d`'s own 82 tests, plus Membership/Retention/account-signing
+> regression suites, all still pass unchanged. See
+> `docs/secure_runtime_alpha_5641_5720_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5641_5720_execution_spec.md`,
+> `docs/secure_runtime_alpha_5641_5720_request_and_acknowledgement_schema.md`,
+> and `docs/secure_runtime_alpha_5641_5720_completion_declaration.md`.
+> Next Arc: FedOS Signed Recipient Deletion Request Private Transport and
+> Local Policy Integration Arc.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5401–5480 — FedOS Local Deletion
 > Capability and Deletion-State Foundation Arc (complete).**
 > Architecture frozen: no remote deletion request, no wire protocol, no
