@@ -221,6 +221,7 @@ import type { FedosDeletionExecutionPersistence } from "../deletion/fedos_deleti
 import { InMemoryFedosDeletionExecutionPersistence } from "../deletion/in_memory_fedos_deletion_execution_persistence.js";
 import type { FedosDeletionRecipientPolicy } from "../deletion_request/fedos_deletion_recipient_policy.js";
 import { FedosDeletionRequestConversationExistenceAdapter } from "../deletion_request/fedos_deletion_request_conversation_existence_adapter.js";
+import type { FedosDeletionRequestInboxSummaryPersistence } from "../deletion_request/fedos_deletion_request_inbox_summary.js";
 import type { FedosConversationParticipantAuthority } from "../membership/fedos_conversation_participant_reference.js";
 
 /**
@@ -379,6 +380,8 @@ export interface FedosConversationDeletionRequestIntegrationDependencies {
   readonly acknowledgementPersistence?: FedosDeletionAcknowledgementPersistence;
   /** Optional — default in-memory. */
   readonly localExecutionPersistence?: FedosDeletionExecutionPersistence;
+  /** Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device Aggregation and User Consent UI Arc) — OPTIONAL, additive. Omitted, the recipient-side consent Inbox has nothing durable to read (`FedosDeletionRequestRuntime.listReceivedRequestSummaries()` returns `[]`) — every OTHER `5881-5960` behavior is unaffected. */
+  readonly inboxSummaryPersistence?: FedosDeletionRequestInboxSummaryPersistence;
   readonly sendMailboxNip17Control: (
     controlId: string,
     conversationId: FedosConversationId,
@@ -705,6 +708,7 @@ export class FedosConversationRuntime {
           searchIndex: deletionRequestDeps.searchIndex,
           localExecutionPersistence,
           localAccountRef: deletionRequestDeps.localAccountRef,
+          inboxSummaryPersistence: deletionRequestDeps.inboxSummaryPersistence,
         },
         acknowledgementOutbound: {
           signingAuthority: deletionRequestDeps.signingAuthority,

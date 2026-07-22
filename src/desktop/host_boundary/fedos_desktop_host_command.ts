@@ -42,6 +42,11 @@ import type { FedosConversationListFilter } from "../shell/fedos_desktop_shell_v
 // comment is ADDITIVE ONLY, mirroring this file's own established pattern.
 import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
 import { FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH } from "../../device/binding_challenge/fedos_device_binding_pairing_exchange.js";
+// Secure Runtime Alpha 6041-6120 -- every import/addition below this comment
+// is ADDITIVE ONLY, mirroring this file's own established pattern above.
+import { FEDOS_DELETION_REQUEST_SCOPES, type FedosDeletionRequestScope } from "../../conversation/deletion_request/fedos_deletion_request_scope.js";
+import { FEDOS_DELETION_REQUEST_REASON_CODES, type FedosDeletionRequestReasonCode } from "../../conversation/deletion_request/fedos_deletion_request_reason_code.js";
+import { FEDOS_DELETION_RECIPIENT_POLICIES, type FedosDeletionRecipientPolicy } from "../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
 
 /** This layer's own bound for id-shaped strings (conversation/message ids) -- mirrors the "512, non-empty" bound this codebase's own domain validators already apply pervasively to ids (e.g. `fedos_group_message.ts`/`fedos_group_direct_path.ts`'s own `MAX_STRING_LENGTH`), restated here since this Host layer sits ABOVE those domains and must reject an oversized/malformed id before it ever reaches them. */
 export const FEDOS_DESKTOP_HOST_MAX_ID_LENGTH = 512;
@@ -84,7 +89,29 @@ export type FedosDesktopHostCommand =
   | { readonly type: "device-pairing-complete"; readonly pairingId: string; readonly encodedApproval: string; readonly requestId?: string }
   | { readonly type: "device-pairings-list"; readonly requestId?: string }
   | { readonly type: "device-revoke"; readonly deviceId: string; readonly devicePublicKeyHex: string; readonly requestId?: string }
-  | { readonly type: "device-registration-status"; readonly deviceId: string; readonly requestId?: string };
+  | { readonly type: "device-registration-status"; readonly deviceId: string; readonly requestId?: string }
+  // Secure Runtime Alpha 6041-6120 -- Signed Deletion Request Multi-Device
+  // Aggregation and Consent commands.
+  | {
+      readonly type: "deletion-request-create";
+      readonly requesterAccountRef: string;
+      readonly recipientAccountRef: string;
+      readonly recipientDeviceRef: string;
+      readonly conversationId: string;
+      readonly targetEnvelopeId: string;
+      readonly scope: FedosDeletionRequestScope;
+      readonly expiresInSeconds: number;
+      readonly reasonCode: FedosDeletionRequestReasonCode | null;
+      readonly requestId?: string;
+    }
+  | { readonly type: "deletion-request-list-sent"; readonly conversationId: string; readonly targetEnvelopeId: string; readonly knownDeviceIds: readonly string[]; readonly requestId?: string }
+  | { readonly type: "deletion-request-list-received"; readonly requestId?: string }
+  | { readonly type: "deletion-request-open"; readonly deletionRequestId: string; readonly localPolicy: FedosDeletionRecipientPolicy; readonly requestId?: string }
+  | { readonly type: "deletion-request-approve"; readonly deletionRequestId: string; readonly requestId?: string }
+  | { readonly type: "deletion-request-reject"; readonly deletionRequestId: string; readonly requestId?: string }
+  | { readonly type: "deletion-request-status"; readonly deletionRequestId: string; readonly requestId?: string }
+  | { readonly type: "deletion-request-device-outcomes"; readonly conversationId: string; readonly targetEnvelopeId: string; readonly knownDeviceIds: readonly string[]; readonly requestId?: string }
+  | { readonly type: "deletion-request-dismiss"; readonly deletionRequestId: string; readonly requestId?: string };
 
 function isNonEmptyBoundedString(value: unknown, maxLength: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= maxLength;
@@ -127,6 +154,21 @@ function isDeviceBindingAccountRef(value: unknown): value is FedosDeviceBindingA
 
 function isPairingRecord(value: unknown): value is string {
   return isNonEmptyBoundedString(value, FEDOS_DESKTOP_HOST_MAX_PAIRING_RECORD_LENGTH);
+}
+
+// Secure Runtime Alpha 6041-6120 -- deletion-request structural checks.
+function isFedosDeletionRequestScopeValue(value: unknown): value is FedosDeletionRequestScope {
+  return typeof value === "string" && (FEDOS_DELETION_REQUEST_SCOPES as readonly string[]).includes(value);
+}
+function isFedosDeletionRequestReasonCodeOrNull(value: unknown): value is FedosDeletionRequestReasonCode | null {
+  return value === null || (typeof value === "string" && (FEDOS_DELETION_REQUEST_REASON_CODES as readonly string[]).includes(value));
+}
+function isFedosDeletionRecipientPolicyValue(value: unknown): value is FedosDeletionRecipientPolicy {
+  return typeof value === "string" && (FEDOS_DELETION_RECIPIENT_POLICIES as readonly string[]).includes(value);
+}
+const FEDOS_DESKTOP_HOST_MAX_DEVICE_LIST_LENGTH = 64;
+function isDeviceIdList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length <= FEDOS_DESKTOP_HOST_MAX_DEVICE_LIST_LENGTH && value.every((v) => isId(v));
 }
 
 /**
@@ -288,6 +330,61 @@ export function validateFedosDesktopHostCommand(candidate: unknown): FedosDeskto
       return requestId === undefined
         ? { type: "device-registration-status", deviceId }
         : { type: "device-registration-status", deviceId, requestId };
+    }
+
+    // Secure Runtime Alpha 6041-6120 -- Signed Deletion Request commands.
+    case "deletion-request-create": {
+      if (!isId(c.requesterAccountRef) || !isId(c.recipientAccountRef) || !isId(c.recipientDeviceRef)) return null;
+      if (!isId(c.conversationId) || !isId(c.targetEnvelopeId)) return null;
+      if (!isFedosDeletionRequestScopeValue(c.scope)) return null;
+      if (typeof c.expiresInSeconds !== "number" || !Number.isInteger(c.expiresInSeconds) || c.expiresInSeconds <= 0) return null;
+      if (!isFedosDeletionRequestReasonCodeOrNull(c.reasonCode)) return null;
+      const base = {
+        type: "deletion-request-create" as const,
+        requesterAccountRef: c.requesterAccountRef,
+        recipientAccountRef: c.recipientAccountRef,
+        recipientDeviceRef: c.recipientDeviceRef,
+        conversationId: c.conversationId,
+        targetEnvelopeId: c.targetEnvelopeId,
+        scope: c.scope,
+        expiresInSeconds: c.expiresInSeconds,
+        reasonCode: c.reasonCode,
+      };
+      return requestId === undefined ? base : { ...base, requestId };
+    }
+
+    case "deletion-request-list-sent":
+    case "deletion-request-device-outcomes": {
+      if (!isId(c.conversationId) || !isId(c.targetEnvelopeId)) return null;
+      if (!isDeviceIdList(c.knownDeviceIds)) return null;
+      const conversationId = c.conversationId;
+      const targetEnvelopeId = c.targetEnvelopeId;
+      const knownDeviceIds = c.knownDeviceIds;
+      return requestId === undefined
+        ? { type: c.type, conversationId, targetEnvelopeId, knownDeviceIds }
+        : { type: c.type, conversationId, targetEnvelopeId, knownDeviceIds, requestId };
+    }
+
+    case "deletion-request-list-received":
+      return requestId === undefined ? { type: "deletion-request-list-received" } : { type: "deletion-request-list-received", requestId };
+
+    case "deletion-request-open": {
+      if (!isId(c.deletionRequestId)) return null;
+      if (!isFedosDeletionRecipientPolicyValue(c.localPolicy)) return null;
+      const deletionRequestId = c.deletionRequestId;
+      const localPolicy = c.localPolicy;
+      return requestId === undefined
+        ? { type: "deletion-request-open", deletionRequestId, localPolicy }
+        : { type: "deletion-request-open", deletionRequestId, localPolicy, requestId };
+    }
+
+    case "deletion-request-approve":
+    case "deletion-request-reject":
+    case "deletion-request-status":
+    case "deletion-request-dismiss": {
+      if (!isId(c.deletionRequestId)) return null;
+      const deletionRequestId = c.deletionRequestId;
+      return requestId === undefined ? { type: c.type, deletionRequestId } : { type: c.type, deletionRequestId, requestId };
     }
 
     default:

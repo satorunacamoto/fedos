@@ -84,6 +84,16 @@ import type {
   FedosDeviceSyncTransferSessionView,
 } from "../runtime/fedos_device_sync_operational_facade.js";
 import type { FedosDeviceSyncTickEntry } from "../../device/sync_scheduler/fedos_device_sync_scheduler.js";
+// Secure Runtime Alpha 6041-6120 -- Deletion Request Shell surface.
+import type { FedosDeletionRequestRuntime } from "../../conversation/deletion_request/fedos_deletion_request_runtime.js";
+import type { FedosDeletionRequestCreateParams } from "../../conversation/deletion_request/fedos_deletion_request_outbound_coordinator.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+import type { FedosDeletionRequestAcknowledgementOutcome } from "../../conversation/deletion_request/fedos_deletion_request_acknowledgement_outcome.js";
+import type { FedosDeletionRequestInboxSummaryV1 } from "../../conversation/deletion_request/fedos_deletion_request_inbox_summary.js";
+import type { FedosDeletionRecipientDecisionState } from "../../conversation/deletion_request/fedos_deletion_recipient_decision_state.js";
+import type { FedosDeletionRequestInboundOutcome } from "../../conversation/deletion_request/fedos_deletion_request_inbound_coordinator.js";
+import type { FedosDeletionRecipientPolicy, FedosDeletionRecipientPolicyDecision } from "../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
+import type { FedosDeletionRequestScope } from "../../conversation/deletion_request/fedos_deletion_request_scope.js";
 import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
 // Durable Sync Journal Arc) -- every import/addition below this comment is
@@ -130,6 +140,27 @@ const DEVICE_SYNC_OUTCOME_TO_SHELL_OUTCOME: Readonly<Record<Exclude<FedosDeviceS
 function mapDeviceSyncFacadeResult<T>(result: FedosDeviceSyncOperationalResult<T>): FedosDesktopShellResult<T> {
   if (result.outcome === "ok") return fedosDesktopShellOk(result.value);
   return fedosDesktopShellFailure(DEVICE_SYNC_OUTCOME_TO_SHELL_OUTCOME[result.outcome], result.reason);
+}
+
+/** Secure Runtime Alpha 6041-6120 -- maps `FedosDeletionRequestOutboundOutcome`'s own closed non-"published" outcomes onto this Shell's existing vocabulary; never invents a new one. */
+function mapDeletionRequestOutboundOutcomeKind(outcome: string): FedosDesktopShellOutcomeKind {
+  switch (outcome) {
+    case "recipient-device-unknown":
+    case "recipient-device-revoked":
+    case "local-device-revoked":
+    case "not-author":
+      return "unauthorized";
+    case "signing-unavailable":
+    case "route-unavailable":
+    case "runtime-stopped":
+      return "unavailable";
+    case "invalid-input":
+      return "invalid-input";
+    case "persistence-failed":
+      return "failed";
+    default:
+      return "failed";
+  }
 }
 
 /**
@@ -680,6 +711,77 @@ export class FedosDesktopApplicationShell {
       case "unavailable":
         return fedosDesktopShellFailure("unavailable", "a required construction dependency was not available");
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-
+  // Device Aggregation and User Consent UI Arc) -- every method below
+  // delegates ENTIRELY to `FedosConversationRuntime.deletionRequest()`
+  // (`../../conversation/deletion_request/fedos_deletion_request_runtime.ts`,
+  // `5881-5960`) -- this Shell owns no deletion-request protocol/policy/
+  // execution logic of its own, only maps that facade's own closed
+  // outcomes onto this Shell's existing result vocabulary. `"unavailable"`
+  // when `deletionRequest()` returns `null` (the Runtime was started
+  // without `deletionRequest` configured) -- the SAME honest terminus
+  // `deviceStatus()`/`deviceTrust()`-gated methods already use above.
+  // ---------------------------------------------------------------------
+
+  #deletionRequestRuntime(): FedosDeletionRequestRuntime | null {
+    if (this.#runtime === null) return null;
+    return this.#runtime.conversationRuntime().deletionRequest();
+  }
+
+  async deletionRequestCreate(params: FedosDeletionRequestCreateParams): Promise<FedosDesktopShellResult<{ readonly requestId: string }>> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    const outcome = await dr.createDeletionRequest(params);
+    if (outcome.outcome === "published") return fedosDesktopShellOk({ requestId: outcome.requestId });
+    return fedosDesktopShellFailure(mapDeletionRequestOutboundOutcomeKind(outcome.outcome), outcome.outcome);
+  }
+
+  /** Every LATEST snapshot this local sender has for the given target — the Controller (Phase B) builds the per-Device aggregate from this plus `deletionRequestAcknowledgementOutcome()` and the real Device Registry list. */
+  deletionRequestListSentForTarget(conversationId: string, targetEnvelopeId: string): FedosDesktopShellResult<readonly FedosPersistedDeletionRequestStateRecordV1[]> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(dr.listSentRequestsForTarget(conversationId, targetEnvelopeId));
+  }
+
+  deletionRequestAcknowledgementOutcome(requestId: string): FedosDesktopShellResult<FedosDeletionRequestAcknowledgementOutcome | null> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(dr.getAcknowledgementOutcome(requestId));
+  }
+
+  deletionRequestListReceived(): FedosDesktopShellResult<
+    readonly { readonly summary: FedosDeletionRequestInboxSummaryV1; readonly decisionState: FedosDeletionRecipientDecisionState | null }[]
+  > {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(dr.listReceivedRequestSummaries());
+  }
+
+  deletionRequestAssessPolicy(policy: FedosDeletionRecipientPolicy, requestedScope: FedosDeletionRequestScope): FedosDesktopShellResult<FedosDeletionRecipientPolicyDecision> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(dr.assessRecipientDeletionPolicy(policy, requestedScope));
+  }
+
+  async deletionRequestApprove(requestId: string): Promise<FedosDesktopShellResult<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }>> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(await dr.approveReceivedDeletionRequest(requestId));
+  }
+
+  async deletionRequestReject(requestId: string): Promise<FedosDesktopShellResult<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }>> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(await dr.rejectReceivedDeletionRequest(requestId));
+  }
+
+  deletionRequestStatus(requestId: string): FedosDesktopShellResult<{ readonly requestId: string; readonly safeStatus: string } | null> {
+    const dr = this.#deletionRequestRuntime();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "deletion request Runtime is not configured");
+    return fedosDesktopShellOk(dr.inspectDeletionRequestStatus(requestId));
   }
 
   #toSummaryView(conversationId: string): FedosConversationSummaryView | null {

@@ -8,6 +8,58 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6041–6120 — FedOS Signed Deletion
+> Request Multi-Device Aggregation and User Consent UI Arc (FULL
+> completion).** Makes the completed Signed Deletion Request transport
+> (`8981f81`, Alpha 5881–5960) understandable and safely usable: a
+> closed, structurally-erasure-claim-free per-Device (17 values) and
+> account-aggregate (7 values) status model; an explicit recipient
+> consent boundary (opening an item never executes anything; no
+> countdown/automatic approval); a restart-safe recipient Inbox backed
+> by a new, additive, insert-only display-fact port
+> (`FedosDeletionRequestInboxSummaryPersistence` — `5641-5720`'s own
+> decision record never carried display fields); nine new
+> `FedosDesktopApplicationShell` methods and nine new closed Host
+> commands, all delegating entirely to the existing, unmodified
+> `FedosConversationRuntime.deletionRequest()` facade; one new
+> Controller/Renderer wired into the EXISTING, unmodified Presentation
+> Boundary and Renderer aggregate — no second Shell, Runtime, Host
+> Bridge, or Renderer architecture. No canonical Desktop/Electron lineage
+> merge was required — `8981f81` already contains it (`8548845`, Alpha
+> 5161–5240). A real functional gap was found and fixed during this
+> Arc's own real vertical slice: `5881-5960`'s own approval method
+> re-evaluated `"always-review"` a second time at approval, making every
+> `"always-review"` item permanently un-approvable; reaching that method
+> at all already IS the human review the policy exists to require, so it
+> now grants the request's own requested scope on explicit approval only
+> (`"deny"`/`"unavailable"` still refuse; `"allow-local-history-only"`
+> still caps every grant). Proven with a REAL, no-mock end-to-end
+> multi-Device vertical slice against a genuinely-built WASM artifact:
+> two real Device-specific requests, Bob's one real Nostr identity
+> receiving both (NIP-17 delivery is per-account) and Device A's own
+> real Runtime independently, correctly rejecting the Device-B-addressed
+> one as a device-mismatch (proving real Device isolation, never a
+> silent accept/drop), Device A's real approval and real `b3b3a6d`
+> execution independently re-verified, a real signed acknowledgement
+> round trip, a real full restart of both sides with byte-identical
+> Shell/Renderer status reconstruction, and an honest
+> `"some-devices-applied"` aggregate — explicitly never a completion
+> claim. Named, honest limitations: Electron subprocess acceptance and
+> Notification Coordinator wiring were not reached (both narrow,
+> non-redesign follow-ons); `fedos_desktop_runtime.ts`'s own full
+> production bootstrap does not yet thread `deletionRequest` config
+> through, matching this codebase's own STANDING precedent for
+> `directRatchet`/`peerCapability` (prior Arcs' own equally-optional
+> capabilities). See
+> `docs/secure_runtime_alpha_6041_6120_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6041_6120_execution_spec.md`,
+> `docs/secure_runtime_alpha_6041_6120_aggregation_truth.md`,
+> `docs/secure_runtime_alpha_6041_6120_consent_and_warning_ux.md`, and
+> `docs/secure_runtime_alpha_6041_6120_completion_declaration.md`. Next
+> Arc: FedOS Desktop Beta Privacy Controls and Safety Center Arc.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 5881–5960 — FedOS Signed Recipient
 > Deletion Request Private Transport and Local Policy Integration Arc
 > (FULL completion).** Makes the completed Signed Recipient Deletion

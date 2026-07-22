@@ -57,6 +57,8 @@ import type { FedosDeletionRequestAcknowledgementOutcome } from "./fedos_deletio
 import type { FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
 import type { FedosDeletionRequestStatePersistence } from "./fedos_deletion_request_state_persistence.js";
 import { safeStatusForFedosDeletionRequestLifecycle, type FedosDeletionRequestSafeStatus } from "./fedos_deletion_request_safe_status.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
+import type { FedosDeletionRequestInboxSummaryV1 } from "./fedos_deletion_request_inbox_summary.js";
 
 export interface FedosDeletionRequestRuntimeDependencies {
   readonly outbound: FedosDeletionRequestOutboundDependencies;
@@ -179,6 +181,16 @@ export class FedosDeletionRequestRuntime {
     return this.#inbound.executeApprovedLocalDeletion(signed);
   }
 
+  /** Secure Runtime Alpha 6041-6120 — Host/Renderer-safe approval by canonical `requestId` only (never a raw signature). See `FedosDeletionRequestInboundCoordinator.executeApprovedLocalDeletionById()`'s own header for the disclosed in-memory-only limitation. */
+  async approveReceivedDeletionRequest(requestId: string): Promise<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }> {
+    return this.#inbound.executeApprovedLocalDeletionById(requestId);
+  }
+
+  /** Secure Runtime Alpha 6041-6120 — explicit human rejection of a `"policy-pending"` item, by canonical `requestId` only. */
+  async rejectReceivedDeletionRequest(requestId: string): Promise<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }> {
+    return this.#inbound.rejectReceivedDeletionRequest(requestId);
+  }
+
   /**
    * Recipient side — builds an HONEST acknowledgement from an already-
    * recorded, TERMINAL `importDeletionRequestPayload()`/`executeApprovedLocalDeletion()`
@@ -230,5 +242,48 @@ export class FedosDeletionRequestRuntime {
   #latestAcknowledgementOutcome(requestId: string): FedosDeletionRequestAcknowledgementOutcome | null {
     const record = this.#deps.acknowledgementInbound.acknowledgementPersistence.getRecord(requestId);
     return record === null ? null : record.acknowledgement.outcome;
+  }
+
+  /** Secure Runtime Alpha 6041-6120 — public, safe (outcome enum only, never the whole ack record) accessor the Desktop per-Device aggregation model (Phase B) needs. `null` if no acknowledgement has been received for `requestId` yet. */
+  getAcknowledgementOutcome(requestId: string): FedosDeletionRequestAcknowledgementOutcome | null {
+    return this.#latestAcknowledgementOutcome(requestId);
+  }
+
+  /**
+   * Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-
+   * Device Aggregation and User Consent UI Arc) — Phase B/E: sender-side,
+   * every Device-specific request this local sender has ever created for
+   * one (conversationId, targetEnvelopeId) pair. Filters the requester's
+   * own real `requestStatePersistence.listAllSnapshots()` (`5641-5720`,
+   * unmodified) down to each `requestId`'s own LATEST snapshot only (the
+   * log itself may contain many superseded snapshots per request).
+   */
+  listSentRequestsForTarget(conversationId: string, targetEnvelopeId: string): readonly FedosPersistedDeletionRequestStateRecordV1[] {
+    const latestByRequestId = new Map<string, FedosPersistedDeletionRequestStateRecordV1>();
+    for (const snapshot of this.#deps.requestStatePersistence.listAllSnapshots()) {
+      if (snapshot.conversationId !== conversationId || snapshot.targetEnvelopeId !== targetEnvelopeId) continue;
+      const existing = latestByRequestId.get(snapshot.requestId);
+      if (existing === undefined || snapshot.recordedAt >= existing.recordedAt) latestByRequestId.set(snapshot.requestId, snapshot);
+    }
+    return [...latestByRequestId.values()];
+  }
+
+  /**
+   * Recipient-side, Phase D: every received request this local Device has
+   * a durable Inbox summary for (`6041-6120`'s own additive port), paired
+   * with its own CURRENT decision state
+   * (`FedosDeletionRecipientDecisionPersistence`, `5641-5720`, unmodified).
+   * `null` (never omitted) when no decision record exists for a summary
+   * that does — structurally unreachable in practice (the Inbound
+   * Coordinator writes both in the same call), but this method fails
+   * closed rather than assuming it.
+   */
+  listReceivedRequestSummaries(): readonly { readonly summary: FedosDeletionRequestInboxSummaryV1; readonly decisionState: FedosDeletionRecipientDecisionState | null }[] {
+    const summaryPersistence = this.#deps.inbound.inboxSummaryPersistence;
+    if (summaryPersistence === undefined) return [];
+    return summaryPersistence.listSummaries().map((summary) => {
+      const decision = this.#deps.inbound.recipientDecisionPersistence.getRecord(summary.requestId);
+      return { summary, decisionState: decision === null ? null : decision.decisionState };
+    });
   }
 }

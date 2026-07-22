@@ -73,6 +73,7 @@ import {
   evaluateFedosDeletionRecipientPolicy,
   type FedosDeletionRecipientPolicy,
 } from "./fedos_deletion_recipient_policy.js";
+import type { FedosDeletionRequestInboxSummaryPersistence, FedosDeletionRequestInboxSummaryV1 } from "./fedos_deletion_request_inbox_summary.js";
 
 export interface FedosDeletionRequestInboundDependencies {
   readonly authorization: FedosDeletionRequestAuthorizationAssessmentDependencies;
@@ -85,6 +86,17 @@ export interface FedosDeletionRequestInboundDependencies {
   readonly localExecutionPersistence: FedosDeletionExecutionPersistence;
   /** Opaque, non-secret local authority reference recorded on the real Retention decision — never a secret, never a raw path. */
   readonly localAccountRef: string;
+  /**
+   * Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-
+   * Device Aggregation and User Consent UI Arc) — OPTIONAL, additive.
+   * When supplied, this coordinator durably records this domain's own new
+   * `FedosDeletionRequestInboxSummaryV1` (safe display fields only) the
+   * FIRST time a request is genuinely newly received (never on a
+   * duplicate/replay) — the restart-safe source of truth the Desktop
+   * consent Inbox reads from. Omitted, this coordinator's own behavior is
+   * byte-for-byte unchanged from `5881-5960`.
+   */
+  readonly inboxSummaryPersistence?: FedosDeletionRequestInboxSummaryPersistence;
 }
 
 export type FedosDeletionRequestInboundOutcome =
@@ -129,9 +141,16 @@ function planForGrantedScope(
 
 export class FedosDeletionRequestInboundCoordinator {
   readonly #deps: FedosDeletionRequestInboundDependencies;
+  /** Secure Runtime Alpha 6041-6120 -- see `#importRequest()`'s own "await-review" branch for why this is in-memory only, never durable. */
+  readonly #pendingReviewCache = new Map<string, FedosSignedDeletionRequestV1>();
 
   constructor(deps: FedosDeletionRequestInboundDependencies) {
     this.#deps = deps;
+  }
+
+  /** `true` only while this process still holds the signed request in memory for a `"policy-pending"` item -- never a durable fact. */
+  hasPendingReviewRequest(requestId: string): boolean {
+    return this.#pendingReviewCache.has(requestId);
   }
 
   /** `content` is the already-unwrapped Rumor's own `content: string` — the ONE inbound dispatch point (mirrors `FedosRatchetPeerCapabilityInboundCoordinator.importRumorContent()`). */
@@ -152,6 +171,27 @@ export class FedosDeletionRequestInboundCoordinator {
     if (evaluation.outcome === "conflicting-duplicate") return { outcome: "conflicting-duplicate" };
     if (evaluation.outcome === "persistence-failed") return { outcome: "persistence-failed" };
 
+    // Secure Runtime Alpha 6041-6120 -- record the restart-safe Inbox summary the FIRST time
+    // this request is genuinely newly received (never on a duplicate, which already returned
+    // above). Best-effort: a write failure here never blocks the real evaluation pipeline.
+    if (this.#deps.inboxSummaryPersistence !== undefined) {
+      const summary: FedosDeletionRequestInboxSummaryV1 = {
+        schemaVersion: 1,
+        requestId,
+        conversationId: signed.record.conversationId,
+        targetEnvelopeId: signed.record.targetEnvelopeId,
+        requesterAccountRef: signed.record.requesterAccountRef,
+        requesterDeviceRef: signed.record.requesterDeviceRef,
+        recipientDeviceRef: signed.record.recipientDeviceRef,
+        scope: signed.record.scope,
+        issuedAt: signed.record.issuedAt,
+        expiresAt: signed.record.expiresAt,
+        reasonCode: signed.record.reasonCode,
+        recordedAt: this.#deps.clock(),
+      };
+      this.#deps.inboxSummaryPersistence.putSummary(summary);
+    }
+
     if (evaluation.decisionState !== "policy-pending") {
       return { outcome: "recorded", requestId, decisionState: evaluation.decisionState, requestedScope: signed.record.scope, grantedScope: null };
     }
@@ -166,6 +206,15 @@ export class FedosDeletionRequestInboundCoordinator {
       return { outcome: "recorded", requestId, decisionState: rejected.decisionState, requestedScope: signed.record.scope, grantedScope: null };
     }
     if (decision.decision === "await-review") {
+      // Secure Runtime Alpha 6041-6120 -- held IN-MEMORY ONLY (never written to disk) so a
+      // later explicit human approval can look the signed request back up by `requestId` alone
+      // (Host/Renderer boundary: "no raw signatures in UI" -- a caller-facing approval command
+      // carries only the canonical id, never this object). Disclosed limitation: an item still
+      // awaiting review does not survive a process restart -- the DISPLAY (Inbox summary +
+      // decision state) is fully restart-safe; only the "click approve" action itself is not,
+      // until the request is naturally redelivered (safe/idempotent by this protocol's own
+      // design).
+      this.#pendingReviewCache.set(requestId, signed);
       return { outcome: "recorded", requestId, decisionState: "policy-pending", requestedScope: signed.record.scope, grantedScope: null };
     }
 
@@ -177,12 +226,24 @@ export class FedosDeletionRequestInboundCoordinator {
    * local policy left at `"policy-pending"` — a human/caller-driven
    * decision, never automatic. Re-derives the grant through the SAME
    * `evaluateFedosDeletionRecipientPolicy()` this file's own live path
-   * uses (the approval itself does not widen what local policy would
-   * otherwise allow — approving a request never grants MORE than the
-   * currently-configured policy permits for its own scope). `signed` is
-   * the caller's own already-received, already-verified copy (this
-   * Arc's own disclosed limitation: no durable review-queue of raw
-   * received request bodies exists yet — see the completion declaration).
+   * uses — the approval itself does not widen what local policy would
+   * otherwise allow: a `"deny"`/`"unavailable"` policy still refuses (a
+   * human cannot approve past an active denial this way), and an
+   * `"allow-local-history-only"` policy still caps the grant exactly as
+   * it always does. The ONE deliberate exception is `"always-review"`
+   * ITSELF: reaching this method at all already IS the human review
+   * `"always-review"` exists to require (Secure Runtime Alpha 6041-6120's
+   * own Phase C, "Required explicit actions: approve") — re-evaluating
+   * that SAME `"always-review"` policy a second time here would make
+   * every `"always-review"` item permanently un-approvable (the policy
+   * would forever re-decide `"await-review"`, never `"grant"`), silently
+   * defeating the entire consent flow this method exists to serve. An
+   * `"always-review"` policy therefore grants exactly the REQUEST's own
+   * requested scope here — never more than what the request itself
+   * asked for. `signed` is the caller's own already-received, already-
+   * verified copy (this Arc's own disclosed limitation: no durable
+   * review-queue of raw received request bodies exists yet — see the
+   * completion declaration).
    */
   async executeApprovedLocalDeletion(signed: FedosSignedDeletionRequestV1): Promise<FedosDeletionRequestInboundOutcome> {
     const requestId = signed.record.requestId;
@@ -190,13 +251,54 @@ export class FedosDeletionRequestInboundCoordinator {
     if (current === null || current.decisionState !== "policy-pending") return { outcome: "conflicting-duplicate" };
 
     const policy = this.#deps.resolveLocalPolicy(signed.record.requesterAccountRef);
-    const decision = evaluateFedosDeletionRecipientPolicy(policy, signed.record.scope);
+    const decision: ReturnType<typeof evaluateFedosDeletionRecipientPolicy> =
+      policy === "always-review" ? { decision: "grant", grantedScope: signed.record.scope } : evaluateFedosDeletionRecipientPolicy(policy, signed.record.scope);
     if (decision.decision !== "grant") {
       const rejected = recordFedosDeletionRecipientPolicyRejection(requestId, this.#deps.recipientDecisionPersistence, this.#deps.clock);
       if (rejected.outcome !== "recorded") return { outcome: "persistence-failed" };
       return { outcome: "recorded", requestId, decisionState: rejected.decisionState, requestedScope: signed.record.scope, grantedScope: null };
     }
     return this.#executeGrantedDeletion(signed, decision.grantedScope);
+  }
+
+  /**
+   * Secure Runtime Alpha 6041-6120 — the Host/Renderer-safe approval entry
+   * point: takes ONLY the canonical `requestId` (never a raw signature),
+   * looks the signed request back up from this process's own in-memory
+   * pending-review cache, and delegates to `executeApprovedLocalDeletion()`.
+   * `"unknown-request"` if this process never received/no longer holds a
+   * `"policy-pending"` copy for `requestId` (including after a restart —
+   * see this file's own disclosed limitation). Consumed exactly once: the
+   * cache entry is removed regardless of outcome.
+   */
+  async executeApprovedLocalDeletionById(requestId: string): Promise<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }> {
+    const signed = this.#pendingReviewCache.get(requestId);
+    if (signed === undefined) return { outcome: "unknown-request" };
+    this.#pendingReviewCache.delete(requestId);
+    return this.executeApprovedLocalDeletion(signed);
+  }
+
+  /**
+   * Secure Runtime Alpha 6041-6120 — the explicit human REJECTION path for
+   * a `"policy-pending"` item, distinct from an automatic `"deny"` policy
+   * decision (`#importRequest()`'s own `decision.decision === "deny"`
+   * branch, unmodified) — a human choosing to reject an item local policy
+   * would otherwise have left for review. Takes only the canonical
+   * `requestId`. Consumes and drops the in-memory pending-review entry
+   * (nothing further can ever be approved for this `requestId` once
+   * rejected — `"policy-pending"->"policy-rejected"` is the only reachable
+   * transition from here, matching the durable transition table).
+   */
+  async rejectReceivedDeletionRequest(requestId: string): Promise<FedosDeletionRequestInboundOutcome | { readonly outcome: "unknown-request" }> {
+    const current = this.#deps.recipientDecisionPersistence.getRecord(requestId);
+    if (current === null || current.decisionState !== "policy-pending") return { outcome: "unknown-request" };
+    const summary = this.#deps.inboxSummaryPersistence?.getSummary(requestId) ?? null;
+    const cached = this.#pendingReviewCache.get(requestId);
+    const requestedScope = summary?.scope ?? cached?.record.scope ?? "local-history";
+    this.#pendingReviewCache.delete(requestId);
+    const rejected = recordFedosDeletionRecipientPolicyRejection(requestId, this.#deps.recipientDecisionPersistence, this.#deps.clock);
+    if (rejected.outcome !== "recorded") return { outcome: "persistence-failed" };
+    return { outcome: "recorded", requestId, decisionState: rejected.decisionState, requestedScope, grantedScope: null };
   }
 
   async #executeGrantedDeletion(

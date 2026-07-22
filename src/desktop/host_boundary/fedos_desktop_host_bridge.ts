@@ -260,6 +260,52 @@ export class FedosDesktopHostBridge implements FedosDesktopHostPort {
           const result = boundary.shell.deviceRegistrationStatus(validated.deviceId);
           return fedosHostResponseFromResult(result, requestId);
         }
+        // Secure Runtime Alpha 6041-6120 -- Signed Deletion Request Multi-
+        // Device Aggregation and Consent commands. Every case delegates to
+        // `boundary.deletionRequests` (the Controller, `5881-5960`'s Shell
+        // facade underneath) -- this Bridge invents no business logic.
+        case "deletion-request-create": {
+          await boundary.deletionRequests.createRequest({
+            requesterAccountRef: validated.requesterAccountRef,
+            recipientAccountRef: validated.recipientAccountRef,
+            recipientDeviceRef: validated.recipientDeviceRef,
+            conversationId: validated.conversationId as never,
+            targetEnvelopeId: validated.targetEnvelopeId as never,
+            scope: validated.scope,
+            expiresInSeconds: validated.expiresInSeconds,
+            reasonCode: validated.reasonCode,
+          });
+          return fedosHostResponseFromViewModelState(boundary.deletionRequests.createState, requestId);
+        }
+        case "deletion-request-list-sent":
+        case "deletion-request-device-outcomes": {
+          await boundary.deletionRequests.refreshSentStatus(validated.conversationId, validated.targetEnvelopeId, validated.knownDeviceIds);
+          return fedosHostResponseFromViewModelState(boundary.deletionRequests.sentStatusState, requestId);
+        }
+        case "deletion-request-list-received": {
+          await boundary.deletionRequests.openReceivedInbox();
+          return fedosHostResponseFromViewModelState(boundary.deletionRequests.inboxState, requestId);
+        }
+        case "deletion-request-open": {
+          await boundary.deletionRequests.openReceivedRequest(validated.deletionRequestId, validated.localPolicy);
+          return fedosHostResponseFromViewModelState(boundary.deletionRequests.consentDetailState, requestId);
+        }
+        case "deletion-request-approve": {
+          const result = await boundary.shell.deletionRequestApprove(validated.deletionRequestId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "deletion-request-reject": {
+          const result = await boundary.shell.deletionRequestReject(validated.deletionRequestId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "deletion-request-status": {
+          const result = boundary.shell.deletionRequestStatus(validated.deletionRequestId);
+          return fedosHostResponseFromResult(result, requestId);
+        }
+        case "deletion-request-dismiss": {
+          boundary.deletionRequests.dismiss(validated.deletionRequestId);
+          return fedosHostOk(null, requestId);
+        }
       }
     } catch {
       return fedosHostFailure("failed", "command failed", requestId);
