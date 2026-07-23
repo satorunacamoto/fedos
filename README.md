@@ -8,6 +8,59 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6681–6760 — FedOS Desktop Beta Release
+> Candidate and Packaged Security Acceptance Arc (honest partial
+> completion — the canonical packaged Beta entry point does not yet
+> thread Direct Ratchet/Peer Capability/Identity Transition/Deletion
+> Request, blocked on the disclosed Settings→Relay plumbing gap, not this
+> session's environment).** Reconciles the two immediately-prior diverged
+> lineages — Desktop Runtime Configuration Unification (`70bbd6e8`, Alpha
+> 6521–6600) and Secure Memory Store Production Wiring (`8a33045e`, Alpha
+> 6601–6680) — with exactly one mechanical `README.md` conflict, zero
+> semantic overlap (the Runtime Configuration lineage never touches
+> `packages/fedos-core-rust`; the Secure Memory lineage never touches
+> Desktop/Electron files), and zero regressions (confirmed by diffing
+> failed-test sets against both pre-merge lineages independently: 4
+> merged-run failures not present in either baseline all turned out to be
+> `Test timed out in 5000ms` resource-contention flakes under the full
+> 14420-test run, each passing on isolated re-run). This is the first
+> session in this repository's own history with BOTH a real compiled WASM
+> artifact AND the Electron spike package's own installed `node_modules`
+> simultaneously present (real `cargo`/`rustc`/`wasm-bindgen` plus real
+> internet access downloaded the actual Electron 43.1.1 binary), closing
+> 3 of the 4 previously-BLOCKED Release Freeze rows for real: a real
+> packaged Electron process, real compiled WASM, real profile creation/
+> unlock/wrong-passphrase-rejection/lock/re-unlock/clean-shutdown, and a
+> real NSIS installer + portable ZIP built via `electron-builder` with
+> real code-signing and independently-re-derived checksums. A real, new,
+> READ-ONLY AUTOTEST diagnostic (`unifiedGraphDiagnostics()`, no renderer-
+> facing IPC added) proved the Store-backed production crypto authority
+> IS live and reachable through the real packaged path
+> (`productionCryptoStatusOutcome: "ok"`) — but ALSO proved, honestly,
+> that the canonical packaged Beta entry point's own Coordinator
+> construction never threads Direct Ratchet/Peer Capability/Identity
+> Transition/Deletion Request through, even though
+> `FedosProfileInitializationCoordinator` has carried that config since
+> Alpha 6521–6600. A fix was attempted and reverted: all four require
+> `privateTransportEnabled: true` plus real Relay/transport configuration
+> no packaged Electron entry point in this codebase has ever wired in —
+> inventing one here would be exactly the "arbitrary production
+> configuration" this Arc's own mission prohibits. A separate, narrow,
+> real bug was found and fixed in the release secret-scanner itself: a
+> `dev-master-seed-double` pattern match inside `/** */` comments (never
+> real code — independently confirmed the flagged class's own file does
+> not even compile into the packaged `dist/`) was a false positive; now
+> comment-aware, every other pattern unchanged. See
+> `docs/secure_runtime_alpha_6681_6760_reconciliation_report.md`,
+> `..._execution_specification.md`, `..._packaged_security_acceptance_report.md`,
+> `..._secret_surface_audit.md`, `..._threat_scenario_report.md`,
+> `..._release_freeze_update.md`, `..._rc_acceptance_matrix.md`, and
+> `..._completion_declaration.md`. Recommended next Arc: **FedOS Desktop
+> Beta Settings-to-Relay Production Wiring and Packaged Direct-Ratchet/
+> Peer-Capability/Identity-Transition/Deletion-Request Reachability Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6601–6680 — FedOS Secure Memory Store
 > Production Wiring Arc (FULL completion).** Before this Arc, every
 > `SecretHandleStore` construction anywhere in `packages/fedos-core-rust`

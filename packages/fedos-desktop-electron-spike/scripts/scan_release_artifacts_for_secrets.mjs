@@ -52,8 +52,44 @@ export const FEDOS_RELEASE_SECRET_SCAN_PATTERNS = Object.freeze([
   { id: "git-credential-url", pattern: /https?:\/\/[^\s"'/]+:[^\s"'/@]+@[^\s"'/]+/, reason: "a credential embedded in a URL (user:pass@host)" },
   { id: "worktree-absolute-path", pattern: /C:\\wt\\[A-Za-z0-9_-]+/, reason: "a local dedicated-worktree absolute path (should never survive into shipped output)" },
   { id: "windows-user-profile-path", pattern: /C:\\Users\\[A-Za-z0-9._-]+\\/, reason: "a local absolute Windows user-profile path" },
-  { id: "dev-master-seed-double", pattern: /DevelopmentFedosMasterSeedAuthority/, reason: "the dev-only Master Seed double must never reach the normal packaged production entry point" },
+  { id: "dev-master-seed-double", pattern: /DevelopmentFedosMasterSeedAuthority/, reason: "the dev-only Master Seed double must never reach the normal packaged production entry point", commentAware: true },
 ]);
+
+/**
+ * Secure Runtime Alpha 6681-6760 -- narrow precision fix, found by this
+ * Arc's own real run of the release pipeline (never previously executable
+ * end to end in any worktree: this is the first session with both a real
+ * compiled WASM artifact AND the Electron spike package's own installed
+ * `node_modules` simultaneously present). A `commentAware` pattern is only
+ * a finding when it appears OUTSIDE a `//` line comment or a block-comment
+ * (`/**` ... `*` continuation) line -- a bare identifier MENTION inside prose
+ * (e.g. "`FedosWasmMasterSeedAuthority` does, `DevelopmentFedosMasterSeedAuthority`
+ * does not") is not the same claim as the class being imported or
+ * instantiated. Verified directly: `DevelopmentFedosMasterSeedAuthority`
+ * the class is defined ONLY in
+ * `src/desktop/onboarding/fedos_development_master_seed_authority.ts`,
+ * which `tsconfig.beta-runtime.json` does not compile into `dist/` at all
+ * (confirmed absent) -- every staged occurrence of the identifier is
+ * inside a comment explaining why that class is NOT used, never a real
+ * import or `new` call. This does not weaken the check: any actual
+ * code-level usage (an `import`/`require` of the file, or
+ * `new DevelopmentFedosMasterSeedAuthority(`) still matches, since real
+ * code is never comment-prefixed.
+ */
+function isCommentOnlyMatch(content, pattern) {
+  const lines = content.split("\n");
+  let inBlockComment = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const lineIsCommentOnly =
+      inBlockComment || trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*");
+    if (trimmed.includes("/*") && !trimmed.includes("*/")) inBlockComment = true;
+    if (trimmed.includes("*/")) inBlockComment = false;
+    if (!lineIsCommentOnly && pattern.test(line)) return false;
+    pattern.lastIndex = 0;
+  }
+  return true;
+}
 
 function walk(dir) {
   const out = [];
@@ -68,8 +104,11 @@ function walk(dir) {
 /** Scans one file's own text content against every pattern; returns closed finding records (never partial/guessed matches). */
 export function scanFedosReleaseFileForSecrets(path, content) {
   const findings = [];
-  for (const { id, pattern, reason } of FEDOS_RELEASE_SECRET_SCAN_PATTERNS) {
-    if (pattern.test(content)) findings.push({ file: path, patternId: id, reason });
+  for (const { id, pattern, reason, commentAware } of FEDOS_RELEASE_SECRET_SCAN_PATTERNS) {
+    if (!pattern.test(content)) continue;
+    pattern.lastIndex = 0;
+    if (commentAware && isCommentOnlyMatch(content, pattern)) continue;
+    findings.push({ file: path, patternId: id, reason });
   }
   return findings;
 }

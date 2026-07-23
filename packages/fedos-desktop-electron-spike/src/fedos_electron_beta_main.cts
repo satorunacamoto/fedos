@@ -149,13 +149,34 @@ interface StatusView {
   readonly runtimeRunning: boolean;
 }
 type CoordResult<T> = { readonly outcome: "ok"; readonly value: T } | { readonly outcome: string; readonly reason: string };
+/**
+ * Secure Runtime Alpha 6681-6760 — the narrow, READ-ONLY shape this Arc's
+ * own AUTOTEST diagnostic needs from the real running Runtime this SAME
+ * Coordinator already constructs. Every accessor here already exists on
+ * `FedosConversationRuntime` (`directRatchet()`/`peerCapability()`/
+ * `identityTransition()`/`deletionRequest()`, all real, all wired by the
+ * immediately-prior Alpha 6521-6600 Arc through this exact Coordinator) —
+ * this type adds no new capability, it only lets the diagnostic report
+ * whether each is reachable (non-null) on THIS packaged process's own
+ * Runtime, proving the unified configuration graph claim end to end.
+ */
+interface RuntimeConversationLike {
+  directRatchet(): unknown;
+  peerCapability(): unknown;
+  identityTransition(): unknown;
+  deletionRequest(): unknown;
+}
+interface RunningRuntimeLike {
+  conversationRuntime(): RuntimeConversationLike;
+  deviceTrust(): unknown;
+}
 interface CoordinatorLike {
   detectProfileState(): CoordResult<StatusView>;
   createProfile(input: { readonly displayLabel: string }, secret: UnlockSecretLike): Promise<CoordResult<ReadyView>>;
   unlockProfile(secret: UnlockSecretLike): Promise<CoordResult<ReadyView>>;
   lock(): Promise<CoordResult<{ readonly lifecycleState: string }>>;
   status(): StatusView;
-  runningRuntime(): unknown;
+  runningRuntime(): RunningRuntimeLike | null;
 }
 interface MasterSeedAuthorityLike {
   clear(): Promise<void>;
@@ -198,7 +219,12 @@ interface DeviceSyncWiringLike {
   handleEvent(event: unknown): Promise<void>;
   readonly currentTrayStatus: string;
 }
+/** Secure Runtime Alpha 6681-6760 — narrow, safe-only Shell surface for the AUTOTEST diagnostic; never exposes a raw Runtime/secret/handle. */
+interface ShellDiagnosticLike {
+  productionCryptoStatus(): { readonly outcome: string; readonly [key: string]: unknown };
+}
 interface AssemblyLike {
+  readonly shell: ShellDiagnosticLike;
   readonly settingsCoordinator: {
     previewPlan(candidate: unknown): unknown;
     apply(candidate: unknown): Promise<unknown>;
@@ -428,6 +454,22 @@ async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; 
     deviceSyncSchedulerEnabled: true,
     deviceSyncAbandonmentPolicy: DEVICE_SYNC_ABANDONMENT_POLICY,
     deviceSyncAttemptFn: eventBridge.wrapAttemptFn(),
+    // Secure Runtime Alpha 6681-6760 -- this Arc's own real AUTOTEST diagnostic
+    // (`unifiedGraphDiagnostics()` below) proved this canonical Beta entry point does
+    // NOT thread `directRatchetEnabled`/`peerCapabilityEnabled`/`identityTransitionEnabled`/
+    // `deletionRequestEnabled` through, unlike `FedosProfileInitializationCoordinator`
+    // itself (which has carried these fields since Alpha 6521-6600). Enabling them here
+    // was tried and reverted: `startFedosDesktopRuntime()` requires `privateTransportEnabled:
+    // true` plus real `conversationTransportRelays`/`conversationTransportObservationLogPath`/
+    // `conversationTransportSigningAuthority` for all four (they send/receive control
+    // payloads through the real Private Transport, never a fabricated one) -- and no
+    // packaged Electron entry point in this codebase has ever wired real Relay/Settings
+    // configuration in (the disclosed "Settings->Relay plumbing" gap Alpha 6521-6600's
+    // own README explicitly named as deliberately NOT done). Inventing a production Relay
+    // endpoint here would be exactly the "arbitrary production configuration" this Arc's
+    // own mission prohibits. Left disabled, honestly, matching every other packaged
+    // Electron main in this repository -- see the Phase C finding in this Arc's own
+    // reconciliation/execution-spec docs for the full account.
   });
   return { coordinator, masterSeedAuthority, eventBridge };
 }
@@ -664,6 +706,59 @@ async function handleBetaStatus() {
   };
 }
 
+/**
+ * Secure Runtime Alpha 6681-6760 — AUTOTEST-only, READ-ONLY reachability
+ * diagnostic proving this packaged process's own real Runtime is the SAME
+ * unified configuration graph the reconciled 70bbd6e8/8a33045e lineages
+ * produce: Direct Ratchet, Peer Capability, Identity Transition, and
+ * Deletion Request all resolve through the SAME `conversationRuntime()`
+ * this Coordinator already constructs (never a second Runtime/Coordinator
+ * built just for this check), and `productionCryptoStatus()` proves the
+ * Store-backed crypto authority from 8a33045e is live -- through the SAME
+ * Shell every other command in this file uses. Reads existing accessors
+ * only; mutates nothing; never returns a raw Runtime/handle/secret, only
+ * booleans and the Shell's own already-safe status outcome string.
+ */
+function unifiedGraphDiagnostics(): {
+  readonly runtimeReachable: boolean;
+  readonly deviceTrustReachable: boolean;
+  readonly directRatchetConfigured: boolean;
+  readonly peerCapabilityConfigured: boolean;
+  readonly identityTransitionConfigured: boolean;
+  readonly deletionRequestConfigured: boolean;
+  readonly productionCryptoStatusOutcome: string | null;
+} {
+  const runtime = activeCoordinator?.runningRuntime() ?? null;
+  if (runtime === null) {
+    return {
+      runtimeReachable: false,
+      deviceTrustReachable: false,
+      directRatchetConfigured: false,
+      peerCapabilityConfigured: false,
+      identityTransitionConfigured: false,
+      deletionRequestConfigured: false,
+      productionCryptoStatusOutcome: null,
+    };
+  }
+  const cr = runtime.conversationRuntime();
+  let deviceTrustReachable = false;
+  try {
+    runtime.deviceTrust();
+    deviceTrustReachable = true;
+  } catch {
+    deviceTrustReachable = false;
+  }
+  return {
+    runtimeReachable: true,
+    deviceTrustReachable,
+    directRatchetConfigured: cr.directRatchet() !== null,
+    peerCapabilityConfigured: cr.peerCapability() !== null,
+    identityTransitionConfigured: cr.identityTransition() !== null,
+    deletionRequestConfigured: cr.deletionRequest() !== null,
+    productionCryptoStatusOutcome: activeAssembly?.shell.productionCryptoStatus().outcome ?? null,
+  };
+}
+
 async function handleSettingsPlan(candidate: unknown) {
   if (activeAssembly === null) return { outcome: "unavailable", reason: "no profile is unlocked" };
   return activeAssembly.settingsCoordinator.previewPlan(candidate);
@@ -804,6 +899,7 @@ app.whenReady().then(async () => {
         const status = await handleBetaStatus();
         console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_STATUS:${JSON.stringify(status.profile)}`);
         console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_COMPOSITION:${JSON.stringify({ navigation: status.navigation !== null, badge: status.badge !== null, tray: status.trayActive, deviceSyncStatus: status.deviceSyncStatus })}`);
+        console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_UNIFIED_GRAPH:${JSON.stringify(unifiedGraphDiagnostics())}`);
       } catch (err) {
         console.error("fedos-beta: autotest error", err instanceof Error ? err.message : String(err));
       } finally {
