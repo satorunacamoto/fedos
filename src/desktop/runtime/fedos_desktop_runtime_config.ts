@@ -84,6 +84,7 @@ import type {
   FedosConversationDirectRatchetIntegrationDependencies,
   FedosConversationPeerCapabilityIntegrationDependencies,
   FedosConversationIdentityTransitionIntegrationDependencies,
+  FedosConversationInvitationIntegrationDependencies,
 } from "../../conversation/runtime/fedos_conversation_runtime.js";
 import type { FedosRatchetPeerCapabilityEntry } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
 import type { FedosIdentityTransitionLocalPolicy } from "../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
@@ -584,6 +585,17 @@ export interface FedosDesktopRuntimeConfig {
   readonly peerCapabilityObservationLogPath?: string;
   /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */
   readonly conversationPeerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
+
+  /**
+   * Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
+   * Shared Conversation Foundation Arc) — OPTIONAL. Auto-constructs
+   * `FedosConversationInvitationIntegrationDependencies` when
+   * `conversationInvitation` was not manually supplied.
+   */
+  readonly conversationInvitationEnabled?: boolean;
+  readonly conversationInvitationReceivedLogPath?: string;
+  /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */
+  readonly conversationInvitation?: FedosConversationInvitationIntegrationDependencies;
 
   /** OPTIONAL. Auto-constructs `FedosConversationIdentityTransitionIntegrationDependencies` when `conversationIdentityTransition` was not manually supplied. */
   readonly identityTransitionEnabled?: boolean;

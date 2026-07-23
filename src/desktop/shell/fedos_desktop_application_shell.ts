@@ -113,6 +113,7 @@ import type { FedosDirectRatchetSafeStatus } from "../../conversation/ratchet/fe
 // Secure Runtime Alpha 7001-7080 -- narrow, additive, real wrappers only; no new activation/establishment logic.
 import type { FedosConversationDirectActivationResult } from "../../conversation/activation/fedos_conversation_direct_activation_result.js";
 import type { FedosDirectRatchetEstablishOptions, FedosDirectRatchetEstablishOutcome } from "../../conversation/ratchet/fedos_direct_ratchet_outbound_integration.js";
+import type { FedosConversationInvitationOutboundOutcome } from "../../conversation/invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
 import type { FedosRatchetPeerCapabilitySafeStatus } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
 import type { FedosRatchetPeerCapabilityPeerDeviceStatus } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
@@ -348,6 +349,25 @@ export class FedosDesktopApplicationShell {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
     const result = await this.#runtime.conversationRuntime().activateDirectConversation(conversationId);
     return fedosDesktopShellOk(result);
+  }
+
+  /**
+   * Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
+   * Shared Conversation Foundation Arc) — a narrow, real, additive
+   * wrapper over `FedosConversationInvitationRuntime.createAndSendInvitation()`.
+   * No new business logic; creates a brand-new Direct conversation and
+   * sends the invitee a real, signed invitation through the real NIP-17
+   * transport.
+   */
+  async createConversationInvitation(
+    invitee: FedosConversationParticipantReference,
+    expiresInMs?: number,
+  ): Promise<FedosDesktopShellResult<FedosConversationInvitationOutboundOutcome>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const invitation = this.#runtime.conversationRuntime().conversationInvitation();
+    if (invitation === null) return fedosDesktopShellFailure("unavailable", "conversation invitation Runtime is not configured");
+    const outcome = await invitation.createAndSendInvitation(invitee, expiresInMs);
+    return fedosDesktopShellOk(outcome);
   }
 
   createPrivateGroup(command: CreatePrivateGroupDraftCommand): FedosDesktopShellResult<FedosConversationDetailView> {

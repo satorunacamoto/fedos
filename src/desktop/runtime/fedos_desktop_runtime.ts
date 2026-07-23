@@ -121,6 +121,7 @@ import {
   type FedosConversationRuntime,
   type FedosConversationDirectRatchetIntegrationDependencies,
   type FedosConversationPeerCapabilityIntegrationDependencies,
+  type FedosConversationInvitationIntegrationDependencies,
   type FedosConversationIdentityTransitionIntegrationDependencies,
   type FedosConversationDeletionRequestIntegrationDependencies,
 } from "../../conversation/runtime/fedos_conversation_runtime.js";
@@ -241,6 +242,8 @@ import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../../conve
 import { AppendOnlyFedosDirectRatchetSessionResetRecordPersistence } from "../../conversation/ratchet/persistence/append_only_fedos_direct_ratchet_session_reset_record_persistence.js";
 import { AppendOnlyFedosPrivateNostrImportRecordPersistence } from "../../conversation/delivery/nostr/append_only_fedos_private_nostr_import_record_persistence.js";
 import { AppendOnlyFedosRatchetPeerCapabilityObservationPersistence } from "../../conversation/ratchet/peer_capability/persistence/append_only_fedos_ratchet_peer_capability_observation_persistence.js";
+import { AppendOnlyFedosConversationInvitationReceivedPersistence } from "../../conversation/invitation_bootstrap/persistence/append_only_fedos_conversation_invitation_received_persistence.js";
+import { FedosSecureRandomConversationInvitationIdGenerator } from "../../conversation/invitation_bootstrap/fedos_secure_random_conversation_invitation_id_generator.js";
 import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../../conversation/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
 import { AppendOnlyFedosIdentityTransitionLocalDecisionPersistence } from "../../conversation/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_local_decision_persistence.js";
 import { AppendOnlyFedosDeletionRequestStatePersistence } from "../../conversation/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
@@ -875,6 +878,23 @@ export async function startFedosDesktopRuntime(
         }
       : undefined);
 
+  // Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
+  // Shared Conversation Foundation Arc) -- mirrors `conversationPeerCapabilityDeps`'s
+  // own auto-construction exactly, reusing the SAME `sendMailboxNip17Control`
+  // closure and the SAME real production `FedosNostrSigningAuthority` --
+  // never a second, divergent signing/transport path.
+  const conversationInvitationDeps: FedosConversationInvitationIntegrationDependencies | undefined =
+    config.conversationInvitation ??
+    (config.conversationInvitationEnabled
+      ? {
+          signingAuthority: config.conversationTransportSigningAuthority!,
+          localDeviceRef: config.localDeviceId!,
+          idGenerator: new FedosSecureRandomConversationInvitationIdGenerator(),
+          receivedPersistence: config.conversationInvitationReceivedLogPath !== undefined ? new AppendOnlyFedosConversationInvitationReceivedPersistence(config.conversationInvitationReceivedLogPath) : undefined,
+          sendMailboxNip17Control,
+        }
+      : undefined);
+
   const conversationIdentityTransitionDeps: FedosConversationIdentityTransitionIntegrationDependencies | undefined =
     config.conversationIdentityTransition ??
     (config.identityTransitionEnabled
@@ -989,6 +1009,7 @@ export async function startFedosDesktopRuntime(
     // was never set, byte-for-byte the same as before this Arc.
     directRatchet: conversationDirectRatchetDeps,
     peerCapability: conversationPeerCapabilityDeps,
+    conversationInvitation: conversationInvitationDeps,
     identityTransition: conversationIdentityTransitionDeps,
     deletionRequest: conversationDeletionRequestDeps,
   });

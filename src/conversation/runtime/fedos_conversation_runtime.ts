@@ -206,6 +206,11 @@ import type { FedosRatchetPeerCapabilityObservationPersistence } from "../ratche
 import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
 import { FedosRatchetPeerCapabilityRuntime } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
 import type { FedosRatchetPeerCapabilityInboundOutcome } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
+import type { FedosConversationInvitationReceivedPersistence } from "../invitation_bootstrap/persistence/fedos_conversation_invitation_received_persistence.js";
+import { InMemoryFedosConversationInvitationReceivedPersistence } from "../invitation_bootstrap/persistence/in_memory_fedos_conversation_invitation_received_persistence.js";
+import { FedosConversationInvitationRuntime } from "../invitation_bootstrap/fedos_conversation_invitation_runtime.js";
+import type { FedosConversationInvitationOutboundOutcome, FedosConversationInvitationIdGenerator } from "../invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
+import type { FedosConversationInvitationInboundOutcome } from "../invitation_bootstrap/fedos_conversation_invitation_inbound_coordinator.js";
 
 // Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion Request Private Transport and Local Policy Integration Arc).
 import { FedosDeletionRequestRuntime } from "../deletion_request/fedos_deletion_request_runtime.js";
@@ -366,6 +371,15 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
    */
   readonly peerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
   /**
+   * Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
+   * Shared Conversation Foundation Arc) — OPTIONAL; omitted,
+   * `conversationInvitation()` returns `null` and `receiveNip17Rumor()`
+   * remains byte-for-byte unchanged for this attempt. Independent of
+   * `directRatchet`/`peerCapability` above — a caller may supply any
+   * combination.
+   */
+  readonly conversationInvitation?: FedosConversationInvitationIntegrationDependencies;
+  /**
    * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
    * Request Private Transport and Local Policy Integration Arc) —
    * OPTIONAL; omitted, `deletionRequest()` returns `null` and
@@ -459,6 +473,21 @@ export interface FedosConversationPeerCapabilityIntegrationDependencies {
   ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
 }
 
+/** See `FedosConversationRuntimeDependencies.conversationInvitation`'s own doc comment. */
+export interface FedosConversationInvitationIntegrationDependencies {
+  readonly signingAuthority: FedosNostrSigningAuthority;
+  readonly localDeviceRef: string;
+  readonly idGenerator: FedosConversationInvitationIdGenerator;
+  /** Optional — default in-memory. */
+  readonly receivedPersistence?: FedosConversationInvitationReceivedPersistence;
+  readonly sendMailboxNip17Control: (
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+}
+
 /** See `FedosConversationRuntimeDependencies.directRatchet`'s own doc comment. */
 export interface FedosConversationDirectRatchetIntegrationDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;
@@ -531,6 +560,8 @@ export class FedosConversationRuntime {
   readonly #directRatchetRuntime: FedosDirectRatchetConversationRuntime | null;
   /** Secure Runtime Alpha 5721–5800 — `null` when `deps.peerCapability` was not supplied. See this class's own constructor comment. */
   readonly #peerCapabilityRuntime: FedosRatchetPeerCapabilityRuntime | null;
+  /** Secure Runtime Alpha 7081-7160 — `null` when `deps.conversationInvitation` was not supplied. See this class's own constructor comment. */
+  readonly #invitationRuntime: FedosConversationInvitationRuntime | null;
   /** Secure Runtime Alpha 5881-5960 — `null` when `deps.deletionRequest` was not supplied. See this class's own constructor comment. */
   readonly #deletionRequestRuntime: FedosDeletionRequestRuntime | null;
   /** Secure Runtime Alpha 6121-6200 — `null` when `deps.identityTransition` was not supplied. See this class's own constructor comment. */
@@ -707,6 +738,33 @@ export class FedosConversationRuntime {
             sendMailboxNip17Control: deps.peerCapability.sendMailboxNip17Control,
             observationPersistence: deps.peerCapability.observationPersistence ?? new InMemoryFedosRatchetPeerCapabilityObservationPersistence(),
             locallySupportedCapabilities: deps.peerCapability.locallySupportedCapabilities,
+          });
+
+    // Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
+    // Shared Conversation Foundation Arc) — `null` when
+    // `deps.conversationInvitation` was not supplied. Reuses the SAME
+    // `membershipAuthority`/`identityResolver` already built above — never
+    // a second, divergent Membership view. `reactivateConversation` is a
+    // forward-reference closure to `this.#reactivationCoordinator`
+    // (assigned further below in this SAME constructor), mirroring
+    // `fedos_desktop_runtime.ts`'s own established "closure captures a
+    // field this constructor assigns later, never a live race since the
+    // closure is never CALLED before construction fully completes"
+    // discipline exactly.
+    this.#invitationRuntime =
+      deps.conversationInvitation === undefined
+        ? null
+        : new FedosConversationInvitationRuntime({
+            membershipAuthority: deps.membershipAuthority,
+            identityResolver,
+            localDeviceRef: deps.conversationInvitation.localDeviceRef,
+            signingAuthority: deps.conversationInvitation.signingAuthority,
+            accountIndex: accountIndexAuthority.localAccountIndex(),
+            idGenerator: deps.conversationInvitation.idGenerator,
+            clock: deps.clock,
+            receivedPersistence: deps.conversationInvitation.receivedPersistence ?? new InMemoryFedosConversationInvitationReceivedPersistence(),
+            reactivateConversation: (conversationId: string) => this.#reactivationCoordinator.reactivateRestoredConversation(conversationId),
+            sendMailboxNip17Control: deps.conversationInvitation.sendMailboxNip17Control,
           });
 
     // Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion
@@ -1374,6 +1432,7 @@ export class FedosConversationRuntime {
     | FedosDeletionRequestInboundOutcome
     | FedosDeletionAcknowledgementInboundOutcome
     | FedosIdentityTransitionInboundOutcome
+    | FedosConversationInvitationInboundOutcome
   > {
     // Secure Runtime Alpha 5561–5640 Phase G — tried FIRST, exactly like
     // the payload codec's own header requires: a ratchet payload must
@@ -1429,6 +1488,17 @@ export class FedosConversationRuntime {
         return identityTransitionResult;
       }
     }
+    // Secure Runtime Alpha 7081-7160 — tried FIFTH, before the legacy
+    // chat fallback: a conversation-invitation control payload must never
+    // be imported as an ordinary chat message either, mirroring every
+    // control-payload attempt above. `"not-invitation-payload"` (the ONLY
+    // outcome possible when `#invitationRuntime` is `null`, or when a
+    // real, non-invitation Rumor arrives) falls through to the EXISTING,
+    // UNCHANGED legacy coordinator below — never the reverse.
+    if (this.#invitationRuntime !== null) {
+      const invitationResult = await this.#invitationRuntime.importInvitationPayload(rumor.content);
+      if (invitationResult.outcome !== "not-invitation-payload") return invitationResult;
+    }
     return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
   }
 
@@ -1452,6 +1522,17 @@ export class FedosConversationRuntime {
    */
   peerCapability(): FedosRatchetPeerCapabilityRuntime | null {
     return this.#peerCapabilityRuntime;
+  }
+
+  /**
+   * Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
+   * Shared Conversation Foundation Arc) — the additive conversation-
+   * invitation facade. `null` when `deps.conversationInvitation` was not
+   * supplied at construction (mirrors `peerCapability()`'s own "null when
+   * not assembled" precedent).
+   */
+  conversationInvitation(): FedosConversationInvitationRuntime | null {
+    return this.#invitationRuntime;
   }
 
   /**

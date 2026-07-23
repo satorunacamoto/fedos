@@ -89,6 +89,19 @@ export interface FedosLocalProfilePaths {
   readonly directRatchetImportRecordLogFile: string;
   /** Ratchet Peer Capability observation append-only log. */
   readonly peerCapabilityObservationLogFile: string;
+  /** Secure Runtime Alpha 7081-7160 — Conversation Invitation received-invitation append-only log. */
+  readonly conversationInvitationReceivedLogFile: string;
+  /**
+   * Secure Runtime Alpha 7081-7160 — real, pre-existing bug fix: this
+   * Draft append-only log path existed on `FedosDesktopRuntimeConfig.conversationDraftLogPath`
+   * already, but `FedosProfileInitializationCoordinator` never supplied
+   * it, so Draft persistence silently defaulted to in-memory-only (lost
+   * on every restart) even through the real production Coordinator path
+   * — confirmed by direct testing (`conversationMembershipLogFile`
+   * immediately above WAS already correctly wired; this ONE sibling
+   * field was not). See the completion declaration for the full account.
+   */
+  readonly conversationDraftLogFile: string;
   /** Identity Transition peer-observation append-only log. */
   readonly identityTransitionObservationLogFile: string;
   /** Identity Transition durable local-decision append-only log. */
@@ -143,6 +156,8 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     directRatchetResetRecordLogFile: join(root, "direct-ratchet-reset-record.ndjson"),
     directRatchetImportRecordLogFile: join(root, "direct-ratchet-import-record.ndjson"),
     peerCapabilityObservationLogFile: join(root, "peer-capability-observation.ndjson"),
+    conversationInvitationReceivedLogFile: join(root, "conversation-invitation-received.ndjson"),
+    conversationDraftLogFile: join(root, "conversation-draft.ndjson"),
     identityTransitionObservationLogFile: join(root, "identity-transition-observation.ndjson"),
     identityTransitionLocalDecisionLogFile: join(root, "identity-transition-local-decision.ndjson"),
     deletionRequestStateLogFile: join(root, "deletion-request-state.ndjson"),

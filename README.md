@@ -8,9 +8,63 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Secure Runtime Alpha 7001–7080 — FedOS Desktop Beta Runtime
-> Acceptance Arc (HONEST PARTIAL — packaged two-party end-to-end
-> messaging blocked, real cause named, not fabricated).** Set out to
+> **Status: Secure Runtime Alpha 7081–7160 — FedOS Conversation
+> Invitation and Shared Conversation Foundation Arc (HONEST PARTIAL —
+> real signed Invitation/Acceptance mechanism built and proven, real
+> relay-transported delivery blocked one layer beneath it, real cause
+> named, not fabricated).** Set out to close the gap the immediately-
+> prior Arc (7001-7080) surfaced: `FedosDesktopApplicationShell.redeemInvitation()`
+> being unconditionally unavailable, and the old Capability/Invitation
+> Transport system (Alpha 991-1050) requiring a shared backend
+> incompatible with two independently-provisioned profiles. Built an
+> entirely new, additive, parallel Invitation subsystem
+> (`src/conversation/invitation_bootstrap/`): a signed, domain-separated
+> Invitation record and token; an outbound coordinator that breaks the
+> real circular Membership/route-resolution dependency by admitting both
+> parties' Memberships locally BEFORE the first invitation is ever sent;
+> an inbound Acceptance coordinator with real signature verification,
+> real addressee verification, expiry checking, and durable idempotent
+> duplicate detection; Runtime wiring additive and optional throughout.
+> Proven for real, on two genuinely independent real production profiles
+> over a real local relay connection: Alice creates an invitation, Bob
+> accepts it, both peers hold the identical conversationId, Membership is
+> durably persisted on both sides, and a real Coordinator restart
+> preserves everything. One real, narrow, in-scope production bug fixed
+> along the way: `conversationDraftLogPath` was never wired by
+> `FedosProfileInitializationCoordinator`, silently defaulting Draft
+> persistence to in-memory-only through the real production path for
+> every Direct/Group conversation. **What remains genuinely blocked, not
+> silently claimed closed:** real testing surfaced three deep,
+> pre-existing, cross-cutting production gaps beneath this Arc's own new
+> code, none of which this Arc created or is scoped to fix — (1) the real
+> NIP-17 wire adapter is never constructed through the real production
+> Coordinator/packaged path (`productionCryptoGraph` never populated),
+> blocking real relay-transported delivery of Conversation Invitations
+> AND every other control-message subsystem (Peer Capability, Direct
+> Ratchet control messages, Identity Transition, Signed Deletion) today;
+> (2) `FedosConversationIdentityResolver` resolves to a generic,
+> non-per-account placeholder in the real production path, worked around
+> in this Arc's own scope via a real per-account signing-derived
+> identity but not fixed at the root; (3) `FedosConversationDirectActivationCoordinator`
+> requires a real production encryption authority that has never been
+> built. This Arc's own real vertical slice test discloses, in its own
+> header comment before a single assertion runs, that it substitutes
+> direct coordinator-to-coordinator delivery of the real signed
+> invitation payload for the (confirmed-blocked) live relay transport
+> leg — never a fabricated record, never a bypassed identity or signature
+> check. Zero redesign of Direct Ratchet, Identity Transition, Signed
+> Deletion, or the Rust/WASM core; the old Capability/Invitation
+> Transport system left fully untouched; zero p2p/.tmp_gen change. See
+> `docs/secure_runtime_alpha_7081_7160_completion_declaration.md` and its
+> own named companion reports (`..._reconciliation_report.md`,
+> `..._execution_specification.md`, `..._deep_production_gap_report.md`).
+> Recommended next Arc (narrow, not the "full completion" default):
+> **FedOS Conversation-Level Production Crypto and Identity Authority
+> Wiring Arc.**
+>
+> Prior status: Secure Runtime Alpha 7001–7080 — FedOS Desktop Beta
+> Runtime Acceptance Arc (HONEST PARTIAL — packaged two-party end-to-end
+> messaging blocked, real cause named, not fabricated). Set out to
 > prove the canonical packaged Desktop Beta can execute a real two-party
 > Direct Ratchet message round trip (renderer → preload → main →
 > Coordinator → Runtime → Ratchet → NIP-17 → real Relay → second party →

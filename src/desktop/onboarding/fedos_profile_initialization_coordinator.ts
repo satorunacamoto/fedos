@@ -203,6 +203,8 @@ export interface FedosProfileInitializationDependencies {
   readonly peerCapabilityEnabled?: boolean;
   /** REQUIRED when `peerCapabilityEnabled` is `true` — this Runtime advertises no capability of its own by default. */
   readonly peerCapabilityLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
+  /** Secure Runtime Alpha 7081-7160 — pass-through to `FedosDesktopRuntimeConfig.conversationInvitationEnabled`'s own doc comment. */
+  readonly conversationInvitationEnabled?: boolean;
   readonly identityTransitionEnabled?: boolean;
   readonly identityTransitionLocalPolicy?: FedosIdentityTransitionLocalPolicy;
   readonly deletionRequestEnabled?: boolean;
@@ -652,6 +654,12 @@ export class FedosProfileInitializationCoordinator {
       conversationEnvelopeLogPath: paths.conversationEnvelopeLogFile,
       conversationPayloadLogPath: paths.conversationPayloadLogFile,
       conversationMembershipLogPath: paths.conversationMembershipLogFile,
+      // Secure Runtime Alpha 7081-7160 -- real, narrow bug fix: this field
+      // already existed on FedosDesktopRuntimeConfig but was never
+      // supplied here, so Draft persistence silently defaulted to
+      // in-memory-only (lost on every restart). See
+      // fedos_local_profile_paths.ts's own doc comment on this field.
+      conversationDraftLogPath: paths.conversationDraftLogFile,
       deviceTrustEnabled: true,
       localDeviceId,
       localAccountRef: accountRef,
@@ -694,6 +702,8 @@ export class FedosProfileInitializationCoordinator {
       peerCapabilityEnabled: this.#deps.peerCapabilityEnabled === true,
       peerCapabilityLocallySupportedCapabilities: this.#deps.peerCapabilityEnabled === true ? this.#deps.peerCapabilityLocallySupportedCapabilities : undefined,
       peerCapabilityObservationLogPath: this.#deps.peerCapabilityEnabled === true ? paths.peerCapabilityObservationLogFile : undefined,
+      conversationInvitationEnabled: this.#deps.conversationInvitationEnabled === true,
+      conversationInvitationReceivedLogPath: this.#deps.conversationInvitationEnabled === true ? paths.conversationInvitationReceivedLogFile : undefined,
       identityTransitionEnabled: this.#deps.identityTransitionEnabled === true,
       identityTransitionObservationLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionObservationLogFile : undefined,
       identityTransitionLocalDecisionLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionLocalDecisionLogFile : undefined,
