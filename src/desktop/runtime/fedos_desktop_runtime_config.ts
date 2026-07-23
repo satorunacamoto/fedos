@@ -557,6 +557,25 @@ export interface FedosDesktopRuntimeConfig {
   readonly conversationDirectRatchetMasterSeedAuthority?: FedosMasterSeedAuthority;
   /** Manual override — when supplied, `directRatchetEnabled`'s own auto-construction is skipped entirely and this object is used verbatim. */
   readonly conversationDirectRatchet?: FedosConversationDirectRatchetIntegrationDependencies;
+  /**
+   * Secure Runtime Alpha 7001-7080 — OPTIONAL. Real Node-level reconciliation
+   * (`docs/secure_runtime_alpha_7001_7080_reconciliation_report.md`) found
+   * that the packaged app's own real, user-facing `sendMessage()` always
+   * used the legacy static NIP-17 route, NEVER Direct Ratchet, because
+   * `FedosConversationRuntimeDependencies.directRatchet.messageDelivery`
+   * (construction-time-fixed to exactly ONE `remoteDeviceRef`, by this
+   * codebase's own established design — see that field's own doc comment)
+   * was never auto-populated, unlike its sibling `directMessageDelivery`.
+   * When supplied together with `directRatchetEnabled`, THIS field names
+   * the one remote Device this Runtime's real user-facing `sendMessage()`
+   * routes through Direct Ratchet for — mirroring
+   * `directMessageDelivery`'s own auto-wiring
+   * (`sendMailboxNip17`, bound to the SAME `privateTransportInstance`)
+   * exactly. Omitted by default — zero behavior change for every existing
+   * caller; `sendMessage()` keeps using the legacy route until a caller
+   * opts in for a specific Device pairing, exactly as before this Arc.
+   */
+  readonly directRatchetMessageDeliveryRemoteDeviceRef?: string;
 
   /** OPTIONAL. Auto-constructs `FedosConversationPeerCapabilityIntegrationDependencies` when `conversationPeerCapability` was not manually supplied. */
   readonly peerCapabilityEnabled?: boolean;

@@ -92,6 +92,10 @@ const AUTOTEST_SECRET = process.env.FEDOS_BETA_AUTOTEST_SECRET ?? "";
 const MAX_LABEL_CHARS = 128;
 const MAX_SECRET_BYTES = 1024;
 const MAX_ID_LENGTH = 512;
+/** Secure Runtime Alpha 7001-7080 — same bound class as `MAX_LABEL_CHARS` above, sized for a real chat message body rather than a short label. */
+const MAX_MESSAGE_BODY_CHARS = 8192;
+/** Secure Runtime Alpha 7001-7080 — a real Device-pairing encoded request/approval string is larger than an id but still bounded (JSON envelope + one signature + one public key, never unbounded). */
+const MAX_PAIRING_ENVELOPE_CHARS = 8192;
 
 /** Secure Runtime Alpha 5161-5240 — mirrors `fedos_electron_badge_main.cts`'s own identical policy value (`DEVICE_SYNC_ABANDONMENT_POLICY`). */
 const DEVICE_SYNC_ABANDONMENT_POLICY = Object.freeze({ maxAttempts: 5, laterDelaySeconds: 30 });
@@ -219,9 +223,35 @@ interface DeviceSyncWiringLike {
   handleEvent(event: unknown): Promise<void>;
   readonly currentTrayStatus: string;
 }
-/** Secure Runtime Alpha 6681-6760 — narrow, safe-only Shell surface for the AUTOTEST diagnostic; never exposes a raw Runtime/secret/handle. */
+/**
+ * Secure Runtime Alpha 6681-6760 — narrow, safe-only Shell surface for the
+ * AUTOTEST diagnostic; never exposes a raw Runtime/secret/handle.
+ *
+ * Secure Runtime Alpha 7001-7080 — extended (never redesigned) with the
+ * closed, ACCEPTANCE-MODE-ONLY command vocabulary Phase C names: every
+ * method below already exists, verbatim, on the real
+ * `FedosDesktopApplicationShell` (`createDirectConversation`/`sendMessage`/
+ * `listMessages`/`readMessage`/`directRatchetStatus`/the six Device
+ * Pairing methods are all pre-existing and unchanged by this Arc;
+ * `activateDirectConversation`/`establishDirectRatchetSession` are the two
+ * new, narrow wrapper methods this Arc added directly to the Shell — see
+ * that file's own Alpha 7001-7080 doc comments). This interface only
+ * narrows the TYPE this file depends on; it grants no new capability
+ * beyond what the Shell itself already implements.
+ */
 interface ShellDiagnosticLike {
   productionCryptoStatus(): { readonly outcome: string; readonly [key: string]: unknown };
+  createDirectConversation(command: unknown): { readonly outcome: string; readonly [key: string]: unknown };
+  activateDirectConversation(conversationId: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  devicePairingCreate(deviceId: string, expectedAccountRef: unknown): { readonly outcome: string; readonly [key: string]: unknown };
+  devicePairingInspect(encodedRequest: string): { readonly outcome: string; readonly [key: string]: unknown };
+  devicePairingApprove(encodedRequest: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  devicePairingComplete(pairingId: string, encodedApproval: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  establishDirectRatchetSession(conversationId: string, remoteDeviceRef: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  sendMessage(conversationId: string, sender: unknown, body: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  listMessages(conversationId: string): { readonly outcome: string; readonly [key: string]: unknown };
+  readMessage(conversationId: string, messageId: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  directRatchetStatus(conversationId: string, remoteDeviceRef: string): { readonly outcome: string; readonly [key: string]: unknown };
 }
 interface AssemblyLike {
   readonly shell: ShellDiagnosticLike;
@@ -517,11 +547,17 @@ function secureRuntimeBundleConfig(m: RootModules, signer: unknown): Record<stri
   }
   const socketFactory = m.createNodeWebSocketRelaySocketFactory();
   const relays = relayUrls.map((url) => new m.WebSocketRelay(url, socketFactory));
+  // Secure Runtime Alpha 7001-7080 -- see `FedosDesktopRuntimeConfig.directRatchetMessageDeliveryRemoteDeviceRef`'s
+  // own doc comment. TEST-INJECTION ONLY, mirrors `AUTOTEST_SECRET`'s own
+  // discipline exactly -- unset on every ordinary launch, so `sendMessage()`
+  // keeps using the legacy static route for every real user by default.
+  const messageDeliveryRemoteDeviceRef = process.env.FEDOS_BETA_DIRECT_RATCHET_MESSAGE_DELIVERY_REMOTE_DEVICE_REF;
   return {
     privateTransportEnabled: true,
     conversationTransportRelays: relays,
     conversationTransportSigningAuthority: signer,
     directRatchetEnabled: true,
+    directRatchetMessageDeliveryRemoteDeviceRef: messageDeliveryRemoteDeviceRef !== undefined && messageDeliveryRemoteDeviceRef.length > 0 ? messageDeliveryRemoteDeviceRef : undefined,
     peerCapabilityEnabled: true,
     peerCapabilityLocallySupportedCapabilities: [{ kind: "private-message-route", route: "nostr-nip17-v1" }],
     identityTransitionEnabled: true,
@@ -861,6 +897,148 @@ async function performCleanShutdown(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------
+// Secure Runtime Alpha 7001-7080 — Phase C: the closed `fedos-acceptance:*`
+// command vocabulary. Every command below is REJECTED (`{outcome:
+// "unavailable", reason: "acceptance-only"}`, structurally identical to
+// every other "unavailable" outcome this file already produces — no new
+// failure shape) unless `AUTOTEST_MODE` is set, proving this vocabulary
+// does not exist in ordinary packaged production mode
+// (`test/../secure_runtime_alpha_7001_7080_structural_guards.test.ts`
+// asserts this directly). Every command delegates ENTIRELY to an
+// ALREADY-REAL `FedosDesktopApplicationShell` method (never a raw
+// Runtime/Store/handle, never a second business-logic implementation) and
+// validates its own JSON payload shape before calling it — malformed
+// input never reaches the Shell.
+// ---------------------------------------------------------------------
+
+function acceptanceGateRejection(): { readonly outcome: "unavailable"; readonly reason: string } {
+  return { outcome: "unavailable", reason: "acceptance-only" };
+}
+
+function requireShell(): ShellDiagnosticLike | null {
+  if (AUTOTEST_MODE.length === 0) return null;
+  if (activeAssembly === null) return null;
+  return activeAssembly.shell;
+}
+
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+}
+
+async function handleAcceptanceCreateDirectConversation(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  if (typeof payload !== "object" || payload === null) return { outcome: "invalid-input", reason: "malformed create-direct-conversation request" };
+  const recipient = (payload as { recipient?: unknown }).recipient;
+  if (typeof recipient !== "object" || recipient === null) return { outcome: "invalid-input", reason: "missing recipient" };
+  const authority = (recipient as { authority?: unknown }).authority;
+  const publicIdentifier = (recipient as { publicIdentifier?: unknown }).publicIdentifier;
+  if (typeof authority !== "string" || !isBoundedString(publicIdentifier, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed recipient" };
+  }
+  return shell.createDirectConversation({ recipient: { authority: authority as never, publicIdentifier } });
+}
+
+async function handleAcceptanceActivateDirectConversation(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  return shell.activateDirectConversation(conversationId);
+}
+
+async function handleAcceptanceDevicePairingCreate(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const deviceId = (payload as { deviceId?: unknown } | null)?.deviceId;
+  const expectedAccountRef = (payload as { expectedAccountRef?: unknown } | null)?.expectedAccountRef;
+  if (!isBoundedString(deviceId, MAX_ID_LENGTH) || typeof expectedAccountRef !== "object" || expectedAccountRef === null) {
+    return { outcome: "invalid-input", reason: "malformed device-pairing-create request" };
+  }
+  return shell.devicePairingCreate(deviceId, expectedAccountRef);
+}
+
+async function handleAcceptanceDevicePairingInspect(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const encodedRequest = (payload as { encodedRequest?: unknown } | null)?.encodedRequest;
+  if (!isBoundedString(encodedRequest, MAX_PAIRING_ENVELOPE_CHARS)) return { outcome: "invalid-input", reason: "malformed encodedRequest" };
+  return shell.devicePairingInspect(encodedRequest);
+}
+
+async function handleAcceptanceDevicePairingApprove(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const encodedRequest = (payload as { encodedRequest?: unknown } | null)?.encodedRequest;
+  if (!isBoundedString(encodedRequest, MAX_PAIRING_ENVELOPE_CHARS)) return { outcome: "invalid-input", reason: "malformed encodedRequest" };
+  return shell.devicePairingApprove(encodedRequest);
+}
+
+async function handleAcceptanceDevicePairingComplete(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const pairingId = (payload as { pairingId?: unknown } | null)?.pairingId;
+  const encodedApproval = (payload as { encodedApproval?: unknown } | null)?.encodedApproval;
+  if (!isBoundedString(pairingId, MAX_ID_LENGTH) || !isBoundedString(encodedApproval, MAX_PAIRING_ENVELOPE_CHARS)) {
+    return { outcome: "invalid-input", reason: "malformed device-pairing-complete request" };
+  }
+  return shell.devicePairingComplete(pairingId, encodedApproval);
+}
+
+async function handleAcceptanceEstablishDirectRatchetSession(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const remoteDeviceRef = (payload as { remoteDeviceRef?: unknown } | null)?.remoteDeviceRef;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || !isBoundedString(remoteDeviceRef, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed establish-session request" };
+  }
+  return shell.establishDirectRatchetSession(conversationId, remoteDeviceRef);
+}
+
+async function handleAcceptanceSendMessage(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const sender = (payload as { sender?: unknown } | null)?.sender;
+  const body = (payload as { body?: unknown } | null)?.body;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || typeof sender !== "object" || sender === null || !isBoundedString(body, MAX_MESSAGE_BODY_CHARS)) {
+    return { outcome: "invalid-input", reason: "malformed send-message request" };
+  }
+  return shell.sendMessage(conversationId, sender, body);
+}
+
+async function handleAcceptanceListMessages(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  return shell.listMessages(conversationId);
+}
+
+async function handleAcceptanceReadMessage(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const messageId = (payload as { messageId?: unknown } | null)?.messageId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || !isBoundedString(messageId, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed read-message request" };
+  }
+  return shell.readMessage(conversationId, messageId);
+}
+
+async function handleAcceptanceDirectRatchetStatus(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const remoteDeviceRef = (payload as { remoteDeviceRef?: unknown } | null)?.remoteDeviceRef;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || !isBoundedString(remoteDeviceRef, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed status request" };
+  }
+  return { outcome: "ok", value: shell.directRatchetStatus(conversationId, remoteDeviceRef) };
+}
+
+// ---------------------------------------------------------------------
 // IPC — `fedos-profile:*` REUSED verbatim (Phase P). Additive `fedos-beta:*`
 // namespace for status/settings-application/tray/badge/background.
 // ---------------------------------------------------------------------
@@ -880,6 +1058,24 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-beta:settings-apply", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleSettingsApply(candidate));
   ipcMain.handle("fedos-beta:tray-action", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleTrayAction(candidate));
   ipcMain.handle("fedos-beta:badge-mark-viewed", async (_e: IpcMainInvokeEvent, payload: unknown) => handleBadgeMarkViewed(payload));
+
+  // Secure Runtime Alpha 7001-7080 — Phase C closed acceptance vocabulary.
+  // Every handler above rejects with `{outcome:"unavailable"}` unless
+  // AUTOTEST_MODE is set (`requireShell()`); registering the CHANNEL
+  // itself unconditionally matches every other channel in this file --
+  // the security boundary is the handler's own runtime check, not
+  // whether `ipcMain.handle` was called.
+  ipcMain.handle("fedos-acceptance:create-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateDirectConversation(payload));
+  ipcMain.handle("fedos-acceptance:activate-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
+  ipcMain.handle("fedos-acceptance:device-pairing-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
+  ipcMain.handle("fedos-acceptance:device-pairing-inspect", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
+  ipcMain.handle("fedos-acceptance:device-pairing-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
+  ipcMain.handle("fedos-acceptance:device-pairing-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
+  ipcMain.handle("fedos-acceptance:establish-direct-ratchet-session", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceEstablishDirectRatchetSession(payload));
+  ipcMain.handle("fedos-acceptance:send-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSendMessage(payload));
+  ipcMain.handle("fedos-acceptance:list-messages", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceListMessages(payload));
+  ipcMain.handle("fedos-acceptance:read-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceReadMessage(payload));
+  ipcMain.handle("fedos-acceptance:direct-ratchet-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDirectRatchetStatus(payload));
 }
 
 // ---------------------------------------------------------------------
@@ -959,6 +1155,56 @@ app.whenReady().then(async () => {
         console.log(`FEDOS_ELECTRON_BETA_AUTOTEST_UNIFIED_GRAPH:${JSON.stringify(unifiedGraphDiagnostics())}`);
       } catch (err) {
         console.error("fedos-beta: autotest error", err instanceof Error ? err.message : String(err));
+      } finally {
+        await performCleanShutdown();
+      }
+    })();
+  }
+
+  if (AUTOTEST_MODE === "acceptance") {
+    // Secure Runtime Alpha 7001-7080 -- Phase C/G/H/J/K. No precedent
+    // exists anywhere in this repository for a live, multi-command IPC
+    // session with a running Electron subprocess from an external Node
+    // test driver (confirmed by the Phase A reconciliation report). This
+    // mode reads an ORDERED SCRIPT of steps (`FEDOS_BETA_ACCEPTANCE_SCRIPT`,
+    // a JSON array of `{command, payload}`), and calls the SAME internal
+    // handler function each named command already dispatches to via
+    // `registerIpcHandlers()` above -- never a second implementation. Each
+    // step's result is logged as one JSON line the test driver parses;
+    // an unknown command name fails that ONE step closed
+    // (`{outcome:"unavailable", reason:"unknown-acceptance-script-command"}`)
+    // without aborting the remaining steps, so a script can assert on a
+    // failure mid-sequence exactly like a real multi-step user flow would.
+    void (async () => {
+      const commands: Record<string, (payload: unknown) => Promise<unknown>> = {
+        "profile-create": (payload) => handleCreate(payload),
+        "profile-unlock": (payload) => handleUnlock(payload),
+        "profile-lock": () => handleLock(),
+        "beta-status": () => handleBetaStatus(),
+        "unified-graph": () => Promise.resolve(unifiedGraphDiagnostics()),
+        "acceptance-create-direct-conversation": (payload) => handleAcceptanceCreateDirectConversation(payload),
+        "acceptance-activate-direct-conversation": (payload) => handleAcceptanceActivateDirectConversation(payload),
+        "acceptance-device-pairing-create": (payload) => handleAcceptanceDevicePairingCreate(payload),
+        "acceptance-device-pairing-inspect": (payload) => handleAcceptanceDevicePairingInspect(payload),
+        "acceptance-device-pairing-approve": (payload) => handleAcceptanceDevicePairingApprove(payload),
+        "acceptance-device-pairing-complete": (payload) => handleAcceptanceDevicePairingComplete(payload),
+        "acceptance-establish-direct-ratchet-session": (payload) => handleAcceptanceEstablishDirectRatchetSession(payload),
+        "acceptance-send-message": (payload) => handleAcceptanceSendMessage(payload),
+        "acceptance-list-messages": (payload) => handleAcceptanceListMessages(payload),
+        "acceptance-read-message": (payload) => handleAcceptanceReadMessage(payload),
+        "acceptance-direct-ratchet-status": (payload) => handleAcceptanceDirectRatchetStatus(payload),
+      };
+      try {
+        const scriptRaw = process.env.FEDOS_BETA_ACCEPTANCE_SCRIPT ?? "[]";
+        const script: ReadonlyArray<{ readonly command: string; readonly payload?: unknown }> = JSON.parse(scriptRaw);
+        for (let i = 0; i < script.length; i++) {
+          const step = script[i]!;
+          const fn = commands[step.command];
+          const result = fn === undefined ? { outcome: "unavailable", reason: "unknown-acceptance-script-command" } : await fn(step.payload);
+          console.log(`FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify(result)}`);
+        }
+      } catch (err) {
+        console.error("fedos-beta: acceptance script error", err instanceof Error ? err.message : String(err));
       } finally {
         await performCleanShutdown();
       }

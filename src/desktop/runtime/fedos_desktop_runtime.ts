@@ -843,6 +843,21 @@ export async function startFedosDesktopRuntime(
           masterSeedAuthority: directRatchetSealingAuthority,
           localDeviceRef: config.localDeviceId!,
           sendMailboxNip17Control,
+          // Secure Runtime Alpha 7001-7080 -- mirrors `directMessageDelivery.sendMailboxNip17`
+          // immediately above (Alpha 1841-1920), forward-referencing the SAME
+          // `privateTransportInstance`. Omitted (`undefined`) unless the caller
+          // opts in via `directRatchetMessageDeliveryRemoteDeviceRef` -- zero
+          // behavior change for every pre-existing caller.
+          messageDelivery:
+            config.directRatchetMessageDeliveryRemoteDeviceRef !== undefined
+              ? {
+                  remoteDeviceRef: config.directRatchetMessageDeliveryRemoteDeviceRef,
+                  sendMailboxNip17: async (envelopeId, conversationId, plaintext) => {
+                    if (privateTransportInstance === undefined) return { outcome: "route-unavailable" };
+                    return privateTransportInstance.sendMailboxNip17(envelopeId as never, conversationId as never, plaintext);
+                  },
+                }
+              : undefined,
         }
       : undefined);
 

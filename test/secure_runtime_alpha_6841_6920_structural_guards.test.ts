@@ -86,12 +86,12 @@ describe("Secure Runtime Alpha 6841-6920 -- structural guards", () => {
     expect(diffOutput.trim()).toBe("");
   });
 
-  it("8. the packaged Beta entry point (fedos_electron_beta_main.cts) is byte-for-byte unchanged by this Arc -- reachability closes purely through the Coordinator/Runtime layer", () => {
+  it("8. the packaged Beta entry point (fedos_electron_beta_main.cts) is byte-for-byte unchanged by THIS Arc (f3e0658..4c1f27c) -- reachability closed purely through the Coordinator/Runtime layer. Pinned to this Arc's own two endpoints, not an open-ended 'forever unchanged' claim -- Secure Runtime Alpha 7001-7080 (a later, separately-scoped Arc) legitimately extends this SAME file with its own additive acceptance-only IPC vocabulary, exactly as that Arc's own mission authorizes; see its own structural guards for that Arc's own diff proof.", () => {
     let diffOutput = "";
     try {
       diffOutput = execFileSync(
         "git",
-        ["diff", "--name-only", "f3e0658", "--", "packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts"],
+        ["diff", "--name-only", "f3e0658", "4c1f27c", "--", "packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts"],
         { cwd: REPO_ROOT, encoding: "utf8" },
       ) as unknown as string;
     } catch {

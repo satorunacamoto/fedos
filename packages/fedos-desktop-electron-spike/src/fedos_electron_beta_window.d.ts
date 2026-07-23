@@ -50,7 +50,36 @@ interface FedosBetaBridge {
   readonly settingsApply: (candidate: unknown) => Promise<unknown>;
 }
 
+/**
+ * Secure Runtime Alpha 7001-7080 — the closed, ACCEPTANCE-MODE-ONLY
+ * command vocabulary (Phase C). Every method rejects with
+ * `{outcome:"unavailable"}` unless the packaged process was launched with
+ * `FEDOS_ELECTRON_BETA_AUTOTEST` set (`fedos_electron_beta_main.cts`'s own
+ * `requireShell()`) — never reachable in ordinary packaged production
+ * mode, proven by `secure_runtime_alpha_7001_7080_structural_guards.test.ts`.
+ */
+interface FedosAcceptanceCommandResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly [key: string]: unknown;
+}
+
+interface FedosAcceptanceBridge {
+  readonly createDirectConversation: (recipient: { readonly authority: string; readonly publicIdentifier: string }) => Promise<FedosAcceptanceCommandResult>;
+  readonly activateDirectConversation: (conversationId: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly devicePairingCreate: (deviceId: string, expectedAccountRef: unknown) => Promise<FedosAcceptanceCommandResult>;
+  readonly devicePairingInspect: (encodedRequest: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly devicePairingApprove: (encodedRequest: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly devicePairingComplete: (pairingId: string, encodedApproval: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly establishDirectRatchetSession: (conversationId: string, remoteDeviceRef: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly sendMessage: (conversationId: string, sender: unknown, body: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly listMessages: (conversationId: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly readMessage: (conversationId: string, messageId: string) => Promise<FedosAcceptanceCommandResult>;
+  readonly directRatchetStatus: (conversationId: string, remoteDeviceRef: string) => Promise<FedosAcceptanceCommandResult>;
+}
+
 interface Window {
   readonly fedosProfile: FedosProfileBridge;
   readonly fedosBeta: FedosBetaBridge;
+  readonly fedosAcceptance: FedosAcceptanceBridge;
 }

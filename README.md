@@ -8,10 +8,57 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Secure Runtime Alpha 6921–7000 — FedOS Direct Ratchet
+> **Status: Secure Runtime Alpha 7001–7080 — FedOS Desktop Beta Runtime
+> Acceptance Arc (HONEST PARTIAL — packaged two-party end-to-end
+> messaging blocked, real cause named, not fabricated).** Set out to
+> prove the canonical packaged Desktop Beta can execute a real two-party
+> Direct Ratchet message round trip (renderer → preload → main →
+> Coordinator → Runtime → Ratchet → NIP-17 → real Relay → second party →
+> decrypt → durable message → lock/restart → continued messaging). Real
+> reconciliation (grounded in direct source inspection, not narrative)
+> surfaced three genuine, previously-undocumented gaps beneath the
+> already-real Alpha 6921-7000 session-establishment layer: (1) the
+> packaged app's own real, user-facing `sendMessage()` always used the
+> legacy static NIP-17 route, never Direct Ratchet — `conversationDirectRatchetDeps.messageDelivery`
+> was never auto-wired, unlike its sibling `directMessageDelivery`; fixed
+> with one new optional config field, mirroring the sibling's own
+> auto-wiring exactly, zero behavior change by default; (2) zero IPC
+> commands existed for conversation creation, session establishment,
+> message send/read, or Device trust, despite real Shell methods for all
+> of them — closed with a new, closed, structurally-validated,
+> AUTOTEST-only `fedos-acceptance:*` vocabulary (11 commands, proven
+> unreachable in ordinary packaged mode) plus two narrow new Shell
+> wrapper methods (`activateDirectConversation`/`establishDirectRatchetSession`);
+> (3) no real WebSocket relay SERVER existed anywhere in this repository
+> — closed with a real, RFC 6455-compliant local relay test fixture
+> (genuine handshake, genuine NIP-01 framing, genuine ACK, smoke-tested
+> and passing). **What remains genuinely blocked, not silently claimed
+> closed:** a real Direct Conversation between two INDEPENDENTLY-
+> provisioned profiles needs the second party to learn the first party's
+> generated `conversationId` and hold a matching local Draft+Membership
+> record; the accepted real mechanism for that,
+> `FedosDesktopApplicationShell.redeemInvitation()`, is confirmed by
+> direct source read to be unconditionally `"unavailable"` on this
+> codebase's own current base — a pre-existing limitation this Arc did
+> not create and whose full closure exceeds this Arc's own narrow
+> mandate. Phases G through Q (session establishment through the full
+> release-candidate matrix) are correspondingly BLOCKED, not FAILED — see
+> `docs/secure_runtime_alpha_7001_7080_completion_declaration.md` and its
+> own named companion reports (`..._reconciliation_report.md`,
+> `..._acceptance_topology_and_ownership.md`, `..._execution_specification.md`,
+> `..._end_to_end_messaging_acceptance_report.md`,
+> `..._lock_restart_restore_report.md`, `..._crash_recovery_report.md`,
+> `..._secret_surface_audit_report.md`,
+> `..._release_candidate_acceptance_matrix.md`). Zero Rust change, zero
+> wire/persistence-schema change, zero Electron security weakening, zero
+> p2p/.tmp_gen change. Recommended next Arc (narrow, not the "full
+> completion" default): **FedOS Desktop Beta Cross-Profile Direct
+> Conversation Establishment Arc.**
+>
+> Prior status: Secure Runtime Alpha 6921–7000 — FedOS Direct Ratchet
 > Cryptographic Session Production Capability Arc (root-cause defect
 > CLOSED and proven with real cryptography; one packaged-diagnostic
-> stretch goal disclosed out of narrow scope, not fabricated).** A
+> stretch goal disclosed out of narrow scope, not fabricated). A
 > post-implementation audit of `4c1f27c` (Alpha 6841-6920) found that Arc
 > honestly closed only the UPPER authority/configuration graph:
 > `directRatchetConfigured` correctly flips to `true` through the real

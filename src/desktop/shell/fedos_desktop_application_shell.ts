@@ -110,6 +110,9 @@ import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_
 // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and Safety Center Arc) -- narrow additive accessors the Safety Center needs, none of which existed on this Shell before.
 import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
 import type { FedosDirectRatchetSafeStatus } from "../../conversation/ratchet/fedos_direct_ratchet_conversation_runtime.js";
+// Secure Runtime Alpha 7001-7080 -- narrow, additive, real wrappers only; no new activation/establishment logic.
+import type { FedosConversationDirectActivationResult } from "../../conversation/activation/fedos_conversation_direct_activation_result.js";
+import type { FedosDirectRatchetEstablishOptions, FedosDirectRatchetEstablishOutcome } from "../../conversation/ratchet/fedos_direct_ratchet_outbound_integration.js";
 import type { FedosRatchetPeerCapabilitySafeStatus } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
 import type { FedosRatchetPeerCapabilityPeerDeviceStatus } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
@@ -330,6 +333,21 @@ export class FedosDesktopApplicationShell {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
     const result = this.#runtime.conversationRuntime().createDirectDraft(command);
     return this.#mapConstructionResult(result);
+  }
+
+  /**
+   * Secure Runtime Alpha 7001-7080 — a narrow, real, additive wrapper over
+   * `FedosConversationRuntime.activateDirectConversation()` (already real,
+   * already used by the established Node-level real vertical slice at
+   * Alpha 5561-5640) — the missing step between drafting a Direct
+   * Conversation and it being usable for real messaging/Ratchet session
+   * establishment (two `"active"` Memberships required). No new
+   * activation logic; this method adds zero business rules of its own.
+   */
+  async activateDirectConversation(conversationId: string): Promise<FedosDesktopShellResult<FedosConversationDirectActivationResult>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const result = await this.#runtime.conversationRuntime().activateDirectConversation(conversationId);
+    return fedosDesktopShellOk(result);
   }
 
   createPrivateGroup(command: CreatePrivateGroupDraftCommand): FedosDesktopShellResult<FedosConversationDetailView> {
@@ -1000,6 +1018,26 @@ export class FedosDesktopApplicationShell {
     const dr = this.#runtime.conversationRuntime().directRatchet();
     if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
     return fedosDesktopShellOk(dr.getDirectRatchetStatus(conversationId, remoteDeviceRef));
+  }
+
+  /**
+   * Secure Runtime Alpha 7001-7080 — a narrow, real, additive wrapper over
+   * `FedosDirectRatchetConversationRuntime.initializeDirectRatchetSession()`
+   * (already real, unchanged since Alpha 5561-5640/6521-6600). No new
+   * establishment logic; this method only routes the call through the
+   * Shell's own established `"unavailable"`-when-not-running/not-configured
+   * discipline, mirroring `directRatchetStatus()` immediately above.
+   */
+  async establishDirectRatchetSession(
+    conversationId: string,
+    remoteDeviceRef: string,
+    options?: FedosDirectRatchetEstablishOptions,
+  ): Promise<FedosDesktopShellResult<FedosDirectRatchetEstablishOutcome>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const dr = this.#runtime.conversationRuntime().directRatchet();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
+    const outcome = await dr.initializeDirectRatchetSession(conversationId, remoteDeviceRef, options);
+    return fedosDesktopShellOk(outcome);
   }
 
   /** Every peer Device this local Device has ever observed a capability advertisement from -- a real listing query DOES exist here (unlike Direct Ratchet above). */

@@ -198,6 +198,8 @@ export interface FedosProfileInitializationDependencies {
   /** REQUIRED when `privateTransportEnabled` is `true` — a real, external fact (this Coordinator invents no Relay endpoint of its own, never a fabricated default). */
   readonly conversationTransportRelays?: readonly FedosRelay[];
   readonly directRatchetEnabled?: boolean;
+  /** Secure Runtime Alpha 7001-7080 — pass-through to `FedosDesktopRuntimeConfig.directRatchetMessageDeliveryRemoteDeviceRef`'s own doc comment; omitted by default, zero behavior change. */
+  readonly directRatchetMessageDeliveryRemoteDeviceRef?: string;
   readonly peerCapabilityEnabled?: boolean;
   /** REQUIRED when `peerCapabilityEnabled` is `true` — this Runtime advertises no capability of its own by default. */
   readonly peerCapabilityLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
@@ -688,6 +690,7 @@ export class FedosProfileInitializationCoordinator {
       // exactly: reuses `this.#deps.masterSeedAuthority` directly, never a second,
       // independently-constructed authority.
       conversationDirectRatchetMasterSeedAuthority: this.#deps.directRatchetEnabled === true ? this.#deps.masterSeedAuthority : undefined,
+      directRatchetMessageDeliveryRemoteDeviceRef: this.#deps.directRatchetEnabled === true ? this.#deps.directRatchetMessageDeliveryRemoteDeviceRef : undefined,
       peerCapabilityEnabled: this.#deps.peerCapabilityEnabled === true,
       peerCapabilityLocallySupportedCapabilities: this.#deps.peerCapabilityEnabled === true ? this.#deps.peerCapabilityLocallySupportedCapabilities : undefined,
       peerCapabilityObservationLogPath: this.#deps.peerCapabilityEnabled === true ? paths.peerCapabilityObservationLogFile : undefined,
