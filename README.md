@@ -8,6 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6601–6680 — FedOS Secure Memory Store
+> Production Wiring Arc (FULL completion).** Before this Arc, every
+> `SecretHandleStore` construction anywhere in `packages/fedos-core-rust`
+> was `#[cfg(test)]`-only — a real, tested, but wholly unused primitive.
+> `FedosMasterSeedAuthorityState::Available(FedosMasterSeedHandle)` (a
+> direct struct field) becomes `Available { store: SecretHandleStore,
+> master_seed_id: SecretHandleId }` — one real, generation-safe,
+> opaque-ID Store per running `FedosMasterSeedAuthority` instance,
+> matching this crate's own established "one Authority per Desktop
+> Runtime" pattern. Ten production methods (`generate`, `restore_sealed`,
+> `seal`, `clear`, `sign_nostr_event`, `public_key_hex_for_account`,
+> `resolve_conversation_key`, `encrypt_nip44_wire`, `decrypt_nip44_wire`,
+> `seal_direct_ratchet_secret`, `restore_direct_ratchet_secret`) now
+> resolve the Master Seed through two new private bridge helpers
+> (`with_master_seed`/`with_master_seed_bytes`) that call
+> `SecretHandleStore::use_handle` — generation/kind-checked, scoped,
+> zeroized-after-use — instead of matching a direct field. `clear()` now
+> explicitly destroys the Store-owned handle by ID rather than merely
+> calling `.clear()` on a held value. Every existing cryptographic output
+> (signatures, derived public keys, sealed envelopes) preserved
+> byte-for-byte — proven by the full, unmodified `master_seed_authority_tests`
+> suite (all still passing) plus a real, new end-to-end vertical slice:
+> generate → sign → real NIP-44 round trip → real Direct Ratchet session
+> + seal → stop (deny everything) → restart with a fresh Store generation
+> → restore from sealed material → identical public identity → continue
+> operating, while the OLD, stopped instance stays permanently denied.
+> Direct Ratchet in-memory session ownership stays deliberately unchanged
+> (a per-conversation object, correctly out of the Authority's own
+> per-Runtime Store scope) — only its seal/restore boundary now
+> transitively inherits Store-gated shutdown. Zero new `Cargo.toml`
+> dependency; zero new `#[wasm_bindgen]` export surface (14, unchanged,
+> confirmed against a real `wasm32-unknown-unknown --release` build);
+> zero `SecretHandle`/`SecretHandleStore`/Master Seed Authority/Ratchet
+> protocol/NIP/WASM API redesign; zero Desktop/Electron/Shell/Safety
+> Center file touched. See
+> `docs/secure_runtime_alpha_6601_6680_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6601_6680_execution_specification.md`,
+> `docs/secure_runtime_alpha_6601_6680_production_secret_flow_map.md`,
+> `docs/secure_runtime_alpha_6601_6680_shutdown_restart_cleanup_truth.md`,
+> and `docs/secure_runtime_alpha_6601_6680_completion_declaration.md`.
+> Next Arc: FedOS Secure Memory Production Secret-Lifetime Audit and
+> Native Host Isolation Review.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6441–6520 — FedOS Secure Memory
 > Secret-Flow Migration and Native Page-Locking Readiness Arc (FULL
 > completion of this Arc's own deliberately bounded scope).** Phase A

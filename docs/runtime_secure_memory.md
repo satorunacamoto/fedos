@@ -23,6 +23,19 @@
 > exists today" is stale, and is corrected by this note rather than
 > silently rewritten in place.
 
+> **Follow-up note (Secure Runtime Alpha 6601–6680, FedOS Secure Memory
+> Store Production Wiring Arc).** As of this Arc, `FedosMasterSeedAuthority`
+> — the production Master Seed authority — owns a real, production
+> `SecretHandleStore` (§14's own reserved-but-then-unbuilt "opaque handle
+> registry" concept, added as a NEW type by the 6281–6360 Arc, wired into
+> real production use by this one). This does not change this document's
+> own §2 "exactly one Secret Buffer... inside `packages/fedos-core-rust`"
+> claim — the Store still lives entirely inside this crate, still never
+> crosses the WASM boundary, and every consumer still receives only a
+> scoped, zeroized copy, never a reference into the Store's own held
+> bytes. See `docs/secure_runtime_alpha_6601_6680_production_secret_flow_map.md`
+> for the exact, current production flow.
+
 **Status: this document adds no code.** It is a **specification only** —
 the UI → IPC → Runtime → Rust secret-memory architecture this codebase's
 eventual real-secret path must satisfy. Nothing under `src/`, `packages/`,
