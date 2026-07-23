@@ -164,7 +164,7 @@ realSuite("Alpha 6761-6840 — REAL packaged Beta process: Settings-to-Relay rea
     expect(run.unifiedGraph!.directRatchetConfigured).toBe(false);
   }, 20000);
 
-  it("7. a genuinely user-configured relay makes Peer Capability/Identity Transition/Deletion Request REAL and reachable through the real packaged path -- Direct Ratchet honestly stays unreachable (structural WASM Dev-only-Gate boundary, see execution spec)", async () => {
+  it("7. a genuinely user-configured relay makes Peer Capability/Identity Transition/Deletion Request/Direct Ratchet ALL real and reachable through the real packaged path (Secure Runtime Alpha 6841-6920 closed Direct Ratchet's own remaining structural gap -- the canonical production Master Seed Authority now implements the Ratchet sealing port directly, never a second, NODE_ENV=development-gated authority)", async () => {
     const dir = makeTmpRoot();
     await seedSettings(dir, ["wss://relay.invalid.example"]);
     const run = await runBetaProcess("create", dir, "correct horse battery staple 6761 with-relay");
@@ -174,8 +174,8 @@ realSuite("Alpha 6761-6840 — REAL packaged Beta process: Settings-to-Relay rea
     expect(run.unifiedGraph!.identityTransitionConfigured).toBe(true);
     expect(run.unifiedGraph!.deletionRequestConfigured).toBe(true);
     expect(run.unifiedGraph!.productionCryptoStatusOutcome).toBe("ok");
-    // Honest, disclosed, structural boundary -- not this Arc's own gap:
-    expect(run.unifiedGraph!.directRatchetConfigured).toBe(false);
+    // Secure Runtime Alpha 6841-6920 closes this -- was `false` before that Arc.
+    expect(run.unifiedGraph!.directRatchetConfigured).toBe(true);
   }, 20000);
 
   it("8. a real restart (fresh process, same on-disk profile + settings) reproduces the SAME identity and the SAME reachability -- no duplicated ownership, no lost state", async () => {
@@ -190,6 +190,8 @@ realSuite("Alpha 6761-6840 — REAL packaged Beta process: Settings-to-Relay rea
     expect(second.unifiedGraph!.peerCapabilityConfigured).toBe(true);
     expect(second.unifiedGraph!.identityTransitionConfigured).toBe(true);
     expect(second.unifiedGraph!.deletionRequestConfigured).toBe(true);
+    // Secure Runtime Alpha 6841-6920 -- Direct Ratchet now survives restart identically.
+    expect(second.unifiedGraph!.directRatchetConfigured).toBe(true);
   }, 40000);
 
   it("9. FAILURE MATRIX: wrong passphrase with a relay configured still fails closed -- no Runtime, no reachable subsystem, no partial success", async () => {

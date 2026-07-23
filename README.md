@@ -8,6 +8,57 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6841–6920 — FedOS Direct Ratchet
+> Production Crypto Graph Unification Arc (FULL completion).** Closes the
+> exact structural blocker `f3e0658` disclosed: Direct Ratchet's own crypto
+> graph factory (`assembleFedosConversationProductionCryptoGraph()`)
+> always constructed a SECOND, independent, permanently
+> `NODE_ENV=development`-gated `FedosMasterSeedAuthority`, never reusing
+> the canonical production one profile unlock already activates. A
+> review-gated Stage 1 (source-grounded reconciliation, ownership
+> analysis, option comparison, normative decision, all seven decision-gate
+> conditions verified true by direct source read — including that
+> `Coordinator#lock()` already clears this exact authority object and
+> `conversationRuntime()` already throws post-stop, meaning lock/restart
+> invalidation required zero new code) selected Option H: make
+> `FedosProductionMasterSeedAuthority` (the ONE canonical production
+> authority) ALSO implement the already-existing, already-reviewed
+> `FedosDirectRatchetSealingAuthority` narrow port (two new methods,
+> mirroring an already-shipped dev-wrapper implementation verbatim,
+> calling the SAME already-Store-backed WASM methods `8a33045e` added),
+> then thread that SAME object into Direct Ratchet's own dependency
+> derivation via one new optional config field — mirroring the EXISTING,
+> shipped `conversationArchiveMasterSeedAuthority` pattern exactly. Zero
+> Rust change, zero WASM export change, zero protocol/wire change, zero
+> Electron-main change (`fedos_electron_beta_main.cts` byte-for-byte
+> unchanged — reachability closed purely through the Coordinator/Runtime
+> layer, confirmed live: `directRatchetConfigured` flips from `false` to
+> `true` through a real packaged Electron process with zero Electron-main
+> edits). A real regression was found and fixed during this Arc's own
+> testing, before commit: the first gate condition ("some
+> `masterSeedAuthority` present") would have let
+> `DevelopmentFedosMasterSeedAuthority` (test-only, does not implement the
+> sealing port) falsely make Direct Ratchet appear reachable — caught by
+> running the EXISTING `secure_runtime_alpha_6521_6600_real_production_
+> vertical_slice.test.ts`, fixed by gating on
+> `isFedosDirectRatchetSealingAuthority()` specifically. 22 new tests (a
+> real production sealing-authority suite mirroring the dev-wrapper's own
+> 10-case suite but NEVER opening `NODE_ENV=development`; structural
+> guards including a real `git diff` proof of zero Rust change; a real
+> production vertical slice proving reachability, lock-invalidation, and
+> restart-with-stable-identity), all passing; zero regression (full suite
+> matches the immediately-prior Arc's own established baseline). See
+> `docs/secure_runtime_alpha_6841_6920_reconciliation_report.md`,
+> `..._architecture_option_review.md`,
+> `..._normative_decision_and_ownership_model.md`,
+> `..._execution_specification.md`, `..._production_reachability_report.md`,
+> `..._compatibility_and_packaged_acceptance_report.md`, and
+> `..._completion_declaration.md`. Recommended next Arc: **FedOS Desktop
+> Beta Final Release Candidate Validation and Public Release Readiness
+> Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6761–6840 — FedOS Settings-to-Relay
 > Production Wiring and Secure Runtime Reachability Arc (honest partial
 > completion — Peer Capability/Identity Transition/Deletion Request now

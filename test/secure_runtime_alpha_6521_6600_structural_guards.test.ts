@@ -93,9 +93,10 @@ describe("Secure Runtime Alpha 6521-6600 -- structural guards", () => {
     }
   });
 
-  it("8. no development seed double is ever used to construct a real sealing/production crypto authority in fedos_desktop_runtime.ts -- directRatchet's own sealingAuthority/masterSeedAuthority are sourced exclusively from productionCryptoGraph, gated behind productionCryptoGraph !== null", () => {
+  it("8. no development seed double is ever used to construct a real sealing/production crypto authority in fedos_desktop_runtime.ts -- directRatchet's own sealingAuthority/masterSeedAuthority are sourced exclusively from the canonical production authority (as of Secure Runtime Alpha 6841-6920: either the already-activated one or, for dev/test callers, the legacy productionCryptoGraph), gated on the sealing port specifically, never a development double", () => {
     const runtimeSource = stripComments(readFileSync(join(REPO_ROOT, "src", "desktop", "runtime", "fedos_desktop_runtime.ts"), "utf8") as string);
     expect(runtimeSource).not.toMatch(/DevelopmentFedosMasterSeedAuthority/);
-    expect(runtimeSource).toMatch(/config\.directRatchetEnabled\s*&&\s*productionCryptoGraph\s*!==\s*null/);
+    expect(runtimeSource).toMatch(/config\.directRatchetEnabled\s*&&\s*directRatchetSealingAuthority\s*!==\s*null/);
+    expect(runtimeSource).toMatch(/config\.conversationDirectRatchetMasterSeedAuthority\s*\?\?\s*productionCryptoGraph\?\.masterSeedAuthority/);
   });
 });

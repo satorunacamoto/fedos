@@ -793,31 +793,54 @@ export async function startFedosDesktopRuntime(
   };
 
   // Secure Runtime Alpha 6521-6600 -- Direct Ratchet REQUIRES a real,
-  // resolved production crypto graph (a genuine `FedosMasterSeedAuthority`
-  // instance) -- if `directRatchetEnabled` is true but production crypto
-  // never resolved (e.g. the WASM artifact is genuinely absent in this
-  // environment), this subsystem stays honestly unreachable (`directRatchet()`
-  // returns `null`) rather than fabricating a Master Seed Authority or
-  // throwing a hard configuration error for an environment fact that is
-  // not the caller's own mistake -- mirrors this whole file's own
-  // established "artifact-missing degrades gracefully" convention.
+  // resolved production Master Seed Authority -- if `directRatchetEnabled`
+  // is true but none resolved (e.g. the WASM artifact is genuinely absent
+  // in this environment), this subsystem stays honestly unreachable
+  // (`directRatchet()` returns `null`) rather than fabricating a Master
+  // Seed Authority or throwing a hard configuration error for an
+  // environment fact that is not the caller's own mistake -- mirrors this
+  // whole file's own established "artifact-missing degrades gracefully"
+  // convention.
+  //
+  // Secure Runtime Alpha 6841-6920 -- prefers `config.conversationDirectRatchetMasterSeedAuthority`
+  // (the ALREADY-ACTIVATED canonical production authority the Coordinator
+  // already holds -- the SAME object profile unlock constructed) over the
+  // legacy `productionCryptoGraph` path -- eliminating the second,
+  // independent, `NODE_ENV=development`-gated WASM instance/authority the
+  // immediately-prior Arc's own real packaged run proved was the last
+  // reachability blocker for the canonical packaged entry point. The
+  // legacy `productionCryptoGraph` path remains fully intact, unmodified,
+  // for any dev/test caller that still supplies `conversationProductionCrypto`
+  // directly -- zero regression, zero removed capability.
+  //
+  // GATE REQUIRES the sealing port specifically (`isFedosDirectRatchetSealingAuthority()`),
+  // not merely "some masterSeedAuthority exists" -- caught by this Arc's own
+  // real regression test: `DevelopmentFedosMasterSeedAuthority` implements
+  // `FedosMasterSeedAuthority` but deliberately NOT the sealing port, and
+  // must NEVER make Direct Ratchet appear reachable (that would be exactly
+  // the "development crypto in production"/"missing capability fails
+  // closed" violation this Arc's own mission absolutely prohibits) --
+  // `FedosWasmMasterSeedAuthority` and, as of this Arc,
+  // `FedosProductionMasterSeedAuthority` both genuinely implement it, so
+  // both correctly pass this gate; a bare `FedosMasterSeedAuthority` that
+  // does not is correctly excluded, exactly like before this Arc.
+  const directRatchetMasterSeedAuthorityCandidate =
+    config.conversationDirectRatchetMasterSeedAuthority ?? productionCryptoGraph?.masterSeedAuthority;
+  const directRatchetSealingAuthority =
+    directRatchetMasterSeedAuthorityCandidate !== undefined && isFedosDirectRatchetSealingAuthority(directRatchetMasterSeedAuthorityCandidate)
+      ? directRatchetMasterSeedAuthorityCandidate
+      : null;
   const conversationDirectRatchetDeps: FedosConversationDirectRatchetIntegrationDependencies | undefined =
     config.conversationDirectRatchet ??
-    (config.directRatchetEnabled && productionCryptoGraph !== null
+    (config.directRatchetEnabled && directRatchetSealingAuthority !== null
       ? {
           deviceRegistry: deviceRegistryPersistence!,
           sessionPersistence: config.directRatchetSessionLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionPersistence(config.directRatchetSessionLogPath) : undefined,
           sealedSecretPersistence: config.directRatchetSealedSecretLogPath !== undefined ? new AppendOnlyFedosSealedDirectRatchetSecretPersistence(config.directRatchetSealedSecretLogPath) : undefined,
           resetRecordPersistence: config.directRatchetResetRecordLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionResetRecordPersistence(config.directRatchetResetRecordLogPath) : undefined,
           importRecordPersistence: config.directRatchetImportRecordLogPath !== undefined ? new AppendOnlyFedosPrivateNostrImportRecordPersistence(config.directRatchetImportRecordLogPath) : undefined,
-          // `null` unless `productionCryptoGraph`'s own `masterSeedAuthority`
-          // genuinely implements the sealing port too (`FedosWasmMasterSeedAuthority`
-          // does, additionally, alongside `FedosMasterSeedAuthority` --
-          // `DevelopmentFedosMasterSeedAuthority` does not, and can never reach
-          // this branch anyway since it never resolves `productionCryptoGraph`) --
-          // never a fabricated sealing authority.
-          sealingAuthority: isFedosDirectRatchetSealingAuthority(productionCryptoGraph.masterSeedAuthority) ? productionCryptoGraph.masterSeedAuthority : null,
-          masterSeedAuthority: productionCryptoGraph.masterSeedAuthority,
+          sealingAuthority: directRatchetSealingAuthority,
+          masterSeedAuthority: directRatchetSealingAuthority,
           localDeviceRef: config.localDeviceId!,
           sendMailboxNip17Control,
         }

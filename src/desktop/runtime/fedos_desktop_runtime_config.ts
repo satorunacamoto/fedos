@@ -544,6 +544,17 @@ export interface FedosDesktopRuntimeConfig {
   readonly directRatchetSealedSecretLogPath?: string;
   readonly directRatchetResetRecordLogPath?: string;
   readonly directRatchetImportRecordLogPath?: string;
+  /**
+   * Secure Runtime Alpha 6841-6920 — the ALREADY-ACTIVATED canonical
+   * production Master Seed Authority (the SAME object profile unlock
+   * already constructed), reused directly for Direct Ratchet's own
+   * seal/restore + conversation-key resolution — mirrors
+   * `conversationArchiveMasterSeedAuthority`'s own EXISTING pattern
+   * exactly. Never a second authority, never a second WASM instance. When
+   * omitted, the legacy `conversationProductionCrypto`-derived graph is
+   * used instead (unchanged, dev/test path).
+   */
+  readonly conversationDirectRatchetMasterSeedAuthority?: FedosMasterSeedAuthority;
   /** Manual override — when supplied, `directRatchetEnabled`'s own auto-construction is skipped entirely and this object is used verbatim. */
   readonly conversationDirectRatchet?: FedosConversationDirectRatchetIntegrationDependencies;
 

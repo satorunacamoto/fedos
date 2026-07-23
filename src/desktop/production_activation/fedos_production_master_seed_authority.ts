@@ -19,6 +19,19 @@
  * post-lock crypto command can reach a live authority through this
  * object — a subsequent method call fails closed (handle re-constructed
  * empty; a wrong-order caller can never resurrect the prior seed).
+ *
+ * Secure Runtime Alpha 6841-6920 — ALSO implements `FedosDirectRatchetSealingAuthority`
+ * (the narrow, additive port `fedos_direct_ratchet_sealing_authority.ts`
+ * already established at Alpha 5401-5480), mirroring `FedosWasmMasterSeedAuthority`'s
+ * own existing dual-implementation of both interfaces exactly. This is the
+ * ONE change that lets Direct Ratchet consume THIS canonical production
+ * authority (the SAME object profile unlock already activates) instead of
+ * a second, independent, `NODE_ENV=development`-gated authority — no new
+ * WASM export, no new Rust code: `seal_direct_ratchet_secret`/
+ * `restore_direct_ratchet_secret` are already real, already Store-backed
+ * methods on the SAME `FedosMasterSeedAuthorityHandle` this file's own
+ * `#handle` already wraps (added by the Secure Memory Store Production
+ * Wiring Arc, `8a33045e`).
  */
 
 import type { AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../runtime/fedos_wasm_loader.js";
@@ -28,8 +41,9 @@ import {
   type FedosSealedMasterSeedEnvelopeV1,
 } from "../../runtime/master_seed/fedos_sealed_master_seed_envelope.js";
 import type { FedosProductionMasterSeedFacade } from "./fedos_production_wasm_master_seed_facade.js";
+import type { FedosDirectRatchetSealingAuthority } from "../../conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
 
-export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthority {
+export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthority, FedosDirectRatchetSealingAuthority {
   readonly #facade: FedosProductionMasterSeedFacade;
   #handle: FedosMasterSeedAuthorityHandle | null = null;
   #cleared = false;
@@ -118,6 +132,55 @@ export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthor
     try {
       const value = h.resolve_conversation_key(accountIndex, counterpartyPublicKeyHex);
       return (value ?? null) as AeadKeyHandle | null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Secure Runtime Alpha 6841-6920 — `FedosDirectRatchetSealingAuthority`.
+   * Seals opaque `secretBytes` at rest under a key bound to the full
+   * Direct Ratchet session-identity tuple, through the SAME `#handle`
+   * every other method on this class already uses. Fails closed (`null`)
+   * on no live seed, CSPRNG failure, or any internal AEAD failure —
+   * identical discipline to every method above.
+   */
+  async sealDirectRatchetSecret(
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    secretBytes: Uint8Array,
+  ): Promise<string | null> {
+    const h = this.#ensure();
+    if (!h) return null;
+    try {
+      const value = h.seal_direct_ratchet_secret(localDeviceRef, remoteDeviceRef, conversationId, generation, secretBytes);
+      return typeof value === "string" ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Secure Runtime Alpha 6841-6920 — the restoring counterpart. Requires
+   * the EXACT SAME binding tuple the secret was sealed with; any
+   * difference fails closed by AEAD authentication, not by a string
+   * comparison. `null` on ANY failure, including a tampered or malformed
+   * `sealedBlob`.
+   */
+  async restoreDirectRatchetSecret(
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    sealedBlob: string,
+  ): Promise<Uint8Array | null> {
+    const h = this.#ensure();
+    if (!h) return null;
+    try {
+      const value = h.restore_direct_ratchet_secret(localDeviceRef, remoteDeviceRef, conversationId, generation, sealedBlob);
+      return (value ?? null) as Uint8Array | null;
     } catch {
       return null;
     }

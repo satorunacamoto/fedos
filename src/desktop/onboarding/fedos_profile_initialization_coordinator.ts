@@ -683,6 +683,11 @@ export class FedosProfileInitializationCoordinator {
       directRatchetSealedSecretLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetSealedSecretLogFile : undefined,
       directRatchetResetRecordLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetResetRecordLogFile : undefined,
       directRatchetImportRecordLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetImportRecordLogFile : undefined,
+      // Secure Runtime Alpha 6841-6920 -- mirrors `conversationArchiveMasterSeedAuthority`'s
+      // own established line immediately above (in file order at Alpha 1691-1760)
+      // exactly: reuses `this.#deps.masterSeedAuthority` directly, never a second,
+      // independently-constructed authority.
+      conversationDirectRatchetMasterSeedAuthority: this.#deps.directRatchetEnabled === true ? this.#deps.masterSeedAuthority : undefined,
       peerCapabilityEnabled: this.#deps.peerCapabilityEnabled === true,
       peerCapabilityLocallySupportedCapabilities: this.#deps.peerCapabilityEnabled === true ? this.#deps.peerCapabilityLocallySupportedCapabilities : undefined,
       peerCapabilityObservationLogPath: this.#deps.peerCapabilityEnabled === true ? paths.peerCapabilityObservationLogFile : undefined,
