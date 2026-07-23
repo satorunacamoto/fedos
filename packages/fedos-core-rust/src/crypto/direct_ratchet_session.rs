@@ -17,6 +17,7 @@ use super::direct_ratchet::{
 };
 use super::direct_ratchet_header::{decode_direct_ratchet_header, encode_direct_ratchet_header, DirectRatchetHeaderFields};
 use crate::secret_handle::{SecretHandle, SecretHandleKind};
+use zeroize::Zeroize;
 
 /// Review-sourced bound (`11_out_of_order_and_skipped_keys.md` §2): 1000
 /// max skipped keys. Applied here as a SESSION-WIDE total (not per
@@ -518,28 +519,35 @@ impl DirectRatchetSessionState {
         receive_counter: u32,
         previous_sending_chain_length: u32,
         remote_ratchet_public: Option<[u8; 32]>,
-        root_key_bytes: [u8; 32],
-        sending_chain_key_bytes: Option<[u8; 32]>,
-        receiving_chain_key_bytes: Option<[u8; 32]>,
-        local_ratchet_private_key_bytes: [u8; 32],
+        mut root_key_bytes: [u8; 32],
+        mut sending_chain_key_bytes: Option<[u8; 32]>,
+        mut receiving_chain_key_bytes: Option<[u8; 32]>,
+        mut local_ratchet_private_key_bytes: [u8; 32],
         skipped_keys: Vec<([u8; 32], u32, i64, [u8; 32])>,
     ) -> Option<Self> {
         let local_private = SecretHandle::new_from_32_bytes_for_internal_use(
             SecretHandleKind::DirectRatchetPrivateKeyMaterial,
             local_ratchet_private_key_bytes,
         );
+        local_ratchet_private_key_bytes.zeroize();
         let local_public = super::direct_ratchet::derive_direct_ratchet_public_from_private_internal(&local_private)?;
         let root_key =
             SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::DirectRatchetRootKeyMaterial, root_key_bytes);
-        let sending_chain_key = sending_chain_key_bytes.map(|bytes| {
-            SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::DirectRatchetChainKeyMaterial, bytes)
+        root_key_bytes.zeroize();
+        let sending_chain_key = sending_chain_key_bytes.take().map(|mut bytes| {
+            let handle = SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::DirectRatchetChainKeyMaterial, bytes);
+            bytes.zeroize();
+            handle
         });
-        let receiving_chain_key = receiving_chain_key_bytes.map(|bytes| {
-            SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::DirectRatchetChainKeyMaterial, bytes)
+        let receiving_chain_key = receiving_chain_key_bytes.take().map(|mut bytes| {
+            let handle = SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::DirectRatchetChainKeyMaterial, bytes);
+            bytes.zeroize();
+            handle
         });
         let mut skipped_map = std::collections::HashMap::new();
-        for (public, counter, created_at_ms, bytes) in skipped_keys {
+        for (public, counter, created_at_ms, mut bytes) in skipped_keys {
             let message_key = SecretHandle::new_from_32_bytes_for_internal_use(SecretHandleKind::AeadKeyMaterial, bytes);
+            bytes.zeroize();
             skipped_map.insert((public, counter), StoredSkippedKey { message_key, created_at_ms });
         }
 
