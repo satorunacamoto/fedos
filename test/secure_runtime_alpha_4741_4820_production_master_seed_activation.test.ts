@@ -187,7 +187,13 @@ suite("Alpha 4741-4820 — production Master Seed activation + secure unlock (RE
       expect(handle).not.toBeNull();
       expect(handle!.is_available()).toBe(false);
       expect(typeof (result.facade as Record<string, unknown>).module).toBe("undefined");
-      expect(Object.keys(result.facade)).toEqual(["constructMasterSeedAuthority"]);
+      // Secure Runtime Alpha 6921-7000 narrowly extended this SAME
+      // capability-limited facade with one additional read of an
+      // already-initialized module export (`constructDirectRatchetSessionModule`)
+      // -- still no raw module exposure, still no second WASM
+      // instantiation. The allowlist below is extended, never widened
+      // past these two named, reviewed capabilities.
+      expect(Object.keys(result.facade).sort()).toEqual(["constructDirectRatchetSessionModule", "constructMasterSeedAuthority"]);
     });
   });
 

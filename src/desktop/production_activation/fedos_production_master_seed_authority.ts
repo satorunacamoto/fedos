@@ -40,7 +40,7 @@ import {
   toSealedMasterSeedEnvelopeV1,
   type FedosSealedMasterSeedEnvelopeV1,
 } from "../../runtime/master_seed/fedos_sealed_master_seed_envelope.js";
-import type { FedosProductionMasterSeedFacade } from "./fedos_production_wasm_master_seed_facade.js";
+import type { FedosProductionMasterSeedFacade, FedosProductionDirectRatchetSessionModule } from "./fedos_production_wasm_master_seed_facade.js";
 import type { FedosDirectRatchetSealingAuthority } from "../../conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
 
 export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthority, FedosDirectRatchetSealingAuthority {
@@ -195,5 +195,24 @@ export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthor
    */
   async accessForNostrSigningAuthorityInternalUse(): Promise<FedosMasterSeedAuthorityHandle | null> {
     return this.#ensure();
+  }
+
+  /**
+   * Secure Runtime Alpha 6921-7000 — INTERNAL, mirrors
+   * `accessForNostrSigningAuthorityInternalUse()`'s own exact discipline
+   * (not part of the public `FedosMasterSeedAuthority` interface, opaque,
+   * carries no secret byte). Reaches `FedosDirectRatchetSession`'s own
+   * static constructors on the SAME already-initialized, already-verified
+   * production module this authority's own facade was built from — never
+   * a second import, never a second WASM initialization. `null` once this
+   * authority is cleared (matches every other post-`clear()` method on
+   * this class: `#cleared` is checked explicitly here, the same
+   * invariant `#ensure()` enforces for the Master Seed handle itself, so
+   * a locked profile can never construct a fresh Direct Ratchet session
+   * through this authority either).
+   */
+  accessDirectRatchetSessionModuleInternalUse(): FedosProductionDirectRatchetSessionModule | null {
+    if (this.#cleared) return null;
+    return this.#facade.constructDirectRatchetSessionModule();
   }
 }

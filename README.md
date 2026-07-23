@@ -8,8 +8,80 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Secure Runtime Alpha 6841–6920 — FedOS Direct Ratchet
-> Production Crypto Graph Unification Arc (FULL completion).** Closes the
+> **Status: Secure Runtime Alpha 6921–7000 — FedOS Direct Ratchet
+> Cryptographic Session Production Capability Arc (root-cause defect
+> CLOSED and proven with real cryptography; one packaged-diagnostic
+> stretch goal disclosed out of narrow scope, not fabricated).** A
+> post-implementation audit of `4c1f27c` (Alpha 6841-6920) found that Arc
+> honestly closed only the UPPER authority/configuration graph:
+> `directRatchetConfigured` correctly flips to `true` through the real
+> packaged path, but the DEEPER layer,
+> `FedosDirectRatchetCryptographicSession`, still (1) unconditionally
+> called `primedLoader()` — `new FedosWasmLoaderSkeleton()` +
+> `attemptDevOnly*` — and (2) accepted only `instanceof
+> FedosWasmMasterSeedAuthority`, rejecting the real
+> `FedosProductionMasterSeedAuthority`. Net effect: "configured" was true,
+> but a real production session establishment returned crypto-unavailable
+> — exactly the gap this Arc closes. Fix: `FedosProductionMasterSeedAuthority`
+> gains one new internal-only accessor,
+> `accessDirectRatchetSessionModuleInternalUse()`, reading
+> `FedosDirectRatchetSession`'s own static constructors off the SAME
+> already-initialized WASM module closure
+> `constructMasterSeedAuthority()` already reads (zero second import,
+> zero second `initSync`) — mirrors `accessForNostrSigningAuthorityInternalUse()`'s
+> exact discipline, `#cleared`-gated. `FedosDirectRatchetCryptographicSession`
+> gains ONE shared resolver, `resolveDirectRatchetSessionAccess()`,
+> checked STRUCTURALLY first (never `instanceof
+> FedosProductionMasterSeedAuthority` — mirrors the established
+> `isFedosDirectRatchetSealingAuthority()` precedent), falling back to the
+> byte-for-byte-unchanged dev/test path
+> (`instanceof FedosWasmMasterSeedAuthority` +
+> `developmentDirectRatchetLoaderBoundary()`, `primedLoader()` renamed
+> only) for every other authority. Zero public method signature changed —
+> both real callers
+> (`fedos_direct_ratchet_outbound_integration.ts`/`inbound_integration.ts`)
+> needed no edit. Proven with a real, no-mock, real-WASM Node-level
+> vertical slice: two independent real `FedosProductionMasterSeedAuthority`
+> instances (Alice, Bob), real Nostr identity derivation, real session
+> establishment, two real encrypt/decrypt rounds with correct counter
+> progression, real seal of both Ratchet state AND the master seed, real
+> `clear()`-invalidation of fresh sessions, a genuinely NEW authority
+> generation via `restoreSealed()` (identical public identity confirmed),
+> both sealed Ratchet sessions restored through that fresh generation, and
+> a third message correctly encrypted/decrypted post-restore. Three real
+> test-authoring bugs were self-caught and fixed during this process
+> (placeholder counterparty keys; `generate()` vs `restoreSealed()` for
+> the fresh-generation step; stale `previousSendingChainLength`/
+> `remoteRatchetPublicKeyHex` at `restore()`) — all in test code, zero in
+> production code. 12 new structural guards (direct source inspection,
+> including a real `git diff` proof of zero Rust change) and a 7-case
+> failure matrix (missing/partial/cleared/malformed capability, all fail
+> closed) also pass. Phase M: the one pre-identified typecheck error
+> fixed by narrowing a TEST fixture's local type, never widening a
+> production interface. **Disclosed, not silently claimed closed:** a
+> packaged-process, IPC-observable "crypto-operational" (not merely
+> "configured") diagnostic was investigated and found not safely
+> constructible within this Arc's own prohibitions — `cr.directRatchet()`
+> exposes no public accessor to the underlying `masterSeedAuthority`, so
+> proving it at the IPC layer would require either a new, separately-
+> reviewed Master-Seed-handle-adjacent capability (out of one narrow
+> remediation Arc's own mandate) or full counterparty/Device-Registry/
+> NIP-17 relay integration scaffolding no prior Arc has ever built for a
+> packaged test either (the immediately-prior Arc's own completion
+> declaration independently disclosed this identical gap). See
+> `docs/secure_runtime_alpha_6921_7000_remediation_reconciliation_report.md`,
+> `..._production_session_capability_design.md`,
+> `..._execution_specification.md`, `..._loader_authority_ownership_proof.md`,
+> `..._compatibility_report.md`, `..._packaged_ratchet_acceptance_report.md`,
+> and `..._completion_declaration.md`.
+>
+> Prior status: Secure Runtime Alpha 6841–6920 — FedOS Direct Ratchet
+> Production Crypto Graph Unification Arc (full completion of the
+> authority/configuration graph layer; the audit above found the deeper
+> session-establishment layer this same Arc's own name implied was
+> unified was, in fact, still split — "configured" was proven true,
+> "crypto-operational" was not yet proven, and is not the same claim).
+> Closes the
 > exact structural blocker `f3e0658` disclosed: Direct Ratchet's own crypto
 > graph factory (`assembleFedosConversationProductionCryptoGraph()`)
 > always constructed a SECOND, independent, permanently

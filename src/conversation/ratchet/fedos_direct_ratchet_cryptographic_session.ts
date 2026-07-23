@@ -20,10 +20,29 @@
  * (the Foundation Arc's own state facade) — it is standalone, matching
  * Phase M's "prefer a constructible standalone Runtime" preference; a
  * future integration Arc decides how the two are wired together.
+ *
+ * Secure Runtime Alpha 6921-7000 — every entry point below (`createAsReceiver`/
+ * `createAsSender`/`restore`/`sealState`) now resolves its own
+ * `FedosDirectRatchetWasmLoaderBoundary` through ONE shared, structural
+ * resolver (`resolveDirectRatchetSessionAccess()`) instead of
+ * unconditionally calling `primedLoader()`. When `masterSeedAuthority`
+ * structurally exposes the SAME already-attested production capability
+ * `FedosProductionMasterSeedAuthority` grants (never a bare
+ * `instanceof` — see `hasProductionDirectRatchetSessionCapability()`
+ * below), the resolver builds a production-safe boundary directly from
+ * the ALREADY-INITIALIZED module the profile-unlock activation path
+ * already verified — NO `FedosWasmLoaderSkeleton`, NO `attemptDevOnly*`,
+ * NO second `import()`/`initSync`. The EXISTING dev/test path
+ * (`primedLoader()` + `instanceof FedosWasmMasterSeedAuthority`) is
+ * fully preserved, unmodified, as the fallback for every other authority
+ * type — `DevelopmentFedosMasterSeedAuthority` and any other
+ * unrecognized object still correctly resolve to `null` (fail closed),
+ * exactly as before this Arc.
  */
 import { FedosWasmLoaderSkeleton } from "../../runtime/fedos_wasm_loader.js";
 import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
 import { FedosWasmMasterSeedAuthority } from "../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
+import type { FedosProductionDirectRatchetSessionModule } from "../../desktop/production_activation/fedos_production_wasm_master_seed_facade.js";
 
 /** PRIVATE — the narrow slice of `FedosWasmLoaderSkeleton` this authority depends on. */
 export interface FedosDirectRatchetWasmLoaderBoundary {
@@ -116,12 +135,230 @@ function parseSealedSkippedKeyEntry(entry: string): FedosDirectRatchetSealedSkip
   return { counter, remoteRatchetPublicKeyHex, createdAtMs, sealedBlob: blobParts.join(":") };
 }
 
-async function primedLoader(): Promise<FedosDirectRatchetWasmLoaderBoundary> {
+/** DEVELOPMENT/TEST ONLY — explicitly named, never called from a production-capable path. Byte-for-byte unchanged from before Secure Runtime Alpha 6921-7000. */
+async function developmentDirectRatchetLoaderBoundary(): Promise<FedosDirectRatchetWasmLoaderBoundary> {
   const loader = new FedosWasmLoaderSkeleton();
   loader.planLoad();
   await loader.attemptDevOnlyJsGlueImport();
   await loader.attemptDevOnlyWasmInitialization();
   return loader as unknown as FedosDirectRatchetWasmLoaderBoundary;
+}
+
+/**
+ * Secure Runtime Alpha 6921-7000 — the narrow, STRUCTURAL (never
+ * `instanceof`) capability shape a `FedosMasterSeedAuthority` must
+ * genuinely expose to be granted production Direct Ratchet session
+ * access. Both named accessors are internal-only (never on the public
+ * `FedosMasterSeedAuthority` interface) — an object exposing only one,
+ * or exposing similarly-named but differently-behaved methods, does not
+ * satisfy this closed shape.
+ */
+interface FedosProductionDirectRatchetSessionAuthority {
+  accessDirectRatchetSessionModuleInternalUse(): FedosProductionDirectRatchetSessionModule | null;
+  accessForNostrSigningAuthorityInternalUse(): Promise<unknown>;
+}
+
+function hasProductionDirectRatchetSessionCapability(
+  masterSeedAuthority: FedosMasterSeedAuthority,
+): masterSeedAuthority is FedosMasterSeedAuthority & FedosProductionDirectRatchetSessionAuthority {
+  const candidate = masterSeedAuthority as Partial<FedosProductionDirectRatchetSessionAuthority>;
+  return (
+    typeof candidate.accessDirectRatchetSessionModuleInternalUse === "function" &&
+    typeof candidate.accessForNostrSigningAuthorityInternalUse === "function"
+  );
+}
+
+/** Mirrors `FedosWasmLoaderSkeleton`'s own private `#attemptDevOnlyDirectRatchetSessionMethodCall()` generic dispatcher shape exactly, minus the dev-only readiness gate (the production module reference is only ever handed here already-verified). */
+function callProductionDirectRatchetSessionMethod(session: unknown, methodName: string, args: readonly unknown[]): unknown {
+  if (typeof session !== "object" || session === null) return null;
+  const method = (session as Record<string, unknown>)[methodName];
+  if (typeof method !== "function") return null;
+  try {
+    const result = (method as (...a: unknown[]) => unknown).apply(session, [...args]);
+    return result === undefined ? null : result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Secure Runtime Alpha 6921-7000 — a `FedosDirectRatchetWasmLoaderBoundary`
+ * built DIRECTLY from `FedosDirectRatchetSession`'s own static
+ * constructors on the ALREADY-INITIALIZED, manifest-verified production
+ * module — never `FedosWasmLoaderSkeleton`, never `attemptDevOnly*`,
+ * never a second `import()`/`initSync`. Every method's own fail-closed
+ * shape mirrors the dev boundary's exact contract (never throws upward;
+ * `null`/`false`/`[]` on any failure) so callers cannot distinguish which
+ * implementation they received — the ONLY difference is where the real
+ * WASM call is reached from.
+ */
+function productionDirectRatchetLoaderBoundary(
+  sessionModule: FedosProductionDirectRatchetSessionModule,
+): FedosDirectRatchetWasmLoaderBoundary {
+  return {
+    planLoad(): unknown {
+      return null;
+    },
+    async attemptDevOnlyJsGlueImport(): Promise<unknown> {
+      return null;
+    },
+    async attemptDevOnlyWasmInitialization(): Promise<unknown> {
+      return null;
+    },
+    async attemptDevOnlyDirectRatchetInitializeAsReceiverCall(
+      masterSeedAuthority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+      sessionId,
+      localDeviceRef,
+      generation,
+    ): Promise<unknown> {
+      try {
+        return sessionModule.initialize_as_receiver(masterSeedAuthority, accountIndex, counterpartyPublicKeyHex, sessionId, localDeviceRef, generation) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    async attemptDevOnlyDirectRatchetInitializeAsSenderCall(
+      masterSeedAuthority,
+      accountIndex,
+      counterpartyPublicKeyHex,
+      sessionId,
+      localDeviceRef,
+      generation,
+      remoteRatchetPublicKeyHex,
+    ): Promise<unknown> {
+      try {
+        return (
+          sessionModule.initialize_as_sender(
+            masterSeedAuthority,
+            accountIndex,
+            counterpartyPublicKeyHex,
+            sessionId,
+            localDeviceRef,
+            generation,
+            remoteRatchetPublicKeyHex,
+          ) ?? null
+        );
+      } catch {
+        return null;
+      }
+    },
+    async attemptDevOnlyDirectRatchetRestoreCall(args: readonly unknown[]): Promise<unknown> {
+      try {
+        return sessionModule.restore(...args) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    async attemptDevOnlyDirectRatchetEncryptCall(session: unknown, plaintext: Uint8Array): Promise<Uint8Array | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "encrypt", [plaintext]);
+      return result instanceof Uint8Array ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetDecryptCall(session: unknown, wireMessage: Uint8Array, nowMs: number): Promise<Uint8Array | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "decrypt", [wireMessage, nowMs]);
+      return result instanceof Uint8Array ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetLocalPublicKeyHexCall(session: unknown): Promise<string | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "local_ratchet_public_key_hex", []);
+      return typeof result === "string" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetRemotePublicKeyHexCall(session: unknown): Promise<string | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "remote_ratchet_public_key_hex", []);
+      return typeof result === "string" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetIsReadyToSendCall(session: unknown): Promise<boolean> {
+      return callProductionDirectRatchetSessionMethod(session, "is_ready_to_send", []) === true;
+    },
+    async attemptDevOnlyDirectRatchetSendCounterCall(session: unknown): Promise<number | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "send_counter", []);
+      return typeof result === "number" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetReceiveCounterCall(session: unknown): Promise<number | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "receive_counter", []);
+      return typeof result === "number" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetSkippedKeyCountCall(session: unknown): Promise<number | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "skipped_key_count", []);
+      return typeof result === "number" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetPreviousSendingChainLengthCall(session: unknown): Promise<number | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "previous_sending_chain_length", []);
+      return typeof result === "number" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetSealRootKeyCall(
+      session: unknown,
+      masterSeedAuthority: unknown,
+      remoteDeviceRef: string,
+      conversationId: string,
+    ): Promise<string | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "seal_root_key", [masterSeedAuthority, remoteDeviceRef, conversationId]);
+      return typeof result === "string" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetSealSendingChainKeyCall(
+      session: unknown,
+      masterSeedAuthority: unknown,
+      remoteDeviceRef: string,
+      conversationId: string,
+    ): Promise<string | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "seal_sending_chain_key", [masterSeedAuthority, remoteDeviceRef, conversationId]);
+      return typeof result === "string" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetSealReceivingChainKeyCall(
+      session: unknown,
+      masterSeedAuthority: unknown,
+      remoteDeviceRef: string,
+      conversationId: string,
+    ): Promise<string | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "seal_receiving_chain_key", [masterSeedAuthority, remoteDeviceRef, conversationId]);
+      return typeof result === "string" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetSealLocalRatchetPrivateKeyCall(
+      session: unknown,
+      masterSeedAuthority: unknown,
+      remoteDeviceRef: string,
+      conversationId: string,
+    ): Promise<string | null> {
+      const result = callProductionDirectRatchetSessionMethod(session, "seal_local_ratchet_private_key", [masterSeedAuthority, remoteDeviceRef, conversationId]);
+      return typeof result === "string" ? result : null;
+    },
+    async attemptDevOnlyDirectRatchetSealAllSkippedKeysCall(
+      session: unknown,
+      masterSeedAuthority: unknown,
+      remoteDeviceRef: string,
+      conversationId: string,
+    ): Promise<readonly string[]> {
+      const result = callProductionDirectRatchetSessionMethod(session, "seal_all_skipped_keys", [masterSeedAuthority, remoteDeviceRef, conversationId]);
+      return Array.isArray(result) ? (result as readonly string[]) : [];
+    },
+  };
+}
+
+/**
+ * Secure Runtime Alpha 6921-7000 — the ONE shared resolver every entry
+ * point below uses. Structural production check FIRST (never nominal);
+ * falls back to the EXISTING, byte-for-byte-unchanged dev/test path
+ * (`instanceof FedosWasmMasterSeedAuthority` + `developmentDirectRatchetLoaderBoundary()`)
+ * for every other authority. Neither branch matching (e.g.
+ * `DevelopmentFedosMasterSeedAuthority`) returns `null` — the SAME
+ * fail-closed outcome this file has always produced for an unsupported
+ * authority.
+ */
+async function resolveDirectRatchetSessionAccess(
+  masterSeedAuthority: FedosMasterSeedAuthority,
+): Promise<{ readonly loaderBoundary: FedosDirectRatchetWasmLoaderBoundary; readonly wasmAuthorityHandle: unknown } | null> {
+  if (hasProductionDirectRatchetSessionCapability(masterSeedAuthority)) {
+    const sessionModule = masterSeedAuthority.accessDirectRatchetSessionModuleInternalUse();
+    if (sessionModule === null) return null;
+    const wasmAuthorityHandle = (await masterSeedAuthority.accessForNostrSigningAuthorityInternalUse()) ?? null;
+    if (wasmAuthorityHandle === null) return null;
+    return { loaderBoundary: productionDirectRatchetLoaderBoundary(sessionModule), wasmAuthorityHandle };
+  }
+  if (!(masterSeedAuthority instanceof FedosWasmMasterSeedAuthority)) return null;
+  const loaderBoundary = await developmentDirectRatchetLoaderBoundary();
+  const wasmAuthorityHandle = (await masterSeedAuthority.accessForNostrSigningAuthorityInternalUse()) ?? null;
+  if (wasmAuthorityHandle === null) return null;
+  return { loaderBoundary, wasmAuthorityHandle };
 }
 
 /**
@@ -148,9 +385,9 @@ export class FedosDirectRatchetCryptographicSession {
     localDeviceRef: string,
     generation: number,
   ): Promise<FedosDirectRatchetCryptographicSession | null> {
-    const loaderBoundary = await primedLoader();
-    const wasmAuthorityHandle = await accessWasmMasterSeedAuthorityHandle(masterSeedAuthority);
-    if (wasmAuthorityHandle === null) return null;
+    const access = await resolveDirectRatchetSessionAccess(masterSeedAuthority);
+    if (access === null) return null;
+    const { loaderBoundary, wasmAuthorityHandle } = access;
     const handle = await loaderBoundary.attemptDevOnlyDirectRatchetInitializeAsReceiverCall(
       wasmAuthorityHandle,
       accountIndex,
@@ -173,9 +410,9 @@ export class FedosDirectRatchetCryptographicSession {
     generation: number,
     remoteRatchetPublicKeyHex: string,
   ): Promise<FedosDirectRatchetCryptographicSession | null> {
-    const loaderBoundary = await primedLoader();
-    const wasmAuthorityHandle = await accessWasmMasterSeedAuthorityHandle(masterSeedAuthority);
-    if (wasmAuthorityHandle === null) return null;
+    const access = await resolveDirectRatchetSessionAccess(masterSeedAuthority);
+    if (access === null) return null;
+    const { loaderBoundary, wasmAuthorityHandle } = access;
     const handle = await loaderBoundary.attemptDevOnlyDirectRatchetInitializeAsSenderCall(
       wasmAuthorityHandle,
       accountIndex,
@@ -203,9 +440,9 @@ export class FedosDirectRatchetCryptographicSession {
     remoteRatchetPublicKeyHex: string | null,
     sealedState: FedosDirectRatchetSealedState,
   ): Promise<FedosDirectRatchetCryptographicSession | null> {
-    const loaderBoundary = await primedLoader();
-    const wasmAuthorityHandle = await accessWasmMasterSeedAuthorityHandle(masterSeedAuthority);
-    if (wasmAuthorityHandle === null) return null;
+    const access = await resolveDirectRatchetSessionAccess(masterSeedAuthority);
+    if (access === null) return null;
+    const { loaderBoundary, wasmAuthorityHandle } = access;
     const sealedSkippedKeys = sealedState.sealedSkippedKeys.map(
       (entry) => `${entry.counter}:${entry.remoteRatchetPublicKeyHex}:${entry.createdAtMs}:${entry.sealedBlob}`,
     );
@@ -274,7 +511,7 @@ export class FedosDirectRatchetCryptographicSession {
     remoteDeviceRef: string,
     conversationId: string,
   ): Promise<FedosDirectRatchetSealedState | null> {
-    const wasmAuthorityHandle = await accessWasmMasterSeedAuthorityHandle(masterSeedAuthority);
+    const wasmAuthorityHandle = await accessSessionCryptoWasmHandle(masterSeedAuthority);
     if (wasmAuthorityHandle === null) return null;
     const sealedRootKey = await this.#loaderBoundary.attemptDevOnlyDirectRatchetSealRootKeyCall(
       this.#handle,
@@ -323,19 +560,20 @@ export class FedosDirectRatchetCryptographicSession {
 }
 
 /**
- * PRIVATE — reaches the real WASM authority handle
- * `FedosWasmMasterSeedAuthority` holds internally, the SAME reviewed seam
- * `accessForNostrSigningAuthorityInternalUse()` already provides for
- * exactly this purpose (Alpha 444) — this Arc's own sealing/bootstrap
- * calls are a SECOND reviewed consumer of that same internal accessor,
- * never a new one. `null` if `masterSeedAuthority` is not a
- * `FedosWasmMasterSeedAuthority` (this Arc's own sealing/bootstrap
- * integration requires the real WASM authority; `DevelopmentFedosMasterSeedAuthority`/
- * `FedosProductionMasterSeedAuthority` are out of scope for this Arc,
- * matching the Foundation Arc's own identical boundary).
+ * Secure Runtime Alpha 6921-7000 — PRIVATE, used only by `sealState()`
+ * (the loader boundary itself is already resolved and stored at
+ * construction time, so only the WASM authority handle needs re-deriving
+ * per call). STRUCTURAL, not nominal: any authority genuinely exposing
+ * `accessForNostrSigningAuthorityInternalUse` as a function is accepted
+ * — both `FedosWasmMasterSeedAuthority` (dev/test) and
+ * `FedosProductionMasterSeedAuthority` (production, since Alpha 4741-4820)
+ * already implement this SAME internal accessor identically.
+ * `DevelopmentFedosMasterSeedAuthority` and any other object lacking it
+ * correctly resolve to `null` (fail closed), exactly as before this Arc.
  */
-async function accessWasmMasterSeedAuthorityHandle(masterSeedAuthority: FedosMasterSeedAuthority): Promise<unknown> {
-  if (!(masterSeedAuthority instanceof FedosWasmMasterSeedAuthority)) return null;
-  const handle = await masterSeedAuthority.accessForNostrSigningAuthorityInternalUse();
+async function accessSessionCryptoWasmHandle(masterSeedAuthority: FedosMasterSeedAuthority): Promise<unknown> {
+  const candidate = masterSeedAuthority as Partial<{ accessForNostrSigningAuthorityInternalUse(): Promise<unknown> }>;
+  if (typeof candidate.accessForNostrSigningAuthorityInternalUse !== "function") return null;
+  const handle = await candidate.accessForNostrSigningAuthorityInternalUse();
   return handle ?? null;
 }

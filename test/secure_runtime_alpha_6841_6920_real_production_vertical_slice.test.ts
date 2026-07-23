@@ -35,8 +35,6 @@ import { activateFedosProductionProfileMasterSeed } from "../src/desktop/product
 import { FedosProductionNostrSigningAuthority } from "../src/desktop/production_activation/fedos_production_nostr_signing_authority.js";
 import { FedosProductionMasterSeedAuthority } from "../src/desktop/production_activation/fedos_production_master_seed_authority.js";
 import { FEDOS_PRODUCTION_ARTIFACT_DIR } from "../src/desktop/production_activation/fedos_production_desktop_crypto_activation_authority.js";
-import type { FedosMasterSeedAuthority } from "../src/runtime/master_seed/fedos_master_seed_authority.js";
-
 declare const process: { cwd(): string };
 
 const PKG_DIR = join(process.cwd(), FEDOS_PRODUCTION_ARTIFACT_DIR);
@@ -46,13 +44,23 @@ const REAL_ARTIFACT_PRESENT = existsSync(WASM_PATH) && existsSync(MANIFEST_PATH)
 
 const suite = REAL_ARTIFACT_PRESENT ? describe : describe.skip;
 
-async function realProductionAuthority(): Promise<FedosMasterSeedAuthority> {
+/**
+ * Secure Runtime Alpha 6921-7000 — narrowed to the concrete
+ * `FedosProductionMasterSeedAuthority` (never the broad
+ * `FedosMasterSeedAuthority` interface), matching the real, already-
+ * asserted `toBeInstanceOf` check below exactly. This is a test-local
+ * type fix only — production interfaces are not widened to accommodate
+ * it (`FedosProductionNostrSigningAuthority`'s own constructor
+ * legitimately requires the internal accessor only the concrete
+ * production class exposes).
+ */
+async function realProductionAuthority(): Promise<FedosProductionMasterSeedAuthority> {
   const attestation = createElectronMainHostAttestation({ appId: "com.fedos.desktop.test", appVersion: "0.0.1" })!;
   const activation = await activateFedosProductionProfileMasterSeed({ attestation });
   expect(activation.outcome).toBe("activated");
   if (activation.outcome !== "activated") throw new Error("unreachable");
   expect(activation.masterSeedAuthority).toBeInstanceOf(FedosProductionMasterSeedAuthority);
-  return activation.masterSeedAuthority;
+  return activation.masterSeedAuthority as FedosProductionMasterSeedAuthority;
 }
 
 async function makeRealProductionCoordinator(dir: string): Promise<FedosProfileInitializationCoordinator> {
