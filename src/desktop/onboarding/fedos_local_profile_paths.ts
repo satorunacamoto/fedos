@@ -72,6 +72,39 @@ export interface FedosLocalProfilePaths {
   readonly logsDirectory: string;
   /** Navigation / session state directory. */
   readonly sessionStateDirectory: string;
+  // Secure Runtime Alpha 6521-6600 (FedOS Desktop Beta Production Runtime
+  // Configuration Unification Arc) -- every field below this comment is
+  // ADDITIVE ONLY, mirroring this file's own established one-leaf-per-line
+  // pattern exactly, for the four previously test-only-reachable
+  // subsystems this Arc threads into production bootstrap.
+  /** Private Transport delivery-observation append-only log. */
+  readonly conversationTransportObservationLogFile: string;
+  /** Direct Ratchet session-state append-only log. */
+  readonly directRatchetSessionLogFile: string;
+  /** Direct Ratchet sealed-secret append-only log. */
+  readonly directRatchetSealedSecretLogFile: string;
+  /** Direct Ratchet Session Reset audit-record append-only log. */
+  readonly directRatchetResetRecordLogFile: string;
+  /** Direct Ratchet inbound dedup/import-record append-only log. */
+  readonly directRatchetImportRecordLogFile: string;
+  /** Ratchet Peer Capability observation append-only log. */
+  readonly peerCapabilityObservationLogFile: string;
+  /** Identity Transition peer-observation append-only log. */
+  readonly identityTransitionObservationLogFile: string;
+  /** Identity Transition durable local-decision append-only log. */
+  readonly identityTransitionLocalDecisionLogFile: string;
+  /** Signed Deletion Request state append-only log. */
+  readonly deletionRequestStateLogFile: string;
+  /** Signed Deletion recipient-decision append-only log. */
+  readonly deletionRequestDecisionLogFile: string;
+  /** Signed Deletion acknowledgement append-only log. */
+  readonly deletionRequestAcknowledgementLogFile: string;
+  /** Signed Deletion local execution-record append-only log. */
+  readonly deletionRequestExecutionLogFile: string;
+  /** Signed Deletion recipient Inbox-summary append-only log. */
+  readonly deletionRequestInboxSummaryLogFile: string;
+  /** Signed Deletion pending-review durable side-channel append-only log. */
+  readonly deletionRequestPendingReviewLogFile: string;
 }
 
 /** The set of directories `ensureDirectories()` creates (recursively). Derived from the leaf paths above; no caller string is ever a directory component beyond the root itself. */
@@ -104,6 +137,20 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     syncConflictLogFile: join(root, "sync-conflict.ndjson"),
     logsDirectory: join(root, "logs"),
     sessionStateDirectory: join(root, "session"),
+    conversationTransportObservationLogFile: join(root, "conversation-transport-observation.ndjson"),
+    directRatchetSessionLogFile: join(root, "direct-ratchet-session.ndjson"),
+    directRatchetSealedSecretLogFile: join(root, "direct-ratchet-sealed-secret.ndjson"),
+    directRatchetResetRecordLogFile: join(root, "direct-ratchet-reset-record.ndjson"),
+    directRatchetImportRecordLogFile: join(root, "direct-ratchet-import-record.ndjson"),
+    peerCapabilityObservationLogFile: join(root, "peer-capability-observation.ndjson"),
+    identityTransitionObservationLogFile: join(root, "identity-transition-observation.ndjson"),
+    identityTransitionLocalDecisionLogFile: join(root, "identity-transition-local-decision.ndjson"),
+    deletionRequestStateLogFile: join(root, "deletion-request-state.ndjson"),
+    deletionRequestDecisionLogFile: join(root, "deletion-request-decision.ndjson"),
+    deletionRequestAcknowledgementLogFile: join(root, "deletion-request-acknowledgement.ndjson"),
+    deletionRequestExecutionLogFile: join(root, "deletion-request-execution.ndjson"),
+    deletionRequestInboxSummaryLogFile: join(root, "deletion-request-inbox-summary.ndjson"),
+    deletionRequestPendingReviewLogFile: join(root, "deletion-request-pending-review.ndjson"),
   });
 }
 

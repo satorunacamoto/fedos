@@ -80,6 +80,12 @@ import {
 } from "./fedos_profile_recovery_notice.js";
 import type { FedosDeviceSyncAbandonmentPolicy } from "../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
 import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos_device_sync_attempt.js";
+// Secure Runtime Alpha 6521-6600 -- every import below this comment is
+// ADDITIVE ONLY, mirroring this file's own established import ordering.
+import type { FedosRelay } from "../fedos_relay.js";
+import type { FedosRatchetPeerCapabilityEntry } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosIdentityTransitionLocalPolicy } from "../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import type { FedosDeletionRecipientPolicy } from "../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
 
 export type FedosProfileCoordinatorOutcome =
   | "ok"
@@ -169,6 +175,37 @@ export interface FedosProfileInitializationDependencies {
   readonly deviceSyncAbandonmentPolicy?: FedosDeviceSyncAbandonmentPolicy;
   /** Optional; omitted, every Scheduler tick's own attempt fails closed with `"failed"` — the SAME existing `FedosDesktopRuntimeConfig.deviceSyncAttemptFn` default. */
   readonly deviceSyncAttemptFn?: FedosDeviceSyncAttemptFn;
+
+  // ---------------------------------------------------------------------
+  // Secure Runtime Alpha 6521-6600 (FedOS Desktop Beta Production Runtime
+  // Configuration Unification Arc) -- every field below this comment is
+  // ADDITIVE ONLY, mirroring `archiveEnabled`/`deviceSyncSchedulerEnabled`'s
+  // own established "optional capability toggle" convention exactly.
+  // Closes the gap the Release Freeze Arc (`76f7fab`) found: this
+  // Coordinator previously had NO private-transport wiring of any kind, so
+  // none of Direct Ratchet/Peer Capability/Identity Transition/Signed
+  // Deletion Request could ever become production-reachable through it.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Whether to enable the real Private Transport (`FedosPrivateTransport`)
+   * on the Runtime this Coordinator starts. REQUIRED for any of the four
+   * subsystems below, since all four send/receive control payloads
+   * through it. Reuses `accountSigningAuthority` above as the transport's
+   * own signing identity — never a second, incoherent signing authority.
+   */
+  readonly privateTransportEnabled?: boolean;
+  /** REQUIRED when `privateTransportEnabled` is `true` — a real, external fact (this Coordinator invents no Relay endpoint of its own, never a fabricated default). */
+  readonly conversationTransportRelays?: readonly FedosRelay[];
+  readonly directRatchetEnabled?: boolean;
+  readonly peerCapabilityEnabled?: boolean;
+  /** REQUIRED when `peerCapabilityEnabled` is `true` — this Runtime advertises no capability of its own by default. */
+  readonly peerCapabilityLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
+  readonly identityTransitionEnabled?: boolean;
+  readonly identityTransitionLocalPolicy?: FedosIdentityTransitionLocalPolicy;
+  readonly deletionRequestEnabled?: boolean;
+  /** REQUIRED when `deletionRequestEnabled` is `true` — LOCAL configuration only, never derived from a request. */
+  readonly deletionRequestResolveLocalPolicy?: (requesterAccountRef: string) => FedosDeletionRecipientPolicy;
 }
 
 export class FedosProfileInitializationCoordinator {
@@ -631,6 +668,36 @@ export class FedosProfileInitializationCoordinator {
         this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAttemptFn : undefined,
       deviceSyncScheduleLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncScheduleLogFile : undefined,
       deviceSyncConflictLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncConflictLogFile : undefined,
+      // Secure Runtime Alpha 6521-6600 -- mirrors `archiveEnabled`'s own
+      // established "optional capability toggle" convention exactly.
+      // `conversationTransportSigningAuthority` reuses `accountSigningAuthority`
+      // above verbatim — the SAME real identity, never a second, incoherent
+      // signing authority.
+      privateTransportEnabled: this.#deps.privateTransportEnabled === true,
+      conversationTransportRelays: this.#deps.privateTransportEnabled === true ? this.#deps.conversationTransportRelays : undefined,
+      conversationTransportObservationLogPath: this.#deps.privateTransportEnabled === true ? paths.conversationTransportObservationLogFile : undefined,
+      conversationTransportSigningAuthority: this.#deps.privateTransportEnabled === true ? this.#deps.accountSigningAuthority : undefined,
+      conversationTransportAccountIndex: this.#deps.privateTransportEnabled === true ? this.#accountIndex : undefined,
+      directRatchetEnabled: this.#deps.directRatchetEnabled === true,
+      directRatchetSessionLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetSessionLogFile : undefined,
+      directRatchetSealedSecretLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetSealedSecretLogFile : undefined,
+      directRatchetResetRecordLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetResetRecordLogFile : undefined,
+      directRatchetImportRecordLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetImportRecordLogFile : undefined,
+      peerCapabilityEnabled: this.#deps.peerCapabilityEnabled === true,
+      peerCapabilityLocallySupportedCapabilities: this.#deps.peerCapabilityEnabled === true ? this.#deps.peerCapabilityLocallySupportedCapabilities : undefined,
+      peerCapabilityObservationLogPath: this.#deps.peerCapabilityEnabled === true ? paths.peerCapabilityObservationLogFile : undefined,
+      identityTransitionEnabled: this.#deps.identityTransitionEnabled === true,
+      identityTransitionObservationLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionObservationLogFile : undefined,
+      identityTransitionLocalDecisionLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionLocalDecisionLogFile : undefined,
+      identityTransitionLocalPolicy: this.#deps.identityTransitionEnabled === true ? this.#deps.identityTransitionLocalPolicy : undefined,
+      deletionRequestEnabled: this.#deps.deletionRequestEnabled === true,
+      deletionRequestResolveLocalPolicy: this.#deps.deletionRequestEnabled === true ? this.#deps.deletionRequestResolveLocalPolicy : undefined,
+      deletionRequestStateLogPath: this.#deps.deletionRequestEnabled === true ? paths.deletionRequestStateLogFile : undefined,
+      deletionRequestDecisionLogPath: this.#deps.deletionRequestEnabled === true ? paths.deletionRequestDecisionLogFile : undefined,
+      deletionRequestAcknowledgementLogPath: this.#deps.deletionRequestEnabled === true ? paths.deletionRequestAcknowledgementLogFile : undefined,
+      deletionRequestExecutionLogPath: this.#deps.deletionRequestEnabled === true ? paths.deletionRequestExecutionLogFile : undefined,
+      deletionRequestInboxSummaryLogPath: this.#deps.deletionRequestEnabled === true ? paths.deletionRequestInboxSummaryLogFile : undefined,
+      deletionRequestPendingReviewLogPath: this.#deps.deletionRequestEnabled === true ? paths.deletionRequestPendingReviewLogFile : undefined,
     };
   }
 

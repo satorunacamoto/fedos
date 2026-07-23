@@ -79,7 +79,15 @@ import type { FedosDeviceSyncAttemptFn } from "../../device/sync_scheduler/fedos
 // Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device
 // Aggregation and User Consent UI Arc) -- every import/addition below this
 // comment is ADDITIVE ONLY, mirroring this file's own established pattern.
-import type { FedosConversationDeletionRequestIntegrationDependencies } from "../../conversation/runtime/fedos_conversation_runtime.js";
+import type {
+  FedosConversationDeletionRequestIntegrationDependencies,
+  FedosConversationDirectRatchetIntegrationDependencies,
+  FedosConversationPeerCapabilityIntegrationDependencies,
+  FedosConversationIdentityTransitionIntegrationDependencies,
+} from "../../conversation/runtime/fedos_conversation_runtime.js";
+import type { FedosRatchetPeerCapabilityEntry } from "../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosIdentityTransitionLocalPolicy } from "../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import type { FedosDeletionRecipientPolicy } from "../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
 
 /**
  * Secure Runtime Alpha 923 ("Running Runtime Integration") — Phase D of
@@ -496,4 +504,74 @@ export interface FedosDesktopRuntimeConfig {
    * contract this Arc's own Shell methods already implement.
    */
   readonly conversationDeletionRequest?: FedosConversationDeletionRequestIntegrationDependencies;
+
+  // -----------------------------------------------------------------------
+  // Secure Runtime Alpha 6521-6600 (FedOS Desktop Beta Production Runtime
+  // Configuration Unification Arc) -- every field below is ADDITIVE ONLY,
+  // closing the gap the Release Freeze Arc (`76f7fab`) found: this config
+  // type previously had NO field at all for `directRatchet`/`peerCapability`/
+  // `identityTransition` (only `conversationDeletionRequest` above existed).
+  //
+  // Two tiers per subsystem: an `*Enabled` boolean (this file's own
+  // auto-construction trigger, mirroring `archiveEnabled`/
+  // `deviceSyncSchedulerEnabled`'s established convention above) plus an
+  // optional FULL manual override (mirroring `conversationDeletionRequest`
+  // itself) for advanced/test callers who want to supply every dependency
+  // by hand. When both are omitted, the subsystem stays exactly as
+  // unreachable as it was before this Arc. When `*Enabled` is true and the
+  // override is omitted, `startFedosDesktopRuntime()` constructs the
+  // dependency bundle itself, reusing the SAME Device Registry / signing
+  // authority / Master Seed authority / search index this Runtime already
+  // owns elsewhere -- never a second, divergent instance of any of them.
+  // Every one of these four REQUIRES `deviceTrustEnabled` AND
+  // `privateTransportEnabled` (validated, thrown synchronously, mirroring
+  // every other guard in this file) -- all four need a real Device
+  // Registry and a real `sendMailboxNip17Control` to do anything.
+  // -----------------------------------------------------------------------
+
+  /**
+   * OPTIONAL. Auto-constructs `FedosConversationDirectRatchetIntegrationDependencies`
+   * when `conversationDirectRatchet` was not manually supplied. NOTE: no
+   * append-only backend exists anywhere in this codebase for
+   * `FedosDirectRatchetRemotePublicKeyPersistence`/
+   * `FedosDirectRatchetLiveStateSnapshotPersistence` — this Arc does not
+   * fabricate durability for either; both remain in-memory-only even when
+   * this subsystem is enabled (a genuine, disclosed, narrower boundary —
+   * see the completion declaration).
+   */
+  readonly directRatchetEnabled?: boolean;
+  readonly directRatchetSessionLogPath?: string;
+  readonly directRatchetSealedSecretLogPath?: string;
+  readonly directRatchetResetRecordLogPath?: string;
+  readonly directRatchetImportRecordLogPath?: string;
+  /** Manual override — when supplied, `directRatchetEnabled`'s own auto-construction is skipped entirely and this object is used verbatim. */
+  readonly conversationDirectRatchet?: FedosConversationDirectRatchetIntegrationDependencies;
+
+  /** OPTIONAL. Auto-constructs `FedosConversationPeerCapabilityIntegrationDependencies` when `conversationPeerCapability` was not manually supplied. */
+  readonly peerCapabilityEnabled?: boolean;
+  /** REQUIRED when `peerCapabilityEnabled` is `true` and `conversationPeerCapability` was not supplied — this Runtime advertises no capability of its own by default (never a fabricated capability list). */
+  readonly peerCapabilityLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
+  readonly peerCapabilityObservationLogPath?: string;
+  /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */
+  readonly conversationPeerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
+
+  /** OPTIONAL. Auto-constructs `FedosConversationIdentityTransitionIntegrationDependencies` when `conversationIdentityTransition` was not manually supplied. */
+  readonly identityTransitionEnabled?: boolean;
+  readonly identityTransitionObservationLogPath?: string;
+  readonly identityTransitionLocalDecisionLogPath?: string;
+  /** Optional — omitted, `FedosIdentityTransitionPeerRuntime`'s own existing default policy applies (unchanged by this Arc). */
+  readonly identityTransitionLocalPolicy?: FedosIdentityTransitionLocalPolicy;
+  /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */
+  readonly conversationIdentityTransition?: FedosConversationIdentityTransitionIntegrationDependencies;
+
+  /** OPTIONAL. Auto-constructs `FedosConversationDeletionRequestIntegrationDependencies` when `conversationDeletionRequest` was not manually supplied — this Arc's own closure of the SAME gap `conversationDeletionRequest` above has had, unreachable from production, since `50f80e8`. */
+  readonly deletionRequestEnabled?: boolean;
+  /** REQUIRED when `deletionRequestEnabled` is `true` and `conversationDeletionRequest` was not supplied — LOCAL configuration only, never derived from a request (mirrors `FedosConversationDeletionRequestIntegrationDependencies.resolveLocalPolicy`'s own existing contract exactly). */
+  readonly deletionRequestResolveLocalPolicy?: (requesterAccountRef: string) => FedosDeletionRecipientPolicy;
+  readonly deletionRequestStateLogPath?: string;
+  readonly deletionRequestDecisionLogPath?: string;
+  readonly deletionRequestAcknowledgementLogPath?: string;
+  readonly deletionRequestExecutionLogPath?: string;
+  readonly deletionRequestInboxSummaryLogPath?: string;
+  readonly deletionRequestPendingReviewLogPath?: string;
 }

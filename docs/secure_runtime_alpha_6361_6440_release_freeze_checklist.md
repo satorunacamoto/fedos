@@ -50,3 +50,34 @@ compiled `packages/fedos-core-rust/pkg/` WASM artifact, and (b) the
 Electron spike package's own dependencies installed. This Arc does not
 claim those 4 items are safe for production — only that nothing found in
 this Arc's own inspection contradicts their being safe once compiled.
+
+## Update (Secure Runtime Alpha 6521–6600) — findings closed / still blocked / intentionally unsupported
+
+This Arc's own real acceptance vertical slice surfaced one genuine finding
+not captured as a row above (it is a configuration-threading gap, not a
+subsystem PASS/FAIL/BLOCKED verdict): the real production Profile/Unlock
+bootstrap did not yet thread Direct Ratchet, Peer Capability, Identity
+Transition, or Signed Deletion Request configuration through
+`FedosDesktopRuntimeConfig`/`FedosProfileInitializationCoordinator`. The
+immediately following **Secure Runtime Alpha 6521–6600 — FedOS Desktop
+Beta Production Runtime Configuration Unification Arc** closed this
+finding. Restating every item above with that closure applied:
+
+- **Closed by Alpha 6521–6600**: the production bootstrap/configuration
+  gap itself. Direct Ratchet, Peer Capability, Identity Transition, and
+  Signed Deletion Request are now reachable from the real
+  `FedosProfileInitializationCoordinator` call a genuine caller makes,
+  through one canonical configuration graph, sharing one Device Registry,
+  one signing identity, one Search Index, and one Conversation Runtime
+  generation — proven by a real, non-test-only-helper vertical slice.
+- **Still blocked by environment (unchanged)**: the same 4 rows marked
+  **BLOCKED** above — Double Ratchet (live session), Master Seed
+  (production activation), and Electron (real subprocess) all still trace
+  to the absent compiled `packages/fedos-core-rust/pkg/` WASM
+  artifact/uninstalled Electron dependency tree, neither of which any
+  configuration-wiring Arc can close.
+- **Intentionally unsupported (unchanged, not an environment gap)**:
+  Secure Memory (OS page-locking) — honestly `Unsupported`/`NotRequested`
+  because no native Desktop Rust host exists to request it from yet; this
+  is a deliberate, disclosed scope boundary, not something a future
+  environment upgrade alone would resolve.

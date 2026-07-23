@@ -8,6 +8,46 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6521–6600 — FedOS Desktop Beta Production
+> Runtime Configuration Unification Arc (FULL completion of this Arc's own
+> deliberately bounded scope).** Closes the production bootstrap/
+> configuration gap discovered by the immediately prior Arc's own real
+> acceptance vertical slice: `FedosDesktopRuntimeConfig` and
+> `FedosProfileInitializationCoordinator` now thread Direct Ratchet, Peer
+> Capability, Identity Transition, and Signed Deletion Request
+> configuration through one canonical, additive, closed configuration
+> graph — all four sharing one hoisted Device Registry, one signing
+> identity, one Search Index, and one `FedosConversationRuntime`
+> generation, never a shadow Runtime/Shell/Host Bridge. Two real bugs
+> found and fixed during this Arc's own implementation, before any test
+> ran: a construction-order bug that would have created a second,
+> divergent Device Registry instance, and a search-index divergence risk
+> that would have let Signed Deletion Request's own retention
+> reconciliation silently apply to an index nobody actually searches. A
+> real, non-test-only-helper vertical slice proves the full chain through
+> the ACTUAL production bootstrap path — real profile creation, unlock,
+> Device Trust, Peer Capability/Identity Transition/Signed Deletion all
+> reachable, Safety Center reading the same live instances, a genuine
+> lock→relaunch→unlock cycle with durable decision survival across a
+> fresh Coordinator instance — plus 7 failure-matrix and 8 structural-
+> guard tests, 163/163 total passing, zero regressions. Direct Ratchet
+> remains honestly WASM-gated (`productionCryptoGraph !== null`, never a
+> fabricated Master Seed Authority). Deliberately NOT done this Arc, per
+> its own explicit scope decision: Settings→Relay plumbing, the full
+> 10-step Runtime generation/rebuild model (only the real
+> lock→relaunch→unlock cycle this codebase actually has), and Electron
+> deepening — all disclosed, none silently worked around. Also surfaced,
+> not fixed (architecture-frozen): `fromRunningRuntime()`'s own Shell does
+> not track an externally-stopped Runtime's state, and several Shell
+> accessors throw rather than gracefully degrading when reached through a
+> Shell tied to an already-stopped Runtime generation — the same class of
+> finding the prior Arc noted for `archive()`. See
+> `docs/secure_runtime_alpha_6521_6600_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Release Candidate and
+> Packaged Security Acceptance Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6361–6440 — FedOS Desktop Beta Security
 > Acceptance, Threat-Scenario Testing, and Release Freeze Arc (FULL
 > completion of this Arc's own deliberately bounded, testing/documentation-

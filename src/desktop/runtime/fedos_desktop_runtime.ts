@@ -119,7 +119,12 @@ import { hydrateFedosConversations } from "../../conversation/fedos_conversation
 import {
   createFedosConversationRuntime,
   type FedosConversationRuntime,
+  type FedosConversationDirectRatchetIntegrationDependencies,
+  type FedosConversationPeerCapabilityIntegrationDependencies,
+  type FedosConversationIdentityTransitionIntegrationDependencies,
+  type FedosConversationDeletionRequestIntegrationDependencies,
 } from "../../conversation/runtime/fedos_conversation_runtime.js";
+import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
 import { assembleFedosConversationRuntimeDependencies } from "../../conversation/runtime/fedos_conversation_runtime_assembly.js";
 import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
 import {
@@ -225,6 +230,25 @@ import { FedosDevicePairingFacade } from "./fedos_device_pairing_facade.js";
 import type { FedosSyncJournalPersistence } from "../../sync/persistence/fedos_sync_journal_persistence.js";
 import { AppendOnlyFedosSyncJournalPersistence } from "../../sync/persistence/append_only_fedos_sync_journal_persistence.js";
 import { InMemoryFedosSyncJournalPersistence } from "../../sync/persistence/in_memory_fedos_sync_journal_persistence.js";
+// Secure Runtime Alpha 6521-6600 (FedOS Desktop Beta Production Runtime
+// Configuration Unification Arc) -- every import below this comment is
+// ADDITIVE ONLY, closing the gap this Arc's own mission names: production
+// bootstrap previously had no route to any of these four subsystems.
+import type { FedosConversationSearchIndex } from "../../conversation/search/fedos_conversation_search_index.js";
+import type { FedosDirectRatchetSealingAuthority } from "../../conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
+import { AppendOnlyFedosDirectRatchetSessionPersistence } from "../../conversation/ratchet/persistence/append_only_fedos_direct_ratchet_session_persistence.js";
+import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../../conversation/ratchet/persistence/append_only_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { AppendOnlyFedosDirectRatchetSessionResetRecordPersistence } from "../../conversation/ratchet/persistence/append_only_fedos_direct_ratchet_session_reset_record_persistence.js";
+import { AppendOnlyFedosPrivateNostrImportRecordPersistence } from "../../conversation/delivery/nostr/append_only_fedos_private_nostr_import_record_persistence.js";
+import { AppendOnlyFedosRatchetPeerCapabilityObservationPersistence } from "../../conversation/ratchet/peer_capability/persistence/append_only_fedos_ratchet_peer_capability_observation_persistence.js";
+import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../../conversation/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
+import { AppendOnlyFedosIdentityTransitionLocalDecisionPersistence } from "../../conversation/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_local_decision_persistence.js";
+import { AppendOnlyFedosDeletionRequestStatePersistence } from "../../conversation/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
+import { AppendOnlyFedosDeletionRecipientDecisionPersistence } from "../../conversation/deletion_request/append_only_fedos_deletion_recipient_decision_persistence.js";
+import { AppendOnlyFedosDeletionAcknowledgementPersistence } from "../../conversation/deletion_request/append_only_fedos_deletion_acknowledgement_persistence.js";
+import { AppendOnlyFedosDeletionExecutionPersistence } from "../../conversation/deletion/append_only_fedos_deletion_execution_persistence.js";
+import { AppendOnlyFedosDeletionRequestInboxSummaryPersistence } from "../../conversation/deletion_request/append_only_fedos_deletion_request_inbox_summary_persistence.js";
+import { AppendOnlyFedosDeletionRequestPendingReviewPersistence } from "../../conversation/deletion_request/append_only_fedos_deletion_request_pending_review_persistence.js";
 
 /** Alpha 1471-1540 -- this runtime's own explicit choice for `AppendOnlyFedosConversationPayloadStorage`'s REQUIRED `maxPayloadByteLength` parameter when `conversationPayloadMaxByteLength` is omitted. 1 MiB. */
 const DEFAULT_CONVERSATION_PAYLOAD_MAX_BYTE_LENGTH = 1_048_576;
@@ -364,6 +388,20 @@ function ensureParentDirectoryExists(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true });
 }
 
+/**
+ * Secure Runtime Alpha 6521-6600 — PRIVATE structural duck-type check: does
+ * this `FedosMasterSeedAuthority` ALSO implement `FedosDirectRatchetSealingAuthority`
+ * (`FedosWasmMasterSeedAuthority` does, additionally; `DevelopmentFedosMasterSeedAuthority`
+ * does not)? Never imports the concrete WASM class here (this file must
+ * construct correctly even when the WASM artifact is entirely absent) —
+ * a pure shape check only, matching this whole subsystem's own established
+ * "never fabricate, never throw, degrade to null" discipline.
+ */
+function isFedosDirectRatchetSealingAuthority(authority: FedosMasterSeedAuthority): authority is FedosMasterSeedAuthority & FedosDirectRatchetSealingAuthority {
+  const candidate = authority as Partial<FedosDirectRatchetSealingAuthority>;
+  return typeof candidate.sealDirectRatchetSecret === "function" && typeof candidate.restoreDirectRatchetSecret === "function";
+}
+
 export async function startFedosDesktopRuntime(
   config: FedosDesktopRuntimeConfig,
 ): Promise<FedosRunningDesktopRuntime> {
@@ -460,6 +498,36 @@ export async function startFedosDesktopRuntime(
   if (config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && config.conversationProductionCrypto === undefined) {
     throw new Error(
       "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but conversationProductionCrypto was not supplied -- the standard route requires a real, coherent Master Seed graph for NIP-44/NIP-59, never a second, independent identity.",
+    );
+  }
+  // Secure Runtime Alpha 6521-6600 -- mirrors every guard above exactly: a
+  // configuration error is thrown synchronously, BEFORE any Persistence
+  // backend or Host is constructed, never a silent no-op. All four new
+  // subsystems need a real Device Registry AND a real
+  // `sendMailboxNip17Control` to do anything -- both come from
+  // `deviceTrustEnabled`/`privateTransportEnabled` respectively.
+  for (const [flag, name] of [
+    [config.directRatchetEnabled, "directRatchetEnabled"],
+    [config.peerCapabilityEnabled, "peerCapabilityEnabled"],
+    [config.identityTransitionEnabled, "identityTransitionEnabled"],
+    [config.deletionRequestEnabled, "deletionRequestEnabled"],
+  ] as const) {
+    if (!flag) continue;
+    if (!config.deviceTrustEnabled) {
+      throw new Error(`startFedosDesktopRuntime: ${name} is true but deviceTrustEnabled is not -- this subsystem reuses FedosDeviceTrustRuntime's own Device Registry instance.`);
+    }
+    if (!config.privateTransportEnabled) {
+      throw new Error(`startFedosDesktopRuntime: ${name} is true but privateTransportEnabled is not -- this subsystem sends/receives control payloads through the real Private Transport, never a fabricated one.`);
+    }
+  }
+  if (config.peerCapabilityEnabled && config.conversationPeerCapability === undefined && config.peerCapabilityLocallySupportedCapabilities === undefined) {
+    throw new Error(
+      "startFedosDesktopRuntime: peerCapabilityEnabled is true but no peerCapabilityLocallySupportedCapabilities was supplied -- this runtime advertises no capability of its own by default, never a fabricated list.",
+    );
+  }
+  if (config.deletionRequestEnabled && config.conversationDeletionRequest === undefined && config.deletionRequestResolveLocalPolicy === undefined) {
+    throw new Error(
+      "startFedosDesktopRuntime: deletionRequestEnabled is true but no deletionRequestResolveLocalPolicy was supplied -- this runtime applies no default recipient policy of its own.",
     );
   }
 
@@ -682,6 +750,132 @@ export async function startFedosDesktopRuntime(
         }
       : undefined;
 
+  // Secure Runtime Alpha 6521-6600 -- the SAME forward-reference-via-closure
+  // discipline as `directMessageDelivery.sendMailboxNip17` immediately
+  // above, for the FOUR new subsystems' own `sendMailboxNip17Control`
+  // control-payload route. By the time any of these subsystems actually
+  // sends anything (well after this whole function returns),
+  // `privateTransportInstance` is already assigned.
+  const sendMailboxNip17Control = async (controlId: string, conversationId: unknown, plaintext: Uint8Array, createdAt: number) => {
+    if (privateTransportInstance === undefined) return { outcome: "route-unavailable" as const };
+    return privateTransportInstance.sendMailboxNip17Control(controlId, conversationId as never, plaintext, createdAt);
+  };
+
+  // Secure Runtime Alpha 6521-6600 -- `deviceRegistryPersistence` is
+  // HOISTED here (rather than left as the `deviceTrustEnabled` block's own
+  // local `const`, further below) so the four new subsystems' own
+  // dependency bundles -- built BEFORE that block runs, since they must be
+  // ready in time for `createFedosConversationRuntime()` just below -- can
+  // share the EXACT SAME instance the `deviceTrustEnabled` block already
+  // constructs, never a second, divergent Device Registry. Side-effect-free
+  // (wraps a log path or defaults to in-memory) — safe to construct early.
+  let deviceRegistryPersistence: FedosDeviceRegistryPersistence | undefined;
+  if (config.deviceTrustEnabled) {
+    deviceRegistryPersistence =
+      config.deviceRegistryLogPath !== undefined
+        ? new AppendOnlyFedosDeviceRegistryPersistence(config.deviceRegistryLogPath)
+        : new InMemoryFedosDeviceRegistryPersistence();
+  }
+
+  // Secure Runtime Alpha 6521-6600 -- the search index a granted Signed
+  // Deletion Request's own `reconcilePayloadRetention()` reconciles MUST be
+  // the SAME instance `conversationContentAccessorInstance.search()` later
+  // queries -- never a second, divergent index. `conversationRuntimeInstance`
+  // (needed to construct a real one via `createSearchIndex()`) does not
+  // exist yet at this point, so this proxy forward-references it exactly
+  // like `sendMailboxNip17Control` above forward-references
+  // `privateTransportInstance` -- assigned once, immediately after
+  // `conversationRuntimeInstance` exists, well before any real deletion
+  // request could ever be processed.
+  let sharedSearchIndexInstance: FedosConversationSearchIndex | undefined;
+  const deletionRequestSearchIndex = {
+    reconcilePayloadRetention: (payloadId: never) => sharedSearchIndexInstance?.reconcilePayloadRetention(payloadId) ?? 0,
+  };
+
+  // Secure Runtime Alpha 6521-6600 -- Direct Ratchet REQUIRES a real,
+  // resolved production crypto graph (a genuine `FedosMasterSeedAuthority`
+  // instance) -- if `directRatchetEnabled` is true but production crypto
+  // never resolved (e.g. the WASM artifact is genuinely absent in this
+  // environment), this subsystem stays honestly unreachable (`directRatchet()`
+  // returns `null`) rather than fabricating a Master Seed Authority or
+  // throwing a hard configuration error for an environment fact that is
+  // not the caller's own mistake -- mirrors this whole file's own
+  // established "artifact-missing degrades gracefully" convention.
+  const conversationDirectRatchetDeps: FedosConversationDirectRatchetIntegrationDependencies | undefined =
+    config.conversationDirectRatchet ??
+    (config.directRatchetEnabled && productionCryptoGraph !== null
+      ? {
+          deviceRegistry: deviceRegistryPersistence!,
+          sessionPersistence: config.directRatchetSessionLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionPersistence(config.directRatchetSessionLogPath) : undefined,
+          sealedSecretPersistence: config.directRatchetSealedSecretLogPath !== undefined ? new AppendOnlyFedosSealedDirectRatchetSecretPersistence(config.directRatchetSealedSecretLogPath) : undefined,
+          resetRecordPersistence: config.directRatchetResetRecordLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionResetRecordPersistence(config.directRatchetResetRecordLogPath) : undefined,
+          importRecordPersistence: config.directRatchetImportRecordLogPath !== undefined ? new AppendOnlyFedosPrivateNostrImportRecordPersistence(config.directRatchetImportRecordLogPath) : undefined,
+          // `null` unless `productionCryptoGraph`'s own `masterSeedAuthority`
+          // genuinely implements the sealing port too (`FedosWasmMasterSeedAuthority`
+          // does, additionally, alongside `FedosMasterSeedAuthority` --
+          // `DevelopmentFedosMasterSeedAuthority` does not, and can never reach
+          // this branch anyway since it never resolves `productionCryptoGraph`) --
+          // never a fabricated sealing authority.
+          sealingAuthority: isFedosDirectRatchetSealingAuthority(productionCryptoGraph.masterSeedAuthority) ? productionCryptoGraph.masterSeedAuthority : null,
+          masterSeedAuthority: productionCryptoGraph.masterSeedAuthority,
+          localDeviceRef: config.localDeviceId!,
+          sendMailboxNip17Control,
+        }
+      : undefined);
+
+  const conversationPeerCapabilityDeps: FedosConversationPeerCapabilityIntegrationDependencies | undefined =
+    config.conversationPeerCapability ??
+    (config.peerCapabilityEnabled
+      ? {
+          deviceRegistry: deviceRegistryPersistence!,
+          signingAuthority: config.conversationTransportSigningAuthority!,
+          localAccountRef: config.localAccountRef!,
+          localDeviceRef: config.localDeviceId!,
+          locallySupportedCapabilities: config.peerCapabilityLocallySupportedCapabilities!,
+          observationPersistence: config.peerCapabilityObservationLogPath !== undefined ? new AppendOnlyFedosRatchetPeerCapabilityObservationPersistence(config.peerCapabilityObservationLogPath) : undefined,
+          sendMailboxNip17Control,
+        }
+      : undefined);
+
+  const conversationIdentityTransitionDeps: FedosConversationIdentityTransitionIntegrationDependencies | undefined =
+    config.conversationIdentityTransition ??
+    (config.identityTransitionEnabled
+      ? {
+          deviceRegistry: deviceRegistryPersistence!,
+          signingAuthority: config.conversationTransportSigningAuthority!,
+          localAccountRef: config.localAccountRef!,
+          localDeviceRef: config.localDeviceId!,
+          sendMailboxNip17Control,
+          observationPersistence: config.identityTransitionObservationLogPath !== undefined ? new AppendOnlyFedosIdentityTransitionPeerObservationPersistence(config.identityTransitionObservationLogPath) : undefined,
+          // Secure Runtime Alpha 6121-6200's own real bug fix -- durable local
+          // decisions -- is only meaningful in production when this is
+          // ACTUALLY append-only; omitted, decisions do not survive restart.
+          localDecisionPersistence: config.identityTransitionLocalDecisionLogPath !== undefined ? new AppendOnlyFedosIdentityTransitionLocalDecisionPersistence(config.identityTransitionLocalDecisionLogPath) : undefined,
+          localPolicy: config.identityTransitionLocalPolicy,
+        }
+      : undefined);
+
+  const conversationDeletionRequestDeps: FedosConversationDeletionRequestIntegrationDependencies | undefined =
+    config.conversationDeletionRequest ??
+    (config.deletionRequestEnabled
+      ? {
+          deviceRegistry: deviceRegistryPersistence!,
+          signingAuthority: config.conversationTransportSigningAuthority!,
+          localAccountRef: config.localAccountRef!.publicIdentifier,
+          localDeviceRef: config.localDeviceId ?? null,
+          accountAuthority: "nostr",
+          searchIndex: deletionRequestSearchIndex,
+          resolveLocalPolicy: config.deletionRequestResolveLocalPolicy!,
+          requestStatePersistence: config.deletionRequestStateLogPath !== undefined ? new AppendOnlyFedosDeletionRequestStatePersistence(config.deletionRequestStateLogPath) : undefined,
+          recipientDecisionPersistence: config.deletionRequestDecisionLogPath !== undefined ? new AppendOnlyFedosDeletionRecipientDecisionPersistence(config.deletionRequestDecisionLogPath) : undefined,
+          acknowledgementPersistence: config.deletionRequestAcknowledgementLogPath !== undefined ? new AppendOnlyFedosDeletionAcknowledgementPersistence(config.deletionRequestAcknowledgementLogPath) : undefined,
+          localExecutionPersistence: config.deletionRequestExecutionLogPath !== undefined ? new AppendOnlyFedosDeletionExecutionPersistence(config.deletionRequestExecutionLogPath) : undefined,
+          inboxSummaryPersistence: config.deletionRequestInboxSummaryLogPath !== undefined ? new AppendOnlyFedosDeletionRequestInboxSummaryPersistence(config.deletionRequestInboxSummaryLogPath) : undefined,
+          pendingReviewPersistence: config.deletionRequestPendingReviewLogPath !== undefined ? new AppendOnlyFedosDeletionRequestPendingReviewPersistence(config.deletionRequestPendingReviewLogPath) : undefined,
+          sendMailboxNip17Control,
+        }
+      : undefined);
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -749,8 +943,28 @@ export async function startFedosDesktopRuntime(
     directMessageDelivery,
     // Secure Runtime Alpha 6041-6120 -- passed straight through, unmodified; see
     // `FedosDesktopRuntimeConfig.conversationDeletionRequest`'s own doc comment.
-    deletionRequest: config.conversationDeletionRequest,
+    // Secure Runtime Alpha 6521-6600 -- either the caller's own manual
+    // override, or this Arc's own auto-constructed bundle (built above,
+    // BEFORE this call, sharing the same Device Registry / signing
+    // authority / Master Seed authority / search index this Runtime
+    // already owns) -- `undefined` when the corresponding `*Enabled` flag
+    // was never set, byte-for-byte the same as before this Arc.
+    directRatchet: conversationDirectRatchetDeps,
+    peerCapability: conversationPeerCapabilityDeps,
+    identityTransition: conversationIdentityTransitionDeps,
+    deletionRequest: conversationDeletionRequestDeps,
   });
+
+  // Secure Runtime Alpha 6521-6600 -- `conversationRuntimeInstance` now
+  // exists; resolve the forward-referenced shared search index EXACTLY
+  // once here, well before any real deletion request could ever be
+  // processed (see `deletionRequestSearchIndex`'s own doc comment above).
+  // Constructed unconditionally (cheap, no persistence, no crypto) so
+  // `conversationContentAccessorInstance` below always receives the SAME
+  // instance `deletionRequestSearchIndex` itself forwards to -- never two
+  // divergent indexes, regardless of whether `deletionRequestEnabled` was
+  // ever set.
+  sharedSearchIndexInstance = conversationRuntimeInstance.createSearchIndex();
 
   // Secure Runtime Alpha 2921-3000 -- exactly one FedosDeviceTrustRuntime
   // per running runtime, constructed ONLY when config.deviceTrustEnabled
@@ -776,12 +990,14 @@ export async function startFedosDesktopRuntime(
   // once `stopped` exists" pattern exactly.
   let devicePairingBoundary: ReturnType<typeof createFedosDeviceBindingBoundary> | undefined;
   if (config.deviceTrustEnabled) {
-    const deviceRegistryPersistence: FedosDeviceRegistryPersistence =
-      config.deviceRegistryLogPath !== undefined
-        ? new AppendOnlyFedosDeviceRegistryPersistence(config.deviceRegistryLogPath)
-        : new InMemoryFedosDeviceRegistryPersistence();
+    // Secure Runtime Alpha 6521-6600 -- `deviceRegistryPersistence` itself
+    // is now constructed ABOVE (hoisted, shared with the four new
+    // Conversation Runtime integrations) -- this block only USES it,
+    // never redeclares or reconstructs it (a second, divergent instance
+    // over the same log path would be exactly the "second Device
+    // Registry" this Arc's own structural guards forbid).
     const deviceTrustAuthority = new PersistedFedosDeviceTrustAuthority({
-      persistence: deviceRegistryPersistence,
+      persistence: deviceRegistryPersistence!,
       registrationAuthority: config.deviceRegistrationAuthority ?? new UnavailableFedosDeviceRegistrationAuthority(),
     });
     const syncAccountKey = `${config.localAccountRef!.authority}:${config.localAccountRef!.publicIdentifier}`;
@@ -811,7 +1027,7 @@ export async function startFedosDesktopRuntime(
         ? new AppendOnlyFedosDeviceBindingChallengeReplayPersistence(config.deviceBindingChallengeReplayLogPath)
         : new InMemoryFedosDeviceBindingChallengeReplayPersistence();
     devicePairingBoundary = createFedosDeviceBindingBoundary({
-      registryPersistence: deviceRegistryPersistence,
+      registryPersistence: deviceRegistryPersistence!,
       replayPersistence: deviceBindingReplayPersistence,
       limits: config.deviceBindingChallengeTtlSeconds !== undefined ? { challengeTtlSeconds: config.deviceBindingChallengeTtlSeconds } : undefined,
       now: config.clock,
@@ -867,7 +1083,7 @@ export async function startFedosDesktopRuntime(
     if (config.deviceSyncSchedulerEnabled) {
       deviceSyncSchedulerInstance = new FedosDeviceSyncScheduler({
         schedulePersistence: schedulePersistence!,
-        registryPersistence: deviceRegistryPersistence,
+        registryPersistence: deviceRegistryPersistence!,
         accountRef: config.localAccountRef!,
         sourceDeviceId: config.localDeviceId!,
         syncState: syncStateInstance,
@@ -1058,6 +1274,10 @@ export async function startFedosDesktopRuntime(
     conversationRuntime: conversationRuntimeInstance,
     archiveRuntime: archiveRuntimeInstance ?? null,
     isRuntimeRunning: () => !stopped,
+    // Secure Runtime Alpha 6521-6600 -- the SAME instance
+    // `deletionRequestSearchIndex` forwards to above -- never a second,
+    // divergent search index.
+    searchIndex: sharedSearchIndexInstance,
   });
 
   return {

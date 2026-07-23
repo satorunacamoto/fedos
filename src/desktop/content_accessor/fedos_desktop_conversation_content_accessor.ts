@@ -69,6 +69,19 @@ export interface FedosDesktopConversationContentAccessorDependencies {
   readonly archiveRuntime: FedosConversationArchiveRuntime | null;
   /** See this file's own header, "LIFECYCLE". */
   readonly isRuntimeRunning: () => boolean;
+  /**
+   * Secure Runtime Alpha 6521-6600 (FedOS Desktop Beta Production Runtime
+   * Configuration Unification Arc) — OPTIONAL. Omitted, this class
+   * constructs its own via `conversationRuntime.createSearchIndex()`
+   * (byte-for-byte the same behavior as before this Arc). A caller that
+   * ALSO needs a coherent, single search-index instance shared with
+   * another subsystem (e.g. Signed Deletion Request's own
+   * `reconcilePayloadRetention()` reconciliation) supplies that SAME
+   * instance here instead — never a second, divergent index silently
+   * left un-reconciled with the one this accessor's own `search()`
+   * actually queries.
+   */
+  readonly searchIndex?: FedosConversationSearchIndex;
 }
 
 function participantsEqual(a: FedosConversationParticipantReference, b: FedosConversationParticipantReference): boolean {
@@ -81,7 +94,7 @@ export class FedosDesktopConversationContentAccessor {
 
   constructor(deps: FedosDesktopConversationContentAccessorDependencies) {
     this.#deps = deps;
-    this.#searchIndex = deps.conversationRuntime.createSearchIndex();
+    this.#searchIndex = deps.searchIndex ?? deps.conversationRuntime.createSearchIndex();
   }
 
   #resolveMode(conversationId: string): "direct" | "private-group" | null {
