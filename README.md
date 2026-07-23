@@ -8,6 +8,53 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 6761–6840 — FedOS Settings-to-Relay
+> Production Wiring and Secure Runtime Reachability Arc (honest partial
+> completion — Peer Capability/Identity Transition/Deletion Request now
+> genuinely reachable through the packaged Beta entry point; Direct
+> Ratchet remains structurally unreachable, permanently gated to
+> `NODE_ENV=development` by an already-reviewed security boundary, not
+> this Arc's own gap).** Closes the exact blocker the immediately-prior
+> Arc's own real execution disclosed: `fedos_electron_beta_main.cts` (the
+> ONE canonical packaged Beta entry point) never threaded
+> `directRatchetEnabled`/`peerCapabilityEnabled`/`identityTransitionEnabled`/
+> `deletionRequestEnabled` through to its own Coordinator construction,
+> because the ONE missing dependency — real `conversationTransportRelays`
+> — was never sourced from the already-existing, already-persisted
+> Settings descriptor's own `relays` field (Alpha 4901–4980, already
+> classified `runtime-restart` by Alpha 4981–5060's own evidence-derived
+> table). One new, additive function
+> (`secureRuntimeBundleConfig()`) reads Settings and, when a real relay is
+> genuinely configured, constructs real `WebSocketRelay` instances (Node
+> 22+'s own global `WebSocket`, zero new dependency, the SAME class
+> `src/worker.ts` already uses in production) — never `NullRelay`, never a
+> fabricated URL; when no relay is configured, every one of the four
+> subsystems stays honestly disabled. Proven through the REAL packaged
+> path, not inference: a real Electron 43.1.1 subprocess, real compiled
+> WASM, a real Settings file seeded through the actual compiled
+> controller — `peerCapabilityConfigured`/`identityTransitionConfigured`/
+> `deletionRequestConfigured` all flip from `false` to `true`, a real
+> restart (fresh subprocess, same on-disk profile) reproduces the
+> identical public identity and reachability, wrong-passphrase and
+> corrupted-Settings both fail closed. Direct Ratchet's own crypto graph
+> (`assembleFedosConversationProductionCryptoGraph()`) was found, by
+> direct source inspection, to always construct a SECOND, independent
+> Master Seed Authority through `FedosWasmLoaderSkeleton`'s own Dev-only
+> Gate (`NODE_ENV === "development"` only, permanently denied otherwise)
+> — closing it would mean either redesigning that factory's own API to
+> accept the ALREADY-ACTIVATED production authority instead, or weakening
+> an already-reviewed security boundary; this Arc's own "no redesign,
+> never weaken security" rules correctly forbid both, so it is named as
+> the next Arc's own precisely-scoped work rather than attempted. Zero
+> regressions (full root suite re-run matches the immediately-prior Arc's
+> own established baseline shape exactly). See
+> `docs/secure_runtime_alpha_6761_6840_reconciliation_report.md`,
+> `..._execution_report.md`, `..._architecture_update.md`, and
+> `..._completion_declaration.md`. Recommended next Arc: **FedOS Direct
+> Ratchet Production Crypto Graph Unification Arc**.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 6681–6760 — FedOS Desktop Beta Release
 > Candidate and Packaged Security Acceptance Arc (honest partial
 > completion — the canonical packaged Beta entry point does not yet

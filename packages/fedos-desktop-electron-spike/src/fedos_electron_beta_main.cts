@@ -240,7 +240,11 @@ interface AssemblyLike {
 }
 type AssemblyResult = { readonly outcome: "ok"; readonly value: AssemblyLike } | { readonly outcome: string; readonly reason: string };
 interface SettingsControllerLike {
-  load(): unknown;
+  load(): { readonly outcome: string; readonly value?: { readonly relays: readonly string[] } };
+}
+/** Secure Runtime Alpha 6761-6840 -- the real, production `FedosRelay` implementation (`WebSocketRelay`, Node 22+'s own global `WebSocket`, no new dependency) and its one real socket factory. Never `NullRelay` (test-only, no real network I/O) in this canonical packaged entry point. */
+interface RelayLike {
+  readonly url: string;
 }
 interface NotificationPortLike {
   status(): "available" | "unavailable";
@@ -293,6 +297,8 @@ interface RootModules {
   readonly betaLimitationsV1: () => unknown;
   readonly DeviceSyncEventBridge: new (deps: { listener: (event: unknown) => void; abandonmentMaxAttempts?: number }) => DeviceSyncEventBridgeLike;
   readonly fedosDesktopTrayMenuItems: (disabled?: ReadonlySet<string>) => readonly FedosElectronBadgeTrayMenuItemLike[];
+  readonly WebSocketRelay: new (url: string, factory: (url: string) => Promise<unknown>) => RelayLike;
+  readonly createNodeWebSocketRelaySocketFactory: () => (url: string) => Promise<unknown>;
 }
 
 async function loadRootModules(): Promise<RootModules> {
@@ -339,6 +345,12 @@ async function loadRootModules(): Promise<RootModules> {
   const deviceSyncEventBridgeModule = (await import(distUrl("device", "sync_events", "fedos_device_sync_event_bridge.js"))) as {
     FedosDeviceSyncEventBridge: RootModules["DeviceSyncEventBridge"];
   };
+  const websocketRelay = (await import(distUrl("desktop", "websocket_relay.js"))) as {
+    WebSocketRelay: RootModules["WebSocketRelay"];
+  };
+  const websocketRelaySocketFactory = (await import(distUrl("desktop", "node_websocket_relay_socket_factory.js"))) as {
+    createNodeWebSocketRelaySocketFactory: RootModules["createNodeWebSocketRelaySocketFactory"];
+  };
   const trayTypes = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_types.js"))) as {
     fedosDesktopTrayMenuItems: RootModules["fedosDesktopTrayMenuItems"];
   };
@@ -359,6 +371,8 @@ async function loadRootModules(): Promise<RootModules> {
     betaLimitationsV1: limitations.fedosDesktopBetaLimitationsV1,
     DeviceSyncEventBridge: deviceSyncEventBridgeModule.FedosDeviceSyncEventBridge,
     fedosDesktopTrayMenuItems: trayTypes.fedosDesktopTrayMenuItems,
+    WebSocketRelay: websocketRelay.WebSocketRelay,
+    createNodeWebSocketRelaySocketFactory: websocketRelaySocketFactory.createNodeWebSocketRelaySocketFactory,
   };
 }
 
@@ -418,6 +432,30 @@ function refreshTrayMenu(): void {
  * dependencies (Phase E) — so the Runtime this Coordinator starts during
  * `createProfile()`/`unlockProfile()` has the Scheduler enabled from the
  * very first construction, never a second, later Runtime just to turn it on.
+ *
+ * Secure Runtime Alpha 6761-6840 — ALSO reads the SAME persisted Settings
+ * descriptor `startAssembly()` already loads later (a second, independent,
+ * stateless `.load()` of the same file-backed store — never a second
+ * owner: neither call holds any state, both just re-read the one durable
+ * file), BEFORE constructing the Coordinator, so a genuinely user-
+ * configured `relays` list can be threaded into Runtime construction
+ * itself (the ONLY point `conversationTransportRelays` can ever be set —
+ * `relays`/`defaultRelay` are classified `runtime-restart` by this
+ * repository's own `fedos_settings_application_class.ts`, exactly because
+ * `FedosConversationRelaySet` is immutable after construction). When
+ * `relays.length > 0`, real `WebSocketRelay` instances (Node's own global
+ * `WebSocket`, no mock, no `NullRelay`) are constructed for each
+ * configured URL and `privateTransportEnabled`/`directRatchetEnabled`/
+ * `peerCapabilityEnabled`/`identityTransitionEnabled`/`deletionRequestEnabled`
+ * are enabled — the SAME conservative, never-auto-accept policy values
+ * `test/secure_runtime_alpha_6521_6600_real_production_vertical_slice.test.ts`
+ * already establishes, reused verbatim, never a new policy. When NO relay
+ * is configured (the honest default on every fresh profile), every one of
+ * these stays disabled — never a fabricated placeholder relay, matching
+ * this Arc's own "no fake Relay configuration" rule; the user must
+ * genuinely configure a relay via Settings, then relaunch (the existing,
+ * accepted `runtime-restart` UX this repository already reports), before
+ * these subsystems activate.
  */
 async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; masterSeedAuthority: MasterSeedAuthorityLike; eventBridge: DeviceSyncEventBridgeLike } | null> {
   const m = requireModules();
@@ -445,6 +483,7 @@ async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; 
     },
     abandonmentMaxAttempts: DEVICE_SYNC_ABANDONMENT_POLICY.maxAttempts,
   });
+  const secureRuntimeBundle = secureRuntimeBundleConfig(m, signer);
   const coordinator = new m.Coordinator({
     paths,
     profilePersistence: new m.ProfilePersistence(paths.profileDescriptorFile),
@@ -454,24 +493,42 @@ async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; 
     deviceSyncSchedulerEnabled: true,
     deviceSyncAbandonmentPolicy: DEVICE_SYNC_ABANDONMENT_POLICY,
     deviceSyncAttemptFn: eventBridge.wrapAttemptFn(),
-    // Secure Runtime Alpha 6681-6760 -- this Arc's own real AUTOTEST diagnostic
-    // (`unifiedGraphDiagnostics()` below) proved this canonical Beta entry point does
-    // NOT thread `directRatchetEnabled`/`peerCapabilityEnabled`/`identityTransitionEnabled`/
-    // `deletionRequestEnabled` through, unlike `FedosProfileInitializationCoordinator`
-    // itself (which has carried these fields since Alpha 6521-6600). Enabling them here
-    // was tried and reverted: `startFedosDesktopRuntime()` requires `privateTransportEnabled:
-    // true` plus real `conversationTransportRelays`/`conversationTransportObservationLogPath`/
-    // `conversationTransportSigningAuthority` for all four (they send/receive control
-    // payloads through the real Private Transport, never a fabricated one) -- and no
-    // packaged Electron entry point in this codebase has ever wired real Relay/Settings
-    // configuration in (the disclosed "Settings->Relay plumbing" gap Alpha 6521-6600's
-    // own README explicitly named as deliberately NOT done). Inventing a production Relay
-    // endpoint here would be exactly the "arbitrary production configuration" this Arc's
-    // own mission prohibits. Left disabled, honestly, matching every other packaged
-    // Electron main in this repository -- see the Phase C finding in this Arc's own
-    // reconciliation/execution-spec docs for the full account.
+    ...secureRuntimeBundle,
   });
   return { coordinator, masterSeedAuthority, eventBridge };
+}
+
+/**
+ * Secure Runtime Alpha 6761-6840 — reads the persisted Settings descriptor's
+ * own `relays` (real, user-configured relay URLs only) and returns the
+ * additive Coordinator dependency fields that activate Direct Ratchet /
+ * Peer Capability / Identity Transition / Deletion Request, or an empty
+ * object when no relay is configured (fail closed, never fabricated).
+ * Pure with respect to Runtime/Electron state; its only side effect is one
+ * stateless settings-file read.
+ */
+function secureRuntimeBundleConfig(m: RootModules, signer: unknown): Record<string, unknown> {
+  const settingsController = m.createFileBackedSettingsController(settingsFilePath());
+  const loaded = settingsController.load();
+  const relayUrls = loaded.outcome === "ok" && loaded.value !== undefined ? loaded.value.relays : [];
+  if (relayUrls.length === 0) {
+    console.log("fedos-beta: no relay configured in Settings -- Direct Ratchet/Peer Capability/Identity Transition/Deletion Request stay honestly disabled until the user configures one and relaunches.");
+    return {};
+  }
+  const socketFactory = m.createNodeWebSocketRelaySocketFactory();
+  const relays = relayUrls.map((url) => new m.WebSocketRelay(url, socketFactory));
+  return {
+    privateTransportEnabled: true,
+    conversationTransportRelays: relays,
+    conversationTransportSigningAuthority: signer,
+    directRatchetEnabled: true,
+    peerCapabilityEnabled: true,
+    peerCapabilityLocallySupportedCapabilities: [{ kind: "private-message-route", route: "nostr-nip17-v1" }],
+    identityTransitionEnabled: true,
+    identityTransitionLocalPolicy: { autoAcceptOldKeyContinuity: false },
+    deletionRequestEnabled: true,
+    deletionRequestResolveLocalPolicy: () => "always-review",
+  };
 }
 
 /** Phase C/D/E — composes the ONE Shell/Boundary/Navigation/Tray/Badge/Background/DeviceSyncWiring + Settings Application Coordinator over the just-unlocked Runtime. Never called before a successful create/unlock. */

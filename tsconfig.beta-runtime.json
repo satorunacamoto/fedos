@@ -31,6 +31,8 @@
     "src/desktop/settings/fedos_desktop_settings_controller.ts",
     "src/desktop/settings/fedos_desktop_settings_application_coordinator.ts",
     "src/desktop/settings/fedos_desktop_settings_application_ports.ts",
-    "src/desktop/settings/fedos_desktop_settings_application_host_bridge.ts"
+    "src/desktop/settings/fedos_desktop_settings_application_host_bridge.ts",
+    "src/desktop/websocket_relay.ts",
+    "src/desktop/node_websocket_relay_socket_factory.ts"
   ]
 }
