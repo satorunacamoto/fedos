@@ -39,6 +39,20 @@
  *     be called once, from the [stopped/running] state" convention.
  *   - No Tor, onion, ActivityPub, AT Protocol, GUI, or Worker reference
  *     anywhere in this file.
+ *
+ * Secure Runtime Alpha 7561–7640 ("FedOS Conversation Outbox Restart
+ * Hydration and Scheduler Scalability Arc") — the constructor now
+ * hydrates `FedosConversationTransportScheduler`'s `initialDelivered`/
+ * `initialAbandoned` seed from the already-durable Delivery Observation
+ * history before constructing it (`fedos_conversation_transport_delivery_recovery_hydration.ts`,
+ * ONE new pure, read-only file), so a restart no longer treats every
+ * historical intent in the shared, whole-profile Outbox log as pending.
+ * This is the ONE production construction site for
+ * `FedosConversationTransportScheduler` (structurally enforced —
+ * `test/secure_runtime_alpha_1471_1540_structural_guards.test.ts`
+ * separately enforces there is exactly one production construction
+ * site for THIS class); no second Scheduler, no second timer, no
+ * persistence rewrite.
  */
 
 import type { FedosConversationMessageEnvelope } from "../envelope/fedos_conversation_message_envelope.js";
@@ -86,7 +100,9 @@ import {
 import { FedosDeliveryRetryRegistry } from "../../board/observation/fedos_delivery_retry_registry.js";
 import { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
 import { FedosDeliveryObservationQuery } from "../../board/observation/fedos_delivery_observation_query.js";
+import { FedosDeliveryRetryQuery } from "../../board/observation/fedos_delivery_retry_query.js";
 import { FedosValidatingDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_write_validator.js";
+import { hydrateFedosConversationTransportDeliveryRecoveryState } from "./fedos_conversation_transport_delivery_recovery_hydration.js";
 
 export interface FedosPrivateTransportInboundConfig {
   readonly filter: FedosSubscriptionFilter;
@@ -193,6 +209,19 @@ export class FedosPrivateTransport {
       observationQuery,
     );
 
+    // Secure Runtime Alpha 7561-7640 (FedOS Conversation Outbox Restart
+    // Hydration and Scheduler Scalability Arc) -- reconstructs terminal
+    // delivery state from the ALREADY-DURABLE Delivery Observation
+    // history BEFORE the Scheduler is constructed, so a restart treats
+    // only genuinely pending intents as pending, mirroring Board's own
+    // Alpha 585/586 hydration precedent
+    // (`../../desktop/host/fedos_delivery_recovery_hydration.ts`). Pure
+    // read against data this constructor already reads/builds (the same
+    // `observationQuery` above) -- no new dependency, no new durable
+    // backend, no new schema.
+    const retryQuery = new FedosDeliveryRetryQuery(observationQuery);
+    const recoveryState = hydrateFedosConversationTransportDeliveryRecoveryState(dependencies.outboxPersistence, retryQuery);
+
     this.#scheduler = new FedosConversationTransportScheduler({
       outboxPersistence: dependencies.outboxPersistence,
       publisher: this.#publisher,
@@ -200,6 +229,8 @@ export class FedosPrivateTransport {
       intervalMs: dependencies.intervalMs,
       retryRegistry: dependencies.retryRegistry ?? new FedosDeliveryRetryRegistry(),
       now: this.#now,
+      initialDelivered: recoveryState.delivered,
+      initialAbandoned: recoveryState.abandoned,
     });
   }
 
