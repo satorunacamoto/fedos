@@ -75,6 +75,14 @@ export class FedosArchiveSuppressionInboundSubscription {
     const opened: OpenSubscription[] = [];
     for (let relayIndex = 0; relayIndex < relays.length; relayIndex += 1) {
       const relay = relays[relayIndex]!;
+      // Secure Runtime Alpha 7961-8040 -- same fix as the Conversation
+      // domain's own `FedosConversationInboundSubscription` (this file's own
+      // mirrored idiom): `relay.subscribe()` throws for a relay that never
+      // actually connected, which would otherwise crash this whole
+      // subscription's own `start()` for one unreachable relay in the set.
+      // Skipping it here mirrors `connectAll()`'s own "one relay's failure
+      // never blocks another" resilience discipline.
+      if (!relay.isConnected()) continue;
       const subscription = await relay.subscribe([{ kinds: [SUPPRESSION_SYNC_SUBSCRIPTION_KIND] }]);
       relay.onSubscriptionMessage(subscription, (message) => {
         if (message.kind !== "event") return;

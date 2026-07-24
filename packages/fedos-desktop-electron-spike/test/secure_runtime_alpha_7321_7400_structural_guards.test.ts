@@ -169,12 +169,13 @@ describe("Secure Runtime Alpha 7321-7400 -- structural guards", () => {
     expect(source).toMatch(/nodeIntegration:\s*false/);
   });
 
-  it("9. zero Rust source changed, zero p2p/.tmp_gen change, zero wire/persistence-schema change, zero Ratchet/Identity/NIP-17/Secure-Memory source change by this Arc", () => {
+  it("9. zero Rust source changed, zero p2p/.tmp_gen change, zero wire/persistence-schema change, zero Ratchet/Identity/NIP-17/Secure-Memory source change by this Arc (RECONCILED: Secure Runtime Alpha 7401-7480's own later, disclosed, additive route-binding fix legitimately touches fedos_direct_ratchet_outbound_integration.ts/fedos_direct_ratchet_inbound_integration.ts -- see that Arc's own structural guards for the current state of those two files; every other path below remains genuinely untouched by this Arc)", () => {
     expect(diffNames("packages/fedos-core-rust").trim()).toBe("");
     const diffOutput = diffNames();
     expect(diffOutput).not.toMatch(/^p2p\//m);
     expect(diffOutput).not.toMatch(/\.tmp_gen\//);
-    expect(diffNames("src/conversation/ratchet").trim()).toBe("");
+    expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_crypto.ts").trim()).toBe("");
+    expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_cryptographic_session.ts").trim()).toBe("");
     expect(diffNames("src/identity").trim()).toBe("");
     expect(diffNames("src/desktop/production_activation").trim()).toBe("");
   });

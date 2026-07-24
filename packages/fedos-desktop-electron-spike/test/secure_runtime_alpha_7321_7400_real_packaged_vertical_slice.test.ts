@@ -155,7 +155,7 @@ const realSuite = CAN_RUN_REAL ? describe : describe.skip;
 
 realSuite("Alpha 7321-7400 -- REAL packaged Beta Electron process: the full production reachability success criteria, using ONLY the packaged application", () => {
   it(
-    "create profile, unlock, create invitation, accept invitation (automatic), exchange encrypted messages, perform search, reach Archive's real IPC surface (honestly blocked end-to-end by a genuine, disclosed, pre-existing Direct-conversation-vs-Board-record gap), open Safety Center, restart, continue the conversation -- all through the real compiled Electron subprocess's real IPC surface",
+    "create profile, unlock, create invitation, accept invitation (automatic), exchange encrypted messages, perform search, export a real Direct Conversation Archive through the real IPC surface (RECONCILED: the Direct-conversation-vs-Board-record gap this test used to disclose here was closed by Secure Runtime Alpha 7801-7880/7881-7960), open Safety Center, restart, continue the conversation -- all through the real compiled Electron subprocess's real IPC surface",
     async () => {
       // A computed (non-literal) specifier -- this sub-package's own
       // typecheck config would otherwise force-typecheck the shared
@@ -301,30 +301,24 @@ realSuite("Alpha 7321-7400 -- REAL packaged Beta Electron process: the full prod
         expect(searchResult.outcome, aliceFeatures.output).toBe("ok");
         expect((searchResult.value as readonly unknown[]).length, aliceFeatures.output).toBeGreaterThanOrEqual(1);
 
-        // GENUINE, DISCLOSED FINDING (not fixed by this Arc -- see this
-        // Arc's own execution specification): a private Direct
-        // conversation is never written into `FedosConversationPersistence`
-        // at all (that port/wire-shape is Board-thread/PUBLIC-only,
-        // `validateFedosConversationRecord()`, Alpha 748, unmodified) --
-        // `exportConversationArchive()`'s own existence check
-        // (`conversationPersistence.getConversation()`) therefore honestly
-        // reports "conversation-not-found" for EVERY Direct conversation
-        // reachable through this packaged app (there is no Board/public-
-        // conversation UI in this app at all, so this is not a corner
-        // case -- it is the ONLY conversation shape the packaged Beta app
-        // can ever produce). This pre-existing gap between Archive's own
-        // existence gate and Direct Conversation's own persistence model
-        // is real, confirmed live here, and NOT this Arc's own narrow
-        // "reachability wiring" mission to redesign -- Archive's own IPC
-        // channel is now genuinely wired and reachable (this Arc's own
-        // fix), and returns an honest, non-fabricated outcome rather than
-        // "unavailable"/a crash.
+        // RECONCILED (Secure Runtime Alpha 7801-7880 and 7881-7960): the gap this
+        // Arc's own comment used to disclose here -- a private Direct conversation
+        // was never written into `FedosConversationPersistence` (Board/public-only),
+        // so `exportConversationArchive()`'s own existence check always reported
+        // "conversation-not-found" for every Direct conversation -- is CLOSED. Alpha
+        // 7801-7880 added a discriminated Archive subject union (a bare object stays
+        // the pre-existing Board shape; `{kind:"direct", record}` wraps the
+        // already-frozen Conversation Draft record) and the Collector/Restore/Runtime
+        // now try the real Board record first, falling back to
+        // `resolveFedosConversationActiveConversation()` for a real Direct
+        // conversation. Verified live here, through the real packaged Electron IPC
+        // surface (not a hand-built Coordinator): export now genuinely succeeds.
         const exportResult = stepFor(aliceFeatures, "acceptance-archive");
-        expect(
-          exportResult.outcome,
-          "genuine, disclosed, pre-existing gap: a Direct conversation is never a real Board record, so Shell.archive() honestly reports outcome:not-found/reason:'unknown conversation' -- see this Arc's own execution specification",
-        ).toBe("not-found");
-        expect(exportResult.reason, aliceFeatures.output).toBe("unknown conversation");
+        expect(exportResult.outcome, aliceFeatures.output).toBe("ok");
+        const exportValue = exportResult.value as { readonly operation: string; readonly result: { readonly outcome: string } };
+        expect(exportValue.operation, aliceFeatures.output).toBe("export");
+        expect(exportValue.result.outcome, aliceFeatures.output).toBe("exported");
+        expect(existsSync(archivePath), "the real Archive file must actually be written to disk by the packaged process").toBe(true);
 
         const safetyCenterResult = stepFor(aliceFeatures, "acceptance-safety-center-overview");
         expect(safetyCenterResult.outcome, aliceFeatures.output).toBe("ok");

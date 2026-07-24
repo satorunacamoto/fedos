@@ -104,6 +104,18 @@ export class FedosConversationInboundSubscription {
     const opened: OpenSubscription[] = [];
     for (let relayIndex = 0; relayIndex < relays.length; relayIndex += 1) {
       const relay = relays[relayIndex]!;
+      // Secure Runtime Alpha 7961-8040 -- real, release-blocking bug found
+      // during Stage 3 acceptance: `connectAll()` never throws for a single
+      // relay's own connection failure (its own documented contract), but
+      // this loop previously called `subscribe()` unconditionally on every
+      // relay in the set, and `FedosRelay.subscribe()` throws when a relay
+      // never actually connected (e.g. a genuinely unreachable/misconfigured
+      // URL) -- crashing the ENTIRE Transport start (and therefore Runtime
+      // startup / profile creation) instead of degrading gracefully for just
+      // that one relay. Skipping an unconnected relay here mirrors
+      // `connectAll()`'s/`disconnectAll()`'s own established "one relay's
+      // failure never blocks another" resilience discipline.
+      if (!relay.isConnected()) continue;
       const relayUrl = relay.url;
       const subscription = await relay.subscribe([filter]);
       relay.onSubscriptionMessage(subscription, (message) => {
