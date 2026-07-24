@@ -36,7 +36,7 @@ import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/f
 import { FedosWasmMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
 import {
   createFedosWasmEphemeralGiftWrapSigningAuthority,
-  type FedosWasmEphemeralGiftWrapSigningAuthority,
+  type FedosEphemeralGiftWrapSigningAuthority,
 } from "./fedos_wasm_ephemeral_gift_wrap_signing_authority.js";
 import {
   buildFedosNip17GiftWrap,
@@ -61,7 +61,7 @@ export interface NostrNip17V1WireAdapterOptions {
   readonly localAccountIndex?: number;
   readonly signingAuthority?: FedosNostrSigningAuthority;
   readonly nip44Wire?: FedosMasterSeedAuthority;
-  readonly ephemeralSigningAuthority?: FedosWasmEphemeralGiftWrapSigningAuthority;
+  readonly ephemeralSigningAuthority?: FedosEphemeralGiftWrapSigningAuthority;
   /** Injected clock — Alpha 1784's own "injected clock/random source for deterministic tests" requirement. Defaults to `Date.now`. */
   readonly now?: () => number;
   /** Injected randomness source for the two-days-in-the-past timestamp tweak — Alpha 1784. Defaults to `Math.random`. Returns a value in `[0, 1)`. */
@@ -74,7 +74,7 @@ export class NostrNip17V1WireAdapter implements FedosPrivateWireAdapter {
   readonly #localAccountIndex: number;
   readonly #signingAuthority: FedosNostrSigningAuthority;
   readonly #nip44Wire: FedosMasterSeedAuthority;
-  readonly #ephemeralSigningAuthority: FedosWasmEphemeralGiftWrapSigningAuthority;
+  readonly #ephemeralSigningAuthority: FedosEphemeralGiftWrapSigningAuthority;
   readonly #now: () => number;
   readonly #random: () => number;
 

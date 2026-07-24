@@ -34,7 +34,7 @@
  * Wiring Arc, `8a33045e`).
  */
 
-import type { AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../runtime/fedos_wasm_loader.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../runtime/fedos_wasm_loader.js";
 import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
 import {
   toSealedMasterSeedEnvelopeV1,
@@ -198,6 +198,57 @@ export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthor
   }
 
   /**
+   * Secure Runtime Alpha 7161-7240 — closes the ONE remaining gap named
+   * in `fedos_master_seed_authority.ts`'s own `encryptNip44Wire` doc
+   * comment (this class named explicitly as an implementer that "never
+   * constructed a real NIP-44 wire bridge"). The underlying Rust/WASM
+   * capability (`FedosMasterSeedAuthority::encrypt_nip44_wire` in
+   * `lib.rs`, `#[wasm_bindgen]`-exported on the SAME struct this file's
+   * own `#handle` already wraps for `sealDirectRatchetSecret`/
+   * `resolveConversationKey`) is real, round-trip-tested, and already
+   * reachable through this handle's own `encrypt_nip44_wire` method
+   * (`FedosMasterSeedAuthorityHandle`, `fedos_wasm_loader.ts`) — this
+   * method adds no cryptography of its own, only the missing thin
+   * wrapper, mirroring `sealDirectRatchetSecret`'s own exact
+   * try/catch/fail-closed discipline.
+   */
+  async encryptNip44Wire(
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    plaintext: Uint8Array,
+  ): Promise<string | null> {
+    const h = this.#ensure();
+    if (!h || typeof h.encrypt_nip44_wire !== "function") return null;
+    try {
+      const value = h.encrypt_nip44_wire(accountIndex, counterpartyPublicKeyHex, plaintext);
+      return typeof value === "string" ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The decrypt-direction sibling of [`encryptNip44Wire`] — see that
+   * method's own doc comment for the shared design rationale. Calls
+   * `h.decrypt_nip44_wire`, the real, already-tested Rust bridge's own
+   * decrypt direction.
+   */
+  async decryptNip44Wire(
+    accountIndex: number,
+    counterpartyPublicKeyHex: string,
+    payload: string,
+  ): Promise<Uint8Array | null> {
+    const h = this.#ensure();
+    if (!h || typeof h.decrypt_nip44_wire !== "function") return null;
+    try {
+      const value = h.decrypt_nip44_wire(accountIndex, counterpartyPublicKeyHex, payload);
+      return (value ?? null) as Uint8Array | null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Secure Runtime Alpha 6921-7000 — INTERNAL, mirrors
    * `accessForNostrSigningAuthorityInternalUse()`'s own exact discipline
    * (not part of the public `FedosMasterSeedAuthority` interface, opaque,
@@ -214,5 +265,61 @@ export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthor
   accessDirectRatchetSessionModuleInternalUse(): FedosProductionDirectRatchetSessionModule | null {
     if (this.#cleared) return null;
     return this.#facade.constructDirectRatchetSessionModule();
+  }
+
+  /**
+   * Secure Runtime Alpha 7161-7240 — mirrors
+   * `accessDirectRatchetSessionModuleInternalUse()`'s own exact
+   * discipline (narrow facade capability, `#cleared`-gated, no secret
+   * byte). Unlike every other method on this class, this one does NOT
+   * touch `#handle`/`#ensure()` at all — a NIP-59 ephemeral Gift Wrap
+   * key is a fresh, single-use, CSPRNG-drawn key generated INSIDE the
+   * one Rust call this facade method wraps, never derived from the
+   * Master Seed (see `build_and_sign_nip17_gift_wrap`'s own doc comment
+   * in `lib.rs`) — so this method is available whenever this authority
+   * is constructed and not yet cleared, independent of whether a seed
+   * has been generated/restored.
+   */
+  buildEphemeralGiftWrap(
+    recipientPublicKeyHex: string,
+    createdAt: number,
+    kind: number,
+    contentPlaintext: Uint8Array,
+  ): string | null {
+    if (this.#cleared) return null;
+    return this.#facade.buildAndSignGiftWrap(recipientPublicKeyHex, createdAt, kind, contentPlaintext);
+  }
+
+  /**
+   * Secure Runtime Alpha 7161-7240 — the generic Envelope-AEAD
+   * encrypt/serialize bridge, mirroring `buildEphemeralGiftWrap()`'s own
+   * exact discipline (narrow facade capability, `#cleared`-gated). Used
+   * by `FedosWasmConversationEncryptionAuthority`/`DecryptionAuthority`
+   * (via `FedosProductionConversationEncryptionRuntimeBoundary`/
+   * `DecryptionRuntimeBoundary`, `fedos_production_conversation_encryption_runtime_boundary.ts`)
+   * for message-CONTENT storage — distinct from the NIP-44 WIRE bridge
+   * above, which is for transport only.
+   */
+  encryptAead(key: AeadKeyHandle, algorithm: AeadAlgorithm, aadDomain: AeadAadDomain, plaintext: Uint8Array): AeadCiphertextHandle | null {
+    if (this.#cleared) return null;
+    return this.#facade.encryptAead(key, algorithm, aadDomain, plaintext);
+  }
+
+  /** The decrypt-direction sibling of [`encryptAead`]. */
+  decryptAead(key: AeadKeyHandle, algorithm: AeadAlgorithm, aadDomain: AeadAadDomain, ciphertext: AeadCiphertextHandle): Uint8Array | null {
+    if (this.#cleared) return null;
+    return this.#facade.decryptAead(key, algorithm, aadDomain, ciphertext);
+  }
+
+  /** Serializes an opaque `AeadCiphertextHandle` to its storable/transmittable wire string. */
+  serializeAeadCiphertext(ciphertext: AeadCiphertextHandle): AeadCiphertextWire | null {
+    if (this.#cleared) return null;
+    return this.#facade.serializeAeadCiphertext(ciphertext);
+  }
+
+  /** The inverse of [`serializeAeadCiphertext`]. */
+  deserializeAeadCiphertext(wire: AeadCiphertextWire): AeadCiphertextHandle | null {
+    if (this.#cleared) return null;
+    return this.#facade.deserializeAeadCiphertext(wire);
   }
 }

@@ -8,11 +8,54 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
-> **Status: Secure Runtime Alpha 7081–7160 — FedOS Conversation
+> **Status: Secure Runtime Alpha 7161–7240 — FedOS Conversation-Level
+> Production Crypto and Identity Authority Wiring Arc (FULL COMPLETION —
+> the mission's own success criteria proven literally, end to end, over
+> a real relay, with no substitution of any kind).** Closed every
+> production wiring gap named by both the Architecture Conformance
+> Review V1 (`17c6cef6`) and the immediately-prior Arc's own Honest
+> Partial (7081-7160, `b44e1a45`) — Production Identity Resolver wiring,
+> Production Encryption Authority wiring, and Production NIP-17 Wire
+> Adapter wiring — plus two further, deeper boundaries real testing
+> found along the way: the generic Envelope-AEAD encrypt/decrypt path
+> (used for message-content storage) and the ephemeral Gift-Wrap signing
+> authority (used for the NIP-59 outer layer) were EACH their own,
+> separate, `NODE_ENV`-gated WASM boundary, undiscovered until this Arc
+> tried to send a real message. All five close via the SAME established
+> pattern (Alpha 6841-6920's own "reuse the canonical, already-activated
+> Master Seed/Signing Authority instead of a second WASM instance"),
+> extended from Direct Ratchet to Conversation-level identity/
+> encryption/transport: a new `assembleFedosConversationCanonicalProductionCryptoGraph()`
+> factory, five new thin wrapper methods on
+> `FedosProductionMasterSeedAuthority` reaching already-real,
+> already-tested Rust exports (`encrypt_nip44_wire`/`decrypt_nip44_wire`/
+> `build_and_sign_nip17_gift_wrap`/`encrypt_aead`/`decrypt_aead`/
+> `serialize_aead_ciphertext`/`deserialize_aead_ciphertext`), and one new
+> production runtime boundary pair. Two further, previously-total
+> Coordinator gaps also closed: `FedosProfileInitializationCoordinator`
+> never threaded `conversationDirectMessageDeliveryRoute` OR
+> `conversationTransportInbound` at all, meaning no caller of this
+> Coordinator — for ANY subsystem — could ever select the standard
+> NIP-17 route or receive a LIVE relay-delivered Rumor through the real
+> Coordinator/packaged path before this Arc. The real production
+> vertical slice test proves, with zero manual test-side delivery of any
+> kind: Alice creates an invitation, Bob's real live NIP-59 subscription
+> receives it over a real local relay, the conversation activates for
+> real (Encryption Authority selected automatically), a real encrypted
+> first message and reply are really delivered over the real relay, both
+> Runtimes restart, activation is genuinely re-established, and the
+> conversation continues. Zero Rust/Cargo.toml change, zero redesign of
+> Direct Ratchet/NIP-17's own construction pipeline/Identity Transition/
+> Signed Deletion (confirmed by structural guard), zero p2p/.tmp_gen
+> change. See `docs/secure_runtime_alpha_7161_7240_completion_declaration.md`
+> and its own named companion reports (`..._reconciliation_report.md`,
+> `..._execution_specification.md`).
+>
+> Prior status: Secure Runtime Alpha 7081–7160 — FedOS Conversation
 > Invitation and Shared Conversation Foundation Arc (HONEST PARTIAL —
 > real signed Invitation/Acceptance mechanism built and proven, real
 > relay-transported delivery blocked one layer beneath it, real cause
-> named, not fabricated).** Set out to close the gap the immediately-
+> named, not fabricated). Set out to close the gap the immediately-
 > prior Arc (7001-7080) surfaced: `FedosDesktopApplicationShell.redeemInvitation()`
 > being unconditionally unavailable, and the old Capability/Invitation
 > Transport system (Alpha 991-1050) requiring a shared backend

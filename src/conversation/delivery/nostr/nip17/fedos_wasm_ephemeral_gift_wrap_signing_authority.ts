@@ -111,7 +111,27 @@ function parseSignedNostrWireEventJson(json: string): FedosNostrWireEvent | null
   });
 }
 
-export class FedosWasmEphemeralGiftWrapSigningAuthority {
+/**
+ * Secure Runtime Alpha 7161-7240 — the narrow, structurally-typed
+ * capability `fedos_nip59_gift_wrap.ts`/`NostrNip17V1WireAdapter`
+ * actually need (`buildGiftWrap()` only), mirroring
+ * `FedosMasterSeedAuthority`'s own generic-interface discipline for
+ * `FedosWasmConversationEncryptionAuthority`/`DecryptionAuthority`
+ * exactly. `FedosWasmEphemeralGiftWrapSigningAuthority` (below)
+ * implements it unchanged; `FedosProductionEphemeralGiftWrapSigningAuthority`
+ * (`../../../../desktop/production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.ts`)
+ * is the second, production-safe implementer this Arc adds.
+ */
+export interface FedosEphemeralGiftWrapSigningAuthority {
+  buildGiftWrap(
+    recipientPublicKeyHex: string,
+    createdAt: number,
+    kind: number,
+    contentPlaintext: Uint8Array,
+  ): Promise<FedosNostrWireEvent | null>;
+}
+
+export class FedosWasmEphemeralGiftWrapSigningAuthority implements FedosEphemeralGiftWrapSigningAuthority {
   readonly #loaderBoundary: FedosEphemeralGiftWrapSigningWasmLoaderBoundary;
 
   constructor(loaderBoundary?: FedosEphemeralGiftWrapSigningWasmLoaderBoundary) {

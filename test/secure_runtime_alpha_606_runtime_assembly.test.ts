@@ -122,12 +122,24 @@ describe("Secure Runtime Alpha 606 -- Runtime Assembly (Board/Outbox Wiring, Alp
     // supplied above, so it throws "not enabled" when called, but the key
     // itself is unconditionally exposed) -- reconciled onto this same
     // Alpha 1263/1291 assertion during the Alpha 1611-1690 integration merge.
+    // `devicePairing`/`deviceSyncOperational`/`deviceTrust` (Alpha 2921-3000/
+    // 3801-3880's own additive accessors) were already present and
+    // unaccounted for here before this update -- reconciled now, not
+    // introduced by this Arc. Secure Runtime Alpha 7161-7240 adds ONE more,
+    // `conversationCanonicalCryptoAvailable()` -- mirrors
+    // `conversationProductionCryptoCapability()`'s own "coarse, non-secret,
+    // readable-after-stop" accessor shape exactly, no persistence port or
+    // secret handle exposed.
     expect(Object.keys(runtime).sort()).toEqual([
       "boardRuntime",
       "conversationArchiveRuntime",
+      "conversationCanonicalCryptoAvailable",
       "conversationContentAccessor",
       "conversationProductionCryptoCapability",
       "conversationRuntime",
+      "devicePairing",
+      "deviceSyncOperational",
+      "deviceTrust",
       "host",
       "privateTransport",
       "stop",

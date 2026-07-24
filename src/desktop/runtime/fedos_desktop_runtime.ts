@@ -134,6 +134,9 @@ import {
   type FedosConversationProductionCryptoGraph,
 } from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
 import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
+import { assembleFedosConversationCanonicalProductionCryptoGraph } from "../../conversation/encryption/production/fedos_conversation_canonical_production_crypto_authority_factory.js";
+import type { FedosProductionEphemeralGiftWrapHandleSource } from "../production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.js";
+import { FedosProductionEphemeralGiftWrapSigningAuthority } from "../production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.js";
 
 // Secure Runtime Alpha 1471-1540 (Private Transport Boundary and
 // Multi-Relay Delivery Arc) -- every import/addition below this comment
@@ -337,6 +340,17 @@ export interface FedosRunningDesktopRuntime {
    */
   conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome;
   /**
+   * Secure Runtime Alpha 7161-7240 — whether the canonical, already-
+   * activated crypto graph (`config.conversationCanonicalCryptoAuthority`)
+   * resolved successfully. `false` when the field was never supplied, OR
+   * when it was supplied but the real per-account identity could not be
+   * resolved (e.g. a cleared authority) — mirrors
+   * `conversationProductionCryptoCapability()`'s own "coarse, static,
+   * non-secret fact about how THIS runtime started" discipline, readable
+   * even after `stop()`.
+   */
+  conversationCanonicalCryptoAvailable(): boolean;
+  /**
    * Secure Runtime Alpha 2921–3000 — the `FedosDeviceTrustRuntime`
    * (`./fedos_device_trust_runtime.js`) this running Local Runtime owns,
    * constructed ONLY when `config.deviceTrustEnabled` was `true`. Throws
@@ -403,6 +417,19 @@ function ensureParentDirectoryExists(filePath: string): void {
 function isFedosDirectRatchetSealingAuthority(authority: FedosMasterSeedAuthority): authority is FedosMasterSeedAuthority & FedosDirectRatchetSealingAuthority {
   const candidate = authority as Partial<FedosDirectRatchetSealingAuthority>;
   return typeof candidate.sealDirectRatchetSecret === "function" && typeof candidate.restoreDirectRatchetSecret === "function";
+}
+
+/**
+ * Secure Runtime Alpha 7161-7240 — mirrors `isFedosDirectRatchetSealingAuthority()`'s
+ * own exact discipline: a pure structural shape check (never `instanceof`,
+ * never a concrete-class import) for the ONE additional capability
+ * `FedosProductionMasterSeedAuthority` (this Arc's own new
+ * `buildEphemeralGiftWrap()`) provides but the generic
+ * `FedosMasterSeedAuthority` interface does not.
+ */
+function isFedosProductionEphemeralGiftWrapHandleSource(authority: FedosMasterSeedAuthority): authority is FedosMasterSeedAuthority & FedosProductionEphemeralGiftWrapHandleSource {
+  const candidate = authority as Partial<FedosProductionEphemeralGiftWrapHandleSource>;
+  return typeof candidate.buildEphemeralGiftWrap === "function";
 }
 
 export async function startFedosDesktopRuntime(
@@ -498,9 +525,18 @@ export async function startFedosDesktopRuntime(
   // never a second, independent, incoherent crypto identity. A real
   // Production Crypto Graph is therefore REQUIRED, never defaulted or
   // silently substituted with an unrelated fresh WASM master seed.
-  if (config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && config.conversationProductionCrypto === undefined) {
+  // Secure Runtime Alpha 7161-7240 -- `conversationCanonicalCryptoAuthority`
+  // (the already-activated canonical authority graph) satisfies this same
+  // requirement without the legacy `conversationProductionCrypto`, exactly
+  // like `conversationDirectRatchetMasterSeedAuthority` already does for
+  // Direct Ratchet's own analogous guard -- either one is sufficient.
+  if (
+    config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" &&
+    config.conversationProductionCrypto === undefined &&
+    config.conversationCanonicalCryptoAuthority === undefined
+  ) {
     throw new Error(
-      "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but conversationProductionCrypto was not supplied -- the standard route requires a real, coherent Master Seed graph for NIP-44/NIP-59, never a second, independent identity.",
+      "startFedosDesktopRuntime: conversationDirectMessageDeliveryRoute is \"nostr-nip17-v1\" but neither conversationProductionCrypto nor conversationCanonicalCryptoAuthority was supplied -- the standard route requires a real, coherent Master Seed graph for NIP-44/NIP-59, never a second, independent identity.",
     );
   }
   // Secure Runtime Alpha 6521-6600 -- mirrors every guard above exactly: a
@@ -731,6 +767,18 @@ export async function startFedosDesktopRuntime(
     }
   }
 
+  // Secure Runtime Alpha 7161-7240 -- the canonical, already-activated
+  // authority graph (mirrors `productionCryptoGraph`'s own resolution
+  // immediately above, but over the Coordinator's own real authorities,
+  // never a second WASM instance). Resolved unconditionally whenever
+  // supplied, independent of `conversationProductionCrypto` -- a caller
+  // may supply either, both (canonical takes precedence below), or
+  // neither (both stay `null`, byte-for-byte prior behavior).
+  let canonicalCryptoGraph: FedosConversationProductionCryptoGraph | null = null;
+  if (config.conversationCanonicalCryptoAuthority !== undefined) {
+    canonicalCryptoGraph = await assembleFedosConversationCanonicalProductionCryptoGraph(config.conversationCanonicalCryptoAuthority);
+  }
+
   // Secure Runtime Alpha 1841-1920 Phase C/G (Alpha 1843/1844/1879) --
   // forward-declared HERE, BEFORE `conversationRuntimeInstance` is built
   // below, so the closure handed to it can reference the Private
@@ -955,7 +1003,14 @@ export async function startFedosDesktopRuntime(
       // individual fields' own existing defaults; any other outcome
       // (including "disabled" -- no config supplied at all) leaves this
       // exactly as every prior Arc's own default (Alpha 1275).
-      creatorIdentityAuthority: productionCryptoGraph?.creatorIdentityAuthority ?? config.conversationCreatorIdentityAuthority,
+      //
+      // Secure Runtime Alpha 7161-7240 -- `canonicalCryptoGraph` (the
+      // already-activated canonical authority graph) takes precedence
+      // over the legacy `productionCryptoGraph`, mirroring
+      // `conversationDirectRatchetMasterSeedAuthority`'s own established
+      // `??` precedence exactly. Both stay `null` unless explicitly
+      // configured -- zero behavior change for every existing caller.
+      creatorIdentityAuthority: canonicalCryptoGraph?.creatorIdentityAuthority ?? productionCryptoGraph?.creatorIdentityAuthority ?? config.conversationCreatorIdentityAuthority,
       encryptionReadinessAuthority: config.conversationEncryptionReadinessAuthority,
       requireResolvedCreatorIdentity: config.conversationRequireResolvedCreatorIdentity,
       // Alpha 1113/1114 -- the Encryption Runtime Wiring's own dependencies,
@@ -965,14 +1020,14 @@ export async function startFedosDesktopRuntime(
       // §7). `nostrAuthorBindingAuthority` reuses the SAME instance already
       // passed to `createFedosBoardRuntime()` above -- one coherent graph,
       // never a second signing/encryption identity (Alpha 1114) -- UNLESS
-      // a real Production Crypto Graph resolved, in which case ITS OWN
-      // binding authority (sharing ITS OWN Master Seed Authority instance)
-      // is the coherent one to use instead.
-      encryptionAuthority: productionCryptoGraph?.encryptionAuthority ?? config.conversationEncryptionAuthority,
-      decryptionAuthority: productionCryptoGraph?.decryptionAuthority ?? config.conversationDecryptionAuthority,
+      // a real canonical or legacy Production Crypto Graph resolved, in
+      // which case ITS OWN binding authority (sharing ITS OWN Master Seed
+      // Authority instance) is the coherent one to use instead.
+      encryptionAuthority: canonicalCryptoGraph?.encryptionAuthority ?? productionCryptoGraph?.encryptionAuthority ?? config.conversationEncryptionAuthority,
+      decryptionAuthority: canonicalCryptoGraph?.decryptionAuthority ?? productionCryptoGraph?.decryptionAuthority ?? config.conversationDecryptionAuthority,
       identityResolver: config.conversationIdentityResolver,
-      accountIndexAuthority: productionCryptoGraph?.accountIndexAuthority ?? config.conversationAccountIndexAuthority,
-      nostrAuthorBindingAuthority: productionCryptoGraph?.nostrAuthorBindingAuthority ?? config.nostrAuthorBindingAuthority,
+      accountIndexAuthority: canonicalCryptoGraph?.accountIndexAuthority ?? productionCryptoGraph?.accountIndexAuthority ?? config.conversationAccountIndexAuthority,
+      nostrAuthorBindingAuthority: canonicalCryptoGraph?.nostrAuthorBindingAuthority ?? productionCryptoGraph?.nostrAuthorBindingAuthority ?? config.nostrAuthorBindingAuthority,
       envelopeLogPath: config.conversationEnvelopeLogPath,
       payloadLogPath: config.conversationPayloadLogPath,
       maxPayloadByteLength: config.conversationMaxPayloadByteLength,
@@ -1204,17 +1259,43 @@ export async function startFedosDesktopRuntime(
     );
     // `nip44Wire` MUST be the SAME Master Seed `conversationTransportSigningAuthority`'s
     // own real identity is derived from -- the top-of-function guard
-    // above already REQUIRES `conversationProductionCrypto` (hence a
-    // resolved, "available" `productionCryptoGraph`) whenever this route
-    // is selected; a caller reaching this line with the route selected
-    // but no resolved graph is a genuine, unrecoverable misconfiguration
-    // this Transport was never meant to paper over.
+    // above already REQUIRES `conversationProductionCrypto` OR
+    // `conversationCanonicalCryptoAuthority` (hence a resolved
+    // `canonicalCryptoGraph` or `productionCryptoGraph`) whenever this
+    // route is selected; a caller reaching this line with the route
+    // selected but no resolved graph is a genuine, unrecoverable
+    // misconfiguration this Transport was never meant to paper over.
+    //
+    // Secure Runtime Alpha 7161-7240 -- prefers `canonicalCryptoGraph`
+    // (the already-activated canonical authority, whose
+    // `masterSeedAuthority` is `FedosProductionMasterSeedAuthority` with
+    // this Arc's own new `encryptNip44Wire`/`decryptNip44Wire` wrapper
+    // methods, real real WASM through the already-tested Rust bridge)
+    // over the legacy `productionCryptoGraph` -- mirrors every other
+    // canonical/legacy precedence choice in this file exactly.
+    const resolvedCryptoGraph = canonicalCryptoGraph ?? productionCryptoGraph;
+    // Secure Runtime Alpha 7161-7240 -- the ephemeral Gift-Wrap signing
+    // authority NostrNip17V1WireAdapter defaults to when omitted
+    // (`createFedosWasmEphemeralGiftWrapSigningAuthority()`) is the SAME
+    // dev-only-gated pattern this Arc eliminates elsewhere -- a real,
+    // previously-undiscovered gap, distinct from the identity/encryption
+    // graph above. Supplied ONLY when `resolvedCryptoGraph`'s own
+    // `masterSeedAuthority` genuinely has the capability (real for the
+    // canonical `FedosProductionMasterSeedAuthority`, absent for the
+    // legacy `productionCryptoGraph`'s `FedosWasmMasterSeedAuthority` --
+    // that path falls back to its own existing dev-gated default,
+    // unchanged, zero regression).
+    const ephemeralSigningAuthority =
+      resolvedCryptoGraph !== null && isFedosProductionEphemeralGiftWrapHandleSource(resolvedCryptoGraph.masterSeedAuthority)
+        ? new FedosProductionEphemeralGiftWrapSigningAuthority(resolvedCryptoGraph.masterSeedAuthority)
+        : undefined;
     const nip17WireAdapter =
-      config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && productionCryptoGraph !== null
+      config.conversationDirectMessageDeliveryRoute === "nostr-nip17-v1" && resolvedCryptoGraph !== null
         ? new NostrNip17V1WireAdapter({
             localAccountIndex: config.conversationNip17LocalAccountIndex ?? config.conversationTransportAccountIndex ?? 0,
             signingAuthority: config.conversationTransportSigningAuthority!,
-            nip44Wire: productionCryptoGraph.masterSeedAuthority,
+            nip44Wire: resolvedCryptoGraph.masterSeedAuthority,
+            ephemeralSigningAuthority,
           })
         : undefined;
 
@@ -1380,6 +1461,9 @@ export async function startFedosDesktopRuntime(
     /** Alpha 1263/1291 -- the closed, non-secret reason production crypto is (or is not) available. `"disabled"` when `conversationProductionCrypto` was never supplied. Readable even after `stop()`. */
     conversationProductionCryptoCapability(): FedosConversationProductionCryptoCapabilityOutcome {
       return productionCryptoCapability;
+    },
+    conversationCanonicalCryptoAvailable(): boolean {
+      return canonicalCryptoGraph !== null;
     },
     deviceTrust(): FedosDeviceTrustRuntime {
       if (stopped) {

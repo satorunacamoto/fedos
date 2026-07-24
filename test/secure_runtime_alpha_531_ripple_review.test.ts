@@ -74,6 +74,19 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
       // docs/secure_runtime_alpha_5401_5480_reconciliation_report.md §5.
       "src/runtime/fedos_wasm_loader.ts",
       "src/runtime/master_seed/fedos_wasm_master_seed_authority.ts",
+      // Secure Runtime Alpha 7161-7240 (FedOS Conversation-Level
+      // Production Crypto and Identity Authority Wiring Arc)
+      // legitimately wires the canonical, already-activated production
+      // Master Seed/Signing Authorities into Conversation-level
+      // identity/encryption/NIP-17 transport, closing the gaps Secure
+      // Runtime Alpha 7081-7160 disclosed -- see
+      // docs/secure_runtime_alpha_7161_7240_reconciliation_report.md.
+      "src/desktop/onboarding/fedos_profile_initialization_coordinator.ts",
+      "src/desktop/production_activation/fedos_production_master_seed_authority.ts",
+      "src/desktop/production_activation/fedos_production_wasm_master_seed_facade.ts",
+      "src/conversation/delivery/nostr/nip17/fedos_nip59_gift_wrap.ts",
+      "src/conversation/delivery/nostr/nip17/fedos_nostr_nip17_v1_wire_adapter.ts",
+      "src/conversation/delivery/nostr/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);

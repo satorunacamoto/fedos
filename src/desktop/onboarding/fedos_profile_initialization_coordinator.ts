@@ -40,6 +40,7 @@
  */
 
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+import { FEDOS_GIFT_WRAP_KIND } from "../../conversation/delivery/nostr/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.js";
 import type { FedosMasterSeedAuthority } from "../../runtime/master_seed/fedos_master_seed_authority.js";
 import type { FedosSealedMasterSeedEnvelopePersistence } from "../../runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
 import type { FedosNostrSigningAuthority } from "../../nostr/sign/fedos_nostr_signing_authority.js";
@@ -210,6 +211,55 @@ export interface FedosProfileInitializationDependencies {
   readonly deletionRequestEnabled?: boolean;
   /** REQUIRED when `deletionRequestEnabled` is `true` — LOCAL configuration only, never derived from a request. */
   readonly deletionRequestResolveLocalPolicy?: (requesterAccountRef: string) => FedosDeletionRecipientPolicy;
+  /**
+   * Secure Runtime Alpha 7161-7240 ("FedOS Conversation-Level Production
+   * Crypto and Identity Authority Wiring Arc") — mirrors
+   * `directRatchetEnabled`'s own established "optional capability
+   * toggle" pattern exactly. When `true`, this Coordinator's own
+   * already-required `masterSeedAuthority`/`accountSigningAuthority`/
+   * account index (the SAME canonical authorities profile
+   * create/unlock already activated — never a second, independently-
+   * constructed authority) are threaded through as
+   * `FedosDesktopRuntimeConfig.conversationCanonicalCryptoAuthority`,
+   * closing the production Conversation-level identity/encryption/NIP-17
+   * wiring gap Secure Runtime Alpha 7081-7160 disclosed. Default `false`
+   * — zero behavior change for every existing caller.
+   */
+  readonly conversationCanonicalCryptoEnabled?: boolean;
+  /**
+   * Secure Runtime Alpha 7161-7240 — pass-through to
+   * `FedosDesktopRuntimeConfig.conversationDirectMessageDeliveryRoute`'s
+   * own doc comment verbatim (this Coordinator never previously threaded
+   * this field at all — a genuine gap this Arc closes, since without it
+   * no caller of this Coordinator could ever reach the standard NIP-17
+   * message-delivery route, regardless of `conversationCanonicalCryptoEnabled`).
+   * Omitted, byte-for-byte unchanged prior behavior (local storage only,
+   * no standard delivery attempted).
+   */
+  readonly conversationDirectMessageDeliveryRoute?: "nostr-nip17-v1";
+  /**
+   * Secure Runtime Alpha 7161-7240 — a SECOND, previously-undiscovered
+   * gap this Arc closes alongside the crypto/identity wiring above: this
+   * Coordinator never threaded `FedosDesktopRuntimeConfig.conversationTransportInbound`
+   * at all, so no subsystem (Direct Ratchet, Peer Capability, Identity
+   * Transition, Deletion Request, Conversation Invitation) could ever
+   * receive a real, live, relay-delivered NIP-17 Rumor through the real
+   * Coordinator/packaged path — every prior real vertical slice that
+   * proved inbound receipt did so by feeding a coordinator-captured
+   * record directly to the inbound coordinator, never a live
+   * subscription. When `true`, subscribes with the real, standard
+   * Gift Wrap kind filter (`FEDOS_GIFT_WRAP_KIND`, NIP-59) — no
+   * server-side tag filter exists in this codebase's own
+   * `FedosSubscriptionFilter` (`fedos_subscription_filter.ts`'s own doc
+   * comment), so client-side classification (wrong-recipient decrypt
+   * failure) is the correct, already-real mechanism, exactly like a real
+   * NIP-17 client. `onEnvelope` is a real no-op: the legacy proprietary
+   * `kind: 24700` delivery format is untouched by this Arc. Default
+   * `false` — zero behavior change for every existing caller.
+   */
+  readonly conversationTransportInboundEnabled?: boolean;
+  /** Pass-through to `FedosDesktopRuntimeConfig.conversationTransportIntervalMs`'s own doc comment. Omitted, `30_000` ms (unchanged prior behavior). Never previously threaded through this Coordinator at all — closed alongside the two toggles above. */
+  readonly conversationTransportIntervalMs?: number;
 }
 
 export class FedosProfileInitializationCoordinator {
@@ -698,6 +748,24 @@ export class FedosProfileInitializationCoordinator {
       // exactly: reuses `this.#deps.masterSeedAuthority` directly, never a second,
       // independently-constructed authority.
       conversationDirectRatchetMasterSeedAuthority: this.#deps.directRatchetEnabled === true ? this.#deps.masterSeedAuthority : undefined,
+      // Secure Runtime Alpha 7161-7240 -- mirrors the line immediately
+      // above exactly: reuses `this.#deps.masterSeedAuthority`/
+      // `this.#deps.accountSigningAuthority`/`this.#accountIndex`
+      // directly, never a second, independently-constructed authority.
+      conversationCanonicalCryptoAuthority:
+        this.#deps.conversationCanonicalCryptoEnabled === true
+          ? {
+              masterSeedAuthority: this.#deps.masterSeedAuthority,
+              signingAuthority: this.#deps.accountSigningAuthority,
+              accountIndex: this.#accountIndex,
+            }
+          : undefined,
+      conversationDirectMessageDeliveryRoute: this.#deps.conversationDirectMessageDeliveryRoute,
+      conversationTransportInbound:
+        this.#deps.conversationTransportInboundEnabled === true
+          ? { filter: { kinds: [FEDOS_GIFT_WRAP_KIND] }, onEnvelope: () => {} }
+          : undefined,
+      conversationTransportIntervalMs: this.#deps.conversationTransportIntervalMs,
       directRatchetMessageDeliveryRemoteDeviceRef: this.#deps.directRatchetEnabled === true ? this.#deps.directRatchetMessageDeliveryRemoteDeviceRef : undefined,
       peerCapabilityEnabled: this.#deps.peerCapabilityEnabled === true,
       peerCapabilityLocallySupportedCapabilities: this.#deps.peerCapabilityEnabled === true ? this.#deps.peerCapabilityLocallySupportedCapabilities : undefined,

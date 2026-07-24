@@ -191,9 +191,23 @@ suite("Alpha 4741-4820 — production Master Seed activation + secure unlock (RE
       // capability-limited facade with one additional read of an
       // already-initialized module export (`constructDirectRatchetSessionModule`)
       // -- still no raw module exposure, still no second WASM
-      // instantiation. The allowlist below is extended, never widened
-      // past these two named, reviewed capabilities.
-      expect(Object.keys(result.facade).sort()).toEqual(["constructDirectRatchetSessionModule", "constructMasterSeedAuthority"]);
+      // instantiation. Secure Runtime Alpha 7161-7240 further extends it
+      // with FIVE more already-real, already-tested export reads
+      // (`buildAndSignGiftWrap`, `encryptAead`, `decryptAead`,
+      // `serializeAeadCiphertext`, `deserializeAeadCiphertext`) closing
+      // the NIP-17 wire adapter and generic Envelope-AEAD production
+      // wiring gaps -- still no raw module exposure, still no second
+      // WASM instantiation. The allowlist below is extended, never
+      // widened past these seven named, reviewed capabilities.
+      expect(Object.keys(result.facade).sort()).toEqual([
+        "buildAndSignGiftWrap",
+        "constructDirectRatchetSessionModule",
+        "constructMasterSeedAuthority",
+        "decryptAead",
+        "deserializeAeadCiphertext",
+        "encryptAead",
+        "serializeAeadCiphertext",
+      ]);
     });
   });
 

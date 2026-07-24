@@ -335,6 +335,7 @@ function wrapAsRunningDesktopRuntime(conversationRuntime: FedosConversationRunti
     conversationArchiveRuntime: notEnabled("conversationArchiveRuntime"),
     conversationContentAccessor: notEnabled("conversationContentAccessor"),
     conversationProductionCryptoCapability: () => "disabled",
+    conversationCanonicalCryptoAvailable: () => false,
     deviceTrust: notEnabled("deviceTrust"),
     deviceSyncOperational: notEnabled("deviceSyncOperational"),
     devicePairing: notEnabled("devicePairing"),

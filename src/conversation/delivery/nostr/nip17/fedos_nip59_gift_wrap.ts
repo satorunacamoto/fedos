@@ -38,7 +38,7 @@ import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/f
 import {
   FEDOS_GIFT_WRAP_KIND,
   FEDOS_EPHEMERAL_GIFT_WRAP_KIND,
-  type FedosWasmEphemeralGiftWrapSigningAuthority,
+  type FedosEphemeralGiftWrapSigningAuthority,
 } from "./fedos_wasm_ephemeral_gift_wrap_signing_authority.js";
 import { buildFedosNip59Seal, openFedosNip59Seal } from "./fedos_nip59_seal.js";
 import type { FedosNip17ChatMessageRumorInput, FedosNip17Rumor } from "./fedos_nip17_rumor.js";
@@ -102,7 +102,7 @@ export interface FedosNip17GiftWrapBuildInput {
   readonly giftWrapKind?: number;
   readonly signingAuthority: FedosNostrSigningAuthority;
   readonly nip44Wire: FedosMasterSeedAuthority;
-  readonly ephemeralSigningAuthority: FedosWasmEphemeralGiftWrapSigningAuthority;
+  readonly ephemeralSigningAuthority: FedosEphemeralGiftWrapSigningAuthority;
 }
 
 /**

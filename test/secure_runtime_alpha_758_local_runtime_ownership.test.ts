@@ -103,12 +103,25 @@ describe("Secure Runtime Alpha 758 -- Local Runtime Ownership", () => {
     // 1471-1540's own `privateTransport()` accessor is ALSO unconditionally
     // exposed (it throws "not enabled" here since `privateTransportEnabled`
     // was never supplied above).
+    // `devicePairing`/`deviceSyncOperational`/`deviceTrust`/`conversationContentAccessor`
+    // (Alpha 2921-3000/3081-3160/3801-3880's own additive accessors) were
+    // already present and unaccounted for here before this update --
+    // reconciled now, not introduced by this Arc. Secure Runtime Alpha
+    // 7161-7240 adds ONE more, `conversationCanonicalCryptoAvailable()`
+    // -- mirrors `conversationProductionCryptoCapability()`'s own
+    // "coarse, non-secret, readable-after-stop" accessor shape exactly,
+    // no filesystem internal or secret handle exposed.
     expect(Object.keys(runtime).sort()).toEqual(
       [
         "boardRuntime",
         "conversationArchiveRuntime",
+        "conversationCanonicalCryptoAvailable",
+        "conversationContentAccessor",
         "conversationProductionCryptoCapability",
         "conversationRuntime",
+        "devicePairing",
+        "deviceSyncOperational",
+        "deviceTrust",
         "host",
         "privateTransport",
         "stop",

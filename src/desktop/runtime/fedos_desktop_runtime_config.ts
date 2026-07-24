@@ -68,6 +68,7 @@ import type { FedosConversationDecryptionAuthority } from "../../conversation/en
 import type { FedosConversationIdentityResolver } from "../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
 import type { FedosConversationLocalAccountIndexAuthority } from "../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
 import type { FedosConversationProductionCryptoConfig } from "../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosConversationCanonicalCryptoAuthorityConfig } from "../../conversation/encryption/production/fedos_conversation_canonical_production_crypto_authority_factory.js";
 import type { FedosGroupParticipantLimitPolicy } from "../../conversation/group/fedos_group_participant_limit.js";
 import type { FedosPrivateNostrDeliveryMode } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
 import type { FedosPrivateNostrDeliveryPublisher } from "../../conversation/delivery/nostr/fedos_private_nostr_delivery_publisher.js";
@@ -351,6 +352,28 @@ export interface FedosDesktopRuntimeConfig {
    * value itself.
    */
   readonly conversationProductionCrypto?: FedosConversationProductionCryptoConfig;
+  /**
+   * Secure Runtime Alpha 7161-7240 ("FedOS Conversation-Level Production
+   * Crypto and Identity Authority Wiring Arc") — the ALREADY-ACTIVATED
+   * canonical Master Seed/Nostr Signing Authorities (the SAME objects
+   * profile unlock already constructed), reused directly to resolve
+   * `creatorIdentityAuthority`/`encryptionAuthority`/`decryptionAuthority`/
+   * `accountIndexAuthority`/`nostrAuthorBindingAuthority` above AND the
+   * NIP-17 wire adapter's own `nip44Wire` dependency — mirrors
+   * `conversationDirectRatchetMasterSeedAuthority`'s own EXISTING
+   * "already-activated canonical authority, never a second WASM
+   * instance" pattern exactly, extended from Direct Ratchet to
+   * Conversation-level identity/encryption/transport. When present,
+   * takes precedence over both the individual
+   * `conversationCreatorIdentityAuthority`/`conversationEncryptionAuthority`/
+   * `conversationDecryptionAuthority`/`conversationAccountIndexAuthority`/
+   * `nostrAuthorBindingAuthority` fields AND the legacy
+   * `conversationProductionCrypto`-derived graph (unchanged fallback,
+   * zero regression, zero removed capability — mirrors Alpha 6841-6920's
+   * own explicit discipline verbatim). Omitted, behavior is byte-for-byte
+   * unchanged from every prior Arc.
+   */
+  readonly conversationCanonicalCryptoAuthority?: FedosConversationCanonicalCryptoAuthorityConfig;
   /**
    * Secure Runtime Alpha 1321–1390 ("Private Group Pairwise Fanout
    * Foundation Arc") — the additive `groupRuntime()` facade's own

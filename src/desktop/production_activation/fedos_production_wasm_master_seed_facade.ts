@@ -17,7 +17,38 @@
  * not widen every caller.
  */
 
-import type { FedosMasterSeedAuthorityHandle } from "../../runtime/fedos_wasm_loader.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../runtime/fedos_wasm_loader.js";
+
+/**
+ * Secure Runtime Alpha 7161-7240 — deliberately duplicated (not
+ * imported) from `fedos_wasm_loader.ts`'s own PRIVATE
+ * `AEAD_ALGORITHM_DISCRIMINANTS`/`AEAD_AAD_DOMAIN_DISCRIMINANTS` —
+ * mirrors `fedos_production_nostr_signing_authority.ts`'s own
+ * "intentionally independent" JSON-parser duplication discipline
+ * exactly, rather than widening that file's own deliberate
+ * encapsulation boundary. Values are `lib.rs`'s own numeric
+ * discriminants (stable Rust enum ordering), identical to the
+ * dev-only loader's own table.
+ */
+const AEAD_ALGORITHM_DISCRIMINANTS: Readonly<Record<AeadAlgorithm, number>> = {
+  ChaCha20Poly1305: 0,
+  Aes256Gcm: 1,
+};
+const AEAD_AAD_DOMAIN_DISCRIMINANTS: Readonly<Record<AeadAadDomain, number>> = {
+  RootKey: 0,
+  Identity: 1,
+  Storage: 2,
+  Conversation: 3,
+  TestOnly: 4,
+};
+
+function isAeadCiphertextHandleShape(value: unknown): value is AeadCiphertextHandle {
+  return typeof value === "object" && value !== null && (value as { kind?: unknown }).kind === "AeadCiphertextHandle";
+}
+
+function isAeadKeyHandleShape(value: unknown): value is AeadKeyHandle {
+  return typeof value === "object" && value !== null && (value as { kind?: unknown }).kind === "AeadKeyHandle";
+}
 
 /**
  * Secure Runtime Alpha 6921-7000 — the narrow, closed slice of the real
@@ -74,6 +105,58 @@ export interface FedosProductionMasterSeedFacade {
    * facade's own closure captured at construction.
    */
   constructDirectRatchetSessionModule(): FedosProductionDirectRatchetSessionModule | null;
+
+  /**
+   * Secure Runtime Alpha 7161-7240 — the SAME already-initialized,
+   * manifest-verified glue module this facade already holds privately,
+   * narrowed to the ONE free `build_and_sign_nip17_gift_wrap` export
+   * (`lib.rs`, NOT a method on any handle — see that export's own doc
+   * comment for why the ephemeral secret, the NIP-44 encrypt, and the
+   * signature all happen inside this ONE call). Returns `null` (never
+   * throws) if the export is absent, not a function, or the underlying
+   * call itself fails/returns no signed event — fail closed, mirroring
+   * every other method on this facade. Never a second `import()`, never
+   * a second WASM initialization.
+   */
+  buildAndSignGiftWrap(
+    recipientPublicKeyHex: string,
+    createdAt: number,
+    kind: number,
+    contentPlaintext: Uint8Array,
+  ): string | null;
+
+  /**
+   * Secure Runtime Alpha 7161-7240 — the SAME already-initialized glue
+   * module's free `encrypt_aead` export (`lib.rs`) — the generic
+   * Envelope-AEAD encrypt path `FedosWasmConversationEncryptionAuthority`
+   * uses for message-content storage, distinct from the NIP-44 wire
+   * bridge above. Operates on the SAME opaque `AeadKeyHandle`
+   * `constructMasterSeedAuthority()`'s own handle's `resolve_conversation_key`
+   * method already returns — never a second module instantiation, so
+   * handles from one are always valid on the other. `null` on ANY
+   * failure (malformed key/algorithm/domain shape, or the underlying
+   * call itself failing) — fail closed.
+   */
+  encryptAead(
+    key: AeadKeyHandle,
+    algorithm: AeadAlgorithm,
+    aadDomain: AeadAadDomain,
+    plaintext: Uint8Array,
+  ): AeadCiphertextHandle | null;
+
+  /** The decrypt-direction sibling of [`encryptAead`] — reaches the SAME module's free `decrypt_aead` export. */
+  decryptAead(
+    key: AeadKeyHandle,
+    algorithm: AeadAlgorithm,
+    aadDomain: AeadAadDomain,
+    ciphertext: AeadCiphertextHandle,
+  ): Uint8Array | null;
+
+  /** Reaches the SAME module's free `serialize_aead_ciphertext` export — the ONLY way `AeadCiphertextHandle` becomes a storable/transmittable wire string. */
+  serializeAeadCiphertext(ciphertext: AeadCiphertextHandle): AeadCiphertextWire | null;
+
+  /** The inverse of [`serializeAeadCiphertext`] — reaches the SAME module's free `deserialize_aead_ciphertext` export. */
+  deserializeAeadCiphertext(wire: AeadCiphertextWire): AeadCiphertextHandle | null;
 }
 
 /**
@@ -126,7 +209,15 @@ function isDirectRatchetSessionModuleShape(value: unknown): value is FedosProduc
 export function createFedosProductionMasterSeedFacade(
   initializedGlueModule: object,
 ): FedosProductionMasterSeedFacade {
-  const moduleRef = initializedGlueModule as { FedosMasterSeedAuthority?: unknown; FedosDirectRatchetSession?: unknown };
+  const moduleRef = initializedGlueModule as {
+    FedosMasterSeedAuthority?: unknown;
+    FedosDirectRatchetSession?: unknown;
+    build_and_sign_nip17_gift_wrap?: unknown;
+    encrypt_aead?: unknown;
+    decrypt_aead?: unknown;
+    serialize_aead_ciphertext?: unknown;
+    deserialize_aead_ciphertext?: unknown;
+  };
   return Object.freeze({
     constructMasterSeedAuthority(): FedosMasterSeedAuthorityHandle | null {
       const Ctor = moduleRef.FedosMasterSeedAuthority;
@@ -141,6 +232,86 @@ export function createFedosProductionMasterSeedFacade(
     constructDirectRatchetSessionModule(): FedosProductionDirectRatchetSessionModule | null {
       const Ctor = moduleRef.FedosDirectRatchetSession;
       return isDirectRatchetSessionModuleShape(Ctor) ? Ctor : null;
+    },
+    buildAndSignGiftWrap(
+      recipientPublicKeyHex: string,
+      createdAt: number,
+      kind: number,
+      contentPlaintext: Uint8Array,
+    ): string | null {
+      const fn = moduleRef.build_and_sign_nip17_gift_wrap;
+      if (typeof fn !== "function") return null;
+      try {
+        const value: unknown = (fn as (...args: readonly unknown[]) => unknown)(
+          recipientPublicKeyHex,
+          createdAt,
+          kind,
+          contentPlaintext,
+        );
+        return typeof value === "string" ? value : null;
+      } catch {
+        return null;
+      }
+    },
+    encryptAead(
+      key: AeadKeyHandle,
+      algorithm: AeadAlgorithm,
+      aadDomain: AeadAadDomain,
+      plaintext: Uint8Array,
+    ): AeadCiphertextHandle | null {
+      const fn = moduleRef.encrypt_aead;
+      if (typeof fn !== "function" || !isAeadKeyHandleShape(key)) return null;
+      try {
+        const value: unknown = (fn as (...args: readonly unknown[]) => unknown)(
+          key,
+          AEAD_ALGORITHM_DISCRIMINANTS[algorithm],
+          AEAD_AAD_DOMAIN_DISCRIMINANTS[aadDomain],
+          plaintext,
+        );
+        return isAeadCiphertextHandleShape(value) ? value : null;
+      } catch {
+        return null;
+      }
+    },
+    decryptAead(
+      key: AeadKeyHandle,
+      algorithm: AeadAlgorithm,
+      aadDomain: AeadAadDomain,
+      ciphertext: AeadCiphertextHandle,
+    ): Uint8Array | null {
+      const fn = moduleRef.decrypt_aead;
+      if (typeof fn !== "function" || !isAeadKeyHandleShape(key) || !isAeadCiphertextHandleShape(ciphertext)) return null;
+      try {
+        const value: unknown = (fn as (...args: readonly unknown[]) => unknown)(
+          key,
+          AEAD_ALGORITHM_DISCRIMINANTS[algorithm],
+          AEAD_AAD_DOMAIN_DISCRIMINANTS[aadDomain],
+          ciphertext,
+        );
+        return value instanceof Uint8Array ? value : null;
+      } catch {
+        return null;
+      }
+    },
+    serializeAeadCiphertext(ciphertext: AeadCiphertextHandle): AeadCiphertextWire | null {
+      const fn = moduleRef.serialize_aead_ciphertext;
+      if (typeof fn !== "function" || !isAeadCiphertextHandleShape(ciphertext)) return null;
+      try {
+        const value: unknown = (fn as (c: unknown) => unknown)(ciphertext);
+        return typeof value === "string" && value.length > 0 ? (value as AeadCiphertextWire) : null;
+      } catch {
+        return null;
+      }
+    },
+    deserializeAeadCiphertext(wire: AeadCiphertextWire): AeadCiphertextHandle | null {
+      const fn = moduleRef.deserialize_aead_ciphertext;
+      if (typeof fn !== "function") return null;
+      try {
+        const value: unknown = (fn as (w: unknown) => unknown)(wire);
+        return isAeadCiphertextHandleShape(value) ? value : null;
+      } catch {
+        return null;
+      }
     },
   });
 }

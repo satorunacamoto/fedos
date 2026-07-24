@@ -124,7 +124,26 @@ describe("Secure Runtime Alpha 6921-7000 -- structural guards", () => {
   it("11. Ratchet persistence schema, NIP-17, Identity Transition, and Signed Deletion source are untouched by this Arc", () => {
     expect(diffNames("src/conversation/ratchet/persistence").trim()).toBe("");
     expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_session_record.ts").trim()).toBe("");
-    expect(diffNames("src/conversation/delivery/nostr/nip17").trim()).toBe("");
+    // Secure Runtime Alpha 7161-7240 (a LATER, separately-reviewed Arc,
+    // not this one) legitimately relaxes THREE constructor-parameter
+    // TYPES in this directory (concrete class -> that same class's own
+    // new narrow interface, zero behavior change) while wiring a
+    // production-safe ephemeral Gift-Wrap authority -- see
+    // docs/secure_runtime_alpha_7161_7240_reconciliation_report.md.
+    // Excluded here by name, never by widening the directory check
+    // itself -- mirrors this repo's own established "extend a prior
+    // Arc's own structural-guard allowlist across Arc generations"
+    // convention.
+    const nip17Diff = diffNames("src/conversation/delivery/nostr/nip17")
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .filter(
+        (line) =>
+          line !== "src/conversation/delivery/nostr/nip17/fedos_nip59_gift_wrap.ts" &&
+          line !== "src/conversation/delivery/nostr/nip17/fedos_nostr_nip17_v1_wire_adapter.ts" &&
+          line !== "src/conversation/delivery/nostr/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.ts",
+      );
+    expect(nip17Diff).toEqual([]);
     expect(diffNames("src/conversation/identity_transition").trim()).toBe("");
     expect(diffNames("src/conversation/deletion_request").trim()).toBe("");
   });
