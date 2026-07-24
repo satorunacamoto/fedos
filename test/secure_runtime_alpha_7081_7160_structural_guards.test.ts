@@ -75,9 +75,8 @@ describe("Secure Runtime Alpha 7081-7160 -- structural guards", () => {
     expect(diffNames("src/conversation/invitation/fedos_conversation_invitation_token.ts").trim()).toBe("");
   });
 
-  it("5. Direct Ratchet, Identity Transition, and Signed Deletion source are untouched by this Arc", () => {
+  it("5. Direct Ratchet, Identity Transition, and Signed Deletion source are untouched by this Arc (Alpha 7081-7160 itself -- reconciled: Secure Runtime Alpha 7401-7480's own later, disclosed, additive route-binding fix legitimately touches fedos_direct_ratchet_outbound_integration.ts/fedos_direct_ratchet_nip17_payload.ts; see that Arc's own structural guards for the current state of those two files)", () => {
     expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_cryptographic_session.ts").trim()).toBe("");
-    expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_outbound_integration.ts").trim()).toBe("");
     expect(diffNames("src/conversation/identity_transition").trim()).toBe("");
     expect(diffNames("src/conversation/deletion_request").trim()).toBe("");
     expect(diffNames("packages/fedos-core-rust").trim()).toBe("");
@@ -110,8 +109,7 @@ describe("Secure Runtime Alpha 7081-7160 -- structural guards", () => {
     expect(diffOutput).not.toMatch(/\.tmp_gen\//);
   });
 
-  it("10. the invitation control payload is a distinct, closed discriminated kind -- never folded into the Ratchet or Peer Capability wire codecs", () => {
-    expect(diffNames("src/conversation/delivery/nostr/nip17/fedos_direct_ratchet_nip17_payload.ts").trim()).toBe("");
+  it("10. the invitation control payload is a distinct, closed discriminated kind -- never folded into the Ratchet or Peer Capability wire codecs (fedos_direct_ratchet_nip17_payload.ts's own zero-diff-since-e43cf67a assertion was reconciled by Secure Runtime Alpha 7401-7480's own later, disclosed, additive schemaVersion-2 route-binding field -- see that Arc's own structural guards)", () => {
     expect(diffNames("src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.ts").trim()).toBe("");
     const source = stripComments(read("src/conversation/invitation_bootstrap/fedos_conversation_invitation_control_payload.ts"));
     expect(source).toMatch(/kind:\s*"conversation-invitation"/);

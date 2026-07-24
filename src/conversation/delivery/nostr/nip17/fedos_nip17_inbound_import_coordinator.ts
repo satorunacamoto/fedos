@@ -52,10 +52,26 @@
  * is the one thing invariant across every legitimate re-delivery of
  * "the same logical message."
  *
- * Alpha 1859 (Admission Gate) — `resolveFedosPrivateNostrInboundDirectConversation()`
- * NEVER auto-creates a Conversation or Membership; an unmatched sender
- * is quarantined/dropped (`"unknown-sender"`), identically to the
- * proprietary route.
+ * Alpha 1859 (Admission Gate) — NEVER auto-creates a Conversation or
+ * Membership; an unmatched sender is quarantined/dropped
+ * (`"unknown-sender"`), identically to the proprietary route.
+ *
+ * Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route Binding
+ * and NIP-17 Inbound Isolation Arc) — the admission gate above is now
+ * PRIMARILY the route binding this Arc's own outbound wiring attaches
+ * (`fedos_direct_conversation_plain_message_payload.ts`): the exact
+ * Conversation is resolved DIRECTLY from the binding's own
+ * `conversationId` (`resolveFedosDirectConversationByRouteBinding()`,
+ * `../fedos_direct_conversation_route_binding_resolver.ts`), never from
+ * sender pubkey alone. `resolveFedosPrivateNostrInboundDirectConversation()`
+ * (Alpha 1424, UNCHANGED) is retained and reused ONLY for genuinely
+ * legacy (undecodable) Rumor content, via
+ * `countFedosPrivateNostrInboundLegacyCandidates()`
+ * (`../fedos_private_nostr_inbound_legacy_candidate_count.ts`) — accepted
+ * only when EXACTLY ONE candidate exists, else failing closed as
+ * `"ambiguous-legacy-route"` — see this Arc's own Legacy and Migration
+ * Policy doc. Real, fresh reproduction of the defect this closes:
+ * `test/secure_runtime_alpha_7401_7480_route_binding_defect_reproduction.test.ts`.
  */
 
 import type { FedosConversationDraftPersistence } from "../../../construction/fedos_conversation_draft_persistence.js";
@@ -73,8 +89,11 @@ import {
 import type { FedosConversationPayloadStorage } from "../../../payload_storage/fedos_conversation_payload_storage.js";
 import { toFedosConversationPayloadId, type FedosConversationPayloadIdGenerator } from "../../../payload_storage/fedos_conversation_payload_id.js";
 import type { FedosConversationId } from "../../../fedos_conversation_id.js";
+import type { FedosConversationMembership } from "../../../membership/fedos_conversation_membership.js";
 import { FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH } from "../../../encryption/fedos_conversation_membership_readiness.js";
-import { resolveFedosPrivateNostrInboundDirectConversation } from "../fedos_private_nostr_inbound_conversation_resolver.js";
+import { resolveFedosDirectConversationByRouteBinding } from "../fedos_direct_conversation_route_binding_resolver.js";
+import { countFedosPrivateNostrInboundLegacyCandidates } from "../fedos_private_nostr_inbound_legacy_candidate_count.js";
+import { decodeFedosDirectConversationPlainMessagePayload } from "./fedos_direct_conversation_plain_message_payload.js";
 import {
   createFedosPrivateNostrImportRecord,
   type FedosPrivateNostrImportRecordPersistence,
@@ -88,7 +107,15 @@ export type FedosNip17InboundReceiveResult =
   | { readonly outcome: "identity-unavailable" }
   | { readonly outcome: "invalid-rumor" }
   | { readonly outcome: "encryption-failed" }
-  | { readonly outcome: "persistence-failed" };
+  | { readonly outcome: "persistence-failed" }
+  /** Secure Runtime Alpha 7401-7480 -- a well-formed JSON object was present but failed this Arc's own strict, closed route-binding shape validator. Fails closed; NEVER falls through to the legacy peer-only path (something was clearly attempted and is broken/tampered, unlike genuinely absent legacy plaintext). */
+  | { readonly outcome: "malformed-binding" }
+  /** Secure Runtime Alpha 7401-7480 -- the binding named a Conversation this Runtime has no active `direct` record for at all. */
+  | { readonly outcome: "unknown-conversation" }
+  /** Secure Runtime Alpha 7401-7480 -- the named Conversation exists and is active, but the sender is not a genuine active Member of THAT EXACT Conversation. */
+  | { readonly outcome: "membership-denied" }
+  /** Secure Runtime Alpha 7401-7480 -- no route binding was present (genuinely pre-existing legacy plaintext) AND two or more active Direct conversations with this sender exist locally -- fails closed rather than guessing among them (see the Legacy and Migration Policy doc). */
+  | { readonly outcome: "ambiguous-legacy-route" };
 
 export interface FedosNip17InboundImportCoordinatorDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;
@@ -122,18 +149,60 @@ export class FedosNip17InboundImportCoordinator {
     const existingImport = this.#deps.importRecordPersistence.getImport(rumor.envelopeId);
     if (existingImport !== null) return { outcome: "duplicate" };
 
-    // Alpha 1859 -- admission gate. Never auto-creates a Conversation.
-    const resolution = resolveFedosPrivateNostrInboundDirectConversation(
-      {
-        draftPersistence: this.#deps.draftPersistence,
-        activationPersistence: this.#deps.activationPersistence,
-        membershipAuthority: this.#deps.membershipAuthority,
-        identityResolver: this.#deps.identityResolver,
-      },
-      rumor.senderPublicKeyHex,
-    );
-    if (resolution.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
-    if (resolution.outcome === "unknown-sender") return { outcome: "unknown-sender" };
+    // Secure Runtime Alpha 7401-7480 -- Phase H: the route binding is now
+    // the PRIMARY admission gate. A well-formed binding (produced by
+    // this Arc's own outbound wiring, `fedos_conversation_direct_messaging_coordinator.ts`)
+    // resolves the exact Conversation DIRECTLY -- never a peer-only scan.
+    // A malformed (but present) binding fails closed WITHOUT ever falling
+    // through to the legacy path (Phase I). Only genuinely ABSENT binding
+    // content (pre-existing, unbound plaintext) reaches the bounded
+    // legacy fallback below.
+    const decoded = decodeFedosDirectConversationPlainMessagePayload(rumor.content);
+    if (decoded.outcome === "malformed") return { outcome: "malformed-binding" };
+
+    let resolvedConversationId: string;
+    let counterpartyMembership: FedosConversationMembership;
+    let bodyText: string;
+
+    if (decoded.outcome === "ok") {
+      const binding = resolveFedosDirectConversationByRouteBinding(
+        {
+          draftPersistence: this.#deps.draftPersistence,
+          activationPersistence: this.#deps.activationPersistence,
+          membershipAuthority: this.#deps.membershipAuthority,
+          identityResolver: this.#deps.identityResolver,
+        },
+        decoded.payload.conversationId,
+        rumor.senderPublicKeyHex,
+      );
+      if (binding.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
+      if (binding.outcome === "unknown-conversation") return { outcome: "unknown-conversation" };
+      if (binding.outcome === "membership-denied") return { outcome: "membership-denied" };
+      resolvedConversationId = binding.conversationId;
+      counterpartyMembership = binding.counterpartyMembership;
+      bodyText = decoded.payload.body;
+    } else {
+      // Alpha 1859 -- the ORIGINAL admission gate, UNMODIFIED, reused
+      // verbatim ONLY for this Arc's own bounded Legacy Policy (see the
+      // Legacy and Migration Policy doc): zero candidates -> unknown
+      // sender; exactly one -> legacy-unambiguous, accepted; two or more
+      // -> fails closed as ambiguous, NEVER a first-match guess.
+      const counted = countFedosPrivateNostrInboundLegacyCandidates(
+        {
+          draftPersistence: this.#deps.draftPersistence,
+          activationPersistence: this.#deps.activationPersistence,
+          membershipAuthority: this.#deps.membershipAuthority,
+          identityResolver: this.#deps.identityResolver,
+        },
+        rumor.senderPublicKeyHex,
+      );
+      if (counted.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
+      if (counted.candidates.length === 0) return { outcome: "unknown-sender" };
+      if (counted.candidates.length > 1) return { outcome: "ambiguous-legacy-route" };
+      resolvedConversationId = counted.candidates[0]!.conversationId;
+      counterpartyMembership = counted.candidates[0]!.counterpartyMembership;
+      bodyText = rumor.content;
+    }
 
     const now = this.#deps.clock();
     const localEnvelopeIdRaw = this.#deps.envelopeIdGenerator.generateEnvelopeId();
@@ -145,12 +214,12 @@ export class FedosNip17InboundImportCoordinator {
     // Authority boundary (Alpha 861/863/870), never a new crypto path.
     // `senderMembershipId` is the COUNTERPARTY's (this is THEIR message),
     // never the local participant's own.
-    const plaintext = new TextEncoder().encode(rumor.content);
-    const conversationId = resolution.conversationId as FedosConversationId;
+    const plaintext = new TextEncoder().encode(bodyText);
+    const conversationId = resolvedConversationId as FedosConversationId;
     const encryption = await this.#deps.encryptionAuthority.encrypt({
       envelopeId: localEnvelopeId,
       conversationId,
-      senderMembershipId: resolution.counterpartyMembership.id,
+      senderMembershipId: counterpartyMembership.id,
       keyEpoch: FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH,
       createdAt: now,
       replyToEnvelopeId: null,
@@ -173,8 +242,8 @@ export class FedosNip17InboundImportCoordinator {
 
     const localEnvelope = validateFedosConversationMessageEnvelope({
       id: localEnvelopeId,
-      conversationId: resolution.conversationId,
-      senderMembershipId: resolution.counterpartyMembership.id as unknown as string,
+      conversationId: resolvedConversationId,
+      senderMembershipId: counterpartyMembership.id as unknown as string,
       payloadId: localPayloadId,
       encryptionSuite: "ChaCha20Poly1305",
       keyEpoch: FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH,
@@ -187,7 +256,7 @@ export class FedosNip17InboundImportCoordinator {
 
     const importRecord = createFedosPrivateNostrImportRecord({
       nostrEventId: rumor.envelopeId,
-      conversationId: resolution.conversationId,
+      conversationId: resolvedConversationId,
       envelopeId: localEnvelopeId,
       relaySource,
       receivedAt: now,
@@ -196,6 +265,6 @@ export class FedosNip17InboundImportCoordinator {
     if (importRecord === null) return { outcome: "persistence-failed" };
     this.#deps.importRecordPersistence.putImportFact(importRecord);
 
-    return { outcome: "imported", conversationId: resolution.conversationId, envelopeId: localEnvelopeId };
+    return { outcome: "imported", conversationId: resolvedConversationId, envelopeId: localEnvelopeId };
   }
 }

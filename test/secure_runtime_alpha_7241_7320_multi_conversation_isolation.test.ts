@@ -6,33 +6,32 @@
  * conversations for the same real profile and proves message/Search
  * isolation between them. This file closes that gap for the case the
  * production inbound routing actually supports correctly (real, distinct
- * counterparty pubkeys) -- AND, via real testing, discovered and honestly
- * documents a genuine, structural limitation for the OTHER case (two
- * concurrent Direct conversations with the SAME peer), rather than
- * silently working around or hiding it.
+ * counterparty pubkeys) -- AND, via real testing, originally discovered
+ * and honestly documented a genuine, structural limitation for the OTHER
+ * case (two concurrent Direct conversations with the SAME peer), rather
+ * than silently working around or hiding it.
  *
- * REAL FINDING (disclosed, not fixed -- out of this Arc's own "harden,
- * do not redesign" scope): `resolveFedosPrivateNostrInboundDirectConversation()`
+ * UPDATE — Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation
+ * Route Binding and NIP-17 Inbound Isolation Arc) closed this exact
+ * finding: `resolveFedosPrivateNostrInboundDirectConversation()`
  * (`src/conversation/delivery/nostr/fedos_private_nostr_inbound_conversation_resolver.ts`,
- * Alpha 1424, unmodified) resolves an inbound Rumor's target Conversation
- * SOLELY by the sender's pubkey -- iterating `listDrafts()` and returning
- * the FIRST active Direct conversation whose counterparty matches, by
- * construction/list order. Nostr's own NIP-17 `kind:14` Rumor wire format
- * carries no explicit conversation identifier at all (a real,
- * upstream-protocol characteristic, not a gap this codebase invented) --
- * so if the SAME two accounts have TWO concurrently-active Direct
- * conversations, every inbound message from that peer is silently routed
- * into whichever one was created FIRST, regardless of which conversation
- * the sender's own local Runtime associated it with when sending. This is
- * confirmed live below (test 2) rather than merely inferred from source
- * reading. Fixing it for real would require embedding an explicit
- * conversation identifier into the wire payload -- a NIP-17 wire-format
- * change this Arc's own mission explicitly forbids as protocol redesign.
- * The system already prevents the WORST-CASE consequence structurally:
- * `createConversationInvitation()` does not itself reject a second
- * invitation to an already-conversing peer, so this state IS reachable in
- * practice (proven by test 2 constructing it), meaning a future Arc
- * should treat this as a real, load-bearing finding, not a hypothetical.
+ * Alpha 1424, still UNMODIFIED) is retained but is no longer the PRIMARY
+ * inbound resolution path -- a new, authenticated route binding carried
+ * inside the encrypted Rumor content
+ * (`fedos_direct_conversation_plain_message_payload.ts`) is resolved
+ * directly via `resolveFedosDirectConversationByRouteBinding()`
+ * (`fedos_direct_conversation_route_binding_resolver.ts`), never a
+ * peer-only guess. This was a real, NIP-17-content-layer fix (never a
+ * wire-format/NIP-level change -- `.content` remains standard NIP-17
+ * plain text; only its FedOS-proprietary INNER meaning changed, mirroring
+ * the Direct Ratchet route's own already-established convention), so
+ * "fixing it for real would require... protocol redesign" (this file's
+ * own original conclusion) turned out to be avoidable: see
+ * `docs/secure_runtime_alpha_7401_7480_routing_decision.md`. Test 2 below
+ * is UPDATED (this Arc) to assert the CORRECTED behavior -- see
+ * `test/secure_runtime_alpha_7401_7480_route_binding_defect_reproduction.test.ts`
+ * for this Arc's own dedicated, fresh regression test of the identical
+ * scenario.
  *
  * Skips itself with a clear message if the real `pkg/` (+ pinned
  * manifest) is absent. **`NODE_ENV` is never read or set anywhere in
@@ -299,7 +298,7 @@ suite("Alpha 7241-7320 -- multi-conversation isolation", () => {
   );
 
   it(
-    "test 2 (a real, disclosed finding, not a redesign target): two concurrent real Direct conversations with the SAME peer are NOT correctly isolated by inbound routing -- confirmed live, never fabricated",
+    "test 2 (UPDATED by Secure Runtime Alpha 7401-7480): two concurrent real Direct conversations with the SAME peer ARE now correctly isolated by inbound routing -- the route-binding fix confirmed live",
     async () => {
       const relay = await startFedosRealLocalWebSocketRelayServer();
       try {
@@ -343,10 +342,7 @@ suite("Alpha 7241-7320 -- multi-conversation isolation", () => {
         expect(conversationFirst).not.toBe(conversationSecond);
 
         // Alice sends a real message specifically into the SECOND
-        // conversation. Give it a generous, genuinely real settle window
-        // (this is a real, disclosed characteristic, not a timing flake --
-        // it never arrives in the SECOND conversation no matter how long
-        // one waits).
+        // conversation.
         const sentToSecond = await aliceShell.sendMessage(conversationSecond, aliceRef, "intended-for-the-second-conversation");
         expect(sentToSecond.outcome).toBe("ok");
         await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -354,25 +350,26 @@ suite("Alpha 7241-7320 -- multi-conversation isolation", () => {
         const bobListSecond = bobShell.listMessages(conversationSecond);
         expect(bobListSecond.outcome).toBe("ok");
         if (bobListSecond.outcome !== "ok") throw new Error("unreachable");
-        // THE FINDING: the message never arrives in the conversation it was
-        // actually sent to.
+        // THE FIX (Secure Runtime Alpha 7401-7480): the message now
+        // arrives in the exact conversation it was actually sent to.
         expect(
           bobListSecond.value,
-          "real, disclosed finding: an inbound message addressed to the SECOND concurrent conversation with the same peer never arrives there -- resolveFedosPrivateNostrInboundDirectConversation() resolves by sender pubkey alone and has no way to disambiguate, since NIP-17's own kind:14 Rumor wire format carries no conversation identifier at all",
-        ).toHaveLength(0);
+          "FIXED: an inbound message addressed to the SECOND concurrent conversation with the same peer now arrives there via resolveFedosDirectConversationByRouteBinding()",
+        ).toHaveLength(1);
+        const readSecond = await bobShell.readMessage(conversationSecond, bobListSecond.value[0]!.messageId);
+        expect(readSecond.outcome).toBe("ok");
+        if (readSecond.outcome !== "ok") throw new Error("unreachable");
+        expect(readSecond.value.plaintext).toEqual({ state: "available", text: "intended-for-the-second-conversation" });
 
-        // It is not lost outright -- it is silently misrouted into the
-        // FIRST (earlier-created) conversation with the same peer instead,
-        // confirming the exact mechanism this test's own header documents.
+        // The FIRST conversation with the same peer must remain completely
+        // untouched -- no more first-match misrouting.
         const bobListFirst = bobShell.listMessages(conversationFirst);
         expect(bobListFirst.outcome).toBe("ok");
         if (bobListFirst.outcome !== "ok") throw new Error("unreachable");
-        const readsFirst = await Promise.all(bobListFirst.value.map((m) => bobShell.readMessage(conversationFirst, m.messageId)));
-        const textsFirst = readsFirst.map((r) => (r.outcome === "ok" ? r.value.plaintext : null));
         expect(
-          textsFirst,
-          "confirms the exact mechanism: misrouted into the FIRST conversation with the same peer, not dropped outright",
-        ).toContainEqual({ state: "available", text: "intended-for-the-second-conversation" });
+          bobListFirst.value,
+          "FIXED: the FIRST conversation with the same peer must never receive a message actually addressed to the SECOND",
+        ).toHaveLength(0);
 
         await alice.coordinator.lock();
         await bob.coordinator.lock();

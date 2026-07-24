@@ -8,6 +8,43 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7401–7480 — FedOS Direct Conversation
+> Route Binding and NIP-17 Inbound Isolation Arc (FULL COMPLETION).**
+> Closes a real security-correctness defect proven during Alpha 7241–7320:
+> two concurrent Direct Conversations with the same peer could be
+> misrouted by inbound NIP-17 processing, because routing resolved
+> primarily by peer identity rather than an unambiguous
+> conversation/session binding. Two findings, both closed: the standard
+> `nostr-nip17-v1` route SILENTLY misrouted a message addressed to a
+> second, later-created same-peer conversation into the first (live-
+> reproduced fresh, independently of the prior report); the Direct
+> Ratchet route did not silently misroute but instead deterministically
+> REJECTED a second same-peer session establishment as
+> `"wrong-conversation"` (source-traced). Fix: a versioned, closed
+> route-binding structure carried inside the already-encrypted NIP-17
+> Rumor content — never Relay-visible, authenticated transitively via the
+> real Seal signature, resolved as the PRIMARY lookup key (never a
+> secondary check against a peer-only guess) — extending the SAME
+> FedOS-proprietary payload convention the Direct Ratchet route already
+> established, never a new NIP, never a new crypto primitive, never a
+> Ratchet-cryptographic-core/Identity-Transition/Signed-Deletion redesign.
+> A genuinely legacy (unbound) message is still accepted when exactly one
+> candidate Conversation matches; two or more fails closed as
+> `"ambiguous-legacy-route"`, never a first-match guess. Signed Deletion's
+> own control payload already carried an explicit, authenticated
+> `conversationId` and was never vulnerable — verified, not re-fixed.
+> Proven live: two same-peer Conversations both establish independent
+> Ratchet sessions and route correctly (previously the second session-init
+> would deterministically fail), a Session Reset on one leaves the other
+> completely untouched, restart survives, Device revocation stops every
+> Conversation sharing that Device pair, duplicate Relay redelivery is a
+> no-op, reverse delivery order still lands correctly, and Search stays
+> isolated per Conversation for the same-peer case. See
+> `docs/secure_runtime_alpha_7401_7480_completion_declaration.md` and
+> `..._execution_specification.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7321–7400 — FedOS Desktop Production
 > Feature Reachability Arc (FULL COMPLETION, one gap honestly disclosed).**
 > Closes the remaining production reachability gaps so the packaged

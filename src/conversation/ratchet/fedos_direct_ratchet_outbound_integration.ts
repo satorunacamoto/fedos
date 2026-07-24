@@ -376,14 +376,22 @@ export class FedosDirectRatchetOutboundIntegration {
       );
     }
 
+    // Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route
+    // Binding and NIP-17 Inbound Isolation Arc) -- `schemaVersion: 2`
+    // additively attaches this Arc's own authenticated route binding
+    // (the ALREADY-real `conversationId` this method already receives as
+    // a parameter, validated by the Membership/session resolution above
+    // it -- never a caller-supplied arbitrary value), letting the
+    // inbound side resolve the EXACT target Conversation directly.
     const messagePayload: FedosDirectRatchetMessagePayloadV1 = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "message",
       suite: sessionMetadata.binding.suite,
       generation: sessionMetadata.binding.generation,
       sessionId: sessionId as unknown as string,
       messageNumber: sendCounterAfter ?? counterUpdate.record.counters.sendCounter,
       wireMessageBase64: wireMessageBytesToBase64(wireMessage),
+      conversationId: conversationId as unknown as string,
     };
 
     const queue = await sendMailboxNip17(envelopeId, conversationId, encodeFedosDirectRatchetNip17PayloadToPlaintext(messagePayload));

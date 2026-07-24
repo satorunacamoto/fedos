@@ -78,6 +78,7 @@ import type { FedosConversationDirectMessageReadResult } from "./fedos_conversat
 import type { FedosConversationDirectMessageSummary } from "./fedos_conversation_direct_message_summary.js";
 import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
 import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
+import { encodeFedosDirectConversationPlainMessagePayload } from "../delivery/nostr/nip17/fedos_direct_conversation_plain_message_payload.js";
 
 /** The ONE encryption suite this facade ever selects — never caller-chosen (Alpha 1127). */
 export const FIXED_DIRECT_MESSAGE_SUITE: FedosConversationEnvelopeEncryptionSuite = "ChaCha20Poly1305";
@@ -219,7 +220,37 @@ export class FedosConversationDirectMessagingCoordinator {
       return { ...result, delivery };
     }
     if (result.outcome === "sent-locally" && this.#deps.delivery !== undefined) {
-      const delivery = await this.#deps.delivery.sendMailboxNip17(result.envelopeId, conversationId, plaintext);
+      // Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route
+      // Binding and NIP-17 Inbound Isolation Arc) -- the standard route's
+      // own wire bytes now carry this Arc's own closed, versioned route
+      // binding (`FedosDirectConversationPlainMessagePayloadV1`), never
+      // the raw `plaintext` alone. Local storage above is COMPLETELY
+      // UNCHANGED (that `plaintext` variable, and everything derived from
+      // it before this point, is untouched) -- only the bytes handed to
+      // the wire adapter change, mirroring the Ratchet route's own
+      // established "structured payload in Rumor content" convention
+      // (`fedos_direct_ratchet_nip17_payload.ts`, unmodified) rather than
+      // inventing a new one. `recipientAccountRef` is the counterparty's
+      // OWN already-real, already-validated Membership participant --
+      // never a caller-supplied value.
+      const counterpartyMember = this.#deps.membershipAuthority
+        .listMemberships(conversationId)
+        .find((member) => member.state === "active" && member.id !== localMembership.id);
+      if (counterpartyMember === undefined) return { outcome: "unauthorized" };
+      const wireBytes = new TextEncoder().encode(
+        encodeFedosDirectConversationPlainMessagePayload({
+          schemaVersion: 1,
+          conversationId,
+          senderAccountRef: { authority: identity.creator.authority, publicIdentifier: identity.creator.publicIdentifier, identityId: null },
+          recipientAccountRef: {
+            authority: counterpartyMember.participant.authority,
+            publicIdentifier: counterpartyMember.participant.publicIdentifier,
+            identityId: null,
+          },
+          body,
+        }),
+      );
+      const delivery = await this.#deps.delivery.sendMailboxNip17(result.envelopeId, conversationId, wireBytes);
       return { ...result, delivery };
     }
 

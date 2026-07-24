@@ -136,9 +136,23 @@ export interface FedosDirectRatchetSessionInitPayloadV1 {
   readonly deviceSignatureHex: string | null;
 }
 
-/** Phase F — the ratchet wire message (header + ciphertext), opaque and already-encrypted. */
+/**
+ * Phase F — the ratchet wire message (header + ciphertext), opaque and
+ * already-encrypted.
+ *
+ * Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route Binding
+ * and NIP-17 Inbound Isolation Arc) — additive `schemaVersion: 2` adds
+ * `conversationId`, this Arc's own authenticated route binding, letting
+ * the inbound side resolve the EXACT target Conversation directly rather
+ * than via the peer-only resolver's first-match guess (the exact
+ * mechanism behind Finding 2 in
+ * `docs/secure_runtime_alpha_7401_7480_defect_reproduction_report.md`).
+ * `schemaVersion: 1` (no `conversationId`) is UNCHANGED and remains
+ * decodable — see the Legacy and Migration Policy doc for the fallback
+ * this Arc's own inbound integration uses for it.
+ */
 export interface FedosDirectRatchetMessagePayloadV1 {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly kind: "message";
   readonly suite: FedosDirectRatchetSuite;
   readonly generation: number;
@@ -146,6 +160,8 @@ export interface FedosDirectRatchetMessagePayloadV1 {
   /** The ratchet send-chain message number this wire message consumed — safe, public metadata (review §10 §2), used ONLY for safe/import observability at this layer; replay rejection is the Rust ratchet core's own job (`decrypt()`). */
   readonly messageNumber: number;
   readonly wireMessageBase64: string;
+  /** REQUIRED when `schemaVersion === 2`; absent at `schemaVersion === 1` (Secure Runtime Alpha 7401-7480's own additive route binding). */
+  readonly conversationId?: string;
 }
 
 export type FedosDirectRatchetNip17PayloadV1 = FedosDirectRatchetSessionInitPayloadV1 | FedosDirectRatchetMessagePayloadV1;
@@ -167,7 +183,7 @@ const SESSION_INIT_FIELDS = new Set<string>([
   "deviceSignatureHex",
 ]);
 
-const MESSAGE_FIELDS = new Set<string>([
+const MESSAGE_FIELDS_V1 = new Set<string>([
   "schemaVersion",
   "kind",
   "suite",
@@ -176,6 +192,9 @@ const MESSAGE_FIELDS = new Set<string>([
   "messageNumber",
   "wireMessageBase64",
 ]);
+
+/** Secure Runtime Alpha 7401-7480 — additive: adds `conversationId` (this Arc's own route binding). */
+const MESSAGE_FIELDS_V2 = new Set<string>([...MESSAGE_FIELDS_V1, "conversationId"]);
 
 function isWellFormedSessionInit(candidate: unknown): candidate is FedosDirectRatchetSessionInitPayloadV1 {
   if (!hasExactFields(candidate, SESSION_INIT_FIELDS)) return false;
@@ -205,15 +224,21 @@ function isWellFormedSessionInit(candidate: unknown): candidate is FedosDirectRa
 }
 
 function isWellFormedMessage(candidate: unknown): candidate is FedosDirectRatchetMessagePayloadV1 {
-  if (!hasExactFields(candidate, MESSAGE_FIELDS)) return false;
+  if (typeof candidate !== "object" || candidate === null) return false;
   const p = candidate as Record<string, unknown>;
-  if (p.schemaVersion !== SCHEMA_VERSION) return false;
+  // Secure Runtime Alpha 7401-7480 -- schemaVersion selects the EXACT
+  // closed field set; any other value (never 1 or 2) fails closed here,
+  // never guessed, never treated as the highest known version.
+  if (p.schemaVersion !== 1 && p.schemaVersion !== 2) return false;
+  const fields = p.schemaVersion === 2 ? MESSAGE_FIELDS_V2 : MESSAGE_FIELDS_V1;
+  if (!hasExactFields(candidate, fields)) return false;
   if (p.kind !== "message") return false;
   if (typeof p.suite !== "string" || p.suite.length === 0) return false;
   if (!Number.isInteger(p.generation) || (p.generation as number) < 0) return false;
   if (!isSafeIdField(p.sessionId)) return false;
   if (!Number.isInteger(p.messageNumber) || (p.messageNumber as number) < 0) return false;
   if (!isValidBase64(p.wireMessageBase64, MAX_WIRE_MESSAGE_BASE64_LENGTH)) return false;
+  if (p.schemaVersion === 2 && !isSafeIdField(p.conversationId)) return false;
   return true;
 }
 
@@ -224,6 +249,33 @@ export function isWellFormedFedosDirectRatchetNip17Payload(candidate: unknown): 
   if (kind === "session-init") return isWellFormedSessionInit(candidate);
   if (kind === "message") return isWellFormedMessage(candidate);
   return false;
+}
+
+/**
+ * Secure Runtime Alpha 7401-7480 — total, never throws. Recognizes the
+ * OUTER shape of a ratchet payload (a real `kind: "session-init" |
+ * "message"` discriminant) independent of whether its own `schemaVersion`
+ * is one this build understands. Lets the inbound integration
+ * distinguish "this IS a ratchet payload, from a version we don't
+ * understand yet" (`"unsupported-version"`, fails closed) from "this is
+ * genuinely not a ratchet payload at all" (`"not-ratchet-payload"`, falls
+ * through to the legacy chat path) — `decodeFedosDirectRatchetNip17PayloadFromContent()`
+ * alone cannot distinguish these (it returns `null` for both), and
+ * silently falling an unrecognized-but-ratchet-shaped future version
+ * through to the legacy plain-chat path would violate this Arc's own
+ * "unknown versions fail closed" requirement.
+ */
+export function isRecognizableFedosDirectRatchetNip17PayloadShape(content: string): boolean {
+  if (typeof content !== "string" || content.length === 0) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return false;
+  }
+  if (typeof parsed !== "object" || parsed === null) return false;
+  const kind = (parsed as Record<string, unknown>).kind;
+  return kind === "session-init" || kind === "message";
 }
 
 /** Plain `JSON.stringify` — private content only this Arc's own strict decoder ever parses back (mirrors `serializeFedosNip17RumorForEncryption()`'s own identical discipline, `../nip17/fedos_nip17_rumor.js`). */

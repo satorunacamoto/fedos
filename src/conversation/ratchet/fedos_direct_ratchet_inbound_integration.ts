@@ -61,10 +61,9 @@ import { toFedosConversationEnvelopeId, type FedosConversationEnvelopeIdGenerato
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import { toFedosConversationPayloadId, type FedosConversationPayloadIdGenerator } from "../payload_storage/fedos_conversation_payload_id.js";
 import { FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH } from "../encryption/fedos_conversation_membership_readiness.js";
-import {
-  resolveFedosPrivateNostrInboundDirectConversation,
-  type FedosPrivateNostrInboundConversationResolution,
-} from "../delivery/nostr/fedos_private_nostr_inbound_conversation_resolver.js";
+import type { FedosPrivateNostrInboundConversationResolution } from "../delivery/nostr/fedos_private_nostr_inbound_conversation_resolver.js";
+import { resolveFedosDirectConversationByRouteBinding } from "../delivery/nostr/fedos_direct_conversation_route_binding_resolver.js";
+import { countFedosPrivateNostrInboundLegacyCandidates } from "../delivery/nostr/fedos_private_nostr_inbound_legacy_candidate_count.js";
 import {
   createFedosPrivateNostrImportRecord,
   type FedosPrivateNostrImportRecordPersistence,
@@ -72,6 +71,7 @@ import {
 import type { FedosPrivateWireParsedRumor } from "../transport/fedos_private_wire_adapter.js";
 import {
   decodeFedosDirectRatchetNip17PayloadFromContent,
+  isRecognizableFedosDirectRatchetNip17PayloadShape,
   wireMessageBytesFromBase64,
   type FedosDirectRatchetSessionInitPayloadV1,
   type FedosDirectRatchetMessagePayloadV1,
@@ -103,6 +103,16 @@ export type FedosDirectRatchetInboundReceiveResult =
   | { readonly outcome: "identity-unavailable" }
   | { readonly outcome: "invalid-payload" }
   | { readonly outcome: "wrong-conversation" }
+  /** Secure Runtime Alpha 7401-7480 -- the route binding named a Conversation this Runtime has no active `direct` record for at all. */
+  | { readonly outcome: "unknown-conversation" }
+  /** Secure Runtime Alpha 7401-7480 -- the named Conversation exists and is active, but the sender is not a genuine active Member of THAT EXACT Conversation. */
+  | { readonly outcome: "membership-denied" }
+  /** Secure Runtime Alpha 7401-7480 -- the claimed route binding does not match the ALREADY-persisted, trust-established session it names -- a genuine tamper/integrity failure, never a peer-only ambiguity guess. */
+  | { readonly outcome: "binding-mismatch" }
+  /** Secure Runtime Alpha 7401-7480 -- a genuinely legacy (schemaVersion 1, no route binding) message matched two or more active Direct conversations with the sender -- fails closed rather than guessing (see the Legacy and Migration Policy doc). */
+  | { readonly outcome: "ambiguous-legacy-route" }
+  /** Secure Runtime Alpha 7401-7480 -- the payload is recognizably a ratchet payload (a real `kind: "session-init" | "message"` discriminant) but its own `schemaVersion` is not one this build understands -- fails closed, NEVER silently treated as plain legacy chat text. */
+  | { readonly outcome: "unsupported-version" }
   | { readonly outcome: "wrong-recipient" }
   | { readonly outcome: "unsupported-suite" }
   | { readonly outcome: "local-device-unknown" | "local-device-revoked" | "local-device-not-trusted" }
@@ -157,24 +167,21 @@ export class FedosDirectRatchetInboundIntegration {
 
   async receiveRumor(rumor: FedosPrivateWireParsedRumor, relaySource: string | null): Promise<FedosDirectRatchetInboundReceiveResult> {
     const payload = decodeFedosDirectRatchetNip17PayloadFromContent(rumor.content);
-    if (payload === null) return { outcome: "not-ratchet-payload" };
+    if (payload === null) {
+      // Secure Runtime Alpha 7401-7480 -- distinguish "genuinely not a
+      // ratchet payload" (falls through to the legacy chat path) from "IS
+      // a ratchet payload, from an unrecognized schemaVersion" (fails
+      // closed here, never silently misinterpreted as plain chat text).
+      if (isRecognizableFedosDirectRatchetNip17PayloadShape(rumor.content)) return { outcome: "unsupported-version" };
+      return { outcome: "not-ratchet-payload" };
+    }
 
     // Phase H — layered dedup: Rumor-id dedup BEFORE any decrypt/state
     // change, sharing the SAME dedicated namespace for every ratchet
     // control/message fact this integration ever imports.
     if (this.#deps.importRecordPersistence.getImport(rumor.envelopeId) !== null) return { outcome: "duplicate" };
 
-    const resolution = resolveFedosPrivateNostrInboundDirectConversation(
-      {
-        draftPersistence: this.#deps.draftPersistence,
-        activationPersistence: this.#deps.activationPersistence,
-        membershipAuthority: this.#deps.membershipAuthority,
-        identityResolver: this.#deps.identityResolver,
-      },
-      rumor.senderPublicKeyHex,
-    );
-    if (resolution.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
-    if (resolution.outcome === "unknown-sender") return { outcome: "unknown-sender" };
+    if (payload.suite !== FEDOS_DIRECT_RATCHET_DEFAULT_SUITE) return { outcome: "unsupported-suite" };
 
     const identity = this.#deps.identityResolver.resolveLocalParticipant();
     if (identity.outcome === "unavailable") return { outcome: "identity-unavailable" };
@@ -183,18 +190,72 @@ export class FedosDirectRatchetInboundIntegration {
       publicIdentifier: identity.creator.publicIdentifier,
       identityId: null,
     };
-    const remoteAccountRef: FedosDeviceBindingAccountRef = {
-      authority: resolution.counterpartyMembership.participant.authority,
-      publicIdentifier: resolution.counterpartyMembership.participant.publicIdentifier,
-      identityId: null,
+    const resolverDeps = {
+      draftPersistence: this.#deps.draftPersistence,
+      activationPersistence: this.#deps.activationPersistence,
+      membershipAuthority: this.#deps.membershipAuthority,
+      identityResolver: this.#deps.identityResolver,
     };
 
-    if (payload.suite !== FEDOS_DIRECT_RATCHET_DEFAULT_SUITE) return { outcome: "unsupported-suite" };
-
+    // Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route
+    // Binding and NIP-17 Inbound Isolation Arc) — the exact target
+    // Conversation is now resolved DIRECTLY from this Arc's own
+    // authenticated route binding, never from a peer-only guess:
+    // session-init ALWAYS carries `conversationId` (schemaVersion 1,
+    // unchanged); a `"message"` payload carries it at schemaVersion 2
+    // (this Arc's own additive field) and falls back to the bounded
+    // Legacy Policy ONLY at schemaVersion 1 (see the Legacy and
+    // Migration Policy doc). This closes Finding 2 (deterministic
+    // "wrong-conversation" rejection of a second same-peer session) —
+    // see the Defect Reproduction Report.
     if (payload.kind === "session-init") {
-      return this.#receiveSessionInit(rumor, relaySource, payload, resolution.conversationId, localAccountRef, remoteAccountRef);
+      const binding = resolveFedosDirectConversationByRouteBinding(resolverDeps, payload.conversationId, rumor.senderPublicKeyHex);
+      if (binding.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
+      if (binding.outcome === "unknown-conversation") return { outcome: "unknown-conversation" };
+      if (binding.outcome === "membership-denied") return { outcome: "membership-denied" };
+      const remoteAccountRef: FedosDeviceBindingAccountRef = {
+        authority: binding.counterpartyMembership.participant.authority,
+        publicIdentifier: binding.counterpartyMembership.participant.publicIdentifier,
+        identityId: null,
+      };
+      return this.#receiveSessionInit(rumor, relaySource, payload, binding.conversationId, localAccountRef, remoteAccountRef);
     }
-    return this.#receiveMessage(rumor, relaySource, payload, resolution, localAccountRef, remoteAccountRef);
+
+    if (payload.schemaVersion === 2 && payload.conversationId !== undefined) {
+      const binding = resolveFedosDirectConversationByRouteBinding(resolverDeps, payload.conversationId, rumor.senderPublicKeyHex);
+      if (binding.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
+      if (binding.outcome === "unknown-conversation") return { outcome: "unknown-conversation" };
+      if (binding.outcome === "membership-denied") return { outcome: "membership-denied" };
+      const remoteAccountRef: FedosDeviceBindingAccountRef = {
+        authority: binding.counterpartyMembership.participant.authority,
+        publicIdentifier: binding.counterpartyMembership.participant.publicIdentifier,
+        identityId: null,
+      };
+      return this.#receiveMessage(rumor, relaySource, payload, binding, localAccountRef, remoteAccountRef);
+    }
+
+    // Legacy Policy — a genuinely pre-existing `schemaVersion: 1` message
+    // (no route binding at all): accepted ONLY when EXACTLY ONE candidate
+    // Conversation matches this sender, else fails closed. Never a
+    // first-match guess.
+    const counted = countFedosPrivateNostrInboundLegacyCandidates(resolverDeps, rumor.senderPublicKeyHex);
+    if (counted.outcome === "identity-unavailable") return { outcome: "identity-unavailable" };
+    if (counted.candidates.length === 0) return { outcome: "unknown-sender" };
+    if (counted.candidates.length > 1) return { outcome: "ambiguous-legacy-route" };
+    const candidate = counted.candidates[0]!;
+    const legacyRemoteAccountRef: FedosDeviceBindingAccountRef = {
+      authority: candidate.counterpartyMembership.participant.authority,
+      publicIdentifier: candidate.counterpartyMembership.participant.publicIdentifier,
+      identityId: null,
+    };
+    return this.#receiveMessage(
+      rumor,
+      relaySource,
+      payload,
+      { outcome: "resolved", conversationId: candidate.conversationId, counterpartyMembership: candidate.counterpartyMembership },
+      localAccountRef,
+      legacyRemoteAccountRef,
+    );
   }
 
   async #receiveSessionInit(
@@ -205,7 +266,13 @@ export class FedosDirectRatchetInboundIntegration {
     localAccountRef: FedosDeviceBindingAccountRef,
     remoteAccountRef: FedosDeviceBindingAccountRef,
   ): Promise<FedosDirectRatchetInboundReceiveResult> {
-    if (payload.conversationId !== conversationId) return { outcome: "wrong-conversation" };
+    // Secure Runtime Alpha 7401-7480 -- `conversationId` is now resolved
+    // DIRECTLY from `payload.conversationId` itself (the caller's own
+    // `resolveFedosDirectConversationByRouteBinding()` call), so this
+    // equality trivially always holds by construction -- the OLD
+    // peer-only-guess-vs-claim equality check this line replaced is what
+    // caused Finding 2 (a second same-peer session-init deterministically
+    // rejected as "wrong-conversation"); see the Defect Reproduction Report.
     if (!accountRefsEqual(payload.recipientAccountRef, localAccountRef)) return { outcome: "wrong-recipient" };
     if (payload.recipientDeviceRef !== this.#deps.localDeviceRef) return { outcome: "wrong-recipient" };
     if (!accountRefsEqual(payload.senderAccountRef, remoteAccountRef)) return { outcome: "wrong-recipient" };
@@ -368,8 +435,14 @@ export class FedosDirectRatchetInboundIntegration {
     // Authentication: the CLAIMED sessionId must genuinely belong to THIS
     // exact sender/Conversation/local Device — verified against the
     // ALREADY-persisted, trust-established binding, never against the
-    // wire's own unauthenticated say-so.
-    if ((sessionMetadata.binding.conversationId as unknown as string) !== resolution.conversationId) return { outcome: "wrong-conversation" };
+    // wire's own unauthenticated say-so. Secure Runtime Alpha 7401-7480 —
+    // `resolution.conversationId` is now itself resolved from this Arc's
+    // own authenticated route binding (schemaVersion 2) or the bounded
+    // Legacy Policy fallback (schemaVersion 1), never a peer-only guess —
+    // this check is now a genuine tamper/integrity cross-check (does the
+    // claimed binding actually match the session `payload.sessionId`
+    // names?), not an ambiguity-guess check, hence "binding-mismatch".
+    if ((sessionMetadata.binding.conversationId as unknown as string) !== resolution.conversationId) return { outcome: "binding-mismatch" };
     if (!accountRefsEqual(sessionMetadata.binding.localAccountRef, localAccountRef)) return { outcome: "wrong-recipient" };
     if (sessionMetadata.binding.localDeviceRef !== this.#deps.localDeviceRef) return { outcome: "wrong-recipient" };
     if (!accountRefsEqual(sessionMetadata.binding.remoteAccountRef, remoteAccountRef)) return { outcome: "wrong-recipient" };

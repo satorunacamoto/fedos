@@ -159,6 +159,15 @@ See the execution specification for the full account:
 1. **Same-peer multi-conversation misrouting** (see scope item 7 above)
    — would require a NIP-17 wire-format change (an explicit conversation
    identifier in the Rumor payload) to fix for real.
+   **UPDATE (Secure Runtime Alpha 7401–7480, FedOS Direct Conversation
+   Route Binding and NIP-17 Inbound Isolation Arc): closed.** The fix
+   turned out to be a `.content`-level (never wire/NIP-level) change —
+   an authenticated route binding inside the already-encrypted Rumor
+   content, mirroring the Direct Ratchet route's own pre-existing
+   convention — so the "would require a wire-format change" conclusion
+   above, while correct about the WIRE FRAMING (unchanged), understated
+   that the inner content convention itself could be extended without
+   touching NIP-17/NIP-59. See `docs/secure_runtime_alpha_7401_7480_completion_declaration.md`.
 2. **Outbox Scheduler tick cost grows with total conversation history**
    (`listIntents()` replays the full append-only log every tick) — a
    real, measured, long-running-reliability characteristic, consistent
