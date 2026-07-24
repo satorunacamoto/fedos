@@ -710,6 +710,17 @@ export class FedosProfileInitializationCoordinator {
       // in-memory-only (lost on every restart). See
       // fedos_local_profile_paths.ts's own doc comment on this field.
       conversationDraftLogPath: paths.conversationDraftLogFile,
+      // Secure Runtime Alpha 7241-7320 -- real, narrow bug fix, the SAME
+      // class as `conversationDraftLogPath` immediately above: both
+      // fields already existed on `FedosDesktopRuntimeConfig` (Alpha
+      // 923/1143) but were never supplied here, so Capability/Payload
+      // Retention state silently defaulted to in-memory-only (lost on
+      // every real restart) even through the real production Coordinator
+      // path. Unconditional, mirroring `conversationMembershipLogPath`'s
+      // own discipline -- neither field is gated behind a dependency
+      // toggle in `FedosDesktopRuntimeConfig`.
+      conversationCapabilityLogPath: paths.conversationCapabilityLogFile,
+      conversationPayloadRetentionLogPath: paths.conversationPayloadRetentionLogFile,
       deviceTrustEnabled: true,
       localDeviceId,
       localAccountRef: accountRef,

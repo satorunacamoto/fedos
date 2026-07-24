@@ -118,6 +118,18 @@ export interface FedosLocalProfilePaths {
   readonly deletionRequestInboxSummaryLogFile: string;
   /** Signed Deletion pending-review durable side-channel append-only log. */
   readonly deletionRequestPendingReviewLogFile: string;
+  // Secure Runtime Alpha 7241-7320 -- real, narrow bug fix: these two
+  // leaf files did not exist at all, so `FedosDesktopRuntimeConfig`'s
+  // own already-existing `conversationCapabilityLogPath`/
+  // `conversationPayloadRetentionLogPath` fields (Alpha 923/1143) had no
+  // planned path to receive from the Coordinator and silently defaulted
+  // to in-memory-only (lost on every restart) even through the real
+  // production Coordinator path -- the SAME bug class Alpha 7081-7160
+  // found and fixed for `conversationDraftLogFile` immediately above.
+  /** Conversation Capability append-only log. */
+  readonly conversationCapabilityLogFile: string;
+  /** Payload Retention decision append-only log. */
+  readonly conversationPayloadRetentionLogFile: string;
 }
 
 /** The set of directories `ensureDirectories()` creates (recursively). Derived from the leaf paths above; no caller string is ever a directory component beyond the root itself. */
@@ -166,6 +178,8 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     deletionRequestExecutionLogFile: join(root, "deletion-request-execution.ndjson"),
     deletionRequestInboxSummaryLogFile: join(root, "deletion-request-inbox-summary.ndjson"),
     deletionRequestPendingReviewLogFile: join(root, "deletion-request-pending-review.ndjson"),
+    conversationCapabilityLogFile: join(root, "conversation-capability.ndjson"),
+    conversationPayloadRetentionLogFile: join(root, "conversation-payload-retention.ndjson"),
   });
 }
 

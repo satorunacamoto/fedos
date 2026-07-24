@@ -8,6 +8,51 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7241–7320 — FedOS Long-Running Runtime
+> Reliability and Recovery Arc (FULL COMPLETION).** Validates and hardens
+> the already-real production runtime under realistic long-running
+> conditions — no new cryptographic protocol, no redesign of Ratchet,
+> Identity, NIP-17, or Secure Memory. Real, no-substitution testing: two
+> real production profiles exchange 221 real encrypted messages across 2
+> full restarts and 1 genuine relay disconnect/reconnect over a real
+> local WebSocket relay
+> (`test/secure_runtime_alpha_7241_7320_long_running_durability_and_reconnect.test.ts`);
+> Direct Ratchet session state survives 4 consecutive real seal/clear/
+> restore cycles; a real Identity Transition arrives mid-conversation and
+> the conversation keeps working across a real restart; a real tombstone
+> (Signed Deletion's own underlying retention effect) genuinely survives
+> a real restart; real WASM-backed Archive export/restore now correctly
+> excludes tombstoned content across a device boundary; two real profiles
+> with two DIFFERENT peers stay fully isolated across a restart. Two real
+> production fixes, both regression-proven: (1)
+> `conversationCapabilityLogPath`/`conversationPayloadRetentionLogPath`
+> — both fields already existed on `FedosDesktopRuntimeConfig` (Alpha
+> 923/1143) but the real Coordinator never supplied either, so
+> Capability/Retention state silently fell back to in-memory-only and
+> was lost on every real restart (the exact bug class Alpha 7081-7160
+> already fixed for `conversationDraftLogPath`); (2) Archive export/
+> restore never enforced Payload Retention (Search closed the identical
+> gap at Alpha 2581-2620) AND never had a real production WASM
+> encryption boundary (the SAME recurring "dev-gated default, never the
+> canonical production authority" bug class Alpha 7161-7240 already
+> fixed for the generic Envelope-AEAD path) — both closed by mirroring
+> already-established patterns, reaching only already-real, already-
+> tested Rust exports. Two genuine findings honestly disclosed, not
+> fixed (out of this Arc's own narrow scope): two concurrent Direct
+> conversations with the SAME peer are NOT correctly isolated by inbound
+> NIP-17 routing (would require a wire-format change to fix for real,
+> forbidden as protocol redesign here); the durable Outbox Scheduler's
+> own tick cost grows with a conversation's total history (a real,
+> measured, long-running characteristic, consistent with a widespread
+> pre-existing persistence pattern, not unique to this Arc's own scope).
+> Zero Rust/Cargo.toml change, zero redesign of Direct Ratchet/Identity
+> Transition/NIP-17's own construction pipeline/Signed Deletion
+> (confirmed by structural guard), zero p2p/.tmp_gen change. See
+> `docs/secure_runtime_alpha_7241_7320_completion_declaration.md` and
+> `..._execution_specification.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7161–7240 — FedOS Conversation-Level
 > Production Crypto and Identity Authority Wiring Arc (FULL COMPLETION —
 > the mission's own success criteria proven literally, end to end, over

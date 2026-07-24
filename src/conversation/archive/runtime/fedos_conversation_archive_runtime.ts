@@ -89,6 +89,7 @@ import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRes
 import { detectFedosConversationArchiveDuplicates, type FedosConversationArchiveDuplicateReport } from "../fedos_conversation_archive_duplicate_detection.js";
 import type { FedosConversationArchiveEncryptionAuthority } from "../fedos_conversation_archive_encryption.js";
 import type { FedosConversationArchiveManifestV1 } from "../fedos_conversation_archive_manifest.js";
+import type { FedosPayloadRetentionAuthority } from "../../retention/fedos_payload_retention_authority.js";
 import type { FedosConversationArchiveFileAuthority } from "../fs/fedos_conversation_archive_file_authority.js";
 import { encodeFedosConversationArchiveFileContainer, decodeFedosConversationArchiveFileContainer } from "../fs/fedos_conversation_archive_file_container.js";
 
@@ -133,6 +134,16 @@ export interface FedosConversationArchiveRuntimeDependencies {
   /** See this file's own header, "LIFECYCLE". */
   readonly isRuntimeRunning: () => boolean;
   readonly bounds?: FedosConversationArchiveRuntimeBounds;
+  /**
+   * Secure Runtime Alpha 7241-7320 — OPTIONAL, additive: see
+   * `fedos_conversation_archive_collector.ts`'s own header for the full
+   * account of the retention-gating gap this closes (Archive export
+   * never enforced retention, even though Search already did from Alpha
+   * 2581-2620 onward). Passed straight through to
+   * `collectFedosConversationArchiveBundle()` on every `exportConversationArchive()`
+   * call; omitted, export behavior is byte-for-byte unchanged.
+   */
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
 }
 
 export interface FedosConversationArchiveExportRequest {
@@ -359,6 +370,7 @@ export class FedosConversationArchiveRuntime {
         envelopePersistence: this.#deps.envelopePersistence,
         payloadStorage: this.#deps.payloadStorage,
         group: this.#groupDeps(),
+        retentionAuthority: this.#deps.retentionAuthority,
       },
       this.#deps.clock(),
     );

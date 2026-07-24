@@ -40,6 +40,7 @@ import type { FedosGroupDirectPathPersistence } from "../../group/fedos_group_di
 import type { FedosGroupMessagePersistence } from "../../group/fedos_group_message.js";
 import type { FedosGroupFanoutDeliveryPersistence } from "../../group/fedos_group_fanout_delivery.js";
 import type { FedosMasterSeedAuthority } from "../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosPayloadRetentionAuthority } from "../../retention/fedos_payload_retention_authority.js";
 import type { FedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
 import { defaultFedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
 import { FedosWasmConversationArchiveEncryptionAuthority, type FedosConversationArchiveEncryptionRuntimeBoundary } from "../fedos_conversation_archive_encryption.js";
@@ -81,6 +82,8 @@ export interface FedosConversationArchiveRuntimeAssemblyConfig {
   readonly fileAuthority?: FedosConversationArchiveFileAuthority;
   /** Optional, testability only — default the real Runtime Service pass-throughs (`fedosConversationArchiveEncryptionRuntimeBoundary`). */
   readonly encryptionRuntimeBoundary?: FedosConversationArchiveEncryptionRuntimeBoundary;
+  /** Secure Runtime Alpha 7241-7320 — optional, additive; see `FedosConversationArchiveRuntimeDependencies`'s own doc comment. Passed straight through, unmodified. */
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
 }
 
 /** Pure with respect to the filesystem — constructs no file, starts no timer, reads no `process.env`. */
@@ -107,5 +110,6 @@ export function assembleFedosConversationArchiveRuntime(
     clock: config.clock ?? defaultFedosBoardRuntimeClock,
     isRuntimeRunning: config.isRuntimeRunning,
     bounds: config.bounds,
+    retentionAuthority: config.retentionAuthority,
   });
 }

@@ -136,6 +136,13 @@ import {
 import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
 import { assembleFedosConversationCanonicalProductionCryptoGraph } from "../../conversation/encryption/production/fedos_conversation_canonical_production_crypto_authority_factory.js";
 import type { FedosProductionEphemeralGiftWrapHandleSource } from "../production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.js";
+// Secure Runtime Alpha 7241-7320 -- closes the SAME recurring "dev-gated
+// default, never the production authority" gap Alpha 7161-7240 already
+// fixed for the generic Envelope-AEAD path, this time for Archive export/
+// import. See `fedos_production_conversation_archive_encryption_runtime_boundary.ts`'s
+// own header for the full account.
+import type { FedosProductionConversationAeadHandleSource } from "../production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
+import { FedosProductionConversationArchiveEncryptionRuntimeBoundary } from "../production_activation/fedos_production_conversation_archive_encryption_runtime_boundary.js";
 import { FedosProductionEphemeralGiftWrapSigningAuthority } from "../production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.js";
 
 // Secure Runtime Alpha 1471-1540 (Private Transport Boundary and
@@ -169,6 +176,19 @@ import { AppendOnlyFedosConversationCapabilityPersistence } from "../../conversa
 import { InMemoryFedosConversationCapabilityPersistence } from "../../conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
 import { assembleFedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.js";
 import type { FedosConversationArchiveRuntime } from "../../conversation/archive/runtime/fedos_conversation_archive_runtime.js";
+// Secure Runtime Alpha 7241-7320 -- closes a real, disclosed gap: Archive
+// export never enforced Payload Retention, even though Search already has
+// since Alpha 2581-2620 (see `fedos_conversation_archive_collector.ts`'s
+// own header for the full account). Mirrors
+// `conversationArchiveCapabilityPersistence`'s own immediately-adjacent
+// "second port instance, same durable backend" discipline exactly -- a
+// SECOND `FedosPayloadRetentionAuthority` instance over the SAME
+// `config.conversationPayloadRetentionLogPath` (this Arc's own fix,
+// immediately above) and the SAME `conversationPayloadStorage` this
+// Runtime already owns, never a second, divergent retention decision log.
+import { FedosPayloadRetentionAuthority } from "../../conversation/retention/fedos_payload_retention_authority.js";
+import { AppendOnlyFedosPayloadRetentionPersistence } from "../../conversation/retention/append_only_fedos_payload_retention_persistence.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../../conversation/retention/in_memory_fedos_payload_retention_persistence.js";
 
 // Secure Runtime Alpha 3081-3160 (Desktop Runtime Conversation Content
 // Accessor and Application Shell Activation Arc) -- every import/addition
@@ -432,6 +452,22 @@ function isFedosProductionEphemeralGiftWrapHandleSource(authority: FedosMasterSe
   return typeof candidate.buildEphemeralGiftWrap === "function";
 }
 
+/**
+ * Secure Runtime Alpha 7241-7320 -- structural guard, mirrors
+ * `isFedosProductionEphemeralGiftWrapHandleSource()` immediately above
+ * exactly: a `conversationArchiveMasterSeedAuthority` that ALSO exposes
+ * the four production AEAD accessor methods (i.e. a real
+ * `FedosProductionMasterSeedAuthority`) gets the real, WASM-backed
+ * production Archive encryption boundary; any other `FedosMasterSeedAuthority`
+ * (a test double, a `DevelopmentFedosMasterSeedAuthority`, etc.) falls
+ * back to `FedosWasmConversationArchiveEncryptionAuthority`'s own
+ * existing default -- zero regression for every existing caller.
+ */
+function isFedosProductionConversationAeadHandleSource(authority: FedosMasterSeedAuthority): authority is FedosMasterSeedAuthority & FedosProductionConversationAeadHandleSource {
+  const candidate = authority as Partial<FedosProductionConversationAeadHandleSource>;
+  return typeof candidate.encryptAead === "function";
+}
+
 export async function startFedosDesktopRuntime(
   config: FedosDesktopRuntimeConfig,
 ): Promise<FedosRunningDesktopRuntime> {
@@ -679,6 +715,20 @@ export async function startFedosDesktopRuntime(
     config.conversationCapabilityLogPath !== undefined
       ? new AppendOnlyFedosConversationCapabilityPersistence(config.conversationCapabilityLogPath)
       : new InMemoryFedosConversationCapabilityPersistence();
+
+  // Secure Runtime Alpha 7241-7320 -- see this file's own import-site
+  // comment immediately above: a second, read-only-from-Archive's-own-
+  // perspective `FedosPayloadRetentionAuthority` instance over the SAME
+  // durable retention log + the SAME `conversationPayloadStorage`
+  // instance below (constructed just above this point already).
+  const conversationArchiveRetentionAuthority = new FedosPayloadRetentionAuthority({
+    retentionPersistence:
+      config.conversationPayloadRetentionLogPath !== undefined
+        ? new AppendOnlyFedosPayloadRetentionPersistence(config.conversationPayloadRetentionLogPath)
+        : new InMemoryFedosPayloadRetentionPersistence(),
+    payloadStorage: conversationPayloadStorage,
+    clock: config.clock,
+  });
 
   // Secure Runtime Alpha 1921-1980 -- mirrors conversationArchiveMembershipPersistence/
   // conversationArchiveCapabilityPersistence's own identical discipline immediately above: a SECOND
@@ -1399,6 +1449,13 @@ export async function startFedosDesktopRuntime(
       isRuntimeRunning: () => !stopped,
       clock: config.clock,
       bounds: config.conversationArchiveBounds,
+      retentionAuthority: conversationArchiveRetentionAuthority,
+      // Secure Runtime Alpha 7241-7320 -- real WASM-backed Archive
+      // encryption when the supplied authority is genuinely a production
+      // one; `undefined` (the existing dev-gated default) otherwise.
+      encryptionRuntimeBoundary: isFedosProductionConversationAeadHandleSource(config.conversationArchiveMasterSeedAuthority!)
+        ? new FedosProductionConversationArchiveEncryptionRuntimeBoundary(config.conversationArchiveMasterSeedAuthority!)
+        : undefined,
     });
   }
 

@@ -36,6 +36,7 @@ import type { FedosConversationCapabilityPersistence } from "../capability/persi
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import { serializeFedosConversationPayload } from "../payload_storage/fedos_conversation_payload_codec.js";
+import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
 import type { FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
 import type { FedosGroupDirectPathPersistence, FedosGroupDirectPathRecord } from "../group/fedos_group_direct_path.js";
 import type { FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
@@ -66,6 +67,34 @@ export interface FedosConversationArchiveCollectorDependencies {
    * for a Direct conversationId is inert.
    */
   readonly group?: FedosConversationArchiveGroupCollectorDependencies;
+  /**
+   * Secure Runtime Alpha 7241-7320 — OPTIONAL, narrow, additive: the SAME
+   * `Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">` gate
+   * Search's own Alpha 2581-2620 fix already added to
+   * `fedos_conversation_search_index.ts`. Closes the real, disclosed
+   * design-vs-implementation drift a Release Readiness Review found at
+   * commit `b4fa2d7f`: Archive export/restore never enforced retention at
+   * all, even though the exact same contract ("once tombstoned/payload-
+   * removed, a payload's bytes must not resurface") already applied to
+   * Search. A payload whose `evaluatePayloadAccess()` is anything other
+   * than `{ outcome: "allowed" }` (denied, tombstoned, payload-removed,
+   * not-found, or a thrown/unavailable Authority — fails closed, mirrors
+   * Search's own `#isPermitted()`) is silently excluded from the
+   * collected bundle's own `payloads` array — never included, never a
+   * placeholder. Omitted entirely, this collector's behavior is BYTE-FOR-
+   * BYTE UNCHANGED from before this Arc (every existing caller that never
+   * wires retention keeps exporting every payload, exactly as before).
+   */
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
+}
+
+/** Fail-closed, mirrors `FedosConversationSearchIndex`'s own `#isPermitted()` (Alpha 2581-2620) exactly: only an explicit `{ outcome: "allowed" }` passes; a thrown error from an unavailable Authority is treated as not-permitted, never as "no gate configured". */
+function isPayloadPermitted(retentionAuthority: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">, payloadId: Parameters<FedosPayloadRetentionAuthority["evaluatePayloadAccess"]>[0]): boolean {
+  try {
+    return retentionAuthority.evaluatePayloadAccess(payloadId).outcome === "allowed";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -93,6 +122,7 @@ export function collectFedosConversationArchiveBundle(
 
   const payloadDescriptors = deps.payloadStorage.listConversationPayloads(conversationId);
   const payloads = payloadDescriptors
+    .filter((descriptor) => deps.retentionAuthority === undefined || isPayloadPermitted(deps.retentionAuthority, descriptor.id))
     .map((descriptor) => deps.payloadStorage.getPayload(descriptor.id))
     .filter((payload): payload is NonNullable<typeof payload> => payload !== null)
     .map((payload) => serializeFedosConversationPayload(payload));
