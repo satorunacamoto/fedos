@@ -41,6 +41,9 @@ import type { FedosGroupMessagePersistence } from "../../group/fedos_group_messa
 import type { FedosGroupFanoutDeliveryPersistence } from "../../group/fedos_group_fanout_delivery.js";
 import type { FedosMasterSeedAuthority } from "../../../runtime/master_seed/fedos_master_seed_authority.js";
 import type { FedosPayloadRetentionAuthority } from "../../retention/fedos_payload_retention_authority.js";
+import type { FedosArchiveSuppressionObservationAuthority } from "../../retention/fedos_archive_suppression_observation_authority.js";
+import type { FedosConversationDraftPersistence } from "../../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationActivationPersistence } from "../../activation/fedos_conversation_activation_persistence.js";
 import type { FedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
 import { defaultFedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
 import { FedosWasmConversationArchiveEncryptionAuthority, type FedosConversationArchiveEncryptionRuntimeBoundary } from "../fedos_conversation_archive_encryption.js";
@@ -54,6 +57,9 @@ import {
 
 export interface FedosConversationArchiveRuntimeAssemblyConfig {
   readonly conversationPersistence: FedosConversationPersistence;
+  /** Secure Runtime Alpha 7801-7880 — optional pair, additive; see `FedosConversationArchiveRuntimeDependencies`'s own doc comment. Passed straight through, unmodified. */
+  readonly draftPersistence?: FedosConversationDraftPersistence;
+  readonly activationPersistence?: FedosConversationActivationPersistence;
   readonly membershipPersistence: FedosConversationMembershipPersistence;
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
@@ -84,6 +90,8 @@ export interface FedosConversationArchiveRuntimeAssemblyConfig {
   readonly encryptionRuntimeBoundary?: FedosConversationArchiveEncryptionRuntimeBoundary;
   /** Secure Runtime Alpha 7241-7320 — optional, additive; see `FedosConversationArchiveRuntimeDependencies`'s own doc comment. Passed straight through, unmodified. Widened in Alpha 7481-7560 to also cover `evaluateRetentionDecisionOnly` (Restore's own defense-in-depth gate). */
   readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
+  /** Secure Runtime Alpha 7801-7880 — optional, additive; see `FedosConversationArchiveRuntimeDependencies`'s own doc comment. Passed straight through, unmodified. Closes the real wiring gap this Arc found: `e048ff63` never threaded this dependency past `restoreFedosConversationArchiveBundle()` itself. */
+  readonly suppressionAuthority?: Pick<FedosArchiveSuppressionObservationAuthority, "evaluateSuppression">;
 }
 
 /** Pure with respect to the filesystem — constructs no file, starts no timer, reads no `process.env`. */
@@ -97,6 +105,8 @@ export function assembleFedosConversationArchiveRuntime(
 
   return createFedosConversationArchiveRuntime({
     conversationPersistence: config.conversationPersistence,
+    draftPersistence: config.draftPersistence,
+    activationPersistence: config.activationPersistence,
     membershipPersistence: config.membershipPersistence,
     capabilityPersistence: config.capabilityPersistence,
     envelopePersistence: config.envelopePersistence,
@@ -111,5 +121,6 @@ export function assembleFedosConversationArchiveRuntime(
     isRuntimeRunning: config.isRuntimeRunning,
     bounds: config.bounds,
     retentionAuthority: config.retentionAuthority,
+    suppressionAuthority: config.suppressionAuthority,
   });
 }

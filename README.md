@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7801–7880 — FedOS Direct Conversation
+> Archive Product Completion and Parallel-Lineage Integration Arc (FULL
+> COMPLETION).** Reconciles two sibling production lineages first
+> (`d5979ae`, Delivery Observation Repository Subject Index; `e048ff63`,
+> Archive Multi-Device Suppression Propagation — completely disjoint
+> file sets, one README conflict, zero production-source conflicts),
+> then closes the Direct Conversation Archive product gap Alpha
+> 7321–7400 disclosed: `FedosConversationArchiveBundleV1.conversation`
+> was valid ONLY for a public, Board-thread-anchored Conversation, but a
+> real Direct Conversation is never written into that persistence port
+> at all — a prior Arc (Alpha 1921–1980) had already found and
+> precisely documented this exact gap, deliberately deferring it. Fix: a
+> new, narrow, additive subject type — a bare object (no `kind` field)
+> is the pre-existing Board shape, byte-for-byte unchanged; an object
+> with `kind: "direct"` wraps the ALREADY-EXISTING, already-frozen
+> Conversation Draft wire record verbatim, no new record shape, no
+> global Archive schema-version bump. The Collector/Restore/Runtime now
+> try the real Board record first, falling back — only when both new,
+> optional dependencies are wired — to the SAME `resolveActiveConversation()`
+> helper the Encryption/Decryption Coordinators already use, never a
+> fabricated Board record. Restore writes ONLY the draft record, never
+> an Activation fact — history recovery and live-session recovery stay
+> separate by construction, proven live: a restored Direct Conversation
+> reports "not-active" and a send attempt fails closed. Two real bugs
+> were found and fixed while building the real vertical slice: reusing
+> a Master Seed Authority after `lock()` (which clears its own secret
+> material) breaks restore, and Activation state — unlike every other
+> port — has no real durable log path in the current profile flow, so
+> two independently-constructed in-memory instances silently never
+> share state; fixed by injecting one shared instance into both the
+> Conversation Runtime's own assembly and the Archive Runtime. Also
+> closed: Multi-Device Suppression's own `suppressionAuthority`
+> dependency was fully implemented and tested by `e048ff63` but never
+> threaded past `restoreFedosConversationArchiveBundle()` itself — no
+> caller anywhere in the Runtime ever wired it, invisible to that Arc's
+> own tests since they call the function directly. Threaded through the
+> Runtime layer; the REMAINING gap (no real production construction site
+> for the suppression authority itself, no Device Sync transport wiring)
+> is disclosed, not fixed, and recommended as follow-on work. Proven
+> live through the exact same `FedosDesktopApplicationShell.archive()`
+> method the packaged Electron app's own `fedos-acceptance:archive` IPC
+> channel already calls — zero new IPC surface needed, since the
+> assumption lived entirely inside the Collector/Restore, never the IPC
+> layer. Zero Ratchet/Identity Transition/NIP-17/Device Sync/Observation-
+> repository-indexing/Outbox-Scheduler changes; zero Electron preload/
+> main files touched. See
+> `docs/secure_runtime_alpha_7801_7880_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7721–7800 — FedOS Archive Multi-Device
 > Suppression Propagation Arc (FULL COMPLETION).** Closes the exact
 > limitation Alpha 7481–7560 left standing: a genuinely foreign or

@@ -172,6 +172,24 @@ export interface FedosConversationRuntimeAssemblyConfig {
   readonly encryptionIdempotencyKeyGenerator?: FedosConversationEncryptionIdempotencyKeyGenerator;
   /** Alpha 1121 — explicit append-only log path for the Direct Activation coordination facts; omitted, in-memory. */
   readonly activationCoordinationLogPath?: string;
+  /**
+   * Secure Runtime Alpha 7801-7880 — OPTIONAL, additive: an ALREADY-
+   * CONSTRUCTED `FedosConversationActivationPersistence` instance,
+   * checked BEFORE `activationCoordinationLogPath` above. Exists so a
+   * caller needing a SECOND consumer of the exact same live Activation
+   * state (this Arc's own Archive Runtime, which must ask "is this
+   * Direct Conversation genuinely active" using the SAME facts this
+   * Runtime itself uses, not a disconnected second copy) can inject the
+   * real instance directly, rather than constructing an independent
+   * `InMemoryFedosConversationActivationPersistence` that would never
+   * see any fact this Runtime records (in-memory Activation state, the
+   * real product's own current default, is never file-backed and so can
+   * never be "the same backend" across two separately-constructed
+   * instances the way every log-path-based port already is). Omitted,
+   * behavior is BYTE-FOR-BYTE UNCHANGED — falls through to
+   * `activationCoordinationLogPath`/in-memory exactly as before.
+   */
+  readonly activationPersistence?: FedosConversationActivationPersistence;
   /** Alpha 1143 — explicit append-only log path for the Payload Retention decision log; omitted, in-memory. */
   readonly payloadRetentionLogPath?: string;
   /** Alpha 1321–1390 — explicit append-only log path for Group Generation snapshots; omitted, in-memory. */
@@ -281,10 +299,14 @@ export function assembleFedosConversationRuntimeDependencies(
       : new InMemoryFedosConversationEncryptionCoordinationPersistence();
 
   // Alpha 1121/1143 — mirrors every backend construction above exactly.
+  // Secure Runtime Alpha 7801-7880 — `config.activationPersistence`, an
+  // already-constructed instance, takes precedence when supplied (see
+  // this file's own header comment on that field for why).
   const activationPersistence: FedosConversationActivationPersistence =
-    config.activationCoordinationLogPath !== undefined
+    config.activationPersistence ??
+    (config.activationCoordinationLogPath !== undefined
       ? new AppendOnlyFedosConversationActivationPersistence(config.activationCoordinationLogPath)
-      : new InMemoryFedosConversationActivationPersistence();
+      : new InMemoryFedosConversationActivationPersistence());
 
   const retentionPersistence: FedosPayloadRetentionPersistence =
     config.payloadRetentionLogPath !== undefined

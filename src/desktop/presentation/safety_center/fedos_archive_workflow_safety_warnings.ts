@@ -37,6 +37,8 @@ export function fedosArchiveRestoreWorkflowWarnings(): readonly FedosArchiveWork
     warning("archive-restore-may-be-suppressed-by-local-deletion-facts"),
     warning("archives-and-backups-may-retain-copies"),
     warning("external-copies-cannot-be-verified"),
+    // Secure Runtime Alpha 7801-7880 -- restoring history is not the same as restoring a live session.
+    warning("archive-restore-does-not-imply-live-session-continuity"),
   ];
 }
 

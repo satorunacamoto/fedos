@@ -8,6 +8,7 @@ import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conv
 import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
 import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
 import type { FedosConversationArchiveBundleV1 } from "../src/conversation/archive/fedos_conversation_archive_bundle.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
 import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreDependencies } from "../src/conversation/archive/fedos_conversation_archive_restore.js";
 import { detectFedosConversationArchiveDuplicates } from "../src/conversation/archive/fedos_conversation_archive_duplicate_detection.js";
 import { collectFedosConversationArchiveBundle } from "../src/conversation/archive/fedos_conversation_archive_collector.js";
@@ -159,7 +160,8 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Restore", () => {
   it("3. restoring a SAME-id, DIFFERENT-content record reports a conflict", () => {
     restoreFedosConversationArchiveBundle(makeBundle(), deps);
     const base = makeBundle();
-    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...base.conversation, createdAt: base.conversation.createdAt + 1 } };
+    const baseConversation = base.conversation as FedosPersistedConversationRecordV1;
+    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...baseConversation, createdAt: baseConversation.createdAt + 1 } };
     const result = restoreFedosConversationArchiveBundle(conflicting, deps);
     expect(result.conversation).toBe("conflict");
   });
@@ -210,7 +212,8 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Duplicate Detection (read-on
     const deps = makeDependencies();
     restoreFedosConversationArchiveBundle(makeBundle(), deps);
     const base = makeBundle();
-    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...base.conversation, createdAt: base.conversation.createdAt + 1 } };
+    const baseConversation = base.conversation as FedosPersistedConversationRecordV1;
+    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...baseConversation, createdAt: baseConversation.createdAt + 1 } };
     const report = detectFedosConversationArchiveDuplicates(conflicting, deps);
     expect(report.conversation).toBe("conflict");
   });

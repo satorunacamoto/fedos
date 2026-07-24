@@ -28,6 +28,9 @@
 import type { FedosConversationId } from "../fedos_conversation_id.js";
 import { fedosPersistedConversationRecordsAreEqual } from "../persistence/fedos_conversation_persistence.js";
 import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import { fedosPersistedConversationDraftRecordsAreEqual } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import { isFedosConversationArchiveDirectConversationSubject } from "./fedos_conversation_archive_direct_subject.js";
 import { fedosPersistedConversationMembershipsAreEqual } from "../membership/persistence/fedos_conversation_membership_persistence.js";
 import type { FedosConversationMembershipPersistence } from "../membership/persistence/fedos_conversation_membership_persistence.js";
 import type { FedosConversationCapabilityPersistence } from "../capability/persistence/fedos_conversation_capability_persistence.js";
@@ -52,6 +55,8 @@ export interface FedosConversationArchiveGroupDuplicateDetectionDependencies {
 
 export interface FedosConversationArchiveDuplicateDetectionDependencies {
   readonly conversationPersistence: FedosConversationPersistence;
+  /** Secure Runtime Alpha 7801-7880 — OPTIONAL. Consulted ONLY when `bundle.conversation` is a Direct subject (`kind: "direct"`), mirroring the Collector's own identical dual-path discipline. Omitted, a Direct bundle's own conversation status cannot be determined and is reported `"new"` (fail-open toward "would insert", never a false `"conflict"`/`"duplicate"` claim) -- callers wanting an accurate Direct preflight answer must supply this. */
+  readonly draftPersistence?: FedosConversationDraftPersistence;
   readonly membershipPersistence: FedosConversationMembershipPersistence;
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
@@ -100,9 +105,20 @@ export function detectFedosConversationArchiveDuplicates(
   bundle: FedosConversationArchiveBundleV1,
   deps: FedosConversationArchiveDuplicateDetectionDependencies,
 ): FedosConversationArchiveDuplicateReport {
-  const existingConversation = deps.conversationPersistence.getConversation(bundle.conversationId as FedosConversationId);
-  const conversationStatus: FedosConversationArchiveDuplicateStatus =
-    existingConversation === null ? "new" : fedosPersistedConversationRecordsAreEqual(existingConversation, bundle.conversation) ? "duplicate" : "conflict";
+  let conversationStatus: FedosConversationArchiveDuplicateStatus;
+  if (isFedosConversationArchiveDirectConversationSubject(bundle.conversation)) {
+    const existingDraft = deps.draftPersistence?.getDraft(bundle.conversationId as FedosConversationId) ?? null;
+    conversationStatus =
+      existingDraft === null
+        ? "new"
+        : fedosPersistedConversationDraftRecordsAreEqual(existingDraft, bundle.conversation.record)
+          ? "duplicate"
+          : "conflict";
+  } else {
+    const existingConversation = deps.conversationPersistence.getConversation(bundle.conversationId as FedosConversationId);
+    conversationStatus =
+      existingConversation === null ? "new" : fedosPersistedConversationRecordsAreEqual(existingConversation, bundle.conversation) ? "duplicate" : "conflict";
+  }
 
   const membershipCounts = zeroCounts();
   for (const membership of bundle.memberships) {

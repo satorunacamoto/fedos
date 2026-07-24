@@ -42,7 +42,17 @@ export type FedosSafetyCenterWarningCode =
    */
   | "archive-suppression-sync-does-not-guarantee-all-devices-informed"
   | "archive-suppression-sync-is-not-recipient-deletion-acknowledgement"
-  | "archive-suppression-requires-local-receipt-to-take-effect";
+  | "archive-suppression-requires-local-receipt-to-take-effect"
+  /**
+   * Secure Runtime Alpha 7801-7880 (FedOS Direct Conversation Archive
+   * Product Completion and Parallel-Lineage Integration Arc) — ONE new,
+   * narrow, additive code: a Direct Conversation's own Archive can now
+   * genuinely export/restore (closing the packaged-product gap Alpha
+   * 7321-7400 disclosed), which makes this distinction user-relevant for
+   * the first time — restoring history was always separate from
+   * restoring a live session (Phase F), but no warning ever said so.
+   */
+  | "archive-restore-does-not-imply-live-session-continuity";
 
 export const FEDOS_SAFETY_CENTER_KNOWN_WARNING_CODES: readonly FedosSafetyCenterWarningCode[] = [
   "device-revocation-does-not-erase-copies",
@@ -63,6 +73,7 @@ export const FEDOS_SAFETY_CENTER_KNOWN_WARNING_CODES: readonly FedosSafetyCenter
   "archive-suppression-sync-does-not-guarantee-all-devices-informed",
   "archive-suppression-sync-is-not-recipient-deletion-acknowledgement",
   "archive-suppression-requires-local-receipt-to-take-effect",
+  "archive-restore-does-not-imply-live-session-continuity",
 ];
 
 export function isFedosSafetyCenterWarningCode(candidate: unknown): candidate is FedosSafetyCenterWarningCode {
@@ -88,6 +99,7 @@ const TEXT: Readonly<Record<FedosSafetyCenterWarningCode, string>> = {
   "archive-suppression-sync-does-not-guarantee-all-devices-informed": "This Device sends its own deletion decisions to your other trusted Devices, but there is no guarantee every Device has received one — an offline, revoked, or newly-paired Device may not have it.",
   "archive-suppression-sync-is-not-recipient-deletion-acknowledgement": "Suppression facts synchronize your own restore policy between your own Devices only — they are separate from, and never automatically created by, a deletion request acknowledgement from someone else's Device.",
   "archive-suppression-requires-local-receipt-to-take-effect": "A Device only refuses to restore a deleted item once it has actually received and recorded that deletion — restoring an old Archive before that point may still show the deleted content.",
+  "archive-restore-does-not-imply-live-session-continuity": "Restoring an Archive brings back your message history. It does not reconnect a live conversation by itself — sending a new message may require re-establishing the conversation first, exactly like starting a new one.",
 };
 
 /** The ONE place any Safety Center screen resolves warning text — never an inline string in a screen-model builder or Renderer. */

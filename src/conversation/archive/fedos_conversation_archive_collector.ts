@@ -31,6 +31,9 @@
 
 import type { FedosConversationId } from "../fedos_conversation_id.js";
 import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationActivationPersistence } from "../activation/fedos_conversation_activation_persistence.js";
+import { resolveFedosConversationActiveConversation } from "../activation/fedos_conversation_active_lookup.js";
 import type { FedosConversationMembershipPersistence } from "../membership/persistence/fedos_conversation_membership_persistence.js";
 import type { FedosConversationCapabilityPersistence } from "../capability/persistence/fedos_conversation_capability_persistence.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
@@ -55,6 +58,25 @@ export interface FedosConversationArchiveGroupCollectorDependencies {
 
 export interface FedosConversationArchiveCollectorDependencies {
   readonly conversationPersistence: FedosConversationPersistence;
+  /**
+   * Secure Runtime Alpha 7801-7880 — OPTIONAL. A real Direct/private-group
+   * Conversation is never written into `conversationPersistence` at all
+   * (that port is Board/public-only, `validateFedosConversationRecord`
+   * hard-rejects any other `mode`) — its own real identity lives here
+   * plus `activationPersistence` below. Consulted ONLY when
+   * `conversationPersistence.getConversation(conversationId)` itself
+   * returns `null`, via the SAME `resolveFedosConversationActiveConversation()`
+   * helper `FedosConversationEncryptionCoordinator`/`DecryptionCoordinator`
+   * already use (Alpha 1116/1160, unmodified) — never a new "is this
+   * Conversation real" rule invented for this Arc. Omitted entirely,
+   * this Collector's behavior for a Board conversationId is BYTE-FOR-BYTE
+   * UNCHANGED, and a Direct conversationId still returns `null` exactly
+   * as it always has (every pre-existing caller that never wires this
+   * new pair keeps its own current behavior).
+   */
+  readonly draftPersistence?: FedosConversationDraftPersistence;
+  /** Secure Runtime Alpha 7801-7880 — OPTIONAL, the `draftPersistence` counterpart above; both must be supplied together for Direct Conversation Archive support, or neither. */
+  readonly activationPersistence?: FedosConversationActivationPersistence;
   readonly membershipPersistence: FedosConversationMembershipPersistence;
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
@@ -125,8 +147,24 @@ export function collectFedosConversationArchiveBundle(
   deps: FedosConversationArchiveCollectorDependencies,
   exportedAt: number,
 ): FedosConversationArchiveBundleV1 | null {
-  const conversation = deps.conversationPersistence.getConversation(conversationId);
-  if (conversation === null) return null;
+  const boardConversation = deps.conversationPersistence.getConversation(conversationId);
+  // Secure Runtime Alpha 7801-7880 -- a Board record is checked FIRST
+  // (byte-for-byte the pre-existing, unchanged lookup); only when that
+  // returns `null` AND both Direct-support dependencies are supplied is
+  // the REAL Direct Conversation existence fact
+  // (`resolveFedosConversationActiveConversation()`) consulted -- never
+  // as a substitute or override for a genuine Board record, and never
+  // fabricating one out of Direct facts.
+  let conversation: FedosConversationArchiveBundleV1["conversation"];
+  if (boardConversation !== null) {
+    conversation = boardConversation;
+  } else if (deps.draftPersistence !== undefined && deps.activationPersistence !== undefined) {
+    const active = resolveFedosConversationActiveConversation(deps.draftPersistence, deps.activationPersistence, conversationId);
+    if (active.outcome !== "active") return null;
+    conversation = { kind: "direct", record: active.draft };
+  } else {
+    return null;
+  }
 
   const memberships = deps.membershipPersistence.listConversationMemberships(conversationId);
   const capabilityEvents = deps.capabilityPersistence.listConversationCapabilityEvents(conversationId);

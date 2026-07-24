@@ -71,6 +71,9 @@
 
 import type { FedosConversationId } from "../../fedos_conversation_id.js";
 import type { FedosConversationPersistence } from "../../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationDraftPersistence } from "../../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationActivationPersistence } from "../../activation/fedos_conversation_activation_persistence.js";
+import { resolveFedosConversationActiveConversation } from "../../activation/fedos_conversation_active_lookup.js";
 import type { FedosConversationMembershipPersistence } from "../../membership/persistence/fedos_conversation_membership_persistence.js";
 import type { FedosConversationCapabilityPersistence } from "../../capability/persistence/fedos_conversation_capability_persistence.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
@@ -90,6 +93,7 @@ import { detectFedosConversationArchiveDuplicates, type FedosConversationArchive
 import type { FedosConversationArchiveEncryptionAuthority } from "../fedos_conversation_archive_encryption.js";
 import type { FedosConversationArchiveManifestV1 } from "../fedos_conversation_archive_manifest.js";
 import type { FedosPayloadRetentionAuthority } from "../../retention/fedos_payload_retention_authority.js";
+import type { FedosArchiveSuppressionObservationAuthority } from "../../retention/fedos_archive_suppression_observation_authority.js";
 import type { FedosConversationArchiveFileAuthority } from "../fs/fedos_conversation_archive_file_authority.js";
 import { encodeFedosConversationArchiveFileContainer, decodeFedosConversationArchiveFileContainer } from "../fs/fedos_conversation_archive_file_container.js";
 
@@ -111,6 +115,24 @@ export const DEFAULT_FEDOS_CONVERSATION_ARCHIVE_RUNTIME_BOUNDS: FedosConversatio
 
 export interface FedosConversationArchiveRuntimeDependencies {
   readonly conversationPersistence: FedosConversationPersistence;
+  /**
+   * Secure Runtime Alpha 7801-7880 — OPTIONAL, additive pair (both or
+   * neither): closes the packaged-product gap disclosed by Alpha
+   * 7321-7400 and Alpha 7481-7560 — `exportConversationArchive()`'s own
+   * existence check previously ONLY consulted `conversationPersistence`
+   * (Board/public-only), so a real Direct Conversation (which never has
+   * a record there) always failed `"conversation-not-found"` before
+   * ever reaching the Collector. Consulted ONLY when
+   * `conversationPersistence.getConversation()` itself returns `null`,
+   * via the SAME `resolveFedosConversationActiveConversation()` helper
+   * the Coordinators already use — never a new "is this real" rule.
+   * Omitted entirely, this Runtime's own behavior for every existing
+   * caller (Board conversations) is BYTE-FOR-BYTE UNCHANGED, and a
+   * Direct conversationId still reports `"conversation-not-found"`
+   * exactly as it always has.
+   */
+  readonly draftPersistence?: FedosConversationDraftPersistence;
+  readonly activationPersistence?: FedosConversationActivationPersistence;
   readonly membershipPersistence: FedosConversationMembershipPersistence;
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
@@ -153,6 +175,21 @@ export interface FedosConversationArchiveRuntimeDependencies {
    * has both methods, so every existing caller is unaffected.
    */
   readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
+  /**
+   * Secure Runtime Alpha 7801-7880 — OPTIONAL, additive. Closes a real,
+   * disclosed wiring gap this Arc found: `e048ff63` (FedOS Archive
+   * Multi-Device Suppression Propagation Arc) fully implemented and
+   * tested `suppressionAuthority` as a `restoreFedosConversationArchiveBundle()`
+   * dependency, but no caller anywhere in this Runtime, nor
+   * `fedos_desktop_runtime.ts`'s own production construction, ever
+   * passed one through — that Arc's own real vertical slice calls
+   * `restoreFedosConversationArchiveBundle()` directly, bypassing this
+   * Runtime entirely, so the gap was invisible to its own tests. Passed
+   * straight through to `restoreConversationArchive()` below; omitted,
+   * restore behavior is byte-for-byte unchanged from `e048ff63`'s own
+   * (already-inert-in-production) state.
+   */
+  readonly suppressionAuthority?: Pick<FedosArchiveSuppressionObservationAuthority, "evaluateSuppression">;
 }
 
 export interface FedosConversationArchiveExportRequest {
@@ -376,7 +413,18 @@ export class FedosConversationArchiveRuntime {
 
     const conversationId = request.conversationId as FedosConversationId;
     const conversation = this.#deps.conversationPersistence.getConversation(conversationId);
-    if (conversation === null) return { outcome: "conversation-not-found" };
+    // Secure Runtime Alpha 7801-7880 -- a Board record is checked FIRST
+    // (byte-for-byte the pre-existing lookup); only when it is absent
+    // AND both Direct-support dependencies are wired is the REAL Direct
+    // Conversation existence fact consulted -- see this file's own
+    // dependency-doc comment above.
+    if (conversation === null) {
+      const directlySupported = this.#deps.draftPersistence !== undefined && this.#deps.activationPersistence !== undefined;
+      const isRealDirectConversation =
+        directlySupported &&
+        resolveFedosConversationActiveConversation(this.#deps.draftPersistence!, this.#deps.activationPersistence!, conversationId).outcome === "active";
+      if (!isRealDirectConversation) return { outcome: "conversation-not-found" };
+    }
 
     // Phase C item 11 -- a Conversation ID alone never authorizes export.
     const membershipId = toFedosConversationMembershipId(conversationId, request.localParticipant);
@@ -387,6 +435,8 @@ export class FedosConversationArchiveRuntime {
       conversationId,
       {
         conversationPersistence: this.#deps.conversationPersistence,
+        draftPersistence: this.#deps.draftPersistence,
+        activationPersistence: this.#deps.activationPersistence,
         membershipPersistence: this.#deps.membershipPersistence,
         capabilityPersistence: this.#deps.capabilityPersistence,
         envelopePersistence: this.#deps.envelopePersistence,
@@ -499,12 +549,14 @@ export class FedosConversationArchiveRuntime {
     // byte-for-byte unchanged from before this Arc.
     const details = restoreFedosConversationArchiveBundle(staged.bundle, {
       conversationPersistence: this.#deps.conversationPersistence,
+      draftPersistence: this.#deps.draftPersistence,
       membershipPersistence: this.#deps.membershipPersistence,
       capabilityPersistence: this.#deps.capabilityPersistence,
       envelopePersistence: this.#deps.envelopePersistence,
       payloadStorage: this.#deps.payloadStorage,
       group: this.#groupDeps(),
       retentionAuthority: this.#deps.retentionAuthority,
+      suppressionAuthority: this.#deps.suppressionAuthority,
     });
 
     if (details.conversation === "invalid" || details.conversation === "failed") {

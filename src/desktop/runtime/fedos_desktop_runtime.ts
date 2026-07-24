@@ -115,6 +115,12 @@ import { createFedosBoardRuntime, type FedosBoardRuntime } from "../../board/run
 import type { FedosConversationPersistence } from "../../conversation/persistence/fedos_conversation_persistence.js";
 import { AppendOnlyFedosConversationPersistence } from "../../conversation/persistence/append_only_fedos_conversation_persistence.js";
 import { InMemoryFedosConversationPersistence } from "../../conversation/persistence/in_memory_fedos_conversation_persistence.js";
+import type { FedosConversationDraftPersistence } from "../../conversation/construction/fedos_conversation_draft_persistence.js";
+import { AppendOnlyFedosConversationDraftPersistence } from "../../conversation/construction/append_only_fedos_conversation_draft_persistence.js";
+import { InMemoryFedosConversationDraftPersistence } from "../../conversation/construction/in_memory_fedos_conversation_draft_persistence.js";
+import type { FedosConversationActivationPersistence } from "../../conversation/activation/fedos_conversation_activation_persistence.js";
+import { AppendOnlyFedosConversationActivationPersistence } from "../../conversation/activation/append_only_fedos_conversation_activation_persistence.js";
+import { InMemoryFedosConversationActivationPersistence } from "../../conversation/activation/in_memory_fedos_conversation_activation_persistence.js";
 import { hydrateFedosConversations } from "../../conversation/fedos_conversation_hydration.js";
 import {
   createFedosConversationRuntime,
@@ -1032,6 +1038,34 @@ export async function startFedosDesktopRuntime(
         }
       : undefined);
 
+  // Secure Runtime Alpha 7801-7880 -- `conversationArchiveDraftPersistence`
+  // is a second, separate port instance over the SAME durable
+  // `conversationDraftLogPath` the Conversation Runtime's own assembly
+  // (below) already uses (mirrors `conversationPersistence`/
+  // `conversationEnvelopePersistence`'s own identical "fresh instance,
+  // same durable backend" pattern) -- this works correctly because that
+  // backend is always file-backed (or consistently in-memory-empty)
+  // either way. `conversationArchiveActivationPersistence`, in contrast,
+  // is constructed ONCE here and passed as the SAME OBJECT REFERENCE
+  // into BOTH the Conversation Runtime's own assembly (immediately
+  // below) AND the Archive Runtime (further below) -- Activation state
+  // has NO real log-path wiring anywhere in the real profile flow today
+  // (`FedosProfileInitializationCoordinator` never sets
+  // `conversationActivationCoordinationLogPath`), so it is always
+  // in-memory; two SEPARATE in-memory instances would never see the
+  // same facts, unlike every log-path-based port above. Sharing the
+  // object reference closes that gap without requiring a real durable
+  // Activation log to exist first (a separate, larger, disclosed
+  // Profile/Onboarding-domain gap this Arc does not fix).
+  const conversationArchiveDraftPersistence: FedosConversationDraftPersistence =
+    config.conversationDraftLogPath !== undefined
+      ? new AppendOnlyFedosConversationDraftPersistence(config.conversationDraftLogPath)
+      : new InMemoryFedosConversationDraftPersistence();
+  const conversationArchiveActivationPersistence: FedosConversationActivationPersistence =
+    config.conversationActivationCoordinationLogPath !== undefined
+      ? new AppendOnlyFedosConversationActivationPersistence(config.conversationActivationCoordinationLogPath)
+      : new InMemoryFedosConversationActivationPersistence();
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -1085,6 +1119,12 @@ export async function startFedosDesktopRuntime(
       // Alpha 1121/1143 -- the NEW Activation coordination and Payload
       // Retention logs this Arc introduces.
       activationCoordinationLogPath: config.conversationActivationCoordinationLogPath,
+      // Secure Runtime Alpha 7801-7880 -- the SAME instance the Archive
+      // Runtime (constructed further below in this same function) also
+      // receives, so both consult IDENTICAL live Activation state. See
+      // `conversationArchiveActivationPersistence`'s own construction
+      // comment above.
+      activationPersistence: conversationArchiveActivationPersistence,
       payloadRetentionLogPath: config.conversationPayloadRetentionLogPath,
       // Alpha 1321-1390 -- the additive Group Runtime facade's own logs.
       groupGenerationLogPath: config.conversationGroupGenerationLogPath,
@@ -1435,6 +1475,8 @@ export async function startFedosDesktopRuntime(
   if (config.archiveEnabled) {
     archiveRuntimeInstance = assembleFedosConversationArchiveRuntime({
       conversationPersistence,
+      draftPersistence: conversationArchiveDraftPersistence,
+      activationPersistence: conversationArchiveActivationPersistence,
       membershipPersistence: conversationArchiveMembershipPersistence,
       capabilityPersistence: conversationArchiveCapabilityPersistence,
       envelopePersistence: conversationEnvelopePersistence,

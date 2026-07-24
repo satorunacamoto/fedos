@@ -39,6 +39,9 @@
 
 import { deserializeFedosConversationRecord, serializeFedosConversationRecord } from "../persistence/fedos_conversation_record_codec.js";
 import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import { deserializeFedosConversationDraftRecord, serializeFedosConversationDraftRecord } from "../construction/fedos_conversation_draft_record_codec.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import { isFedosConversationArchiveDirectConversationSubject } from "./fedos_conversation_archive_direct_subject.js";
 import { deserializeFedosConversationMembership, serializeFedosConversationMembership } from "../membership/persistence/fedos_conversation_membership_codec.js";
 import type { FedosConversationMembershipPersistence } from "../membership/persistence/fedos_conversation_membership_persistence.js";
 import {
@@ -71,6 +74,25 @@ export interface FedosConversationArchiveGroupRestoreDependencies {
 
 export interface FedosConversationArchiveRestoreDependencies {
   readonly conversationPersistence: FedosConversationPersistence;
+  /**
+   * Secure Runtime Alpha 7801-7880 — OPTIONAL. Consulted ONLY when
+   * `bundle.conversation` is a Direct subject (`kind: "direct"`,
+   * `./fedos_conversation_archive_direct_subject.ts`) — writes ONLY the
+   * DRAFT record (history/identity), never an Activation fact: restoring
+   * an Archive must never silently mark a Conversation "active" or
+   * establish a live Ratchet session as a side effect (Phase F's own
+   * "history recovery and live-session recovery remain separate" rule)
+   * — a restored Direct Conversation's own history becomes visible and
+   * inspectable again, but sending a NEW message still requires the
+   * normal, real activation/session-establishment flow, exactly as it
+   * would for any other draft with no completed Activation fact yet.
+   * Omitted, a Direct bundle's own `conversation` record is tallied
+   * `"invalid"` (this dependency was not wired) rather than silently
+   * dropped or misfiled as a Board record — mirrors every other OPTIONAL
+   * dependency's own "omitted, byte-for-byte unchanged/disclosed"
+   * discipline in this file.
+   */
+  readonly draftPersistence?: FedosConversationDraftPersistence;
   readonly membershipPersistence: FedosConversationMembershipPersistence;
   readonly capabilityPersistence: FedosConversationCapabilityPersistence;
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
@@ -221,9 +243,26 @@ export function restoreFedosConversationArchiveBundle(
   bundle: FedosConversationArchiveBundleV1,
   deps: FedosConversationArchiveRestoreDependencies,
 ): FedosConversationArchiveRestoreResult {
-  const conversationRuntime = deserializeFedosConversationRecord(bundle.conversation);
-  const conversationOutcome: FedosConversationArchiveSingleRecordOutcome =
-    conversationRuntime === null ? "invalid" : fromWriteResult(deps.conversationPersistence.putConversation(serializeFedosConversationRecord(conversationRuntime)));
+  // Secure Runtime Alpha 7801-7880 -- a Direct subject (`kind: "direct"`)
+  // writes ONLY the draft record, via `deps.draftPersistence`, never
+  // `conversationPersistence` (that port's own validator hard-rejects
+  // any non-"public" mode -- writing a Direct record there would either
+  // be rejected as invalid or, worse, silently misfiled as a Board
+  // conversation, exactly the "Board/Direct identity conflation" this
+  // Arc's own mission forbids). A bare (no `kind`) subject is the
+  // pre-existing Board shape, written exactly as before.
+  let conversationOutcome: FedosConversationArchiveSingleRecordOutcome;
+  if (isFedosConversationArchiveDirectConversationSubject(bundle.conversation)) {
+    const draftRuntime = deserializeFedosConversationDraftRecord(bundle.conversation.record);
+    conversationOutcome =
+      draftRuntime === null || deps.draftPersistence === undefined
+        ? "invalid"
+        : fromWriteResult(deps.draftPersistence.putDraft(serializeFedosConversationDraftRecord(draftRuntime)));
+  } else {
+    const conversationRuntime = deserializeFedosConversationRecord(bundle.conversation);
+    conversationOutcome =
+      conversationRuntime === null ? "invalid" : fromWriteResult(deps.conversationPersistence.putConversation(serializeFedosConversationRecord(conversationRuntime)));
+  }
 
   const membershipCounts = zeroCounts();
   for (const raw of bundle.memberships) {
