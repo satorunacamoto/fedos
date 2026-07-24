@@ -31,7 +31,18 @@ export type FedosSafetyCenterWarningCode =
    */
   | "archive-metadata-may-survive-content-deletion"
   | "archive-export-after-deletion-applies-retention-parity"
-  | "archive-restore-may-be-suppressed-by-local-deletion-facts";
+  | "archive-restore-may-be-suppressed-by-local-deletion-facts"
+  /**
+   * Secure Runtime Alpha 7721-7800 (FedOS Archive Multi-Device
+   * Suppression Propagation Arc) — three NEW, narrow, additive codes
+   * closing the multi-Device limitation `feff676` itself named and
+   * deferred: a same-account Device that never independently observed a
+   * deletion has no basis to suppress a pre-deletion Archive on its own.
+   * ADDITIVE to every existing code above, never a replacement.
+   */
+  | "archive-suppression-sync-does-not-guarantee-all-devices-informed"
+  | "archive-suppression-sync-is-not-recipient-deletion-acknowledgement"
+  | "archive-suppression-requires-local-receipt-to-take-effect";
 
 export const FEDOS_SAFETY_CENTER_KNOWN_WARNING_CODES: readonly FedosSafetyCenterWarningCode[] = [
   "device-revocation-does-not-erase-copies",
@@ -49,6 +60,9 @@ export const FEDOS_SAFETY_CENTER_KNOWN_WARNING_CODES: readonly FedosSafetyCenter
   "archive-metadata-may-survive-content-deletion",
   "archive-export-after-deletion-applies-retention-parity",
   "archive-restore-may-be-suppressed-by-local-deletion-facts",
+  "archive-suppression-sync-does-not-guarantee-all-devices-informed",
+  "archive-suppression-sync-is-not-recipient-deletion-acknowledgement",
+  "archive-suppression-requires-local-receipt-to-take-effect",
 ];
 
 export function isFedosSafetyCenterWarningCode(candidate: unknown): candidate is FedosSafetyCenterWarningCode {
@@ -71,6 +85,9 @@ const TEXT: Readonly<Record<FedosSafetyCenterWarningCode, string>> = {
   "archive-metadata-may-survive-content-deletion": "Deleting a message removes its readable content locally, but an Archive taken before that deletion can still show that the message existed, when, and between whom.",
   "archive-export-after-deletion-applies-retention-parity": "A new Archive export made after a deletion excludes that message's content and its metadata together — neither resurfaces in a fresh export.",
   "archive-restore-may-be-suppressed-by-local-deletion-facts": "Restoring an older Archive onto a device that already recorded a deletion will not bring that message back; restoring onto a device that never knew about the deletion may still show it.",
+  "archive-suppression-sync-does-not-guarantee-all-devices-informed": "This Device sends its own deletion decisions to your other trusted Devices, but there is no guarantee every Device has received one — an offline, revoked, or newly-paired Device may not have it.",
+  "archive-suppression-sync-is-not-recipient-deletion-acknowledgement": "Suppression facts synchronize your own restore policy between your own Devices only — they are separate from, and never automatically created by, a deletion request acknowledgement from someone else's Device.",
+  "archive-suppression-requires-local-receipt-to-take-effect": "A Device only refuses to restore a deleted item once it has actually received and recorded that deletion — restoring an old Archive before that point may still show the deleted content.",
 };
 
 /** The ONE place any Safety Center screen resolves warning text — never an inline string in a screen-model builder or Renderer. */

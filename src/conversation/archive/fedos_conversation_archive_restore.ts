@@ -53,6 +53,7 @@ import type { FedosConversationMessageEnvelopePersistence } from "../envelope/pe
 import { deserializeFedosConversationPayload } from "../payload_storage/fedos_conversation_payload_codec.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
 import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
+import type { FedosArchiveSuppressionObservationAuthority } from "../retention/fedos_archive_suppression_observation_authority.js";
 import { validateFedosGroupGenerationRecord, type FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
 import { validateFedosGroupDirectPathRecord, type FedosGroupDirectPathPersistence } from "../group/fedos_group_direct_path.js";
 import { validateFedosGroupMessageRecord, type FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
@@ -101,6 +102,26 @@ export interface FedosConversationArchiveRestoreDependencies {
    * `isPayloadPermitted()` discipline.
    */
   readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
+  /**
+   * Secure Runtime Alpha 7721-7800 (FedOS Archive Multi-Device
+   * Suppression Propagation Arc) — OPTIONAL, additive, second and
+   * independent gate alongside `retentionAuthority` above. Where
+   * `retentionAuthority` answers "has THIS device's own local decision
+   * denied this payload," this answers "has this device IMPORTED a
+   * trusted suppression fact — from another of this account's own
+   * Devices — denying it," closing the ONE limitation `feff676` itself
+   * named and deferred: a same-account Device that was offline (or
+   * never independently observed the deletion) when a sibling Device
+   * decided to tombstone a payload has no LOCAL retention decision of
+   * its own, yet must still refuse to resurrect that payload once it has
+   * received the sibling's own suppression fact. Never merged into
+   * `retentionAuthority`'s own log or evaluator — the two remain
+   * entirely separate objects/logs by construction (Phase A
+   * reconciliation report's own decision: "local decision and imported
+   * observation remain distinguishable"). Omitted entirely, restore
+   * behavior is BYTE-FOR-BYTE UNCHANGED from `feff676`.
+   */
+  readonly suppressionAuthority?: Pick<FedosArchiveSuppressionObservationAuthority, "evaluateSuppression">;
 }
 
 /** Secure Runtime Alpha 7481-7560 -- `"denied"` is a NEW outcome, distinct from `"invalid"`: the record is structurally well-formed and passed deep validation, but this device's own CURRENT retention state forbids writing it. Never conflated with a validation failure. */
@@ -136,9 +157,21 @@ export interface FedosConversationArchiveRestoreOutcomeCounts {
 function isPayloadPermittedForRestore(
   retentionAuthority: Pick<FedosPayloadRetentionAuthority, "evaluateRetentionDecisionOnly">,
   payloadId: Parameters<FedosPayloadRetentionAuthority["evaluateRetentionDecisionOnly"]>[0],
+  suppressionAuthority?: Pick<FedosArchiveSuppressionObservationAuthority, "evaluateSuppression">,
 ): boolean {
   try {
-    return retentionAuthority.evaluateRetentionDecisionOnly(payloadId) === "active";
+    if (retentionAuthority.evaluateRetentionDecisionOnly(payloadId) !== "active") return false;
+  } catch {
+    return false;
+  }
+  // Secure Runtime Alpha 7721-7800 -- second, independent gate (see this
+  // file's own `suppressionAuthority` dependency doc comment). Local
+  // retention passing is necessary but not sufficient: an imported,
+  // trusted suppression fact from a sibling Device denies restore even
+  // when this device's OWN retention log has never heard of the payload.
+  if (suppressionAuthority === undefined) return true;
+  try {
+    return suppressionAuthority.evaluateSuppression(payloadId, "restore") === "active";
   } catch {
     return false;
   }
@@ -237,7 +270,10 @@ export function restoreFedosConversationArchiveBundle(
       tally(envelopeCounts, "invalid");
       continue;
     }
-    if (deps.retentionAuthority !== undefined && !isPayloadPermittedForRestore(deps.retentionAuthority, runtime.payloadId)) {
+    if (
+      deps.retentionAuthority !== undefined &&
+      !isPayloadPermittedForRestore(deps.retentionAuthority, runtime.payloadId, deps.suppressionAuthority)
+    ) {
       tally(envelopeCounts, "denied");
       continue;
     }
@@ -251,7 +287,10 @@ export function restoreFedosConversationArchiveBundle(
       tally(payloadCounts, "invalid");
       continue;
     }
-    if (deps.retentionAuthority !== undefined && !isPayloadPermittedForRestore(deps.retentionAuthority, decoded.descriptor.id)) {
+    if (
+      deps.retentionAuthority !== undefined &&
+      !isPayloadPermittedForRestore(deps.retentionAuthority, decoded.descriptor.id, deps.suppressionAuthority)
+    ) {
       tally(payloadCounts, "denied");
       continue;
     }

@@ -8,6 +8,56 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7721–7800 — FedOS Archive Multi-Device
+> Suppression Propagation Arc (FULL COMPLETION).** Closes the exact
+> limitation Alpha 7481–7560 left standing: a genuinely foreign or
+> never-informed Device that possesses a pre-deletion Archive has no
+> basis to suppress its restore, since Retention only knows what THIS
+> Device decided locally. Fix: a new, additive
+> `FedosArchiveSuppressionFact` domain — a closed, versioned, 10-field
+> fact naming a payload and a suppression meaning (payload restore,
+> envelope restore, search reindex), authenticated primarily by the
+> real, unmodified outer Nostr event signature and optionally narrowed
+> by Device-level evidence — propagated between currently-trusted
+> Devices of the SAME account over a new, dedicated `kind:1` route
+> (never a new NIP), reusing the existing `FedosDeviceRelaySyncPublisher`
+> transport unmodified. A durable, per-`(subject, sourceDevice)`
+> monotonic-revision Observation Authority (mirroring Identity
+> Transition's own rollback rule) records both self-authored and
+> imported facts, and Archive restore gains one new, optional
+> `suppressionAuthority` gate alongside `feff676`'s own retention gate —
+> proven live that an imported fact denies restore of both the Envelope
+> and the Payload even when the restoring Device's own local Retention
+> log knows nothing about the deletion. Proven via a real, no-mocks
+> vertical slice: a real local WebSocket relay, a real client, real
+> BIP-340 Schnorr signing, and real file-backed persistence across a
+> literal restart, with three Device contexts — the fact's originator,
+> an already-paired online Device that receives/persists/restarts/
+> suppresses, and a Device not yet paired at fanout time that
+> legitimately still restores the pre-deletion content, an honestly
+> disclosed limitation, never fabricated global deletion propagation.
+> No return-acknowledgement protocol exists — `"relay-accepted"` is the
+> strongest per-Device status this Arc can honestly report, never "the
+> target actually imported it." A real bug was found and fixed while
+> building the vertical slice: the relay client's own raw
+> `FedosNostrWireEvent` (fields `pubkey`/`created_at`/`sig`) was pushed
+> directly into a buffer typed as `FedosEventDescriptor` (`author`/
+> `createdAt`/`signature`) without the existing wire-to-descriptor
+> adapter, silently defeating the Inbound Handler's very first check — a
+> test-fixture bug, not a production defect, fixed by applying the same
+> adapter the outbound side already uses in reverse. Zero Rust/Cargo/
+> WASM changes; zero Ratchet/Identity Transition/Signed Deletion Request/
+> NIP-17/Delivery Observation Repository indexing/Outbox-Scheduler
+> changes (verified via dedicated structural guards, including a direct,
+> behaviorally-proven separation from Signed Deletion's own
+> Acknowledgement flow — neither domain ever creates the other's own
+> fact as a side effect). Ran as one of two parallel Arcs in separate
+> worktrees; the sibling Arc's own domain (Delivery Observation
+> Repository indexing/query) was never touched. See
+> `docs/secure_runtime_alpha_7721_7800_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7481–7560 — FedOS Archive Envelope
 > Retention Parity and Metadata Deletion Semantics Arc (FULL
 > COMPLETION).** Remediates a committed audit's own headline finding
