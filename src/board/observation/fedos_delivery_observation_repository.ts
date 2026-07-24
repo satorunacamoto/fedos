@@ -22,6 +22,25 @@
  *     GUI import of any kind anywhere in this file.
  *   - No delete, no update-in-place — `record()` is the ONLY write
  *     method.
+ *
+ * Secure Runtime Alpha 7641-7720 (FedOS Delivery Observation Repository
+ * Subject Index and Query Scalability Arc) — adds `#bySubject`, a
+ * derived, incrementally-maintained in-memory index from
+ * `FedosDeliveryObservationSubjectId` to that subject's own Observations
+ * (insertion order, NOT necessarily chronological — `historyFor()`'s own
+ * existing sort in `fedos_delivery_observation_query.ts` still applies).
+ * Rebuilt from scratch at every construction (one O(T) scan, same cost
+ * `list()` already paid on its own first call); updated incrementally,
+ * O(1) amortized, by `record()` ONLY after a genuinely new record is
+ * durably written (`persistence.putObservation()` returns `"inserted"`)
+ * — never for `"already-present"`/`"conflict"`/`"failed"`/`"invalid"`,
+ * so the index can never diverge from what is actually durable. `list()`
+ * and `listByState()` are BYTE-FOR-BYTE UNCHANGED (still a fresh
+ * `persistence.listObservations()` scan every call) — this index is
+ * PURELY ADDITIVE, read through the new `listForSubject()` method only.
+ * This is the SAME Repository class, not a second one; the durable
+ * `FedosDeliveryObservationPersistence` remains the sole source of
+ * truth, this index is never serialized and never itself read from disk.
  */
 
 import {
@@ -60,9 +79,20 @@ export type FedosDeliveryObservationRepositoryWriteResult =
 
 export class FedosDeliveryObservationRepository {
   readonly #persistence: FedosDeliveryObservationPersistence;
+  readonly #bySubject = new Map<FedosDeliveryObservationSubjectId, FedosDeliveryObservation[]>();
 
   constructor(persistence: FedosDeliveryObservationPersistence) {
     this.#persistence = persistence;
+    for (const record of this.#persistence.listObservations()) {
+      const observation = deserializeFedosDeliveryObservation(record);
+      if (observation !== null) this.#appendToIndex(observation);
+    }
+  }
+
+  #appendToIndex(observation: FedosDeliveryObservation): void {
+    const existing = this.#bySubject.get(observation.subjectId);
+    if (existing === undefined) this.#bySubject.set(observation.subjectId, [observation]);
+    else existing.push(observation);
   }
 
   record(
@@ -75,6 +105,7 @@ export class FedosDeliveryObservationRepository {
     if (observation === null) return "invalid";
 
     const result = this.#persistence.putObservation(serializeFedosDeliveryObservation(observation));
+    if (result === "inserted") this.#appendToIndex(observation);
     return result === "inserted" ? "recorded" : result;
   }
 
@@ -84,7 +115,7 @@ export class FedosDeliveryObservationRepository {
     return deserializeFedosDeliveryObservation(record);
   }
 
-  /** Skips (never throws on) any corrupt stored record — a pure, best-effort read. */
+  /** Skips (never throws on) any corrupt stored record — a pure, best-effort read. UNCHANGED by Alpha 7641-7720 — still a fresh full scan every call, for callers that genuinely need every Observation across every subject. */
   list(): readonly FedosDeliveryObservation[] {
     const observations: FedosDeliveryObservation[] = [];
     for (const record of this.#persistence.listObservations()) {
@@ -92,5 +123,20 @@ export class FedosDeliveryObservationRepository {
       if (observation !== null) observations.push(observation);
     }
     return observations;
+  }
+
+  /**
+   * Secure Runtime Alpha 7641-7720 — NEW, additive. Every Observation
+   * recorded for `subjectId` so far, read from the derived in-memory
+   * index (O(1) lookup + O(historyBearingCount for THIS subject) copy) —
+   * never scans any OTHER subject's own history. Returns a fresh array
+   * (never the index's own backing array) so a caller may safely sort/
+   * mutate it, exactly like `list()`'s own contract. Insertion order,
+   * NOT necessarily chronological — callers needing chronological order
+   * must sort (see `FedosDeliveryObservationQuery.historyFor()`).
+   */
+  listForSubject(subjectId: FedosDeliveryObservationSubjectId): readonly FedosDeliveryObservation[] {
+    const existing = this.#bySubject.get(subjectId);
+    return existing === undefined ? [] : existing.slice();
   }
 }

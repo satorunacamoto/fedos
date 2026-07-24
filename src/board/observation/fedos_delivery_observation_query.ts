@@ -28,6 +28,17 @@
  *     Persistence layer.
  *   - No Board, Outbox, Publisher, Nostr, Relay, retry, backoff, pool, or
  *     GUI import of any kind anywhere in this file.
+ *
+ * Secure Runtime Alpha 7641-7720 — `historyFor()` now reads
+ * `repository.listForSubject(subjectId)` (the new derived per-subject
+ * index) instead of `repository.list()` + `.filter()` — O(subject's own
+ * history length) instead of O(every Observation across every subject).
+ * Ordering contract is BYTE-FOR-BYTE UNCHANGED: the same
+ * `.sort(compareByObservedAtThenId)` still runs, since the index itself
+ * is insertion-order, not chronological. `currentStateFor()` is
+ * UNCHANGED (still derives from `historyFor()`'s own last element).
+ * `listByState()` is UNCHANGED (still a genuinely cross-subject query,
+ * correctly left on `repository.list()`'s own full scan).
  */
 
 import type { FedosDeliveryObservation, FedosDeliveryObservationSubjectId } from "./fedos_delivery_observation.js";
@@ -47,10 +58,7 @@ export class FedosDeliveryObservationQuery {
 
   /** Every Observation for `subjectId`, oldest first (`observedAt` ASC, `id` ASC on a tie). */
   historyFor(subjectId: FedosDeliveryObservationSubjectId): readonly FedosDeliveryObservation[] {
-    return this.#repository
-      .list()
-      .filter((observation) => observation.subjectId === subjectId)
-      .sort(compareByObservedAtThenId);
+    return [...this.#repository.listForSubject(subjectId)].sort(compareByObservedAtThenId);
   }
 
   /** The most recently observed state for `subjectId`, or `null` if no Observation exists yet. */
