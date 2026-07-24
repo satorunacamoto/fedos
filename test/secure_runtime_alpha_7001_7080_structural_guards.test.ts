@@ -55,9 +55,9 @@ describe("Secure Runtime Alpha 7001-7080 -- structural guards", () => {
     expect(source).toMatch(/dr\.initializeDirectRatchetSession\(conversationId, remoteDeviceRef, options\)/);
   });
 
-  it("3. the closed fedos-acceptance:* command vocabulary rejects unless AUTOTEST_MODE is set -- proven unavailable in ordinary packaged production mode", () => {
+  it("3. the closed fedos-acceptance:* command vocabulary rejects unless a real profile is unlocked -- gated on requireShell(), never a second, ad-hoc check (Secure Runtime Alpha 7321-7400's own real-production-reachability fix reconciled this exact-shape assertion: the ORIGINAL AUTOTEST_MODE-only gate this Arc itself introduced was later found to be exactly the reachability gap a follow-on Arc's own mission existed to close -- see that Arc's own structural guards for the current gate's own exact shape)", () => {
     const source = stripComments(read(MAIN_PATH));
-    expect(source).toMatch(/function requireShell\(\)[\s\S]{0,120}if \(AUTOTEST_MODE\.length === 0\) return null;/);
+    expect(source).toMatch(/function requireShell\(\)[\s\S]{0,120}if \(activeAssembly === null\) return null;/);
     const acceptanceHandlerNames = [
       "handleAcceptanceCreateDirectConversation",
       "handleAcceptanceActivateDirectConversation",

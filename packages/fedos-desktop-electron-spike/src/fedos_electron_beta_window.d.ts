@@ -51,12 +51,16 @@ interface FedosBetaBridge {
 }
 
 /**
- * Secure Runtime Alpha 7001-7080 — the closed, ACCEPTANCE-MODE-ONLY
- * command vocabulary (Phase C). Every method rejects with
- * `{outcome:"unavailable"}` unless the packaged process was launched with
- * `FEDOS_ELECTRON_BETA_AUTOTEST` set (`fedos_electron_beta_main.cts`'s own
- * `requireShell()`) — never reachable in ordinary packaged production
- * mode, proven by `secure_runtime_alpha_7001_7080_structural_guards.test.ts`.
+ * Secure Runtime Alpha 7001-7080 — the closed `fedos-acceptance:*` command
+ * vocabulary (Phase C); EXTENDED by Secure Runtime Alpha 7321-7400 with
+ * `createConversationInvitation`/`search`/`archive`/`safetyCenterOverview`.
+ * Every method rejects with `{outcome:"unavailable"}` whenever no real
+ * profile is currently unlocked (`fedos_electron_beta_main.cts`'s own
+ * `requireShell()`/`requireBoundary()`) — the SAME real precondition every
+ * other bridge in this file already requires. Genuinely reachable in
+ * ordinary packaged production mode once a real profile is unlocked
+ * (Secure Runtime Alpha 7321-7400 closed the prior AUTOTEST-only gate —
+ * see `secure_runtime_alpha_7321_7400_structural_guards.test.ts`).
  */
 interface FedosAcceptanceCommandResult {
   readonly outcome: string;
@@ -76,6 +80,14 @@ interface FedosAcceptanceBridge {
   readonly listMessages: (conversationId: string) => Promise<FedosAcceptanceCommandResult>;
   readonly readMessage: (conversationId: string, messageId: string) => Promise<FedosAcceptanceCommandResult>;
   readonly directRatchetStatus: (conversationId: string, remoteDeviceRef: string) => Promise<FedosAcceptanceCommandResult>;
+  /** Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-2. */
+  readonly createConversationInvitation: (invitee: { readonly authority: string; readonly publicIdentifier: string }, expiresInMs?: number) => Promise<FedosAcceptanceCommandResult>;
+  /** Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-7 (Search). */
+  readonly search: (query: string) => Promise<FedosAcceptanceCommandResult>;
+  /** Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-7 (Archive). */
+  readonly archive: (command: unknown) => Promise<FedosAcceptanceCommandResult>;
+  /** Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-7 (Safety Center). */
+  readonly safetyCenterOverview: () => Promise<FedosAcceptanceCommandResult>;
 }
 
 interface Window {

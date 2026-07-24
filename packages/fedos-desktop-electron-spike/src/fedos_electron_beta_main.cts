@@ -71,6 +71,36 @@
  * `fedos_electron_unlock_main.cts`, per Phase P "do not rename existing
  * accepted surfaces"), wrapped in the redacting `FedosProfileUnlockSecret`,
  * never logged/echoed/persisted.
+ *
+ * -----------------------------------------------------------------------
+ * Secure Runtime Alpha 7321-7400 ("FedOS Desktop Production Feature
+ * Reachability Arc") — closes the Release Readiness Review's own B-1/B-2/
+ * B-3/B-7 findings: `secureRuntimeBundleConfig()` now enables the five
+ * flags that were silently absent (`conversationCanonicalCryptoEnabled`/
+ * `conversationDirectMessageDeliveryRoute`/`conversationTransportInboundEnabled`/
+ * `conversationInvitationEnabled`/`archiveEnabled`), so a real, packaged,
+ * unlocked profile can genuinely deliver an invitation and messages over
+ * the real relay (never merely "sent-locally") and export/import a real
+ * Archive; `requireShell()`/the new `requireBoundary()` no longer require
+ * `AUTOTEST_MODE` — a real unlocked profile is now the ONLY precondition,
+ * in ANY mode, closing the "AUTOTEST-only path" this Review named. Four
+ * new commands (`create-conversation-invitation`/`search`/`archive`/
+ * `safety-center-overview`) close B-2/B-7 for good — each a thin,
+ * validated wrapper over an ALREADY-REAL `FedosDesktopApplicationShell`/
+ * `FedosSafetyCenterController` method, never a new business-logic
+ * implementation. `AUTOTEST_MODE` itself is UNCHANGED as a test-driving
+ * convenience (offscreen window, the scripted "create"/"unlock"/
+ * "acceptance" headless startup branches below) — it no longer gates
+ * whether the acceptance vocabulary FUNCTIONS, only whether this file
+ * drives itself through a scripted sequence at startup for automated
+ * testing, exactly like a real user's own click-through would reach the
+ * SAME handlers. No visual renderer screen is added for these four new
+ * commands in this Arc (disclosed scope decision, see this Arc's own
+ * execution specification) — consistent with this codebase's own
+ * long-standing, repeatedly-restated choice to defer the full
+ * conversation UI to a later Arc; "UI → Runtime routing" here means the
+ * IPC main-process handler + preload bridge layer, the SAME layer every
+ * existing `fedos-acceptance:*` command already used before this Arc.
  */
 
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
@@ -96,6 +126,10 @@ const MAX_ID_LENGTH = 512;
 const MAX_MESSAGE_BODY_CHARS = 8192;
 /** Secure Runtime Alpha 7001-7080 — a real Device-pairing encoded request/approval string is larger than an id but still bounded (JSON envelope + one signature + one public key, never unbounded). */
 const MAX_PAIRING_ENVELOPE_CHARS = 8192;
+/** Secure Runtime Alpha 7321-7400 — a real Search query string, same bound class as a label, never a document body. */
+const MAX_SEARCH_QUERY_CHARS = 256;
+/** Secure Runtime Alpha 7321-7400 — a real filesystem path for Archive export/import, bounded but generous (Windows long-path aware). */
+const MAX_ARCHIVE_PATH_CHARS = 4096;
 
 /** Secure Runtime Alpha 5161-5240 — mirrors `fedos_electron_badge_main.cts`'s own identical policy value (`DEVICE_SYNC_ABANDONMENT_POLICY`). */
 const DEVICE_SYNC_ABANDONMENT_POLICY = Object.freeze({ maxAttempts: 5, laterDelaySeconds: 30 });
@@ -252,9 +286,24 @@ interface ShellDiagnosticLike {
   listMessages(conversationId: string): { readonly outcome: string; readonly [key: string]: unknown };
   readMessage(conversationId: string, messageId: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
   directRatchetStatus(conversationId: string, remoteDeviceRef: string): { readonly outcome: string; readonly [key: string]: unknown };
+  /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.createConversationInvitation()` (Alpha 7081-7160, unmodified); no new business logic. */
+  createConversationInvitation(invitee: unknown, expiresInMs?: number): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.search()` (Alpha 3081-3160, unmodified); synchronous, never a promise. */
+  search(query: string): { readonly outcome: string; readonly [key: string]: unknown };
+  /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.archive()` (Alpha 3081-3160, unmodified). */
+  archive(command: unknown): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+}
+/** Secure Runtime Alpha 7321-7400 — narrows `FedosSafetyCenterController` (`src/desktop/presentation/safety_center/`, unmodified). */
+interface BoundaryLike {
+  readonly safetyCenter: {
+    refreshOverview(ratchetPairs?: readonly unknown[]): Promise<void>;
+    readonly overviewState: { readonly status: string; readonly [key: string]: unknown };
+  };
 }
 interface AssemblyLike {
   readonly shell: ShellDiagnosticLike;
+  /** Secure Runtime Alpha 7321-7400 — `FedosDesktopBetaApplicationAssembly` (`src/desktop/beta/fedos_desktop_beta_application_assembly.ts`, unmodified) already exposes this getter; this file simply never read it before now. */
+  readonly boundary: BoundaryLike;
   readonly settingsCoordinator: {
     previewPlan(candidate: unknown): unknown;
     apply(candidate: unknown): Promise<unknown>;
@@ -564,6 +613,32 @@ function secureRuntimeBundleConfig(m: RootModules, signer: unknown): Record<stri
     identityTransitionLocalPolicy: { autoAcceptOldKeyContinuity: false },
     deletionRequestEnabled: true,
     deletionRequestResolveLocalPolicy: () => "always-review",
+    // Secure Runtime Alpha 7321-7400 -- these five flags already existed
+    // on `FedosDesktopRuntimeConfig`/`FedosProfileInitializationDependencies`
+    // (Alpha 7161-7240/7081-7160/1691-1760) and are already proven real,
+    // no-substitution production-reachable by that Arc's own vertical
+    // slice tests -- this canonical packaged entry point simply never
+    // enabled them (Release Readiness Review, B-1/B-2/B-7). Enabling them
+    // here is the direct fix: a real, packaged, unlocked profile can now
+    // genuinely send an invitation, have it delivered over the real relay,
+    // exchange real encrypted messages via the standard NIP-17 route, and
+    // export/import a real Archive -- never merely "sent-locally".
+    conversationCanonicalCryptoEnabled: true,
+    conversationDirectMessageDeliveryRoute: "nostr-nip17-v1",
+    conversationTransportInboundEnabled: true,
+    conversationInvitationEnabled: true,
+    archiveEnabled: true,
+    // Secure Runtime Alpha 7321-7400 -- TEST-INJECTION ONLY, mirrors
+    // `messageDeliveryRemoteDeviceRef`'s own identical discipline exactly:
+    // unset on every ordinary launch, so a real user gets the Coordinator's
+    // own real default production cadence. Lets this Arc's own real
+    // packaged vertical slice test exchange several real messages within a
+    // sane test time budget without waiting on that production cadence.
+    conversationTransportIntervalMs: (() => {
+      const raw = process.env.FEDOS_BETA_CONVERSATION_TRANSPORT_INTERVAL_MS;
+      const parsed = raw !== undefined ? Number(raw) : NaN;
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+    })(),
   };
 }
 
@@ -898,27 +973,52 @@ async function performCleanShutdown(): Promise<void> {
 
 // ---------------------------------------------------------------------
 // Secure Runtime Alpha 7001-7080 — Phase C: the closed `fedos-acceptance:*`
-// command vocabulary. Every command below is REJECTED (`{outcome:
-// "unavailable", reason: "acceptance-only"}`, structurally identical to
-// every other "unavailable" outcome this file already produces — no new
-// failure shape) unless `AUTOTEST_MODE` is set, proving this vocabulary
-// does not exist in ordinary packaged production mode
-// (`test/../secure_runtime_alpha_7001_7080_structural_guards.test.ts`
-// asserts this directly). Every command delegates ENTIRELY to an
-// ALREADY-REAL `FedosDesktopApplicationShell` method (never a raw
-// Runtime/Store/handle, never a second business-logic implementation) and
-// validates its own JSON payload shape before calling it — malformed
-// input never reaches the Shell.
+// command vocabulary; EXTENDED by Secure Runtime Alpha 7321-7400 with
+// createConversationInvitation/search/archive/safety-center-overview
+// (Release Readiness Review B-2/B-7). Every command below is REJECTED
+// (`{outcome: "unavailable", reason: "acceptance-only"}`, structurally
+// identical to every other "unavailable" outcome this file already
+// produces — no new failure shape) whenever no real profile is currently
+// unlocked (`requireShell()`/`requireBoundary()`) — the SAME real
+// precondition every other command in this file already requires. Prior
+// to Alpha 7321-7400 this vocabulary was ADDITIONALLY gated behind
+// `AUTOTEST_MODE`, making it unreachable in ordinary packaged production
+// mode even with a real profile unlocked — that gap is what this Arc
+// closes (Release Readiness Review B-3); the name `"acceptance-only"`
+// is kept as the existing, stable outcome-reason string (Phase P "do not
+// rename existing accepted surfaces"), even though the gate it now
+// describes is real-profile-required, not AUTOTEST-required. Every
+// command delegates ENTIRELY to an ALREADY-REAL `FedosDesktopApplicationShell`/
+// `FedosSafetyCenterController` method (never a raw Runtime/Store/handle,
+// never a second business-logic implementation) and validates its own
+// JSON payload shape before calling it — malformed input never reaches
+// the Shell.
 // ---------------------------------------------------------------------
 
 function acceptanceGateRejection(): { readonly outcome: "unavailable"; readonly reason: string } {
   return { outcome: "unavailable", reason: "acceptance-only" };
 }
 
+/**
+ * Secure Runtime Alpha 7321-7400 — real production reachability fix
+ * (Release Readiness Review B-3): the ONLY gate is now "is a real profile
+ * genuinely unlocked" — the SAME real precondition every other command in
+ * this file already requires (`fedos-beta:*`/`fedos-profile:*`). The prior
+ * `AUTOTEST_MODE.length === 0` check made this entire vocabulary
+ * unreachable in ordinary packaged production mode by design; that was
+ * itself the reachability gap this Arc's own mission exists to close. No
+ * other change: still `null` before any create/unlock, still delegates
+ * entirely to the SAME already-real `FedosDesktopApplicationShell`.
+ */
 function requireShell(): ShellDiagnosticLike | null {
-  if (AUTOTEST_MODE.length === 0) return null;
   if (activeAssembly === null) return null;
   return activeAssembly.shell;
+}
+
+/** Secure Runtime Alpha 7321-7400 — mirrors `requireShell()`'s own identical discipline exactly, for Safety Center's own real presentation boundary. */
+function requireBoundary(): BoundaryLike | null {
+  if (activeAssembly === null) return null;
+  return activeAssembly.boundary;
 }
 
 function isBoundedString(value: unknown, maxLength: number): value is string {
@@ -1038,6 +1138,87 @@ async function handleAcceptanceDirectRatchetStatus(payload: unknown) {
   return { outcome: "ok", value: shell.directRatchetStatus(conversationId, remoteDeviceRef) };
 }
 
+/**
+ * Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-2:
+ * `createConversationInvitation()` had zero IPC/preload exposure anywhere.
+ * Delegates ENTIRELY to the already-real `FedosDesktopApplicationShell.createConversationInvitation()`
+ * (Alpha 7081-7160, unmodified) — creates a brand-new Direct conversation
+ * and sends a real, signed invitation over the real relay.
+ */
+async function handleAcceptanceCreateConversationInvitation(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  if (typeof payload !== "object" || payload === null) return { outcome: "invalid-input", reason: "malformed create-conversation-invitation request" };
+  const invitee = (payload as { invitee?: unknown }).invitee;
+  if (typeof invitee !== "object" || invitee === null) return { outcome: "invalid-input", reason: "missing invitee" };
+  const authority = (invitee as { authority?: unknown }).authority;
+  const publicIdentifier = (invitee as { publicIdentifier?: unknown }).publicIdentifier;
+  if (typeof authority !== "string" || !isBoundedString(publicIdentifier, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed invitee" };
+  }
+  const expiresInMs = (payload as { expiresInMs?: unknown }).expiresInMs;
+  return shell.createConversationInvitation({ authority: authority as never, publicIdentifier, identityId: null }, typeof expiresInMs === "number" ? expiresInMs : undefined);
+}
+
+/**
+ * Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-7
+ * (Search): delegates ENTIRELY to the already-real, unconditionally-
+ * constructed `FedosDesktopApplicationShell.search()` (Alpha 3081-3160,
+ * unmodified) — real, retention-gated keyword search over locally-held
+ * plaintext.
+ */
+async function handleAcceptanceSearch(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const query = (payload as { query?: unknown } | null)?.query;
+  if (!isBoundedString(query, MAX_SEARCH_QUERY_CHARS)) return { outcome: "invalid-input", reason: "malformed search query" };
+  return Promise.resolve(shell.search(query));
+}
+
+/**
+ * Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-7
+ * (Archive): delegates ENTIRELY to the already-real `FedosDesktopApplicationShell.archive()`
+ * (Alpha 3081-3160, unmodified) — real WASM-backed export/inspect/
+ * preflightRestore/restore, exactly the same command shape
+ * `FedosContentAccessorArchiveCommand` already defines. Only the closed
+ * `operation` discriminant and any bounded path string are validated
+ * here — the nested `request` object (export/restore parameters) is
+ * passed through to the Shell's own existing validation, mirroring how
+ * `sendMessage`'s own `sender` and `devicePairingCreate`'s own
+ * `expectedAccountRef` are already handled in this file.
+ */
+async function handleAcceptanceArchive(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  if (typeof payload !== "object" || payload === null) return { outcome: "invalid-input", reason: "malformed archive request" };
+  const operation = (payload as { operation?: unknown }).operation;
+  if (operation === "inspect") {
+    const sourcePath = (payload as { sourcePath?: unknown }).sourcePath;
+    if (!isBoundedString(sourcePath, MAX_ARCHIVE_PATH_CHARS)) return { outcome: "invalid-input", reason: "malformed sourcePath" };
+    return shell.archive({ operation: "inspect", sourcePath });
+  }
+  if (operation === "preflightRestore" || operation === "export" || operation === "restore") {
+    const request = (payload as { request?: unknown }).request;
+    if (typeof request !== "object" || request === null) return { outcome: "invalid-input", reason: "missing request" };
+    return shell.archive({ operation, request } as never);
+  }
+  return { outcome: "invalid-input", reason: "unknown archive operation" };
+}
+
+/**
+ * Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-7
+ * (Safety Center): delegates ENTIRELY to the already-real
+ * `FedosSafetyCenterController` (`src/desktop/presentation/safety_center/`,
+ * unmodified), reached via `FedosDesktopBetaApplicationAssembly`'s own
+ * pre-existing `boundary` getter — no new presentation logic.
+ */
+async function handleAcceptanceSafetyCenterOverview(): Promise<{ readonly outcome: string; readonly [key: string]: unknown }> {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  await boundary.safetyCenter.refreshOverview([]);
+  return { outcome: "ok", value: boundary.safetyCenter.overviewState };
+}
+
 // ---------------------------------------------------------------------
 // IPC — `fedos-profile:*` REUSED verbatim (Phase P). Additive `fedos-beta:*`
 // namespace for status/settings-application/tray/badge/background.
@@ -1076,6 +1257,13 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-acceptance:list-messages", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceListMessages(payload));
   ipcMain.handle("fedos-acceptance:read-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceReadMessage(payload));
   ipcMain.handle("fedos-acceptance:direct-ratchet-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDirectRatchetStatus(payload));
+  // Secure Runtime Alpha 7321-7400 -- see this section's own updated
+  // header comment: these four channels close Release Readiness Review
+  // B-2/B-7, reachable whenever a real profile is unlocked, in ANY mode.
+  ipcMain.handle("fedos-acceptance:create-conversation-invitation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
+  ipcMain.handle("fedos-acceptance:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
+  ipcMain.handle("fedos-acceptance:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
+  ipcMain.handle("fedos-acceptance:safety-center-overview", async () => handleAcceptanceSafetyCenterOverview());
 }
 
 // ---------------------------------------------------------------------
@@ -1193,12 +1381,32 @@ app.whenReady().then(async () => {
         "acceptance-list-messages": (payload) => handleAcceptanceListMessages(payload),
         "acceptance-read-message": (payload) => handleAcceptanceReadMessage(payload),
         "acceptance-direct-ratchet-status": (payload) => handleAcceptanceDirectRatchetStatus(payload),
+        "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
+        "acceptance-search": (payload) => handleAcceptanceSearch(payload),
+        "acceptance-archive": (payload) => handleAcceptanceArchive(payload),
+        "acceptance-safety-center-overview": () => handleAcceptanceSafetyCenterOverview(),
       };
       try {
         const scriptRaw = process.env.FEDOS_BETA_ACCEPTANCE_SCRIPT ?? "[]";
         const script: ReadonlyArray<{ readonly command: string; readonly payload?: unknown }> = JSON.parse(scriptRaw);
         for (let i = 0; i < script.length; i++) {
           const step = script[i]!;
+          // Secure Runtime Alpha 7321-7400 -- "wait" is the ONE pseudo-command
+          // this script interpreter recognizes that never reaches a Shell/
+          // IPC handler: a real, live, two-party relay-delivered flow needs
+          // a genuine settle window for the durable Outbox Scheduler's own
+          // NEXT real tick (Alpha 1471-1540, unmodified) before this process
+          // exits -- exactly the same "standard NIP-01 client discipline"
+          // settle wait every real vertical-slice test elsewhere in this
+          // repository already uses, just expressed as a scripted step here
+          // since this process has no test harness of its own to await from
+          // the outside.
+          if (step.command === "wait") {
+            const ms = (step.payload as { ms?: unknown } | null)?.ms;
+            await new Promise((resolve) => setTimeout(resolve, typeof ms === "number" && ms > 0 && ms <= 30000 ? ms : 0));
+            console.log(`FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify({ outcome: "ok" })}`);
+            continue;
+          }
           const fn = commands[step.command];
           const result = fn === undefined ? { outcome: "unavailable", reason: "unknown-acceptance-script-command" } : await fn(step.payload);
           console.log(`FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify(result)}`);

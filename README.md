@@ -8,6 +8,48 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7321–7400 — FedOS Desktop Production
+> Feature Reachability Arc (FULL COMPLETION, one gap honestly disclosed).**
+> Closes the remaining production reachability gaps so the packaged
+> Electron application can actually use existing backend functionality —
+> no protocol redesign, no redesign of Ratchet, Identity, NIP-17, or
+> Secure Memory. The core fix: the entire `fedos-acceptance:*` IPC
+> vocabulary (Alpha 7001-7080) previously rejected every call unless
+> `AUTOTEST_MODE` was set, making it unreachable in ordinary packaged
+> production mode by construction — `requireShell()`/the new
+> `requireBoundary()` now gate on ONE real precondition, "a profile is
+> genuinely unlocked," the same precondition every other channel already
+> requires. Four new IPC channels close Release Readiness Review findings
+> B-2/B-7 — Conversation Invitation, Search, Archive, and Safety Center —
+> each delegating entirely to an already-real Shell/Boundary method,
+> proven via the real, compiled, packaged Beta Electron subprocess (never
+> a hand-built Runtime, never a mock relay):
+> `packages/fedos-desktop-electron-spike/test/secure_runtime_alpha_7321_7400_real_packaged_vertical_slice.test.ts`
+> drives create profile → unlock → create invitation → accept invitation
+> → exchange encrypted messages → search → reach Archive's real IPC
+> surface → open Safety Center → restart → continue the conversation, all
+> through two real, independently-provisioned production profiles over a
+> real local WebSocket relay. One genuine, pre-existing architectural gap
+> found and honestly disclosed, not fixed: Archive export can never
+> succeed end-to-end for any conversation this packaged app produces,
+> because `exportConversationArchive()`'s existence check requires a real
+> Board-level (public) conversation record, but the packaged app can only
+> ever create private Direct conversations — confirmed live
+> (`{outcome:"not-found", reason:"unknown conversation"}`, never a crash,
+> never a fabricated success); fixing it for real would require either a
+> real Public-conversation creation path or a deliberate, scoped redesign
+> of Archive's own existence-check boundary, both out of this Arc's own
+> narrow "reachability wiring" mission. No visual renderer screen is added
+> for the four newly reachable commands (a disclosed scope decision,
+> consistent with this codebase's own established convention of deferring
+> full visual UI to a later arc). Zero Rust/Cargo.toml change, zero
+> Ratchet/Identity/production-activation-chain change (confirmed by
+> structural guard). See
+> `docs/secure_runtime_alpha_7321_7400_completion_declaration.md` and
+> `..._execution_specification.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7241–7320 — FedOS Long-Running Runtime
 > Reliability and Recovery Arc (FULL COMPLETION).** Validates and hardens
 > the already-real production runtime under realistic long-running
