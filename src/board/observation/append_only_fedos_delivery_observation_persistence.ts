@@ -36,7 +36,6 @@
  *     stores the given file path.
  *   - NO external dependency — `node:fs` only, reached the same
  *     untyped way `AppendOnlyFedosBoardOutboxPersistence` already does.
- *   - NO in-memory cache/index of any kind is held between calls.
  *   - NO compression, NO binary format, NO write batching.
  *   - NO automatic repair of any kind, ever.
  *   - NO default file path — the caller always supplies one; nothing
@@ -45,6 +44,23 @@
  *     Nostr, Ontology, or `p2p/` import of any kind — Observation
  *     persistence stays exactly as protocol/layer-neutral as its own
  *     unchanged port already requires.
+ *
+ * Secure Runtime Alpha 7881–7960 ("FedOS Delivery Observation Durable
+ * Write Index" Stage 2) NARROWLY relaxes exactly ONE of the guardrails
+ * above: this class now holds a single, LAZILY built, private
+ * `id -> record` `Map` (`#index`), closing a real measured O(T)-per-call
+ * defect (`docs/secure_runtime_alpha_7881_7960_write_index_design_and_crash_consistency.md`)
+ * where every `putObservation`/`getObservation`/`listObservations` call
+ * re-read and re-parsed the ENTIRE durable log. The durable append-only
+ * log on disk remains the SOLE source of truth: `#index` is never
+ * serialized, never written to disk, always fully rebuildable from the
+ * log alone, and only ever updated AFTER a durable `appendFileSync`
+ * already succeeded (never before, never on a failed append) — see that
+ * same document's Phase E for the exact ordering and crash-consistency
+ * argument. A distinct instance already holding a built `#index` will
+ * NOT see another instance's concurrent append until reconstructed —
+ * the same accepted contract `FedosDeliveryObservationRepository`'s own
+ * `#bySubject` index (Alpha 7641–7720) already has.
  */
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
@@ -110,14 +126,34 @@ function replayLog(filePath: string): FedosPersistedDeliveryObservationRecordV1[
 export class AppendOnlyFedosDeliveryObservationPersistence implements FedosDeliveryObservationPersistence {
   readonly #filePath: string;
 
+  /**
+   * Lazily built, in-memory only. `null` until the first call that needs
+   * it. Never serialized. Always exactly reconstructable from the durable
+   * log via `replayLog()` alone -- see the class-level comment above.
+   */
+  #index: Map<string, FedosPersistedDeliveryObservationRecordV1> | null = null;
+
   constructor(filePath: string) {
     this.#filePath = filePath;
+  }
+
+  /** PRIVATE — builds `#index` from the durable log on first use; returns the cached `Map` on every later call. */
+  #ensureIndex(): Map<string, FedosPersistedDeliveryObservationRecordV1> {
+    if (this.#index === null) {
+      const rebuilt = new Map<string, FedosPersistedDeliveryObservationRecordV1>();
+      for (const record of replayLog(this.#filePath)) {
+        rebuilt.set(record.id, record);
+      }
+      this.#index = rebuilt;
+    }
+    return this.#index;
   }
 
   putObservation(
     record: FedosPersistedDeliveryObservationRecordV1,
   ): FedosDeliveryObservationPersistenceWriteResult {
-    const existing = this.getObservation(record.id);
+    const index = this.#ensureIndex();
+    const existing = index.get(record.id) ?? null;
     if (existing !== null) {
       return fedosPersistedDeliveryObservationRecordsAreEqual(existing, record) ? "already-present" : "conflict";
     }
@@ -126,14 +162,17 @@ export class AppendOnlyFedosDeliveryObservationPersistence implements FedosDeliv
     } catch {
       return "failed";
     }
+    // Durable append already succeeded above -- only now update the in-memory index, synchronously,
+    // with no `await` between the two, so no crash-window can observe one without the other.
+    index.set(record.id, record);
     return "inserted";
   }
 
   getObservation(id: string): FedosPersistedDeliveryObservationRecordV1 | null {
-    return this.listObservations().find((record) => record.id === id) ?? null;
+    return this.#ensureIndex().get(id) ?? null;
   }
 
   listObservations(): readonly FedosPersistedDeliveryObservationRecordV1[] {
-    return replayLog(this.#filePath);
+    return [...this.#ensureIndex().values()];
   }
 }

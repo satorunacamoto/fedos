@@ -160,6 +160,18 @@ export interface FedosProfileInitializationDependencies {
   /** Whether to enable the Archive capability (requires a REAL Master Seed authority for archive crypto). Default false — the dev double cannot back real archive crypto. */
   readonly archiveEnabled?: boolean;
   /**
+   * Secure Runtime Alpha 7881-7960 — mirrors `deviceSyncSchedulerEnabled`'s
+   * own established "optional capability toggle, threaded straight into
+   * `#buildRuntimeConfig()`" pattern exactly. Whether to enable real Device
+   * Sync propagation of Archive Suppression facts on the Runtime this
+   * Coordinator starts — REQUIRES `privateTransportEnabled` (the SAME real
+   * relay set/signing authority this Coordinator already wires for private
+   * transport is reused, never a second one). Default false; the LOCAL
+   * suppression authority itself (durable, via `paths.archiveSuppressionObservationLogFile`)
+   * is unconditional whenever `archiveEnabled` is true, unaffected by this flag.
+   */
+  readonly archiveSuppressionSyncEnabled?: boolean;
+  /**
    * Secure Runtime Alpha 5161-5240 (Canonical Desktop Composition Arc) —
    * mirrors `archiveEnabled`'s own established "optional capability toggle,
    * threaded straight into `#buildRuntimeConfig()`" pattern exactly. Whether
@@ -732,6 +744,17 @@ export class FedosProfileInitializationCoordinator {
       archiveEnabled: this.#deps.archiveEnabled === true,
       conversationArchiveMasterSeedAuthority:
         this.#deps.archiveEnabled === true ? this.#deps.masterSeedAuthority : undefined,
+      // Secure Runtime Alpha 7881-7960 -- unconditional, mirrors
+      // `conversationCapabilityLogPath`/`conversationPayloadRetentionLogPath`'s
+      // own discipline immediately above: a real profile's own local
+      // suppression facts survive restart regardless of whether Device
+      // Sync propagation is ever enabled.
+      archiveSuppressionObservationLogPath: paths.archiveSuppressionObservationLogFile,
+      archiveSuppressionSyncEnabled: this.#deps.archiveSuppressionSyncEnabled === true,
+      archiveSuppressionInboundDedupLogPath:
+        this.#deps.archiveSuppressionSyncEnabled === true ? paths.archiveSuppressionInboundDedupLogFile : undefined,
+      archiveSuppressionFanoutObservationLogPath:
+        this.#deps.archiveSuppressionSyncEnabled === true ? paths.archiveSuppressionFanoutObservationLogFile : undefined,
       deviceSyncSchedulerEnabled: this.#deps.deviceSyncSchedulerEnabled === true,
       deviceSyncAbandonmentPolicy:
         this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAbandonmentPolicy : undefined,

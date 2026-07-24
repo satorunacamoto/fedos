@@ -130,6 +130,19 @@ export interface FedosLocalProfilePaths {
   readonly conversationCapabilityLogFile: string;
   /** Payload Retention decision append-only log. */
   readonly conversationPayloadRetentionLogFile: string;
+  /**
+   * Secure Runtime Alpha 7881-7960 — Archive Suppression Observation
+   * append-only log. UNCONDITIONAL (mirrors `conversationCapabilityLogFile`/
+   * `conversationPayloadRetentionLogFile`'s own discipline immediately
+   * above, not gated behind a dependency toggle) — a real profile's own
+   * local suppression facts survive restart regardless of whether
+   * multi-Device sync is ever enabled.
+   */
+  readonly archiveSuppressionObservationLogFile: string;
+  /** Meaningful only when Device Sync suppression propagation is enabled. */
+  readonly archiveSuppressionInboundDedupLogFile: string;
+  /** Meaningful only when Device Sync suppression propagation is enabled. */
+  readonly archiveSuppressionFanoutObservationLogFile: string;
 }
 
 /** The set of directories `ensureDirectories()` creates (recursively). Derived from the leaf paths above; no caller string is ever a directory component beyond the root itself. */
@@ -180,6 +193,9 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     deletionRequestPendingReviewLogFile: join(root, "deletion-request-pending-review.ndjson"),
     conversationCapabilityLogFile: join(root, "conversation-capability.ndjson"),
     conversationPayloadRetentionLogFile: join(root, "conversation-payload-retention.ndjson"),
+    archiveSuppressionObservationLogFile: join(root, "archive-suppression-observation.ndjson"),
+    archiveSuppressionInboundDedupLogFile: join(root, "archive-suppression-inbound-dedup.ndjson"),
+    archiveSuppressionFanoutObservationLogFile: join(root, "archive-suppression-fanout-observation.ndjson"),
   });
 }
 

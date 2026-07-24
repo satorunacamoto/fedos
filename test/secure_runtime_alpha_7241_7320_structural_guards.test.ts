@@ -101,8 +101,15 @@ describe("Secure Runtime Alpha 7241-7320 -- structural guards", () => {
     const coordinatorSource = stripComments(read("src/desktop/onboarding/fedos_profile_initialization_coordinator.ts"));
     expect(coordinatorSource).toMatch(/conversationCapabilityLogPath: paths\.conversationCapabilityLogFile,/);
     expect(coordinatorSource).toMatch(/conversationPayloadRetentionLogPath: paths\.conversationPayloadRetentionLogFile,/);
-    // The two fields ALREADY existed on FedosDesktopRuntimeConfig before this Arc -- this Arc's own diff never touches that config file.
-    expect(diffNames("src/desktop/runtime/fedos_desktop_runtime_config.ts").trim()).toBe("");
+    // The two fields ALREADY existed on FedosDesktopRuntimeConfig before this Arc -- this Arc's own diff never touched that config file.
+    // RECONCILED (Secure Runtime Alpha 7881-7960): that LATER Arc's own separately-authorized Stage 3 mission
+    // ("FedOS Archive Suppression Production Wiring") legitimately, disclosedly ADDED new, unrelated
+    // `archiveSuppression*` fields to this same config file -- narrowed from a blanket zero-diff assertion
+    // (which that later, independent extension would otherwise always break) to confirming the two fields
+    // THIS Arc's own claim is about are still genuinely present, unchanged, never silently removed.
+    const configSourceForRequirement5 = stripComments(read("src/desktop/runtime/fedos_desktop_runtime_config.ts"));
+    expect(configSourceForRequirement5).toMatch(/readonly conversationCapabilityLogPath\?: string;/);
+    expect(configSourceForRequirement5).toMatch(/readonly conversationPayloadRetentionLogPath\?: string;/);
   });
 
   it("6. the Archive retention-gating fix is optional and additive, mirrors Search's own Alpha 2581-2620 fail-closed discipline exactly (RECONCILED: Secure Runtime Alpha 7481-7560, FedOS Archive Envelope Retention Parity and Metadata Deletion Semantics Arc, later, disclosedly extended this SAME field to ALSO filter Envelopes -- closing the exact 'Envelope/Payload collection unlinked' gap a committed audit found; this Arc's own 7241-7320 structural guards for the current shape live at that later Arc's own test file)", () => {

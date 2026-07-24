@@ -57,8 +57,12 @@ describe("Secure Runtime Alpha 7801-7880 -- structural guards", () => {
     expect(diffNames("src/board/observation/fedos_delivery_observation_query.ts").trim()).toBe("");
   });
 
-  it("3. no new Observation repository index, and no write-time duplicate-index optimization introduced by this Arc", () => {
-    expect(diffNames("src/board/observation").trim()).toBe("");
+  it("3. no new Observation repository index, and no write-time duplicate-index optimization introduced by this Arc (RECONCILED, Secure Runtime Alpha 7881-7960: that LATER Arc's own separately-authorized Stage 2 mission -- named as this Arc's own explicit recommended next step in its own multidevice-suppression-wiring status doc and completion declaration -- legitimately, disclosedly added the write-time duplicate-index optimization to append_only_fedos_delivery_observation_persistence.ts; never a violation of THIS Arc's own claim, which is that THIS Arc itself introduced no such thing)", () => {
+    expect(diffNames("src/board/observation/fedos_delivery_observation_repository.ts").trim()).toBe("");
+    expect(diffNames("src/board/observation/fedos_delivery_observation_query.ts").trim()).toBe("");
+    expect(diffNames("src/board/observation/fedos_delivery_observation.ts").trim()).toBe("");
+    expect(diffNames("src/board/observation/fedos_delivery_observation_codec.ts").trim()).toBe("");
+    expect(diffNames("src/board/observation/in_memory_fedos_delivery_observation_persistence.ts").trim()).toBe("");
   });
 
   it("4. no Board/Direct Conversation identity conflation -- the Collector checks the REAL Board record first, and never fabricates one for a Direct Conversation", () => {

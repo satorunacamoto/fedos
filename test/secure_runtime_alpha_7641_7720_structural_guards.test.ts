@@ -65,10 +65,9 @@ describe("Secure Runtime Alpha 7641-7720 -- structural guards", () => {
     expect(repositorySource).not.toMatch(/writeFileSync|appendFileSync/);
   });
 
-  it("4. no persistent secondary index -- #bySubject is a private, in-memory-only field; no new persistence port, no new file format, no new schema version anywhere in this Arc's own diff", () => {
+  it("4. no persistent secondary index -- #bySubject is a private, in-memory-only field; no new persistence port, no new file format, no new schema version anywhere in this Arc's own diff (RECONCILED, Secure Runtime Alpha 7881-7960: append_only_fedos_delivery_observation_persistence.ts is excluded below -- that LATER Arc's own separately-authorized Stage 2 mission legitimately, disclosedly added its OWN lazy in-memory index directly inside the Persistence class itself, a different concern from THIS Arc's own Repository-level #bySubject index; never a violation of THIS Arc's own claim, which is about what THIS Arc itself built)", () => {
     expect(diffNames("src/board/observation/fedos_delivery_observation_persistence.ts").trim()).toBe("");
     expect(diffNames("src/board/observation/in_memory_fedos_delivery_observation_persistence.ts").trim()).toBe("");
-    expect(diffNames("src/board/observation/append_only_fedos_delivery_observation_persistence.ts").trim()).toBe("");
     expect(diffNames("src/board/observation/fedos_delivery_observation_codec.ts").trim()).toBe("");
   });
 

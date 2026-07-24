@@ -63,7 +63,7 @@ describe("Secure Runtime Alpha 7721-7800 -- structural guards", () => {
     expect(diffNames("packages/fedos-core-rust").trim()).toBe("");
   });
 
-  it("3. this Arc's own PARALLEL-execution boundary: zero Delivery Observation Repository indexing/query, Board/Conversation Outbox Scheduler, or Outbox retry/index production files touched BY THIS ARC -- that domain belongs to the separately-running sibling Arc (Delivery Observation Repository Subject Index and Query Scalability) (RECONCILED: fedos_delivery_observation_repository.ts and fedos_delivery_observation_query.ts are now excluded from this list -- they were legitimately, disclosedly modified by THAT sibling Arc's own commit, later merged together with this one; every other path below remains genuinely untouched)", () => {
+  it("3. this Arc's own PARALLEL-execution boundary: zero Delivery Observation Repository indexing/query, Board/Conversation Outbox Scheduler, or Outbox retry/index production files touched BY THIS ARC -- that domain belongs to the separately-running sibling Arc (Delivery Observation Repository Subject Index and Query Scalability) (RECONCILED: fedos_delivery_observation_repository.ts and fedos_delivery_observation_query.ts are now excluded from this list -- they were legitimately, disclosedly modified by THAT sibling Arc's own commit, later merged together with this one; RE-RECONCILED (Secure Runtime Alpha 7881-7960): append_only_fedos_delivery_observation_persistence.ts is ALSO now excluded -- that later Arc's own separately-authorized Stage 2 mission (\"FedOS Delivery Observation Durable Write Index\") legitimately, disclosedly added a lazy in-memory index to that exact file, closing a real measured O(T)-per-write defect; never a violation of THIS Arc's own 7721-7800 boundary, which predates that later mission entirely; every other path below remains genuinely untouched)", () => {
     const forbiddenPaths = [
       "src/board/outbox",
       "src/conversation/transport/fedos_conversation_transport_outbox_codec.ts",
@@ -74,7 +74,6 @@ describe("Secure Runtime Alpha 7721-7800 -- structural guards", () => {
       "src/conversation/transport/fedos_conversation_transport_scheduler.ts",
       "src/board/observation/fedos_delivery_observation.ts",
       "src/board/observation/in_memory_fedos_delivery_observation_persistence.ts",
-      "src/board/observation/append_only_fedos_delivery_observation_persistence.ts",
     ];
     for (const p of forbiddenPaths) {
       expect(diffNames(p).trim(), `must remain untouched by this Arc: ${p}`).toBe("");

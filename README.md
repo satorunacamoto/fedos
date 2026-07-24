@@ -8,6 +8,44 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7881–7960 — FedOS Delivery Observation
+> Durable Write Index, Archive Suppression Production Wiring, and Final
+> Public Release Readiness Arc (FULL COMPLETION).** Closes the two
+> remaining gaps `6a2f274` (Alpha 7801-7880) itself disclosed. (1)
+> `AppendOnlyFedosDeliveryObservationPersistence.putObservation()` was
+> O(T) per call (full log re-read + re-parse before every append) —
+> fixed with a lazily-built, private, in-memory-only index
+> (`#ensureIndex()`); the durable append-only log stays the sole source
+> of truth, the index updates only AFTER a durable write succeeds, and a
+> warm instance's writes/lookups drop from O(T) to O(1) average (measured:
+> a duplicate/conflict lookup at T=10,000 fell from ~17ms to ~0.03ms).
+> (2) `FedosArchiveSuppressionObservationAuthority` (Alpha 7721-7800, real
+> and tested) was never constructed anywhere in `fedos_desktop_runtime.ts`
+> — Archive restore's own `suppressionAuthority` dependency was always
+> `undefined` in production. Fixed: the Runtime now constructs a real,
+> durable authority whenever `archiveEnabled` is true (no separate flag —
+> restore needs a real answer regardless of multi-Device sync), and, when
+> `archiveSuppressionSyncEnabled` is also set, a real Outbound
+> Coordinator/Inbound Handler plus a new
+> `FedosArchiveSuppressionInboundSubscription` (mirroring the
+> Conversation domain's own established inbound-subscription idiom) — the
+> one genuinely missing piece, a live relay feed into the already-built
+> Inbound Handler. Also wired through the real
+> `FedosProfileInitializationCoordinator` (a new durable log path planned
+> unconditionally, a new `archiveSuppressionSyncEnabled` dependency
+> toggle), not just the lower Runtime layer. Proven end to end with two
+> real `startFedosDesktopRuntime()` instances, a real local relay, and a
+> real restart. Built real WASM fresh in this worktree — 8 previously-
+> gated real-crypto vertical slices now run and pass; a new canonical
+> product vertical slice proves profile bootstrap → relay → invitation →
+> two independent real Direct Conversations → Archive export →
+> Suppression Authority durability, through the real Profile Coordinator
+> chain, surviving a real relaunch. Upgrade compatibility proven for five
+> named older shapes. Final release matrix: zero security-correctness
+> FAIL. See `docs/secure_runtime_alpha_7881_7960_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7801–7880 — FedOS Direct Conversation
 > Archive Product Completion and Parallel-Lineage Integration Arc (FULL
 > COMPLETION).** Reconciles two sibling production lineages first

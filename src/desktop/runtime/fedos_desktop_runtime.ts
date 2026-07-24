@@ -196,6 +196,29 @@ import { FedosPayloadRetentionAuthority } from "../../conversation/retention/fed
 import { AppendOnlyFedosPayloadRetentionPersistence } from "../../conversation/retention/append_only_fedos_payload_retention_persistence.js";
 import { InMemoryFedosPayloadRetentionPersistence } from "../../conversation/retention/in_memory_fedos_payload_retention_persistence.js";
 
+// Secure Runtime Alpha 7881-7960 (Stage 3, Phase H/I) -- the real
+// production construction this Arc adds: `FedosArchiveSuppressionObservationAuthority`
+// (Alpha 7721-7800, unmodified) over a real durable log, ALWAYS constructed
+// when `archiveEnabled` is true; the Outbound Coordinator/Inbound
+// Handler/Inbound Subscription ADDITIONALLY when `archiveSuppressionSyncEnabled`
+// is also true, reusing the SAME Device Registry/relay set/signing
+// authority this Runtime already owns -- never a second Device or Sync
+// stack.
+import { AppendOnlyFedosArchiveSuppressionObservationPersistence } from "../../conversation/retention/append_only_fedos_archive_suppression_observation_persistence.js";
+import { InMemoryFedosArchiveSuppressionObservationPersistence } from "../../conversation/retention/in_memory_fedos_archive_suppression_observation_persistence.js";
+import { FedosArchiveSuppressionObservationAuthority } from "../../conversation/retention/fedos_archive_suppression_observation_authority.js";
+import {
+  createAndRecordLocalArchiveSuppressionFact,
+  type FedosCreateLocalSuppressionFactInput,
+  type FedosCreateAndRecordLocalSuppressionFactOutcome,
+} from "../../conversation/retention/fedos_archive_suppression_local_bridge.js";
+import { FedosArchiveSuppressionOutboundCoordinator } from "../../device/archive_suppression_sync/fedos_archive_suppression_outbound_coordinator.js";
+import { FedosArchiveSuppressionInboundHandler } from "../../device/archive_suppression_sync/fedos_archive_suppression_inbound_handler.js";
+import { FedosArchiveSuppressionInboundSubscription } from "../../device/archive_suppression_sync/fedos_archive_suppression_inbound_subscription.js";
+import { AppendOnlyFedosArchiveSuppressionInboundDedupPersistence } from "../../device/archive_suppression_sync/persistence/append_only_fedos_archive_suppression_inbound_dedup_persistence.js";
+import { InMemoryFedosArchiveSuppressionInboundDedupPersistence } from "../../device/archive_suppression_sync/persistence/fedos_archive_suppression_inbound_dedup_persistence.js";
+import { FedosDeviceRelaySyncPublisher } from "../../device/relay_sync/fedos_device_relay_sync_publisher.js";
+
 // Secure Runtime Alpha 3081-3160 (Desktop Runtime Conversation Content
 // Accessor and Application Shell Activation Arc) -- every import/addition
 // below this comment is ADDITIVE ONLY, mirroring the Alpha 1691-1760
@@ -414,6 +437,36 @@ export interface FedosRunningDesktopRuntime {
    */
   devicePairing(): FedosDevicePairingFacade;
   /**
+   * Secure Runtime Alpha 7881-7960 — the `FedosArchiveSuppressionObservationAuthority`
+   * (`../../conversation/retention/fedos_archive_suppression_observation_authority.js`)
+   * this running Local Runtime owns, ALWAYS constructed when
+   * `config.archiveEnabled` is `true` (no separate trigger flag — a real
+   * Archive restore needs a real, non-fabricated suppression answer
+   * regardless of whether multi-Device sync is ever configured). Throws
+   * `"not enabled"` if `archiveEnabled` was never configured, and throws
+   * `"inaccessible after stop"` once `stop()` has been called — the SAME
+   * two-state fail-closed contract every other accessor on this handle
+   * already uses.
+   */
+  archiveSuppressionAuthority(): FedosArchiveSuppressionObservationAuthority;
+  /**
+   * Secure Runtime Alpha 7881-7960 — the real production entry point for
+   * composing a local Retention/Deletion decision (already executed by the
+   * caller, through Retention/Deletion's own existing, unmodified
+   * boundaries) into a durable, self-authored suppression fact. Throws
+   * `"not enabled"` if `archiveEnabled` was never configured, and throws if
+   * `config.localAccountRef`/`config.localDeviceId` were never supplied
+   * (a suppression fact is always Device/account-scoped — never
+   * fabricated). Returns synchronously with the real, durable LOCAL
+   * outcome; if `config.archiveSuppressionSyncEnabled` resolved a real
+   * Outbound Coordinator, propagation to this account's OTHER trusted
+   * Devices is additionally kicked off in the background, never awaited
+   * here (Local Deletion NEVER waits for this coordinator).
+   */
+  recordAndPropagateArchiveSuppression(
+    input: Omit<FedosCreateLocalSuppressionFactInput, "accountRef" | "sourceDeviceId">,
+  ): FedosCreateAndRecordLocalSuppressionFactOutcome;
+  /**
    * Alpha 612 — ordering enforced: (1) no further calls into this
    * runtime are meaningful once called; (2) if delivery was started,
    * `host.stopDelivery()` first (itself already guarantees "no new
@@ -518,6 +571,32 @@ export async function startFedosDesktopRuntime(
     if (config.conversationArchiveMasterSeedAuthority === undefined) {
       throw new Error(
         "startFedosDesktopRuntime: archiveEnabled is true but no conversationArchiveMasterSeedAuthority was supplied — this runtime constructs no Master Seed Authority of its own.",
+      );
+    }
+  }
+  // Secure Runtime Alpha 7881-7960 -- mirrors the guards above exactly: a
+  // configuration error is thrown synchronously, before any Persistence
+  // backend or Host is constructed, never a silent fallback to a
+  // fabricated Device Registry/relay set/signing authority.
+  if (config.archiveSuppressionSyncEnabled) {
+    if (!config.archiveEnabled) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveSuppressionSyncEnabled is true but archiveEnabled is false — suppression has nothing to gate without a real Archive Runtime.",
+      );
+    }
+    if (!config.deviceTrustEnabled) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveSuppressionSyncEnabled is true but deviceTrustEnabled is false — this runtime constructs no Device Registry of its own.",
+      );
+    }
+    if (config.conversationTransportRelays === undefined || config.conversationTransportRelays.length === 0) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveSuppressionSyncEnabled is true but no conversationTransportRelays were supplied — this runtime constructs no Relay of its own.",
+      );
+    }
+    if (config.conversationTransportSigningAuthority === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: archiveSuppressionSyncEnabled is true but no conversationTransportSigningAuthority was supplied — this runtime constructs no Signing Authority of its own.",
       );
     }
   }
@@ -1066,6 +1145,25 @@ export async function startFedosDesktopRuntime(
       ? new AppendOnlyFedosConversationActivationPersistence(config.conversationActivationCoordinationLogPath)
       : new InMemoryFedosConversationActivationPersistence();
 
+  // Secure Runtime Alpha 7881-7960 (Stage 3, Phase H/I) -- ALWAYS
+  // constructed when `archiveEnabled` is true (no separate trigger flag,
+  // unlike directRatchet/peerCapability/etc: a real Archive restore needs
+  // a real, non-fabricated suppression answer regardless of whether
+  // multi-Device sync is ever configured). Closes the gap `6a2f274` itself
+  // disclosed: `FedosConversationArchiveRuntime`'s own `suppressionAuthority`
+  // dependency (already threaded by that Arc) was always `undefined` in
+  // production until now.
+  const conversationArchiveSuppressionPersistence =
+    config.archiveEnabled === true
+      ? config.archiveSuppressionObservationLogPath !== undefined
+        ? new AppendOnlyFedosArchiveSuppressionObservationPersistence(config.archiveSuppressionObservationLogPath)
+        : new InMemoryFedosArchiveSuppressionObservationPersistence()
+      : undefined;
+  const conversationArchiveSuppressionAuthority: FedosArchiveSuppressionObservationAuthority | undefined =
+    conversationArchiveSuppressionPersistence !== undefined
+      ? new FedosArchiveSuppressionObservationAuthority({ persistence: conversationArchiveSuppressionPersistence, now: config.clock })
+      : undefined;
+
   // Alpha 921/923 -- exactly one FedosConversationRuntime per running
   // runtime, a NEW peer to FedosBoardRuntime (not a wrapper, not a
   // subclass), over its own durable (or in-memory) backends. Constructed
@@ -1193,6 +1291,12 @@ export async function startFedosDesktopRuntime(
   // "assembled inside the deviceTrustEnabled gate, constructed further below
   // once `stopped` exists" pattern exactly.
   let devicePairingBoundary: ReturnType<typeof createFedosDeviceBindingBoundary> | undefined;
+  // Secure Runtime Alpha 7881-7960 -- mirrors devicePairingBoundary's own
+  // "assembled inside the deviceTrustEnabled gate, constructed further
+  // below once `stopped` exists" pattern; both stay `undefined` unless
+  // `config.archiveSuppressionSyncEnabled` was true (validated above).
+  let archiveSuppressionOutboundCoordinatorInstance: FedosArchiveSuppressionOutboundCoordinator | undefined;
+  let archiveSuppressionInboundSubscriptionInstance: FedosArchiveSuppressionInboundSubscription | undefined;
   if (config.deviceTrustEnabled) {
     // Secure Runtime Alpha 6521-6600 -- `deviceRegistryPersistence` itself
     // is now constructed ABOVE (hoisted, shared with the four new
@@ -1320,6 +1424,55 @@ export async function startFedosDesktopRuntime(
       transferSessionPersistence,
       relaySyncObservationRepository,
     };
+
+    // Secure Runtime Alpha 7881-7960 (Stage 3, Phase H/I) -- real Device
+    // Sync propagation, constructed ONLY when both `archiveSuppressionSyncEnabled`
+    // and `archiveEnabled` are true (the top-of-function guard already
+    // confirmed `conversationTransportRelays`/`conversationTransportSigningAuthority`
+    // are present in that case). Reuses the SAME `deviceRegistryPersistence`
+    // this whole `deviceTrustEnabled` block already owns -- never a second
+    // Device Registry -- and the SAME `conversationTransportRelays` the
+    // Private Transport (if enabled) also connects to, over a SECOND,
+    // stateless `FedosConversationRelaySet` wrapper (safe: it owns no
+    // independent connection state of its own, see that class's own
+    // header) and a SECOND `FedosDeviceRelaySyncPublisher` instance (Alpha
+    // 3641-3720, unmodified) -- no new transport protocol, no new Relay
+    // implementation, no new signing authority.
+    if (config.archiveSuppressionSyncEnabled && conversationArchiveSuppressionAuthority !== undefined) {
+      const archiveSuppressionRelaySet = new FedosConversationRelaySet(config.conversationTransportRelays!);
+      await archiveSuppressionRelaySet.connectAll();
+      const archiveSuppressionPublisher = new FedosDeviceRelaySyncPublisher(archiveSuppressionRelaySet);
+      const archiveSuppressionFanoutObservationRepository = new FedosDeliveryObservationRepository(
+        config.archiveSuppressionFanoutObservationLogPath !== undefined
+          ? new AppendOnlyFedosDeliveryObservationPersistence(config.archiveSuppressionFanoutObservationLogPath)
+          : new InMemoryFedosDeliveryObservationPersistence(),
+      );
+      archiveSuppressionOutboundCoordinatorInstance = new FedosArchiveSuppressionOutboundCoordinator({
+        registryPersistence: deviceRegistryPersistence!,
+        signingAuthority: config.conversationTransportSigningAuthority!,
+        publisher: archiveSuppressionPublisher,
+        observationRepository: archiveSuppressionFanoutObservationRepository,
+        now: config.clock,
+      });
+
+      const archiveSuppressionInboundDedupPersistence =
+        config.archiveSuppressionInboundDedupLogPath !== undefined
+          ? new AppendOnlyFedosArchiveSuppressionInboundDedupPersistence(config.archiveSuppressionInboundDedupLogPath)
+          : new InMemoryFedosArchiveSuppressionInboundDedupPersistence();
+      const archiveSuppressionInboundHandler = new FedosArchiveSuppressionInboundHandler({
+        registryPersistence: deviceRegistryPersistence!,
+        dedupPersistence: archiveSuppressionInboundDedupPersistence,
+        observationAuthority: conversationArchiveSuppressionAuthority,
+        localDeviceId: config.localDeviceId!,
+        localAccountRef: config.localAccountRef!,
+      });
+      archiveSuppressionInboundSubscriptionInstance = new FedosArchiveSuppressionInboundSubscription(
+        archiveSuppressionRelaySet,
+        archiveSuppressionInboundHandler,
+        config.clock,
+      );
+      await archiveSuppressionInboundSubscriptionInstance.start();
+    }
   }
 
   // Secure Runtime Alpha 1471-1540 -- exactly one FedosPrivateTransport
@@ -1498,6 +1651,11 @@ export async function startFedosDesktopRuntime(
       encryptionRuntimeBoundary: isFedosProductionConversationAeadHandleSource(config.conversationArchiveMasterSeedAuthority!)
         ? new FedosProductionConversationArchiveEncryptionRuntimeBoundary(config.conversationArchiveMasterSeedAuthority!)
         : undefined,
+      // Secure Runtime Alpha 7881-7960 -- the real, durable authority
+      // constructed above; restore now receives a real suppression
+      // answer automatically, no manual fabrication required by any
+      // caller.
+      suppressionAuthority: conversationArchiveSuppressionAuthority,
     });
   }
 
@@ -1591,6 +1749,65 @@ export async function startFedosDesktopRuntime(
       }
       return devicePairingFacadeInstance;
     },
+    // Secure Runtime Alpha 7881-7960 -- the real, durable authority ALWAYS
+    // constructed when `config.archiveEnabled` is true (see
+    // `conversationArchiveSuppressionAuthority`'s own construction comment
+    // above) -- the SAME instance `conversationArchiveRuntime()`'s own
+    // restore path already consults automatically.
+    archiveSuppressionAuthority(): FedosArchiveSuppressionObservationAuthority {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.archiveSuppressionAuthority() is inaccessible after stop().");
+      }
+      if (conversationArchiveSuppressionAuthority === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.archiveSuppressionAuthority() is not enabled -- see config.archiveEnabled.");
+      }
+      return conversationArchiveSuppressionAuthority;
+    },
+    /**
+     * Secure Runtime Alpha 7881-7960 -- the real production entry point a
+     * caller composes AFTER a local Retention/Deletion decision has already
+     * durably executed (mirrors `fedos_archive_suppression_local_bridge.ts`'s
+     * own header: "a caller invokes this function AFTER a local retention
+     * transition has already succeeded" -- this Runtime constructs no
+     * mutation path of its own, Local Deletion/Retention's own closed
+     * boundaries are never reopened here). Records a durable, self-authored
+     * suppression fact SYNCHRONOUSLY (the real local guarantee a caller can
+     * depend on immediately), then -- ONLY if `archiveSuppressionSyncEnabled`
+     * resolved a real Outbound Coordinator -- fans it out to every other
+     * currently-trusted Device of the SAME account in the BACKGROUND,
+     * never awaited here: Local Deletion NEVER waits for this coordinator
+     * (the Outbound Coordinator's own header, unmodified).
+     */
+    recordAndPropagateArchiveSuppression(
+      input: Omit<FedosCreateLocalSuppressionFactInput, "accountRef" | "sourceDeviceId">,
+    ): FedosCreateAndRecordLocalSuppressionFactOutcome {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.recordAndPropagateArchiveSuppression() is inaccessible after stop().");
+      }
+      if (conversationArchiveSuppressionAuthority === undefined) {
+        throw new Error("FedosRunningDesktopRuntime.recordAndPropagateArchiveSuppression() is not enabled -- see config.archiveEnabled.");
+      }
+      if (config.localAccountRef === undefined || config.localDeviceId === undefined) {
+        throw new Error(
+          "FedosRunningDesktopRuntime.recordAndPropagateArchiveSuppression() requires config.localAccountRef and config.localDeviceId -- a suppression fact is always Device/account-scoped, never fabricated.",
+        );
+      }
+      const localAccountRef = config.localAccountRef;
+      const localDeviceId = config.localDeviceId;
+      const outcome = createAndRecordLocalArchiveSuppressionFact(
+        { ...input, accountRef: localAccountRef, sourceDeviceId: localDeviceId },
+        conversationArchiveSuppressionAuthority,
+      );
+      if (outcome.outcome === "recorded" && archiveSuppressionOutboundCoordinatorInstance !== undefined) {
+        void archiveSuppressionOutboundCoordinatorInstance.fanOut({
+          fact: outcome.fact,
+          deviceEvidence: null,
+          sourceDeviceId: localDeviceId,
+          localAccountIndex: config.conversationTransportAccountIndex ?? 0,
+        });
+      }
+      return outcome;
+    },
     async stop(): Promise<void> {
       if (stopped) {
         throw new Error("FedosRunningDesktopRuntime.stop() may only be called once.");
@@ -1601,6 +1818,15 @@ export async function startFedosDesktopRuntime(
       // own contract, unmodified) BEFORE the Host itself stops.
       if (deviceSyncFacadeDeps?.scheduler !== null && deviceSyncFacadeDeps?.scheduler !== undefined) {
         await deviceSyncFacadeDeps.scheduler.stopSync();
+      }
+      // Secure Runtime Alpha 7881-7960 -- unsubscribes from every Relay the
+      // suppression Inbound Subscription opened; the underlying `FedosRelay`
+      // CONNECTIONS themselves are left open here (they may be the SAME
+      // shared connections `privateTransportInstance` below still needs
+      // until ITS OWN `stop()` runs) -- disconnecting is that instance's own
+      // established responsibility, never duplicated here.
+      if (archiveSuppressionInboundSubscriptionInstance !== undefined) {
+        await archiveSuppressionInboundSubscriptionInstance.stop();
       }
       if (privateTransportStarted && privateTransportInstance !== undefined) {
         await privateTransportInstance.stop();

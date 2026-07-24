@@ -95,6 +95,17 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
       // index -- see docs/secure_runtime_alpha_7641_7720_reconciliation_report.md.
       "src/board/observation/fedos_delivery_observation_repository.ts",
       "src/board/observation/fedos_delivery_observation_query.ts",
+      // Secure Runtime Alpha 7881-7960 (FedOS Delivery Observation Durable
+      // Write Index, Archive Suppression Production Wiring, and Final
+      // Public Release Readiness Arc) -- legitimately: (1) adds a lazy
+      // in-memory write-time index directly inside the Persistence class
+      // itself (Stage 2, a real measured O(T)-per-write fix, distinct from
+      // the Repository-level index above), and (2) threads new, additive
+      // `archiveSuppression*` config fields through the Coordinator's own
+      // profile-path planning (Stage 3) -- see
+      // docs/secure_runtime_alpha_7881_7960_reconciliation_report.md.
+      "src/board/observation/append_only_fedos_delivery_observation_persistence.ts",
+      "src/desktop/onboarding/fedos_local_profile_paths.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);

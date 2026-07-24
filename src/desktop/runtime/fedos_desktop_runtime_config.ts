@@ -639,4 +639,49 @@ export interface FedosDesktopRuntimeConfig {
   readonly deletionRequestExecutionLogPath?: string;
   readonly deletionRequestInboxSummaryLogPath?: string;
   readonly deletionRequestPendingReviewLogPath?: string;
+
+  // -----------------------------------------------------------------------
+  // Secure Runtime Alpha 7881-7960 (Stage 3, Phase H/I: "FedOS Archive
+  // Suppression Production Wiring") -- closes the gap the immediately
+  // prior Arc (`6a2f274`) disclosed: `FedosArchiveSuppressionObservationAuthority`
+  // (Alpha 7721-7800, fully built/tested) was never constructed anywhere
+  // in `fedos_desktop_runtime.ts`, and `FedosConversationArchiveRuntime`'s
+  // own `suppressionAuthority` dependency (already threaded by `6a2f274`)
+  // was always `undefined` in production.
+  // -----------------------------------------------------------------------
+
+  /**
+   * ALWAYS constructed when `archiveEnabled` is `true` (unlike the four
+   * `*Enabled` subsystems above, this needs no separate trigger flag — a
+   * real Archive restore needs a real, non-fabricated suppression answer
+   * regardless of whether multi-Device sync is ever configured). Omitted,
+   * `InMemoryFedosArchiveSuppressionObservationPersistence` — matches
+   * every other backend's own "AppendOnly when a log path is supplied,
+   * else InMemory" discipline; this Device's own self-authored
+   * suppression facts (see `fedos_archive_suppression_local_bridge.ts`)
+   * still evaluate correctly within this process, but do not survive a
+   * restart without a real log path.
+   */
+  readonly archiveSuppressionObservationLogPath?: string;
+  /**
+   * OPTIONAL. Enables REAL Device Sync propagation (outbound fan-out over
+   * the SAME `conversationTransportRelays`/`conversationTransportSigningAuthority`
+   * this Runtime already owns, AND a real inbound subscription over the
+   * identical relay set) of suppression facts between trusted Devices of
+   * the SAME account — REQUIRES `deviceTrustEnabled` (for a real Device
+   * Registry) AND both `conversationTransportRelays` and
+   * `conversationTransportSigningAuthority` to be supplied (independent of
+   * `privateTransportEnabled` itself — suppression sync rides the SAME
+   * relay connections, not the private NIP-17 queue). Validated, thrown
+   * synchronously, mirroring every other guard in this file. When omitted
+   * or a prerequisite is missing, THIS Device's own local suppression
+   * authority (see `archiveSuppressionObservationLogPath`) still works
+   * correctly for single-Device restore-gating — only cross-Device
+   * propagation is skipped, honestly, never fabricated.
+   */
+  readonly archiveSuppressionSyncEnabled?: boolean;
+  /** Meaningful ONLY when `archiveSuppressionSyncEnabled` is `true`. Omitted, `InMemoryFedosArchiveSuppressionInboundDedupPersistence` — a restart forgets which inbound Relay events were already imported, which can only ever cause a harmless, already-idempotent re-import attempt (the Observation Authority's own revision/duplicate check is the real, durable safety net), never a duplicate suppression EFFECT. */
+  readonly archiveSuppressionInboundDedupLogPath?: string;
+  /** Meaningful ONLY when `archiveSuppressionSyncEnabled` is `true` — a dedicated `FedosDeliveryObservationRepository` log for per-(fact, target Device) fan-out attempt history, mirroring `conversationTransportObservationLogPath`'s own identical "each domain gets its own dedicated Observation log, over the SAME generic, protocol-agnostic Observation machinery" convention. Omitted, in-memory (attempt history does not survive a restart; the durable suppression fact itself, and its real Device-trust-gated delivery, are entirely unaffected). */
+  readonly archiveSuppressionFanoutObservationLogPath?: string;
 }
