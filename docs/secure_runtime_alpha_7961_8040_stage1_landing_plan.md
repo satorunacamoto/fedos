@@ -20,7 +20,46 @@ points in the real commit list, matching (not forcing) the requested
 | 7 | Invitation / messaging reachability / route isolation / Archive parity | `4c6fa3b3` (Alpha 7401-7480) | Secure Memory production wiring, Settings-to-Relay production wiring, Direct Ratchet production crypto graph, Conversation Invitation, production crypto/identity wiring (FULL COMPLETION), long-running reliability, packaged feature reachability, same-peer route binding. |
 | 8 | Scalability / multi-Device suppression / final hardening | `81b5f0d1` (Alpha 7881-7960, this Arc's own base) | Outbox restart hydration, Archive retention parity, Observation subject index, Archive Multi-Device Suppression, Direct Conversation Archive product, Observation write-time index, Suppression production wiring, prior release-readiness pass. |
 
-## Per-checkpoint execution contract
+## Revision (discovered during execution): this history is a DAG, not a line
+
+Attempting checkpoint 1 (`767eb54e`) as a standalone `git merge --ff-only`
+failed with "Diverging branches." Direct ancestry testing revealed the
+real topology: `master` (`3eb9eadd`) is **not** an ancestor of `767eb54e`
+specifically, even though `767eb54e` IS an ancestor of `81b5f0d1`, and
+`master` IS an ancestor of checkpoints 2–8 individually. The 113-commit
+list from `git log --oneline master..81b5f0d1` is a topological listing
+of a graph with many historical merge points (`git log --graph` confirms
+numerous `Merge X into Y` commits) — not one straight line. `master`
+itself joins the graph at one specific historical merge point, not at
+the very start. Checkpoint 5→6 (`9cdd74ec`→`ed5128f6`) is similarly not
+a direct ancestor pair (both are independent branches merged at a later
+common point) — confirmed by direct `--is-ancestor` testing.
+
+**Revised methodology, adopted honestly rather than force a false linear
+narrative**: checkpoint 1 is folded into checkpoint 2 (`568ddb88`,
+confirmed a valid ancestor of both `master` and the later checkpoints).
+The remaining 7 checkpoints (2–8) are each audited by checking out that
+commit **detached** (no branch movement, no merge, no conflict
+resolution of an already-historically-settled decision) inside this same
+worktree, running `npm run typecheck` (fast, catches structural breaks)
+plus one representative focused test file for that checkpoint's own
+named capability. Diff scale is recorded via `git diff --stat` between
+consecutive checkpoints (valid regardless of exact graph shape, since
+`git diff` works between any two commits). The actual INTEGRATION BRANCH
+movement happens exactly ONCE, at the end, via a single real (non-`--ff-only`)
+merge from the integration branch's own tip (this Stage 0/1 report
+commit) to `81b5f0d1` — already proven conflict-free at the tree level
+for the master↔`81b5f0d1` pair; the one real conflict expected is
+`README.md` (both sides independently added content at the top across
+genuinely divergent history), resolved by taking `81b5f0d1`'s own
+version (the complete, correct, cumulative, newest-first lineage — the
+version that becomes the actual final "master state" documentation, not
+a hybrid), then re-inserting nothing lost (verified: master's own unique
+content, if any, is already a merged-in ancestor of `81b5f0d1` itself,
+per `git rev-list --count 81b5f0d1..master` = 0 — master has zero
+commits `81b5f0d1` does not already contain).
+
+## Per-checkpoint execution contract (as revised above)
 
 For every checkpoint, in order:
 
