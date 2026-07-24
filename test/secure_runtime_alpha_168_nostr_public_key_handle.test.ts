@@ -109,7 +109,7 @@ describe("Secure Runtime Alpha 168 -- Nostr Public Key Handle", () => {
 
   it("10. Regression: the crate's #[wasm_bindgen] count remains fixed at 13", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
   });
 
   it("11. Regression: desktop_application.ts, fedos_runtime_identity.ts, and worker.ts carry no reference to this Stage's own doc", () => {

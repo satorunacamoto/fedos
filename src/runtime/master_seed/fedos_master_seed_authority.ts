@@ -37,4 +37,39 @@ export interface FedosMasterSeedAuthority {
    * off-curve counterparty key).
    */
   resolveConversationKey(accountIndex: number, counterpartyPublicKeyHex: string): Promise<AeadKeyHandle | null>;
+
+  /**
+   * Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+   * Delivery Arc") Phase B — encrypts `plaintext` (a caller-supplied
+   * Rumor/Seal serialization; this method performs NO Rumor/Seal
+   * construction of its own) into a genuine NIP-44 v2 WIRE payload string
+   * for the pairwise conversation between `accountIndex` and
+   * `counterpartyPublicKeyHex`. This is NOT [`resolveConversationKey`] +
+   * `encrypt()` (`../fedos_runtime_encrypt.js`) — that pipeline produces
+   * this crate's own generic Envelope AEAD ciphertext, never standard
+   * NIP-44 wire ciphertext a real Nostr client could decrypt. `null` on
+   * ANY failure (no Master Seed held, malformed input, or an internal
+   * derivation/encrypt failure) — fail closed, never a partial payload.
+   *
+   * OPTIONAL — mirrors `FedosMasterSeedWasmLoaderBoundary`'s own
+   * `encrypt_nip44_wire`/`decrypt_nip44_wire` optionality (Secure Runtime
+   * Alpha 5561–5640 integration merge): several pre-existing implementers
+   * of this interface (`DevelopmentFedosMasterSeedAuthority`,
+   * `FedosProductionMasterSeedAuthority`) never constructed a real NIP-44
+   * wire bridge and are not required to grow one just because this method
+   * exists. Callers (`fedos_nip59_seal.ts`/`fedos_nip59_gift_wrap.ts`)
+   * check for its presence and fail closed, exactly like every other
+   * failure mode here — never a silent downgrade.
+   */
+  encryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, plaintext: Uint8Array): Promise<string | null>;
+
+  /**
+   * The decrypt-direction sibling of [`encryptNip44Wire`]. `null` on ANY
+   * failure — no Master Seed held, malformed input, a structurally
+   * malformed `payload`, OR a genuine authentication failure (wrong
+   * recipient or tampered ciphertext) — never distinguishing which, never
+   * a partial/best-effort plaintext. OPTIONAL — see `encryptNip44Wire`'s
+   * own doc comment for why.
+   */
+  decryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, payload: string): Promise<Uint8Array | null>;
 }

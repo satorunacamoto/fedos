@@ -51,4 +51,15 @@ export interface FedosConversationCapabilityIssueRequest {
 export interface FedosConversationCapabilityIssuerAuthority {
   issueJoinCapability(request: FedosConversationCapabilityIssueRequest, now: number): FedosConversationCapabilityIssuanceResult;
   inspectDescriptor(capabilityId: FedosConversationCapabilityId): FedosConversationCapabilityDescriptor | null;
+  /**
+   * Alpha 1000 ("Invitation Directory Read") — OPTIONAL, additive read of every
+   * PUBLIC descriptor issued for one conversation. Added for the Alpha 991–1050
+   * Invitation Transport & Draft Management Arc's invitation-management read
+   * surface (`listConversationInvitations()`), exactly the "list all
+   * capabilities issued for a conversation" case the Arc's reconciliation
+   * sanctions extending additively. Descriptors ONLY — never a bearer secret.
+   * Optional so this addition breaks no existing implementation; a caller that
+   * needs listing checks for its presence and falls back to `[]`.
+   */
+  listIssuedDescriptorsForConversation?(conversationId: FedosConversationId): readonly FedosConversationCapabilityDescriptor[];
 }

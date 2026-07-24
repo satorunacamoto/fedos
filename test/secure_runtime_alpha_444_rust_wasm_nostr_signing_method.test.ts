@@ -5,9 +5,9 @@ import libRaw from "../packages/fedos-core-rust/src/lib.rs?raw";
 const lib: string = (libRaw as string).replace(/\r\n/g, "\n");
 
 describe("Secure Runtime Alpha 444 -- Rust/WASM Nostr Signing Method", () => {
-  it("sign_nostr_event checks kind against exactly 1", () => {
+  it("sign_nostr_event checks kind against exactly 1 or 13 (Secure Runtime Alpha 1761-1840 Phase D added NIP-59 Seal signing, additively)", () => {
     const fn = (lib.match(/pub fn sign_nostr_event\([\s\S]*?\n    \}/) ?? [""])[0];
-    expect(fn).toContain("if kind != 1 {");
+    expect(fn).toContain("if kind != 1 && kind != 13 {");
   });
 
   it("sign_nostr_event validates created_at as finite, non-negative, and a whole number", () => {

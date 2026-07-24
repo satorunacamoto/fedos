@@ -22,10 +22,21 @@
  *     always comes from the CLI-layer caller (`../archive_cli/fedos_conversation_archive_cli_directory.ts`),
  *     which is itself in-process/trusted, not untrusted external input;
  *     out of scope for this Arc.
+ *
+ * Secure Runtime Alpha 5401–5480 ("FedOS Local Deletion Capability and
+ * Deletion-State Foundation Arc") adds ONE new method, `deleteFile` — the
+ * missing local capability the Secret Capability Deletion review
+ * (`cf5b870`) identified: "no `deleteFile`/`removeFile` method anywhere
+ * in `src/conversation/archive_cli/`." Mirrors every other method's own
+ * fail-closed, missing-idempotent discipline: a target that does not
+ * exist is treated as ALREADY removed (`true`), never an error; a
+ * symlink/reparse-point target is refused outright (`false`) rather than
+ * followed — this Arc's own deletion coordinator never deletes THROUGH a
+ * link, only an ordinary file the Archive CLI itself wrote.
  */
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
@@ -36,6 +47,14 @@ export interface FedosConversationArchiveCliFileSystem {
   writeFile(path: string, bytes: Uint8Array): boolean;
   /** Every entry name directly inside `directoryPath` (not recursive). `null` if `directoryPath` does not exist or cannot be listed. */
   listFiles(directoryPath: string): readonly string[] | null;
+  /**
+   * Removes exactly the one file at `path` — never a directory, never
+   * recursive. `true` if `path` did not exist to begin with (missing-file
+   * idempotency) or was successfully removed. `false` if `path` is a
+   * symlink/reparse point (refused, never followed) or removal otherwise
+   * failed — fails closed, never throws.
+   */
+  deleteFile(path: string): boolean;
 }
 
 /** The real, `node:fs`-backed `FedosConversationArchiveCliFileSystem`. */
@@ -71,6 +90,18 @@ export const fedosConversationArchiveCliNodeFileSystem: FedosConversationArchive
       return readdirSync(directoryPath) as readonly string[];
     } catch {
       return null;
+    }
+  },
+
+  deleteFile(path: string): boolean {
+    try {
+      if (!existsSync(path)) return true;
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) return false;
+      unlinkSync(path);
+      return true;
+    } catch {
+      return false;
     }
   },
 };

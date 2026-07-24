@@ -12,7 +12,10 @@ import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../sr
 import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
 import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "../src/conversation/transport/fedos_conversation_transport_outbox_codec.js";
+import type {
+  FedosPersistedConversationTransportOutboxRecord,
+  FedosPersistedConversationTransportOutboxRecordV1,
+} from "../src/conversation/transport/fedos_conversation_transport_outbox_codec.js";
 
 /** Mirrors `ManualRelay` (`test/secure_runtime_alpha_730_ok_listener_lifecycle.test.ts`) -- a directly-controllable `FedosRelay` double, extended with subscribe/fireEvent for Inbound Subscription tests. */
 class ManualRelay implements FedosRelay {
@@ -109,7 +112,7 @@ describe("Secure Runtime Alpha 1471-1540 -- Relay Deduplication", () => {
 });
 
 function fakeEventSourceReturning(event: FedosNostrWireEvent | null) {
-  return async (_record: FedosPersistedConversationTransportOutboxRecordV1) => event;
+  return async (_record: FedosPersistedConversationTransportOutboxRecord) => event;
 }
 
 function fakeOutboxRecord(): FedosPersistedConversationTransportOutboxRecordV1 {

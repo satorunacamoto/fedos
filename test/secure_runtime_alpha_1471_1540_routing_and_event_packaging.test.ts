@@ -7,6 +7,7 @@ import {
   parseFedosPrivateTransportEventDescriptor,
   FEDOS_PRIVATE_TRANSPORT_MARKER_TAG,
 } from "../src/conversation/transport/fedos_conversation_transport_event.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
 import type { FedosConversationMembership } from "../src/conversation/membership/fedos_conversation_membership.js";
 import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope.js";
@@ -129,8 +130,8 @@ function fakeEnvelope(overrides: Partial<FedosConversationMessageEnvelope> = {})
   });
 }
 
-describe("Secure Runtime Alpha 1471-1540 -- Wire Packaging (kind fixed to 1, no new crypto)", () => {
-  it("1. builds an unsigned event request with kind 1, the marker tag, the p tag, and base64 content", () => {
+describe("Secure Runtime Alpha 1471-1540 -- Wire Packaging (kind fixed to the shared FedOS proprietary kind since Alpha 1615, no new crypto)", () => {
+  it("1. builds an unsigned event request with the shared proprietary kind (Alpha 1615 -- never kind 1), the marker tag, the p tag, and base64 content", () => {
     const ciphertext = new Uint8Array([1, 2, 3, 4, 5]);
     const request = buildFedosPrivateTransportUnsignedEventRequest({
       envelope: fakeEnvelope(),
@@ -138,7 +139,7 @@ describe("Secure Runtime Alpha 1471-1540 -- Wire Packaging (kind fixed to 1, no 
       counterpartyPublicKeyHex: COUNTERPARTY_PUBKEY,
       localAccountIndex: 0,
     });
-    expect(request.kind).toBe(1);
+    expect(request.kind).toBe(FEDOS_PRIVATE_NOSTR_DELIVERY_KIND);
     expect(request.accountIndex).toBe(0);
     expect(request.createdAt).toBe(1_700_000_000);
     expect(request.tags).toContainEqual([...FEDOS_PRIVATE_TRANSPORT_MARKER_TAG]);
@@ -147,7 +148,7 @@ describe("Secure Runtime Alpha 1471-1540 -- Wire Packaging (kind fixed to 1, no 
     expect(Buffer.from(request.content, "base64")).toEqual(Buffer.from(ciphertext));
   });
 
-  function descriptorFrom(tags: readonly (readonly string[])[], content: string, kind = 1): FedosEventDescriptor {
+  function descriptorFrom(tags: readonly (readonly string[])[], content: string, kind = FEDOS_PRIVATE_NOSTR_DELIVERY_KIND): FedosEventDescriptor {
     return Object.freeze({
       id: "event-1",
       provider: "nostr",
@@ -176,7 +177,7 @@ describe("Secure Runtime Alpha 1471-1540 -- Wire Packaging (kind fixed to 1, no 
     expect(parsed?.ciphertext).toEqual(ciphertext);
   });
 
-  it("3. rejects a non-kind-1 event", () => {
+  it("3. rejects an event at the wrong kind (including, per Alpha 1615's own Kind-1 Closure, kind 1 itself -- see also test/secure_runtime_alpha_1611_1690_kind1_closure.test.ts)", () => {
     const descriptor = descriptorFrom(
       [[...FEDOS_PRIVATE_TRANSPORT_MARKER_TAG], ["p", COUNTERPARTY_PUBKEY], ["e-envelope", "envelope-1"]],
       "",
@@ -185,7 +186,7 @@ describe("Secure Runtime Alpha 1471-1540 -- Wire Packaging (kind fixed to 1, no 
     expect(parseFedosPrivateTransportEventDescriptor(descriptor)).toBeNull();
   });
 
-  it("4. rejects an event lacking the fedos-private marker tag (e.g. a public Board post sharing kind 1)", () => {
+  it("4. rejects an event lacking the fedos-private marker tag (e.g. a privateNostrDelivery()-originated event sharing this same proprietary kind but a different tag shape -- see also test/secure_runtime_alpha_1611_1690_kind1_closure.test.ts for the public-Board-kind-1 case)", () => {
     const descriptor = descriptorFrom([["p", COUNTERPARTY_PUBKEY], ["e-envelope", "envelope-1"]], "");
     expect(parseFedosPrivateTransportEventDescriptor(descriptor)).toBeNull();
   });

@@ -722,8 +722,7 @@ describe("Secure Runtime Alpha 053-055 -- Identity Runtime Internal Operations, 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
+    expect(pubFnNames.length).toBe(69);    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_053|secure_runtime_alpha_054|secure_runtime_alpha_055/);
 
     const cargoCode = cargoTomlSource

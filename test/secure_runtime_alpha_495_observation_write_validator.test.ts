@@ -90,10 +90,10 @@ describe("Secure Runtime Alpha 495 -- Observation Write Validator", () => {
     expect(repository.list()).toHaveLength(0);
   });
 
-  it("the underlying FedosDeliveryObservationRepository/Query classes are unmodified (record/get/list, historyFor/currentStateFor/listByState)", () => {
+  it("the underlying FedosDeliveryObservationRepository/Query classes gain no BREAKING change (record/get/list unmodified; RECONCILED: Secure Runtime Alpha 7641-7720 adds ONE new, purely additive method, listForSubject(), the derived per-subject index accessor -- historyFor/currentStateFor/listByState keep their own identical signatures and behavior)", () => {
     const { repository, query } = makePipeline();
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(repository)).sort()).toEqual(
-      ["constructor", "get", "list", "record"].sort(),
+      ["constructor", "get", "list", "listForSubject", "record"].sort(),
     );
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(query)).sort()).toEqual(
       ["constructor", "currentStateFor", "historyFor", "listByState"].sort(),

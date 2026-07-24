@@ -86,6 +86,10 @@ function fakeFileSystem(): FedosConversationArchiveCliFileSystem & { readonly fi
       return true;
     },
     listFiles: (directoryPath) => [...files.keys()].filter((key) => key.startsWith(`${directoryPath}/`)).map((key) => key.slice(directoryPath.length + 1)),
+    deleteFile: (path) => {
+      files.delete(path);
+      return true;
+    },
   };
 }
 
@@ -184,8 +188,8 @@ describe("Secure Runtime Alpha 2341-2420 -- LARGE ARCHIVE (1,000 envelopes/paylo
     const imported = await importFedosConversationArchiveCliPackage({ package: exported.package, ...BASE_REQUEST_FIELDS }, authority, targetDeps);
     expect(imported.outcome).toBe("decrypted");
     if (imported.outcome !== "decrypted") throw new Error("unreachable");
-    expect(imported.result.envelopes).toEqual({ inserted: LARGE_ENVELOPE_COUNT, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(imported.result.payloads).toEqual({ inserted: LARGE_ENVELOPE_COUNT, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(imported.result.envelopes).toEqual({ inserted: LARGE_ENVELOPE_COUNT, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(imported.result.payloads).toEqual({ inserted: LARGE_ENVELOPE_COUNT, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
 
     const restoredPayload = targetDeps.payloadStorage.getPayload("payload-500" as never);
     expect(restoredPayload).not.toBeNull();

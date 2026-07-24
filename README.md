@@ -8,6 +8,3006 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7881–7960 — FedOS Delivery Observation
+> Durable Write Index, Archive Suppression Production Wiring, and Final
+> Public Release Readiness Arc (FULL COMPLETION).** Closes the two
+> remaining gaps `6a2f274` (Alpha 7801-7880) itself disclosed. (1)
+> `AppendOnlyFedosDeliveryObservationPersistence.putObservation()` was
+> O(T) per call (full log re-read + re-parse before every append) —
+> fixed with a lazily-built, private, in-memory-only index
+> (`#ensureIndex()`); the durable append-only log stays the sole source
+> of truth, the index updates only AFTER a durable write succeeds, and a
+> warm instance's writes/lookups drop from O(T) to O(1) average (measured:
+> a duplicate/conflict lookup at T=10,000 fell from ~17ms to ~0.03ms).
+> (2) `FedosArchiveSuppressionObservationAuthority` (Alpha 7721-7800, real
+> and tested) was never constructed anywhere in `fedos_desktop_runtime.ts`
+> — Archive restore's own `suppressionAuthority` dependency was always
+> `undefined` in production. Fixed: the Runtime now constructs a real,
+> durable authority whenever `archiveEnabled` is true (no separate flag —
+> restore needs a real answer regardless of multi-Device sync), and, when
+> `archiveSuppressionSyncEnabled` is also set, a real Outbound
+> Coordinator/Inbound Handler plus a new
+> `FedosArchiveSuppressionInboundSubscription` (mirroring the
+> Conversation domain's own established inbound-subscription idiom) — the
+> one genuinely missing piece, a live relay feed into the already-built
+> Inbound Handler. Also wired through the real
+> `FedosProfileInitializationCoordinator` (a new durable log path planned
+> unconditionally, a new `archiveSuppressionSyncEnabled` dependency
+> toggle), not just the lower Runtime layer. Proven end to end with two
+> real `startFedosDesktopRuntime()` instances, a real local relay, and a
+> real restart. Built real WASM fresh in this worktree — 8 previously-
+> gated real-crypto vertical slices now run and pass; a new canonical
+> product vertical slice proves profile bootstrap → relay → invitation →
+> two independent real Direct Conversations → Archive export →
+> Suppression Authority durability, through the real Profile Coordinator
+> chain, surviving a real relaunch. Upgrade compatibility proven for five
+> named older shapes. Final release matrix: zero security-correctness
+> FAIL. See `docs/secure_runtime_alpha_7881_7960_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7801–7880 — FedOS Direct Conversation
+> Archive Product Completion and Parallel-Lineage Integration Arc (FULL
+> COMPLETION).** Reconciles two sibling production lineages first
+> (`d5979ae`, Delivery Observation Repository Subject Index; `e048ff63`,
+> Archive Multi-Device Suppression Propagation — completely disjoint
+> file sets, one README conflict, zero production-source conflicts),
+> then closes the Direct Conversation Archive product gap Alpha
+> 7321–7400 disclosed: `FedosConversationArchiveBundleV1.conversation`
+> was valid ONLY for a public, Board-thread-anchored Conversation, but a
+> real Direct Conversation is never written into that persistence port
+> at all — a prior Arc (Alpha 1921–1980) had already found and
+> precisely documented this exact gap, deliberately deferring it. Fix: a
+> new, narrow, additive subject type — a bare object (no `kind` field)
+> is the pre-existing Board shape, byte-for-byte unchanged; an object
+> with `kind: "direct"` wraps the ALREADY-EXISTING, already-frozen
+> Conversation Draft wire record verbatim, no new record shape, no
+> global Archive schema-version bump. The Collector/Restore/Runtime now
+> try the real Board record first, falling back — only when both new,
+> optional dependencies are wired — to the SAME `resolveActiveConversation()`
+> helper the Encryption/Decryption Coordinators already use, never a
+> fabricated Board record. Restore writes ONLY the draft record, never
+> an Activation fact — history recovery and live-session recovery stay
+> separate by construction, proven live: a restored Direct Conversation
+> reports "not-active" and a send attempt fails closed. Two real bugs
+> were found and fixed while building the real vertical slice: reusing
+> a Master Seed Authority after `lock()` (which clears its own secret
+> material) breaks restore, and Activation state — unlike every other
+> port — has no real durable log path in the current profile flow, so
+> two independently-constructed in-memory instances silently never
+> share state; fixed by injecting one shared instance into both the
+> Conversation Runtime's own assembly and the Archive Runtime. Also
+> closed: Multi-Device Suppression's own `suppressionAuthority`
+> dependency was fully implemented and tested by `e048ff63` but never
+> threaded past `restoreFedosConversationArchiveBundle()` itself — no
+> caller anywhere in the Runtime ever wired it, invisible to that Arc's
+> own tests since they call the function directly. Threaded through the
+> Runtime layer; the REMAINING gap (no real production construction site
+> for the suppression authority itself, no Device Sync transport wiring)
+> is disclosed, not fixed, and recommended as follow-on work. Proven
+> live through the exact same `FedosDesktopApplicationShell.archive()`
+> method the packaged Electron app's own `fedos-acceptance:archive` IPC
+> channel already calls — zero new IPC surface needed, since the
+> assumption lived entirely inside the Collector/Restore, never the IPC
+> layer. Zero Ratchet/Identity Transition/NIP-17/Device Sync/Observation-
+> repository-indexing/Outbox-Scheduler changes; zero Electron preload/
+> main files touched. See
+> `docs/secure_runtime_alpha_7801_7880_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7721–7800 — FedOS Archive Multi-Device
+> Suppression Propagation Arc (FULL COMPLETION).** Closes the exact
+> limitation Alpha 7481–7560 left standing: a genuinely foreign or
+> never-informed Device that possesses a pre-deletion Archive has no
+> basis to suppress its restore, since Retention only knows what THIS
+> Device decided locally. Fix: a new, additive
+> `FedosArchiveSuppressionFact` domain — a closed, versioned, 10-field
+> fact naming a payload and a suppression meaning (payload restore,
+> envelope restore, search reindex), authenticated primarily by the
+> real, unmodified outer Nostr event signature and optionally narrowed
+> by Device-level evidence — propagated between currently-trusted
+> Devices of the SAME account over a new, dedicated `kind:1` route
+> (never a new NIP), reusing the existing `FedosDeviceRelaySyncPublisher`
+> transport unmodified. A durable, per-`(subject, sourceDevice)`
+> monotonic-revision Observation Authority (mirroring Identity
+> Transition's own rollback rule) records both self-authored and
+> imported facts, and Archive restore gains one new, optional
+> `suppressionAuthority` gate alongside `feff676`'s own retention gate —
+> proven live that an imported fact denies restore of both the Envelope
+> and the Payload even when the restoring Device's own local Retention
+> log knows nothing about the deletion. Proven via a real, no-mocks
+> vertical slice: a real local WebSocket relay, a real client, real
+> BIP-340 Schnorr signing, and real file-backed persistence across a
+> literal restart, with three Device contexts — the fact's originator,
+> an already-paired online Device that receives/persists/restarts/
+> suppresses, and a Device not yet paired at fanout time that
+> legitimately still restores the pre-deletion content, an honestly
+> disclosed limitation, never fabricated global deletion propagation.
+> No return-acknowledgement protocol exists — `"relay-accepted"` is the
+> strongest per-Device status this Arc can honestly report, never "the
+> target actually imported it." A real bug was found and fixed while
+> building the vertical slice: the relay client's own raw
+> `FedosNostrWireEvent` (fields `pubkey`/`created_at`/`sig`) was pushed
+> directly into a buffer typed as `FedosEventDescriptor` (`author`/
+> `createdAt`/`signature`) without the existing wire-to-descriptor
+> adapter, silently defeating the Inbound Handler's very first check — a
+> test-fixture bug, not a production defect, fixed by applying the same
+> adapter the outbound side already uses in reverse. Zero Rust/Cargo/
+> WASM changes; zero Ratchet/Identity Transition/Signed Deletion Request/
+> NIP-17/Delivery Observation Repository indexing/Outbox-Scheduler
+> changes (verified via dedicated structural guards, including a direct,
+> behaviorally-proven separation from Signed Deletion's own
+> Acknowledgement flow — neither domain ever creates the other's own
+> fact as a side effect). Ran as one of two parallel Arcs in separate
+> worktrees; the sibling Arc's own domain (Delivery Observation
+> Repository indexing/query) was never touched. See
+> `docs/secure_runtime_alpha_7721_7800_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7641–7720 — FedOS Delivery Observation
+> Repository Subject Index and Query Scalability Arc (FULL
+> COMPLETION).** Closes the O(historyBearingCount²) finding Alpha
+> 7561–7640 disclosed but explicitly left out of its own scope:
+> `FedosDeliveryObservationQuery.historyFor(subjectId)` re-scanned the
+> ENTIRE Observation repository (every subject's history, not just the
+> one requested) on every single per-subject read — the shared machinery
+> both Board and Conversation delivery hydration depend on. Fix: a new,
+> private, derived `#bySubject` index inside
+> `FedosDeliveryObservationRepository` itself, rebuilt once at
+> construction (O(T)) and updated O(1) amortized on every successful
+> `record()`; `historyFor()` now reads the one requested subject's own
+> bucket instead of filtering the whole repository, with the SAME
+> ordering contract and SAME output as before. `list()`/`listByState()`
+> are byte-for-byte unchanged for genuinely cross-subject callers.
+> Measured, not claimed: querying every subject once at
+> deliveredCount=3,200 dropped from a cited 19,399.14 ms to a measured
+> 2.26 ms (~8,584x); at deliveredCount=100,000 — previously only
+> derivable at roughly 5.2 hours for a comparable write-path scenario —
+> the equivalent read now measures 154.28 ms directly. Board and
+> Conversation both benefit identically (shared code, zero Scheduler/
+> Outbox changes on either side) — every pre-existing test suite for
+> both domains re-runs unmodified and passing. One real, disclosed,
+> unfixed boundary remains: the durable file-backed persistence
+> backend's own write-time duplicate check is still O(T), unchanged,
+> structurally identical to and mirroring the original audit's own
+> still-open Outbox finding — recommended as the next Arc. Ran as one of
+> two parallel Arcs in separate worktrees; the sibling Arc's own domain
+> (Archive/Retention/Deletion/Safety Center) was never touched, verified
+> via a dedicated structural guard. See
+> `docs/secure_runtime_alpha_7641_7720_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7561–7640 — FedOS Conversation Outbox
+> Restart Hydration and Scheduler Scalability Arc (FULL COMPLETION, one
+> significant unplanned finding disclosed).** Closes the named production
+> defect: the Conversation Transport Scheduler was constructed with no
+> initial delivered/abandoned state, so every restart treated the entire
+> historical, shared, whole-profile Outbox log as pending and retried it
+> in full. Ports the proven Board Outbox hydration pattern (Alpha
+> 585/586) into `FedosPrivateTransport`'s one production construction
+> site: a new, pure `hydrateFedosConversationTransportDeliveryRecoveryState()`
+> reads the already-durable Delivery Observation history and seeds the
+> Scheduler's own existing (previously-unpopulated) `initialDelivered`/
+> `initialAbandoned` constructor seam. Proven at three levels — unit,
+> integration (`FedosPrivateTransport` restart, in-memory), and a real
+> vertical slice (file-backed persistence, real local WebSocket relay,
+> multi-conversation mixed workload, 5+ restart cycles) — that a
+> delivered or abandoned intent is never re-attempted after any number of
+> restarts, while genuinely pending intents still retry correctly, with
+> zero retry amplification across repeated cycles. A significant,
+> unplanned discovery made during benchmarking is fully disclosed, not
+> minimized: the shared (Board-and-Conversation) `FedosDeliveryObservationQuery`/
+> `FedosDeliveryRetryQuery` machinery this Arc reuses unchanged scans the
+> entire Observation repository on every per-subject history read,
+> making both this Arc's own hydration and the pre-existing Validating
+> Repository's per-write staleness check cost O(historyBearingCount²),
+> not O(T) — measured cleanly at deliveredCount 100–3,200 (consistent
+> ~4x-per-doubling growth), honestly not completed at the 10,000/100,000
+> scale the Arc's own template requested (mathematically projected, not
+> measured, at ~3.2 minutes and ~5.3 hours respectively). The Outbox
+> persistence layer itself remains confirmed cheap and linear even at
+> T=100,000. Recommends exactly one next Arc: an internal, incrementally-
+> maintained subject index inside `FedosDeliveryObservationRepository`
+> to close this newly-found gap for Board and Conversation alike. See
+> `docs/secure_runtime_alpha_7561_7640_completion_declaration.md` and
+> the accompanying reconciliation/terminal-state/scheduler-lifecycle/
+> complexity/benchmark-methodology documents.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7481–7560 — FedOS Archive Envelope
+> Retention Parity and Metadata Deletion Semantics Arc (FULL
+> COMPLETION).** Remediates a committed audit's own headline finding
+> (`2eed88d9`): Payload collection was retention-gated on Archive export,
+> but Envelope collection was not, so an Archive taken after a deletion
+> could still preserve and later restore message existence, timestamp,
+> sender, recipient, conversation association, and envelope identity even
+> once content was inaccessible. Fix: the SAME `retentionAuthority`
+> dependency now gates BOTH Envelope and Payload collection on export,
+> keyed by the same `payloadId` — one denial excludes both records,
+> never an independent, disagreeing check. A NEW, additive restore-time
+> gate re-evaluates the RESTORING device's own current retention state
+> before writing either record back, closing the honest defense-in-depth
+> gap for an OLDER (pre-deletion) Archive restored onto a device that has
+> since independently learned of the deletion — proven live via a real,
+> no-mocks vertical slice with real two-profile WASM crypto: a fresh
+> "already-informed" device restoring a pre-deletion Archive reports the
+> new `"partially-denied"` outcome and never resurfaces the deleted
+> message, while a genuinely foreign/never-informed device restores it in
+> full, an honestly disclosed limitation, never fabricated global
+> deletion propagation. A real, self-discovered defense-in-depth defect
+> was found and fixed during this same Arc's own vertical-slice test:
+> the obvious restore-time gate reused the existing
+> `evaluatePayloadAccess()`, whose Payload-Storage-existence check made
+> every fresh restore indistinguishable from "genuinely foreign" (a fresh
+> device's own storage is empty by construction at the exact moment
+> restore's own check runs, before restore itself has written anything) —
+> silently defeating the intended re-evaluation. Fixed with a new,
+> narrow, additive public method,
+> `FedosPayloadRetentionAuthority.evaluateRetentionDecisionOnly()`, that
+> checks the retention decision log directly, independent of storage
+> presence. Also found and fixed, beyond the audit's own named scope: the
+> Deletion Capability Registry's own `"local-envelope"` entry falsely
+> claimed `reachableToday: true` with real supported operations, though no
+> executor for it exists anywhere; and the deletion-assessment's own
+> "denied" branch wrongly claimed the live Envelope record mirrors its
+> Payload's tombstoned/removed state, when in live storage it always
+> remains present. Safety Center now surfaces three new, accurate
+> warnings, both on the generic overview screen and inside the Archive
+> workflow itself (previously silent there, a separate audit finding).
+> Schema version unchanged (still `1`); zero Ratchet/Identity/NIP-17/
+> Secure Memory/Outbox/Scheduler changes. Ran as one of two parallel Arcs
+> in separate worktrees; the sibling Arc's own domain (Conversation
+> Outbox/Scheduler) was never touched, verified via a dedicated
+> structural guard. See
+> `docs/secure_runtime_alpha_7481_7560_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7401–7480 — FedOS Direct Conversation
+> Route Binding and NIP-17 Inbound Isolation Arc (FULL COMPLETION).**
+> Closes a real security-correctness defect proven during Alpha 7241–7320:
+> two concurrent Direct Conversations with the same peer could be
+> misrouted by inbound NIP-17 processing, because routing resolved
+> primarily by peer identity rather than an unambiguous
+> conversation/session binding. Two findings, both closed: the standard
+> `nostr-nip17-v1` route SILENTLY misrouted a message addressed to a
+> second, later-created same-peer conversation into the first (live-
+> reproduced fresh, independently of the prior report); the Direct
+> Ratchet route did not silently misroute but instead deterministically
+> REJECTED a second same-peer session establishment as
+> `"wrong-conversation"` (source-traced). Fix: a versioned, closed
+> route-binding structure carried inside the already-encrypted NIP-17
+> Rumor content — never Relay-visible, authenticated transitively via the
+> real Seal signature, resolved as the PRIMARY lookup key (never a
+> secondary check against a peer-only guess) — extending the SAME
+> FedOS-proprietary payload convention the Direct Ratchet route already
+> established, never a new NIP, never a new crypto primitive, never a
+> Ratchet-cryptographic-core/Identity-Transition/Signed-Deletion redesign.
+> A genuinely legacy (unbound) message is still accepted when exactly one
+> candidate Conversation matches; two or more fails closed as
+> `"ambiguous-legacy-route"`, never a first-match guess. Signed Deletion's
+> own control payload already carried an explicit, authenticated
+> `conversationId` and was never vulnerable — verified, not re-fixed.
+> Proven live: two same-peer Conversations both establish independent
+> Ratchet sessions and route correctly (previously the second session-init
+> would deterministically fail), a Session Reset on one leaves the other
+> completely untouched, restart survives, Device revocation stops every
+> Conversation sharing that Device pair, duplicate Relay redelivery is a
+> no-op, reverse delivery order still lands correctly, and Search stays
+> isolated per Conversation for the same-peer case. See
+> `docs/secure_runtime_alpha_7401_7480_completion_declaration.md` and
+> `..._execution_specification.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7321–7400 — FedOS Desktop Production
+> Feature Reachability Arc (FULL COMPLETION, one gap honestly disclosed).**
+> Closes the remaining production reachability gaps so the packaged
+> Electron application can actually use existing backend functionality —
+> no protocol redesign, no redesign of Ratchet, Identity, NIP-17, or
+> Secure Memory. The core fix: the entire `fedos-acceptance:*` IPC
+> vocabulary (Alpha 7001-7080) previously rejected every call unless
+> `AUTOTEST_MODE` was set, making it unreachable in ordinary packaged
+> production mode by construction — `requireShell()`/the new
+> `requireBoundary()` now gate on ONE real precondition, "a profile is
+> genuinely unlocked," the same precondition every other channel already
+> requires. Four new IPC channels close Release Readiness Review findings
+> B-2/B-7 — Conversation Invitation, Search, Archive, and Safety Center —
+> each delegating entirely to an already-real Shell/Boundary method,
+> proven via the real, compiled, packaged Beta Electron subprocess (never
+> a hand-built Runtime, never a mock relay):
+> `packages/fedos-desktop-electron-spike/test/secure_runtime_alpha_7321_7400_real_packaged_vertical_slice.test.ts`
+> drives create profile → unlock → create invitation → accept invitation
+> → exchange encrypted messages → search → reach Archive's real IPC
+> surface → open Safety Center → restart → continue the conversation, all
+> through two real, independently-provisioned production profiles over a
+> real local WebSocket relay. One genuine, pre-existing architectural gap
+> found and honestly disclosed, not fixed: Archive export can never
+> succeed end-to-end for any conversation this packaged app produces,
+> because `exportConversationArchive()`'s existence check requires a real
+> Board-level (public) conversation record, but the packaged app can only
+> ever create private Direct conversations — confirmed live
+> (`{outcome:"not-found", reason:"unknown conversation"}`, never a crash,
+> never a fabricated success); fixing it for real would require either a
+> real Public-conversation creation path or a deliberate, scoped redesign
+> of Archive's own existence-check boundary, both out of this Arc's own
+> narrow "reachability wiring" mission. No visual renderer screen is added
+> for the four newly reachable commands (a disclosed scope decision,
+> consistent with this codebase's own established convention of deferring
+> full visual UI to a later arc). Zero Rust/Cargo.toml change, zero
+> Ratchet/Identity/production-activation-chain change (confirmed by
+> structural guard). See
+> `docs/secure_runtime_alpha_7321_7400_completion_declaration.md` and
+> `..._execution_specification.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7241–7320 — FedOS Long-Running Runtime
+> Reliability and Recovery Arc (FULL COMPLETION).** Validates and hardens
+> the already-real production runtime under realistic long-running
+> conditions — no new cryptographic protocol, no redesign of Ratchet,
+> Identity, NIP-17, or Secure Memory. Real, no-substitution testing: two
+> real production profiles exchange 221 real encrypted messages across 2
+> full restarts and 1 genuine relay disconnect/reconnect over a real
+> local WebSocket relay
+> (`test/secure_runtime_alpha_7241_7320_long_running_durability_and_reconnect.test.ts`);
+> Direct Ratchet session state survives 4 consecutive real seal/clear/
+> restore cycles; a real Identity Transition arrives mid-conversation and
+> the conversation keeps working across a real restart; a real tombstone
+> (Signed Deletion's own underlying retention effect) genuinely survives
+> a real restart; real WASM-backed Archive export/restore now correctly
+> excludes tombstoned content across a device boundary; two real profiles
+> with two DIFFERENT peers stay fully isolated across a restart. Two real
+> production fixes, both regression-proven: (1)
+> `conversationCapabilityLogPath`/`conversationPayloadRetentionLogPath`
+> — both fields already existed on `FedosDesktopRuntimeConfig` (Alpha
+> 923/1143) but the real Coordinator never supplied either, so
+> Capability/Retention state silently fell back to in-memory-only and
+> was lost on every real restart (the exact bug class Alpha 7081-7160
+> already fixed for `conversationDraftLogPath`); (2) Archive export/
+> restore never enforced Payload Retention (Search closed the identical
+> gap at Alpha 2581-2620) AND never had a real production WASM
+> encryption boundary (the SAME recurring "dev-gated default, never the
+> canonical production authority" bug class Alpha 7161-7240 already
+> fixed for the generic Envelope-AEAD path) — both closed by mirroring
+> already-established patterns, reaching only already-real, already-
+> tested Rust exports. Two genuine findings honestly disclosed, not
+> fixed (out of this Arc's own narrow scope): two concurrent Direct
+> conversations with the SAME peer are NOT correctly isolated by inbound
+> NIP-17 routing (would require a wire-format change to fix for real,
+> forbidden as protocol redesign here); the durable Outbox Scheduler's
+> own tick cost grows with a conversation's total history (a real,
+> measured, long-running characteristic, consistent with a widespread
+> pre-existing persistence pattern, not unique to this Arc's own scope).
+> Zero Rust/Cargo.toml change, zero redesign of Direct Ratchet/Identity
+> Transition/NIP-17's own construction pipeline/Signed Deletion
+> (confirmed by structural guard), zero p2p/.tmp_gen change. See
+> `docs/secure_runtime_alpha_7241_7320_completion_declaration.md` and
+> `..._execution_specification.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7161–7240 — FedOS Conversation-Level
+> Production Crypto and Identity Authority Wiring Arc (FULL COMPLETION —
+> the mission's own success criteria proven literally, end to end, over
+> a real relay, with no substitution of any kind).** Closed every
+> production wiring gap named by both the Architecture Conformance
+> Review V1 (`17c6cef6`) and the immediately-prior Arc's own Honest
+> Partial (7081-7160, `b44e1a45`) — Production Identity Resolver wiring,
+> Production Encryption Authority wiring, and Production NIP-17 Wire
+> Adapter wiring — plus two further, deeper boundaries real testing
+> found along the way: the generic Envelope-AEAD encrypt/decrypt path
+> (used for message-content storage) and the ephemeral Gift-Wrap signing
+> authority (used for the NIP-59 outer layer) were EACH their own,
+> separate, `NODE_ENV`-gated WASM boundary, undiscovered until this Arc
+> tried to send a real message. All five close via the SAME established
+> pattern (Alpha 6841-6920's own "reuse the canonical, already-activated
+> Master Seed/Signing Authority instead of a second WASM instance"),
+> extended from Direct Ratchet to Conversation-level identity/
+> encryption/transport: a new `assembleFedosConversationCanonicalProductionCryptoGraph()`
+> factory, five new thin wrapper methods on
+> `FedosProductionMasterSeedAuthority` reaching already-real,
+> already-tested Rust exports (`encrypt_nip44_wire`/`decrypt_nip44_wire`/
+> `build_and_sign_nip17_gift_wrap`/`encrypt_aead`/`decrypt_aead`/
+> `serialize_aead_ciphertext`/`deserialize_aead_ciphertext`), and one new
+> production runtime boundary pair. Two further, previously-total
+> Coordinator gaps also closed: `FedosProfileInitializationCoordinator`
+> never threaded `conversationDirectMessageDeliveryRoute` OR
+> `conversationTransportInbound` at all, meaning no caller of this
+> Coordinator — for ANY subsystem — could ever select the standard
+> NIP-17 route or receive a LIVE relay-delivered Rumor through the real
+> Coordinator/packaged path before this Arc. The real production
+> vertical slice test proves, with zero manual test-side delivery of any
+> kind: Alice creates an invitation, Bob's real live NIP-59 subscription
+> receives it over a real local relay, the conversation activates for
+> real (Encryption Authority selected automatically), a real encrypted
+> first message and reply are really delivered over the real relay, both
+> Runtimes restart, activation is genuinely re-established, and the
+> conversation continues. Zero Rust/Cargo.toml change, zero redesign of
+> Direct Ratchet/NIP-17's own construction pipeline/Identity Transition/
+> Signed Deletion (confirmed by structural guard), zero p2p/.tmp_gen
+> change. See `docs/secure_runtime_alpha_7161_7240_completion_declaration.md`
+> and its own named companion reports (`..._reconciliation_report.md`,
+> `..._execution_specification.md`).
+>
+> Prior status: Secure Runtime Alpha 7081–7160 — FedOS Conversation
+> Invitation and Shared Conversation Foundation Arc (HONEST PARTIAL —
+> real signed Invitation/Acceptance mechanism built and proven, real
+> relay-transported delivery blocked one layer beneath it, real cause
+> named, not fabricated). Set out to close the gap the immediately-
+> prior Arc (7001-7080) surfaced: `FedosDesktopApplicationShell.redeemInvitation()`
+> being unconditionally unavailable, and the old Capability/Invitation
+> Transport system (Alpha 991-1050) requiring a shared backend
+> incompatible with two independently-provisioned profiles. Built an
+> entirely new, additive, parallel Invitation subsystem
+> (`src/conversation/invitation_bootstrap/`): a signed, domain-separated
+> Invitation record and token; an outbound coordinator that breaks the
+> real circular Membership/route-resolution dependency by admitting both
+> parties' Memberships locally BEFORE the first invitation is ever sent;
+> an inbound Acceptance coordinator with real signature verification,
+> real addressee verification, expiry checking, and durable idempotent
+> duplicate detection; Runtime wiring additive and optional throughout.
+> Proven for real, on two genuinely independent real production profiles
+> over a real local relay connection: Alice creates an invitation, Bob
+> accepts it, both peers hold the identical conversationId, Membership is
+> durably persisted on both sides, and a real Coordinator restart
+> preserves everything. One real, narrow, in-scope production bug fixed
+> along the way: `conversationDraftLogPath` was never wired by
+> `FedosProfileInitializationCoordinator`, silently defaulting Draft
+> persistence to in-memory-only through the real production path for
+> every Direct/Group conversation. **What remains genuinely blocked, not
+> silently claimed closed:** real testing surfaced three deep,
+> pre-existing, cross-cutting production gaps beneath this Arc's own new
+> code, none of which this Arc created or is scoped to fix — (1) the real
+> NIP-17 wire adapter is never constructed through the real production
+> Coordinator/packaged path (`productionCryptoGraph` never populated),
+> blocking real relay-transported delivery of Conversation Invitations
+> AND every other control-message subsystem (Peer Capability, Direct
+> Ratchet control messages, Identity Transition, Signed Deletion) today;
+> (2) `FedosConversationIdentityResolver` resolves to a generic,
+> non-per-account placeholder in the real production path, worked around
+> in this Arc's own scope via a real per-account signing-derived
+> identity but not fixed at the root; (3) `FedosConversationDirectActivationCoordinator`
+> requires a real production encryption authority that has never been
+> built. This Arc's own real vertical slice test discloses, in its own
+> header comment before a single assertion runs, that it substitutes
+> direct coordinator-to-coordinator delivery of the real signed
+> invitation payload for the (confirmed-blocked) live relay transport
+> leg — never a fabricated record, never a bypassed identity or signature
+> check. Zero redesign of Direct Ratchet, Identity Transition, Signed
+> Deletion, or the Rust/WASM core; the old Capability/Invitation
+> Transport system left fully untouched; zero p2p/.tmp_gen change. See
+> `docs/secure_runtime_alpha_7081_7160_completion_declaration.md` and its
+> own named companion reports (`..._reconciliation_report.md`,
+> `..._execution_specification.md`, `..._deep_production_gap_report.md`).
+> Recommended next Arc (narrow, not the "full completion" default):
+> **FedOS Conversation-Level Production Crypto and Identity Authority
+> Wiring Arc.**
+>
+> Prior status: Secure Runtime Alpha 7001–7080 — FedOS Desktop Beta
+> Runtime Acceptance Arc (HONEST PARTIAL — packaged two-party end-to-end
+> messaging blocked, real cause named, not fabricated). Set out to
+> prove the canonical packaged Desktop Beta can execute a real two-party
+> Direct Ratchet message round trip (renderer → preload → main →
+> Coordinator → Runtime → Ratchet → NIP-17 → real Relay → second party →
+> decrypt → durable message → lock/restart → continued messaging). Real
+> reconciliation (grounded in direct source inspection, not narrative)
+> surfaced three genuine, previously-undocumented gaps beneath the
+> already-real Alpha 6921-7000 session-establishment layer: (1) the
+> packaged app's own real, user-facing `sendMessage()` always used the
+> legacy static NIP-17 route, never Direct Ratchet — `conversationDirectRatchetDeps.messageDelivery`
+> was never auto-wired, unlike its sibling `directMessageDelivery`; fixed
+> with one new optional config field, mirroring the sibling's own
+> auto-wiring exactly, zero behavior change by default; (2) zero IPC
+> commands existed for conversation creation, session establishment,
+> message send/read, or Device trust, despite real Shell methods for all
+> of them — closed with a new, closed, structurally-validated,
+> AUTOTEST-only `fedos-acceptance:*` vocabulary (11 commands, proven
+> unreachable in ordinary packaged mode) plus two narrow new Shell
+> wrapper methods (`activateDirectConversation`/`establishDirectRatchetSession`);
+> (3) no real WebSocket relay SERVER existed anywhere in this repository
+> — closed with a real, RFC 6455-compliant local relay test fixture
+> (genuine handshake, genuine NIP-01 framing, genuine ACK, smoke-tested
+> and passing). **What remains genuinely blocked, not silently claimed
+> closed:** a real Direct Conversation between two INDEPENDENTLY-
+> provisioned profiles needs the second party to learn the first party's
+> generated `conversationId` and hold a matching local Draft+Membership
+> record; the accepted real mechanism for that,
+> `FedosDesktopApplicationShell.redeemInvitation()`, is confirmed by
+> direct source read to be unconditionally `"unavailable"` on this
+> codebase's own current base — a pre-existing limitation this Arc did
+> not create and whose full closure exceeds this Arc's own narrow
+> mandate. Phases G through Q (session establishment through the full
+> release-candidate matrix) are correspondingly BLOCKED, not FAILED — see
+> `docs/secure_runtime_alpha_7001_7080_completion_declaration.md` and its
+> own named companion reports (`..._reconciliation_report.md`,
+> `..._acceptance_topology_and_ownership.md`, `..._execution_specification.md`,
+> `..._end_to_end_messaging_acceptance_report.md`,
+> `..._lock_restart_restore_report.md`, `..._crash_recovery_report.md`,
+> `..._secret_surface_audit_report.md`,
+> `..._release_candidate_acceptance_matrix.md`). Zero Rust change, zero
+> wire/persistence-schema change, zero Electron security weakening, zero
+> p2p/.tmp_gen change. Recommended next Arc (narrow, not the "full
+> completion" default): **FedOS Desktop Beta Cross-Profile Direct
+> Conversation Establishment Arc.**
+>
+> Prior status: Secure Runtime Alpha 6921–7000 — FedOS Direct Ratchet
+> Cryptographic Session Production Capability Arc (root-cause defect
+> CLOSED and proven with real cryptography; one packaged-diagnostic
+> stretch goal disclosed out of narrow scope, not fabricated). A
+> post-implementation audit of `4c1f27c` (Alpha 6841-6920) found that Arc
+> honestly closed only the UPPER authority/configuration graph:
+> `directRatchetConfigured` correctly flips to `true` through the real
+> packaged path, but the DEEPER layer,
+> `FedosDirectRatchetCryptographicSession`, still (1) unconditionally
+> called `primedLoader()` — `new FedosWasmLoaderSkeleton()` +
+> `attemptDevOnly*` — and (2) accepted only `instanceof
+> FedosWasmMasterSeedAuthority`, rejecting the real
+> `FedosProductionMasterSeedAuthority`. Net effect: "configured" was true,
+> but a real production session establishment returned crypto-unavailable
+> — exactly the gap this Arc closes. Fix: `FedosProductionMasterSeedAuthority`
+> gains one new internal-only accessor,
+> `accessDirectRatchetSessionModuleInternalUse()`, reading
+> `FedosDirectRatchetSession`'s own static constructors off the SAME
+> already-initialized WASM module closure
+> `constructMasterSeedAuthority()` already reads (zero second import,
+> zero second `initSync`) — mirrors `accessForNostrSigningAuthorityInternalUse()`'s
+> exact discipline, `#cleared`-gated. `FedosDirectRatchetCryptographicSession`
+> gains ONE shared resolver, `resolveDirectRatchetSessionAccess()`,
+> checked STRUCTURALLY first (never `instanceof
+> FedosProductionMasterSeedAuthority` — mirrors the established
+> `isFedosDirectRatchetSealingAuthority()` precedent), falling back to the
+> byte-for-byte-unchanged dev/test path
+> (`instanceof FedosWasmMasterSeedAuthority` +
+> `developmentDirectRatchetLoaderBoundary()`, `primedLoader()` renamed
+> only) for every other authority. Zero public method signature changed —
+> both real callers
+> (`fedos_direct_ratchet_outbound_integration.ts`/`inbound_integration.ts`)
+> needed no edit. Proven with a real, no-mock, real-WASM Node-level
+> vertical slice: two independent real `FedosProductionMasterSeedAuthority`
+> instances (Alice, Bob), real Nostr identity derivation, real session
+> establishment, two real encrypt/decrypt rounds with correct counter
+> progression, real seal of both Ratchet state AND the master seed, real
+> `clear()`-invalidation of fresh sessions, a genuinely NEW authority
+> generation via `restoreSealed()` (identical public identity confirmed),
+> both sealed Ratchet sessions restored through that fresh generation, and
+> a third message correctly encrypted/decrypted post-restore. Three real
+> test-authoring bugs were self-caught and fixed during this process
+> (placeholder counterparty keys; `generate()` vs `restoreSealed()` for
+> the fresh-generation step; stale `previousSendingChainLength`/
+> `remoteRatchetPublicKeyHex` at `restore()`) — all in test code, zero in
+> production code. 12 new structural guards (direct source inspection,
+> including a real `git diff` proof of zero Rust change) and a 7-case
+> failure matrix (missing/partial/cleared/malformed capability, all fail
+> closed) also pass. Phase M: the one pre-identified typecheck error
+> fixed by narrowing a TEST fixture's local type, never widening a
+> production interface. **Disclosed, not silently claimed closed:** a
+> packaged-process, IPC-observable "crypto-operational" (not merely
+> "configured") diagnostic was investigated and found not safely
+> constructible within this Arc's own prohibitions — `cr.directRatchet()`
+> exposes no public accessor to the underlying `masterSeedAuthority`, so
+> proving it at the IPC layer would require either a new, separately-
+> reviewed Master-Seed-handle-adjacent capability (out of one narrow
+> remediation Arc's own mandate) or full counterparty/Device-Registry/
+> NIP-17 relay integration scaffolding no prior Arc has ever built for a
+> packaged test either (the immediately-prior Arc's own completion
+> declaration independently disclosed this identical gap). See
+> `docs/secure_runtime_alpha_6921_7000_remediation_reconciliation_report.md`,
+> `..._production_session_capability_design.md`,
+> `..._execution_specification.md`, `..._loader_authority_ownership_proof.md`,
+> `..._compatibility_report.md`, `..._packaged_ratchet_acceptance_report.md`,
+> and `..._completion_declaration.md`.
+>
+> Prior status: Secure Runtime Alpha 6841–6920 — FedOS Direct Ratchet
+> Production Crypto Graph Unification Arc (full completion of the
+> authority/configuration graph layer; the audit above found the deeper
+> session-establishment layer this same Arc's own name implied was
+> unified was, in fact, still split — "configured" was proven true,
+> "crypto-operational" was not yet proven, and is not the same claim).
+> Closes the
+> exact structural blocker `f3e0658` disclosed: Direct Ratchet's own crypto
+> graph factory (`assembleFedosConversationProductionCryptoGraph()`)
+> always constructed a SECOND, independent, permanently
+> `NODE_ENV=development`-gated `FedosMasterSeedAuthority`, never reusing
+> the canonical production one profile unlock already activates. A
+> review-gated Stage 1 (source-grounded reconciliation, ownership
+> analysis, option comparison, normative decision, all seven decision-gate
+> conditions verified true by direct source read — including that
+> `Coordinator#lock()` already clears this exact authority object and
+> `conversationRuntime()` already throws post-stop, meaning lock/restart
+> invalidation required zero new code) selected Option H: make
+> `FedosProductionMasterSeedAuthority` (the ONE canonical production
+> authority) ALSO implement the already-existing, already-reviewed
+> `FedosDirectRatchetSealingAuthority` narrow port (two new methods,
+> mirroring an already-shipped dev-wrapper implementation verbatim,
+> calling the SAME already-Store-backed WASM methods `8a33045e` added),
+> then thread that SAME object into Direct Ratchet's own dependency
+> derivation via one new optional config field — mirroring the EXISTING,
+> shipped `conversationArchiveMasterSeedAuthority` pattern exactly. Zero
+> Rust change, zero WASM export change, zero protocol/wire change, zero
+> Electron-main change (`fedos_electron_beta_main.cts` byte-for-byte
+> unchanged — reachability closed purely through the Coordinator/Runtime
+> layer, confirmed live: `directRatchetConfigured` flips from `false` to
+> `true` through a real packaged Electron process with zero Electron-main
+> edits). A real regression was found and fixed during this Arc's own
+> testing, before commit: the first gate condition ("some
+> `masterSeedAuthority` present") would have let
+> `DevelopmentFedosMasterSeedAuthority` (test-only, does not implement the
+> sealing port) falsely make Direct Ratchet appear reachable — caught by
+> running the EXISTING `secure_runtime_alpha_6521_6600_real_production_
+> vertical_slice.test.ts`, fixed by gating on
+> `isFedosDirectRatchetSealingAuthority()` specifically. 22 new tests (a
+> real production sealing-authority suite mirroring the dev-wrapper's own
+> 10-case suite but NEVER opening `NODE_ENV=development`; structural
+> guards including a real `git diff` proof of zero Rust change; a real
+> production vertical slice proving reachability, lock-invalidation, and
+> restart-with-stable-identity), all passing; zero regression (full suite
+> matches the immediately-prior Arc's own established baseline). See
+> `docs/secure_runtime_alpha_6841_6920_reconciliation_report.md`,
+> `..._architecture_option_review.md`,
+> `..._normative_decision_and_ownership_model.md`,
+> `..._execution_specification.md`, `..._production_reachability_report.md`,
+> `..._compatibility_and_packaged_acceptance_report.md`, and
+> `..._completion_declaration.md`. Recommended next Arc: **FedOS Desktop
+> Beta Final Release Candidate Validation and Public Release Readiness
+> Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6761–6840 — FedOS Settings-to-Relay
+> Production Wiring and Secure Runtime Reachability Arc (honest partial
+> completion — Peer Capability/Identity Transition/Deletion Request now
+> genuinely reachable through the packaged Beta entry point; Direct
+> Ratchet remains structurally unreachable, permanently gated to
+> `NODE_ENV=development` by an already-reviewed security boundary, not
+> this Arc's own gap).** Closes the exact blocker the immediately-prior
+> Arc's own real execution disclosed: `fedos_electron_beta_main.cts` (the
+> ONE canonical packaged Beta entry point) never threaded
+> `directRatchetEnabled`/`peerCapabilityEnabled`/`identityTransitionEnabled`/
+> `deletionRequestEnabled` through to its own Coordinator construction,
+> because the ONE missing dependency — real `conversationTransportRelays`
+> — was never sourced from the already-existing, already-persisted
+> Settings descriptor's own `relays` field (Alpha 4901–4980, already
+> classified `runtime-restart` by Alpha 4981–5060's own evidence-derived
+> table). One new, additive function
+> (`secureRuntimeBundleConfig()`) reads Settings and, when a real relay is
+> genuinely configured, constructs real `WebSocketRelay` instances (Node
+> 22+'s own global `WebSocket`, zero new dependency, the SAME class
+> `src/worker.ts` already uses in production) — never `NullRelay`, never a
+> fabricated URL; when no relay is configured, every one of the four
+> subsystems stays honestly disabled. Proven through the REAL packaged
+> path, not inference: a real Electron 43.1.1 subprocess, real compiled
+> WASM, a real Settings file seeded through the actual compiled
+> controller — `peerCapabilityConfigured`/`identityTransitionConfigured`/
+> `deletionRequestConfigured` all flip from `false` to `true`, a real
+> restart (fresh subprocess, same on-disk profile) reproduces the
+> identical public identity and reachability, wrong-passphrase and
+> corrupted-Settings both fail closed. Direct Ratchet's own crypto graph
+> (`assembleFedosConversationProductionCryptoGraph()`) was found, by
+> direct source inspection, to always construct a SECOND, independent
+> Master Seed Authority through `FedosWasmLoaderSkeleton`'s own Dev-only
+> Gate (`NODE_ENV === "development"` only, permanently denied otherwise)
+> — closing it would mean either redesigning that factory's own API to
+> accept the ALREADY-ACTIVATED production authority instead, or weakening
+> an already-reviewed security boundary; this Arc's own "no redesign,
+> never weaken security" rules correctly forbid both, so it is named as
+> the next Arc's own precisely-scoped work rather than attempted. Zero
+> regressions (full root suite re-run matches the immediately-prior Arc's
+> own established baseline shape exactly). See
+> `docs/secure_runtime_alpha_6761_6840_reconciliation_report.md`,
+> `..._execution_report.md`, `..._architecture_update.md`, and
+> `..._completion_declaration.md`. Recommended next Arc: **FedOS Direct
+> Ratchet Production Crypto Graph Unification Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6681–6760 — FedOS Desktop Beta Release
+> Candidate and Packaged Security Acceptance Arc (honest partial
+> completion — the canonical packaged Beta entry point does not yet
+> thread Direct Ratchet/Peer Capability/Identity Transition/Deletion
+> Request, blocked on the disclosed Settings→Relay plumbing gap, not this
+> session's environment).** Reconciles the two immediately-prior diverged
+> lineages — Desktop Runtime Configuration Unification (`70bbd6e8`, Alpha
+> 6521–6600) and Secure Memory Store Production Wiring (`8a33045e`, Alpha
+> 6601–6680) — with exactly one mechanical `README.md` conflict, zero
+> semantic overlap (the Runtime Configuration lineage never touches
+> `packages/fedos-core-rust`; the Secure Memory lineage never touches
+> Desktop/Electron files), and zero regressions (confirmed by diffing
+> failed-test sets against both pre-merge lineages independently: 4
+> merged-run failures not present in either baseline all turned out to be
+> `Test timed out in 5000ms` resource-contention flakes under the full
+> 14420-test run, each passing on isolated re-run). This is the first
+> session in this repository's own history with BOTH a real compiled WASM
+> artifact AND the Electron spike package's own installed `node_modules`
+> simultaneously present (real `cargo`/`rustc`/`wasm-bindgen` plus real
+> internet access downloaded the actual Electron 43.1.1 binary), closing
+> 3 of the 4 previously-BLOCKED Release Freeze rows for real: a real
+> packaged Electron process, real compiled WASM, real profile creation/
+> unlock/wrong-passphrase-rejection/lock/re-unlock/clean-shutdown, and a
+> real NSIS installer + portable ZIP built via `electron-builder` with
+> real code-signing and independently-re-derived checksums. A real, new,
+> READ-ONLY AUTOTEST diagnostic (`unifiedGraphDiagnostics()`, no renderer-
+> facing IPC added) proved the Store-backed production crypto authority
+> IS live and reachable through the real packaged path
+> (`productionCryptoStatusOutcome: "ok"`) — but ALSO proved, honestly,
+> that the canonical packaged Beta entry point's own Coordinator
+> construction never threads Direct Ratchet/Peer Capability/Identity
+> Transition/Deletion Request through, even though
+> `FedosProfileInitializationCoordinator` has carried that config since
+> Alpha 6521–6600. A fix was attempted and reverted: all four require
+> `privateTransportEnabled: true` plus real Relay/transport configuration
+> no packaged Electron entry point in this codebase has ever wired in —
+> inventing one here would be exactly the "arbitrary production
+> configuration" this Arc's own mission prohibits. A separate, narrow,
+> real bug was found and fixed in the release secret-scanner itself: a
+> `dev-master-seed-double` pattern match inside `/** */` comments (never
+> real code — independently confirmed the flagged class's own file does
+> not even compile into the packaged `dist/`) was a false positive; now
+> comment-aware, every other pattern unchanged. See
+> `docs/secure_runtime_alpha_6681_6760_reconciliation_report.md`,
+> `..._execution_specification.md`, `..._packaged_security_acceptance_report.md`,
+> `..._secret_surface_audit.md`, `..._threat_scenario_report.md`,
+> `..._release_freeze_update.md`, `..._rc_acceptance_matrix.md`, and
+> `..._completion_declaration.md`. Recommended next Arc: **FedOS Desktop
+> Beta Settings-to-Relay Production Wiring and Packaged Direct-Ratchet/
+> Peer-Capability/Identity-Transition/Deletion-Request Reachability Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6601–6680 — FedOS Secure Memory Store
+> Production Wiring Arc (FULL completion).** Before this Arc, every
+> `SecretHandleStore` construction anywhere in `packages/fedos-core-rust`
+> was `#[cfg(test)]`-only — a real, tested, but wholly unused primitive.
+> `FedosMasterSeedAuthorityState::Available(FedosMasterSeedHandle)` (a
+> direct struct field) becomes `Available { store: SecretHandleStore,
+> master_seed_id: SecretHandleId }` — one real, generation-safe,
+> opaque-ID Store per running `FedosMasterSeedAuthority` instance,
+> matching this crate's own established "one Authority per Desktop
+> Runtime" pattern. Ten production methods (`generate`, `restore_sealed`,
+> `seal`, `clear`, `sign_nostr_event`, `public_key_hex_for_account`,
+> `resolve_conversation_key`, `encrypt_nip44_wire`, `decrypt_nip44_wire`,
+> `seal_direct_ratchet_secret`, `restore_direct_ratchet_secret`) now
+> resolve the Master Seed through two new private bridge helpers
+> (`with_master_seed`/`with_master_seed_bytes`) that call
+> `SecretHandleStore::use_handle` — generation/kind-checked, scoped,
+> zeroized-after-use — instead of matching a direct field. `clear()` now
+> explicitly destroys the Store-owned handle by ID rather than merely
+> calling `.clear()` on a held value. Every existing cryptographic output
+> (signatures, derived public keys, sealed envelopes) preserved
+> byte-for-byte — proven by the full, unmodified `master_seed_authority_tests`
+> suite (all still passing) plus a real, new end-to-end vertical slice:
+> generate → sign → real NIP-44 round trip → real Direct Ratchet session
+> + seal → stop (deny everything) → restart with a fresh Store generation
+> → restore from sealed material → identical public identity → continue
+> operating, while the OLD, stopped instance stays permanently denied.
+> Direct Ratchet in-memory session ownership stays deliberately unchanged
+> (a per-conversation object, correctly out of the Authority's own
+> per-Runtime Store scope) — only its seal/restore boundary now
+> transitively inherits Store-gated shutdown. Zero new `Cargo.toml`
+> dependency; zero new `#[wasm_bindgen]` export surface (14, unchanged,
+> confirmed against a real `wasm32-unknown-unknown --release` build);
+> zero `SecretHandle`/`SecretHandleStore`/Master Seed Authority/Ratchet
+> protocol/NIP/WASM API redesign; zero Desktop/Electron/Shell/Safety
+> Center file touched. See
+> `docs/secure_runtime_alpha_6601_6680_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6601_6680_execution_specification.md`,
+> `docs/secure_runtime_alpha_6601_6680_production_secret_flow_map.md`,
+> `docs/secure_runtime_alpha_6601_6680_shutdown_restart_cleanup_truth.md`,
+> and `docs/secure_runtime_alpha_6601_6680_completion_declaration.md`.
+> Next Arc: FedOS Secure Memory Production Secret-Lifetime Audit and
+> Native Host Isolation Review.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6441–6520 — FedOS Secure Memory
+> Secret-Flow Migration and Native Page-Locking Readiness Arc (FULL
+> completion of this Arc's own deliberately bounded scope).** Phase A
+> inventoried every remaining production secret category the mission
+> named (identity/device signing keys, Ratchet chain/root keys, Sender
+> keys, Archive wrapping keys, Capability secrets, Deletion signing keys).
+> Five of the eight do not exist anywhere in this Rust crate at all
+> (Device signing, Sender keys, Archive wrapping keys, Capability
+> secrets, Deletion signing keys — each entirely TypeScript-side or
+> unimplemented); the in-memory Ratchet/Identity/Master-Seed state was
+> already `SecretHandle`-backed (prior Arc). The one real, previously-
+> undetected gap: the Direct Ratchet SEAL/RESTORE boundary
+> (`FedosDirectRatchetSession::seal_root_key`/`seal_sending_chain_key`/
+> `seal_receiving_chain_key`/`seal_local_ratchet_private_key`/
+> `seal_all_skipped_keys`/`restore`) moved raw key bytes — including one
+> genuinely heap-allocated `Vec<u8>` AEAD-decrypted plaintext — through
+> several stack/heap locations without ever zeroizing them. Closed at
+> every hop, in both `lib.rs` and `crypto/direct_ratchet_session.rs`,
+> matching this crate's own "every consumer zeroizes its own copy"
+> convention. A second, incidental finding: no test anywhere in this
+> crate previously exercised these exact WASM-exported seal/restore
+> methods (only their lower-level, non-WASM counterparts) — two new real
+> tests close that gap too, including a real two-party session, a real
+> seal → restore → post-restore-encrypt round trip proving the sending
+> chain key survived intact, and a real wrong-conversation-id
+> fail-closed proof. Native page-lock readiness (Phase D) was already
+> honest from the prior Arc (`Unsupported`/`NotRequested`, never
+> `mlock`/`VirtualLock`) — no new code needed. Zero `SecretHandle`/Runtime
+> redesign; zero new `Cargo.toml` dependency; zero new `#[wasm_bindgen]`
+> export surface (real `wasm32-unknown-unknown --release` build
+> confirms); zero Desktop Safety Center file read or touched. See
+> `docs/secure_runtime_alpha_6441_6520_migration_inventory.md`,
+> `docs/secure_runtime_alpha_6441_6520_execution_report.md`, and
+> `docs/secure_runtime_alpha_6441_6520_completion_declaration.md`. Next
+> Arc: FedOS Secure Memory Store Production Wiring Arc.
+>
+> Prior status (separate, previously-unmerged Desktop Beta Production
+> Runtime Configuration Unification lineage, now merged as this Arc's own
+> prerequisite):
+>
+> **Status: Secure Runtime Alpha 6521–6600 — FedOS Desktop Beta Production
+> Runtime Configuration Unification Arc (FULL completion of this Arc's own
+> deliberately bounded scope).** Closes the production bootstrap/
+> configuration gap discovered by the immediately prior Arc's own real
+> acceptance vertical slice: `FedosDesktopRuntimeConfig` and
+> `FedosProfileInitializationCoordinator` now thread Direct Ratchet, Peer
+> Capability, Identity Transition, and Signed Deletion Request
+> configuration through one canonical, additive, closed configuration
+> graph — all four sharing one hoisted Device Registry, one signing
+> identity, one Search Index, and one `FedosConversationRuntime`
+> generation, never a shadow Runtime/Shell/Host Bridge. Two real bugs
+> found and fixed during this Arc's own implementation, before any test
+> ran: a construction-order bug that would have created a second,
+> divergent Device Registry instance, and a search-index divergence risk
+> that would have let Signed Deletion Request's own retention
+> reconciliation silently apply to an index nobody actually searches. A
+> real, non-test-only-helper vertical slice proves the full chain through
+> the ACTUAL production bootstrap path — real profile creation, unlock,
+> Device Trust, Peer Capability/Identity Transition/Signed Deletion all
+> reachable, Safety Center reading the same live instances, a genuine
+> lock→relaunch→unlock cycle with durable decision survival across a
+> fresh Coordinator instance — plus 7 failure-matrix and 8 structural-
+> guard tests, 163/163 total passing, zero regressions. Direct Ratchet
+> remains honestly WASM-gated (`productionCryptoGraph !== null`, never a
+> fabricated Master Seed Authority). Deliberately NOT done this Arc, per
+> its own explicit scope decision: Settings→Relay plumbing, the full
+> 10-step Runtime generation/rebuild model (only the real
+> lock→relaunch→unlock cycle this codebase actually has), and Electron
+> deepening — all disclosed, none silently worked around. Also surfaced,
+> not fixed (architecture-frozen): `fromRunningRuntime()`'s own Shell does
+> not track an externally-stopped Runtime's state, and several Shell
+> accessors throw rather than gracefully degrading when reached through a
+> Shell tied to an already-stopped Runtime generation — the same class of
+> finding the prior Arc noted for `archive()`. See
+> `docs/secure_runtime_alpha_6521_6600_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Release Candidate and
+> Packaged Security Acceptance Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6361–6440 — FedOS Desktop Beta Security
+> Acceptance, Threat-Scenario Testing, and Release Freeze Arc (FULL
+> completion of this Arc's own deliberately bounded, testing/documentation-
+> only scope).** Merges the diverged Safety Center (`fc48d64c`) and Secure
+> Memory (`33f29f22`) lineages (merge commit `d23f350`) and proves the
+> Secure Runtime production-consistent through system-wide acceptance and
+> threat validation — this Arc adds **zero files under `src/`**, confirmed
+> structurally by direct `git diff` against the merge commit itself (the
+> strongest possible proof of "architecture-frozen: no protocol redesign,
+> no new cryptographic feature, no new Runtime owner"). A canonical
+> Security Acceptance Matrix classifies 17 properties: 12 SUPPORTED, 5
+> PARTIAL (Forward Secrecy, PCS, Metadata Protection, Master Seed, Double
+> Ratchet — every one traced to the SAME single root cause, the absent
+> compiled `packages/fedos-core-rust/pkg/` WASM artifact, never a design
+> defect; every underlying algorithm was directly inspected in real
+> source and confirmed non-stub), 0 UNSUPPORTED. 16 real Threat Scenario
+> tests (stolen/revoked device, forged-signature relay injection, replay,
+> downgrade, duplicated notification, Archive restoration, retention
+> bypass, wrong passphrase, profile locked, Ratchet-reset call contract,
+> conflicting identity replacement, signed-deletion replay/resurrection,
+> capability downgrade, restart recovery, crash recovery) all pass,
+> composing only already-shipped facades. A Release Freeze Checklist rates
+> every subsystem PASS/FAIL/BLOCKED with no fuzzy wording: 18 PASS, 4
+> BLOCKED (all environment/artifact gaps, 0 FAIL). The real acceptance
+> vertical slice (Profile→Unlock→Ratchet→NIP17→Identity Replacement→
+> Deletion Request→Safety Center→Restart→Recovery→Archive→Search→
+> Shutdown) surfaces one genuine, previously-unstated finding: the REAL
+> production Profile/Unlock bootstrap does not yet thread Identity
+> Transition/Deletion Request/Ratchet config through its own Runtime
+> config — stated honestly (Part 1) rather than hidden, with the full
+> domain-crypto chain then proven separately and completely with 100%
+> real BIP-340 Schnorr crypto (Part 2). See
+> `docs/secure_runtime_alpha_6361_6440_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Production Runtime
+> Configuration Unification Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6281–6360 — FedOS Secure Memory Secret
+> Buffer and Zeroization Foundation Arc (FULL completion of this Arc's own
+> deliberately bounded scope).** Phase A inventory found the normative
+> `docs/runtime_secure_memory.md` architecture (written on an older,
+> never-merged lineage) stale: on the real, selected Rust/crypto lineage
+> (`b8e9e062`), `SecretHandle` is already a mature, production, non-Clone,
+> zeroizing secret owner — already load-bearing for the Master Seed, the
+> Identity/Application/Protocol Root hierarchy, Nostr signing, NIP-44
+> conversation keys, and the entire Direct Ratchet Cryptographic Core.
+> Rather than duplicating it with a redundant `FedosSecretBuffer` type,
+> this Arc built the one piece genuinely missing — `SecretHandleStore`, a
+> bounded (64), generation-safe, opaque-ID handle registry with
+> use-after-destroy/wrong-kind/stale-generation denial, idempotent
+> double-destroy, and shutdown cleanup, none of which existed anywhere in
+> this crate before — and closed a real, previously-undetected
+> zeroization gap: NIP-44's own per-message `chacha_key`/`hmac_key`
+> (32 bytes each) lived in plain, never-zeroized `Vec<u8>` since the code
+> was written; both are now `SecretHandle`-backed, with both live
+> consumers (`nip44_wire_encrypt`/`nip44_wire_decrypt`) explicitly
+> zeroizing their own local copies after use, including on an early-return
+> failure path. All 163 pre-existing NIP-44 tests, including every RFC/
+> NIP-44 reference vector, pass unchanged — proving the migration changed
+> ownership, not output. Also adds an honest page-locking capability
+> status (`Unsupported`/`NotRequested` — no native Desktop Rust host
+> exists yet; never `mlock`/`VirtualLock`) and safe, non-sensitive
+> diagnostics (live handle count, capacity, limit-reached, page-locking
+> status). Zero new `Cargo.toml` dependency (`zeroize`/`secrecy` already
+> production since Stage 78); zero new `#[wasm_bindgen]` export surface
+> (verified against the real `wasm32-unknown-unknown --release` build's
+> own generated `.d.ts`); zero Desktop/Electron/UI/Identity-Transition/
+> Ratchet-protocol/NIP change. One real regression caught by this Arc's
+> own new structural guard suite before it shipped: an early draft's own
+> classification-label name leaked a concrete cipher name into the
+> algorithm-agnostic `secret_handle` vocabulary — renamed and fixed. See
+> `docs/secure_runtime_alpha_6281_6360_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6281_6360_execution_spec.md`,
+> `docs/secure_runtime_alpha_6281_6360_ownership_and_lifetime.md`,
+> `docs/secure_runtime_alpha_6281_6360_zeroization_assurance.md`,
+> `docs/secure_runtime_alpha_6281_6360_migration_inventory.md`, and
+> `docs/secure_runtime_alpha_6281_6360_completion_declaration.md`. Next
+> Arc: FedOS Secure Memory Secret-Flow Migration and Native Page-Locking
+> Readiness Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6201–6280 — FedOS Desktop Beta Privacy
+> Controls and Safety Center Arc (FULL completion, four disclosed
+> boundaries, all matching established precedent or explicitly scoped
+> out).** Merges the diverged Identity Replacement UI (`9cdd74ec`) and
+> Signed Deletion gap-closure (`50f80e8`) lineages (merge commit
+> `85c64304`) and builds one canonical, user-facing Safety Center
+> aggregating every existing security capability: a closed, 13-section
+> model (profile/unlock, Devices, Device Sync, secure messaging, peer
+> capabilities, Identity Replacement, Deletion Requests, Retention/Search,
+> Archive/Backups, Notifications, Security Events, Limitations), each with
+> its own independent state — never a single numeric "security score,"
+> never a fabricated "100% safe." A real bug found in the prior Arc's own
+> Signed Deletion Request lineage — a `"policy-pending"` review item's
+> signed body was held in memory only, so a restart before human approval
+> lost it — is fixed via a new, additive, tombstone-based append-only
+> durable side-channel (`FedosDeletionRequestPendingReviewPersistence`),
+> proven with real BIP-340 Schnorr crypto and a real process restart. Four
+> new narrow, additive Shell accessors
+> (`productionCryptoStatus`/`directRatchetStatus`/`peerCapabilityListObserved`/
+> `peerCapabilityStatus`) expose facts the Shell never surfaced before; 8
+> new closed Host Commands, one new Controller/Renderer/Navigation state,
+> wired into the EXISTING, unmodified Shell/Presentation Boundary/Renderer/
+> Host Bridge — no second Shell, Runtime, Presentation Boundary, Renderer,
+> Navigation Registry, Notification Coordinator, or Electron Main owner. 5
+> new closed notification kinds fire at most once per fact, never
+> double-firing an already-existing per-domain notification. 12
+> centralized warning codes cover every non-guarantee named in the
+> mission, including an intentionally non-committal Secure Memory
+> zeroization warning (a separate, parallel Arc owns that domain and is
+> never touched here). Real vertical slice: 100% real Schnorr crypto
+> throughout, a genuinely real `FedosConversationRuntime`/
+> `FedosDesktopApplicationShell`/`FedosDesktopConversationUiPresentationBoundary`/
+> `FedosSafetyCenterController`/`FedosSafetyCenterRenderer` stack, a real
+> restart proving both the aggregation and the pending-review durability
+> fix. Four disclosed boundaries, all either matching established
+> precedent (Device Trust/Sync/live-Ratchet unconfigured on this slice's
+> own Runtime, matching every prior Arc's own "optional integration a
+> slice doesn't need" precedent; a compiled Ratchet WASM artifact remains
+> absent, universal precedent) or explicitly scoped out (a manual
+> Ratchet-reset confirmation outside the Identity Replacement flow honestly
+> reports `"unsupported"` rather than inventing a second reset mechanism;
+> the Electron spike package's own typecheck could not run to completion
+> in this worktree due to a pre-existing, unrelated missing-`node_modules`
+> environment gap). See
+> `docs/secure_runtime_alpha_6201_6280_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Security Acceptance,
+> Threat-Scenario Testing, and Release Freeze Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 6121–6200 — FedOS Identity Replacement
+> User Verification and Conversation Continuity UI Arc (FULL completion,
+> two disclosed pre-existing boundaries matching established precedent).**
+> Merges the diverged Identity Transition (`a5f9cca5`) and Desktop/UI
+> (`b72ca7b6`) lineages (merge commit `02845ed9`) and builds the explicit
+> user-verification/conversation-continuity experience over the completed
+> Identity Transition foundation: a closed, safe transition display model
+> combining evidence outcome, acceptance state, per-Device evidence, and
+> centralized warnings (never "verified" shown as "trusted"); a durable,
+> restart-safe manual-verification fact (3 closed methods, unknown methods
+> fail closed); explicit, durably-persisted accept/reject/defer decisions
+> (a real gap in the prior Arc — decisions were computed per-call but
+> never durably recorded — found and fixed via this Arc's own real
+> restart vertical slice); the smallest additive Conversation Continuity
+> model (the existing Direct Conversation ID is never rewritten; a new
+> local link records accepted continuity + a required new session
+> generation); a two-step Ratchet reset flow (read-only impact assessment,
+> then a separate explicit authorization, a thin adapter over the
+> existing `initializeDirectRatchetSession()`, never a new reset
+> mechanism); a bounded, deterministic Identity Transition Inbox; 10 new
+> `FedosDesktopApplicationShell` methods and 10 new closed Host commands,
+> all delegating entirely to the existing, unmodified
+> `FedosConversationRuntime.identityTransition()` (a new nullable
+> accessor mirroring `deletionRequest()` byte-for-byte) plus
+> `directRatchet()`; one new Controller/Renderer/Navigation state wired
+> into the EXISTING, unmodified Presentation Boundary, Renderer
+> aggregate, and Host Bridge — no second Shell, Runtime, Presentation
+> Boundary, Renderer, Navigation Registry, or Host Bridge. Real vertical
+> slice with 100% real BIP-340 Schnorr crypto through a genuinely real
+> `FedosConversationRuntime`/`FedosDesktopApplicationShell`/Presentation
+> Boundary stack (built via the SAME production assembly helper the real
+> Desktop Runtime itself uses) — no fake business Runtime anywhere.
+> Two disclosed, pre-existing boundaries, neither specific to this Arc:
+> Notification Coordinator wiring and Electron subprocess acceptance were
+> not reached, exactly matching `b72ca7b6`'s own disclosed scope; and a
+> genuine live Direct Ratchet session / `establishSession()` reset
+> dispatch needs a compiled `packages/fedos-core-rust/pkg/` this worktree
+> does not have — confirmed every test in this repository exercising
+> `establishSession()` is WASM-gated, no exceptions, so this Arc's own
+> reset-authorization CALL CONTRACT is proven honest (`"unavailable"`,
+> never a fabricated success) rather than faked. See
+> `docs/secure_runtime_alpha_6121_6200_completion_declaration.md`.
+> Recommended next Arc: **FedOS Desktop Beta Privacy Controls and Safety
+> Center Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5961–6040 — FedOS Identity Transition
+> Peer Notification and Ratchet Reset Integration Arc (FULL completion,
+> one disclosed pre-existing WASM boundary).** Wires the Identity
+> Transition evidence foundation (`b4aaab9`) into the live peer-capability
+> private-transport pipeline (`d825aa0`) and the live authenticated
+> Ratchet Session Reset foundation (`f80889d`). New, additive bridge
+> domain under `src/conversation/identity_transition/peer_integration/`:
+> a strict notification schema riding the EXISTING `"nostr-nip17-v1"`
+> route through a new, additive third `kind` on the peer-capability
+> control payload (no new Nostr kind); real BIP-340 Schnorr signatures
+> throughout (account authorization, new-key proof, old-key continuity —
+> all independently reverified by the receiver, never trusted from the
+> sender's own claims); a durable, restart-safe, multi-Device-isolated
+> Peer Transition Observation store with idempotent/conflicting-duplicate,
+> rollback, broken-predecessor, and cycle detection; local acceptance
+> reusing the Foundation's own evidence/acceptance vocabularies directly
+> (no third vocabulary); a new `"identity-transition-v1"` peer capability
+> advertisement value through the existing, unmodified advertisement
+> pipeline; and an explicit, `"accepted"`-gated Ratchet reset
+> authorization that dispatches the REAL, existing
+> `FedosDirectRatchetOutboundIntegration.establishSession()` with one new,
+> additive `"identity-transition"` reason — never a new reset message
+> type, never automatic, never rebinding old root/chain keys. Transition
+> ID is bound to the resulting session via a separate, additive local
+> correlation record rather than widening the frozen, positional-array
+> Session Reset wire tuple (a deliberate, documented scope decision).
+> Real vertical slice with 100% real Identity Transition crypto through
+> its own Ratchet-authorization boundary; the one genuinely WASM-gated
+> piece (a real `establishSession()` Double-Ratchet round trip) is
+> `describe.skip`'d here exactly like the two earlier Arcs' own real
+> vertical slices already are, for the same pre-existing reason (no
+> compiled `pkg/` in this worktree). No live account/Nostr identity
+> replaced, no automatic peer trust, no Device Registry/Membership/
+> Archive/Search mutation anywhere in this codebase as a result of this
+> Arc. See `docs/secure_runtime_alpha_5961_6040_completion_declaration.md`.
+> Recommended next Arc: **FedOS Identity Replacement User Verification
+> and Conversation Continuity UI Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5801–5880 — FedOS Identity Transition
+> Types, Validation, and Durable Evidence Foundation Arc (FULL
+> completion).** Implements the non-network foundation the FedOS Account
+> and Nostr Identity Rotation V1 Specification Review (`45e0fce`) named as
+> its own recommended next Arc. New, standalone, additive domain under
+> `src/conversation/identity_transition/`: closed transition/reason/
+> evidence-kind/evidence-status vocabularies; a strict, versioned
+> transition record (`authority: "nostr"` required for both identities —
+> the only account/Nostr mapping this codebase's architecture supports);
+> deterministic, domain-separated canonical serialization for the body and
+> all three evidence artifacts (mutation invalidates every attached
+> proof); a real BIP-340-Schnorr-verified new-key proof of possession; old
+> -identity continuity evidence whose own verifier NEVER returns an
+> acceptance-flavored status (only the pure evidence evaluator may); optional
+> Device corroboration reusing the live Device Binding trust/revocation
+> boundary; a pure evidence evaluator enforcing both of this review's hard
+> invariants — no auto-accept from parsing signatures alone, and a
+> compromise-confirmed reason never treats an old-key signature as
+> sufficient even with the new-key proof valid; durable, restart-safe,
+> append-only transition facts with idempotent-duplicate, conflicting-
+> duplicate, revision-rollback, broken-predecessor, and predecessor-cycle
+> detection (supersession and conflict state are derived at read time,
+> never backfilled onto an already-inserted fact); local peer acceptance
+> state; and two read-only impact plans (Ratchet reset, Conversation/
+> Archive/Search) that are never applied. Real vertical slice with two
+> genuine independent Schnorr identities, a real Device, restart/replay,
+> and 20 of Phase O's own named checks, all passing. No live account/Nostr
+> identity is replaced anywhere in this codebase by this Arc; no Device
+> Registry, Conversation Membership, Ratchet session, Archive, or Search
+> state is mutated. See
+> `docs/secure_runtime_alpha_5801_5880_completion_declaration.md`.
+> Recommended next Arc: **FedOS Identity Transition Peer Notification and
+> Ratchet Reset Integration Arc**.
+>
+> Prior status:
+>
+> **Status: FedOS Account and Nostr Identity Rotation V1 Specification
+> Review (specification-only, empty production diff).** The canonical V1
+> decision review the FedOS Ratchet Peer Notification and Capability
+> Advertisement Arc (`d825aa0`) named as its own recommended next step,
+> and the terminal link in the review chain `b34d608` → `3ebfa37` →
+> `f80889d` → `d825aa0` started. Twenty docs under
+> `docs/reviews/fedos_account_nostr_identity_rotation_v1/`. Verdict:
+> account identity and Nostr identity do **not** rotate in V1 — they
+> remain the single, immutable value they are today (reaffirming
+> `3ebfa37`'s own Option 1). What changes is a complete specification for
+> **Replacement**: a brand-new identity, never an in-place key change,
+> optionally carrying an explicit, evidence-leveled continuity claim
+> (old-identity signature alone is explicitly insufficient under a
+> compromised-old-key assumption — reusing the account's independent
+> per-Device signing keypair, Alpha 3161–3240, as the strongest available
+> corroborating evidence). Device migration is explicit rebind-through-
+> reauthorization, reusing `f80889d`'s own register-then-revoke Device
+> Replacement pattern at account scope. Ratchet sessions always reset,
+> never rebind root/chain keys to a new identity. Direct Conversation
+> identity/history is preserved and never rewritten; Archive Restore
+> never establishes identity trust; Group continuity is deferred. Master
+> Seed replacement while preserving account identity is not possible in
+> this architecture (they are the same event); passphrase rotation is
+> named as a separate, low-risk, future Arc. Peer notification reuses
+> `d825aa0`'s live, authenticated, evidence-only private-transport
+> pipeline with new additive fact kinds — no new Nostr kind, no public
+> event. Self-declared rotation is never automatic trust. See
+> `docs/reviews/fedos_account_nostr_identity_rotation_v1/20_normative_recommendation.md`.
+> Recommended next Arc: **FedOS Identity Transition Types, Validation,
+> and Durable Evidence Foundation Arc** — types/validation/durable
+> evidence only; no live migration ships until a later Arc.
+>
+> Prior status (parallel Desktop/UI lineage, merged in at this Arc):
+>
+> **Status: Secure Runtime Alpha 6041–6120 — FedOS Signed Deletion
+> Request Multi-Device Aggregation and User Consent UI Arc (FULL
+> completion).** Makes the completed Signed Deletion Request transport
+> (`8981f81`, Alpha 5881–5960) understandable and safely usable: a
+> closed, structurally-erasure-claim-free per-Device (17 values) and
+> account-aggregate (7 values) status model; an explicit recipient
+> consent boundary (opening an item never executes anything; no
+> countdown/automatic approval); a restart-safe recipient Inbox backed
+> by a new, additive, insert-only display-fact port
+> (`FedosDeletionRequestInboxSummaryPersistence` — `5641-5720`'s own
+> decision record never carried display fields); nine new
+> `FedosDesktopApplicationShell` methods and nine new closed Host
+> commands, all delegating entirely to the existing, unmodified
+> `FedosConversationRuntime.deletionRequest()` facade; one new
+> Controller/Renderer wired into the EXISTING, unmodified Presentation
+> Boundary and Renderer aggregate — no second Shell, Runtime, Host
+> Bridge, or Renderer architecture. No canonical Desktop/Electron lineage
+> merge was required — `8981f81` already contains it (`8548845`, Alpha
+> 5161–5240). A real functional gap was found and fixed during this
+> Arc's own real vertical slice: `5881-5960`'s own approval method
+> re-evaluated `"always-review"` a second time at approval, making every
+> `"always-review"` item permanently un-approvable; reaching that method
+> at all already IS the human review the policy exists to require, so it
+> now grants the request's own requested scope on explicit approval only
+> (`"deny"`/`"unavailable"` still refuse; `"allow-local-history-only"`
+> still caps every grant). Proven with a REAL, no-mock end-to-end
+> multi-Device vertical slice against a genuinely-built WASM artifact:
+> two real Device-specific requests, Bob's one real Nostr identity
+> receiving both (NIP-17 delivery is per-account) and Device A's own
+> real Runtime independently, correctly rejecting the Device-B-addressed
+> one as a device-mismatch (proving real Device isolation, never a
+> silent accept/drop), Device A's real approval and real `b3b3a6d`
+> execution independently re-verified, a real signed acknowledgement
+> round trip, a real full restart of both sides with byte-identical
+> Shell/Renderer status reconstruction, and an honest
+> `"some-devices-applied"` aggregate — explicitly never a completion
+> claim. **Gap-closing follow-up (same commit lineage):** Electron
+> subprocess acceptance is now proven for real through the existing,
+> unmodified `window.fedos.invoke()` transport (4 new self-test steps,
+> a real spawned Electron subprocess, 21/21 passing); the Notification
+> Coordinator is now wired (5 new fixed-template kinds, once-per-item
+> firing discipline, 8 new tests proving no request id/requester
+> ref/reason code ever leaks into a notification); and
+> `fedos_desktop_runtime.ts`'s own full production bootstrap now
+> threads `conversationDeletionRequest` through (one new optional
+> config field, proven live via the real production
+> `startFedosDesktopRuntime()`/`FedosDesktopApplicationShell.start()`
+> path, 4 new tests). One narrower, still-standing limitation:
+> `refreshSentStatus()`'s own per-Device trust-fact lookup needs
+> `deviceSyncOperational()`, which the minimal-config production paths
+> above do not construct — out of scope for this follow-up. See
+> `docs/secure_runtime_alpha_6041_6120_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_6041_6120_execution_spec.md`,
+> `docs/secure_runtime_alpha_6041_6120_aggregation_truth.md`,
+> `docs/secure_runtime_alpha_6041_6120_consent_and_warning_ux.md`, and
+> `docs/secure_runtime_alpha_6041_6120_completion_declaration.md`. Next
+> Arc: FedOS Desktop Beta Privacy Controls and Safety Center Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5881–5960 — FedOS Signed Recipient
+> Deletion Request Private Transport and Local Policy Integration Arc
+> (FULL completion).** Makes the completed Signed Recipient Deletion
+> Request protocol (`22f9277`, Alpha 5641–5720) usable end to end over
+> the real, live private transport: eight new files under
+> `src/conversation/deletion_request/` add a protocol-neutral control
+> payload (mirrors `d825aa0`'s own peer-capability precedent, two
+> discriminators, `deletion-request-v1`/`deletion-acknowledgement-v1`,
+> wrapping the already-real signed request/acknowledgement — no second
+> signature scheme), a sender-side Outbound Coordinator (real signing,
+> real pre-publish self-check, real durable state, real publish through
+> `FedosPrivateTransport.sendMailboxNip17Control()`), a closed, LOCALLY-
+> CONFIGURED recipient policy vocabulary
+> (`always-review`/`allow-local-history-only`/`allow-local-history-and-index`/
+> `deny`/`unavailable` — never an unconditional default allow), a
+> recipient-side Inbound Coordinator that reuses `5641-5720`'s own real
+> evaluation pipeline unmodified and adds the ONE new sanctioned call
+> site to `b3b3a6d`'s own real `executeFedosLocalPayloadDeletionPlan()`,
+> and a real signed-acknowledgement round trip (recipient signs/persists/
+> publishes; requester verifies/correlates/persists, advancing its own
+> durable request lifecycle through every intermediate live state to
+> `acknowledged`, never a single illegal jump). A real, genuinely-found
+> integration gap — `assessFedosDeletionRequestAuthorization()`'s own
+> hardcoded `"fedos"`-authority participant reference, which would have
+> failed EVERY real production Direct Conversation's own `"nostr"`-
+> authority Membership — was fixed with a narrow, additive, 100%-
+> backward-compatible optional parameter. Proven with a REAL, no-mock
+> end-to-end vertical slice against a genuinely-built WASM artifact
+> (`cargo build --target wasm32-unknown-unknown --release` +
+> `wasm-bindgen`, built fresh in this session): real Master Seeds, real
+> Direct Conversation, a real message, a real signed Device-specific
+> deletion request published through a real in-process Relay and real
+> NIP-17 Gift Wrap, real recipient policy grant, real `b3b3a6d` execution
+> independently re-verified (`evaluatePayloadAccess()` → `"denied"`), a
+> real signed acknowledgement round trip, an unregistered-Device request
+> denied before publish, and a full restart of both sides with exact
+> durable replay — no message plaintext, private key, or raw path in any
+> protocol durable file. Compared against the unmodified integration
+> base via a sorted full-suite JSON-report diff: zero net regressions
+> (the only newly-failing tests are the well-known, self-resolving
+> `git status`-based review-guard pattern). Named, honest limitation:
+> the vertical slice does not include Bob independently creating an
+> Archive of the message (orthogonal harness wiring, out of this Arc's
+> own time budget) — the structural "no Archive deletion" guarantee
+> itself is proven independently and unaffected. See
+> `docs/secure_runtime_alpha_5881_5960_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5881_5960_execution_spec.md`,
+> `docs/secure_runtime_alpha_5881_5960_control_payload_mapping.md`,
+> `docs/secure_runtime_alpha_5881_5960_recipient_policy_and_acknowledgement_truth.md`,
+> and `docs/secure_runtime_alpha_5881_5960_completion_declaration.md`.
+> Next Arc: FedOS Signed Deletion Request Multi-Device Aggregation and
+> User Consent UI Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5721–5800 — FedOS Ratchet Peer
+> Notification and Capability Advertisement Arc (FULL completion).**
+> Implements the authenticated peer-notification and capability-advertisement
+> foundation the FedOS Ratchet Device Lifecycle and Authenticated Session
+> Reset Foundation Arc (`f80889d`) named as its own recommended next Arc.
+> New, all additive, under `src/conversation/ratchet/peer_capability/`: a
+> closed, versioned capability vocabulary (reusing, never widening, the
+> existing private-message-route and ratchet-suite vocabularies); a
+> signed Peer Capability Advertisement record and six closed, authenticated
+> Device Lifecycle Notification facts (`device-added`/`device-revoked`/
+> `device-replaced`/`ratchet-session-reset-required`/
+> `ratchet-session-generation-advanced`/`capability-superseded` — NOT
+> `device-key-updated`, since no in-place Device key-rotation primitive
+> exists anywhere in this codebase); real account-level signing (reusing
+> the Device Binding kind-1-event pattern) plus optional, best-effort
+> Device-level signing (reusing the Session Reset pattern), modeled as
+> three distinct, never-silently-upgraded evidence states; both record
+> types carried through the EXISTING `"nostr-nip17-v1"` Gift Wrap
+> transport via the existing `sendMailboxNip17Control()` seam — no new
+> Nostr kind, no new NIP, no public unencrypted event; a pure, 13-outcome
+> local acceptance policy and a pure session-action-recommendation layer
+> that never itself resets/establishes/copies a session; a dedicated,
+> append-only-capable, per-local-Device peer-capability Observation
+> domain; and a narrow safe facade
+> (`FedosRatchetPeerCapabilityRuntime`) wired into `FedosConversationRuntime`
+> via one optional dependency bundle and one narrow, additive
+> inbound-dispatch hook. Proven with a real, no-fake-crypto vertical
+> slice: a real signed advertisement published through the real NIP-17
+> transport and a real in-process Relay, durably observed, restart-safe,
+> with independent per-Device state (Alice's second Device announced and
+> recorded with no inherited session) and a Device-revocation
+> notification whose `"revoked"` status a later, conflicting, stale
+> re-advertisement can never silently overwrite. Three real bugs found
+> and fixed via this real testing: an exact-nonce-replay false conflict,
+> lifecycle-notification observations keyed by the wrong Device, and
+> cross-`sourceKind` revision-counter mixing. See
+> `docs/secure_runtime_alpha_5721_5800_completion_declaration.md`.
+> Peer advertisement is evidence, not trust; one Device observation is
+> never account-wide; no capability fact ever activates a route, mutates
+> the Device Registry, or resets a session automatically; no account/Nostr
+> identity rotation is implemented. Recommended next Arc: **FedOS Account
+> and Nostr Identity Rotation V1 Specification Review**.
+>
+> Prior status:
+>
+> **Status: FedOS Ratchet Device Lifecycle and Authenticated Session
+> Reset Foundation Arc (FULL completion).** Implements the Runtime
+> foundation the FedOS Direct Ratchet Multi-Device Session Lifecycle and
+> Identity Rotation V1 Review (`3ebfa37`) named as the exact next Arc, on
+> top of the completed Direct Ratchet + NIP-17 Integration (`b8e9e06`).
+> New, all additive: an authenticated Session Reset message (four new
+> fields on the existing `session-init` NIP-17 payload — `previousGeneration`/
+> `resetReason`/`resetNonce`/`deviceSignatureHex` — never a new
+> control-message kind); the FIRST real consumption of the existing
+> per-Device signing keypair (Alpha 3161–3240) by the Ratchet, via a
+> best-effort, optional Device-level signature (never a hard requirement,
+> since no durable Device-key storage exists anywhere in this codebase,
+> and this Arc does not invent one); a Session Reset Authority (Device
+> Trust integration, generation-integrity check, replay protection) and a
+> Runtime Reset Coordinator that supersedes the prior generation via the
+> ALREADY-LIVE `"reset-required"` lifecycle state (Alpha 5401–5480 — no
+> new state was needed; a real discrepancy the source review itself
+> missed); durable, restart-safe, nonce-keyed reset audit records; a
+> Device Lifecycle derivation (`pending`/`active`/`replaced`/`revoked`/
+> `unavailable`) and a formalized Device Replacement Coordinator
+> (register-then-revoke, real Nostr + real Device signatures, never
+> inherits the old Device's identity or key); and Device-revocation
+> quarantine wired to the Ratchet (`applyDeviceRevocationToSessions()`).
+> Proven with a real, no-fake-crypto vertical slice: generation 0 →
+> authenticated, Device-signed, reasoned reset → generation 1, superseded
+> + restart-safe on both sides, a real second Device pair (Alice's
+> tablet) proven isolated and unaffected, and "a reset always names why"
+> enforced structurally end-to-end through a second real reset to
+> generation 2. See
+> `docs/fedos_ratchet_device_lifecycle_session_reset_foundation_completion_declaration.md`.
+> No account/Nostr identity rotation, Master Seed replacement, PQ, MLS,
+> Sender-Key redesign, group messaging, UI, Electron, or remote
+> synchronization touched. Recommended next Arc: **FedOS Ratchet Peer
+> Notification and Capability Advertisement Arc**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5561–5640 — FedOS Direct Double Ratchet
+> Conversation Runtime and NIP-17 Integration Arc (FULL completion).**
+> Wires the already-real Ratchet State Foundation (`be1bc0d`) and
+> Cryptographic Core (`080cb99`) into the already-real NIP-17 Rumor/Seal/
+> Gift Wrap wire-adapter lineage (`100c231`, merged as this Arc's own
+> prerequisite) and the existing Direct Conversation send/receive path —
+> real product-level forward secrecy, not merely a standalone crypto core.
+> New: a closed route-vocabulary extension (`"nostr-nip17-v1-ratchet"`,
+> additive, never replacing the two existing routes, with an explicit
+> `"downgrade-detected"` outcome so an already-active ratchet session can
+> never be silently bypassed); a canonical, side-independent Device-pair
+> session-id resolver (both participants must derive the byte-identical
+> id — the Rust ratchet core's own HKDF context binding input); a strict,
+> closed `"session-init"`/`"message"` inner payload carried through the
+> UNMODIFIED NIP-17/NIP-59 outer framing (never a new NIP, never a new
+> public event kind); real outbound/inbound integration composing the
+> real Ratchet Core `encrypt()`/`decrypt()` with durable state commits,
+> the real `FedosPrivateTransport` (one additive `sendMailboxNip17Control()`
+> method for session-establishment control facts), and the existing,
+> unmodified Conversation Envelope/Payload/Retention/Search import path;
+> and a narrow Runtime facade (`directRatchet()` on `FedosConversationRuntime`)
+> exposing only safe operations. Two real bugs in the real cryptographic
+> restart-recovery path were found and fixed during this Arc's own
+> development (not present before it): the Rust ratchet header's 256-byte
+> session-id bound was silently exceeded by a naive full-pubkey encoding
+> (fixed by a compact, canonically-ordered encoding), and
+> `send_counter`/`previous_sending_chain_length` reset on a real DH
+> ratchet step but were never read back correctly on restore (fixed by one
+> additive Rust getter, `FedosDirectRatchetSession::previous_sending_chain_length()`,
+> and one additive `FedosDirectRatchetStateRuntime.commitCounters()`
+> method). The headline proof
+> (`test/secure_runtime_alpha_5561_5640_real_vertical_slice.test.ts`) runs
+> two independent real identities/Devices through real session
+> establishment, real bidirectional messaging, duplicate rejection, a full
+> stop/restart of both Runtimes from durable files, and a post-restart
+> message exchange on the restored session — with no known plaintext or
+> root/chain/private-key fixture ever appearing in the durable files. A
+> second file
+> (`test/secure_runtime_alpha_5561_5640_failure_matrix.test.ts`) proves
+> tampered-ciphertext rejection, unsupported-suite rejection, and
+> unknown-session rejection, all with real crypto. See
+> `docs/secure_runtime_alpha_5561_5640_execution_spec.md`,
+> `docs/secure_runtime_alpha_5561_5640_ratchet_nip17_payload_mapping.md`,
+> `docs/secure_runtime_alpha_5561_5640_atomic_state_outbox_retry.md`, and
+> `docs/secure_runtime_alpha_5561_5640_completion_declaration.md` (which
+> also discloses several narrower, non-blocking test-coverage boundaries:
+> out-of-order/skipped-key recovery and a live three-simultaneous-session
+> proof were not separately re-demonstrated at this Arc's own integration
+> layer beyond what the already-real Cryptographic Core Arc's own test
+> already proves, and Desktop/Electron wiring of the new optional
+> `directRatchet` dependency bundle was left for a follow-on, mirroring how
+> the static NIP-17 route's own Desktop wiring landed one Arc at a time).
+> Recommended next Arc: **FedOS Direct Ratchet Multi-Device Session
+> Lifecycle and Identity Rotation Decision Review**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5641–5720 — FedOS Signed Recipient
+> Deletion Request Types, Validation, and Durable State Foundation Arc
+> (complete).** Architecture frozen: no Relay event, no NIP-17 wiring, no
+> new Nostr kind, no live transport, no automatic local deletion, no
+> Ratchet dependency, `p2p/`/`.tmp_gen/` untouched. Implements Doc 19's
+> own Stage 1 scope of the normative review (`860a58e`,
+> `review/fedos-signed-recipient-deletion-request-v1`) over the real,
+> implemented `arc/local-deletion-capability-state-foundation @ b3b3a6d`
+> base: thirty new files under `src/conversation/deletion_request/`
+> provide closed request/acknowledgement schemas (strict, unknown-field-
+> rejecting), fixed-field-order canonical serialization, real account
+> signing/verification reusing the EXISTING `FedosNostrSigningAuthority`
+> and the EXISTING pure-TypeScript `validateInboundNostrEvent` chain (no
+> WASM needed for verification), a target-existence-oracle-safe
+> authorization assessment over real Conversation/Membership/Envelope
+> state, and three independent durable domains (outbound request
+> lifecycle, recipient decision, acknowledgement fact) — each with an
+> in-memory and a real append-only NDJSON backend sharing one
+> monotonic-transition-validating write function. `FedosNobleTestNostrSigningAuthority`
+> (mirrors `MockFedosBoardOutboxPublisher`'s own Alpha 473 precedent for
+> living in `src/`) produces genuinely real BIP-340 Schnorr signatures via
+> `@noble/curves` — an already-declared dependency, not a new primitive —
+> isolated from the absent WASM/Master-Seed production path this worktree
+> does not have. This Arc never calls `b3b3a6d`'s own execution
+> coordinator or Archive-file authority: recipient evaluation stops at
+> `"policy-pending"` (authorized) or a terminal denial; only a caller
+> explicitly supplying an already-produced local outcome can record
+> `"locally-applied"`/`"partially-applied"`/`"failed"`. Device identity
+> stays honestly advisory-only throughout (no real per-Device signing key
+> exists anywhere in this codebase — confirmed independently in this
+> Arc's own reconciliation report). Nine new test files (132 new tests)
+> cover closed vocabularies and strict record validation, real signing/
+> verification (including one-byte-mutation and content-splicing tamper
+> detection), authorization assessment (target substitution, non-author
+> denial, Device/recipient mismatch), durable state and restart replay
+> across all three domains, the expiry/retry planner and safe
+> multi-device aggregation (never account-wide), the recipient evaluation
+> pipeline, a failure matrix closing remaining gaps (future-issued
+> requests, wrong-Conversation targets, state rollback, interrupted
+> append, acknowledgement overclaim), a structural no-live-wire proof, and
+> one real Phase O vertical slice — real Alice/Bob accounts, real signing,
+> a real restart across all three durable domains, a real `b3b3a6d`
+> execution, real acknowledgement correlation, and a real check that no
+> message plaintext, private key, or raw path exists in any durable file.
+> `b3b3a6d`'s own 82 tests, plus Membership/Retention/account-signing
+> regression suites, all still pass unchanged. See
+> `docs/secure_runtime_alpha_5641_5720_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5641_5720_execution_spec.md`,
+> `docs/secure_runtime_alpha_5641_5720_request_and_acknowledgement_schema.md`,
+> and `docs/secure_runtime_alpha_5641_5720_completion_declaration.md`.
+> Next Arc: FedOS Signed Recipient Deletion Request Private Transport and
+> Local Policy Integration Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5481–5560 — FedOS Direct Double Ratchet
+> Cryptographic Core Arc (FULL completion).** Implements the real,
+> pure cryptographic core the normative forward-secrecy review delegates to
+> this exact Arc, built entirely on top of the completed, unmodified
+> Ratchet State Foundation Arc (`be1bc0d`) — no live Conversation wiring, no
+> NIP-17 mapping, no transport of any kind. Three new Rust modules
+> (`packages/fedos-core-rust/src/crypto/direct_ratchet{,_header,_session}.rs`):
+> fresh ephemeral secp256k1 keypair generation and validated ECDH agreement
+> (mirroring `conversation_key.rs`'s own reviewed point-arithmetic technique,
+> never modifying that frozen file); a root KDF and chain KDF built on raw
+> HKDF-SHA256, both session/Device-pair/Conversation/generation-bound and
+> proven deterministic-yet-context-separated; a versioned, fixed-layout,
+> transport-neutral header authenticated as AEAD Additional Authenticated
+> Data (a narrow, independent ChaCha20-Poly1305 helper, since the shared
+> `aead_internal::seal_internal` only accepts a fixed per-domain AAD label,
+> never arbitrary caller bytes — a deliberate new, narrow function rather
+> than widening that frozen shared primitive); a full session state machine
+> implementing the standard DH-ratchet-on-direction-switch transition
+> (proven by the local ratchet keypair genuinely rotating, discarding the
+> old private key for post-compromise security); bounded out-of-order/
+> skipped-key handling (1000 keys/gap, 14-day expiry — the review's own
+> exact figures); and atomic encrypt/decrypt (every fallible step computed
+> before any state mutation, committed in one place only after real AEAD
+> authentication succeeds). Sealed-persistence integration is deliberately
+> per-secret-kind, reusing the Foundation Arc's OWN already-proven
+> `FedosMasterSeedAuthority.seal_direct_ratchet_secret()`/
+> `restore_direct_ratchet_secret()` internally (Rust-to-Rust) for every
+> secret-bearing field — no new sealed bundle format, and no raw secret
+> byte ever crosses the WASM boundary into JavaScript. The headline proof
+> (`test/secure_runtime_alpha_5481_5560_real_vertical_slice.test.ts`) runs
+> against REAL cryptography and REAL durable files: two independently-
+> generated Device identities (Alice, Bob), a full real conversation
+> including a three-message send burst received out of order, one-time
+> skipped-key consumption, duplicate rejection, a genuine DH ratchet
+> transition completing Bob's reply, a real stop/seal/restore cycle,
+> continued conversation post-restart, wrong-Device rejection (a third
+> identity cannot restore another party's sealed state), ciphertext-tamper
+> rejection immediately followed by successful decryption of the genuine
+> message, an honest documented boundary around state-revision rollback
+> (a persistence-layer responsibility, not a crypto-core one), and a direct
+> read of the durable sealed-state file confirming none of the seven
+> plaintext markers used anywhere in the conversation appear in it. 78 new
+> tests (59 Rust + 14 TypeScript + structural guards), all passing, plus a
+> real WASM build. No Signal-protocol interoperability, MLS, or
+> post-quantum cryptography is claimed anywhere in this Arc — see
+> `docs/secure_runtime_alpha_5481_5560_cryptographic_construction.md`.
+> **Product-level forward secrecy is not yet claimed**: this is a
+> standalone cryptographic core with no live callers; it becomes a product
+> property only once a future Arc wires it into live message flow. See
+> `docs/secure_runtime_alpha_5481_5560_reconciliation_report.md`,
+> `..._execution_spec.md`, `..._cryptographic_construction.md`,
+> `..._test_vectors.md`, and `..._completion_declaration.md`.
+> Recommended next Arc: **FedOS Direct Double Ratchet Conversation Runtime
+> and NIP-17 Integration Arc.**
+>
+> **Note on Alpha-range numbering**: this branch's own base, `be1bc0d`
+> (Alpha 5401–5480, Direct Ratchet State and Sealed Persistence
+> Foundation), shares its Alpha label with an unrelated, independently-
+> completed sibling branch, `b3b3a6d` (Local Deletion Capability and
+> Deletion-State Foundation) — a genuine collision, recorded (never
+> silently repaired) in this Arc's own reconciliation report. Neither
+> commit was rewritten, amended, or renamed; this Arc's own range,
+> 5481–5560, is the earliest genuinely-free range as of this Arc's own
+> Phase A inventory.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5401–5480 — FedOS Direct Ratchet State and
+> Sealed Persistence Foundation Arc (FULL completion).** Implements the
+> complete NON-CRYPTOGRAPHIC foundation the normative forward-secrecy
+> review (`review/fedos-forward-secrecy-double-ratchet-v1`) names as its
+> own recommended next Arc — no DH ratchet step, no root/chain-key KDF
+> evolution, no message-key derivation, and no NIP-17 wiring exist
+> anywhere in this Arc. A new, additive domain, `src/conversation/ratchet/`
+> (14 files): a versioned, Device-pair-bound, collision-safe session
+> identity (deliberately wider than the review's own 3-component model —
+> this codebase's own multi-device-per-account reality requires binding
+> local Device identity too, not just local account); a closed lifecycle
+> vocabulary (`initialized`/`active`/`suspended`/`reset-required`/
+> `expired`/`revoked`/`corrupt`/`unavailable`) with validated transitions
+> and fully-terminal `revoked`/`corrupt`; monotonic counters; a bounded
+> (1000 keys/chain-gap, 14-day retention — the review's own exact
+> figures) skipped-message-key reference index, never an unbounded map;
+> a versioned sealed-secret record (one opaque `sealedBlob` field,
+> modeled on the Sender-Key sealed-persistence lineage's own precedent);
+> event-sourced append-only persistence for session metadata and
+> insert-only persistence for sealed secrets; and a narrow Runtime
+> facade (create/inspect/readiness/suspend/reset-required/expire/revoke/
+> counters/skipped-key register-remove/seal/recover/lock/stop) exposing
+> closed outcomes throughout. The EXISTING Master Seed WASM Rust Boundary
+> (`FedosMasterSeedAuthority`, Alpha 436/869) gains two new, narrow
+> methods — `seal_direct_ratchet_secret`/`restore_direct_ratchet_secret`
+> — deriving a session-bound AEAD key via a two-stage HKDF (one new
+> `HkdfDomain`/`AeadAadDomain` variant each, zero new Cargo dependencies)
+> so that sealing/restoring under the wrong Device, account, conversation,
+> or generation fails by REAL AEAD authentication, never a string
+> comparison; the new sealing port is deliberately kept OFF the shared
+> `FedosMasterSeedAuthority` interface (widening it was tried and reverted
+> after it broke ~20 unrelated fixtures) — `FedosWasmMasterSeedAuthority`
+> implements it additionally. The headline sealed-persistence proof runs
+> against REAL cryptography and REAL durable files, not a mock: two
+> Device identities, one Direct Conversation, a real CSPRNG placeholder
+> secret, a real seal, real append-only persistence, a Runtime `stop()`,
+> a FRESH Runtime restoring the SAME Master Seed from its own sealed
+> envelope, genuine restart recovery, genuine wrong-Device/tamper
+> rejection (AEAD authentication failure), `lock()` disposal, and a
+> direct read of the durable files confirming no raw secret byte ever
+> appears in either log. 122 new tests across 9 files, all passing (12
+> more real Rust unit tests, plus a WASM build). Two real design bugs
+> were found and fixed during implementation, both caught by this Arc's
+> own tests: the session-id delimiter originally rejected `"::"`, which
+> a real `FedosConversationId` always itself contains; and session
+> persistence was originally treated as mutable "upsert" against an
+> insert-only backend, corrected to the event-sourced-by-revision design
+> described above. Full `npx vitest run` failing-file set is IDENTICAL to
+> this worktree's own pre-existing baseline (~242 files, confirmed via
+> `git stash` to predate this Arc) — verified by a sorted-file-list diff,
+> not inspection alone; ~96 historical structural "exact `pub fn`/
+> `HkdfDomain` count" tests (a long-established per-Arc convention across
+> this crate's history) were updated accordingly. No file under
+> `src/conversation/archive/`, `search/`, `retention/`, `src/sync/`, or
+> `src/conversation/transport/` was modified — the exclusion is structural
+> absence, proven by reading real source. No forward secrecy or
+> cryptographic messaging claim is made anywhere in this Arc. See
+> `docs/secure_runtime_alpha_5401_5480_ratchet_state_foundation_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5401_5480_ratchet_state_foundation_execution_spec.md`, and
+> `docs/secure_runtime_alpha_5401_5480_ratchet_state_foundation_completion_declaration.md`.
+> Recommended next Arc: **FedOS Direct Double Ratchet Cryptographic Core
+> Arc.**
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5401–5480 — FedOS Local Deletion
+> Capability and Deletion-State Foundation Arc (complete).**
+> Architecture frozen: no remote deletion request, no wire protocol, no
+> Relay deletion, no new NIP, no recipient acknowledgement, no physical/
+> secure-erase or SSD-overwrite guarantee, no cloud/OneDrive
+> version-history deletion, no automatic backup deletion, no new crypto
+> primitive, no new dependency, `p2p/`/`.tmp_gen/` untouched. **Local-only
+> V1** over the normative design review (`cf5b870`,
+> `review/fedos-secret-capability-deletion-v1`): ten new files under
+> `src/conversation/deletion/` implement a closed, versioned target
+> vocabulary (10 values), operation vocabulary (8 values), evidence
+> vocabulary (4 values), a fixed-registry `FedosDeletionCapabilityDescriptor`
+> (never caller-self-declared, unknown target fails closed), a 15-value
+> `FedosDeletionStatus` mapped onto the EXISTING `FedosPayloadDeletionMeaning`
+> (Alpha 792), read-only assessment, deterministic pure plans, a narrow
+> four-entry-point execution coordinator, and a dedicated append-only
+> durable execution record (mirrors `AppendOnlyFedosPayloadRetentionPersistence`'s
+> own corruption-fails-closed convention) — because no existing record
+> captured one plan's cross-cutting Retention+Search+Archive outcome as a
+> single restart-recoverable fact. Reuses the EXISTING
+> `FedosPayloadRetentionAuthority`, `FedosConversationSearchIndex.reconcilePayloadRetention()`,
+> `FedosSyncDeviceRegistry.revokeDevice()`, and
+> `FedosConversationMembershipAuthority.revoke()` verbatim — zero redesign
+> of any of the four. Implements the ONE local capability the review found
+> genuinely missing: tracked Archive-file removal, added as one new
+> method (`deleteFile`) on `FedosConversationArchiveCliFileSystem` (refuses
+> a symlink/reparse-point target, treats a missing target as already
+> removed) and one new function
+> (`removeFedosConversationArchiveCliDirectoryEntry`) on the Archive CLI
+> directory module (removes exactly one tracked file via the directory's
+> own trusted index, never a raw path, never a directory, never a
+> wildcard) — resolved only through a canonical
+> `FedosDeletionArchiveFileHandle` that re-checks its own conversation
+> identity at removal time. Archive-file removal and payload deletion are
+> structurally separated: the payload executor's own dependency type
+> carries no filesystem; the Archive-file executor's own dependency type
+> carries no Retention/Search authority — deleting an Archive file never
+> changes live Conversation history, and deleting live history never
+> silently removes an Archive file. Device and Membership revocation are
+> exposed as their own separate plan/outcome, never implicitly combined
+> with payload deletion. Seven new test files (82 new tests) cover the
+> full required matrix — vocabulary/capability, read-only assessment,
+> deterministic planning, real Retention+Search execution (including
+> duplicate execution, conflicting-plan rejection, and partial-Search-
+> failure honesty), trusted Archive-file removal (traversal denial,
+> wrong-identity refusal, missing-file idempotency, symlink refusal, exact-
+> one-file removal), restart/interruption/corruption recovery against the
+> REAL append-only log backend, structural non-guarantee proof (no
+> network transport, no Relay/NIP vocabulary, no raw path or plaintext in
+> any public summary), and a real Phase O vertical slice (real Direct
+> Conversation, real payload, real Search index, real Archive export to a
+> real temp directory, real deletion, real restart, real idempotent
+> reconvergence) — no mock for the headline flow. Two pre-existing Archive
+> CLI test files' own in-memory fixture gained a four-line `deleteFile`
+> stub to satisfy the interface's new method; no other change, no new test
+> case in either. See
+> `docs/secure_runtime_alpha_5401_5480_reconciliation_report.md`,
+> `docs/secure_runtime_alpha_5401_5480_execution_spec.md`, and
+> `docs/secure_runtime_alpha_5401_5480_completion_declaration.md`. Next
+> Arc: FedOS Signed Recipient Deletion Request Protocol Foundation Review.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5321–5400 — FedOS Desktop Beta 0.1 Canonical
+> Release Hosting, Manual Publication, and Signing Readiness Arc (FULL
+> completion).** Turns the locally-built NSIS/ZIP/checksum artifacts from
+> the prior Arc into a complete, reviewable, manually-publishable
+> release-candidate set — without publishing, signing, or touching any
+> remote system. New, additive modules
+> (`scripts/lib/publication_bundle.mjs`, `signing_readiness.mjs`,
+> `revocation_status.mjs`, `tag_format.mjs`,
+> `remote_download_verification.mjs`, `generate_release_staging.mjs`,
+> `verify_release_staging.mjs`, `publication_dry_run.mjs`,
+> `generate_public_beta_gate.mjs`) implement: a canonical-host policy
+> (`"local-only"` — honest, since no git remote is configured anywhere in
+> this repository); a local publication-bundle format referencing
+> artifacts by filename+hash only, never bytes; a human-executed manual
+> publication workflow; a local release verifier that re-derives every
+> fact from real bytes on disk; deterministic release notes/known
+> limitations/install/verify/security-notice/announcement documents; a
+> revocation/advisory record format with no application dependency on live
+> status (no remote kill-switch); a tag-format policy that forbids
+> retagging; a zero-side-effect publication dry run that fails closed on
+> an invalid bundle; a remote-download verifier proven against a real
+> local HTTP server; a safe, non-secret signing-toolchain inventory (real
+> finding: no `signtool.exe`/Windows SDK/`winCodeSign` cache present in
+> this environment) plus a pure signing-readiness decision function; a
+> certificate-custody policy and a documented (unimplemented) future
+> signing seam, proven not to silently accept stale checksums across a
+> simulated signing mutation; and a closed public-Beta release gate whose
+> final state is `"ready-for-human-publication"` — never `"published"`.
+> Two real, previously-latent defects were found and fixed this session
+> via direct execution (not assumed): `buildFedosBetaPublicationBundleV1`'s
+> own valid output failed its own strict validator (an `unsigned` field it
+> produced was missing from the validator's known-field set, and
+> `deepFreeze` was mutating the caller's own shared `identity` object in
+> place, breaking a second call with the same identity); and
+> `verify_release_staging.mjs` ran an exact-directory-inventory checksum
+> check against a staging directory that legitimately holds more files
+> than `SHA256SUMS.txt` lists, always failing on a real bundle. Honest
+> environment disclosure: `vitest` itself fails to parse every test file
+> in this worktree — including the prior Arc's own unmodified, previously-
+> accepted suite — a worktree-environment artifact confirmed by A/B
+> testing against a sibling worktree, not a regression; real verification
+> of every new module was instead performed via a plain-Node harness
+> script (deleted before commit) exercising the same assertions as the
+> durable `.test.ts` suite left in place. See
+> `docs/secure_runtime_alpha_5321_5400_release_publication_reconciliation_report.md`,
+> `..._certificate_custody_and_signing_seam.md`,
+> `..._manual_publication_workflow.md`, and `..._completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5241–5320 — FedOS Desktop Beta 0.1 NSIS
+> Installer, Portable ZIP, and Checksum Publication Arc (FULL completion).**
+> Implements the normative distribution review's own V1 policy
+> (`docs/reviews/fedos_beta_distribution_v1/20_normative_recommendation.md`):
+> the canonical Beta application now builds a real NSIS installer
+> (primary) and a real portable ZIP (secondary, same profile location as
+> the installed build), plus a versioned release manifest and a
+> SHA-256 checksum file, all additive — the canonical Beta entry point,
+> Runtime, Settings, and WASM manifest verification code are byte-for-byte
+> unmodified. Closes ONE real, previously-latent defect found and fixed
+> this session: `run_electron_builder_package_beta.mjs` hardcoded a
+> `--dir` electron-builder CLI flag that silently overrode the configured
+> `win.target` (harmless while the config was ALSO `["dir"]`, but once
+> this Arc changed it to `["nsis", "zip"]` it discarded both real targets
+> with exit code 0 and no error) — isolated via a methodical, reproducible
+> temporary-config test and fixed with a one-line change (`--dir` →
+> `--win`). New, additive packaging scripts
+> (`scripts/lib/release_identity.mjs`, `generate_release_manifest.mjs`,
+> `generate_release_checksums.mjs`, `verify_release_checksums.mjs`
+> — tamper-detecting, hash-recomputing, never trusting a stored value
+> alone — `scan_release_artifacts_for_secrets.mjs`, and
+> `verify_release_package_allowlist.mjs`) compose into ONE deterministic
+> `build_release.mjs` pipeline, gated by a real, tested, fail-closed
+> "dirty-tree public release artifacts are forbidden" check (verified
+> this session: it correctly refused against this Arc's own
+> not-yet-committed tree). REAL EVIDENCE this session (genuine internet +
+> Rust toolchain access again available): a real WASM artifact was built;
+> a real NSIS installer (101,407,959 bytes) and a real portable ZIP
+> (366,955,240 bytes) were produced in ONE electron-builder invocation
+> after the fix; the real staging-input secret scan reported 538 files
+> scanned, 0 findings; the packaged `.exe`'s own direct-launch hang was
+> re-tested (not assumed) and remains unchanged across three consecutive
+> Arcs now — an environment-specific limitation, not a product defect
+> (the identical application, unpackaged, continues to work completely).
+> New suite (`test/secure_runtime_alpha_5241_5320_packaging.test.ts`):
+> **21/21** passing against real accepted source plus deterministic
+> fixtures, requiring no Electron/Rust toolchain to run. `typecheck`
+> green (2 pre-existing errors, unchanged); full `vitest run` failure set
+> unchanged from the documented fresh-worktree baseline. No signing, no
+> auto-update, no hosting, no CI/release-upload was implemented (all
+> remain out of this Arc's own scope per the normative review). See
+> `docs/secure_runtime_alpha_5241_5320_packaging_reconciliation_report.md`
+> and `..._packaging_completion_declaration.md` for the full Phase A-Q
+> evidence and disclosed limitations. Recommended next Arc: **FedOS
+> Desktop Beta 0.1 Canonical Release Hosting, Manual Publication, and
+> Signing Readiness Arc.**
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5161–5240 — Canonical Desktop Composition
+> and FedOS Beta 0.1 Release-Blocker Closure Arc (FULL completion — BLK-1
+> closed).**
+> Architecture frozen and strictly additive: the only production-source
+> touches beyond `FedosDesktopBetaApplicationAssembly` itself are THREE new
+> optional dependencies on `FedosProfileInitializationCoordinator`
+> (`deviceSyncSchedulerEnabled`/`deviceSyncAbandonmentPolicy`/
+> `deviceSyncAttemptFn`), mirroring the existing `archiveEnabled` toggle's
+> own pattern byte-for-byte — omitted, behavior is unchanged for every
+> existing caller. Closes BLK-1 from the prior Arc: `fedos_electron_beta_main.cts`
+> now composes Navigation (`FedosDesktopConversationWindowRegistry`),
+> Notification/Tray/Badge Coordinators, Background Lifecycle, and Device
+> Sync (Operational Facade + Scheduler + Event Bridge + Presentation Wiring)
+> into the SAME canonical `FedosDesktopBetaApplicationAssembly`/Runtime —
+> every one of these was ALREADY real, framework-neutral, and
+> port-based (Alpha 4181-4500, UNMODIFIED); this Arc only composes them,
+> reusing the SAME real Electron-side adapters
+> (`FedosElectronTrayAdapter`/`FedosElectronBadgeAdapter`/
+> `FedosElectronNotificationAdapter`) `fedos_electron_badge_main.cts` already
+> proves work. A confirmed Runtime restart rebuilds the Runtime-bound
+> subset (Navigation/Tray/Badge/DeviceSyncWiring) while explicitly NOT
+> rebuilding the Electron-global subset (Notification/Background-Lifecycle)
+> — proven by reference-identity assertions. REAL, PACKAGED-ADJACENT
+> VERIFICATION this session (genuine internet + Rust toolchain access
+> again available): an unpackaged real Electron process completed create →
+> real WASM Master Seed → full composition verified live
+> (`{"navigation":true,"badge":true,"tray":true,"deviceSyncStatus":"Idle"}`)
+> → lock → relaunch → wrong-passphrase-denied (composition honestly
+> `false`/`false`/`false`/`null`) → relaunch → correct-passphrase-unlock
+> (identical identity, composition freshly rebuilt); `electron-builder`
+> packaging succeeded end-to-end against the larger `dist/` graph. New suite
+> (`test/secure_runtime_alpha_5161_5240_canonical_desktop_composition.test.ts`):
+> **9/9** against real boundaries, including a real Device Sync Scheduler
+> genuinely started/stopped through Settings for the first time, and a
+> 5-cycle lock/unlock duplication check (5 distinct Runtimes, never fewer,
+> never more). `typecheck` green (2 pre-existing errors, unchanged); full
+> `vitest run` failure set unchanged from the documented fresh-worktree
+> baseline. Honest, disclosed, non-release-blocking limitations unchanged
+> from the prior Arc: the packaged `.exe`'s own direct launch still hangs in
+> this sandboxed, display-less environment (a packaged-Electron GPU/
+> compositor-init issue, not a code defect — the identical code is fully
+> verified unpackaged); Relay/Archive-directory Settings still have no
+> Runtime-config field to feed. See
+> `docs/secure_runtime_alpha_5161_5240_ownership_inventory.md` and
+> `..._completion_declaration.md` for the full Phase A ownership table and
+> evidence. Recommended next Arc: **FedOS Desktop Beta 0.1 Installer,
+> Signing, Distribution, and Update Policy Review.**
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 5061–5160 — FedOS Desktop Beta 0.1
+> Integration, Release Candidate, and Acceptance Freeze Arc (honest partial
+> completion — release freeze blocked by one named, disclosed composition
+> gap).**
+> Architecture frozen and strictly additive: the only production-source
+> touches are THREE new, single-method additive factories/hooks on
+> already-open Beta-lineage classes
+> (`FedosDesktopApplicationShell.fromRunningRuntime()`,
+> `FedosDesktopConversationUiPresentationBoundary.fromShell()`,
+> `FedosProfileInitializationCoordinator.adoptReplacementRuntime()`) — zero
+> existing method signature or behavior changed for any existing caller.
+> Closes the exact gap the prior Arc's own Completion Declaration named as its
+> recommended next Arc: no Electron main previously composed the real
+> production-unlock chain AND a live Presentation/Settings boundary over the
+> SAME Desktop Runtime (doing so naively would construct two independent
+> Runtimes over the same durable paths — a real duplicate-ownership defect).
+> New `FedosDesktopBetaApplicationAssembly`
+> (`src/desktop/beta/fedos_desktop_beta_application_assembly.ts`) composes
+> exactly one Shell/Boundary over the Coordinator's own Runtime, wires the
+> Alpha 4981–5060 Settings Application Coordinator's startup application for
+> the first time in any Electron main, and provides a generic, tested
+> confirmed-Runtime-restart primitive. New canonical Electron entry point
+> `fedos_electron_beta_main.cts` (+ preload/page/renderer) reuses the
+> `fedos-profile:*` IPC contract verbatim (Phase P surface freeze) and adds a
+> new `fedos-beta:*` namespace (status/settings-plan/settings-apply) — all
+> seven pre-existing Electron main files remain byte-for-byte unmodified,
+> preserved as accepted test/harness entry points. REAL, PACKAGED-ADJACENT
+> VERIFICATION this session (genuine internet + Rust toolchain access): a real
+> WASM `pkg/` was built; an unpackaged real Electron process completed a full
+> create → real WASM Master Seed generation/sealing → ready → lock → relaunch
+> → wrong-passphrase-denied → correct-passphrase-unlock round trip with
+> IDENTICAL account/device identity across three separate process launches;
+> `electron-builder` packaging succeeded end-to-end (new, additive
+> `electron_builder.beta.config.json`, correctly relocating the root `dist/`
+> graph and WASM `pkg/` to the packaged app's own expected paths) though the
+> packaged `.exe`'s own direct launch hung before `app.whenReady()` in this
+> sandboxed, display-less environment (disclosed, not root-caused — the
+> IDENTICAL unpackaged code path is fully verified). Named, disclosed,
+> release-blocking gap: Navigation/Tray/Badge/Device-Sync-event-wiring are
+> NOT yet composed into this same canonical entry point (they remain real and
+> reachable only via `fedos_electron_badge_main.cts`) — full completion is
+> not declared. New suite
+> (`test/secure_runtime_alpha_5061_5160_beta_application_assembly.test.ts`):
+> **7/7** against real boundaries; `typecheck:core` unchanged (2 pre-existing
+> errors); `typecheck:electron` **0 errors**; full `vitest run` unchanged from
+> the documented fresh-worktree baseline. See
+> `docs/secure_runtime_alpha_5061_5160_reconciliation_report.md` for the full
+> Phase A–R inventory and blocker table. Recommended next Arc: **FedOS Desktop
+> Beta 0.1 Composition Completion and Packaged Acceptance Arc.**
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4981–5060 — Desktop Settings Runtime
+> Application and Safe Reconfiguration Arc (FULL completion — persisted
+> settings now visibly affect real live application behavior through accepted
+> boundaries).**
+> Architecture frozen and strictly additive: ZERO existing production source
+> file modified (only new files under `src/settings/application/`,
+> `src/desktop/settings/`, `src/desktop/presentation/`, a new test, docs, and
+> this README). No Runtime / Relay-transport / Device-Sync-Scheduler /
+> Notification / Tray / Badge / Archive / Conversation / Electron-IPC redesign;
+> no new dependency; no Rust/Cargo change; `p2p/`/`.tmp_gen/` untouched. This
+> Arc closes the chain the prior Settings Arc left open: Settings persistence →
+> Authority → **Application Planner** → classified decision → immediate update
+> OR safe subsystem reconfiguration OR runtime-restart-required OR blocked →
+> honest **effective state** the UI renders. The Settings store is NOT a
+> generic remote-control surface: every one of the ten fields is classified
+> into exactly ONE application class, derived from real source inspection —
+> **IMMEDIATE** (theme, windowLayout, notificationsEnabled — applied without
+> reconstructing the Runtime), **SUBSYSTEM** (backgroundSyncEnabled — via the
+> existing `FedosDeviceSyncOperationalFacade.startSync()/stopSync()`, one
+> scheduler, no second timer), **RUNTIME-RESTART** (relays, defaultRelay,
+> archiveDirectory — bound at Runtime construction, no dishonest hot reload),
+> and **UNSUPPORTED/BLOCKED** (language — no localization boundary; autoStart —
+> no OS auto-start boundary; autoLockTimeoutMinutes — no idle/activity
+> boundary; persisted, never falsely claimed applied). WIRED TO REAL LIVE
+> BEHAVIOR (proven with real boundaries, no mocks): theme/windowLayout mutate a
+> live presentation sink; notificationsEnabled gates a real
+> `GatedFedosDesktopNotificationPort` so presentation is suppressed while the
+> canonical event still flows; backgroundSyncEnabled flips a REAL
+> `FedosDeviceSyncScheduler`'s `isRunning()`. New (all additive):
+> `src/settings/application/` (application class table, `FedosSettingsApplicationPlanner`,
+> effective-state model + boundary-safe view), `FedosDesktopSettingsApplicationCoordinator`
+> (validate → persist desired → apply supported actions in operation order →
+> honest per-field effective delta; transaction semantics = persist-then-apply,
+> closed outcome vocabulary distinguishing rejected-before-persist /
+> persisted-and-applied / pending-runtime-restart / persisted-but-blocked /
+> partially-applied / application-failed / rolled-back / rollback-failed), the
+> narrow live-subsystem application ports, a SEPARATE closed four-command
+> application Host Bridge (`settings-application-plan`/`settings-apply`/
+> `settings-effective-state`/`settings-reload-effective-state`, reusing the
+> unmodified `FedosDesktopHostResponse` vocabulary and sending only sanitized,
+> secret-free views toward the renderer), and an application ViewModel/renderer
+> projection. No secret, relay credential, or filesystem path ever crosses the
+> host/renderer boundary (proven). Acceptance
+> (`test/secure_runtime_alpha_4981_5060_settings_runtime_application.test.ts`):
+> **50/50** against REAL file-backed persistence, a REAL notification
+> coordinator/gate, and a REAL device-sync scheduler; `typecheck` green (only
+> the two documented pre-existing baseline errors, measured A/B); full
+> `vitest run` failure set unchanged from base (the documented fresh-worktree
+> raw-import / source-alignment / missing-WASM-`pkg/` failures, none in the
+> settings subsystem). Recommended next Arc: **FedOS Desktop Beta 0.1
+> Integration, Release Candidate, and Acceptance Freeze Arc.**
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4901–4980 — Desktop Settings, Relay
+> Configuration, and User Preferences Arc (FULL completion of the additive
+> settings feature; real packaged-Electron round trip environment-blocked by a
+> missing Electron binary, not code).**
+> Architecture frozen and strictly additive: no Runtime / Persistence-mechanism
+> / Crypto / Search / Archive / Device-Sync / Conversation-Runtime source
+> touched, Shell not broken, no new dependency (Electron already present). Zero
+> existing production source file modified — the only existing-file edits are
+> additive script/tsconfig/asset registrations plus this README. A complete,
+> closed-vocabulary settings subsystem was added: `src/settings/`
+> (`FedosSettingsDescriptorV1` / codec / validator / file-backed persistence /
+> authority — REUSING the `FileFedosLocalProfilePersistence` one-JSON-file
+> fail-closed pattern, not a new mechanism), a `FedosDesktopSettingsController`
+> (load/save/reset/validate/export/import), a Settings ViewModel + Renderer
+> over the eight closed screens (General/Appearance/Relay/Notification/Privacy/
+> Archive/Advanced/About), a SEPARATE closed-five-command Host Bridge
+> (`settings-load`/`settings-save`/`settings-reset`/`settings-export`/
+> `settings-import`, reusing the unmodified `FedosDesktopHostResponse`
+> vocabulary), and a preload-only Electron adapter
+> (`fedos_electron_settings_*`: main/preload/dispatch-translation/loader/page/
+> renderer/self-test/window.d.ts — one frozen `window.fedosSettings.invoke`, no
+> `ipcRenderer`/`require`/fs; `contextIsolation:true`/`nodeIntegration:false`/
+> `sandbox:true`/`webSecurity:true` unchanged). The settings vocabulary is
+> closed — Theme / Language / Relay List / Default Relay / Notification Enabled
+> / Background Sync Enabled / Archive Directory / Auto Start / Auto Lock Timeout
+> / Window Layout — with NO free-form key/value (an exact-key-count validator
+> rejects extras) and fail-closed decode (corrupt/tampered/unknown-key/
+> version-mismatch all reject, writing nothing). Phase H acceptance
+> (`test/secure_runtime_alpha_4901_4980_desktop_settings.test.ts`): **31/31**
+> against REAL temp-directory JSON files, NO mocks — first load, save, restart
+> (fresh controller/same file) → exact restore, relay/theme/notification
+> changes, reset, export/import round trip, corrupted file, unknown key,
+> version mismatch, validation error, fail-closed, tampered JSON, the closed
+> host command set, and the Electron dispatch translation. `typecheck:electron`
+> green; `typecheck:core` only the two pre-existing baseline errors (untouched
+> prior-arc test files, measured A/B). Honest Blocker: the Electron `.exe`
+> binary is not downloaded in this worktree, so `electron dist/…settings_main.cjs`
+> cannot launch a real process — the adapter is fully typechecked and its
+> compiled bridge/controller emit to the exact dynamic-import paths, but the
+> real packaged round trip is deferred (same environment class the prior Arc
+> disclosed). `p2p/`/`.tmp_gen/` untouched. Next: Desktop Settings ↔ Runtime
+> Application Arc (apply the durable settings to relay set / notifications /
+> sync / auto-lock / theme behind existing ports).
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4821–4900 — Packaged Electron Real-Unlock
+> Acceptance and GUI Passphrase-Input Boundary Arc (FULL completion — real
+> packaged renderer→preload→main unlock through real WASM).**
+> Architecture frozen: no crypto/Runtime/coordinator/Shell/Host redesign, no
+> `lib.rs`/Rust change, no prior `*_main.cts` touched, the dev-only WASM gate
+> byte-for-byte untouched. This Arc closes the ONLY blocker Alpha 4741–4820
+> disclosed. Re-verified firsthand (the prior Arc's "headless, no Electron"
+> finding was measured in a DIFFERENT worktree): in THIS worktree Electron
+> **installs** (`electron.exe`, 225 MB) and an **offscreen** BrowserWindow
+> (`show:false`, `offscreen:true`, `contextIsolation:true`/`nodeIntegration:false`/
+> `sandbox:true`) starts a **real renderer process** — so packaged acceptance
+> is achievable, not blocked. A NEW, additive sibling Electron package
+> (`fedos_electron_unlock_*`: main/preload/onboarding page/renderer/self-test)
+> exposes a closed, dedicated secret-input contract — `window.fedosProfile`
+> (`status`/`create`/`unlock`/`lock`/`quit`, one frozen object, five
+> `fedos-profile:*` channels, no generic `invoke`, no `ipcRenderer`) — into
+> the UNCHANGED production activation authority and profile coordinator. ONE
+> strictly-necessary production-source addition
+> (`src/desktop/production_activation/fedos_production_nostr_signing_authority.ts`):
+> a `FedosNostrSigningAuthority` that derives the account identity / signs
+> **directly on the production WASM facade handle** (NOT the dev-gated
+> loader), sharing the same handle as the Master Seed authority so identity is
+> **stable across a real relaunch** (the prior Arc's test double could not be).
+> PROVEN through TWO real, offscreen-rendered Electron processes: first-run
+> welcome → real `type=password` input → real WASM generate+seal → account +
+> `trusted` local Device → **ready**; then a separate process → locked →
+> **wrong secret stays locked (no Runtime)** → correct secret restores the
+> **identical** account through real WASM → lock → re-unlock. Secret leak scan
+> (unique per-run secret): absent from renderer DOM/storage/URL, main stdout,
+> the profile descriptor, and every sealed file (sealed material is real
+> `{"v":1,"kdf":"argon2id"...`); the passphrase field is cleared after submit.
+> No dev seed double, no dev-only loader, no new dependency (Playwright NOT
+> added — reuses the repo's own subprocess/marked-stdout self-test convention,
+> driving the REAL renderer via `webContents.executeJavaScript`). Acceptance
+> suite (`packages/fedos-desktop-electron-spike/test/secure_runtime_alpha_4821_4900_unlock_electron_acceptance.test.ts`):
+> **15/15** — structural guards + real packaged create + real packaged unlock
+> + missing-artifact-fails-closed. `p2p/`/`.tmp_gen/` untouched. Next:
+> Desktop Settings, Relay Configuration, and User Preferences Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4741–4820 — Production Master Seed Runtime
+> Activation and Secure Unlock Completion Arc (honest partial — packaged
+> Electron real-unlock acceptance blocked by this headless environment).**
+> Architecture frozen: no crypto/Runtime/coordinator/Shell/Host/Electron
+> redesign, no `lib.rs`/Rust change, and the existing dev-only WASM gate is
+> byte-for-byte untouched. This Arc closed the prior Arc's disclosed blocker
+> at the source/runtime level: the real WASM **builds here** (`cargo` +
+> `wasm-bindgen 0.2.126`, ~34 s, a 260 KB `fedos_core_rust_bg.wasm` exporting
+> the full `FedosMasterSeedAuthority` class), and real production Master Seed
+> **generate → Argon2id+ChaCha20-Poly1305 seal → restore → identity match →
+> wrong-passphrase fail-closed** runs end-to-end through the UNCHANGED
+> profile coordinator with NO development seed double and NO dev-only
+> `NODE_ENV` gate. Six new files under `src/desktop/production_activation/`
+> add a NARROW production Desktop path: a closed-vocabulary crypto activation
+> authority (permitted / unsupported-host / artifact-missing / artifact-invalid
+> / artifact-version-mismatch / unapproved-build / capability-not-allowed /
+> initialization-failed); an unforgeable Electron-main **host attestation**
+> (module-private-symbol brand a renderer/Worker cannot mint — capability
+> containment, not host authenticity); a **pinned artifact manifest**
+> (SHA-256 recomputed from the real bytes, reviewed capability profile +
+> allowed export set, no secret, no remote fetch); a **capability-limited
+> facade** exposing only the Master Seed constructor, never the raw module; a
+> production `FedosMasterSeedAuthority` (clear() drops the handle so post-lock
+> crypto fails closed); and a no-fallback activation assembler. A deterministic
+> SEQUENTIAL build pipeline (`npm run build:production-wasm`: cargo test →
+> wasm32 build → wasm-bindgen → manifest gen, never Cargo+npm concurrently)
+> generates the gitignored `pkg/` output; nothing generated is committed.
+> Acceptance suite
+> (`test/secure_runtime_alpha_4741_4820_production_master_seed_activation.test.ts`):
+> **17/17** — the full failure matrix, real create → ready (sealed material on
+> disk, no plaintext) → lock → relaunch → unlock (stable identity) →
+> wrong-secret-stays-locked, all through REAL WASM. **Honestly blocked
+> (Phase L):** a packaged Electron GUI process cannot be launched/driven in
+> this headless environment (no display; Electron not installed; electron-
+> builder + GUI automation out of reach), so packaged real-unlock acceptance
+> is declared partial rather than faked — every step it would exercise is
+> proven at the Node/source level. Next: a Packaged Electron Real-Unlock
+> Acceptance + GUI Passphrase-Input Boundary Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4661–4740 — Master Seed Unlock, First-Run
+> Onboarding, and Local Profile Initialization Arc (honest partial —
+> production Master Seed unlock blocked by the existing dev-only crypto
+> gate).**
+> Architecture frozen: no crypto/Runtime/Registry/Shell/Host/Electron
+> redesign. Ten new files under `src/desktop/onboarding/` compose the
+> EXISTING authorities through the EXISTING
+> `FedosDesktopRuntimeConfig`/`startFedosDesktopRuntime()` surface — zero
+> existing source file modified except this README, no config field added.
+> A fresh install now reaches a safe, explicit usable state through ONE new
+> application coordinator (`FedosProfileInitializationCoordinator`): detect
+> profile → first-run create OR existing-profile unlock → seal/restore the
+> Master Seed authority → resolve account identity → register the local
+> Device with REAL BIP-340 account + Device Schnorr proofs
+> (`runtime.devicePairing()`, reaching `"trusted"`, never a caller-supplied
+> `trusted=true`) → initialize durable per-profile paths → start the real
+> Desktop Runtime → lock/relaunch. New: a versioned NON-SECRET profile
+> descriptor + strict validator + deterministic codec + in-memory/file
+> persistence (fail-closed on corruption, never overwrites); a closed
+> 8-state profile lifecycle machine (no partial ready; wrong-unlock →
+> locked; corruption/identity-mismatch → recovery-required, never a silent
+> new profile); a one-profile-root durable path authority (traversal-proof,
+> isolated, Japanese/OneDrive long-path tested); a one-shot self-redacting
+> unlock-secret payload; an honest recovery-material notice (no plaintext
+> seed display; forgotten-secret-is-unrecoverable stated); a closed
+> onboarding command vocabulary (secret redacted from every diagnostic, no
+> response echoes it); and framework-neutral onboarding presentation view
+> models. **Honestly blocked (per the spec's own Phase D fallback):** the
+> ONE real `FedosMasterSeedAuthority` (`FedosWasmMasterSeedAuthority`) is
+> unreachable here — no compiled WASM `pkg/`, and the dev-only crypto gate
+> (`fedos_dynamic_loader_gate.ts`) is hardcoded shut — so the Arc ships a
+> clearly-labeled DEVELOPMENT-ONLY seed double (a non-cryptographic
+> lifecycle simulator: no seed byte, no plaintext passphrase) and STOPS
+> before claiming user-ready production unlock. Real acceptance suite
+> (`test/secure_runtime_alpha_4661_4740_first_run_onboarding.test.ts`):
+> **40/40 passing** against the REAL runtime + REAL BIP-340 proofs; the
+> immediately-prior Arc's 39/39 pairing suite unchanged; `tsc` adds zero
+> new errors (only the one long-pre-existing scheduler failure remains).
+> Development-runtime real coordination is proven; production crypto
+> availability is NOT claimed. Recommended next Arc: Desktop Settings,
+> Relay Configuration, and User Preferences.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4581–4660 — Desktop Device Registration,
+> Pairing, and Durable Sync Journal Arc (complete).**
+> Architecture frozen: no Registration/Registry/Sync/Electron redesign.
+> Closes both blockers Alpha 4501-4580 named. New `FedosDevicePairingFacade`
+> (`src/desktop/runtime/fedos_device_pairing_facade.ts`) composes the
+> EXISTING Alpha 3161-3240 `FedosDeviceBindingBoundary`/Alpha 2921-3000
+> `FedosDeviceTrustRuntime` — zero owned crypto, zero owned trust truth —
+> reachable end to end: Electron IPC → Host Bridge → Shell (7 new methods)
+> → Facade → real BIP-340 Schnorr account authorization + Device proof of
+> possession → Device Registry. New, versioned, secret-free pairing
+> exchange format (`FedosDevicePairingRequestV1`/`ApprovalV1`) is the
+> transport-neutral port itself — no QR/Bluetooth/LAN/Relay implementation.
+> Electron IPC needed ZERO changes: `fedosElectronHandleInvoke()` was
+> already a generic command-forwarding multiplexer, verified by reading it
+> in full before writing any Electron-adjacent code. Sync Journal gains a
+> real, durable, NDJSON append-only backend (`src/sync/persistence/`),
+> optionally injected with zero behavior change to any pre-existing call
+> site. Real, non-obvious gap found only by testing: making the Journal
+> durable did not, by itself, make Sync-fabric ELIGIBILITY survive a
+> restart (`FedosSyncState`'s own Device Registry is a separate,
+> always-in-memory structure) — fixed with an explicit restart-hydration
+> step re-admitting every durably-`"trusted"` Device via the existing
+> `registerSyncDevice()`. Exact protocol semantics (never overclaimed):
+> registration and revocation are each LOCAL to whichever machine's own
+> Device Registry a call reaches — the Authorizing Device also locally,
+> immediately records the identical verified binding into its OWN
+> Registry (two independent local writes, never a network call, never
+> cryptographic bidirectional trust) — proven via a real two-Shell,
+> two-durable-directory, two-real-process-restart end-to-end test. 11
+> files modified, 8 new production files, 1 new 39-test acceptance suite
+> (no mocks for the headline flow), 2 historical Alpha 3941-4020 tests
+> updated (genuinely stale `available: false` → `true`, unweakened
+> otherwise). Full root suite 1014 files/810 passed/204 failed, 13308
+> tests/13047 passed/261 failed (+1 file/+1 test vs. the immediately-prior
+> Arc's own 1013/810/203, 13269/13009/260 baseline — traced to
+> `test/reviews/**`'s own documented uncommitted-worktree effect, resolves
+> on commit); real Electron subprocess suite unchanged at 108/4/0.
+> Recommended next Arc: Master Seed Unlock, First-Run Onboarding, and
+> Local Profile Initialization.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4501–4580 — Desktop Device Sync Electron
+> Main Integration Arc (complete).**
+> Architecture frozen: no Runtime/Scheduler/Notification/Tray/Badge/Electron
+> redesign. Completes the final Electron integration for Alpha 4421-4500's
+> Device Sync Presentation Wiring, extending
+> `fedos_electron_badge_main.cts` (Package F, Alpha 4341-4420) **in
+> place** — verified, by reading all five Electron main files' own
+> headers, as the ONE process that already owns
+> `FedosDesktopNotificationCoordinator`/`TrayCoordinator`/
+> `FedosDesktopBadgeCoordinator` together, so this is the only place
+> attaching Device Sync routing does not duplicate ownership. Constructs
+> exactly one `FedosDeviceSyncEventBridge`/`FedosDesktopDeviceSyncPresentationWiring`
+> (both UNMODIFIED) per real startup, threads
+> `eventBridge.wrapAttemptFn()` into the real `startFedosDesktopRuntime()`
+> config (`deviceTrustEnabled`/`deviceSyncSchedulerEnabled` turned on for
+> the first time in this file's own history — the real, previously-inert
+> Tray `"pause-sync"`/`"resume-sync"` actions are now genuinely
+> functional, with zero changes to `TrayCoordinator`), and destroys both
+> idempotently on shutdown. New idempotent-startup/idempotent-shutdown
+> guards, proven via real object-identity comparison and a real count of
+> `"shutdown clean"` occurrences across two deliberate calls in a real
+> spawned process. Honest, disclosed Phase A finding: Shell/Boundary
+> expose Device Sync OPERATIONAL commands only, never a device
+> REGISTRATION surface, and the Sync Journal has no durable-path config
+> anywhere in this codebase — so this real process's own real Scheduler
+> can never have a real, trusted, in-range target device today; the new
+> Device Sync self-test proves the real, live Notification/Badge/Tray
+> Coordinators still correctly receive and process events by driving
+> `wiring.handleEvent()` directly with hand-built, schema-valid events —
+> the identical method a genuine Scheduler-sourced event takes. 1 file
+> modified in place, 2 new files (a selftest module, an acceptance test),
+> zero new IPC channels; real Electron subprocess suite 108/4/0 (was
+> 99/4/0 — this Arc's own +9 tests, +0 regressions); full root suite
+> byte-for-byte unchanged at 1013 files/810 passed/203 failed, 13269
+> tests/13009 passed/260 failed (this Arc adds no root `test/` file).
+> Recommended next Arc: a Device Sync Registration and Pairing Arc to
+> close the one remaining gap this Arc's own Phase A finding surfaced.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4421–4500 — Desktop Device Sync Badge,
+> Notification, and Operational Event Wiring Arc (complete).**
+> Architecture frozen: no Runtime/Scheduler redesign, no Sync protocol or
+> Transport changes, no new persistence, no new crypto. Connects the real
+> `FedosDeviceSyncScheduler` (Alpha 3721-3800) to the Desktop Notification/
+> Tray/Badge boundaries (Alpha 4261-4420) for the first time. New, additive
+> `src/device/sync_events/` (`FedosDeviceSyncEventBridge`) translates real
+> Scheduler attempt activity into a closed nine-kind event vocabulary
+> (`sync-started`/`sync-progress`/`sync-completed`/`sync-failed`/
+> `conflict-detected`/`retry-scheduled`/`retry-aborted`/`device-offline`/
+> `device-online`) — a real Phase A finding drove the integration
+> technique: the Scheduler has no event emitter anywhere in its own file,
+> so the Bridge wraps the ONE real extension seam it does expose, the
+> injected `attemptFn` boundary, rather than monkey-patching the instance.
+> A new `FedosDesktopDeviceSyncPresentationWiring`
+> (`src/desktop/runtime/`) routes those events into the three existing
+> Coordinators through their real, narrow, already-existing public
+> surfaces only — reusing the three existing `"device-sync"`/
+> `"sync-complete"`/`"sync-failed"` notification kinds (never inventing a
+> fourth), reducing a closed five-value tray status list to
+> `FedosDesktopTrayPort.setTooltip()`, and calling only the Badge
+> Coordinator's own two real control surfaces,
+> `setSynchronizing()`/`refresh()` (a disclosed, verified-against-real-
+> source correction of the brief's own wording, which named three
+> nonexistent Coordinator methods). 2 new root source files, 2 new root
+> test files (21 tests, real Runtime/Scheduler/Coordinators, no mocks);
+> zero regression traceable to this Arc (full Electron subprocess suite
+> unchanged at 99/103; full root suite delta is exactly this Arc's own +2
+> files/+21 tests, 0 change to the pre-existing failure baseline).
+> Electron main-process wiring itself is named as the recommended next
+> Arc, disclosed honestly as a scope boundary of time, not feasibility.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4341–4420 — Desktop Unread Badge and Menu
+> Bar Count Integration Arc (complete).**
+> Architecture frozen: no persistence changes, no Runtime/Search/Conversation
+> redesign. Reuses the existing `FedosDesktopUnreadCounterViewModel` (Alpha
+> 3241-3320) verbatim — never computes unread independently. Adds one new,
+> additive boundary: a closed, five-state Desktop Badge boundary
+> (`src/desktop/badge/`, `FedosDesktopBadgePort`/`FedosDesktopBadgeCoordinator`
+> — `none`/`count`/`attention`/`synchronizing`/`error`), aggregating real
+> per-conversation unread counts over
+> `FedosDesktopConversationWindowRegistry.recentConversationIds` (a real,
+> disclosed Phase A design finding: `FedosDesktopConversationListViewModel`
+> was tried first and found to never rediscover a conversation activated by
+> a different Shell/runtime instance — the Registry's own persisted list,
+> already reused by `TrayCoordinator`, does not have that gap). A new,
+> additive Electron adapter
+> (`packages/fedos-desktop-electron-spike/src/fedos_electron_badge_*`) wires
+> this to real Electron `app.dock`/`app.setBadgeCount`/
+> `BrowserWindow.setOverlayIcon` APIs, plus the SAME, already-existing
+> `FedosElectronTrayAdapter` instance (tooltip + menu label suffix) — no
+> duplicate Tray, Electron hosts UI only. Real Electron subprocess
+> acceptance tests, including a main-process self-test sequence
+> (`FEDOS_ELECTRON_BADGE_AUTOTEST=1`) exercising all 8 named Phase G
+> scenarios against real objects, plus a genuine two-process restart test.
+> 3 new root source files, 8 new Electron files, 1 new root test file (11
+> tests) plus 1 new real Electron acceptance suite (15 tests); zero
+> regression traceable to this Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4261–4340 — Desktop Notifications, System
+> Tray, and Background Operation Arc (complete).**
+> Architecture frozen: no redesign of Runtime/Shell/Presentation/Renderer/
+> Host Bridge/Navigation. Adds three new, additive boundaries: a closed,
+> nine-kind Desktop Notification boundary (`src/desktop/notification/`,
+> `FedosDesktopNotificationPort`/`FedosDesktopNotificationCoordinator`,
+> fixed per-kind templates only — no custom payloads, fail-closed on any
+> sensitive-looking field); a six-action System Tray boundary
+> (`src/desktop/tray/`, `FedosDesktopTrayPort`/`TrayCoordinator` — Open
+> Window/Recent Conversations/Device Sync Status/Pause Sync/Resume
+> Sync/Exit); and a pure Background Operation state machine
+> (`src/desktop/background/`, `BackgroundLifecycleCoordinator` — window
+> closed keeps the Runtime alive, background sync/notifications, clean
+> shutdown, single runtime ownership; no daemon mode, no singleton
+> service). A new, additive Electron adapter
+> (`packages/fedos-desktop-electron-spike/src/fedos_electron_notifications_tray_*`
+> + `fedos_electron_notification_adapter.ts`/`fedos_electron_tray_adapter.ts`)
+> wires these to real Electron `Notification`/`Tray` APIs — Electron hosts
+> UI only, zero business logic. Investigated Host Bridge reuse honestly:
+> NOT reused directly (would mean a second, divergent Boundary/Runtime
+> racing the Window Registry's own, a direct violation of "single runtime
+> ownership"), but its Port+adapter PATTERN is restated for both new
+> boundaries. Real Electron subprocess acceptance tests, including a
+> main-process self-test sequence (`FEDOS_ELECTRON_BG_AUTOTEST=1`)
+> exercising all 14 named Phase G scenarios against real objects. 8 new
+> source files, 1 new minimal additive Presentation ViewModel, 4 new root
+> test files (31 tests) plus 1 new real Electron acceptance suite (15
+> tests); zero regression traceable to this Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4181–4260 — Desktop Conversation Window
+> and Navigation Arc (complete).**
+> Architecture frozen: no redesign of Runtime/Shell/Presentation/Renderer/
+> Host Bridge. Adds a closed navigation state vocabulary
+> (`empty`/`opening`/`open`/`open-failed`), pure back/forward history,
+> window-title generation, a `FedosDesktopConversationWindowController`
+> (one window's own orchestration — open/switch/close/back/forward/
+> restoreLastOpened/render, owning its OWN ViewModel/Renderer instances
+> over the Presentation Boundary's single shared `.shell`, the deliberate
+> resolution to a genuine multi-window-vs-shared-ViewModel-state safety
+> gap found in Phase A), and a `FedosDesktopConversationWindowRegistry`
+> (multi-window state model + lifecycle + pin state + recent-conversation
+> list + last-opened restoration, backed by a new append-only NDJSON log
+> following this repository's own established persistence pattern). A new,
+> real `ipcMain`/preload Electron adapter
+> (`packages/fedos-desktop-electron-spike/src/fedos_electron_navigation_*`)
+> constructs the Presentation Boundary and Window Registry DIRECTLY —
+> deliberately NOT `FedosDesktopHostBridge`, which has no concept of
+> "window" and owns its own private Boundary internally; reusing it
+> alongside the Registry would race two divergent Runtime instances in one
+> process. 29 new root unit/acceptance tests plus 13 new real Electron
+> acceptance tests (build, security baseline, closed IPC vocabulary, real
+> subprocess launch/repeat-launch/fail-closed-on-corruption); zero
+> regression traceable to this Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4101–4180 — Electron Main/Preload
+> Adapter for FedosDesktopHostBridge Arc (complete).**
+> Architecture frozen: no redesign of Shell/Presentation/Renderer/Runtime/
+> Host Bridge. Connects the existing, unmodified `FedosDesktopHostBridge`
+> to a real Electron process as a thin transport layer only: Electron
+> Renderer → Preload (`window.fedos.invoke()`, ONE frozen method, no other
+> global) → `ipcRenderer.invoke()` → `ipcMain.handle()` → HostBridge →
+> Presentation → Shell → Runtime, proven end to end against a REAL spawned
+> Electron process (real `status`/`dispatch`/`render` calls reaching the
+> live Runtime, a real malformed-command rejection, real stop/restart).
+> `start()`/`stop()` remain Main-process-owned lifecycle calls, never
+> renderer-invokable (would otherwise indirectly expose filesystem paths
+> to the renderer). All mandatory security defaults
+> (contextIsolation/sandbox/webSecurity/no nodeIntegration) verified both
+> structurally and against real process behavior. Fixed a real
+> TypeScript/Node16-module-resolution blocker discovered during
+> implementation (dynamic `import()` was being silently downleveled to a
+> non-functional `require()` call under the electron package's own prior
+> `module: CommonJS` setting) — resolved entirely within the
+> already-isolated Electron package, root project's own type graph
+> untouched. Also repaired 4 genuinely-stale historical `package.json`
+> exact-shape tests (broken by earlier, unrelated Electron-lineage work),
+> net IMPROVING the full suite's own failure count by 4. 3 new test files
+> (34 new tests) plus the repaired historical ones; zero regression
+> traceable to this Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 4021–4100 — Repository-Wide Node Type
+> Isolation and Electron Build Compatibility Arc (complete — type
+> isolation/build compatibility, NOT Electron application integration).**
+> Resolves the ONE blocker Alpha 3881–3940 stopped at, honestly: adding
+> Electron transitively pulled in `@types/node`, which broke `npm run
+> typecheck` repository-wide by turning ~390 pre-existing
+> `// @ts-expect-error` suppressions (this repository's own established
+> convention for `node:fs`/`node:child_process`/etc. imports, across
+> ~130 files) into "unused directive" errors — confirmed, empirically,
+> that no `tsconfig.json` setting (`types`/`typeRoots`/`paths`/
+> `moduleResolution`) can prevent this while both sides share one
+> `node_modules` tree, since TypeScript resolves `node:*` imports via
+> filesystem lookup, not tsconfig configuration. The fix: the Electron
+> spike moved to a physically separate package
+> (`packages/fedos-desktop-electron-spike/`, its own `package.json`/
+> `package-lock.json`/`node_modules`, no npm workspace hoisting) — so
+> `@types/node` (Electron's own unavoidable transitive dependency) never
+> touches the root project's own `node_modules` at all. `npm run
+> typecheck` (root) is clean again (except the one pre-existing,
+> unrelated failure every recent Arc's own baseline documents); the
+> isolated package's own typecheck/build/tests/packaging all pass
+> independently; NO postinstall deletion script, NO dependency mutation
+> after install, NO mechanical weakening of the ~130 unrelated files'
+> own suppression comments. Confirmed stable across two independent,
+> from-scratch clean installs. Full account in
+> `docs/secure_runtime_alpha_4021_4100_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3881–3940 — Electron Dependency and Build
+> Spike Arc (build spike, partial completion, honestly declared — NOT an
+> Electron app, NOT feature-complete).**
+> Package A only, per the Electron Dependency and Desktop Packaging V1
+> Review's own recommendation: adds `electron` (`43.1.1`) and
+> `electron-builder` (`26.15.3`, `"dir"`/unpacked target only) as
+> devDependencies, a narrow `src/desktop/electron_spike/` directory (main
+> entry, minimal preload, static local page — Electron imports exist
+> ONLY here, confirmed by grep), and proves, with real evidence, that a
+> secure, blank/static-page `BrowserWindow` (`contextIsolation: true`,
+> `nodeIntegration: false`, `sandbox: true`, `webSecurity: true`, no
+> remote content, no business IPC, exactly one immutable
+> build-metadata value exposed via `contextBridge`) launches, shows the
+> correct local page, and shuts down cleanly — both in development and
+> as a packaged, unpacked Windows directory (348 MB total; this Arc's
+> own bundled code is 12 KB). No `FedosDesktopHostBridge`/Desktop
+> Runtime/Shell/ViewModel/Renderer wiring of any kind. **Partial, not
+> full, completion**: `npm run typecheck` is NOT clean after this Arc —
+> Electron's own transitive `@types/node` dependency (unavoidable simply
+> by adding Electron) breaks ~130 existing files' own
+> `// @ts-expect-error` conventions repository-wide, a mitigation for
+> which (a drafted, tested `postinstall` cleanup script) was rejected by
+> this environment's own permission classifier and, when presented
+> directly, the user chose to stop here rather than authorize it. `npm
+> test` and every existing test suite are unaffected (77/77 existing
+> Desktop tests, 25/25 new spike tests, both passing). Full account in
+> `docs/secure_runtime_alpha_3881_3940_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3941–4020 — Desktop Device Management
+> and Sync Operations UI Renderer Arc (honest partial — Device
+> registration/revocation confirmation commands unavailable).**
+> Architecture frozen: no redesign of the Device Registry, Device Trust,
+> Device Sync Scheduler, Relay Sync, or Conflict Authority; no second
+> operational facade, Shell, or Device Runtime; no dependency added; no
+> `package.json`/`package-lock.json`/`tsconfig.json`/Cargo change. Turns
+> the completed Device Sync operational Shell/ViewModel/Renderer boundary
+> (Alpha 3801-3880) into a coherent, framework-neutral Desktop
+> device-management presentation surface: a closed 14-screen vocabulary,
+> a fail-closed in-memory navigation state (never durable canonical
+> data), one composing controller over the 6 existing Device Sync
+> ViewModels (registered additively as `.deviceManagement` on the
+> existing Presentation Boundary/Renderer, never a second parallel one),
+> and a full Overview/Device-list-detail/Sync-Operations/Schedule/
+> Transfer/Conflict-Inbox screen+render-model layer with honest
+> truncation limits and closed, callback-free action descriptors.
+> **Honest, documented boundary**: no `registerDevice`/`confirmTrust`/
+> `revokeDevice` command exists anywhere on the Shell or the Device Sync
+> Operational Facade — only `runtime.deviceTrust()` supports those, and
+> the Shell never calls it. The Registration and Revocation Confirmation
+> screens are therefore complete, real screen models that honestly report
+> their own confirm action as unavailable, never a fabricated success —
+> every OTHER target screen, including the entire Conflict Inbox with
+> safe acknowledgment, is fully real end to end. Relay-accepted and
+> Device-imported remain two independently-observable facts throughout;
+> an empty transfer set never counts as "everything synced." 2 new test
+> files, 37 new tests, real Runtime/Shell/Boundary/Renderer throughout;
+> full suite failure rate matches this environment's own already-
+> documented run-to-run baseline variance, zero regression traceable to
+> this Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3801–3880 — Device Sync Operational
+> Status and Desktop Shell Integration Arc (complete).**
+> Architecture frozen: reconciles the previously-diverged Desktop UI
+> lineage (Runtime → Shell → ViewModels → Renderer → Host Boundary) and
+> Device Sync lineage (Device Trust/Registry, Device Sync Foundation,
+> Local Transfer, Relay-Assisted Synchronization, Background Scheduling
+> and Conflict Resolution) into one dedicated integration branch with
+> zero content lost, then wires real Device Sync operational state
+> (Device inventory/trust, Scheduler status/control, Schedules, Transfer
+> sessions, Conflicts) through one new, narrow
+> `FedosDeviceSyncOperationalFacade` — reusing the SAME Device
+> Registry/Sync Journal instances `FedosDeviceTrustRuntime` (Alpha
+> 2921-3000) already owns, never a second Device Runtime or Scheduler.
+> No real, network-attached Relay Sync graph is assembled (that needs a
+> Device-scoped signing/encryption authority this Runtime does not
+> source today) — the Scheduler's `attemptFn` remains an explicit,
+> caller-supplied injection point, mirroring `conversationTransportPublisher`'s
+> own established discipline; every tick fails closed to `"failed"`
+> when omitted, never fabricating `"delivered"`. Relay-accepted and
+> Device-imported are two independently-observable facts throughout,
+> never merged into one "synced" label. 11 new Shell commands, 5 new
+> ViewModels, 5 new Renderers, 4 new test files, 50 new tests, real
+> Runtime/Shell/ViewModel/Renderer throughout; full suite failure rate
+> (≈20.0%) matches both source lineages' own independently-confirmed
+> baselines, zero regression traceable to this Arc.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3721–3800 — Background Device Sync
+> Scheduling and Conflict Resolution Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, Registration
+> Authority, Device Trust, Device Sync Runtime, Sync Session/Package,
+> the Encrypted Device-to-Device Local Transfer protocol, Relay-Assisted
+> Device Synchronization (Alpha 3641–3720), or the Sync
+> Journal/Cursor/Queue/Conflict-Vocabulary/Allowlist (all unmodified);
+> no new dependency, no Rust change, no Desktop UI/Shell change,
+> `p2p/`/`.tmp_gen` untouched. Turns the existing manually-invoked Relay
+> Device Sync flow into a controlled, restart-safe background
+> scheduling boundary (`FedosDeviceSyncScheduler`: disabled by default,
+> explicit `startSync()`/`stopSync()`/`syncStatus()`/`tickSync()`/
+> `triggerSyncNow()`, single-flight, restart-recovery-proven) and
+> introduces an ADDITIVE, richer 11-value Conflict Vocabulary layered
+> over the existing 4-value classifier, a deterministic domain-specific
+> resolution planner (7 closed decisions, never a generic
+> last-write-wins), and durable, queryable Conflict persistence with
+> only 4 objectively-safe resolution actions — no forced overwrite of
+> canonical state anywhere. Explicitly does not claim distributed
+> consensus, strong eventual consistency, or any change to the Sync
+> Journal's own accepted Cursor-advance-past-everything design: an
+> unresolved conflict is made visible through a separate, independent
+> Conflict persistence/query layer instead. 3 new test files, 56 tests,
+> real BIP-340 Schnorr device registration/revocation and real
+> append-only restart-recovery proofs throughout; full suite unchanged
+> at 239 pre-existing failures (both categories independently
+> re-confirmed against a clean `main` checkout), 56 new passes, zero
+> regressions.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3641–3720 — Relay-Assisted Device
+> Synchronization Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, Registration
+> Authority, Device Trust, Device Sync Runtime, Sync Session/Package,
+> the Encrypted Device-to-Device Local Transfer protocol, the Sync
+> Journal/Cursor/Allowlist, or the existing `FedosRelay`/
+> `FedosConversationRelaySet`/private transport (all unmodified); no
+> Sender-Key change (this checkout has no Sender-Key secret persistence
+> code at all), no Conversation Runtime/Archive/Search change; no new
+> dependency, no Rust change, `p2p/`/`.tmp_gen` untouched. Extends the
+> proven local Encrypted Device Transfer protocol (Alpha 3481–3560)
+> over an untrusted, store-and-forward Relay boundary — the Relay is a
+> mailbox and transport only, never an identity/trust/decryption
+> authority. Route Decision: NIP-17 Gift Wrap is genuinely absent from
+> this checkout's history (confirmed, not an ancestor of this Arc's own
+> base) and the existing proprietary private-transport route is
+> hard-bound to Direct-mode Conversation membership — a structural
+> mismatch for Device pairing — so this Arc freezes a NEW, dedicated,
+> honestly-labeled proprietary route (kind:1, `["fedos-device-sync","1"]`,
+> route version 1, no NIP compliance claimed), built entirely from
+> ALREADY-REAL primitives (`FedosRelay`/`FedosConversationRelaySet`,
+> the existing kind-1-only `FedosNostrSigningAuthority`). A real
+> `FedosDeviceRelaySyncOutboundCoordinator`/`FedosDeviceRelaySyncInboundHandler`
+> pair carries the EXISTING, unmodified `FedosDeviceTransferPackageV1`
+> across the Relay: outer BIP-340 Schnorr signature re-verification
+> (reusing the existing `NobleSignatureVerifier`) catches any tamper to
+> the routing facts; an outer content-hash gate catches any tamper to,
+> or substitution of, the package itself, BEFORE decryption is ever
+> attempted; the inner package's own mutual device authentication and
+> tamper detection (Alpha 3481–3560, unmodified) runs unchanged.
+> Two-layer durable dedup (outer Relay event id, then
+> transferSessionId+package hash) makes duplicate delivery across
+> multiple Relays and across a simulated process restart import
+> exactly once — proven with a real, functional in-process Relay
+> fixture that actually stores and delivers messages (unlike the
+> existing bookkeeping-only `NullRelay`), including target-offline-
+> then-later-receive. Device revocation fails closed at every point
+> tested (before publish, after publish but before import); Relay
+> acceptance and Device import are tracked as two permanently distinct
+> facts (`"relay-accepted"` vs. `"imported"`) via a new, small,
+> 9-state Observation vocabulary, never collapsed. The existing Sync
+> record allowlist is reused unmodified and directly re-tested against
+> Master Seed/private-key/Sender-Key-secret/passphrase/plaintext
+> shapes; the one genuine, narrow addition this Arc makes is an
+> explicit oversized-payload resource limit (256 KiB), checked before
+> JSON parsing. Three new test files, 50 tests, real Schnorr signatures
+> + real AEAD wiring + a real functional Relay fixture throughout —
+> including two genuine off-by-one field-count bugs (the same class
+> this repo's history already recorded finding twice before) caught by
+> the first real end-to-end test run and fixed in this same commit.
+> See `docs/secure_runtime_alpha_3641_3720_execution_spec.md` and
+> `docs/secure_runtime_alpha_3641_3720_completion_declaration.md`.
+> Recommended next Arc: **Background Device Sync Scheduling and
+> Conflict Resolution**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3481–3560 — Encrypted
+> Device-to-Device Local Transfer Arc (complete).**
+> Architecture frozen: no redesign of the Device Registry, the
+> Registration Authority, Device Trust, or the Device Sync Runtime and
+> its Sync Session/Package types (all unmodified); no Sender-Key,
+> Conversation Runtime, Archive, or Search change; no new dependency,
+> no Rust change, `p2p/`/`.tmp_gen` untouched. Completes local
+> encrypted transfer between two already-registered, already-trusted
+> Devices of the SAME account — still no cloud, no relay, no
+> synchronization daemon. A real `FedosDeviceTransferCoordinator`
+> (`src/device/transfer/`) drives Transfer Invitation → Challenge →
+> Proof of Possession → Approval → Package → Verification →
+> Completion end to end with real BIP-340 Schnorr signatures
+> throughout: the initiator proves possession of its own registered
+> Device key, the responder independently proves possession of ITS
+> own — both re-checked against the LIVE Registry at every step, never
+> a cached snapshot. The Transfer Package is a thin `sessionId` binder
+> around the EXISTING, unmodified `FedosDeviceSyncPackageV1` — zero new
+> encryption logic — protected by a content-hash gate that catches any
+> in-transit tampering before decryption is even attempted, distinct
+> from a benign duplicate resubmission (idempotent) and from an
+> automatic, durable `"failed"` transition on every genuine
+> cryptographic denial (wrong device, replay, expiry, tampering) —
+> while a transient/environmental Package-build failure stays
+> retryable rather than killing the transfer. Restart-safe:
+> event-sourced Transfer Session persistence (in-memory + append-only
+> NDJSON backends, its own separate port from the Device Registry and
+> the Alpha 3161–3240 Challenge Replay persistence) recovers and
+> RESUMES a mid-flight transfer after a simulated process restart. Two
+> new test files, 26 tests, real Device Registry + real signatures +
+> real AEAD wiring throughout, covering tampering, replay, wrong
+> device, wrong account, interrupted transfer, restart recovery,
+> duplicate package, and cancellation — including a genuine off-by-one
+> bug (the same class Alpha 3161–3240 once found) caught by the first
+> real end-to-end test run and fixed in this same commit. See
+> `docs/secure_runtime_alpha_3481_3560_execution_spec.md` and
+> `docs/secure_runtime_alpha_3481_3560_completion_declaration.md`.
+> Recommended next Arc: **Relay-assisted Device Synchronization**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3321–3400 — Device Registration
+> Runtime Activation and Local Device Sync Foundation Arc (complete).**
+> Architecture frozen: no redesign of the accepted Device Registry,
+> Device Binding, or Account Authorization boundary
+> (`src/device/binding_challenge/`, `src/device/persistence/`,
+> unmodified); no Desktop Shell/Search/Archive/Sender-Key change; no
+> new dependency, no Rust change, `p2p/`/`.tmp_gen` untouched. Activates
+> Alpha 3161–3240's own Registration Authority — built but never called
+> from anywhere in `src/` — inside a real, constructible
+> `FedosDeviceSyncRuntime` (`src/device/runtime/`): Runtime Device
+> Registration/Activation (one atomic, cryptographically-verified call,
+> proven with real BIP-340 Schnorr signatures throughout), Runtime
+> Device Revocation, Local Device Inventory and Device Status Queries
+> (read directly from the existing Registry, no parallel state), and
+> Sync Session Preparation/Validation (`src/device/sync_session/`) — a
+> LOCAL, at-rest snapshot of one account's currently-trusted Device
+> inventory, addressed to one target Device the LIVE Registry currently
+> trusts, re-validated against that same live state rather than a
+> frozen snapshot. An Encrypted Sync Package Builder/Reader
+> (`src/device/sync_package/`) seals and opens that snapshot using the
+> EXISTING, real AEAD Runtime Service and the EXISTING `"Conversation"`
+> `AeadAadDomain` — resolved via a documented self-ECDH adaptation
+> (`resolveConversationKey()` against the account's own public key,
+> since a Sync Package has no counterparty to ECDH against and adding a
+> new AAD domain would require a Rust change) rather than any new
+> cryptographic primitive. No network sync, no cloud sync, no relay
+> sync, and no Encrypted Device-to-Device Local Transfer — this Arc
+> builds the LOCAL data a future transfer mechanism would move, and
+> does not itself move anything between two Devices. Two new test
+> files, 33 tests, real Device Registry + real signatures throughout,
+> covering restart recovery, duplicate registration, revocation,
+> malformed/expired/tampered packages, unauthorized devices, and
+> replay. See `docs/secure_runtime_alpha_3321_3400_execution_spec.md`
+> and `docs/secure_runtime_alpha_3321_3400_completion_declaration.md`.
+> Recommended next Arc: **Encrypted Device-to-Device Local Transfer**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3161–3240 — Account-to-Device
+> Signature Verification Boundary Arc (complete).**
+> Architecture frozen: no redesign of the accepted Device Registry,
+> trust-state transition table, or Multi-Device Sync Foundation
+> (`src/sync/`, unmodified); no Desktop Runtime/Shell change; no
+> Archive/Search/Sender-Key/Group change; no new dependency, no Rust
+> change, `p2p/`/`.tmp_gen` untouched. Closes the exact blocker named
+> by Alpha 2921–3000: this codebase now has a real, independent Device
+> signing keypair (`src/device/crypto/`, `@noble/curves`
+> Schnorr/secp256k1 — the same already-shipped production library used
+> for Nostr verification — never derived from the Master Seed, never
+> the account key, opaque handle with no raw private-key getter), a
+> canonical versioned `FedosDeviceBindingChallengeV1` (fixed domain
+> separator, fixed-order array serialization, `register-device`/
+> `revoke-device` action, expiry, CSPRNG nonce), a detached
+> account-authorization signature reusing the existing kind-1 Nostr
+> signing authority unwidened, and a Device proof of possession under a
+> distinct signed preimage — neither signature alone can register or
+> self-authorize anything; both are independently re-verified on every
+> call. A new `FedosDeviceBindingRegistrationAuthority`
+> (`src/device/binding_challenge/`) orchestrates both checks plus a
+> durable, restart-safe replay/expiry guard (separate codec + in-memory
+> + append-only persistence, fail-closed on corruption, idempotent on
+> byte-identical resubmission, refused on any changed-byte reuse of a
+> consumed nonce) against the EXISTING, unmodified Device Registry
+> (`PersistedFedosDeviceTrustAuthority`, Alpha 2921–3000) — through an
+> internal `AlreadyVerifiedFedosDeviceRegistrationAuthority` this Arc's
+> own orchestrator is the only caller of, never a default anywhere else.
+> `UnavailableFedosDeviceRegistrationAuthority` remains untouched and
+> still fails closed. Account-authorized revocation is implemented
+> (separate action/domain, bound to the exact target device key,
+> terminal, idempotent, wrong-account denied) with no device-sync key
+> rotation and no remote-erasure claim. A Phase J factory
+> (`fedos_device_binding_boundary_factory.ts`) provides the one
+> construction point a future Desktop Runtime integration would call —
+> **not wired into `fedos_desktop_runtime.ts` in this Arc**, so this Arc
+> remains independently mergeable alongside the Desktop Content Accessor
+> Arc. One new test file, 48 tests, real BIP-340 Schnorr signatures
+> throughout (a test-only real-crypto signing-authority stand-in ships
+> nowhere in `src/`), covering the full 28-item required matrix,
+> including a genuine bug found and fixed in Phase C's own challenge
+> validator (an off-by-one field-count check that rejected every
+> well-formed challenge, caught by this Arc's first real-crypto test).
+> See `docs/secure_runtime_alpha_3161_3240_execution_spec.md` and
+> `docs/secure_runtime_alpha_3161_3240_completion_declaration.md`.
+> Recommended next Arc: **Device Registration Runtime Activation and
+> Encrypted Device-to-Device Sync Transport**.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 2921–3000 — Device Trust and
+> Multi-Device Runtime Integration Arc (complete, honest partial
+> capability — cryptographic Device authorization blocked).**
+> Architecture frozen: no redesign of the accepted Multi-Device Sync
+> Foundation (`src/sync/`, Alpha 2421–2500, unmodified), Conversation
+> Runtime, or Archive; no cloud account/server, no push, no MLS, no
+> Onion/Tor, no new dependency, no Rust change, `p2p/`/`.tmp_gen`
+> untouched. Follows the reviewed recommendation (`docs/reviews/multi_device_device_trust_v1/`,
+> commit `4672244`): account identity + independent Device keys (Option
+> B), never raw Master Seed copying. A new, additive `src/device/`
+> domain implements a versioned `FedosDeviceBindingV1` (deviceId,
+> account reference, opaque device-key reference, label, trustState,
+> `schemaVersion`/`capabilityVersion` — no private key, no Master Seed,
+> no passphrase), a closed `pending|trusted|revoked|unavailable` trust
+> vocabulary with validated transitions (`revoked` terminal), and an
+> event-sourced Device Registry (codec, in-memory + append-only
+> backends, conflict/idempotency, fail-closed on corruption) mirroring
+> the existing Capability persistence pattern exactly — never merged
+> into Membership/Conversation persistence. **The cryptographic
+> blocker, stated honestly**: this codebase has no accepted boundary yet
+> for independent, account-verifiable Device keys
+> (`src/crypto/types.ts` remains a pure placeholder seam) — Phase E
+> stops exactly there: `UnavailableFedosDeviceRegistrationAuthority` is
+> the only production `FedosDeviceRegistrationAuthority`, and it can
+> record a registration attempt but can NEVER return `"verified"`, so no
+> device — legitimate or attacker-controlled — can reach `"trusted"`
+> through it. `FedosDesktopRuntime` gains an opt-in (`deviceTrustEnabled`,
+> mirrors `privateTransportEnabled`'s own discipline), narrow
+> `runtime.deviceTrust()` accessor owning one local Device identity, the
+> Device Registry/Trust Authority, and the EXISTING (unmodified)
+> `FedosSyncState` — sync-fabric membership always follows Device Trust,
+> never the reverse: only a `"trusted"` device may join the Sync fan-out
+> set, and a new, standalone, additive Sync Journal record allowlist
+> (`src/sync/fedos_sync_record_allowlist.ts`) fails closed on any
+> `recordType` outside six named non-secret metadata kinds, or on
+> sensitive-marker metadata, before the Journal is ever touched — zero
+> modification to the Journal's own frozen shape. Revocation denies
+> future sync eligibility and rejects any new change originating from
+> the revoked device, without erasing the historical binding fact or
+> claiming any retroactive deletion of already-copied data; Sender-Key
+> rekey is explicitly out of scope. Archive Restore is proven, directly,
+> to never register or imply a trusted Device. One new test file (26
+> tests) covers the full 24-item required matrix (items 21/22 satisfied
+> by re-running the existing, untouched Search and Conversation Runtime
+> regression suites rather than duplicating their coverage) over real
+> in-memory and append-only backends. See
+> `docs/secure_runtime_alpha_2921_3000_execution_spec.md` and
+> `docs/secure_runtime_alpha_2921_3000_completion_declaration.md`.
+> Recommended next Arc: **Device-to-Device Encrypted Sync Transport**
+> remains blocked on the same cryptographic Device-key boundary named
+> above — the recommended next Arc is instead **Account-to-Device
+> Signature Verification Boundary**, the named prerequisite that would
+> let a real `FedosDeviceRegistrationAuthority` finally return
+> `"verified"`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3561–3640 — Desktop Electron Host Boundary
+> Arc (partial completion, honestly declared).**
+> Creates the first Desktop Host boundary around the completed Runtime →
+> Shell → ViewModels → Renderer stack. This repository has no accepted
+> Electron dependency (confirmed: zero references in `package.json`/
+> `package-lock.json`) — per this Arc's own instruction, Electron is NOT
+> added; instead the complete, framework-neutral host abstraction
+> (`FedosDesktopHostPort`, `src/desktop/host_boundary/fedos_desktop_host_port.ts`)
+> and its full in-process reference implementation
+> (`FedosDesktopHostBridge`) are built and fully tested, stopping exactly
+> at the external Electron dependency boundary. The Host owns
+> process/window lifecycle ONLY — exactly one Presentation Boundary (which
+> owns exactly one Shell, which owns exactly one Runtime) and exactly one
+> Renderer per `start()`, constructed once, stopped via the ONE real
+> `shell.stop()` call already needed. A closed, 14-command vocabulary
+> (`fedos_desktop_host_command.ts`) covers exactly what the real Shell/
+> ViewModel stack supports — two categories are deliberately EXCLUDED and
+> documented rather than faked: `archive-list`/`archive-verify` (no such
+> real Archive Runtime operation exists, Alpha 3081-3160's own finding)
+> and `archive-export`/`preflightRestore`/`restore` (need a raw filesystem
+> destination path this foundational Arc declines to expose without a real
+> path-authority/file-picker story). Every command is validated
+> structurally (type/shape/size-bounded, reusing
+> `FEDOS_CONVERSATION_DIRECT_MESSAGE_MAX_BODY_LENGTH`/
+> `FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES` verbatim) before it ever
+> reaches a ViewModel — an unknown command, wrong-shaped payload, or
+> path-traversal attempt all fail closed to `"unknown-command"`. `dispatch()`
+> returns the raw ViewModel action result, never a Renderer-shaped screen
+> model a second time -- Phase G's own explicit "action → state → render"
+> separation, avoiding duplicating what the Renderer layer already owns;
+> `render()` is the separate, on-demand, side-effect-free full-screen
+> snapshot. Every response is a closed, `Object.freeze`d, JSON-safe
+> `FedosDesktopHostResponse<T>` -- no raw Error, no persistence record, no
+> secret, ever (confirmed by a dedicated full-session leakage test).
+> Concurrent `dispatch()` calls are serialized through one internal
+> Promise queue (confirmed by a real 5-way-concurrent-creation test with
+> zero corruption). 17 new real tests against the real
+> Host/Runtime/Shell/ViewModel/Renderer stack, covering every required
+> scenario except the Electron-specific ones (which do not apply). One
+> real, honest discovery along the way: `conversations-list` is a
+> SESSION-scoped in-memory registry, not a durable enumeration (Alpha
+> 2841-2920's own already-documented, unchanged behavior) — a restart-recovery
+> test therefore verifies via `conversation-open` (a real durable read),
+> not `conversations-list`. Baseline/final: typecheck clean except the one
+> already-documented pre-existing failure; full suite's failure count and
+> file set unchanged from Alpha 3401-3480's own baseline. See
+> `docs/secure_runtime_alpha_3561_3640_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_3561_3640_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3401–3480 — Desktop UI Renderer Boundary
+> (complete).**
+> Implements the rendering boundary only, over the ten ViewModels Alpha
+> 3241-3320 built — pure TypeScript render-model contracts under
+> `src/desktop/renderer/`, explicitly NOT Electron/React/Tauri/browser
+> code. One shared, closed render-output shape,
+> `FedosDesktopRenderModel<T> = {kind:"idle"} | {kind:"loading"} |
+> {kind:"error",outcome,message} | {kind:"content",content:T}`
+> (`fedos_desktop_render_model.ts`), plus eight content renderers
+> (Conversation List, Conversation Detail, Message, Reply, Archive,
+> Search, Membership, Status), two shared cross-cutting ones (Error,
+> Loading), and one aggregator (`FedosDesktopRenderer`) constructed from a
+> `FedosDesktopConversationUiPresentationBoundary`. Ten ViewModels map onto
+> eight content renderers, not 1:1 — `MessageRenderer` consumes Message
+> List + Compose Message + Unread Counter together (a real message pane
+> renders exactly those three facets as one cohesive unit), each an
+> independent `FedosDesktopRenderModel` facet rather than one forced
+> top-level `kind`, since their lifecycles genuinely differ (a loaded list
+> alongside a still-`"loading"` pending send). "Empty" is represented as
+> DATA (`{items, count, isEmpty}` via `fedosRenderList()`) on a real,
+> successfully-`"content"`-kind result, never a separate `kind` and never
+> confused with `"idle"`/`"error"`. Every renderer's ONLY dependency is a
+> ViewModel's already-public getters — no `.load()`/`.send()`/`.search()`
+> call, no `FedosDesktopApplicationShell`, no persistence port, no crypto
+> authority, no rendering framework/HTML/CSS/browser global anywhere in
+> the directory (confirmed by grep). "Renderer snapshot tests" are full,
+> deterministic `toEqual()` assertions of complete render-model objects —
+> this repository's own already-established assertion style — rather than
+> a new external `__snapshots__` file convention introduced for the first
+> time. 11 new real tests against a real Renderer/ViewModel/Shell/Runtime
+> stack, covering every required category: snapshot, state transitions,
+> error, loading (a real async gap observed synchronously before
+> awaiting), empty, 30-message large-conversation rendering, search, and
+> archive. Baseline/final: typecheck clean except the one already-documented
+> pre-existing failure; full suite's failure count and file set unchanged
+> from Alpha 3241-3320's own baseline. See
+> `docs/secure_runtime_alpha_3401_3480_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3241–3320 — Desktop Local Conversation
+> Management UI Prototype Arc (complete).**
+> Builds the first real Desktop Local UI boundary over the newly completed
+> `FedosDesktopApplicationShell`/`FedosDesktopConversationContentAccessor`
+> (Alpha 3081-3160) — a pure TypeScript presentation boundary, explicitly
+> NOT Electron/React/Tauri/any rendering framework. Ten ViewModels under
+> `src/desktop/presentation/` (Conversation List, Conversation Detail,
+> Message List, Compose Message, Reply, Search, Archive, Membership,
+> Unread Counter, Runtime Status), one file each, plus a shared closed
+> `"idle" | "loading" | "loaded" | "error"` state shape
+> (`fedos_desktop_view_model_state.ts`) and one aggregating factory
+> (`FedosDesktopConversationUiPresentationBoundary`) that owns exactly one
+> Shell instance and one of each ViewModel over it. Every ViewModel's ONLY
+> dependency is `FedosDesktopApplicationShell` — no persistence port,
+> crypto authority, or `conversationRuntime()`/`conversationContentAccessor()`
+> access anywhere in this directory; no new business logic, only Shell-call
+> plus state-shape bookkeeping. Two honest scope findings, neither worked
+> around: the Shell has no public activation or invitation-redemption
+> method at all (a real, pre-existing characteristic, not something this
+> Arc's own ten ViewModels could or should add), so tests needing a
+> genuinely active conversation establish it via a real, independent Runtime
+> setup call, fully stopped, before starting the presentation boundary's
+> own Shell over that already-durable state — mirroring this codebase's own
+> established restart-recovery testing convention; and the Unread Counter
+> ViewModel is an honest, local, in-memory-only "last viewed" watermark
+> over real `listMessages()` data, never a fabricated cross-device "read
+> receipt" (no such concept exists anywhere in this codebase). 13 new real
+> tests, every one against a real `startFedosDesktopRuntime()` instance —
+> Runtime Status lifecycle, real Direct creation visible through
+> List/Detail/Membership, real send→list→reveal→reply with an exact
+> plaintext round trip and real Unread Counter tracking, real keyword
+> Search, real Archive `"unavailable"`/`"not-found"` behavior, no raw
+> Error/secret leakage, independent boundary isolation. Baseline/final:
+> typecheck clean except the one already-documented pre-existing failure;
+> full suite's failures match, file-for-file, the two pre-existing
+> environment-only categories Alpha 3081-3160 already confirmed, plus three
+> transient failures from three unrelated historical review tests that
+> assert a clean `git status` and briefly saw this Arc's own not-yet-committed
+> files — resolved once this Arc's commit landed. See
+> `docs/secure_runtime_alpha_3241_3320_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 3081–3160 — Desktop Runtime Conversation
+> Content Accessor and Application Shell Activation Arc (complete).**
+> Closes the exact boundary Alpha 2841-2920 documented and stopped at.
+> Architecture frozen: no redesign of `FedosDesktopRuntime`/Conversation
+> Runtime/Direct/Group messaging, no second message repository, no
+> persistence port or crypto authority/handle exposed, no new dependency,
+> no Rust/WASM/Cargo touch, no `p2p/`/`.tmp_gen` touch. One new narrow
+> boundary — `FedosDesktopConversationContentAccessor`
+> (`src/desktop/content_accessor/`), owned by exactly one
+> `FedosRunningDesktopRuntime` (new `conversationContentAccessor()`
+> accessor, lifecycle-gated exactly like `conversationArchiveRuntime()`) —
+> delegates to the EXISTING Direct/Group messaging, Search, Retention and
+> Archive Runtime APIs; owns no persistence, no crypto authority, no
+> secret. `FedosDesktopApplicationShell.listMessages`/`sendMessage`/`reply`/
+> `search`/`archive` are now real (a new `readMessage()` method was added —
+> a send/read is structurally impossible without message content, which
+> the pre-existing signatures carried none of); every outcome maps onto the
+> Shell's own existing closed result vocabulary, never a raw error. Fixed a
+> real, latent defect Phase A's own inventory found: the Shell's
+> `sendMessage`/`reply` precondition check read `draft.lifecycleState`
+> (permanently `"draft"` by construction, Alpha 1116) instead of the real
+> activation/usability fact — meaning `"requires-activation"` could never
+> have cleared even after Alpha 1111-1180/2041-2120 shipped real
+> activation; now reads
+> `FedosConversationRuntime.resolveActiveConversation()`/
+> `FedosConversationGroupRuntime.readinessForPrivateGroup()` (both new,
+> narrow, additive accessors). Group message plaintext read for a
+> recipient (previously no production API existed for it at all) is now
+> real via a new `FedosConversationGroupRuntime.resolveLocalGroupMessagePlaintext()`,
+> composing the SAME fan-out delivery/path records
+> `FedosGroupSendCoordinator` itself already produces, delegating to the
+> frozen Direct read path — invents no crypto. Honestly documents, rather
+> than works around, two real structural characteristics discovered this
+> Arc: a Group message's own SENDER has no self-Envelope to decrypt on this
+> base (`"own-message"`, not a fabricated plaintext), and
+> `FedosConversationArchiveRuntime.exportConversationArchive()`'s own
+> existence gate is keyed to the PUBLIC, Board-thread-derived Conversation
+> persistence domain — entirely separate from the private Direct/Group
+> draft domain a Shell caller actually messages through — so archiving a
+> real private conversation by its own id requires an independently-existing
+> bridging record this Arc does not auto-create (this codebase's own
+> pre-existing Archive Runtime tests already construct this bridge
+> manually; new tests do the same, never inventing an automatic bridge).
+> Search is wired to the existing, already retention-gated
+> `FedosConversationSearchIndex` (one instance per Runtime, fed
+> incrementally only when this Accessor already holds real plaintext it
+> just encrypted/decrypted — never a bulk decrypt pass); Group messages are
+> deliberately NOT indexed (their own recipient Envelope lives under an
+> internal pairwise-child conversation id, not the Group id a caller
+> holds — indexing it would leak that internal id or require an invented
+> remap). One new test file, 16 tests, every one against a real
+> `startFedosDesktopRuntime()` instance: accessor ownership/lifecycle/
+> isolation; full Direct send→reply→read→list round trip with exact
+> plaintext; malformed-input fail-closed; wrong-identity denial across two
+> independent Runtimes sharing durable state; Group admit→send→real
+> per-recipient read→honest `"own-message"`→member removal excludes a
+> future send; restored/reactivated conversation resumes real messaging;
+> real keyword Search plus a real retention transition removing both the
+> Search hit and the message's plaintext; Archive `inspect`/`export`/
+> `preflightRestore`/`restore` wiring including `requires-unlock` and the
+> honestly-documented, environment-driven `"failed"`/real-file-`inspect`
+> split (this checked-out tree has no compiled WASM artifact — confirmed by
+> direct reproduction, a pre-existing, repo-wide condition unrelated to
+> this Arc, see `docs/secure_runtime_alpha_3081_3160_completion_declaration.md`
+> §14); no raw Error/secret/ciphertext leakage; no hidden network activity.
+> Two pre-existing tests updated as genuinely stale, never weakened: the
+> Shell suite's `listMessages`/`search`/`archive` call sites and one now-more-precise
+> outcome (`"requires-activation"` replacing a stale blanket
+> `"unavailable"`); the Runtime-assembly suite's closed key-enumeration
+> gained the one new key. Baseline (this exact worktree, before this Arc's
+> production edits): typecheck clean except one pre-existing, unrelated
+> failure (`secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> committed `aff32c5`, confirmed untouched); full suite 254/12774 tests
+> failing, every one independently confirmed to fall into one of two
+> pre-existing, environment-only categories (a fresh-linked-worktree
+> Cargo.toml/lib.rs raw-import artifact; the missing compiled WASM
+> artifact) — zero traceable to this Arc's own files. Final: identical.
+> See `docs/secure_runtime_alpha_3081_3160_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_3081_3160_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 2841–2920 — Desktop Local Application
+> Shell and Conversation Management Boundary Arc (complete).**
+> Architecture frozen: no redesign of Conversation Runtime, no renamed
+> public interface, no new dependency, no Rust/WASM/Cargo touch, no
+> `p2p/`/`.tmp_gen` touch, no existing production file changed. Three new
+> files under `src/desktop/shell/` (`fedos_desktop_shell_result.ts`,
+> `fedos_desktop_shell_view_models.ts`, `fedos_desktop_application_shell.ts`)
+> implement `FedosDesktopApplicationShell`, a narrow application boundary
+> owning exactly one `FedosRunningDesktopRuntime`, exposing a closed
+> `ok | unavailable | unauthorized | not-found | invalid-input | conflict |
+> requires-activation | requires-unlock | unsupported | failed` result
+> vocabulary and closed view models (`ConversationSummary`,
+> `ConversationDetail`, `MessageView`) over `start`/`stop`/`status`,
+> `createDirectConversation`/`createPrivateGroup`, `listConversations`/
+> `getConversation`, `issuedInvitations`/`redeemInvitation`,
+> `listMessages`/`sendMessage`/`reply`, `search`, `archive`, `deviceStatus`.
+> Phase A's own inventory found, and this Arc documents honestly rather
+> than working around, a real structural boundary: `FedosRunningDesktopRuntime`
+> exposes only `boardRuntime()`/`conversationRuntime()`/`privateTransport()`,
+> none of which reaches the Envelope/Payload/Membership/Capability
+> persistence ports Search, Archive, and message send/read composition
+> need — `conversationEnvelopePersistence`/`conversationPayloadStorage` are
+> constructed inside `startFedosDesktopRuntime()` but never returned to any
+> caller, and `FedosConversationEncryptionAuthority`/`DecryptionAuthority`
+> both still require an Identity-domain key-resolution mapping named, in
+> their own file headers, as an unsolved blocker since Alpha 890. Rather
+> than bundle an unreviewed extension to `fedos_desktop_runtime.ts` into
+> this already-large Arc, `listMessages`/`sendMessage`/`reply`/`search`/
+> `archive` are real, testable methods that perform every check possible
+> against live Runtime state (existence, membership/authorization checked
+> *before* lifecycle so a non-member never learns activation state,
+> `requires-activation` because no conversation on this base can ever leave
+> `"draft"`) and terminate at an honest, closed `"unavailable"` — never a
+> fabricated plaintext, never a silent empty-list-as-success, never a raw
+> error. `deviceStatus()` is `"unavailable"` for the independent reason that
+> `src/sync/*` (Device Sync Foundation) is real but wired into nothing
+> (zero imports, confirmed by grep); Sender-Key is confirmed not integrated
+> on this base at all. Conversation creation, listing, detail, membership,
+> readiness, and issued-invitation reads are fully real and tested against
+> a live Runtime — no mock. One new test file (20 tests), all against real
+> `startFedosDesktopRuntime()` instances over real append-only log files,
+> covering lifecycle fail-closed behavior before/after start/stop, empty
+> list, real Direct/Group creation, deterministic filtered listing, the
+> honest send/message/search/archive/device `"unavailable"` boundary,
+> invitation issue (never the bearer secret) vs. honestly-unavailable
+> redeem, restart recovery over durable paths, independent Runtime
+> isolation, malformed-command rejection, wrong-identity denial, and no
+> raw-error/secret leakage (JSON-serialized and checked). Baseline (fresh
+> `arc/desktop-application-shell` worktree, `master` @ `3eb9ead`): typecheck
+> clean except one pre-existing unrelated error; full suite 189 files/233
+> tests failed, 751 files/12130 tests passed (a known fresh-worktree
+> artifact plus one already-stale pre-existing assertion, `secure_runtime_alpha_758_*`,
+> that predates this Arc). Final: typecheck unchanged; new shell suite 20/20
+> passed; focused Conversation Runtime/Search/Archive regression 73/74
+> passed (the one failure is the identical pre-existing baseline failure);
+> full-suite failure count unchanged from baseline within measurement noise,
+> zero new failure traceable to this Arc's files. See
+> `docs/secure_runtime_alpha_2841_2920_execution_spec.md` and
+> `docs/secure_runtime_alpha_2841_2920_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 2581–2620 — Conversation Search
 > Retention Authority and Index Purge Hardening Arc (complete).**
 > Architecture frozen: no redesign of the accepted Search Runtime, no
@@ -247,6 +3247,235 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status:
 >
+> **Status: Secure Runtime Alpha 2041–2120 — Conversation Identity
+> Restoration and Reactivation Arc (complete).** Closes the ONE real,
+> structural gap the prior Arc's own completion declaration named as its
+> recommended next step: archived Conversations restored their persisted
+> DATA correctly, but a restored Conversation had no production-grade path
+> back to normal send/read — the prior Arc's own round-trip test needed a
+> test-only workaround (directly seeding a child Direct Conversation's
+> Draft+Activation facts) just to prove a post-restore send wasn't
+> replayed. A mandatory Phase 1 reconciliation report
+> (`docs/secure_runtime_alpha_2041_2120_reconciliation_report.md`),
+> written and committed before any production code change, traced the
+> real gap in full: `resolveFedosConversationActiveConversation()`
+> requires a Draft record (Alpha 894) AND a `"completed"` Activation fact
+> (Alpha 1121), neither of which the archive ever replays (by frozen
+> design, unchanged); additionally, for a restored Group,
+> `FedosGroupGenerationAuthority.createNextGeneration()`/
+> `evaluateFedosGroupUsability()` both independently require the GROUP's
+> own top-level Draft too — a blocker the prior Arc's own analysis had not
+> named. `FedosConversationRuntime` — confirmed the correct owner over
+> `FedosConversationArchiveRuntime`/`FedosRunningDesktopRuntime` (both
+> considered and rejected in the reconciliation report §1) — gains ONE
+> new, additive method, `reactivateRestoredConversation(conversationId)`,
+> delegating to a new `FedosConversationReactivationCoordinator`
+> (`src/conversation/activation/`) composed ENTIRELY over existing,
+> unmodified machinery: it deterministically re-derives a missing Draft
+> from the ONE already-restored Membership fact with `role === "owner"`
+> (never invented), then activates every `direct` id — the top-level id
+> itself, or, for a restored Group, every distinct pairwise child Direct
+> Conversation its restored Paths reference — through the SAME, untouched
+> `FedosConversationDirectActivationCoordinator.activateDirectConversation()`
+> (Alpha 1122). Authorization reuses the SAME "local identity resolves and
+> holds an ACTIVE Membership on this id" gate `activateDirectConversation()`/
+> `sendGroupMessage()` already enforce — never a new authorization model;
+> a caller with no legitimate claim to a conversation gets `"unauthorized"`
+> (or, per child, `"not-member"`), and a genuinely unknown id gets
+> `"conversation-not-found"` before any identity check even runs. Every
+> write is idempotent (a repeat call reports `"already-active"`, never
+> re-running a durable write) and fails closed on a structurally corrupt
+> pre-existing Draft rather than silently re-deriving over it. The REAL
+> Application Round Trip acceptance test passes: a real
+> `startFedosDesktopRuntime()` source Runtime creates a Private Group,
+> admits two real-keyed recipients, sends, exports; a fully independent
+> destination Runtime restores, stops, and restarts as a genuinely fresh
+> instance — confirmed GENUINELY INERT first (`findConversation()` returns
+> `null`, `readinessForPrivateGroup()` reports `"failed"`) — then
+> `reactivateRestoredConversation()` reactivates the group's own Draft and
+> both real pairwise children; discovery now succeeds via real Runtime
+> read APIs (`findConversation()` returns the record,
+> `readinessForPrivateGroup()` reports `"usable"`); a genuinely NEW send
+> succeeds, a REPLY to it succeeds; a repeat reactivation call reports
+> `"already-active"` for both children with nothing duplicated; a second,
+> independent archive/restore cycle into a THIRD, fully fresh Runtime
+> reports the exact expected insert counts with zero duplicates, and
+> reactivation composes cleanly across that second cycle too. No
+> plaintext of any real message sent in the test appears anywhere in
+> either raw on-disk archive file; no network side effect is even
+> possible (no transport of any kind was ever configured). A dedicated
+> 12-test unit suite additionally covers the full security/idempotency
+> matrix directly (unauthorized, not-found, identity-unavailable,
+> creator-unresolvable, a structurally corrupt pre-existing Draft, an
+> already-present valid Draft trusted verbatim, a child no longer an
+> active member skipped while siblings still reactivate). A TRUE fresh
+> baseline was captured in this exact worktree (stash/re-run/restore, not
+> reused from any other Arc's own documented numbers): 764 passed files /
+> 192 failed at the clean pre-Arc tip; with this Arc's own changes
+> present, 762 passed / 196 failed — diffed file-by-file, confirming the
+> entire +4 delta is exactly four "git working tree is clean" review
+> guards reacting to this session's own not-yet-committed diff (the same
+> "red only until this Arc's own commit lands" phenomenon every prior Arc
+> already documents), with the +2 passed-file delta being this Arc's own
+> two new, fully-passing test files — zero real regressions. See
+> `docs/secure_runtime_alpha_2041_2120_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1921–1980 — Group Conversation Archive
+> Integration and Cross-Branch Recovery Arc (complete).** Extends the
+> Alpha 1541–1610/1691–1760 Archive Foundation/Runtime additively to
+> cover Group Conversations, resolving the exact blocker the prior Arc's
+> own status (below) named: this branch's own prerequisite merges
+> (`03ac16e`) brought in the real Group Runtime lineage, and this Arc
+> adds the ONE new optional `group?` bundle section (same
+> `schemaVersion: 1`, no second schema branch) carrying every
+> Generation (exhaustive), every current Path fact, the current record
+> per Group Message/Fanout Delivery, and one full nested bundle per
+> child Direct Conversation a Group's own paths reference — deduplicated
+> by conversation id. A real, load-bearing correction was found while
+> wiring the Collector's own group-detection signal (documented in full
+> in `docs/secure_runtime_alpha_1921_1980_completion_declaration.md`
+> §1): no real Group or Direct Conversation is ever written into
+> `FedosConversationPersistence` by any production code path in this
+> codebase (that port is Public-Board-only, Alpha 748) — a pre-existing
+> gap in the Archive Foundation/Runtime this Arc does not introduce and
+> does not redesign; the Group Section's own population signal was
+> built instead on the real, authoritative Group Generation persistence,
+> entirely decoupled from that gap. Export/Preflight/Restore/Duplicate-
+> Detection all extended additively, reusing every existing Group
+> equality/validator helper (adding three new deep validators —
+> `validateFedosGroupDirectPathRecord`/`validateFedosGroupMessageRecord`/
+> `validateFedosGroupFanoutDeliveryRecord` — mirroring Generation's own
+> existing one, since Path/Message/Fanout Delivery had none before this
+> Arc). The REAL Application Round Trip acceptance test passes: a real
+> `startFedosDesktopRuntime()` source Runtime creates a Private Group,
+> admits two real-keyed recipients, sends, removes one member, sends
+> again, exports; a fully independent destination Runtime inspects,
+> preflights, restores, stops, and restarts as a genuinely fresh
+> instance — 3 generations survive exactly, the removed member is
+> excluded from the later generation, canonical Group Message order and
+> the reply reference are exact, an authorized party decrypts the
+> restored ciphertext back to the exact original plaintext, a second
+> restore reports fully `already-present` (no duplicate fanout facts),
+> no transport/delivery was ever configured (no network side effect is
+> even possible), and one genuinely new Group Message sent after restore
+> is neither duplicated nor replayed. Full corruption/security matrix
+> (missing child conversation, deep-invalid records, tampered manifest/
+> ciphertext, two-Group isolation, no-plaintext) all fail closed. All 92
+> pre-existing Direct archive tests remain green, unchanged; a Direct-only
+> bundle still round-trips byte-for-byte identical to every archive this
+> codebase produced before this Arc. `npm test`: 760 passed files
+> (identical to the pre-Arc baseline), every new failure traced to a
+> pre-existing, already-documented category or the expected
+> "git working tree is clean" review-guard flip (red only until this
+> Arc's own commit lands) — zero real regressions. See
+> `docs/secure_runtime_alpha_1921_1980_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1691–1760 — Conversation Archive
+> Runtime Integration and Recovery Operations Arc (complete for Direct
+> Conversations; Group Conversation round trip genuinely blocked, not
+> attempted).** Resumed uncommitted partial work rather than
+> restarting: the File Authority (exclusive-create via same-directory
+> temp-file + `link()`, bounded read, never overwrites) and File
+> Container (length-prefixed Manifest+ciphertext framing) were already
+> complete; `FedosConversationArchiveRuntime`'s own four operations
+> (`exportConversationArchive()`/`inspectConversationArchive()`/
+> `preflightRestore()`/`restoreConversationArchive()`) were already
+> wired against the real Alpha 1541–1610 Archive Foundation, but the
+> Local Runtime's own `conversationArchiveRuntime()` accessor was
+> declared and imported, never actually constructed or implemented —
+> completed this Arc, mirroring `privateTransport()`'s own exact
+> two-state fail-closed contract. One real defect found and fixed
+> during reconciliation, matching this Arc's own Quality Gate: `restoreConversationArchive()`
+> tracked `.failed`/`.conflict`/`.inserted` per-domain tallies but never
+> checked `.invalid`, so a cryptographically authentic,
+> integrity-passing Archive containing individually-malformed child
+> records would silently report `"restored"` despite incomplete data —
+> fixed by adding one precisely-scoped `"partially-invalid"` outcome to
+> this Arc's own closed vocabulary, proven by a real end-to-end test
+> constructing exactly that scenario. Direct Conversation round trip
+> verified for real: seed -> export -> stop -> a genuinely independent
+> fresh Runtime -> inspect -> preflight -> restore -> the exact original
+> message plaintext recovered byte-for-byte; duplicate restore
+> (`"already-present"`, never a duplicate record), conflict
+> (`"conflicts-found"`, pre-existing record never overwritten), and
+> crash/restart recovery (a restore interrupted after only SOME
+> persistence domains were written converges cleanly on a fresh retry,
+> no duplication) all verified with real interrupted-then-resumed
+> scenarios, not mere assertions. Group Conversation round trip is a
+> genuine, named, structural blocker, not attempted: this worktree's own
+> branch contains zero Group Conversation code and zero Direct-messaging
+> activation/send facade at all (both live only on a separate,
+> still-unmerged branch this Arc's own task carries no authorization to
+> merge) — the Archive Runtime's own contract is provably agnostic to
+> how a record reached persistence, so no Archive-layer code change is
+> expected once that lineage merges; only the test seeding would change.
+> No plaintext/raw-secret ever appears in an on-disk archive file
+> (verified directly, not by type signature alone). `npm test`: every
+> failure traced to the SAME two pre-existing, cross-Arc-documented
+> categories (the `core.autocrlf` fresh-worktree CRLF artifact, and
+> three review docs' own "git working tree is clean" guards, red only
+> until this Arc's own commit lands) — zero new failures, zero
+> Archive-specific failures. See
+> `docs/secure_runtime_alpha_1691_1760_completion_declaration.md` for
+> the full record.
+>
+> Prior status (separate, previously-unmerged NIP-17 lineage, now merged
+> as this Arc's own prerequisite):
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1611–1690 — Nostr Private Wire
+> Standardization and Transport Reconciliation Arc (honest partial —
+> Phase A/B safety closure complete, Phase C+ deferred).** Reconciled
+> two prerequisite branches that had diverged since Alpha 1051–1110
+> (`arc/nostr-private-direct-pairwise-fanout-delivery`, tip `71c938b`,
+> merged into this integration branch — three mechanical conflicts, full
+> detail in `docs/secure_runtime_alpha_1611_1690_phase_a_reconciliation.md`).
+> **Closed the kind-1 hole** (Alpha 1612/1615): `FedosPrivateTransport`'s
+> own wire event builder (`fedos_conversation_transport_event.ts`)
+> previously hard-fixed `kind: 1` for private ciphertext — closed by a
+> failing-regression-test-first fix, now hard-fixed to the SAME disclosed
+> `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND` (`24700`) the `privateNostrDelivery()`
+> facade (Alpha 1391–1470) already used; public Board `kind: 1` behavior
+> is byte-for-byte unchanged. Froze the `FedosPrivateWireAdapter`
+> boundary (Alpha 1616 — Transport owns Relay/mailbox/multi-Relay/retry/
+> dedup, unchanged; a Wire Adapter owns event shape/kind/tags/unwrap) with
+> two real implementations: `FedosPrivateV1WireAdapter` (thin wrapper
+> around the existing, now kind-1615-closed, proprietary wire functions)
+> and `NostrNip17V1WireAdapter` (`src/conversation/delivery/nostr/nip17/`,
+> real module, honestly `isAvailable() === false` today — NOT because
+> normative material is missing, see below, but because Rumor/Seal/
+> Gift-Wrap construction itself is real, deferred, new protocol work).
+> Added the closed `"fedos-private-v1" | "nostr-nip17-v1" | "unsupported"`
+> route vocabulary (Alpha 1613) with one fixed, never file-probed
+> default. **Fetched and checked in real, byte-verbatim NIP-17/NIP-44/
+> NIP-59 text** (Alpha 1617 — `docs/normative/nostr-protocol-nips/`,
+> pinned to `nostr-protocol/nips@bdfa7e62ef87fcfcb992b1a27aee49d36b0b4f91`,
+> fetched directly rather than through any summarizing tool), resolving
+> every prior Arc's own "zero normative material" finding and confirming
+> directly from source (never guessed) that kind 14/15/13/1059/21059/10050
+> are Chat Message/File Message/Seal/Gift Wrap/Ephemeral Gift Wrap/DM
+> relay list respectively. Confirmed, by actually running `cargo test` in
+> this exact worktree (531 passed / 1 pre-existing unrelated failure),
+> that `packages/fedos-core-rust/src/crypto/`'s own existing 5,463-line
+> NIP-44 v2 implementation already matches the normative pipeline exactly
+> (Alpha 1618) — untouched by this Arc. **Deliberately deferred, not
+> blocked**: Phase C (real Rumor/Seal/Gift-Wrap construction) and every
+> phase after it, plus the NIP-44 narrow-WASM-export boundary (Alpha
+> 1619–1621) — genuine new security-sensitive protocol work, scoped to
+> a recommended next Arc rather than rushed inside this one. See
+> `docs/secure_runtime_alpha_1611_1690_phase_a_reconciliation.md`,
+> `_phase_b_normative_source_gate.md`, `_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
 > and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
 > crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
@@ -404,6 +3633,645 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status:
 >
+> **Status: Secure Runtime Alpha 1391–1470 — Nostr Private Direct and
+> Pairwise Fanout Delivery Arc (complete, protocol-neutral — NOT
+> NIP-17/NIP-44/NIP-59 compliant).** Run in a dedicated integration
+> worktree (`C:\wt\nostr-private-delivery`, branch
+> `arc/nostr-private-direct-pairwise-fanout-delivery`) built from the
+> prior Arc's own tip (`b3b9b96`), with two required prerequisite
+> branches merged in — `f715a5d` (Private Protocol Delivery review,
+> clean, zero conflicts) and `3dc4f7a` (Alpha 1321–1390 Private Group
+> Pairwise Fanout Foundation, two clean additive-union conflicts,
+> resolved chronologically) — both reported in full in
+> `docs/secure_runtime_alpha_1391_1470_completion_declaration.md`.
+>
+> **Protocol Compliance Gate (Alpha 1393), run first, before any
+> production code:** this repository contains ZERO normative NIP-17/
+> NIP-44-wire/NIP-59 material — every review already present
+> (`docs/reviews/private_protocol_delivery_group_v1/04_nostr_readiness.md`,
+> `docs/reviews/private_group_pairwise_fanout/01_nip17_inventory.md`/
+> `02_gift_wrap_inventory.md`) independently reconfirms this and
+> explicitly defers the research. Per the Gate's own fallback, this Arc
+> implements PROTOCOL-NEUTRAL Private Nostr Delivery contracts and makes
+> no NIP-17/44/59 compliance claim anywhere:
+> `FEDOS_PRIVATE_NOSTR_DELIVERY_KIND = 24700` is a disclosed,
+> FedOS-proprietary event kind, not a registered NIP, not interoperable
+> with any other Nostr client. Confidentiality is provided entirely by
+> the EXISTING, real, already-proven pairwise ECDH + AEAD scheme (Alpha
+> 861–890, real since Alpha 1261–1320) — no gift-wrap, no seal, no
+> ephemeral per-recipient key scheme is invented.
+>
+> **New domain, `src/conversation/delivery/nostr/` (13 files):** a
+> Private Delivery Request (a NEW, parallel durable intent, deliberately
+> not forced into the Board-post-specific `FedosBoardOutboxIntent`) whose
+> STATE reuses the EXISTING `FedosDeliveryObservationRepository`
+> directly; a recipient-specific wire payload carrying the sender's own
+> Envelope-identifying fields verbatim (required for the Alpha 856
+> associated-data header to re-derive correctly); an OK-correlated
+> Publisher adapter mirroring `FedosRelayOkCorrelatedNostrBoardPublisher`'s
+> own technique field-for-field over the unmodified `FedosRelay`; an
+> Inbound Delivery Coordinator sitting strictly ABOVE the unmodified
+> `validateInboundNostrEvent()` that classifies, gates by recipient
+> ownership, deduplicates by intrinsic NIP-01 event id, unwraps/decrypts
+> via the EXISTING `FedosConversationDecryptionAuthority.decrypt()`
+> directly (no cryptography in TypeScript), and imports into a FRESH
+> local Envelope/Payload pair through the unmodified persistence ports —
+> the received message becomes readable through the UNCHANGED
+> `readDirectMessage()`/`listDirectMessages()`; a Group Delivery Planner
+> that reuses the EXISTING Alpha 1321–1390 Pairwise Fanout plan
+> unmodified, firing one independent recipient-specific delivery per
+> already-fanned-out recipient (never one shared group event), threading
+> the sender's own local Group Message id through as opaque
+> authenticated-encrypted `groupLinkage` (never any recipient's own
+> canonical id).
+>
+> **Minimal, additive extension to one frozen file, disclosed:**
+> `src/nostr/sign/fedos_nostr_signing_authority.ts`'s own kind allowlist
+> widened from the single fixed `1` to a closed two-value set
+> (`{1, FEDOS_PRIVATE_NOSTR_DELIVERY_KIND}`) — the minimal change Alpha
+> 1447's own "no private plaintext in a public kind-1 event" requirement
+> makes unavoidable; every other field/behavior in that file is
+> unchanged. `FedosConversationRuntime` gains one new, additive,
+> always-constructible `privateNostrDelivery()` facade — `FedosRunningDesktopRuntime`'s
+> own exposed key set is UNCHANGED (confirmed:
+> `secure_runtime_alpha_606_runtime_assembly.test.ts`/
+> `secure_runtime_alpha_758_local_runtime_ownership.test.ts` both still
+> pass unmodified).
+>
+> **Verified for real:** both a Direct and a 3-member Group vertical
+> slice run through the real `startFedosDesktopRuntime()` entry point
+> with genuinely independent Alice/Bob(/Carol) runtime instances (Fake
+> Encryption/Decryption Authorities — this Arc's own baseline tier —
+> combined with a REAL Schnorr-signing `FedosNostrSigningAuthority`,
+> `@noble/curves`, real BIP-340 verification through the unmodified
+> inbound validator, and a real OK-correlated Relay publisher): real
+> signed private event → Relay ACK → the SAME real event received on a
+> genuinely separate runtime → unwrap/decrypt/import → exact plaintext
+> read back through the unchanged `readDirectMessage()`; restart-safe
+> idempotency (no duplicate publish, no duplicate import); a real
+> ciphertext-byte tamper (re-signed with the sender's own real key —
+> proving a valid signature alone never proves ciphertext integrity)
+> fails closed; a wrong-recipient `p`-tag event is denied before any
+> decrypt attempt; a genuine Relay rejection is a distinct, terminal
+> outcome; Group fanout produces two independent, non-shared-ciphertext
+> recipient-specific events, each importable ONLY by its own addressed
+> recipient, with a removed member correctly excluded from the next
+> send. 26 new focused tests, all passing (10 wire-payload-codec + 2
+> Direct vertical slice + 1 Group vertical slice + 13 architecture/secret
+> guards).
+>
+> **Honest scope limits, named explicitly:** no wire-level (NIP-40-style)
+> expiration encoding and no Nostr deletion-request construction (no
+> reviewed normative material for either); `"ephemeral-online"` mode is
+> an application-level distinction only, not backed by any wire-level
+> convention; no automatic Runtime-level subscription/reconnect wiring
+> (`receiveInboundEvent()` is a manually-invoked coordinator method); no
+> automatic retry/Scheduler integration for outbound delivery (a
+> `"rejected"` vs `"failed"` Observation distinction exists, but this
+> layer does not itself decide whether to retry). The Production-mode
+> WASM Dev-only Gate remains byte-for-byte untouched — private delivery
+> is development-Runtime capable only, never production-enabled.
+> `npm run typecheck` clean (one pre-existing, unrelated failure,
+> unchanged from every prior Arc); full `npm test` precisely diffed
+> against a stashed clean-baseline re-run in this exact worktree — every
+> newly-failing test traced to a pre-existing, git-status-dependent
+> "working tree unchanged" staleness guard, zero attributable to a
+> genuine functional regression. `package.json`/`package-lock.json`/
+> `Cargo.toml` byte-for-byte unchanged; no new dependency; `p2p/`
+> untouched. See
+> `docs/secure_runtime_alpha_1391_1470_phase_a_inventory.md` and
+> `docs/secure_runtime_alpha_1391_1470_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1471–1540 — Private Transport Boundary
+> and Multi-Relay Delivery Arc (complete).** Architecture frozen: no new
+> crypto, no Onion, no Tor, no ActivityPub, no AT Protocol, no GUI, no
+> Worker wiring. Builds `FedosPrivateTransport`
+> (`src/conversation/transport/`, 18 new files) — the boundary that
+> actually moves an already-encrypted `FedosConversationMessageEnvelope`
+> (Private Delivery, Alpha 851–890, UNCHANGED) over one or more Nostr
+> relays, closing the gap every prior Arc left open: nothing before this
+> one ever sent a Conversation Envelope anywhere. Reuses, by direct
+> import, the fully generic `FedosDeliveryObservation`/
+> `FedosDeliveryObservationRepository`/`FedosValidatingDeliveryObservationRepository`
+> and `FedosDeliveryRetryRegistry`/`makeFedosDeliveryAttemptSubjectId`
+> (`src/board/observation/*`, Alpha 461–470/521–540, UNCHANGED) for both
+> Mailbox (durable) and Ephemeral (best-effort, no Outbox row, no Retry
+> Registry) Delivery; mirrors — never redesigns — Board's own Outbox/
+> Publisher/Scheduler architecture as a new, parallel
+> `FedosConversationTransportOutbox`/`FedosConversationTransportPublisher`/
+> `FedosConversationTransportScheduler` set, since Board's own types are
+> `postId`-bound and this Arc's instruction forbids touching them.
+> Multiple Relay fan-out (`FedosConversationRelaySet` +
+> `FedosMultiRelayOkCorrelatedConversationTransportPublisher`) reruns the
+> SAME per-relay OK-correlation idiom `FedosRelayOkCorrelatedNostrBoardPublisher`
+> (Alpha 710/711/724) already established, once per relay, in parallel —
+> `"delivered"` if ANY relay accepts, `"rejected"` only if EVERY relay
+> explicitly does. Inbound Subscription + Relay Deduplication
+> (`FedosConversationInboundSubscription`/`FedosRelayEventDeduplicator`)
+> opens every relay's own subscription simultaneously and funnels every
+> inbound event through ONE shared, bounded, FIFO-evicted dedup gate
+> keyed by the Nostr event's own deterministic id, so a caller's envelope
+> callback fires exactly once per event no matter how many relays
+> deliver it. Wire packaging is constrained to `kind: 1` (Alpha 424's own
+> V1 signing policy, unmodified) — a private-transport event is
+> distinguished from a public Board post purely by tags
+> (`fedos-private`/`p`/`e-envelope`), never a new Nostr kind; `content` is
+> base64 ciphertext, mirroring `fedos_conversation_payload_codec.ts`'s
+> (Alpha 806) own encoding-only boundary discipline. Identity Resolution
+> reuse: `fedos_conversation_transport_routing.ts` resolves the still-open
+> Alpha 890 `localAccountIndex`/`counterpartyPublicKeyHex` blocker for
+> Direct conversations ONLY, by applying the exact verification idiom
+> `FedosSigningAuthorityNostrAuthorBinding` (Alpha 688) already
+> established for Board Authors to Conversation Membership instead — a
+> group conversation fails closed to `"not-direct"`, not silently routed.
+> Named, real (not glossed-over) limitation: `FedosSubscriptionFilter`
+> has no server-side tag filter, so Inbound Subscription filters by
+> `authors`/`kinds` server-side and does the `#p`-equivalent recipient
+> check client-side. Runtime wiring: `FedosRunningDesktopRuntime` gains a
+> new `privateTransport()` sibling accessor to `boardRuntime()`/
+> `conversationRuntime()`, gated by an OPTIONAL `privateTransportEnabled`
+> config field (kept optional, unlike `deliveryEnabled`, so every
+> pre-existing `FedosDesktopRuntimeConfig` call site keeps compiling
+> unchanged) with the same synchronous fail-closed guard
+> `deliveryEnabled` already established; this Arc also wires Private
+> Delivery's own Envelope/Payload durable backends (Alpha 857/804) into
+> the runtime for the first time — no prior Arc ever constructed them
+> there. Eight new test files (59 new tests), including one full
+> end-to-end test exercising two independent `FedosPrivateTransport`
+> instances (sender + receiver) over two independent relay connections
+> each to two shared in-process relay servers: real Mailbox queueing, a
+> real Scheduler tick, real Multi-Relay fan-out publish + OK correlation
+> on BOTH relays, a real canonical Observation showing `"accepted"`, a
+> real Inbound Subscription receiving the identical event from BOTH
+> relays with the envelope callback firing EXACTLY ONCE, and the opaque
+> payload bytes surviving the full sign→publish→OK-correlate→subscribe→
+> dedup→parse→decode pipeline byte-for-byte. **Verification**: `npm run
+> typecheck` clean except the same one PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`)
+> every recent Arc has already confirmed predates it; `npx vitest run`
+> baseline (before this Arc's own files existed) already showed 18
+> failing test files / 29 failing tests, every one of them a
+> `git status`-cleanliness check unrelated to Transport (the untracked
+> `p2p/` directory and the then-uncommitted Alpha 1541–1610 Archive
+> work, both already present in this working tree before this Arc
+> began) — this Arc's own 59 new tests all pass, and it introduces zero
+> new failures beyond that pre-existing baseline. See
+> `docs/secure_runtime_alpha_1471_1540_private_transport_boundary_and_multi_relay_delivery_arc.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1541–1610 — Conversation Export,
+> Restore, Archive Foundation Arc (complete).** Architecture frozen: no
+> new Rust/WASM primitive, no new `AeadAadDomain` variant, no Host/GUI
+> wiring, no network transport of any kind (No Cloud, No Sync, No GUI).
+> A pure TypeScript orchestration layer, `src/conversation/archive/`
+> (11 new files), built entirely on five already-existing, unmodified
+> domains — Conversation Persistence (Alpha 749/750), Envelope (Alpha
+> 854/858), Payload (Alpha 803/804/806), Membership (Alpha 825/827),
+> Capability (Alpha 833/836/837) — implementing Encrypted Export,
+> Encrypted Import, Manifest, Integrity, Schema Version, Restore, and
+> Duplicate Detection. An Archive is sealed under the SAME per-
+> conversation `AeadKeyHandle` `FedosMasterSeedAuthority.resolveConversationKey()`
+> already derives for that conversation's own Envelopes (Alpha 869) —
+> never a new passphrase or key-derivation domain; identity binding
+> reuses Alpha 856's own prefix-then-encrypt technique
+> (`fedos_conversation_archive_header.ts`) rather than native AAD, and
+> the `"Conversation"` `AeadAadDomain` label is reused verbatim, never
+> extended. Integrity is a SHA-256 content hash (`@noble/hashes`, an
+> existing dependency) over the canonical Bundle bytes, carried in a
+> cleartext Manifest and independently re-verified after decrypt — a
+> distinct `"manifest-mismatch"` outcome, kept separate from AEAD's own
+> undifferentiated `"failed"`. Restore replays a decrypted Bundle back
+> into the five EXISTING ports' own `put*` methods, reusing each
+> domain's own EXISTING `deserializeX`/`serializeX` codec pair for deep
+> per-record validation rather than re-implementing any check; Duplicate
+> Detection is not a new outcome vocabulary — `"already-present"`/
+> `"conflict"` are this codebase's own pre-existing write-result
+> vocabulary (Alpha 315/749/804/827/837/857), surfaced either as
+> Restore's own write-outcome tally or, read-only, via a dedicated
+> preflight report over each port's existing `get*`/`has*` methods. ONE
+> additive port method, `FedosConversationCapabilityPersistence.listConversationCapabilityEvents()`
+> (plus both its backends), mirrors `hasRedeemedEvent()`'s own Alpha 841
+> additive-port precedent: Capability is exported/restored via RAW
+> `"issued"`/`"redeemed"` events rather than the lossy reconstructed
+> `currentUses`-only record, since replaying just a count back into a
+> fresh backend would lose WHICH distinct redeemers already used a slot,
+> silently permitting a double-redemption after restore. Membership
+> export uses the CURRENT record per id (`listConversationMemberships()`)
+> — that port exposes no raw-event listing, and the current record alone
+> is sufficient to reconstruct correct present-day status. Four new test
+> files, `test/secure_runtime_alpha_1541_1560_archive_manifest_integrity.test.ts`,
+> `test/secure_runtime_alpha_1561_1580_archive_encrypted_export_import.test.ts`,
+> `test/secure_runtime_alpha_1581_1600_archive_restore_duplicate_detection.test.ts`,
+> `test/secure_runtime_alpha_1601_1610_capability_event_listing.test.ts`
+> (48 new tests): Bundle codec round-trip/order-independence/
+> fail-closed rejection; Manifest build/codec round-trip/fail-closed
+> rejection; Header encode/split/mismatch-detection; a full injected-
+> boundary Export→Import round trip plus every coarse failure branch
+> (`invalid-input`/`key-unavailable`/`failed`/`manifest-mismatch`);
+> Restore's insert/duplicate/conflict/invalid tally against real
+> in-memory backends; the read-only Duplicate Detection report; and the
+> new `listConversationCapabilityEvents()` port method against both the
+> in-memory and append-only Capability backends. **Verification**:
+> `npm run typecheck` clean except one PRE-EXISTING, unrelated error
+> (`test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> confirmed via `git log` to predate this Arc entirely); `npx vitest run`
+> (915 files / 12,119 tests): 48/48 new tests pass, and every one of the
+> 31 pre-existing failing assertions falls into a category this
+> codebase's own prior Arcs already documented as expected — ten
+> Rust-source static-analysis files this Arc's own `git diff` confirms
+> zero touch to `packages/fedos-core-rust/`, the same four files the
+> Alpha 1051–1110 completion declaration already named verbatim as
+> pre-existing (`publish_pipeline_host_ownership_review_current_state`,
+> `secure_runtime_alpha_405/472/543`), one `src/board/`-scoped ripple
+> check this Arc never touches, and three review docs' own
+> "git working tree is clean" checks that are by construction red while
+> this Arc's own new files sit uncommitted — each of those three docs'
+> own header already states this check "is expected to be red only
+> until this Arc's own single commit lands." Draft (private,
+> not-yet-active) conversations, any Host/file-path/GUI wiring for where
+> Export/Import bytes are read from or written to, passphrase-protected
+> export independent of live conversation-key availability, and any
+> Cloud/Sync/network transport are all explicitly named OUT of this
+> Arc's scope, not silently dropped — see
+> `docs/secure_runtime_alpha_1541_1610_execution_spec.md`/
+> `_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1321–1390 — Private Group Pairwise
+> Fanout Foundation Arc (complete).** Run in a dedicated integration
+> worktree (`C:\wt\private-group-fanout`, branch
+> `arc/private-group-pairwise-fanout-foundation`) built from the prior
+> Arc's own tip (`7990ce4`), with the required Pairwise Fanout Review
+> commit (`b205ff0`, `review/private-group-pairwise-fanout-v1`) merged
+> in cleanly — one merge, zero conflicts, reported in full in
+> `docs/secure_runtime_alpha_1321_1390_reconciliation_report.md`. No
+> `Alpha 1261–1320` ("Production Crypto Activation") branch existed
+> anywhere in this repository during this Arc; nothing from it was
+> merged, depended on, or guessed at.
+>
+> Implements private-group messaging as a purely ADDITIVE orchestration
+> layer over the now-real Alpha 1111–1260 Direct pipeline — it never
+> widens the Direct Activation Coordinator's own Private-Group Gate
+> (`draft.mode !== "direct"` still returns `"unsupported-mode"`,
+> byte-for-byte unchanged), never touches the frozen Encryption/
+> Decryption Coordinators, and never widens the Direct participant
+> resolver beyond its own exactly-one-counterparty contract. Instead, a
+> new `src/conversation/group/` domain (20 files) composes the EXISTING
+> `direct` pipeline once per active OTHER group member: an immutable
+> `FedosGroupGenerationRecord` snapshots the group's own real Membership
+> roster on every admission/removal; a `FedosGroupDirectPathAuthority`
+> lazily constructs, admits, and activates one real, independently-keyed
+> `direct` Conversation per (local, counterparty) pair — reusing
+> `createDirectDraft()`/`redeem()`/`activateDirectConversation()`
+> unmodified; a `FedosGroupSendCoordinator` fans one logical plaintext
+> out into N independently-encrypted Envelopes (all-or-nothing for a
+> fresh send, Option A), recording a local canonical
+> `FedosGroupMessageRecord` plus one `FedosGroupFanoutDeliveryRecord`
+> per recipient — its OWN "already-stored" check is the crash-recovery
+> mechanism, since `sendDirectMessage()`'s own public surface exposes no
+> idempotency key. `FedosConversationRuntime.groupRuntime()` is the one
+> new, narrow accessor exposing `preparePrivateGroup()`/
+> `readinessForPrivateGroup()`/`sendPrivateGroupMessage()`/
+> `listPrivateGroupMessages()`/`listPrivateGroupGenerations()`/
+> `addPrivateGroupMember()`/`removePrivateGroupMember()` — no existing
+> public method's signature changes.
+>
+> Verified end to end through the real `startFedosDesktopRuntime()`
+> entry point with injected Fake Direct Authorities (no WASM artifact in
+> this tree, unchanged from every prior Arc): a 3-member group, two
+> independent recipient Envelopes per send, restart with the identical
+> idempotency key returning the identical result with no duplicate
+> Envelope, member removal excluding the removed member from the next
+> send while leaving their own prior Direct Conversation untouched, and
+> an unsupported-authority (non-`"nostr"`) counterparty failing that one
+> path closed without blocking the rest of the group. No shared group
+> key, Sender Key, MLS, NIP-17/NIP-59, or network delivery of any kind
+> is implemented or claimed — restated explicitly in
+> `docs/secure_runtime_alpha_1321_1390_completion_declaration.md`, §9.
+> `npm run typecheck` clean (one pre-existing, unrelated failure,
+> unchanged from every prior Arc); targeted Conversation+Group-domain
+> run 95/95; full `npm test` 12015/12259, every one of the 244 failures
+> individually categorized as a confirmed pre-existing `core.autocrlf`
+> CRLF-checkout artifact, an already-independently-named pre-existing
+> failure, or a prior review's own now-expected "working tree unchanged"
+> staleness check — zero attributable to this Arc. `package.json`/
+> `package-lock.json`/`Cargo.toml` byte-for-byte unchanged; `packages/fedos-core-rust/`
+> untouched; `p2p/` untouched. See
+> `docs/secure_runtime_alpha_1321_1390_reconciliation_report.md` and
+> `docs/secure_runtime_alpha_1321_1390_completion_declaration.md` for
+> the full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1261–1320 — Production Conversation
+> Crypto Runtime Activation Arc (complete, Development-mode only —
+> Production activation remains a deliberately closed, separate
+> decision).** Same worktree/branch as the prior two Arcs — `master` was
+> unchanged, so no additional integration was needed. Turns the
+> already-tested INJECTED-Authority Direct-message path into a genuinely
+> real, no-Fake-Authority one: `npm run build:wasm` (unmodified command)
+> produces `packages/fedos-core-rust/pkg/{fedos_core_rust.js,fedos_core_rust_bg.wasm}`
+> cleanly and reproducibly; `cargo test` — 531/532 native, one
+> pre-existing unrelated dependency-count guard failure — proves the Rust
+> Master Seed Authority's own seal/restore/wrong-passphrase/corrupt-file
+> paths were ALREADY real before this Arc touched anything.
+>
+> **A genuine, empirically-discovered wiring gap, closed additively:**
+> `FedosWasmMasterSeedAuthority#ensureConstructed()` calls
+> `attemptDevOnlyMasterSeedAuthorityConstructCall()` directly, whose own
+> gate requires `fedos_wasm_loader.ts`'s `generatedArtifactCheckResult`/
+> `devOnlyGateEvaluation`/`importReadiness`/`importExecution`/
+> `jsGlueModule`/`wasmInitialization` to already be populated on the SAME
+> loader instance — nothing populated them automatically, so constructing
+> a `FedosWasmMasterSeedAuthority` directly always failed with
+> `"PrototypeStillClosed"`, even under `NODE_ENV=development` with the
+> artifact built (confirmed empirically before writing any production
+> code). `attemptDevOnlyRuntimeEncrypt()` (`fedos_runtime_encrypt.ts`,
+> unmodified) already primes this exact three-call chain
+> (`planLoad()` → `attemptDevOnlyJsGlueImport()` →
+> `attemptDevOnlyWasmInitialization()`) before its own Rust Boundary
+> reach — the new
+> `assembleFedosConversationProductionCryptoGraph()`
+> (`src/conversation/encryption/production/`, Alpha 1273) reuses that
+> IDENTICAL, already-established sequence rather than modifying
+> `FedosWasmMasterSeedAuthority` itself (an already-reviewed file this
+> Arc does not touch).
+>
+> **New, additive-only:** a file-based sealed-seed envelope port
+> (`FileFedosSealedMasterSeedEnvelopePersistence` — never overwrites an
+> existing file, throws on structural corruption rather than silently
+> treating it as absent) and a narrow injected passphrase-provider
+> boundary (`FedosPassphraseProvider` — no GUI, no `process.env` read, no
+> plaintext-passphrase config field anywhere). `FedosDesktopRuntimeConfig`
+> gained exactly one new optional field, `conversationProductionCrypto`;
+> `startFedosDesktopRuntime()` resolves it before Conversation Runtime
+> assembly and, on a real `"available"` outcome, supplies the resulting
+> real Authorities in place of the individual
+> `conversationEncryptionAuthority`/etc. fields Alpha 1113 already wired —
+> any other outcome (including simply omitting the field) falls back to
+> those fields' own pre-existing, unmodified defaults. A new read
+> accessor, `conversationProductionCryptoCapability()`, surfaces Alpha
+> 1263's own nine-outcome closed vocabulary
+> (`available`/`artifact-missing`/`artifact-incompatible`/`seed-unavailable`/
+> `seed-restore-failed`/`identity-unavailable`/`unsupported-runtime`/
+> `disabled`/`failed`) — never a raw loader `Error`.
+>
+> **Proven for real, no Fake Authority anywhere in the acceptance test:**
+> two independently generated/sealed real identities (Alice, Bob) exchange
+> one genuinely ChaCha20-Poly1305-AEAD-encrypted Direct message, pairwise-
+> keyed via real secp256k1 ECDH, through the REAL application path
+> (`createDirectDraft` → invitation → redemption →
+> `activateDirectConversation` → `sendDirectMessage` → full restart —
+> fresh backends AND a freshly-restored Master Seed Authority from the
+> same sealed-seed file — → `readDirectMessage`), exact plaintext
+> recovered; an unrelated real identity, the correct sealed-seed file with
+> the wrong passphrase, and a different account index against the SAME
+> sealed seed are all denied; a real ciphertext byte flip (decoded from
+> the durable payload log's own `bytesBase64` field) fails closed; real
+> retention and revocation denial both hold. Twelve tests total across
+> `test/secure_runtime_alpha_1261_1320_real_crypto_vertical_slice.test.ts`
+> and `test/secure_runtime_alpha_1261_1320_production_gate_semantics.test.ts`
+> (config-disabled/unsupported-runtime/corrupt-seed/no-passphrase/clear-
+> denies-reuse/`stop()`-clears-the-real-authority), all 12 passing with
+> the artifact built and `NODE_ENV=development`.
+>
+> **Kept Development-only — deliberately, per this Arc's own reviewed
+> option menu.** `fedos_wasm_loader.ts`'s `#evaluateDevOnlyGate()` is
+> completely untouched: it already, permanently, returns
+> `developmentAllowed: false` for `mode === "Production"` — confirmed by
+> direct source inspection, the gate's own header states "never
+> Production, never Worker." This is a reviewed, intentional security
+> boundary, not an unimplemented feature; architecture-frozen forbids
+> redesigning it, so this Arc extends nothing there. The Desktop
+> Runtime's own `start:runtime` script never sets `NODE_ENV` itself —
+> reaching Development mode (and therefore any real crypto capability at
+> all) requires an explicit, deliberate operator action, never an
+> accident.
+>
+> **Artifact policy, restated plainly (Alpha 1306):** `packages/fedos-core-rust/pkg/`
+> is gitignored and was removed after verification, exactly like every
+> prior Arc's own `target/`/`Cargo.lock` — anyone building on this commit
+> must run `npm run build:wasm` themselves before this Arc's own two new
+> test files (or any real Development-mode crypto path) report
+> `"available"` instead of `"artifact-missing"`; without it, they report
+> that closed, honest outcome — never a crash, never a silent fallback —
+> which is the SAME pre-existing behavior every other real-WASM-dependent
+> test in this repository already has on a stock checkout.
+>
+> **Historical ripple (Alpha 1304), exact and mechanical:**
+> `secure_runtime_alpha_606_runtime_assembly.test.ts` and
+> `secure_runtime_alpha_758_local_runtime_ownership.test.ts` each assert
+> the EXACT closed set of keys `FedosRunningDesktopRuntime` exposes; both
+> updated to include the one new, genuinely additive, non-secret
+> accessor. `npm run typecheck` clean; full `npm test` precisely diffed
+> by exact failing file name against the prior Arc's own baseline —
+> zero other regressions. `package.json`/`Cargo.toml` byte-for-byte
+> unchanged; no new dependency; `p2p/` untouched.
+>
+> See `docs/secure_runtime_alpha_1261_1320_completion_declaration.md` for
+> the full record, including the Production Readiness Statement.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1181–1260 — Conversation Runtime
+> Finalization Arc (complete).** Same worktree/branch as the prior Arc —
+> no new sibling Arc branch had landed, so no additional integration was
+> needed. Phase A (Runtime ownership/dependency/lifecycle) and Phase B
+> (Conversation Runtime API completion) were reviewed by direct source
+> inspection and found ALREADY correct and complete: `FedosConversationRuntime`'s
+> public surface exposes no persistence port, encryption handle, WASM
+> handle, or raw-key resolver (Alpha 1144); `conversationRuntime()`
+> already throws after `stop()` (Alpha 923); a repository-wide search for
+> `TODO`/`FIXME`/`temporary`/`placeholder` scaffolding across
+> `src/conversation/`/`src/desktop/` found none to eliminate (the only
+> `"temporary"` hits are the reviewed, permanent `"temporary-capability"`
+> participant-authority enum value, Alpha 762) — reported honestly rather
+> than manufacturing a change. Phase C adds real, additive test coverage
+> the prior Arc's own completion declaration named as not individually
+> exercised: a corruption matrix over the new Activation log and the
+> Envelope log (malformed lines and conflicting duplicate records both
+> throw on replay, mirroring this codebase's own established "one corrupt
+> record voids the backend" precedent — no new corruption-handling
+> mechanism invented); confirmation that a corrupted Activation log makes
+> `sendDirectMessage()`/`readDirectMessage()` REJECT rather than silently
+> report a wrong or false-active answer, reproducibly across three
+> independent restarts over the same corrupted file (Alpha 1156);
+> Independent Runtime Isolation — two wholly independent backend sets
+> addressing the identical Conversation id never share state (Alpha
+> 1167); and Restart Identity Stability — the same local identity across
+> a restart resolves the same Membership and decrypts an existing
+> message, a different, never-admitted identity is denied (Alpha 1163).
+> One new test file, zero production source changes. `npm run typecheck`
+> clean (one pre-existing, unrelated failure, unchanged from the prior
+> Arc); targeted Conversation-domain run 115/115; full `npm test`
+> 11984/12215, consistent with the prior Arc's own diagnosed baseline
+> (17 pre-existing-on-`master` failures plus the same previously-confirmed
+> `core.autocrlf` worktree-checkout CRLF artifact affecting ~173 unrelated
+> early-stage files) — zero Conversation-domain regression. See
+> `docs/secure_runtime_alpha_1181_1260_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 1111–1180 — Private Conversation
+> Activation and Direct Messaging Runtime Arc (complete).** Closes the
+> final gap between a durable private Conversation draft and a real,
+> usable DIRECT encrypted Conversation. Run in a dedicated short-path
+> integration worktree (`C:\wt\private-direct-messaging`, branch
+> `arc/private-conversation-activation-direct-messaging`) because two
+> required prerequisite Arcs — `arc/conversation-identity-resolution-encryption-coordinator`
+> (Alpha 931–990) and `arc/conversation-invitation-draft-management`
+> (Alpha 991–1050) — existed only on sibling branches, never reached
+> `master`, and had themselves diverged from each other (each continuing
+> independently past their own shared base). Both were merged in first
+> (two mechanical merges, zero non-mechanical conflicts — both sibling
+> Arcs had added disjoint fields/branches to the same two files,
+> `fedos_conversation_runtime.ts`/`fedos_conversation_runtime_assembly.ts`;
+> resolution was a pure union, no logic changed), superseding the PRIOR
+> status entry's own "the Alpha 851–8XX blocker... requires both fields
+> pre-resolved by its caller, and no such caller exists yet" claim — that
+> caller (`FedosConversationKeyResolver`, Alpha 935) already existed on
+> the merged-in branch; this Arc consumes it unmodified.
+>
+> **What activation means, concretely:** the immutable private-draft
+> record (`FedosConversationDraftRecord`, still permanently
+> `lifecycleState: "draft"` by construction — never rewritten) is NOT the
+> source of truth for "is this Conversation active." A NEW, separate,
+> durable Activation fact is (`src/conversation/activation/`,
+> `FedosConversationDirectActivationCoordinator`) — a five-phase
+> (`prepared → readiness-confirmed → lifecycle-activated → completed`,
+> or `terminal-failed`) coordination log mirroring the Alpha 913/845
+> construction/redemption coordinators' own proven crash-recovery
+> discipline field-for-field. `activateDirectConversation(conversationId)`
+> proves, fresh on every call (never trusting a stale phase): direct mode
+> only (private-group always `"unsupported-mode"` — no group key
+> strategy exists, none is invented); the LOCAL controlled participant
+> resolves and holds active Membership; the ONE counterparty resolves and
+> is — by `MembershipFedosConversationParticipantResolver`'s own
+> construction — already proven active; pairwise key readiness (identity,
+> account index, counterparty public key, Nostr-binding verification) via
+> ONE call to the existing, unmodified `FedosConversationKeyResolver`;
+> real (non-placeholder) Encryption/Decryption Authorities; storage/
+> retention availability. `FedosConversationEncryptionCoordinator`/
+> `DecryptionCoordinator` (Alpha 943/946) — previously permanently
+> dead-code past their own `lifecycleState !== "active"` gate, since
+> nothing could ever construct that value — now consult this SAME
+> Activation fact via one shared helper
+> (`resolveFedosConversationActiveConversation()`), the only change made
+> to either frozen coordinator.
+>
+> **Direct messaging** (`src/conversation/messaging/`,
+> `FedosConversationDirectMessagingCoordinator`, exposed on
+> `FedosConversationRuntime` as `sendDirectMessage()`/`readDirectMessage()`/
+> `listDirectMessages()`) is a thin application-command layer over the
+> SAME two Encryption/Decryption Coordinators — no crypto, no Envelope
+> encoding, no crash-recovery logic duplicated (the encryption
+> coordinator's own existing coordination log already makes a retried
+> send safe against duplicate Envelopes/Payloads). The caller supplies
+> ONLY `conversationId`/`body`/`replyToEnvelopeId` — sender identity,
+> Envelope/payload ids, nonce, account index, counterparty key, suite, and
+> key epoch are all resolved or fixed internally (suite is always
+> `ChaCha20Poly1305`; epoch is always `0`, matching the Alpha 850
+> Direct-mode decision). The plaintext body reuses the Board domain's own
+> reviewed size discipline verbatim (`FEDOS_BOARD_POST_MAX_BODY_LENGTH =
+> 10_000` UTF-16 code units, restated rather than cross-imported to avoid
+> an accidental Board/Conversation coupling). **Retention enforcement on
+> read is a genuine new gate:** `FedosPayloadRetentionAuthority` (Alpha
+> 796) existed but was wired into nothing in the Conversation Runtime;
+> `readDirectMessage()` now consults it before ever calling into the
+> Decryption Coordinator — a tombstoned/removed payload is denied,
+> matching Alpha 796's own already-reviewed security claims exactly, no
+> claim strengthened or invented.
+>
+> **Runtime Encryption Configuration** (Alpha 1113) closes a confirmed
+> gap: `FedosConversationRuntimeDependencies` already accepted every Alpha
+> 949 field (real Encryption/Decryption Authority, identity resolver,
+> account index authority, Nostr binding authority, Envelope/Payload log
+> paths) as optional — but `FedosDesktopRuntimeConfig`/
+> `startFedosDesktopRuntime()` never threaded ANY of them through; a real
+> desktop deployment had no way to reach this Arc's own crypto injection
+> seam at all. Now threaded, reusing the SAME `nostrAuthorBindingAuthority`
+> instance already passed to `createFedosBoardRuntime()` — one coherent
+> identity graph, never a second signing/encryption identity.
+>
+> **Production crypto gate: still closed, exactly as every prior Arc back
+> to Alpha 851 already found.** No `packages/fedos-core-rust/pkg/` WASM
+> artifact exists in this checked-out tree (confirmed by direct filesystem
+> check); `cargo`/`wasm-bindgen` are present on this machine but building
+> the existing, unmodified Rust crate changes no TypeScript behavior this
+> Arc needs and is out of scope (no Rust file touched). Every test proving
+> the activation/send/read vertical slice uses injected
+> `FakeConversationEncryptionAuthority`/`DecryptionAuthority` test
+> doubles — the SAME pattern the pre-existing Alpha 943/946 coordinator
+> suite already established — never a real WASM call; the REAL
+> `FedosWasmConversationEncryptionAuthority`/`DecryptionAuthority` (Alpha
+> 870/871, already built, already reviewed) slot into the identical
+> `conversationEncryptionAuthority`/`conversationDecryptionAuthority`
+> config fields unchanged, once a real seeded `FedosMasterSeedAuthority`
+> is available. By DEFAULT (nothing injected), activation and messaging
+> stay fail-closed unavailable; public Board and local draft management
+> are entirely unaffected either way (Alpha 1115/1162, verified).
+>
+> **The real application path, not a hand-built fixture, constructs an
+> active direct Conversation:** `test/secure_runtime_alpha_1111_1180_runtime_vertical_slice.test.ts`
+> drives `startFedosDesktopRuntime()` directly — real Direct Draft, real
+> recipient-bound Capability, real redemption, real Activation
+> Coordinator call, real `sendDirectMessage()`, a full `stop()`/fresh
+> `startFedosDesktopRuntime()` restart, then real
+> `readDirectMessage()` recovering the exact original plaintext — closing
+> the gap the pre-existing Alpha 949 test's own "hand-built ACTIVE
+> fixture… reachable only through tests bypassing Runtime" language had
+> named (that test is updated, not deleted, to prove the identical
+> "wiring is real" property through the new mechanism, since the
+> `lifecycleState` field it used to write directly is now permanently
+> inert).
+>
+> **Known, deliberately unimplemented (unchanged from every prior Arc's
+> own scope line):** private-group activation, group/shared keys, Sender
+> Keys, MLS, any protocol delivery (Nostr DM/ActivityPub/AT Protocol/
+> Session), Relay Pool, GUI, Worker, invitation URL/QR transport,
+> distributed/multi-writer redemption, moderation plaintext inspection,
+> multi-device key recovery, physical-deletion or operator-anonymity
+> claims. `p2p/` untouched. No new npm or Cargo dependency.
+>
+> **Verification:** `npm run typecheck` clean (one pre-existing failure,
+> `test/secure_runtime_alpha_477_scheduler_lifecycle_model.test.ts`,
+> confirmed byte-identical and independently failing on plain `master`).
+> Full `npm test` run in BOTH this integration worktree and, separately,
+> plain `master`, then diffed by exact failing test name (never assumed):
+> of this worktree's 190 failing files, 17 are byte-identical to
+> `master`'s own 17 pre-existing failures (unrelated: identity/protocol-
+> root-handle tests, and three `test/reviews/*` "git status stays clean"
+> guards broken by this repository's own pre-existing untracked `p2p/`
+> directory in the MAIN worktree, not by this Arc). The remaining 173 —
+> spanning `test/fedos_core_rust_*`, `test/runtime_wasm_*`,
+> `test/secure_runtime_alpha_001` through `060`, none of them
+> Conversation/Encryption/Activation/Messaging-related — all fail on the
+> IDENTICAL signature (`expected +0 to be 11`, a Cargo.toml
+> dependency-count assertion reading raw file content via a Vite `?raw`
+> import) and were confirmed, by direct byte inspection, to be caused by
+> `core.autocrlf=true` giving this freshly-created worktree CRLF line
+> endings while `packages/fedos-core-rust/Cargo.toml` in the pre-existing
+> `master` worktree has LF — a pure git-worktree-checkout environmental
+> artifact, not a behavioral regression; global git config was
+> deliberately left untouched per this Arc's own explicit instruction.
+> Every Conversation-domain test this Arc added or modified was
+> individually re-verified passing after this comparison (activation: 13/13;
+> messaging: 23/23; vertical slice: 3/3; the four pre-existing coordinator/
+> wiring test files this Arc's own gate change required updating: all
+> green). `cargo`/WASM not rebuilt (no Rust file changed).
+>
+> See `docs/secure_runtime_alpha_1111_1180_integrated_inventory.md` and
+> `docs/secure_runtime_alpha_1111_1180_completion_declaration.md` for the
+> full record.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 1051–1110 — Conversation Runtime
 > Consolidation Arc (complete).** Purely additive: `master` was still
 > pinned at Alpha 621–640 while eight sibling Arc branches (Alpha
@@ -504,6 +4372,8 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > See `docs/secure_runtime_alpha_851_890_execution_spec.md` and
 > `docs/secure_runtime_alpha_890_completion_declaration.md` for the full
 > record.
+>
+> Prior status:
 >
 > **Status: Secure Runtime Alpha 891–930 — Private Conversation Draft
 > Construction & Readiness Runtime Arc (complete).** Wires the

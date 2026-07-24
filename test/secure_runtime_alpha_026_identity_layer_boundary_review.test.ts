@@ -222,8 +222,7 @@ describe("Secure Runtime Alpha 026 -- Identity Layer / Secure Runtime Boundary R
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
+    expect(pubFnNames.length).toBe(69);    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
     expect(libRsSource).not.toMatch(/secure_runtime_alpha_026/);
 
     const cargoCode = cargoTomlSource

@@ -41,14 +41,34 @@ import type { FedosPersistedConversationMembershipV1 } from "../membership/persi
 import type { FedosPersistedConversationCapabilityEventV1 } from "../capability/persistence/fedos_persisted_conversation_capability_v1.js";
 import type { FedosPersistedConversationMessageEnvelopeV1 } from "../envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
 import type { FedosPersistedConversationPayloadV1 } from "../payload_storage/fedos_persisted_conversation_payload_v1.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
+import type { FedosConversationArchiveSubject } from "./fedos_conversation_archive_direct_subject.js";
 
 export interface FedosConversationArchiveBundleV1 {
   readonly schemaVersion: FedosConversationArchiveSchemaVersion;
   readonly conversationId: string;
   readonly exportedAt: number;
-  readonly conversation: FedosPersistedConversationRecordV1;
+  /**
+   * Secure Runtime Alpha 7801-7880 — widened from the bare
+   * `FedosPersistedConversationRecordV1` (Board-only) to
+   * `FedosConversationArchiveSubject`, additively: a bare object (no
+   * `kind` field) is still read as exactly the pre-existing Board shape,
+   * byte-for-byte unchanged for every Archive this codebase produced
+   * before this Arc; an object with `kind: "direct"` is the new Direct
+   * Conversation subject. See `./fedos_conversation_archive_direct_subject.ts`.
+   */
+  readonly conversation: FedosConversationArchiveSubject;
   readonly memberships: readonly FedosPersistedConversationMembershipV1[];
   readonly capabilityEvents: readonly FedosPersistedConversationCapabilityEventV1[];
   readonly envelopes: readonly FedosPersistedConversationMessageEnvelopeV1[];
   readonly payloads: readonly FedosPersistedConversationPayloadV1[];
+  /**
+   * Secure Runtime Alpha 1921–1980 — OPTIONAL, additive. Present iff
+   * `conversationId` is a `private-group` Conversation AND the Collector
+   * was given the Group persistence ports it needs to populate it.
+   * Absent, this bundle is a Direct-only bundle, byte-for-byte identical
+   * in shape to every Archive this codebase produced before this Arc —
+   * see `./fedos_conversation_archive_group_section.ts`'s own header.
+   */
+  readonly group?: FedosConversationArchiveGroupSectionV1;
 }

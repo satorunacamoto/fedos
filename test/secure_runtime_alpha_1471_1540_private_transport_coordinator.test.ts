@@ -16,6 +16,7 @@ import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
 import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
 import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationMembership } from "../src/conversation/membership/fedos_conversation_membership.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
 
 const LOCAL_PUBKEY = "a".repeat(64);
 const COUNTERPARTY_PUBKEY = "b".repeat(64);
@@ -152,7 +153,8 @@ describe("Secure Runtime Alpha 1471-1540 -- FedosPrivateTransport Coordinator", 
       expect(entries).toHaveLength(1);
       expect(entries[0]!.result).toEqual({ outcome: "delivered", retryPolicy: "never" });
       expect(relay.published).toHaveLength(1);
-      expect(relay.published[0]!.kind).toBe(1);
+      // Alpha 1615 (Alpha 1611-1690 Kind-1 Closure) -- never kind 1 for private ciphertext.
+      expect(relay.published[0]!.kind).toBe(FEDOS_PRIVATE_NOSTR_DELIVERY_KIND);
     } finally {
       await transport.stop();
     }
@@ -207,5 +209,44 @@ describe("Secure Runtime Alpha 1471-1540 -- FedosPrivateTransport Coordinator", 
     await transport.start();
     expect(transport.isRunning()).toBe(true);
     await transport.stop();
+  });
+
+  it("6. (Secure Runtime Alpha 1761-1840 Phase G) an optional injected wireAdapter is retrievable via wireAdapter() -- narrow constructor-injection only, no internal dispatch rewiring in this Arc", () => {
+    const relay = new ManualRelay("wss://relay.example");
+    const envelopePersistence = new InMemoryFedosConversationMessageEnvelopePersistence();
+    const payloadStorage = new InMemoryFedosConversationPayloadStorage();
+    const fakeAdapter = {
+      route: "nostr-nip17-v1" as const,
+      isAvailable: () => true,
+      build: async () => ({ outcome: "unsupported" as const }),
+      parse: async () => ({ outcome: "unsupported" as const }),
+    };
+
+    const withAdapter = new FedosPrivateTransport({
+      relaySet: new FedosConversationRelaySet([relay]),
+      signingAuthority: fakeSigningAuthority(),
+      localAccountIndex: 0,
+      envelopePersistence,
+      payloadStorage,
+      membershipsForConversation: () => [],
+      outboxPersistence: new InMemoryFedosConversationTransportOutboxPersistence(),
+      observationRepository: new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence()),
+      intervalMs: 1000,
+      wireAdapter: fakeAdapter,
+    });
+    expect(withAdapter.wireAdapter()).toBe(fakeAdapter);
+
+    const withoutAdapter = new FedosPrivateTransport({
+      relaySet: new FedosConversationRelaySet([relay]),
+      signingAuthority: fakeSigningAuthority(),
+      localAccountIndex: 0,
+      envelopePersistence,
+      payloadStorage,
+      membershipsForConversation: () => [],
+      outboxPersistence: new InMemoryFedosConversationTransportOutboxPersistence(),
+      observationRepository: new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence()),
+      intervalMs: 1000,
+    });
+    expect(withoutAdapter.wireAdapter()).toBeUndefined();
   });
 });

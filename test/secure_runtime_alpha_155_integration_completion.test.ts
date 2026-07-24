@@ -90,10 +90,9 @@ describe("Secure Runtime Alpha 155 -- Integration Completion", () => {
 
   it("7. structural: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36 across the whole Arc", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
-  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("8. structural: SecretHandleKind gained exactly one new variant across the whole Arc -- ProtocolRootMaterial", () => {
     const enumBody = (libRsSource.match(/pub\(crate\) enum SecretHandleKind \{([\s\S]*?)\n {4}\}/) ?? [])[1] ?? "";
@@ -111,6 +110,9 @@ describe("Secure Runtime Alpha 155 -- Integration Completion", () => {
       "ApplicationRootMaterial",
       "ProtocolRootMaterial",
       "TestOnlySecretMaterial",
+      "DirectRatchetRootKeyMaterial",
+      "DirectRatchetChainKeyMaterial",
+      "DirectRatchetPrivateKeyMaterial",
     ]);
   });
 
@@ -127,6 +129,7 @@ describe("Secure Runtime Alpha 155 -- Integration Completion", () => {
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
   });

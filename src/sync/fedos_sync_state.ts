@@ -50,6 +50,7 @@ import {
   isFedosSyncRecoverySnapshotConsistent,
   type FedosSyncRecoverySnapshotV1,
 } from "./fedos_sync_recovery.js";
+import type { FedosSyncJournalPersistence } from "./persistence/fedos_sync_journal_persistence.js";
 
 export interface FedosSyncArchiveAwareness {
   isConversationArchived(conversationId: string): boolean;
@@ -57,6 +58,15 @@ export interface FedosSyncArchiveAwareness {
 
 export interface FedosSyncStateDependencies {
   readonly archiveAwareness?: FedosSyncArchiveAwareness;
+  /**
+   * Secure Runtime Alpha 4581–4660 (Phase F) — OPTIONAL durable backend for
+   * this account's own Sync Journal. Omitted (every pre-existing call
+   * site), `FedosSyncJournal` is constructed exactly as before this Arc — a
+   * pure in-memory ledger. Supplying one hydrates the Journal from durable
+   * storage at construction and write-through's every successful
+   * `recordLocalChange()` — see `./fedos_sync_journal.ts`'s own header.
+   */
+  readonly journalPersistence?: FedosSyncJournalPersistence;
 }
 
 export type FedosSyncApplyOutcome = "applied" | "duplicate" | "conflict" | "archived-skip";
@@ -81,7 +91,7 @@ export class FedosSyncState {
   readonly accountRef: string;
   readonly #archiveAwareness: FedosSyncArchiveAwareness | undefined;
   readonly #registry = new FedosSyncDeviceRegistry();
-  readonly #journal = new FedosSyncJournal();
+  readonly #journal: FedosSyncJournal;
   readonly #cursors = new FedosSyncCursorStore();
   readonly #pendingByDevice = new Map<string, FedosSyncPendingChangeQueue>();
   readonly #outbound = new FedosSyncOutboundQueue();
@@ -91,6 +101,10 @@ export class FedosSyncState {
   constructor(accountRef: string, deps: FedosSyncStateDependencies = {}) {
     this.accountRef = accountRef;
     this.#archiveAwareness = deps.archiveAwareness;
+    // Alpha 4581-4660 (Phase F) -- `deps.journalPersistence` omitted, this is
+    // BYTE-FOR-BYTE the same `new FedosSyncJournal()` every pre-existing call
+    // site already constructed.
+    this.#journal = new FedosSyncJournal(deps.journalPersistence);
   }
 
   registerDevice(deviceRef: string, at: number): FedosSyncDeviceRegistryOutcome {

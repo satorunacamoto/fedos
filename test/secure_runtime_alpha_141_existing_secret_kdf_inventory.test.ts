@@ -83,7 +83,7 @@ describe("Secure Runtime Alpha 141 -- Existing Secret / KDF Inventory", () => {
 
   it("8. RIPPLE (Secure Runtime Alpha 146): exactly 13 #[wasm_bindgen] annotations existed AS OF this Stage's own scope, matching the doc's own count, and none was a key-derivation function; a LATER Arc (Alpha 146-150) legitimately added Rust doc comments that mention the literal string `#[wasm_bindgen]` in prose (never as a real annotation), so this count is now measured with a line-anchored regex -- the real annotation count remains 13, and still no key-derivation function is wasm_bindgen-exported, reconfirmed here as the CURRENT state", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
     expect(libRsSource).not.toMatch(/^#\[wasm_bindgen\]\s*\n\s*(?:pub\s+)?fn derive/m);
   });
 

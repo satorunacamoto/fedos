@@ -237,7 +237,7 @@ describe("Secure Runtime Alpha 2341-2420 -- importFedosConversationArchiveCliPac
     expect(result.outcome).toBe("decrypted");
     if (result.outcome !== "decrypted") throw new Error("unreachable");
     expect(result.result.conversation).toBe("inserted");
-    expect(result.result.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(result.result.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(targetDeps.conversationPersistence.getConversation(CONVERSATION_ID)).not.toBeNull();
   });
 

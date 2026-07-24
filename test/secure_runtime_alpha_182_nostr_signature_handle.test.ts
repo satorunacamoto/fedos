@@ -88,7 +88,7 @@ describe("Secure Runtime Alpha 182 -- FedosNostrSignatureHandle", () => {
 
   it("9. structural: no #[wasm_bindgen] attribute is attached to FedosNostrSignatureHandle, count fixed at 13", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
     // No wasm_bindgen attribute immediately precedes the struct or impl.
     expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]\s*\n\s*pub\(crate\) struct FedosNostrSignatureHandle/);
   });
@@ -110,6 +110,9 @@ describe("Secure Runtime Alpha 182 -- FedosNostrSignatureHandle", () => {
       "ProtocolRootMaterial",
       "NostrSecretKeyMaterial",
       "TestOnlySecretMaterial",
+      "DirectRatchetRootKeyMaterial",
+      "DirectRatchetChainKeyMaterial",
+      "DirectRatchetPrivateKeyMaterial",
     ]);
   });
 

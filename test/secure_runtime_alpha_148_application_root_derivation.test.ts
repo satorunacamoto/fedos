@@ -72,9 +72,10 @@ describe("Secure Runtime Alpha 148 -- Application Root Derivation", () => {
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
-    expect(libRsSource).toMatch(/fn hkdf_domain_has_no_variant_other_than_the_ten_specified/);
+    expect(libRsSource).toMatch(/fn hkdf_domain_has_no_variant_other_than_the_eleven_specified/);
   });
 
   it("8. the design doc explicitly records the hierarchy divergence from Alpha 142's own sibling diagram", () => {
@@ -107,10 +108,9 @@ describe("Secure Runtime Alpha 148 -- Application Root Derivation", () => {
 
   it("11. Regression: the crate's #[wasm_bindgen] count and pub fn count remain fixed at 13/36", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)];
-    expect(pubFnNames.length).toBe(46);
-  });
+    expect(pubFnNames.length).toBe(69);  });
 
   it("12. Regression: desktop_application.ts and fedos_runtime_identity.ts carry no reference to this Stage's own doc", () => {
     expect(desktopApplicationSource).not.toMatch(/secure_runtime_alpha_148/);

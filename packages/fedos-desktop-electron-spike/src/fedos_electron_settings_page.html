@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>FedOS Desktop Settings</title>
+</head>
+<body>
+<h1>FedOS Desktop Settings</h1>
+<p>
+  This window proves the Electron Main/Preload transport to the desktop
+  settings bridge only (Secure Runtime Alpha 4901-4980). It uses the one
+  exposed <code>window.fedosSettings.invoke()</code> API — never a Node API
+  directly — over the closed five-command vocabulary
+  (<code>settings-load</code>/<code>settings-save</code>/<code>settings-reset</code>/<code>settings-export</code>/<code>settings-import</code>).
+</p>
+<p id="fedos-electron-settings-status">Running self-test...</p>
+<script src="fedos_electron_settings_selftest.js"></script>
+</body>
+</html>

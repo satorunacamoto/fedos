@@ -145,8 +145,7 @@ describe("FedOS generated JS glue version() export verification -- doc + IF-pres
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(pubFnNames.length).toBe(46);
-    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
+    expect(pubFnNames.length).toBe(69);    expect((libRsSource.match(/#\[wasm_bindgen\]/g) ?? []).length).toBe(17);
   });
 
   it("12. src/runtime/fedos_wasm_loader.ts was untouched by THIS stage's own scope (Stage 987) -- a real module.version() call was later added by Stage 993, Prototype EXECUTION Phase 012, see test/runtime_wasm_loader_dev_only_rust_version_call_execution.test.ts -- still seven Plan interfaces", () => {

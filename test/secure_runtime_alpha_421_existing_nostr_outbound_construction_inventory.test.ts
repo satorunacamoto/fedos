@@ -49,7 +49,29 @@ describe("Secure Runtime Alpha 421 -- Existing Nostr Outbound Construction Inven
     const signingRelated = wasmBindgenBlocks.filter((block: string) =>
       /nostr|schnorr|sign_event|NostrSecretKey/i.test(block),
     );
-    expect(signingRelated).toEqual([]);
+    // Secure Runtime Alpha 1761-1840 ("NIP-17 Rumor Seal Gift Wrap Standard
+    // Delivery Arc") Phase E/F -- this Alpha 421 inventory's own premise
+    // ("no wasm_bindgen signing export exists yet") is a snapshot of ITS
+    // OWN stage, long since superseded by later, real, reviewed work
+    // (Secure Runtime Alpha 444's real `sign_nostr_event`, and now this
+    // Arc's own `sign_nostr_event_with_fresh_ephemeral_key`/
+    // `build_and_sign_nip17_gift_wrap` -- fresh-ephemeral-key Gift-Wrap
+    // signing, never the Master Seed, never a raw key). Exempt ONLY
+    // these two known, additive, reviewed exports; anything else
+    // matching the signing-related filter still fails this guard.
+    // The 400-char window can bleed either direction (a short export's
+    // own block reaching FORWARD into the NEXT export's doc comment, or
+    // simply landing on the real function signature itself) -- exempt
+    // any block naming either of this Arc's two new, real, reviewed
+    // signing-related exports, or mentioning this Arc's own doc-comment
+    // marker text (covering the bleed-forward case).
+    const knownLaterSigningExports = signingRelated.filter(
+      (block: string) =>
+        !/Secure Runtime Alpha 1761–1840/.test(block) &&
+        !/sign_nostr_event_with_fresh_ephemeral_key/.test(block) &&
+        !/build_and_sign_nip17_gift_wrap/.test(block),
+    );
+    expect(knownLaterSigningExports).toEqual([]);
   });
 
   it("5. structural: src/nostr/noble_signature.ts documents itself as verify-only, no private keys", () => {

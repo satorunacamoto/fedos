@@ -94,6 +94,10 @@ function fakeFileSystem(): FedosConversationArchiveCliFileSystem & { readonly fi
       const prefix = `${directoryPath}/`;
       return [...files.keys()].filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length));
     },
+    deleteFile(path: string): boolean {
+      files.delete(path);
+      return true;
+    },
   };
 }
 

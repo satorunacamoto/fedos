@@ -8,6 +8,7 @@ import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conv
 import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
 import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
 import type { FedosConversationArchiveBundleV1 } from "../src/conversation/archive/fedos_conversation_archive_bundle.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
 import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreDependencies } from "../src/conversation/archive/fedos_conversation_archive_restore.js";
 import { detectFedosConversationArchiveDuplicates } from "../src/conversation/archive/fedos_conversation_archive_duplicate_detection.js";
 import { collectFedosConversationArchiveBundle } from "../src/conversation/archive/fedos_conversation_archive_collector.js";
@@ -140,10 +141,10 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Restore", () => {
   it("1. a fresh restore inserts every record", () => {
     const result = restoreFedosConversationArchiveBundle(makeBundle(), deps);
     expect(result.conversation).toBe("inserted");
-    expect(result.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.capabilityEvents).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.envelopes).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.payloads).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(result.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.capabilityEvents).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.envelopes).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.payloads).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
   });
 
   it("2. re-restoring the identical bundle reports every record as a duplicate (already-present)", () => {
@@ -159,7 +160,8 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Restore", () => {
   it("3. restoring a SAME-id, DIFFERENT-content record reports a conflict", () => {
     restoreFedosConversationArchiveBundle(makeBundle(), deps);
     const base = makeBundle();
-    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...base.conversation, createdAt: base.conversation.createdAt + 1 } };
+    const baseConversation = base.conversation as FedosPersistedConversationRecordV1;
+    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...baseConversation, createdAt: baseConversation.createdAt + 1 } };
     const result = restoreFedosConversationArchiveBundle(conflicting, deps);
     expect(result.conversation).toBe("conflict");
   });
@@ -169,7 +171,7 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Restore", () => {
     const malformed = { ...bundle.envelopes[0]!, keyEpoch: "not-a-number" as unknown as number };
     const withMalformedEnvelope: FedosConversationArchiveBundleV1 = { ...bundle, envelopes: [malformed] };
     const result = restoreFedosConversationArchiveBundle(withMalformedEnvelope, deps);
-    expect(result.envelopes).toEqual({ inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 1 });
+    expect(result.envelopes).toEqual({ inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 1, denied: 0 });
     expect(result.conversation).toBe("inserted");
     expect(result.memberships.inserted).toBe(1);
   });
@@ -210,7 +212,8 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Duplicate Detection (read-on
     const deps = makeDependencies();
     restoreFedosConversationArchiveBundle(makeBundle(), deps);
     const base = makeBundle();
-    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...base.conversation, createdAt: base.conversation.createdAt + 1 } };
+    const baseConversation = base.conversation as FedosPersistedConversationRecordV1;
+    const conflicting: FedosConversationArchiveBundleV1 = { ...base, conversation: { ...baseConversation, createdAt: baseConversation.createdAt + 1 } };
     const report = detectFedosConversationArchiveDuplicates(conflicting, deps);
     expect(report.conversation).toBe("conflict");
   });

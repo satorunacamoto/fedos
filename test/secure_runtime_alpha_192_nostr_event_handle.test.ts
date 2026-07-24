@@ -102,7 +102,7 @@ describe("Secure Runtime Alpha 192 -- FedosNostrEventHandle", () => {
 
   it("10. structural: no #[wasm_bindgen] attribute is attached to FedosNostrEventHandle, count fixed at 13", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
     expect(libRsSource).not.toMatch(/#\[wasm_bindgen\]\s*\r?\n\s*pub\(crate\) struct FedosNostrEventHandle/);
   });
 

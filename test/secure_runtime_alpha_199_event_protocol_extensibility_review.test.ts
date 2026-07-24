@@ -81,12 +81,13 @@ describe("Secure Runtime Alpha 199 -- Nostr Event Protocol Extensibility Review"
       "Session",
       "ATProto",
       "Wallet",
+      "DirectRatchetSealing",
       "TestOnly",
     ]);
 
     const kindBody = (libRsSource.match(/pub\(crate\) enum SecretHandleKind \{([\s\S]*?)\r?\n {4}\}/) ?? [])[1] ?? "";
     const kindVariants = [...kindBody.matchAll(/^\s*(\w+),/gm)].map((m: RegExpMatchArray) => m[1]);
-    expect(kindVariants.length).toBe(13);
+    expect(kindVariants.length).toBe(16);
   });
 
   it("8. structural: no CBOR/IPLD/CID library was added, Cargo.toml's own dependency count is unchanged by this Arc", () => {
@@ -109,7 +110,7 @@ describe("Secure Runtime Alpha 199 -- Nostr Event Protocol Extensibility Review"
 
   it("10. structural: wasm_bindgen count remains fixed at 13, unchanged by this REVIEW-ONLY Stage", () => {
     const wasmBindgenCount = [...libRsSource.matchAll(/^#\[wasm_bindgen\]/gm)].length;
-    expect(wasmBindgenCount).toBe(15);
+    expect(wasmBindgenCount).toBe(19);
   });
 
   // ---------------------------------------------------------------------

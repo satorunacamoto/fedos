@@ -4,5 +4,16 @@
     "noEmit": false,
     "outDir": "dist"
   },
-  "include": ["src/desktop/runtime/run_fedos_desktop_runtime.ts"]
+  "include": [
+    "src/desktop/runtime/run_fedos_desktop_runtime.ts",
+    "src/desktop/navigation/fedos_desktop_conversation_window_registry.ts",
+    "src/conversation/construction/fedos_conversation_creator_identity_authority.ts",
+    "src/desktop/notification/fedos_desktop_notification_coordinator.ts",
+    "src/desktop/tray/fedos_desktop_tray_coordinator.ts",
+    "src/desktop/background/fedos_desktop_background_lifecycle_coordinator.ts",
+    "src/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.ts",
+    "src/desktop/badge/fedos_desktop_badge_coordinator.ts",
+    "src/device/sync_events/fedos_device_sync_event_bridge.ts",
+    "src/desktop/runtime/fedos_desktop_device_sync_presentation_wiring.ts"
+  ]
 }

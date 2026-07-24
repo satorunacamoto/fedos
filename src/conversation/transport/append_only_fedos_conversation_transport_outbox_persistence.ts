@@ -22,6 +22,13 @@
  *   - NO in-memory cache/index of any kind is held between calls.
  *   - NO automatic repair of any kind, ever.
  *   - NO default file path — the caller always supplies one.
+ *
+ * Secure Runtime Alpha 1841–1920 Phase B — widened, additively, to the
+ * `FedosPersistedConversationTransportOutboxRecord` union (V1 | V2). The
+ * on-disk JSON-Lines format/replay strategy is unchanged; a V2 line
+ * simply carries more fields (including the nested `nativeEvent`
+ * object), which `JSON.parse`/`JSON.stringify` round-trip exactly like
+ * any other plain-object record.
  */
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
@@ -31,7 +38,7 @@ import {
   type FedosConversationTransportOutboxPersistence,
   type FedosConversationTransportOutboxPersistenceWriteResult,
 } from "./fedos_conversation_transport_outbox_persistence.js";
-import type { FedosPersistedConversationTransportOutboxRecordV1 } from "./fedos_conversation_transport_outbox_codec.js";
+import type { FedosPersistedConversationTransportOutboxRecord } from "./fedos_conversation_transport_outbox_codec.js";
 
 /** PRIVATE — narrow, dependency-free check for a Node `ENOENT` error, without `@types/node`. */
 function isEnoent(err: unknown): boolean {
@@ -49,13 +56,13 @@ function readLogFile(filePath: string): string {
 }
 
 /** PRIVATE — replays the append log into a deduplicated array of records, in on-disk order. */
-function replayLog(filePath: string): FedosPersistedConversationTransportOutboxRecordV1[] {
+function replayLog(filePath: string): FedosPersistedConversationTransportOutboxRecord[] {
   const contents = readLogFile(filePath);
-  const byId = new Map<string, FedosPersistedConversationTransportOutboxRecordV1>();
+  const byId = new Map<string, FedosPersistedConversationTransportOutboxRecord>();
   for (const rawLine of contents.split("\n")) {
     const line = rawLine.trim();
     if (line.length === 0) continue;
-    const parsed = JSON.parse(line) as FedosPersistedConversationTransportOutboxRecordV1;
+    const parsed = JSON.parse(line) as FedosPersistedConversationTransportOutboxRecord;
     const existing = byId.get(parsed.id);
     if (existing === undefined) {
       byId.set(parsed.id, parsed);
@@ -75,7 +82,7 @@ export class AppendOnlyFedosConversationTransportOutboxPersistence implements Fe
     this.#filePath = filePath;
   }
 
-  putIntent(record: FedosPersistedConversationTransportOutboxRecordV1): FedosConversationTransportOutboxPersistenceWriteResult {
+  putIntent(record: FedosPersistedConversationTransportOutboxRecord): FedosConversationTransportOutboxPersistenceWriteResult {
     const existing = this.getIntent(record.id);
     if (existing !== null) {
       return fedosPersistedConversationTransportOutboxRecordsAreEqual(existing, record) ? "already-present" : "conflict";
@@ -88,11 +95,11 @@ export class AppendOnlyFedosConversationTransportOutboxPersistence implements Fe
     return "inserted";
   }
 
-  getIntent(id: string): FedosPersistedConversationTransportOutboxRecordV1 | null {
+  getIntent(id: string): FedosPersistedConversationTransportOutboxRecord | null {
     return this.listIntents().find((record) => record.id === id) ?? null;
   }
 
-  listIntents(): readonly FedosPersistedConversationTransportOutboxRecordV1[] {
+  listIntents(): readonly FedosPersistedConversationTransportOutboxRecord[] {
     return replayLog(this.#filePath);
   }
 }

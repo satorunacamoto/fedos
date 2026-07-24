@@ -118,11 +118,10 @@ fn chacha_key_and_nonce_from(conversation_key: &[u8; 32], nonce: &[u8; 32]) -> (
     assert_eq!(chacha_nonce_bytes.status, Nip44MessageKeyStatus::Ready);
 
     let chacha_key: [u8; 32] = chacha_key_bytes
-        .bytes
-        .as_deref()
-        .expect("Ready ChachaKey must carry bytes")
-        .try_into()
-        .expect("chacha_key must be 32 bytes");
+        .handle
+        .as_ref()
+        .and_then(|h| h.expose_bytes_for_internal_nip44_message_key())
+        .expect("Ready ChachaKey must carry a handle");
     let chacha_nonce: [u8; 12] = chacha_nonce_bytes
         .bytes
         .as_deref()

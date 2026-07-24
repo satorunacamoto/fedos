@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>FedOS Desktop Host Adapter</title>
+</head>
+<body>
+<h1>FedOS Desktop Host Adapter</h1>
+<p>
+  This window proves the Electron Main/Preload transport to
+  FedosDesktopHostBridge only (Secure Runtime Alpha 4101-4180). It renders
+  no Conversation/Device/business UI of its own -- that is the explicitly
+  preferred NEXT Arc. This page's own script calls the one exposed
+  <code>window.fedos.invoke()</code> API with a small self-test sequence
+  and logs each real result for this Arc's own acceptance tests.
+</p>
+<p id="fedos-electron-host-adapter-status">Running self-test...</p>
+<script src="fedos_electron_host_adapter_selftest.js"></script>
+</body>
+</html>
