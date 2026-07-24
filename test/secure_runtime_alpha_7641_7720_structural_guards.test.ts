@@ -97,11 +97,35 @@ describe("Secure Runtime Alpha 7641-7720 -- structural guards", () => {
     expect(diffNames("src/desktop/runtime/fedos_desktop_runtime.ts").trim()).toBe("");
   });
 
-  it("9. no Archive/Retention/Deletion file of any kind was touched -- this Arc's own domain boundary from the sibling parallel Arc B", () => {
-    expect(diffNames("src/conversation/archive").trim()).toBe("");
-    expect(diffNames("src/conversation/retention").trim()).toBe("");
-    expect(diffNames("src/conversation/deletion").trim()).toBe("");
-    expect(diffNames("src/desktop/presentation/safety_center").trim()).toBe("");
+  it("9. no Archive/Retention/Deletion file was touched BY THIS ARC -- this Arc's own domain boundary from the sibling parallel Arc B (RECONCILED: Arc B, FedOS Archive Multi-Device Suppression Propagation, later merged this same lineage together with this one, legitimately introducing its own disclosed changes under these exact paths -- a blanket zero-diff assertion can no longer distinguish 'this Arc's own violation' from 'the sibling's own later-merged, always-authorized work,' so this now checks every file under these paths against the sibling's own known, disclosed file set instead)", () => {
+    const knownSiblingFiles = new Set([
+      "src/conversation/archive/fedos_conversation_archive_collector.ts",
+      "src/conversation/archive/fedos_conversation_archive_restore.ts",
+      "src/conversation/archive/runtime/fedos_conversation_archive_runtime.ts",
+      "src/conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.ts",
+      "src/conversation/retention/append_only_fedos_archive_suppression_observation_persistence.ts",
+      "src/conversation/retention/fedos_archive_suppression_fact.ts",
+      "src/conversation/retention/fedos_archive_suppression_fact_signing.ts",
+      "src/conversation/retention/fedos_archive_suppression_local_bridge.ts",
+      "src/conversation/retention/fedos_archive_suppression_observation_authority.ts",
+      "src/conversation/retention/fedos_archive_suppression_observation_persistence.ts",
+      "src/conversation/retention/fedos_payload_retention_authority.ts",
+      "src/conversation/retention/fedos_persisted_archive_suppression_observation_v1.ts",
+      "src/conversation/retention/in_memory_fedos_archive_suppression_observation_persistence.ts",
+      "src/conversation/deletion/fedos_deletion_assessment.ts",
+      "src/conversation/deletion/fedos_deletion_capability_descriptor.ts",
+      "src/desktop/presentation/safety_center/fedos_archive_workflow_safety_warnings.ts",
+      "src/desktop/presentation/safety_center/fedos_safety_center_warning_codes.ts",
+    ]);
+    for (const p of ["src/conversation/archive", "src/conversation/retention", "src/conversation/deletion", "src/desktop/presentation/safety_center"]) {
+      const files = diffNames(p)
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      for (const f of files) {
+        expect(knownSiblingFiles.has(f), `unexpected Archive/Retention/Deletion/Safety-Center file, not in the sibling's own known disclosed set: ${f}`).toBe(true);
+      }
+    }
   });
 
   it("10. no new transport protocol, no new NIP, no new crypto -- zero Rust/Cargo/WASM diff, zero Ratchet/Identity Transition diff", () => {
@@ -130,7 +154,7 @@ describe("Secure Runtime Alpha 7641-7720 -- structural guards", () => {
     expect(status).not.toMatch(/\.tmp_gen\//);
   });
 
-  it("13. this Arc's own required production files are present in the diff against its own base commit, and nothing under Archive/Retention/Deletion/Outbox/Scheduler/p2p/.tmp_gen appears anywhere in the FULL diff (not just the spot-checked paths above)", () => {
+  it("13. this Arc's own required production files are present in the diff against its own base commit, and nothing under Outbox/Scheduler/Ratchet/Identity-Transition/Rust/p2p/.tmp_gen appears anywhere in the FULL diff (RECONCILED: the sibling Archive Multi-Device Suppression Propagation Arc, 7721-7800, later merged this same lineage together with 7641-7720 -- Archive/Retention/Deletion/Safety-Center paths are THAT Arc's own legitimate, disclosed domain, removed from this list since this diff-against-base-commit check can no longer distinguish 'this Arc's own violation' from 'the sibling's own later-merged, always-authorized work' once a merge has occurred; every path still listed below remains genuinely untouched by BOTH lineages)", () => {
     const modifiedLines = diffNames()
       .split("\n")
       .map((line) => line.trim())
@@ -142,10 +166,6 @@ describe("Secure Runtime Alpha 7641-7720 -- structural guards", () => {
       expect(modifiedLines, `required file missing from diff: ${required}`).toContain(required);
     }
     const forbiddenPrefixes = [
-      "src/conversation/archive/",
-      "src/conversation/retention/",
-      "src/conversation/deletion/",
-      "src/desktop/presentation/safety_center/",
       "src/board/outbox/",
       "src/conversation/transport/",
       "src/device/relay_sync/",

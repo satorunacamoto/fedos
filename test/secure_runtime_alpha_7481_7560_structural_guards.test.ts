@@ -86,7 +86,7 @@ describe("Secure Runtime Alpha 7481-7560 -- structural guards", () => {
     expect(status, "no .tmp_gen/ entries in this worktree's own working-tree status").not.toMatch(/\.tmp_gen\//);
   });
 
-  it("5. this Arc's own required production files are all present in the diff against its own base commit -- never silently reverted", () => {
+  it("5. this Arc's own required production files are all present in the diff against its own base commit -- never silently reverted (RECONCILED: the sibling Archive Multi-Device Suppression Propagation Arc, 7721-7800, later merged this same lineage together with 7641-7720, committing this Arc's own new file in the process -- it is no longer untracked, checked directly by content/path instead of via a porcelain-status untracked-file scan)", () => {
     const requiredFromThisArc = [
       "src/conversation/archive/fedos_conversation_archive_collector.ts",
       "src/conversation/archive/fedos_conversation_archive_restore.ts",
@@ -107,8 +107,7 @@ describe("Secure Runtime Alpha 7481-7560 -- structural guards", () => {
       expect(modifiedLines, `this Arc's own required file must be in the diff: ${required}`).toContain(required);
     }
     // The ONE new production (non-test, non-doc) file this Arc adds.
-    const status = porcelainStatus();
-    expect(status).toMatch(/\?\? src\/desktop\/presentation\/safety_center\/fedos_archive_workflow_safety_warnings\.ts/);
+    expect(() => read("src/desktop/presentation/safety_center/fedos_archive_workflow_safety_warnings.ts")).not.toThrow();
   });
 
   it("6. no independent Payload/Envelope retention bypass -- export and restore each gate BOTH record kinds off the SAME single retentionAuthority dependency, keyed by the SAME payloadId concept, never two disagreeing checks", () => {
