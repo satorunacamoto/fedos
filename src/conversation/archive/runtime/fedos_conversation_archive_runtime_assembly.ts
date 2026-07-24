@@ -82,8 +82,8 @@ export interface FedosConversationArchiveRuntimeAssemblyConfig {
   readonly fileAuthority?: FedosConversationArchiveFileAuthority;
   /** Optional, testability only — default the real Runtime Service pass-throughs (`fedosConversationArchiveEncryptionRuntimeBoundary`). */
   readonly encryptionRuntimeBoundary?: FedosConversationArchiveEncryptionRuntimeBoundary;
-  /** Secure Runtime Alpha 7241-7320 — optional, additive; see `FedosConversationArchiveRuntimeDependencies`'s own doc comment. Passed straight through, unmodified. */
-  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
+  /** Secure Runtime Alpha 7241-7320 — optional, additive; see `FedosConversationArchiveRuntimeDependencies`'s own doc comment. Passed straight through, unmodified. Widened in Alpha 7481-7560 to also cover `evaluateRetentionDecisionOnly` (Restore's own defense-in-depth gate). */
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
 }
 
 /** Pure with respect to the filesystem — constructs no file, starts no timer, reads no `process.env`. */

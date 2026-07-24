@@ -435,7 +435,7 @@ describe("Secure Runtime Alpha 2041-2120 -- Conversation Identity Restoration an
       sourcePath: secondArchivePath, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: ARCHIVE_COUNTERPARTY_KEY_HEX, suite: "ChaCha20Poly1305",
     });
     expect(restoreC.outcome).toBe("restored");
-    expect(restoreC.details?.group?.messages).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(restoreC.details?.group?.messages).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
 
     // A second restore attempt against the SAME destination reports fully already-present -- no
     // duplicate archive/identity/capability/activation facts of any kind.

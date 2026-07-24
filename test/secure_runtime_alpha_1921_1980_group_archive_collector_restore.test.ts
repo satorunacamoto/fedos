@@ -216,10 +216,10 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Archive Restore", () => {
 
     expect(result.conversation).toBe("inserted");
     expect(result.group).toBeDefined();
-    expect(result.group!.generations).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.group!.paths).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.group!.messages).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.group!.fanoutDeliveries).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(result.group!.generations).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.group!.paths).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.group!.messages).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.group!.fanoutDeliveries).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(result.group!.childConversations.length).toBe(2);
     for (const child of result.group!.childConversations) {
       expect(child.conversation).toBe("inserted");
@@ -244,10 +244,10 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Archive Restore", () => {
     restoreFedosConversationArchiveBundle(bundle, restoreDeps(destPorts));
     const second = restoreFedosConversationArchiveBundle(bundle, restoreDeps(destPorts));
 
-    expect(second.group!.generations).toEqual({ inserted: 0, duplicate: 2, conflict: 0, failed: 0, invalid: 0 });
-    expect(second.group!.paths).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0 });
-    expect(second.group!.messages).toEqual({ inserted: 0, duplicate: 2, conflict: 0, failed: 0, invalid: 0 });
-    expect(second.group!.fanoutDeliveries).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0 });
+    expect(second.group!.generations).toEqual({ inserted: 0, duplicate: 2, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(second.group!.paths).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(second.group!.messages).toEqual({ inserted: 0, duplicate: 2, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(second.group!.fanoutDeliveries).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(destPorts.groupGenerationPersistence.listGenerations(GROUP_ID).length).toBe(2); // still exactly 2, never 4.
   });
 
@@ -263,10 +263,10 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Archive Restore", () => {
     for (const p of bundle.group!.paths) destPorts.groupDirectPathPersistence.putPathFact(p);
 
     const result = restoreFedosConversationArchiveBundle(bundle, restoreDeps(destPorts));
-    expect(result.group!.generations).toEqual({ inserted: 0, duplicate: 2, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.group!.paths).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.group!.messages).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.group!.fanoutDeliveries).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(result.group!.generations).toEqual({ inserted: 0, duplicate: 2, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.group!.paths).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.group!.messages).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.group!.fanoutDeliveries).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(result.group!.childConversations.every((c) => c.conversation === "inserted")).toBe(true);
 
     const secondAttempt = restoreFedosConversationArchiveBundle(bundle, restoreDeps(destPorts));
@@ -292,7 +292,7 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Archive Restore", () => {
     };
     const destPorts = makePorts();
     const result = restoreFedosConversationArchiveBundle(tampered, restoreDeps(destPorts));
-    expect(result.group!.generations).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 1 });
+    expect(result.group!.generations).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 1, denied: 0 });
     expect(destPorts.groupGenerationPersistence.listGenerations(GROUP_ID).length).toBe(1);
   });
 

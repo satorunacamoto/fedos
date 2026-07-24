@@ -577,7 +577,7 @@ describe("Secure Runtime Alpha 1691-1760 -- duplicate restore + crash/restart re
 
     const second = await receiver.runtime.restoreConversationArchive({ sourcePath: path, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: COUNTERPARTY_PUBLIC_KEY_HEX, suite: "ChaCha20Poly1305" });
     expect(second.outcome).toBe("already-present");
-    expect(second.details?.envelopes).toEqual({ inserted: 0, duplicate: 1, conflict: 0, failed: 0, invalid: 0 });
+    expect(second.details?.envelopes).toEqual({ inserted: 0, duplicate: 1, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     // Still exactly one envelope/payload -- no duplicate record was ever created.
     expect(receiver.payloadStorage.getPayload("payload-1" as never)?.bytes).toEqual(EXACT_MESSAGE);
   });
@@ -618,8 +618,8 @@ describe("Secure Runtime Alpha 1691-1760 -- duplicate restore + crash/restart re
     const restore = await receiver.runtime.restoreConversationArchive({ sourcePath: path, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: COUNTERPARTY_PUBLIC_KEY_HEX, suite: "ChaCha20Poly1305" });
     expect(restore.outcome).toBe("restored");
     expect(restore.details?.conversation).toBe("duplicate");
-    expect(restore.details?.memberships).toEqual({ inserted: 0, duplicate: 1, conflict: 0, failed: 0, invalid: 0 });
-    expect(restore.details?.envelopes).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(restore.details?.memberships).toEqual({ inserted: 0, duplicate: 1, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(restore.details?.envelopes).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(receiver.payloadStorage.getPayload("payload-1" as never)?.bytes).toEqual(EXACT_MESSAGE);
 
     // A SECOND fresh attempt after that (idempotent restart-of-the-restart) reports fully already-present.
@@ -693,7 +693,7 @@ describe("Secure Runtime Alpha 1691-1760 -- partially-invalid outcome (reconcili
     const restore = await receiver.runtime.restoreConversationArchive({ sourcePath: path, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: COUNTERPARTY_PUBLIC_KEY_HEX, suite: "ChaCha20Poly1305" });
 
     expect(restore.outcome).toBe("partially-invalid");
-    expect(restore.details?.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 1 });
+    expect(restore.details?.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 1, denied: 0 });
     // The one VALID membership (alice) WAS restored -- a partially-invalid archive still restores
     // everything it safely can, it is not an all-or-nothing failure.
     expect(receiver.membershipPersistence.getMembership(LOCAL_MEMBERSHIP_ID)).not.toBeNull();

@@ -472,9 +472,9 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Conversation real Application 
       sourcePath: destination, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: ARCHIVE_COUNTERPARTY_KEY_HEX, suite: "ChaCha20Poly1305",
     });
     expect(restoreResult.outcome).toBe("restored");
-    expect(restoreResult.details?.group?.generations).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(restoreResult.details?.group?.messages).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(restoreResult.details?.group?.fanoutDeliveries).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(restoreResult.details?.group?.generations).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(restoreResult.details?.group?.messages).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(restoreResult.details?.group?.fanoutDeliveries).toEqual({ inserted: 3, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(restoreResult.details?.group?.childConversations.length).toBe(2);
 
     await destination1.stop();
@@ -552,7 +552,7 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Conversation real Application 
       sourcePath: destination, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: ARCHIVE_COUNTERPARTY_KEY_HEX, suite: "ChaCha20Poly1305",
     });
     expect(secondRestoreAttempt.outcome).toBe("already-present");
-    expect(secondRestoreAttempt.details?.group?.fanoutDeliveries).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0 });
+    expect(secondRestoreAttempt.details?.group?.fanoutDeliveries).toEqual({ inserted: 0, duplicate: 3, conflict: 0, failed: 0, invalid: 0, denied: 0 });
     expect(destGr.listPrivateGroupMessages(groupId).length).toBe(2); // still exactly 2, never 4.
 
     // Verify NO network/transport side effect occurred: this Runtime was never configured with any

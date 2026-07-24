@@ -321,12 +321,21 @@ suite("Alpha 7241-7320 -- Archive/Retention interaction: a real, live, two-profi
         const keep2PayloadId = toFedosConversationPayloadId(keep2Envelope!.payloadId)!;
         expect(recoveryPayloadStorage.getPayload(keep2PayloadId), "a kept message's payload must restore across the device boundary").not.toBeNull();
 
+        // Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+        // Parity and Metadata Deletion Semantics Arc) -- UPDATED: the
+        // Envelope record itself is now ALSO excluded from the Archive
+        // bundle, closing the exact gap this test's own PRIOR assertion
+        // documented as accepted behavior ("Archive never filters
+        // Envelopes, only Payloads"). Envelope and Payload now share one
+        // fate, keyed off the same `retentionAuthority` this test already
+        // wires for export -- see
+        // `docs/secure_runtime_alpha_7481_7560_defect_reproduction_report.md`
+        // (recorded as `..._reconciliation_report.md` in this Arc's own
+        // docs) for the full account.
         const deletedEnvelope = recoveryConversationRuntime.getConversationMessageEnvelope(conversationId, toDelete.value.messageId);
-        expect(deletedEnvelope, "the Envelope record itself still restores (Archive never filters Envelopes, only Payloads) -- only its own payload must be absent").not.toBeNull();
-        const deletedPayloadId = toFedosConversationPayloadId(deletedEnvelope!.payloadId)!;
         expect(
-          recoveryPayloadStorage.getPayload(deletedPayloadId),
-          "the tombstoned message's payload must NEVER cross the device boundary -- this Arc's own regression proof of the Archive/retention fix",
+          deletedEnvelope,
+          "FIXED: the tombstoned message's own Envelope must no longer restore either -- existence, timing, sender, recipient, and envelope id must not survive across the device boundary any more than its Payload already didn't",
         ).toBeNull();
 
         await recoveryRuntime.stop();

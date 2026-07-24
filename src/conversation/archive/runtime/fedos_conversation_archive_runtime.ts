@@ -142,8 +142,17 @@ export interface FedosConversationArchiveRuntimeDependencies {
    * 2581-2620 onward). Passed straight through to
    * `collectFedosConversationArchiveBundle()` on every `exportConversationArchive()`
    * call; omitted, export behavior is byte-for-byte unchanged.
+   *
+   * Secure Runtime Alpha 7481-7560 — the SAME dependency is now ALSO
+   * passed through to `restoreFedosConversationArchiveBundle()` on every
+   * `restoreConversationArchive()` call, which is why this Pick includes
+   * `evaluateRetentionDecisionOnly` too (Restore's own defense-in-depth
+   * gate; see `fedos_conversation_archive_restore.ts`'s header for why
+   * `evaluatePayloadAccess()` alone is unsuitable for restore-time
+   * gating). The real production `FedosPayloadRetentionAuthority` always
+   * has both methods, so every existing caller is unaffected.
    */
-  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
 }
 
 export interface FedosConversationArchiveExportRequest {
@@ -239,6 +248,19 @@ export type FedosConversationArchiveRestoreOutcome =
    * "partial restore falsely reported as complete" finding.
    */
   | "partially-invalid"
+  /**
+   * Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+   * Parity and Metadata Deletion Semantics Arc) — one or more
+   * Envelope/Payload records were structurally VALID and passed deep
+   * validation, but this RESTORING device's own CURRENT Retention
+   * Authority denies them (already tombstoned/removed locally) and they
+   * were skipped, never written. Deliberately DISTINCT from
+   * `"partially-invalid"`: a denied record is not malformed, it is
+   * correctly, intentionally suppressed — "Do not collapse all deletion
+   * meanings into one boolean." See the Export/Restore Parity
+   * Specification.
+   */
+  | "partially-denied"
   | "invalid-archive"
   | "integrity-failed"
   | "identity-mismatch"
@@ -437,6 +459,11 @@ export class FedosConversationArchiveRuntime {
     const staged = await this.#stageDecryptedBundle(request);
     if (staged.outcome !== "staged") return { outcome: staged.outcome, manifest: staged.manifest };
 
+    // Secure Runtime Alpha 7481-7560 -- preflightRestore() is a READ-ONLY
+    // preview (duplicate detection only); it never writes anything, so
+    // this Arc's own retention re-evaluation (a write-time gate) does not
+    // apply here -- it applies in restoreConversationArchive() below, the
+    // only place a write ever occurs.
     const report = detectFedosConversationArchiveDuplicates(staged.bundle, {
       conversationPersistence: this.#deps.conversationPersistence,
       membershipPersistence: this.#deps.membershipPersistence,
@@ -465,6 +492,11 @@ export class FedosConversationArchiveRuntime {
       return { outcome, manifest: staged.manifest };
     }
 
+    // Secure Runtime Alpha 7481-7560 -- the SAME `retentionAuthority` this
+    // Runtime already threads into export is now ALSO threaded into
+    // restore, as write-time defense-in-depth (see the Export/Restore
+    // Parity Specification). Omitted entirely, restore behavior is
+    // byte-for-byte unchanged from before this Arc.
     const details = restoreFedosConversationArchiveBundle(staged.bundle, {
       conversationPersistence: this.#deps.conversationPersistence,
       membershipPersistence: this.#deps.membershipPersistence,
@@ -472,6 +504,7 @@ export class FedosConversationArchiveRuntime {
       envelopePersistence: this.#deps.envelopePersistence,
       payloadStorage: this.#deps.payloadStorage,
       group: this.#groupDeps(),
+      retentionAuthority: this.#deps.retentionAuthority,
     });
 
     if (details.conversation === "invalid" || details.conversation === "failed") {
@@ -501,6 +534,15 @@ export class FedosConversationArchiveRuntime {
     // "already-present" below despite those records never having been written anywhere.
     const anyInvalid = groups.some((group) => group.invalid > 0) || conversationOutcomes.some((o) => o === "invalid");
     if (anyInvalid) return { outcome: "partially-invalid", manifest: staged.manifest, details };
+
+    // Secure Runtime Alpha 7481-7560 -- mirrors the "partially-invalid"
+    // check immediately above, for a DIFFERENT, deliberately distinct
+    // reason: one or more structurally-valid records were correctly
+    // suppressed by this device's own current Retention Authority (see
+    // `isPayloadPermittedForRestore()`). Never conflated with
+    // "partially-invalid" — a denied record is not malformed.
+    const anyDenied = groups.some((group) => group.denied > 0);
+    if (anyDenied) return { outcome: "partially-denied", manifest: staged.manifest, details };
 
     const anyInserted = conversationOutcomes.some((o) => o === "inserted") || groups.some((group) => group.inserted > 0);
     if (!anyInserted) return { outcome: "already-present", manifest: staged.manifest, details };

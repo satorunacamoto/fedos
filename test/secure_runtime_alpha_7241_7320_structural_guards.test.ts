@@ -55,9 +55,8 @@ describe("Secure Runtime Alpha 7241-7320 -- structural guards", () => {
     }
   });
 
-  it("2. Ratchet's own cryptographic session logic, Identity Transition's own record/proof/decision model, NIP-17's own Rumor/Seal/Gift-Wrap construction pipeline, and Secure Memory are completely untouched -- this Arc validates and hardens, it does not redesign", () => {
+  it("2. Ratchet's own cryptographic session logic, Identity Transition's own record/proof/decision model, NIP-17's own Rumor/Seal/Gift-Wrap construction pipeline, and Secure Memory are completely untouched -- this Arc validates and hardens, it does not redesign (RECONCILED: fedos_direct_ratchet_outbound_integration.ts's own zero-diff assertion was superseded by Secure Runtime Alpha 7401-7480's own later, disclosed, additive route-binding field on that same file -- see that Arc's own structural guards)", () => {
     expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_cryptographic_session.ts").trim()).toBe("");
-    expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_outbound_integration.ts").trim()).toBe("");
     expect(diffNames("src/conversation/identity_transition").trim()).toBe("");
     expect(diffNames("src/conversation/delivery/nostr/nip17/fedos_nip17_rumor.ts").trim()).toBe("");
     expect(diffNames("src/conversation/delivery/nostr/nip17/fedos_nip59_seal.ts").trim()).toBe("");
@@ -66,34 +65,25 @@ describe("Secure Runtime Alpha 7241-7320 -- structural guards", () => {
     expect(diffNames("packages/fedos-core-rust/src").trim()).toBe("");
   });
 
-  it("3. this Arc's own production diff is EXACTLY the files its own completion declaration names -- no other src/ file touched, tracked or untracked", () => {
-    const allowedModified = new Set([
-      "README.md",
+  it("3. this Arc's own (7241-7320's own) production diff, RECONCILED: this exact-allowlist assertion's own premise (a single-arc diff against a fixed base) is structurally incompatible with an accumulating multi-arc lineage -- Secure Runtime Alpha 7321-7400, 7401-7480, and 7481-7560 have each since landed real, disclosed, legitimate changes on top of this same base. Narrowed to what remains meaningful: the files THIS Arc's own completion declaration named must still all be present in the diff (never silently reverted), never that the diff contains NOTHING else.", () => {
+    const requiredFromThisArc = [
       "src/conversation/archive/fedos_conversation_archive_collector.ts",
       "src/conversation/archive/runtime/fedos_conversation_archive_runtime.ts",
       "src/conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.ts",
       "src/desktop/onboarding/fedos_local_profile_paths.ts",
       "src/desktop/onboarding/fedos_profile_initialization_coordinator.ts",
       "src/desktop/runtime/fedos_desktop_runtime.ts",
-    ]);
+    ];
     const modifiedLines = diffNames()
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    for (const line of modifiedLines) {
-      expect(allowedModified.has(line), `unexpected modified file: ${line}`).toBe(true);
+    for (const required of requiredFromThisArc) {
+      expect(modifiedLines, `this Arc's own required file must still be in the diff: ${required}`).toContain(required);
     }
-    expect(modifiedLines.length, "every allowed file must actually be modified").toBe(allowedModified.size);
   });
 
-  it("4. the ONE new production file this Arc adds is the disclosed Archive encryption boundary -- a thin adapter, no new capability, no raw secret handling", () => {
-    const status = porcelainStatus();
-    const newProductionFiles = status
-      .split("\n")
-      .filter((line) => line.startsWith("?? src/") && !line.includes("test"))
-      .map((line) => line.slice(3).trim());
-    expect(newProductionFiles).toEqual(["src/desktop/production_activation/fedos_production_conversation_archive_encryption_runtime_boundary.ts"]);
-
+  it("4. the ONE new production file this Arc adds is the disclosed Archive encryption boundary -- a thin adapter, no new capability, no raw secret handling (RECONCILED: the file is no longer untracked -- it has since been committed by this same lineage -- checked directly by content/path instead of via a porcelain-status untracked-file scan)", () => {
     const source = stripComments(read("src/desktop/production_activation/fedos_production_conversation_archive_encryption_runtime_boundary.ts"));
     expect(source).toMatch(/implements FedosConversationArchiveEncryptionRuntimeBoundary/);
     expect(source).toMatch(/this\.#handleSource\.encryptAead\(/);
@@ -115,20 +105,18 @@ describe("Secure Runtime Alpha 7241-7320 -- structural guards", () => {
     expect(diffNames("src/desktop/runtime/fedos_desktop_runtime_config.ts").trim()).toBe("");
   });
 
-  it("6. the Archive retention-gating fix is optional and additive, mirrors Search's own Alpha 2581-2620 fail-closed discipline exactly, and NEVER filters Envelopes -- only Payloads", () => {
+  it("6. the Archive retention-gating fix is optional and additive, mirrors Search's own Alpha 2581-2620 fail-closed discipline exactly (RECONCILED: Secure Runtime Alpha 7481-7560, FedOS Archive Envelope Retention Parity and Metadata Deletion Semantics Arc, later, disclosedly extended this SAME field to ALSO filter Envelopes -- closing the exact 'Envelope/Payload collection unlinked' gap a committed audit found; this Arc's own 7241-7320 structural guards for the current shape live at that later Arc's own test file)", () => {
     const collectorSource = stripComments(read("src/conversation/archive/fedos_conversation_archive_collector.ts"));
-    expect(collectorSource).toMatch(/readonly retentionAuthority\?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;/);
+    expect(collectorSource).toMatch(/readonly retentionAuthority\?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" \| "evaluateRetentionDecisionOnly">;/);
     // Fail-closed: a thrown/unavailable Authority is treated as not-permitted, never as "no gate".
     expect(collectorSource).toMatch(/catch\s*\{\s*return false;\s*\}/);
-    // Filters payloadDescriptors only -- envelopes/memberships/capabilityEvents collection is untouched by this Arc's own diff hunk (still the SAME unconditional list() calls).
-    expect(collectorSource).toMatch(/const envelopes = deps\.envelopePersistence\.listConversationEnvelopes\(conversationId\);/);
-    expect(collectorSource).not.toMatch(/envelopes\s*=.*retentionAuthority/);
+    expect(collectorSource).toMatch(/const envelopes = deps\.envelopePersistence\s*\n\s*\.listConversationEnvelopes\(conversationId\)/);
 
     const runtimeSource = stripComments(read("src/conversation/archive/runtime/fedos_conversation_archive_runtime.ts"));
-    expect(runtimeSource).toMatch(/readonly retentionAuthority\?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;/);
+    expect(runtimeSource).toMatch(/readonly retentionAuthority\?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" \| "evaluateRetentionDecisionOnly">;/);
 
     const assemblySource = stripComments(read("src/conversation/archive/runtime/fedos_conversation_archive_runtime_assembly.ts"));
-    expect(assemblySource).toMatch(/readonly retentionAuthority\?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;/);
+    expect(assemblySource).toMatch(/readonly retentionAuthority\?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" \| "evaluateRetentionDecisionOnly">;/);
   });
 
   it("7. the Archive production-crypto wiring is a structural, opt-in type-guard -- any Master Seed Authority WITHOUT the four production AEAD accessors keeps using the existing dev-gated default, zero regression", () => {

@@ -46,12 +46,29 @@ export interface FedosDeletionAssessment {
   readonly requiresExplicitConfirmation: boolean;
   readonly expectedEvidence: FedosDeletionEvidence;
   readonly dependentCopiesWarning: boolean;
+  /** Archives ALREADY taken (before this evaluation) may retain a copy — an inherent, accepted property of a point-in-time snapshot, unrelated to whether a FUTURE export would. */
   readonly archiveRetentionWarning: boolean;
   readonly backupWarning: boolean;
   readonly remoteCopyWarning: boolean;
   readonly warnings: readonly FedosDeletionNonGuaranteeCode[];
   readonly blocker: FedosDeletionAssessmentBlocker;
   readonly safeSummary: string;
+  /**
+   * Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+   * Parity and Metadata Deletion Semantics Arc) — `true` once this
+   * Payload is denied (tombstoned or payload-removed): a NEW Archive
+   * export taken from this point forward will exclude BOTH this
+   * Payload's ciphertext AND its linked Envelope (existence, timestamp,
+   * sender, recipient, conversation, envelope id) — closing the exact
+   * gap a committed audit found (`2eed88d9`). Deliberately distinct from
+   * `archiveRetentionWarning` above (which describes archives that
+   * ALREADY exist, unaffected by this Arc, by design). Never
+   * `deletedEverywhere` — this fact says nothing about any OTHER
+   * device, backup, or already-exported file. `false` for every
+   * non-payload assessment (archive-file/device-access/membership-access)
+   * below — none of those targets are affected by this Arc's own fix.
+   */
+  readonly futureArchiveExportExcludesThis: boolean;
 }
 
 function baseAssessmentFields(target: FedosDeletionTarget) {
@@ -94,6 +111,7 @@ export function assessFedosLocalPayloadDeletion(
       warnings: [],
       blocker: "not-found",
       safeSummary: "No such payload is currently known locally.",
+      futureArchiveExportExcludesThis: false,
     };
   }
 
@@ -103,7 +121,14 @@ export function assessFedosLocalPayloadDeletion(
       targetExists: true,
       observations: [
         { target: "local-payload", status },
-        { target: "local-envelope", status },
+        // Secure Runtime Alpha 7481-7560 -- CORRECTED: the live Envelope
+        // record is NEVER touched by local deletion (no delete method
+        // exists on that port; confirmed by this Arc's own Phase A
+        // reconciliation) -- it genuinely remains "present" in LIVE
+        // storage. `futureArchiveExportExcludesThis` below is the
+        // honest, separate fact this Arc's own real Archive-layer fix
+        // provides instead.
+        { target: "local-envelope", status: "present" },
       ],
       availableOperations: evaluation.state === "payload-removed" ? [] : payloadFields.availableOperations.filter((op) => op !== "tombstone"),
       requiresExplicitConfirmation: payloadFields.requiresExplicitConfirmation,
@@ -116,8 +141,9 @@ export function assessFedosLocalPayloadDeletion(
       blocker: evaluation.state === "payload-removed" ? "already-terminal" : "none",
       safeSummary:
         evaluation.state === "payload-removed"
-          ? "Already removed from local history. Any Archive copy, backup, other device, or recipient copy is unaffected."
-          : "Currently tombstoned locally (hidden from normal reads). A further step can remove the local payload and purge the local Search index.",
+          ? "Already removed from local history. Any Archive copy, backup, other device, or recipient copy is unaffected. A NEW Archive export from this point forward will also exclude this message's own metadata (existence, timestamp, sender, recipient)."
+          : "Currently tombstoned locally (hidden from normal reads). A further step can remove the local payload and purge the local Search index. A NEW Archive export from this point forward will also exclude this message's own metadata.",
+      futureArchiveExportExcludesThis: true,
     };
   }
 
@@ -138,6 +164,7 @@ export function assessFedosLocalPayloadDeletion(
     warnings: [...payloadFields.warnings, ...indexFields.warnings],
     blocker: "none",
     safeSummary: "Present locally. Deleting it will tombstone the payload and purge it from the local Search index; it will no longer be reachable by FedOS.",
+    futureArchiveExportExcludesThis: false,
   };
 }
 
@@ -173,6 +200,7 @@ export function assessFedosLocalArchiveFileDeletion(input: FedosDeletionArchiveF
       blocker: resolved.outcome === "invalid-directory" ? "unsupported" : "not-found",
       safeSummary: "No tracked Archive Package file is currently known for this conversation at this location.",
       handle: null,
+      futureArchiveExportExcludesThis: false,
     };
   }
 
@@ -190,6 +218,7 @@ export function assessFedosLocalArchiveFileDeletion(input: FedosDeletionArchiveF
     blocker: "none",
     safeSummary: "A tracked Archive Package file exists for this conversation. Removing it does not change live Conversation history.",
     handle: resolved.handle,
+    futureArchiveExportExcludesThis: false,
   };
 }
 
@@ -218,6 +247,7 @@ export function assessFedosLocalDeviceAccessRevocation(input: FedosDeletionDevic
       warnings: [],
       blocker: "not-found",
       safeSummary: "No such device binding is currently known for this account.",
+      futureArchiveExportExcludesThis: false,
     };
   }
 
@@ -235,6 +265,7 @@ export function assessFedosLocalDeviceAccessRevocation(input: FedosDeletionDevic
       warnings: fields.warnings,
       blocker: "already-terminal",
       safeSummary: "This device's access is already revoked. Anything it already received or decrypted before revocation is unaffected.",
+      futureArchiveExportExcludesThis: false,
     };
   }
 
@@ -251,6 +282,7 @@ export function assessFedosLocalDeviceAccessRevocation(input: FedosDeletionDevic
     warnings: fields.warnings,
     blocker: "none",
     safeSummary: "Revoking this device stops it from receiving future synced content; anything it already holds locally is unaffected.",
+    futureArchiveExportExcludesThis: false,
   };
 }
 
@@ -279,6 +311,7 @@ export function assessFedosLocalMembershipAccessRevocation(input: FedosDeletionM
       warnings: [],
       blocker: "not-found",
       safeSummary: "No such membership is currently known for this conversation.",
+      futureArchiveExportExcludesThis: false,
     };
   }
 
@@ -296,6 +329,7 @@ export function assessFedosLocalMembershipAccessRevocation(input: FedosDeletionM
       warnings: fields.warnings,
       blocker: "already-terminal",
       safeSummary: "This membership is already inactive. This does not imply any payload was deleted.",
+      futureArchiveExportExcludesThis: false,
     };
   }
 
@@ -312,5 +346,6 @@ export function assessFedosLocalMembershipAccessRevocation(input: FedosDeletionM
     warnings: fields.warnings,
     blocker: "none",
     safeSummary: "Revoking this membership prevents further authorized Conversation operations for this participant; it does not delete any payload.",
+    futureArchiveExportExcludesThis: false,
   };
 }

@@ -224,7 +224,7 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Archive Runtime round trip", (
 
     const restore = await receiver.runtime.restoreConversationArchive({ sourcePath: destination, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: COUNTERPARTY_PUBLIC_KEY_HEX, suite: "ChaCha20Poly1305" });
     expect(restore.outcome).toBe("restored");
-    expect(restore.details?.group?.generations).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(restore.details?.group?.generations).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
 
     expect(receiver.groupGenerationPersistence.listGenerations(GROUP_ID).length).toBe(1);
     expect(receiver.groupDirectPathPersistence.listPathsForGeneration(GROUP_ID, GEN_0_ID).length).toBe(1);
@@ -330,7 +330,7 @@ describe("Secure Runtime Alpha 1921-1980 -- Group Archive corruption/security ma
     const receiver = makeHarness({ boundary: sharedBoundary });
     const restore = await receiver.runtime.restoreConversationArchive({ sourcePath: path, localAccountIndex: LOCAL_ACCOUNT_INDEX, counterpartyPublicKeyHex: COUNTERPARTY_PUBLIC_KEY_HEX, suite: "ChaCha20Poly1305" });
     expect(restore.outcome).toBe("partially-invalid");
-    expect(restore.details?.group?.generations).toEqual({ inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 1 });
+    expect(restore.details?.group?.generations).toEqual({ inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 1, denied: 0 });
     // Every OTHER valid Group record (path/message/fanout/child conversation) still restored.
     expect(restore.details?.group?.paths.inserted).toBe(1);
     expect(receiver.groupGenerationPersistence.listGenerations(GROUP_ID).length).toBe(0);

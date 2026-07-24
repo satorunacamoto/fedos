@@ -140,10 +140,10 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Restore", () => {
   it("1. a fresh restore inserts every record", () => {
     const result = restoreFedosConversationArchiveBundle(makeBundle(), deps);
     expect(result.conversation).toBe("inserted");
-    expect(result.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.capabilityEvents).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.envelopes).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
-    expect(result.payloads).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0 });
+    expect(result.memberships).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.capabilityEvents).toEqual({ inserted: 2, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.envelopes).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
+    expect(result.payloads).toEqual({ inserted: 1, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 });
   });
 
   it("2. re-restoring the identical bundle reports every record as a duplicate (already-present)", () => {
@@ -169,7 +169,7 @@ describe("Secure Runtime Alpha 1581-1600 -- Archive Restore", () => {
     const malformed = { ...bundle.envelopes[0]!, keyEpoch: "not-a-number" as unknown as number };
     const withMalformedEnvelope: FedosConversationArchiveBundleV1 = { ...bundle, envelopes: [malformed] };
     const result = restoreFedosConversationArchiveBundle(withMalformedEnvelope, deps);
-    expect(result.envelopes).toEqual({ inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 1 });
+    expect(result.envelopes).toEqual({ inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 1, denied: 0 });
     expect(result.conversation).toBe("inserted");
     expect(result.memberships.inserted).toBe(1);
   });

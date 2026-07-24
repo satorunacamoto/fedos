@@ -81,11 +81,23 @@ export interface FedosConversationArchiveCollectorDependencies {
    * not-found, or a thrown/unavailable Authority — fails closed, mirrors
    * Search's own `#isPermitted()`) is silently excluded from the
    * collected bundle's own `payloads` array — never included, never a
-   * placeholder. Omitted entirely, this collector's behavior is BYTE-FOR-
-   * BYTE UNCHANGED from before this Arc (every existing caller that never
-   * wires retention keeps exporting every payload, exactly as before).
+   * placeholder.
+   *
+   * Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+   * Parity and Metadata Deletion Semantics Arc) — this SAME field now
+   * ALSO gates Envelope collection (below), keyed off each Envelope's own
+   * `payloadId` — closing the exact gap a committed audit found
+   * (`docs/reviews/archive_retention_deletion_audit_194dc448/00_archive_retention_deletion_audit.md`,
+   * `2eed88d9`): Envelope and Payload collection were two independent,
+   * unlinked loops, so an export taken AFTER a Payload was
+   * tombstoned/removed still carried that message's full metadata
+   * (existence, timestamp, sender, recipient, conversation, envelope id)
+   * forward via its own untouched Envelope. Omitted entirely, this
+   * collector's behavior is BYTE-FOR-BYTE UNCHANGED from before this Arc
+   * (every existing caller that never wires retention keeps exporting
+   * every envelope AND every payload, exactly as before).
    */
-  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
 }
 
 /** Fail-closed, mirrors `FedosConversationSearchIndex`'s own `#isPermitted()` (Alpha 2581-2620) exactly: only an explicit `{ outcome: "allowed" }` passes; a thrown error from an unavailable Authority is treated as not-permitted, never as "no gate configured". */
@@ -118,7 +130,17 @@ export function collectFedosConversationArchiveBundle(
 
   const memberships = deps.membershipPersistence.listConversationMemberships(conversationId);
   const capabilityEvents = deps.capabilityPersistence.listConversationCapabilityEvents(conversationId);
-  const envelopes = deps.envelopePersistence.listConversationEnvelopes(conversationId);
+  // Secure Runtime Alpha 7481-7560 -- Envelope collection is now gated by
+  // the SAME `retentionAuthority`, keyed off each Envelope's own
+  // `payloadId` -- an Envelope whose linked Payload is denied is excluded
+  // from the bundle exactly like a denied Payload already is, never a
+  // placeholder/tombstone record (this Arc's own chosen model, see
+  // `docs/secure_runtime_alpha_7481_7560_chosen_archive_model.md`).
+  // Membership/Conversation/Capability collection remain intentionally
+  // UNLINKED -- those are Conversation-level facts, not per-message ones.
+  const envelopes = deps.envelopePersistence
+    .listConversationEnvelopes(conversationId)
+    .filter((envelope) => deps.retentionAuthority === undefined || isPayloadPermitted(deps.retentionAuthority, envelope.payloadId as Parameters<FedosPayloadRetentionAuthority["evaluatePayloadAccess"]>[0]));
 
   const payloadDescriptors = deps.payloadStorage.listConversationPayloads(conversationId);
   const payloads = payloadDescriptors

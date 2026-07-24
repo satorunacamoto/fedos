@@ -52,6 +52,7 @@ import { deserializeFedosConversationMessageEnvelope, serializeFedosConversation
 import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
 import { deserializeFedosConversationPayload } from "../payload_storage/fedos_conversation_payload_codec.js";
 import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
 import { validateFedosGroupGenerationRecord, type FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
 import { validateFedosGroupDirectPathRecord, type FedosGroupDirectPathPersistence } from "../group/fedos_group_direct_path.js";
 import { validateFedosGroupMessageRecord, type FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
@@ -74,9 +75,36 @@ export interface FedosConversationArchiveRestoreDependencies {
   readonly envelopePersistence: FedosConversationMessageEnvelopePersistence;
   readonly payloadStorage: FedosConversationPayloadStorage;
   readonly group?: FedosConversationArchiveGroupRestoreDependencies;
+  /**
+   * Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+   * Parity and Metadata Deletion Semantics Arc) — OPTIONAL, additive
+   * defense-in-depth: re-evaluates the RESTORING device's own CURRENT
+   * retention state for each incoming Envelope/Payload pair (keyed off
+   * the Envelope's own `payloadId`) BEFORE writing either. An
+   * Archive-carried record whose Payload this device has already
+   * tombstoned/removed is never written back, regardless of what the
+   * Archive itself contains — an Archive's own bundled content can never
+   * grant access this device's own live Retention Authority currently
+   * denies. Deliberately gated by `evaluateRetentionDecisionOnly()`, NOT
+   * `evaluatePayloadAccess()`: the restoring device's own Payload Storage
+   * is empty-by-construction for a record restore has not yet written,
+   * so a storage-existence-gated check could never distinguish "already
+   * informed, bytes just not restored yet" from "genuinely foreign" (see
+   * `isPayloadPermittedForRestore()`'s own header below for the full
+   * defect history). `"active"` (no decision on file for this Payload —
+   * either genuinely foreign, or never denied) does NOT block restore —
+   * see the Legacy/Foreign-Restore doc for why: a foreign/new profile has
+   * no basis to deny something it never knew about. Omitted entirely,
+   * restore behavior is BYTE-FOR-BYTE UNCHANGED from before this Arc. A
+   * thrown/unavailable Authority is treated as denied, never as "no gate
+   * configured, allow everything" — mirrors the Collector's own identical
+   * `isPayloadPermitted()` discipline.
+   */
+  readonly retentionAuthority?: Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess" | "evaluateRetentionDecisionOnly">;
 }
 
-export type FedosConversationArchiveSingleRecordOutcome = "inserted" | "duplicate" | "conflict" | "failed" | "invalid";
+/** Secure Runtime Alpha 7481-7560 -- `"denied"` is a NEW outcome, distinct from `"invalid"`: the record is structurally well-formed and passed deep validation, but this device's own CURRENT retention state forbids writing it. Never conflated with a validation failure. */
+export type FedosConversationArchiveSingleRecordOutcome = "inserted" | "duplicate" | "conflict" | "failed" | "invalid" | "denied";
 
 export interface FedosConversationArchiveRestoreOutcomeCounts {
   readonly inserted: number;
@@ -84,6 +112,36 @@ export interface FedosConversationArchiveRestoreOutcomeCounts {
   readonly conflict: number;
   readonly failed: number;
   readonly invalid: number;
+  readonly denied: number;
+}
+
+/**
+ * Fail-closed. Deliberately uses `evaluateRetentionDecisionOnly()`, NOT
+ * `evaluatePayloadAccess()`: the latter gates on this device's own
+ * Payload Storage containing a descriptor for `payloadId` FIRST, which
+ * is ALWAYS empty for a payload restore has not yet written -- exactly
+ * the record this gate exists to check before it is written. Using
+ * `evaluatePayloadAccess()` here would make every fresh restore
+ * indistinguishable from "genuinely foreign," silently defeating
+ * restore-time re-evaluation entirely (Alpha 7481-7560's own
+ * self-discovered defect, fixed here). `evaluateRetentionDecisionOnly()`
+ * answers the actual question: does this device's own retention LOG
+ * already carry a tombstoned/payload-removed decision for this
+ * payloadId, independent of whatever bytes currently exist in storage.
+ * `"active"` (no decision on file -- either genuinely foreign, or this
+ * exact payload was never denied) is permitted; `"tombstoned"` /
+ * `"payload-removed"` are denied; a thrown/unavailable Authority is
+ * treated as denied, never as "no gate configured, allow everything."
+ */
+function isPayloadPermittedForRestore(
+  retentionAuthority: Pick<FedosPayloadRetentionAuthority, "evaluateRetentionDecisionOnly">,
+  payloadId: Parameters<FedosPayloadRetentionAuthority["evaluateRetentionDecisionOnly"]>[0],
+): boolean {
+  try {
+    return retentionAuthority.evaluateRetentionDecisionOnly(payloadId) === "active";
+  } catch {
+    return false;
+  }
 }
 
 /** Secure Runtime Alpha 1921–1980 — the Group Section's own per-domain outcome tally, present iff `bundle.group` was present AND `deps.group` was supplied. `childConversations` is one FULL nested `FedosConversationArchiveRestoreResult` per child Direct Conversation bundle, in the SAME order as `bundle.group.childConversations` — each restored through the SAME top-level replay logic this function already applies (new orchestration, never a second write path). */
@@ -104,8 +162,8 @@ export interface FedosConversationArchiveRestoreResult {
   readonly group?: FedosConversationArchiveGroupRestoreResult;
 }
 
-function zeroCounts(): { inserted: number; duplicate: number; conflict: number; failed: number; invalid: number } {
-  return { inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 0 };
+function zeroCounts(): { inserted: number; duplicate: number; conflict: number; failed: number; invalid: number; denied: number } {
+  return { inserted: 0, duplicate: 0, conflict: 0, failed: 0, invalid: 0, denied: 0 };
 }
 
 function tally(counts: ReturnType<typeof zeroCounts>, outcome: FedosConversationArchiveSingleRecordOutcome): void {
@@ -113,6 +171,7 @@ function tally(counts: ReturnType<typeof zeroCounts>, outcome: FedosConversation
   else if (outcome === "duplicate") counts.duplicate += 1;
   else if (outcome === "conflict") counts.conflict += 1;
   else if (outcome === "failed") counts.failed += 1;
+  else if (outcome === "denied") counts.denied += 1;
   else counts.invalid += 1;
 }
 
@@ -164,11 +223,22 @@ export function restoreFedosConversationArchiveBundle(
     }
   }
 
+  // Secure Runtime Alpha 7481-7560 -- defense-in-depth: re-evaluates the
+  // RESTORING device's own CURRENT retention state for each Envelope's
+  // own `payloadId` BEFORE writing it, symmetric with the Collector's own
+  // export-side gate. An Archive-carried Envelope can never grant access
+  // this device's own live Retention Authority currently denies -- see
+  // `isPayloadPermittedForRestore()`'s own header for the `"not-found"`
+  // (foreign/new profile) exception.
   const envelopeCounts = zeroCounts();
   for (const raw of bundle.envelopes) {
     const runtime = deserializeFedosConversationMessageEnvelope(raw);
     if (runtime === null) {
       tally(envelopeCounts, "invalid");
+      continue;
+    }
+    if (deps.retentionAuthority !== undefined && !isPayloadPermittedForRestore(deps.retentionAuthority, runtime.payloadId)) {
+      tally(envelopeCounts, "denied");
       continue;
     }
     tally(envelopeCounts, fromWriteResult(deps.envelopePersistence.putEnvelope(serializeFedosConversationMessageEnvelope(runtime))));
@@ -179,6 +249,10 @@ export function restoreFedosConversationArchiveBundle(
     const decoded = deserializeFedosConversationPayload(raw);
     if (decoded === null) {
       tally(payloadCounts, "invalid");
+      continue;
+    }
+    if (deps.retentionAuthority !== undefined && !isPayloadPermittedForRestore(deps.retentionAuthority, decoded.descriptor.id)) {
+      tally(payloadCounts, "denied");
       continue;
     }
     tally(payloadCounts, fromWriteResult(deps.payloadStorage.putPayload(decoded.descriptor, decoded.bytes)));

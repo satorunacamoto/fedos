@@ -473,6 +473,7 @@ export class FedosDesktopConversationContentAccessor {
           case "already-present":
           case "conflicts-found":
           case "partially-invalid":
+          case "partially-denied":
             return fedosContentAccessorOk({ operation: "restore", result });
           case "invalid-archive":
             return fedosContentAccessorFailure("invalid-input", "archive file is malformed or unsupported");

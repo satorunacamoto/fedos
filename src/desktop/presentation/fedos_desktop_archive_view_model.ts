@@ -22,6 +22,12 @@ import {
   fedosViewModelFromShellResult,
   type FedosDesktopViewModelState,
 } from "./fedos_desktop_view_model_state.js";
+import {
+  fedosArchiveExportWorkflowWarnings,
+  fedosArchiveRestoreWorkflowWarnings,
+  fedosArchiveInspectWorkflowWarnings,
+  type FedosArchiveWorkflowWarning,
+} from "./safety_center/fedos_archive_workflow_safety_warnings.js";
 
 export class FedosDesktopArchiveViewModel {
   readonly #shell: FedosDesktopApplicationShell;
@@ -33,6 +39,21 @@ export class FedosDesktopArchiveViewModel {
 
   get state(): FedosDesktopViewModelState<FedosContentAccessorArchiveValue> {
     return this.#state;
+  }
+
+  /**
+   * Secure Runtime Alpha 7481-7560 -- closes a committed audit's own
+   * Section 5 finding (`2eed88d9`): the Archive workflow itself never
+   * surfaced any warning. A Renderer calls this BEFORE (and alongside)
+   * any Archive operation to show the specific, accurate warnings for
+   * THAT operation -- never the generic Safety Center overview screen
+   * alone. Pure, read-only, reuses the SAME canonical warning-text
+   * lookup every other Safety Center surface already uses.
+   */
+  workflowWarnings(operation: "inspect" | "preflightRestore" | "export" | "restore"): readonly FedosArchiveWorkflowWarning[] {
+    if (operation === "export") return fedosArchiveExportWorkflowWarnings();
+    if (operation === "preflightRestore" || operation === "restore") return fedosArchiveRestoreWorkflowWarnings();
+    return fedosArchiveInspectWorkflowWarnings();
   }
 
   /** Reads an archive container's cleartext Manifest only -- never decrypts (closest real "summary"/"verify" this base has, see the Content Accessor's own header). */

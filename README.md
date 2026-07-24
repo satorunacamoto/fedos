@@ -8,6 +8,55 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7481–7560 — FedOS Archive Envelope
+> Retention Parity and Metadata Deletion Semantics Arc (FULL
+> COMPLETION).** Remediates a committed audit's own headline finding
+> (`2eed88d9`): Payload collection was retention-gated on Archive export,
+> but Envelope collection was not, so an Archive taken after a deletion
+> could still preserve and later restore message existence, timestamp,
+> sender, recipient, conversation association, and envelope identity even
+> once content was inaccessible. Fix: the SAME `retentionAuthority`
+> dependency now gates BOTH Envelope and Payload collection on export,
+> keyed by the same `payloadId` — one denial excludes both records,
+> never an independent, disagreeing check. A NEW, additive restore-time
+> gate re-evaluates the RESTORING device's own current retention state
+> before writing either record back, closing the honest defense-in-depth
+> gap for an OLDER (pre-deletion) Archive restored onto a device that has
+> since independently learned of the deletion — proven live via a real,
+> no-mocks vertical slice with real two-profile WASM crypto: a fresh
+> "already-informed" device restoring a pre-deletion Archive reports the
+> new `"partially-denied"` outcome and never resurfaces the deleted
+> message, while a genuinely foreign/never-informed device restores it in
+> full, an honestly disclosed limitation, never fabricated global
+> deletion propagation. A real, self-discovered defense-in-depth defect
+> was found and fixed during this same Arc's own vertical-slice test:
+> the obvious restore-time gate reused the existing
+> `evaluatePayloadAccess()`, whose Payload-Storage-existence check made
+> every fresh restore indistinguishable from "genuinely foreign" (a fresh
+> device's own storage is empty by construction at the exact moment
+> restore's own check runs, before restore itself has written anything) —
+> silently defeating the intended re-evaluation. Fixed with a new,
+> narrow, additive public method,
+> `FedosPayloadRetentionAuthority.evaluateRetentionDecisionOnly()`, that
+> checks the retention decision log directly, independent of storage
+> presence. Also found and fixed, beyond the audit's own named scope: the
+> Deletion Capability Registry's own `"local-envelope"` entry falsely
+> claimed `reachableToday: true` with real supported operations, though no
+> executor for it exists anywhere; and the deletion-assessment's own
+> "denied" branch wrongly claimed the live Envelope record mirrors its
+> Payload's tombstoned/removed state, when in live storage it always
+> remains present. Safety Center now surfaces three new, accurate
+> warnings, both on the generic overview screen and inside the Archive
+> workflow itself (previously silent there, a separate audit finding).
+> Schema version unchanged (still `1`); zero Ratchet/Identity/NIP-17/
+> Secure Memory/Outbox/Scheduler changes. Ran as one of two parallel Arcs
+> in separate worktrees; the sibling Arc's own domain (Conversation
+> Outbox/Scheduler) was never touched, verified via a dedicated
+> structural guard. See
+> `docs/secure_runtime_alpha_7481_7560_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7401–7480 — FedOS Direct Conversation
 > Route Binding and NIP-17 Inbound Isolation Arc (FULL COMPLETION).**
 > Closes a real security-correctness defect proven during Alpha 7241–7320:

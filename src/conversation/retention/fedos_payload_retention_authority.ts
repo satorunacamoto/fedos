@@ -118,6 +118,30 @@ export class FedosPayloadRetentionAuthority {
     return { outcome: "denied", state };
   }
 
+  /**
+   * Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+   * Parity and Metadata Deletion Semantics Arc) — pure preview, checks
+   * ONLY the retention decision log, deliberately WITHOUT
+   * `evaluatePayloadAccess()`'s own payload-storage-existence gate.
+   *
+   * `evaluatePayloadAccess()` is correct for LIVE reads (a payload that
+   * was never downloaded/stored has nothing to protect, so
+   * `"not-found"` is the honest answer) but WRONG for Archive
+   * restore-time re-evaluation: at the exact moment a fresh restore
+   * checks whether to write a Payload, that Payload's own storage entry
+   * does not exist YET on this device by construction (restore is the
+   * one process that would create it) — so `evaluatePayloadAccess()`
+   * would ALWAYS answer `"not-found"` during a fresh restore, even when
+   * a real, durable retention decision already exists, silently
+   * defeating the exact defense-in-depth restore is supposed to provide.
+   * This method answers the question restore actually needs: "does this
+   * device's own retention LOG say this payload is denied, regardless
+   * of whether its bytes currently exist in storage."
+   */
+  evaluateRetentionDecisionOnly(payloadId: FedosConversationPayloadId): FedosPayloadRetentionState {
+    return this.#currentState(payloadId);
+  }
+
   /** Alpha 811 — the narrow gated read: retention state is checked BEFORE `payloadStorage.getPayload()` is ever called. */
   readPayload(payloadId: FedosConversationPayloadId): FedosGatedPayloadReadResult {
     const evaluation = this.evaluatePayloadAccess(payloadId);

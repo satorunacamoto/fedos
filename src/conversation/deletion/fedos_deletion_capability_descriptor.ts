@@ -88,18 +88,35 @@ const FEDOS_DELETION_CAPABILITY_REGISTRY: Readonly<Record<FedosDeletionTarget, F
     localSupport: true,
     reachableToday: true,
   }),
+  /**
+   * Secure Runtime Alpha 7481-7560 (FedOS Archive Envelope Retention
+   * Parity and Metadata Deletion Semantics Arc) — CORRECTED. A committed
+   * audit (`2eed88d9`) and this Arc's own Phase A reconciliation
+   * independently confirmed this entry previously overclaimed
+   * `reachableToday: true` with real `supportedOperations` — but no live
+   * Envelope delete method, plan-step, or executor exists anywhere in
+   * this codebase (`fedos_deletion_plan.ts`'s own `target` union
+   * structurally supports only `"local-payload"`/`"local-index"`;
+   * `executeFedosLocalPayloadDeletionPlan()` never touches Envelope
+   * persistence). The live Envelope record survives every local
+   * deletion by design (Alpha 854/858) — there is nothing to tombstone.
+   * This Arc's own real fix operates at the ARCHIVE layer only (export/
+   * restore parity, see `fedos_conversation_archive_collector.ts`), never
+   * by adding a live Envelope-delete capability — "Fail Closed over
+   * fabrication" requires this descriptor to say so honestly.
+   */
   "local-envelope": descriptor({
     target: "local-envelope",
-    supportedOperations: ["tombstone", "logical-delete"],
-    evidenceClass: "local-observed",
-    requiresExplicitConfirmation: true,
+    supportedOperations: [],
+    evidenceClass: "none",
+    requiresExplicitConfirmation: false,
     idempotent: true,
     reversible: false,
     mayRetainBackups: true,
     mayRetainRemoteCopies: true,
-    userVisibleLimitationCode: "logical-only-bytes-may-remain",
-    localSupport: true,
-    reachableToday: true,
+    userVisibleLimitationCode: "not-implemented",
+    localSupport: false,
+    reachableToday: false,
   }),
   "local-index": descriptor({
     target: "local-index",
