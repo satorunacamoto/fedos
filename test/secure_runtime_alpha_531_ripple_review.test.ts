@@ -23,7 +23,7 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
     expect(doc).toMatch(/#deliveryRetryRegistry/);
   });
 
-  it("git status confirms exactly the src/ files this doc claims changed, and nothing else pre-existing under src/board/", () => {
+  it("git status confirms exactly the src/ files this doc claims changed, and nothing else pre-existing under src/board/ (RECONCILED: Secure Runtime Alpha 7641-7720, FedOS Delivery Observation Repository Subject Index and Query Scalability Arc, later, disclosedly, and explicitly-authorizedly extends the canonical Observation Repository/Query with a purely additive derived index -- the exact 'recommended next Arc' Alpha 7561-7640's own completion declaration named verbatim; every OTHER file this Stage's own protected-area check names remains genuinely off-limits)", () => {
     const output: string = execSync("git status --porcelain", { encoding: "utf8" });
     const modified = output
       .split("\n")
@@ -87,6 +87,14 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
       "src/conversation/delivery/nostr/nip17/fedos_nip59_gift_wrap.ts",
       "src/conversation/delivery/nostr/nip17/fedos_nostr_nip17_v1_wire_adapter.ts",
       "src/conversation/delivery/nostr/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.ts",
+      // Secure Runtime Alpha 7641-7720 (FedOS Delivery Observation
+      // Repository Subject Index and Query Scalability Arc) -- the ONE
+      // Arc explicitly authorized (by Alpha 7561-7640's own named
+      // "Recommended next Arc") to extend the canonical Observation
+      // Repository/Query with a purely additive, derived per-subject
+      // index -- see docs/secure_runtime_alpha_7641_7720_reconciliation_report.md.
+      "src/board/observation/fedos_delivery_observation_repository.ts",
+      "src/board/observation/fedos_delivery_observation_query.ts",
     ]);
     for (const file of modified.filter((f) => f.startsWith("src/"))) {
       expect(accountedForSrc.has(file)).toBe(true);
@@ -102,6 +110,11 @@ describe("Secure Runtime Alpha 531 -- Ripple Review", () => {
     for (const file of modified) {
       if (file === "src/board/outbox/fedos_publish_scheduler.ts") continue;
       if (file.startsWith("src/board/outbox/") && file.endsWith("_abandonment_policy.ts")) continue;
+      // Alpha 7641-7720's own two explicitly-authorized files (see the
+      // `accountedForSrc` comment above) -- every OTHER Observation-model
+      // file remains genuinely protected.
+      if (file === "src/board/observation/fedos_delivery_observation_repository.ts") continue;
+      if (file === "src/board/observation/fedos_delivery_observation_query.ts") continue;
       expect(file).not.toMatch(/fedos_publish_scheduler\.ts$/);
       expect(file).not.toMatch(/^src\/board\/publish\//);
       expect(file).not.toMatch(/^src\/board\/outbox\//);

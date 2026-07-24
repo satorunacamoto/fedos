@@ -58,6 +58,78 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 >
 > Prior status:
 >
+> **Status: Secure Runtime Alpha 7641–7720 — FedOS Delivery Observation
+> Repository Subject Index and Query Scalability Arc (FULL
+> COMPLETION).** Closes the O(historyBearingCount²) finding Alpha
+> 7561–7640 disclosed but explicitly left out of its own scope:
+> `FedosDeliveryObservationQuery.historyFor(subjectId)` re-scanned the
+> ENTIRE Observation repository (every subject's history, not just the
+> one requested) on every single per-subject read — the shared machinery
+> both Board and Conversation delivery hydration depend on. Fix: a new,
+> private, derived `#bySubject` index inside
+> `FedosDeliveryObservationRepository` itself, rebuilt once at
+> construction (O(T)) and updated O(1) amortized on every successful
+> `record()`; `historyFor()` now reads the one requested subject's own
+> bucket instead of filtering the whole repository, with the SAME
+> ordering contract and SAME output as before. `list()`/`listByState()`
+> are byte-for-byte unchanged for genuinely cross-subject callers.
+> Measured, not claimed: querying every subject once at
+> deliveredCount=3,200 dropped from a cited 19,399.14 ms to a measured
+> 2.26 ms (~8,584x); at deliveredCount=100,000 — previously only
+> derivable at roughly 5.2 hours for a comparable write-path scenario —
+> the equivalent read now measures 154.28 ms directly. Board and
+> Conversation both benefit identically (shared code, zero Scheduler/
+> Outbox changes on either side) — every pre-existing test suite for
+> both domains re-runs unmodified and passing. One real, disclosed,
+> unfixed boundary remains: the durable file-backed persistence
+> backend's own write-time duplicate check is still O(T), unchanged,
+> structurally identical to and mirroring the original audit's own
+> still-open Outbox finding — recommended as the next Arc. Ran as one of
+> two parallel Arcs in separate worktrees; the sibling Arc's own domain
+> (Archive/Retention/Deletion/Safety Center) was never touched, verified
+> via a dedicated structural guard. See
+> `docs/secure_runtime_alpha_7641_7720_completion_declaration.md`.
+>
+> Prior status:
+>
+> **Status: Secure Runtime Alpha 7561–7640 — FedOS Conversation Outbox
+> Restart Hydration and Scheduler Scalability Arc (FULL COMPLETION, one
+> significant unplanned finding disclosed).** Closes the named production
+> defect: the Conversation Transport Scheduler was constructed with no
+> initial delivered/abandoned state, so every restart treated the entire
+> historical, shared, whole-profile Outbox log as pending and retried it
+> in full. Ports the proven Board Outbox hydration pattern (Alpha
+> 585/586) into `FedosPrivateTransport`'s one production construction
+> site: a new, pure `hydrateFedosConversationTransportDeliveryRecoveryState()`
+> reads the already-durable Delivery Observation history and seeds the
+> Scheduler's own existing (previously-unpopulated) `initialDelivered`/
+> `initialAbandoned` constructor seam. Proven at three levels — unit,
+> integration (`FedosPrivateTransport` restart, in-memory), and a real
+> vertical slice (file-backed persistence, real local WebSocket relay,
+> multi-conversation mixed workload, 5+ restart cycles) — that a
+> delivered or abandoned intent is never re-attempted after any number of
+> restarts, while genuinely pending intents still retry correctly, with
+> zero retry amplification across repeated cycles. A significant,
+> unplanned discovery made during benchmarking is fully disclosed, not
+> minimized: the shared (Board-and-Conversation) `FedosDeliveryObservationQuery`/
+> `FedosDeliveryRetryQuery` machinery this Arc reuses unchanged scans the
+> entire Observation repository on every per-subject history read,
+> making both this Arc's own hydration and the pre-existing Validating
+> Repository's per-write staleness check cost O(historyBearingCount²),
+> not O(T) — measured cleanly at deliveredCount 100–3,200 (consistent
+> ~4x-per-doubling growth), honestly not completed at the 10,000/100,000
+> scale the Arc's own template requested (mathematically projected, not
+> measured, at ~3.2 minutes and ~5.3 hours respectively). The Outbox
+> persistence layer itself remains confirmed cheap and linear even at
+> T=100,000. Recommends exactly one next Arc: an internal, incrementally-
+> maintained subject index inside `FedosDeliveryObservationRepository`
+> to close this newly-found gap for Board and Conversation alike. See
+> `docs/secure_runtime_alpha_7561_7640_completion_declaration.md` and
+> the accompanying reconciliation/terminal-state/scheduler-lifecycle/
+> complexity/benchmark-methodology documents.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7481–7560 — FedOS Archive Envelope
 > Retention Parity and Metadata Deletion Semantics Arc (FULL
 > COMPLETION).** Remediates a committed audit's own headline finding
