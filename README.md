@@ -8,6 +8,45 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 7961–8040 — FedOS Secure Runtime Staged
+> Master Landing and Desktop Beta Release Candidate Arc (FULL
+> COMPLETION).** Lands the complete, converged Secure Runtime lineage
+> (Alpha 931 through Alpha 7960, `81b5f0d1`) into local `master` through
+> 7 audited checkpoints (the real commit graph turned out to be a DAG,
+> not a line — revised honestly mid-execution rather than forcing a false
+> linear narrative), with zero new regression. Found and fixed a real,
+> release-blocking defect during the real packaged-Electron acceptance
+> pass: a single unreachable or temporarily-offline relay configured in
+> Settings crashed the ENTIRE Desktop Runtime startup — and therefore
+> profile creation itself — instead of degrading gracefully for just that
+> one relay. Root cause: `FedosConversationInboundSubscription.start()`
+> called `relay.subscribe()` unconditionally on every configured relay,
+> and `FedosRelay.subscribe()` throws for one that never actually
+> connected, even though `connectAll()` already tolerates a per-relay
+> connection failure by its own documented contract. Fixed by skipping an
+> unconnected relay before subscribing, in both the original file (Alpha
+> 1471-1540) and Alpha 7881-7960's own suppression inbound subscription
+> (which mirrored the same idiom and inherited the same defect).
+> Regression-proven: the full Electron acceptance suite runs 149/149
+> passing (serialized — default parallel test-file concurrency produces
+> confirmed, repeatability-tested resource-contention flake from many
+> concurrent real Electron subprocess launches, not a code defect). Also
+> reconciled three stale test assumptions found live during the same
+> pass (Direct Conversation Archive export now genuinely succeeds through
+> the real packaged IPC surface; the Safety Center overview's real
+> settled shape nests `sections` under `summary`; a secret-scan regex
+> incorrectly flagged the public, non-secret word "signature"). Built and
+> verified real release artifacts from the landed lineage: a real NSIS
+> installer and portable ZIP, checksums independently re-derived and
+> matched, 0 secret-scan findings across 752 staging files, real WASM
+> hash confirmed embedded correctly. Local `master` fast-forwarded
+> (`3eb9eadd` → `aed0951`, zero conflicts, full history preserved) and a
+> local `release/fedos-desktop-beta-0.1` branch created with real release
+> notes — no push, no tag, no publication, no remote change of any kind.
+> See `docs/secure_runtime_alpha_7961_8040_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7881–7960 — FedOS Delivery Observation
 > Durable Write Index, Archive Suppression Production Wiring, and Final
 > Public Release Readiness Arc (FULL COMPLETION).** Closes the two
