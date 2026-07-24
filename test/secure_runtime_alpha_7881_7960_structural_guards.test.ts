@@ -165,8 +165,7 @@ describe("Secure Runtime Alpha 7881-7960 -- structural guards", () => {
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
-    const untrackedLines = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], { cwd: REPO_ROOT, encoding: "utf8" })
-      .toString()
+    const untrackedLines = (execFileSync("git", ["ls-files", "--others", "--exclude-standard"], { cwd: REPO_ROOT, encoding: "utf8" }) as unknown as string)
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
