@@ -1,5 +1,44 @@
 # FedOS Runtime Positioning — Secure Runtime Platform, Desktop-first
 
+> **Status update: Secure Runtime Alpha 8281-8360 — Production Cleanup
+> and Repository Consolidation Arc.** Everything below this box is the
+> ORIGINAL positioning document (Stage ~700s era), written before the
+> real, shipped Desktop Beta product existed, and is preserved unchanged
+> as historical context. Since then, the "Production activation — no
+> real cryptography executes anywhere" line in §3 has become historically
+> inaccurate: real production crypto activation now exists, but as a
+> SEPARATE tree this document's own Runtime chain never connects to. This
+> repository contains two, largely-disconnected Runtime/crypto paths
+> today; the diagram below is the current, accurate picture (full trace:
+> `docs/reviews/fedos_dead_runtime_production_path_v1/01_production_path_graph.md`
+> and `02_non_production_path_graph.md`):
+>
+> ```
+> Path A -- ORIGINAL product ("nostr-window"), described by this document below
+>   src/worker.ts (Cloudflare Worker, no deploy config in this repo today)
+>     -> src/runtime/create_runtime.ts  (createRuntime() / AppRuntime)
+>          -> initializeCrypto()  =>  always { allowed: false, reason: "PrototypeDisabled" }
+>          -> (reaches fedos_crypto_loader_facade.ts and stops -- never
+>              reaches fedos_wasm_loader.ts, WebAssembly, or Rust)
+>   Reachable from: src/worker.ts, and 295 test files. NOT reachable from
+>   the shipped Desktop app.
+>
+> Path B -- REAL product actually shipped: FedOS Desktop Beta (Electron)
+>   packages/fedos-desktop-electron-spike/  (electron_builder.beta.config.json -> main)
+>     -> src/desktop/production_activation/*
+>          -> fedos_profile_initialization_coordinator.ts  (real identity bootstrap)
+>          -> real WASM-backed crypto via packages/fedos-core-rust (Rust)
+>   This path NEVER constructs an AppRuntime and NEVER calls create_runtime.ts.
+> ```
+>
+> Both paths are real and tested; neither is "the mistake." The
+> confusion this update fixes is purely that one repository, one
+> `package.json`, and one `README.md` describe two coexisting products,
+> and this document (like `create_runtime.ts` itself) only ever described
+> Path A. See `docs/reviews/fedos_dead_runtime_production_path_v1/`
+> (Dead Runtime Paths / Production-Path Consolidation V1 review) for the
+> full evidence trail. No code changed by this update.
+
 **Status: this document is a SCOPE/POSITIONING statement only — it
 adds no code, changes no fixed value, and does not alter any existing
 guard test's outcome.** It exists to fix, in writing, what "FedOS"

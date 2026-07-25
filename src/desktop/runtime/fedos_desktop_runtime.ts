@@ -892,6 +892,23 @@ export async function startFedosDesktopRuntime(
   // collapses to one of the nine closed capability outcomes (Alpha 1263);
   // Runtime startup itself never fails because production crypto could
   // not be assembled (Alpha 1264/1275).
+  //
+  // Secure Runtime Alpha 8281-8360 -- Production Cleanup Arc: this is the
+  // LEGACY resolution path, superseded in preference (not in function) by
+  // `canonicalCryptoGraph` below (Alpha 7161-7240). A prior read-only
+  // review (`docs/reviews/fedos_dead_runtime_production_path_v1/`)
+  // proposed removing this call as provably redundant, based on a grep of
+  // the private `productionCryptoCapability` local alone; this Arc's own
+  // direct re-verification found `productionCryptoGraph` (the OTHER local
+  // this call assigns) still used as a real `??` fallback throughout this
+  // function, and found real tests
+  // (`secure_runtime_alpha_7081_7160_real_vertical_slice`,
+  // `secure_runtime_alpha_6521_6600_failure_matrix`,
+  // `secure_runtime_alpha_1261_1320_production_gate_semantics`) that
+  // still supply `conversationProductionCrypto` directly and depend on
+  // this exact path. Left unmodified, and not recommended for removal in
+  // any future Arc without first re-deciding the fate of those tests'
+  // own scenarios.
   let productionCryptoCapability: FedosConversationProductionCryptoCapabilityOutcome = "disabled";
   let productionCryptoGraph: FedosConversationProductionCryptoGraph | null = null;
   if (config.conversationProductionCrypto !== undefined) {

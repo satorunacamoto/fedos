@@ -1,4 +1,20 @@
 /**
+ * Secure Runtime Alpha 8281-8360 -- Production Cleanup and Repository
+ * Consolidation Arc: **this is NOT the Desktop Beta's real identity
+ * bootstrap**, despite `FedosDesktopHost` genuinely constructing and
+ * starting this class during real production Host startup. It bootstraps
+ * a permanently-unrelated Alpha-050-era `FedosRuntimeIdentity`, entirely
+ * separate from the Desktop app's actual identity/profile bootstrap
+ * (`fedos_profile_initialization_coordinator.ts`), which is constructed
+ * and invoked independently, one layer up. This class is genuinely live
+ * (not dead code) -- it is simply unrelated to the identity you are
+ * probably looking for. See
+ * `docs/reviews/fedos_dead_runtime_production_path_v1/07_misleading_naming.md`
+ * (item 6) for the full trace of why this wiring exists and what it
+ * actually does. Nothing below this banner is changed by this Arc.
+ */
+
+/**
  * Secure Runtime Alpha 096 ("Desktop Shell Skeleton") — the FIRST file
  * anywhere in `src/desktop/`, and the first REAL implementation Stage
  * of the Desktop Shell Foundation Arc (Alpha 096–100), following the
