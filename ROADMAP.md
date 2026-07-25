@@ -21,6 +21,15 @@ which source commit each item traces back to.
    task; explicitly not done automatically by this consolidation.
 3. Fill `SECURITY.md`'s vulnerability-reporting contact placeholder with
    a real channel once one exists.
+4. Select a project license (or explicitly decide to remain
+   proprietary) — see `LICENSE_STATUS.md`. Blocks Public Beta;
+   does not block the Closed Beta pilot.
+5. Complete a human/legal decision on code-signing before Public Beta —
+   see the HUMAN DECISION REQUIRED section this Arc added on that topic
+   (release-artifact provenance docs).
+6. Complete real legal review and human ownership assignment for the
+   Privacy Policy and Terms drafts before presenting either as approved
+   policy — see each draft's own DRAFT status header.
 
 ## P0 / P1 — real, measured, not yet fixed
 

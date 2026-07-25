@@ -154,3 +154,19 @@ the full source-to-doc mapping.
     disconnected fossil code from before the product pivot — reachable
     only from the original vision's own entry point and ~295 tests,
     never from the shipped app. See `ARCHITECTURE.md`.
+
+## Legal and licensing
+
+28. **No open-source (or other) license has been selected for this
+    repository's own original code.** Under default copyright law, this
+    means "all rights reserved" — nobody outside this project currently
+    has explicit permission to copy, modify, or redistribute this
+    code. This blocks Public Beta (a wider release than the current
+    Closed Beta pilot) until resolved. See `LICENSE_STATUS.md` and
+    `THIRD_PARTY_NOTICES.md`.
+29. Dependency licenses are real and already inventoried
+    (`THIRD_PARTY_NOTICES.md`, regenerate with
+    `node scripts/generate_third_party_notices.mjs`) — no forced-copyleft
+    dependency was found across 313 npm packages / 82 Rust crates as of
+    this writing, but that inventory is a preliminary scan, not a
+    substitute for real legal review once a project license is chosen.
