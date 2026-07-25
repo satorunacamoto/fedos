@@ -58,6 +58,20 @@ before relying on it for anything sensitive.
   screen-capture tool is entirely outside this application's protection
   boundary.** No application-level defense against any of these exists or
   is claimed.
+- **A second preload bridge, `window.fedosAcceptance`, exists alongside
+  the real `window.fedosApp`** and is a structurally permanent part of
+  this codebase, not an oversight — it carries a wider test-automation
+  command vocabulary and is exposed only when a recognized
+  `FEDOS_ELECTRON_BETA_AUTOTEST` mode is set, verified absent from an
+  ordinary packaged launch by a real subprocess check, not merely a
+  convention. Anyone who can set that environment variable on a running
+  install has access to it.
+- **Device-signature evidence is checked only during Ratchet session
+  reset, on a best-effort basis** — not during a Direct conversation's
+  initial session establishment.
+
+See `ARCHITECTURE.md` for the full trust-boundary map and crypto
+primitive inventory this status list summarizes.
 
 ## Reporting a vulnerability
 
@@ -72,6 +86,5 @@ unpatched vulnerability.
 
 - This is a Beta build. Treat it as suitable for testing and feedback, not
   for protecting information where compromise would cause serious harm.
-- See `docs/secure_runtime_alpha_8041_8120_completion_declaration.md` and
-  the in-app Safety Center for the current, real, per-subsystem security
-  state.
+- See `KNOWN_LIMITATIONS.md`, `ARCHITECTURE.md`, and the in-app Safety
+  Center for the current, real, per-subsystem security state.

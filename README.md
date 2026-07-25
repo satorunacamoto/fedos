@@ -5,11 +5,19 @@ messenger**, built on the Nostr protocol (NIP-17 private Direct messages)
 with a real Double-Ratchet session per conversation. It is currently in
 **Closed Beta**: no independent, external security audit has been performed,
 the installer is not code-signed, and Group Messaging is intentionally not
-exposed in this pilot (see `docs/desktop_beta_known_limitations.md` and the
-in-app Safety Center for the full, honest limitations list). This repository
-began as a much broader "Reddit-style window into Nostr" project — that
-original, broader vision is preserved below as historical/future-roadmap
-material; it is **not** what the shipped Desktop Beta product is today.
+exposed in this pilot (see `KNOWN_LIMITATIONS.md` and the in-app Safety
+Center for the full, honest limitations list). This repository began as a
+much broader "Reddit-style window into Nostr" project — that original,
+broader vision is preserved below as historical/future-roadmap material;
+it is **not** what the shipped Desktop Beta product is today.
+
+**Start here:** `ARCHITECTURE.md` (system design and trust boundaries),
+`SECURITY.md` (security status and disclosures), `KNOWN_LIMITATIONS.md`
+(the full honest limitations list), `BUILDING.md` (build/release
+process), `ROADMAP.md` (deferred and future work), `CONTRIBUTING.md`
+(Arc conventions). This file's own Status section below is this
+repository's append-only, newest-first changelog of every landed Arc —
+useful for history, not the place to start.
 
 ## Original project vision (historical / future roadmap, not shipped today)
 
