@@ -22,7 +22,9 @@
     "scripts": {}
   },
   "extraFiles": [
-    { "from": "../../dist", "to": "dist" }
+    { "from": "../../dist", "to": "dist" },
+    { "from": "../../LICENSE", "to": "LICENSE.txt" },
+    { "from": "../../THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
   ],
   "extraResources": [
     { "from": "../fedos-core-rust/pkg", "to": "fedos-core-rust/pkg" }
