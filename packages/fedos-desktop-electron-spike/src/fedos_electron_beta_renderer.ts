@@ -1343,6 +1343,19 @@ async function onSettingsSave(): Promise<void> {
       byId("settings-report").textContent = `Saved. Restart the application for Relay changes to take effect.${languageNote}`;
     } else if (report.outcome === "persisted-and-applied" || report.outcome === "no-change") {
       byId("settings-report").textContent = `Saved.${languageNote}`;
+    } else if (report.outcome === "persisted-but-blocked") {
+      // Secure Runtime Alpha 8441-8520 -- real, currently-reproducible bug
+      // found by an independent Go/No-Go revalidation (review
+      // d6cb95d0), confirmed by direct source reading: a save touching
+      // ONLY a field with no accepted application boundary (today:
+      // language, auto-start, auto-lock -- see SettingsDescriptor)
+      // reaches this outcome, which fell through to the generic error
+      // branch below even though the save genuinely SUCCEEDED --
+      // Alpha 8361-8440's own languageNote fix (bc8482d2, reconciled
+      // into this Arc) only covered the two SUCCESS branches above, never
+      // this one, so it did not actually close the bug it targeted. This
+      // is a real success shown as a real error; fixed here.
+      byId("settings-report").textContent = `Saved — this preference is stored, but no part of this Beta currently reads or applies it yet.${languageNote}`;
     } else {
       byId("settings-error").textContent = describeOutcome(report.outcome);
     }
