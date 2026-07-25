@@ -1,4 +1,26 @@
 /**
+ * Secure Runtime Alpha 8281-8360 -- Production Cleanup and Repository
+ * Consolidation Arc: **this is NOT the FedOS Secure Messenger Desktop
+ * Beta's production Runtime.** This file builds `AppRuntime`, the Runtime
+ * for the ORIGINAL "nostr-window" product (`src/worker.ts`, a Cloudflare
+ * Worker) -- the repository's earliest product, still real and still
+ * tested (295 test files), but with no deployment configuration in this
+ * repository today (no `wrangler.toml`, no `deploy` script). The shipped
+ * Desktop app never constructs an `AppRuntime` and has its own, entirely
+ * separate crypto/Runtime path: `src/desktop/production_activation/*`,
+ * reached from `packages/fedos-desktop-electron-spike/`. If you are
+ * looking for how the Desktop app boots its Runtime or activates crypto,
+ * start there instead. See `docs/reviews/fedos_dead_runtime_production_path_v1/`
+ * (Dead Runtime Paths / Production-Path Consolidation V1 review) for the
+ * full traced graph of both products and why they coexist in one
+ * repository. Nothing below this banner is changed by this Arc --
+ * `AppRuntime`/`initializeCrypto()`/`PrototypeDisabled` remain exactly as
+ * documented, kept intentionally (108-295 test files depend on this
+ * object's shape; see that review's own `09`/`12` for why deleting it is
+ * explicitly NOT recommended).
+ */
+
+/**
  * Stage 21 — `createRuntime`: the one place that picks every boundary.
  *
  * Each `select*` reads (never mutates) the `RuntimeEnv` and returns a concrete

@@ -1,4 +1,28 @@
 /**
+ * Secure Runtime Alpha 8281-8360 -- Production Cleanup and Repository
+ * Consolidation Arc: `FedosWasmLoaderSkeleton`/`assembleFedosConversationProductionCryptoGraph()`
+ * (the production-crypto-graph factory built on top of this file) is a
+ * REAL, still-tested, LEGACY crypto-resolution path in
+ * `src/desktop/runtime/fedos_desktop_runtime.ts` -- confirmed still
+ * exercised directly by `test/secure_runtime_alpha_7081_7160_real_vertical_slice.test.ts`,
+ * `test/secure_runtime_alpha_6521_6600_failure_matrix.test.ts`, and
+ * `test/secure_runtime_alpha_1261_1320_production_gate_semantics.test.ts`
+ * (each supplies `conversationProductionCrypto` directly), and used
+ * throughout that file as a real `??` fallback (`productionCryptoGraph`)
+ * alongside the newer, PREFERRED `canonicalCryptoGraph` path (Alpha
+ * 7161-7240) wherever a caller has not supplied the newer canonical
+ * authority. **This is NOT dead code** -- a prior review's own narrower
+ * grep (checking only the private local variable
+ * `productionCryptoCapability`, not the graph itself) under-counted its
+ * real reachability; this Arc's own direct re-verification found real
+ * callers and left this file and its call site unmodified rather than
+ * remove it. See
+ * `docs/reviews/fedos_dead_runtime_production_path_v1/09_guard_test_impact_map.md`
+ * for the original, narrower claim this banner corrects. Nothing below
+ * this banner is changed by this Arc.
+ */
+
+/**
  * Stage 489–492 — FedOS WASM Loader Skeleton (standalone, unwired,
  * fixed-value only).
  *

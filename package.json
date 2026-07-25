@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Reddit-style window into Nostr — MVP prototype (Stage 1: read-only event ingest).",
+  "description": "FedOS Desktop — a focused, end-to-end encrypted Direct-message secure messenger (Closed Beta), built on Nostr (NIP-17) with a Double Ratchet session per conversation. Originally began as \"nostr-window,\" a broader Reddit-style window into Nostr (MVP prototype, Stage 1: read-only event ingest); see README.md for the full history.",
   "scripts": {
     "typecheck:core": "tsc --noEmit",
     "typecheck:electron": "npm run typecheck --prefix packages/fedos-desktop-electron-spike",
