@@ -134,9 +134,31 @@ A (canonical state reconciliation) · B (README split + guard test) · C
 (SECURITY.md reporting channel) · F (external audit bundle landed +
 revalidated) · G (code-signing truth, independently verified) · H
 (Privacy/Terms status + informed-consent path) · I (technical defects
-verified, one new bug found and fixed) · J (clean build/release proof)
-· K (Closed Pilot vs. Public Beta matrix) · L (master/release landing,
-see below).
+verified, one new bug found and fixed) · J (clean build/release proof,
+two independent full passing runs) · K (Closed Pilot vs. Public Beta
+matrix) · L (master/release landing, below).
+
+## Phase L — master/release landing
+
+- `master` fast-forwarded (`git merge --ff-only`, from the primary
+  checkout) from `59a0307b` to this Arc's own final commit tip. No
+  merge commit; a pure fast-forward.
+- Before the fast-forward, the primary checkout's working tree had an
+  untracked `docs/reviews/fedos_external_security_audit_bundle_v1/`
+  directory that would have been overwritten (19 of 20 files
+  byte-identical to this Arc's own landed copies; `00_audit_package.md`
+  differed by one extra paragraph, consistent with another concurrent
+  session's own uncommitted work-in-progress in the same shared
+  checkout). Nothing was deleted: the whole directory was moved aside
+  to a clearly-labeled sibling path
+  (`docs/reviews/fedos_external_security_audit_bundle_v1__untracked_backup_preserved_20260726/`,
+  itself untracked) before the fast-forward, so that other session's
+  work remains fully recoverable.
+- `release/fedos-desktop-beta-0.1` updated via `git merge --no-ff`
+  (from its own dedicated worktree, `C:\wt\fedos-desktop-beta-0.1-release`),
+  matching this branch's own established merge-commit convention from
+  prior Arcs. Clean merge, no conflicts.
+- No push, no tag, no publication. Both landings are local-only.
 
 ## Verdict
 
