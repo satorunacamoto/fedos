@@ -215,3 +215,41 @@ step — and it is the instrument Phase 2 needs to prove it worked.
 does not change that.** It removes the two design blockers that made it
 inexpressible, and makes its absence impossible to ship silently. The
 protocol work that actually delivers it is `01_migration_plan.md`.
+
+---
+
+## 8. Verification
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | 4 errors, all pre-existing baseline, **none in changed files** |
+| New suite `fedos_direct_conversation_forward_secrecy_route` | **16 / 16 passed** |
+| Existing `secure_runtime_alpha_1111_1180_direct_messaging` | **23 / 23 passed** — routing genuinely unchanged |
+| Release build (`npm run release:beta`) | **OK, all 9 stages** |
+| Secret scan | **OK — 753 staging files, 0 findings** |
+| Checksum verify | **OK — 3 files** |
+
+Release artifacts, built from a clean detached worktree at `58ccb56d`
+(unsigned):
+
+| Artifact | SHA-256 |
+|---|---|
+| `FedOS-Desktop-Beta-Setup-0.1.0-beta.1.exe` | `ecdc3b0d4ef266e27146258969a6c0badb7218aeb79215eca24b8a49c871ce7a` |
+| `FedOS Desktop Beta-0.1.0-beta.1-win.zip` | `825afe22b1c4f0ac6a5833d152e795203ce0cae998cdb003d3e38c4a2ae29a43` |
+
+### Coverage limits, stated rather than implied
+
+The 16 new tests are behavioural against the selection function. The
+Runtime-level wiring (`forwardSecrecySelector` construction in
+`FedosConversationRuntime`) is covered by typecheck plus the existing
+direct-messaging suite, **not** by a dedicated end-to-end assertion that a
+real packaged send reports `forwardSecrecy:false`. That assertion belongs
+with Phase 3, where it becomes meaningful — a real two-profile relay slice
+showing `false` before session establishment and `true` after.
+
+The `REAL crypto, REAL WASM` ratchet vertical slices
+(`secure_runtime_alpha_5561_5640_real_vertical_slice` and siblings) remain
+**unrunnable in this environment**, failing at participant construction with
+`unsupported-runtime` from the staged WASM loader's dev-only gate. That is a
+pre-existing condition unrelated to this Arc, and it means the Ratchet's own
+end-to-end behaviour was not re-exercised here.
