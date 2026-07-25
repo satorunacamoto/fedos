@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 // The Rust crate / repo files as strings (Vite `?raw` works on any file type).
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
@@ -204,10 +205,7 @@ describe("FedOS Rust crate — crypto capability matrix + diagnostics preview (S
   });
 
   it("13. no committed .wasm / target / Cargo.lock / build artifact under the new crypto/ directory", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/src/crypto/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths("src/crypto");
     expect(paths.length).toBeGreaterThanOrEqual(2);
     for (const path of paths) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);

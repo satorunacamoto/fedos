@@ -211,6 +211,47 @@ function setAppStatus(text: string): void {
   byId("app-status-area").textContent = text;
 }
 
+/**
+ * Secure Runtime Alpha 8121-8200 -- real, disclosed gap this Arc's own
+ * extended vertical slice found live: `#app-status-area` existed in the
+ * nav bar but was never populated with real Relay connectivity, so "one
+ * unreachable Relay does not invalidate the whole profile" had no visible
+ * confirmation anywhere. Polls the SAME real `relayStatus()` command a
+ * manual check would call; a bounded interval (not a hidden background
+ * timer beyond this ONE nav-bar area), started once at Ready and never
+ * stopped by screen navigation (unlike the chat-only message poll) since
+ * the nav bar itself is always visible once unlocked.
+ */
+async function refreshRelayStatus(): Promise<void> {
+  const result = await window.fedosApp.relayStatus();
+  if (result.outcome !== "ok") {
+    setAppStatus("");
+    return;
+  }
+  const relays = (result.value as readonly { readonly url: string; readonly connected: boolean }[]) ?? [];
+  if (relays.length === 0) {
+    setAppStatus("No Relay configured");
+    return;
+  }
+  const connectedCount = relays.filter((r) => r.connected).length;
+  // Honest copy only: this Runtime's own `WebSocketRelay` (Alpha 214/215,
+  // `src/desktop/websocket_relay.ts`) has "NO automatic reconnect, retry,
+  // storage, or global event bus of its own" -- a deliberate, repeatedly-
+  // documented contract, not an oversight (see also `fedos_conversation_relay_set.ts`:
+  // "no reconnect/backoff policy of any kind"). A disconnected Relay stays
+  // disconnected until the user locks and unlocks again (each unlock builds
+  // a fresh `WebSocketRelay` and reconnects it) -- there is no passive
+  // background retry to describe, so this text must never claim one.
+  setAppStatus(connectedCount === relays.length ? `${connectedCount}/${relays.length} Relay connected` : `${connectedCount}/${relays.length} Relay connected — lock and unlock again to retry`);
+}
+
+let relayStatusIntervalId: ReturnType<typeof setInterval> | null = null;
+function startRelayStatusPolling(): void {
+  if (relayStatusIntervalId !== null) return;
+  void refreshRelayStatus();
+  relayStatusIntervalId = setInterval(() => void refreshRelayStatus(), 3000);
+}
+
 // ---------------------------------------------------------------------
 // Phase E — Conversations list + chat.
 // ---------------------------------------------------------------------
@@ -232,7 +273,6 @@ function renderConversationsList(filterText: string): void {
     const lifecycle = String(c.lifecycleState ?? "");
     const activation = String(c.activationStatus ?? "");
     const title = document.createElement("div");
-    title.innerHTML = "";
     title.appendChild(document.createTextNode(`${mode} conversation `));
     const badge = document.createElement("span");
     badge.className = `status-badge status-${activation === "ready" ? "available" : "available-development-only"}`;
@@ -625,21 +665,36 @@ async function refreshDevicesList(): Promise<void> {
       const revokeBtn = document.createElement("button");
       revokeBtn.type = "button";
       revokeBtn.textContent = "Revoke";
-      revokeBtn.addEventListener("click", () => void onDeviceRevoke(d.deviceId, d.devicePublicKeyRef as string, d.label ?? d.deviceId));
+      revokeBtn.addEventListener("click", () => void onDeviceRevoke(d.deviceId, d.devicePublicKeyRef as string, d.label ?? d.deviceId, revokeBtn));
       li.appendChild(revokeBtn);
     }
     list.appendChild(li);
   }
 }
 
-async function onDeviceRevoke(deviceId: string, devicePublicKeyHex: string, label: string): Promise<void> {
+/**
+ * Secure Runtime Alpha 8121-8200 -- Security Finding 2 (external audit
+ * delta `6873d24f`): `revokeBtn` is disabled for the duration of the
+ * request (mirrors `onChatSend()`'s own established `setBusy()`
+ * discipline, applied directly to this dynamically-created button since
+ * it has no static id `setBusy()` could look up). This is a UX guard
+ * only -- the REAL, authoritative boundary remains the backend's own
+ * idempotent revoke handling; disabling the button never substitutes for it.
+ */
+async function onDeviceRevoke(deviceId: string, devicePublicKeyHex: string, label: string, revokeBtn: HTMLButtonElement): Promise<void> {
   if (!window.confirm(`Revoke "${label}"? This removes its trust for future messages. It does not delete copies that Device already has.`)) return;
-  const result = await window.fedosApp.deviceRevoke(deviceId, devicePublicKeyHex);
-  if (result.outcome !== "ok") {
-    showError("devices-error", result);
-    return;
+  if (revokeBtn.disabled) return;
+  revokeBtn.disabled = true;
+  try {
+    const result = await window.fedosApp.deviceRevoke(deviceId, devicePublicKeyHex);
+    if (result.outcome !== "ok") {
+      showError("devices-error", result);
+      return;
+    }
+    await refreshDevicesList();
+  } finally {
+    revokeBtn.disabled = false;
   }
-  await refreshDevicesList();
 }
 
 // ---------------------------------------------------------------------
@@ -729,10 +784,23 @@ async function refreshIdentityTransitionList(): Promise<void> {
 async function openIdentityTransition(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): Promise<void> {
   currentIdentityTransitionSelection = { peerAccountRef, peerDeviceRef, transitionId };
   const result = await window.fedosApp.identityTransitionOpen(peerAccountRef, peerDeviceRef, transitionId);
-  renderIdentityTransitionDetail(result);
+  renderIdentityTransitionDetail(result, { peerAccountRef, peerDeviceRef, transitionId });
 }
 
-function renderIdentityTransitionDetail(result: { readonly outcome: string; readonly value?: unknown; readonly reason?: string }): void {
+/**
+ * Secure Runtime Alpha 8121-8200 -- Security Finding 3 (`6873d24f`):
+ * `target` is captured HERE, once, from the exact `openIdentityTransition()`
+ * call that produced this render, and closed over by each button below --
+ * never re-read from the shared, mutable `currentIdentityTransitionSelection`
+ * at click time. If the user opens a DIFFERENT item while this render's
+ * own decision is still in flight, `currentIdentityTransitionSelection`
+ * may change, but these buttons' own closures cannot: a click always
+ * decides the item that was actually on screen when it was clicked.
+ */
+function renderIdentityTransitionDetail(
+  result: { readonly outcome: string; readonly value?: unknown; readonly reason?: string },
+  target: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string },
+): void {
   const container = byId("identity-transition-detail");
   container.textContent = "";
   if (result.outcome !== "ok") {
@@ -773,27 +841,56 @@ function renderIdentityTransitionDetail(result: { readonly outcome: string; read
   const acceptBtn = document.createElement("button");
   acceptBtn.type = "button";
   acceptBtn.textContent = "Accept";
-  acceptBtn.addEventListener("click", () => void decideIdentityTransition("accept"));
-  container.appendChild(acceptBtn);
   const rejectBtn = document.createElement("button");
   rejectBtn.type = "button";
   rejectBtn.textContent = "Reject";
-  rejectBtn.addEventListener("click", () => void decideIdentityTransition("reject"));
-  container.appendChild(rejectBtn);
   const deferBtn = document.createElement("button");
   deferBtn.type = "button";
   deferBtn.textContent = "Defer";
-  deferBtn.addEventListener("click", () => void decideIdentityTransition("defer"));
+  // Secure Runtime Alpha 8121-8200 -- Security Finding 2: all three
+  // buttons are disabled together while ANY one decision on this item is
+  // in flight (they are mutually exclusive actions on the SAME item, a
+  // rapid click on a different one is exactly as much a double-submit
+  // risk as clicking the same one twice). UX guard only -- the real
+  // boundary is the Controller's own `#actionInFlight` (Security Finding 3).
+  const decisionButtons = [acceptBtn, rejectBtn, deferBtn];
+  acceptBtn.addEventListener("click", () => void decideIdentityTransition("accept", target, decisionButtons));
+  rejectBtn.addEventListener("click", () => void decideIdentityTransition("reject", target, decisionButtons));
+  deferBtn.addEventListener("click", () => void decideIdentityTransition("defer", target, decisionButtons));
+  container.appendChild(acceptBtn);
+  container.appendChild(rejectBtn);
   container.appendChild(deferBtn);
 }
 
-async function decideIdentityTransition(decision: "accept" | "reject" | "defer"): Promise<void> {
-  if (currentIdentityTransitionSelection === null) return;
+async function decideIdentityTransition(
+  decision: "accept" | "reject" | "defer",
+  target: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string },
+  decisionButtons: readonly HTMLButtonElement[],
+): Promise<void> {
   if (decision === "accept" && !window.confirm("Accept this new identity? This is a trust decision you make yourself — it cannot be undone automatically.")) return;
-  const result =
-    decision === "accept" ? await window.fedosApp.identityTransitionAccept() : decision === "reject" ? await window.fedosApp.identityTransitionReject() : await window.fedosApp.identityTransitionDefer();
-  renderIdentityTransitionDetail(result);
-  await refreshIdentityTransitionList();
+  if (decisionButtons.some((b) => b.disabled)) return;
+  for (const b of decisionButtons) b.disabled = true;
+  try {
+    const result =
+      decision === "accept"
+        ? await window.fedosApp.identityTransitionAccept(target.peerAccountRef, target.peerDeviceRef, target.transitionId)
+        : decision === "reject"
+          ? await window.fedosApp.identityTransitionReject(target.peerAccountRef, target.peerDeviceRef, target.transitionId)
+          : await window.fedosApp.identityTransitionDefer(target.peerAccountRef, target.peerDeviceRef, target.transitionId);
+    // Only re-render the detail view if `target` is STILL what's selected --
+    // a decision made on an item the user has since navigated away from
+    // must never clobber a newer item's own detail view.
+    if (
+      currentIdentityTransitionSelection !== null &&
+      currentIdentityTransitionSelection.transitionId === target.transitionId &&
+      currentIdentityTransitionSelection.peerDeviceRef === target.peerDeviceRef
+    ) {
+      renderIdentityTransitionDetail(result, target);
+    }
+    await refreshIdentityTransitionList();
+  } finally {
+    for (const b of decisionButtons) b.disabled = false;
+  }
 }
 
 const DELETION_WARNING_TEXT: Readonly<Record<string, string>> = {
@@ -833,10 +930,11 @@ async function refreshDeletionRequestList(): Promise<void> {
 async function openDeletionRequest(requestId: string): Promise<void> {
   currentDeletionRequestId = requestId;
   const result = await window.fedosApp.deletionRequestOpen(requestId);
-  renderDeletionRequestDetail(result);
+  renderDeletionRequestDetail(result, requestId);
 }
 
-function renderDeletionRequestDetail(result: { readonly outcome: string; readonly value?: unknown }): void {
+/** Secure Runtime Alpha 8121-8200 -- Security Finding 3: `targetRequestId` is captured from the exact `openDeletionRequest()` call that produced this render and closed over by the buttons below -- mirrors `renderIdentityTransitionDetail()`'s own reasoning exactly. */
+function renderDeletionRequestDetail(result: { readonly outcome: string; readonly value?: unknown }, targetRequestId: string): void {
   const container = byId("deletion-request-detail");
   container.textContent = "";
   if (result.outcome !== "ok") {
@@ -868,22 +966,35 @@ function renderDeletionRequestDetail(result: { readonly outcome: string; readonl
     const approveBtn = document.createElement("button");
     approveBtn.type = "button";
     approveBtn.textContent = "Approve";
-    approveBtn.addEventListener("click", () => void decideDeletionRequest("approve"));
-    container.appendChild(approveBtn);
     const rejectBtn = document.createElement("button");
     rejectBtn.type = "button";
     rejectBtn.textContent = "Reject";
-    rejectBtn.addEventListener("click", () => void decideDeletionRequest("reject"));
+    // Secure Runtime Alpha 8121-8200 -- Security Finding 2: both buttons
+    // disabled together while either decision is in flight -- mirrors
+    // `decideIdentityTransition()`'s own reasoning exactly.
+    const decisionButtons = [approveBtn, rejectBtn];
+    approveBtn.addEventListener("click", () => void decideDeletionRequest("approve", targetRequestId, decisionButtons));
+    rejectBtn.addEventListener("click", () => void decideDeletionRequest("reject", targetRequestId, decisionButtons));
+    container.appendChild(approveBtn);
     container.appendChild(rejectBtn);
   }
 }
 
-async function decideDeletionRequest(decision: "approve" | "reject"): Promise<void> {
-  if (currentDeletionRequestId === null) return;
+async function decideDeletionRequest(decision: "approve" | "reject", targetRequestId: string, decisionButtons: readonly HTMLButtonElement[]): Promise<void> {
   if (decision === "approve" && !window.confirm("Approve this deletion request? This never guarantees removal everywhere — see the warnings above.")) return;
-  await (decision === "approve" ? window.fedosApp.deletionRequestApprove() : window.fedosApp.deletionRequestReject());
-  byId("deletion-request-detail").textContent = "";
-  await refreshDeletionRequestList();
+  if (decisionButtons.some((b) => b.disabled)) return;
+  for (const b of decisionButtons) b.disabled = true;
+  try {
+    await (decision === "approve" ? window.fedosApp.deletionRequestApprove(targetRequestId) : window.fedosApp.deletionRequestReject(targetRequestId));
+    // Only clear the detail view if `targetRequestId` is STILL what's open --
+    // mirrors `decideIdentityTransition()`'s own reasoning.
+    if (currentDeletionRequestId === targetRequestId) {
+      byId("deletion-request-detail").textContent = "";
+    }
+    await refreshDeletionRequestList();
+  } finally {
+    for (const b of decisionButtons) b.disabled = false;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -1042,6 +1153,7 @@ function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   showAppScreen("conversations");
   void refreshConversationsList();
   setAppStatus("");
+  startRelayStatusPolling();
 }
 
 function routeByStatus(status: FedosProfileStatusResult): void {
@@ -1054,6 +1166,7 @@ function routeByStatus(status: FedosProfileStatusResult): void {
     void renderBetaStatus();
     showAppScreen("conversations");
     void refreshConversationsList();
+    startRelayStatusPolling();
     return;
   }
   if (status.presence === "absent") {
@@ -1074,6 +1187,12 @@ async function refreshFromStatus(): Promise<void> {
 }
 
 async function onCreateSubmit(): Promise<void> {
+  // Secure Runtime Alpha 8121-8200 -- Security Finding 4: defense in
+  // depth against any earlier session generation's leftover content
+  // (the normal path already clears everything in `onLock()`; this
+  // guards the same invariant for a session that reached this screen
+  // without a clean lock -- e.g. recovery-required cycling back here).
+  clearAllRendererContentState();
   const label = byId<HTMLInputElement>("create-label").value.trim();
   const pass = byId<HTMLInputElement>("create-pass").value;
   const confirm = byId<HTMLInputElement>("create-pass-confirm").value;
@@ -1115,6 +1234,11 @@ async function onCreateSubmit(): Promise<void> {
 }
 
 async function onUnlockSubmit(): Promise<void> {
+  // Secure Runtime Alpha 8121-8200 -- Security Finding 4: same defense in
+  // depth as `onCreateSubmit()` -- see that call's own comment. Applies
+  // whether this unlock succeeds or fails; a WRONG passphrase must not
+  // leave any earlier generation's content still cached either.
+  clearAllRendererContentState();
   const pass = byId<HTMLInputElement>("unlock-pass").value;
   byId("unlock-error").textContent = "";
   if (pass.length === 0) {
@@ -1194,14 +1318,109 @@ async function onRecoveryCopyDiagnostic(): Promise<void> {
   }
 }
 
+function stopRelayStatusPolling(): void {
+  if (relayStatusIntervalId !== null) {
+    clearInterval(relayStatusIntervalId);
+    relayStatusIntervalId = null;
+  }
+}
+
+/**
+ * Secure Runtime Alpha 8121-8200 — Security Finding 4 (external audit
+ * delta `6873d24f`): clears every Renderer-held content-shaped value this
+ * page accumulates — the revealed-plaintext cache (§6/§11 item 4, the
+ * review's own headline concern), every list/detail cache, every
+ * content-bearing DOM container, and every free-text input — so no
+ * old-generation content can remain visible or re-appear after a fresh
+ * unlock (of the SAME or a DIFFERENT profile) without being freshly
+ * reloaded through the new Runtime. Called on lock, before create/unlock
+ * establishes a new session (defense in depth against any earlier
+ * generation's leftover state), and on unlock failure.
+ *
+ * Best-effort JS-level clearing only (`Map.clear()`, reassigning `[]`,
+ * `textContent = ""`, `.value = ""`) — this is NOT a claim of guaranteed
+ * physical RAM erasure or garbage-collector timing; V8 may retain freed
+ * memory pages until its own GC cycle runs. No raw secret (a
+ * `SecretHandle`, Master Seed, or private key) has ever been held by this
+ * Renderer to begin with (confirmed: `docs/reviews/.../01_delta_review_alpha_8041_8120.md`
+ * §6) — everything cleared here is already-decrypted DISPLAY content
+ * (message text, search hits, identity/device labels), which is exactly
+ * the class of content this finding is about.
+ */
+function clearAllRendererContentState(): void {
+  stopChatPolling();
+  stopRelayStatusPolling();
+
+  // In-memory caches/selections.
+  revealedMessagePlaintext.clear();
+  conversationsCache = [];
+  currentConversationId = null;
+  currentIdentityTransitionSelection = null;
+  currentDeletionRequestId = null;
+  archiveExportDestinationPath = null;
+  archiveRestoreSourcePath = null;
+  settingsWorkingCopy = null;
+  localAccountPublicIdentifier = "";
+
+  // Content-bearing DOM containers (list/detail views, error text, status/feedback text).
+  const textContentOnlyIds = [
+    "chat-messages",
+    "chat-title",
+    "chat-meta",
+    "chat-error",
+    "chat-send-feedback",
+    "conversations-list",
+    "conversations-error",
+    "search-results",
+    "search-error",
+    "archive-export-dest-label",
+    "archive-export-error",
+    "archive-restore-manifest",
+    "archive-restore-source-label",
+    "archive-restore-counterparty",
+    "archive-restore-error",
+    "identity-transition-detail",
+    "identity-transition-list",
+    "deletion-request-detail",
+    "deletion-request-list",
+    "devices-list",
+    "devices-error",
+    "safety-sections",
+    "safety-error",
+    "invite-error",
+    "recovery-copy-feedback",
+    "settings-report",
+    "settings-relay-error",
+    "settings-relay-list",
+    "ready-account",
+    "ready-label",
+    "ready-device",
+    "ready-trust",
+    "app-status-area",
+  ];
+  for (const id of textContentOnlyIds) {
+    const el = document.getElementById(id);
+    if (el !== null) el.textContent = "";
+  }
+
+  // Free-text input fields a prior session's own typing/paste may have left behind.
+  const inputValueOnlyIds = ["chat-compose", "conversations-filter", "search-query", "invite-identifier", "archive-export-conversation-id", "settings-relay-new"];
+  for (const id of inputValueOnlyIds) {
+    const el = document.getElementById(id);
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.value = "";
+  }
+}
+
 async function onLock(): Promise<void> {
   stopChatPolling();
+  stopRelayStatusPolling();
   setBusy(true, "lock-btn");
   try {
     await window.fedosProfile.lock();
   } finally {
     setBusy(false, "lock-btn");
   }
+  clearAllRendererContentState();
   await refreshFromStatus();
 }
 

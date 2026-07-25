@@ -10,6 +10,7 @@ import policyDocSource from "../docs/public_algorithm_policy.md?raw";
 import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /**
  * Stage 106 — public algorithm policy metadata (planning only), part 2 of
@@ -226,10 +227,7 @@ describe("FedOS Rust crate — public algorithm policy metadata (Stage 106)", ()
   });
 
   it("14. no .wasm / target / Cargo.lock artifact is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     for (const path of paths) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
       expect(/\/(target|build)\//i.test(path), `unexpected build dir artifact: ${path}`).toBe(

@@ -135,21 +135,23 @@ interface FedosAppBridge {
   readonly devicePairingComplete: (pairingId: string, encodedApproval: string) => Promise<FedosAppCommandResult>;
   readonly identityTransitionList: (limit?: number, offset?: number) => Promise<FedosAppCommandResult>;
   readonly identityTransitionOpen: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
-  readonly identityTransitionAccept: () => Promise<FedosAppCommandResult>;
-  readonly identityTransitionReject: () => Promise<FedosAppCommandResult>;
-  readonly identityTransitionDefer: () => Promise<FedosAppCommandResult>;
+  readonly identityTransitionAccept: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionReject: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionDefer: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
   readonly identityTransitionRecordManualVerification: (method: string, noteCode: string) => Promise<FedosAppCommandResult>;
   readonly deletionRequestListReceived: () => Promise<FedosAppCommandResult>;
   readonly deletionRequestOpen: (requestId: string) => Promise<FedosAppCommandResult>;
-  readonly deletionRequestApprove: () => Promise<FedosAppCommandResult>;
-  readonly deletionRequestReject: () => Promise<FedosAppCommandResult>;
+  readonly deletionRequestApprove: (requestId: string) => Promise<FedosAppCommandResult>;
+  readonly deletionRequestReject: (requestId: string) => Promise<FedosAppCommandResult>;
   readonly safetyCenterOverview: () => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
+  readonly relayStatus: () => Promise<FedosAppCommandResult>;
 }
 
 interface Window {
   readonly fedosProfile: FedosProfileBridge;
   readonly fedosBeta: FedosBetaBridge;
-  readonly fedosAcceptance: FedosAcceptanceBridge;
+  /** Secure Runtime Alpha 8121-8200 — genuinely optional now: only defined when explicit acceptance mode is active (Security Finding 1, `6873d24f`). Absent (not merely unused) in an ordinary packaged production launch. */
+  readonly fedosAcceptance?: FedosAcceptanceBridge;
   readonly fedosApp: FedosAppBridge;
 }

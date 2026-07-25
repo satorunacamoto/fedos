@@ -1,0 +1,22 @@
+# Secure Runtime Alpha 8121-8200 -- Reproducibility Finding 1 (external
+# clean-checkout audit `73fc0b2`): on a Windows machine with
+# `core.autocrlf=true` and no `.gitattributes`, every tracked text file is
+# checked out with CRLF even though every committed blob is already
+# LF-only (confirmed: `git show HEAD:<path> | grep -c $'\r'` returns 0 for
+# every sampled file type -- .ts/.md/.rs/.json/.html/.gitignore). This was
+# the root cause of ~330 of ~365 clean-checkout test failures the review
+# found: structural-guard tests whose regexes assume a bare `\n` (e.g.
+# `/(^|\n)\/pkg\/(\n|$)/`) never match text that was silently rewritten to
+# `\r\n` at checkout time. Adding this file changes NOTHING about the
+# already-LF committed blobs -- it only pins the WORKING-TREE CHECKOUT to
+# LF regardless of a contributor's own local `core.autocrlf` setting, so
+# no repository-wide renormalization commit is needed or included here.
+#
+# This repository has no tracked binary files and no tracked
+# Windows-native script files (.bat/.cmd/.ps1) as of this Arc (confirmed:
+# `git ls-files` inventory, Alpha 8121-8200's own reconciliation report) --
+# a single blanket rule is therefore the narrowest correct policy. If a
+# genuine binary or Windows-native-CRLF-required file is ever added, give
+# it its own more specific line ABOVE this one (`git-attributes` uses
+# last-match-wins per path).
+* text=auto eol=lf

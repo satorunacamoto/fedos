@@ -142,8 +142,16 @@ export interface FedosRealLocalWebSocketRelayServer {
   close(): Promise<void>;
 }
 
-/** Starts a real local relay server bound to an ephemeral port on 127.0.0.1. Resolves once genuinely listening. */
-export async function startFedosRealLocalWebSocketRelayServer(): Promise<FedosRealLocalWebSocketRelayServer> {
+/**
+ * Starts a real local relay server bound to an ephemeral port on 127.0.0.1
+ * (or, if `port` is given, that EXACT port -- Secure Runtime Alpha 8121-8200:
+ * lets a caller genuinely restart a relay server on the SAME address a
+ * disconnected `WebSocketRelay` client is already configured with, to
+ * exercise a real reconnect via the client's own real, unmodified
+ * `connect()`/next-unlock path, never a second, different relay URL
+ * scripted into the client mid-test). Resolves once genuinely listening.
+ */
+export async function startFedosRealLocalWebSocketRelayServer(options?: { readonly port?: number }): Promise<FedosRealLocalWebSocketRelayServer> {
   const connections = new Map<Socket, Connection>();
   let lastDeliveries: ReadonlyArray<{ readonly subId: string; readonly eventObj: unknown }> = [];
 
@@ -242,7 +250,7 @@ export async function startFedosRealLocalWebSocketRelayServer(): Promise<FedosRe
     }
   }
 
-  await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => httpServer.listen(options?.port ?? 0, "127.0.0.1", resolve));
   const address = httpServer.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
 

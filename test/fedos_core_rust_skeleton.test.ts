@@ -3,6 +3,7 @@ import {
   createFedosCoreCrypto,
   PlaceholderFedosCoreCrypto,
 } from "../packages/fedos-core-rust/src/index.js";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 // The Rust skeleton files as strings (Vite `?raw` works on any file type).
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
@@ -276,19 +277,13 @@ describe("FedOS Rust crate skeleton", () => {
   });
 
   it("9. no .wasm file is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    for (const path of Object.keys(files)) {
+    for (const path of fedosCoreRustGitTrackedPaths()) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
     }
   });
 
   it("10. no build/ or target/ artifact is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    for (const path of Object.keys(files)) {
+    for (const path of fedosCoreRustGitTrackedPaths()) {
       expect(/\/(build|target)\//i.test(path), `unexpected build artifact: ${path}`).toBe(false);
     }
   });

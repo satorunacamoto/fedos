@@ -201,31 +201,46 @@ export class FedosDeletionRequestController {
     return result.outcome === "ok" ? result.value : null;
   }
 
-  /** Duplicate submission is prevented — a second call while one is already in flight is a silent no-op, mirroring `FedosDeviceManagementController`'s own established discipline. */
-  async approveSelected(): Promise<void> {
+  /**
+   * Secure Runtime Alpha 8121-8200 — Security Finding 3 (external audit
+   * delta `6873d24f`): the REAL authorization boundary, mirroring
+   * `FedosIdentityTransitionController`'s own `#decideById()` exactly.
+   * The Shell's own `deletionRequestApprove(requestId)`/`deletionRequestReject(requestId)`
+   * were ALREADY id-based; only `navigation.selectedRequestId` (mutable)
+   * was the race-prone layer. A decision now always targets EXACTLY the
+   * requestId passed in, regardless of what has since been opened.
+   */
+  async approve(requestId: string): Promise<void> {
+    await this.#decideById(requestId, "approve");
+  }
+
+  async reject(requestId: string): Promise<void> {
+    await this.#decideById(requestId, "reject");
+  }
+
+  async #decideById(requestId: string, decision: "approve" | "reject"): Promise<void> {
     if (this.#actionInFlight) return;
-    const requestId = this.navigation.selectedRequestId;
-    if (requestId === null) return;
     this.#actionInFlight = true;
     try {
-      await this.#shell.deletionRequestApprove(requestId);
+      if (decision === "approve") await this.#shell.deletionRequestApprove(requestId);
+      else await this.#shell.deletionRequestReject(requestId);
       await this.refreshReceivedInbox();
     } finally {
       this.#actionInFlight = false;
     }
   }
 
-  async rejectSelected(): Promise<void> {
-    if (this.#actionInFlight) return;
+  /** Retained for any existing selection-based caller — delegates to the exact-id path above using `navigation.selectedRequestId`. New callers (the ordinary `fedos-app:*` IPC path, Alpha 8121-8200) should prefer `approve()`/`reject()` directly. */
+  async approveSelected(): Promise<void> {
     const requestId = this.navigation.selectedRequestId;
     if (requestId === null) return;
-    this.#actionInFlight = true;
-    try {
-      await this.#shell.deletionRequestReject(requestId);
-      await this.refreshReceivedInbox();
-    } finally {
-      this.#actionInFlight = false;
-    }
+    await this.approve(requestId);
+  }
+
+  async rejectSelected(): Promise<void> {
+    const requestId = this.navigation.selectedRequestId;
+    if (requestId === null) return;
+    await this.reject(requestId);
   }
 
   /** Clears a terminal item from view (local presentation state only — the durable decision record itself is never deleted). */

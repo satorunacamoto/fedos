@@ -19,6 +19,7 @@ import wasmLoaderSource from "../packages/fedos-core-rust/src/wasm_loader.ts?raw
 import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /** A loader whose load() throws — proves the safe wrapper never propagates it. */
 class ThrowingWasmLoader implements FedosCoreWasmLoader {
@@ -183,10 +184,7 @@ describe("FedOS Core WASM loader is not auto-wired into the core", () => {
 
 describe("FedOS Core WASM loader ships no WASM/Rust and no cryptography", () => {
   it("12. no .wasm file is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     expect(paths.some((p) => p.endsWith("/src/wasm_loader.ts"))).toBe(true);
     for (const path of paths) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
@@ -198,10 +196,7 @@ describe("FedOS Core WASM loader ships no WASM/Rust and no cryptography", () => 
     // must stay absent is any COMPILED output: no `.wasm`, no `.rlib`/`.so`/
     // `.dll`/`.dylib`/`.node`/`.a`/`.o`, no committed `Cargo.lock`, and no
     // `target/`/`build/` artifacts.
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
     const forbiddenName = /\/Cargo\.lock$/i;
     const forbiddenDir = /\/(target|build)\//i;

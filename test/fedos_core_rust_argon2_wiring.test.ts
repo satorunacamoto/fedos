@@ -9,6 +9,7 @@ import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
 import rfc9106Vectors from "../test-vectors/kdf/argon2id-rfc9106.json";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /**
  * Stage 85 — wire the RFC 9106 Argon2id vectors
@@ -283,10 +284,7 @@ describe("FedOS Rust crate — RFC 9106 Argon2id vectors wired to cargo test", (
   });
 
   it("11. no .wasm / Cargo.lock / target / build artifact is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     for (const path of paths) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
       expect(/\/(target|build)\//i.test(path), `unexpected build dir artifact: ${path}`).toBe(

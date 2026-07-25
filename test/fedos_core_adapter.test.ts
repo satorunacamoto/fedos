@@ -10,6 +10,7 @@ import type {
 } from "../packages/fedos-core-rust/src/index.js";
 import { FedosCoreCryptoProvider } from "../src/crypto/fedos_core_adapter.js";
 import type { CryptoProvider, EncryptRequest } from "../src/crypto/types.js";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 // Sources as strings: prove no crypto-library import and no auto-wiring.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import pkgIndexSource from "../packages/fedos-core-rust/src/index.ts?raw";
@@ -220,16 +221,14 @@ describe("FedOS core package has no real cryptography", () => {
   });
 
   it("15. no compiled WASM / Rust binary is committed to the package", () => {
-    // Enumerate every committed file in the package via Vite's glob (no import,
-    // keys only) — no node:fs types needed. Stage 69 allows a Rust crate SKELETON
-    // (Cargo.toml + src/lib.rs); what must stay absent is any COMPILED artifact.
-    const files = (
-      import.meta as unknown as {
-        glob: (pattern: string) => Record<string, unknown>;
-      }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
-    // Sanity: the glob actually found the package's committed files.
+    // Secure Runtime Alpha 8121-8200 -- Reproducibility Finding 2 (`73fc0b2`):
+    // enumerate ACTUALLY git-tracked files (`git ls-files`), never raw
+    // filesystem presence -- a locally-built, gitignored artifact must
+    // never flip this test merely by existing on disk. Stage 69 allows a
+    // Rust crate SKELETON (Cargo.toml + src/lib.rs); what must stay absent
+    // is any COMMITTED compiled artifact.
+    const paths = fedosCoreRustGitTrackedPaths();
+    // Sanity: the check actually found the package's committed files.
     expect(paths.some((p) => p.endsWith("/src/index.ts"))).toBe(true);
     const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
     const forbiddenName = /\/Cargo\.lock$/i;

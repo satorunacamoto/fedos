@@ -378,4 +378,90 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
     },
     120000,
   );
+
+  it(
+    "Phase K steps 15-18 -- the real nav-bar Relay status indicator (Secure Runtime Alpha 8121-8200) shows a genuinely connected Relay, then a genuinely disconnected one with HONEST copy (this Runtime's own WebSocketRelay has no automatic reconnect/backoff of any kind -- src/desktop/websocket_relay.ts, src/conversation/transport/relay/fedos_conversation_relay_set.ts), then recovers once the user really locks and unlocks again",
+    async () => {
+      const relayServerModuleSpecifier = "../../../test/support/fedos_real_local_websocket_relay_server.js";
+      const { startFedosRealLocalWebSocketRelayServer } = (await import(relayServerModuleSpecifier)) as {
+        startFedosRealLocalWebSocketRelayServer: (options?: {
+          readonly port?: number;
+        }) => Promise<{ readonly url: string; connectionCount(): number; close(): Promise<void> }>;
+      };
+      let relay = await startFedosRealLocalWebSocketRelayServer();
+      const relayPort = Number(relay.url.slice(relay.url.lastIndexOf(":") + 1));
+      try {
+        const aliceDir = makeTmpRoot("alice-relay-status");
+        await seedSettings(aliceDir, [relay.url]);
+        const fastTick = { FEDOS_BETA_CONVERSATION_TRANSPORT_INTERVAL_MS: "50" };
+
+        // Real disconnect/reconnect timing (no test-side mock, no fabricated
+        // state): the OLD server is closed for real, then a NEW real server
+        // is bound to the SAME port almost immediately. This does NOT create
+        // a race with the client's own reconnect, because the client (this
+        // Runtime's own WebSocketRelay) has no automatic reconnect at all --
+        // it will stay disconnected regardless of the server's own state
+        // until the real Lock -> Unlock click sequence below constructs a
+        // fresh WebSocketRelay and calls connect() for the first time since
+        // the disconnect. Reopening the server early only ensures that LATER
+        // real connect() attempt has somewhere to succeed.
+        //
+        // Timed off the relay server's own REAL `connectionCount()` signal
+        // (never a blind guessed delay) so this holds up under heavy
+        // machine load (many Electron subprocesses spawned back-to-back by
+        // the rest of this suite can genuinely slow real WASM/crypto profile
+        // creation well past any fixed guess) -- close only fires once the
+        // real client connection is observed, with a further safety margin
+        // so the FIRST status read (below) reliably observes "connected"
+        // before the close happens.
+        const timing = (async () => {
+          const deadline = Date.now() + 20000;
+          while (relay.connectionCount() < 1 && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          await relay.close();
+          relay = await startFedosRealLocalWebSocketRelayServer({ port: relayPort });
+        })();
+
+        const [uiRun] = await Promise.all([
+          runBetaUiScript(
+            aliceDir,
+            [
+              { action: "wait", ms: 300 },
+              { action: "fill", selector: "#create-label", value: "Alice" },
+              { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8121 relay status" },
+              { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8121 relay status" },
+              { action: "click", selector: "#create-submit" },
+              { action: "wait", ms: 1200 },
+              // ---- real connected state, right after create. ----
+              { action: "read", selector: "#app-status-area" },
+              // ---- 15/16. wait past the real server close (above) and a full poll tick -- shows the real, HONEST disconnected state. ----
+              { action: "wait", ms: 6000 },
+              { action: "read", selector: "#app-status-area" },
+              // ---- 17. reconnect: the only real recovery action this product offers for a dropped Relay -- lock, then unlock again. ----
+              { action: "click", selector: "#lock-btn" },
+              { action: "wait", ms: 500 },
+              { action: "read", selector: "#current-screen" },
+              { action: "fill", selector: "#unlock-pass", value: "correct horse battery staple 8121 relay status" },
+              { action: "click", selector: "#unlock-submit" },
+              { action: "wait", ms: 2000 },
+              // ---- 18. Relay status genuinely recovers -- read again after reconnect. ----
+              { action: "read", selector: "#app-status-area" },
+            ],
+            fastTick,
+          ),
+          timing,
+        ]);
+
+        expect(readAt(uiRun, 6)).toBe("1/1 Relay connected");
+        expect(readAt(uiRun, 8)).toBe("0/1 Relay connected — lock and unlock again to retry");
+        expect(readAt(uiRun, 11)).toBe("unlock");
+        expect(readAt(uiRun, 15)).toBe("1/1 Relay connected");
+      } finally {
+        await relay.close();
+      }
+    },
+    90000,
+  );
 });

@@ -15,6 +15,21 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
+/**
+ * Secure Runtime Alpha 8121-8200 — Security Finding 1 (external audit
+ * delta `6873d24f`): mirrors `fedos_electron_beta_main.cts`'s own
+ * `ACCEPTANCE_MODE_ENABLED` gate exactly (same closed literal check,
+ * same env var), independently re-derived here rather than passed in —
+ * two separate enforcement points (this file's own `exposeInMainWorld`
+ * call below, and main's own `ipcMain.handle` registration), neither
+ * depending on the other. Preload runs in a privileged context with its
+ * own `process.env` snapshot even under `sandbox: true` (confirmed: this
+ * package's OTHER preload files already read `process.versions` the same
+ * way) — the Renderer's own isolated-world JS can never read or
+ * influence this value.
+ */
+const ACCEPTANCE_MODE_ENABLED = process.env.FEDOS_ELECTRON_BETA_AUTOTEST === "acceptance";
+
 const MAX_PASSPHRASE_CHARS = 4096;
 const MAX_LABEL_CHARS = 256;
 /** Secure Runtime Alpha 7001-7080 — mirrors `MAX_LABEL_CHARS` above; sized for an id/conversationId/deviceId, never a secret. */
@@ -151,20 +166,36 @@ const fedosApp: FedosAppBridge = Object.freeze({
     ipcRenderer.invoke("fedos-app:identity-transition-list", { limit: typeof limit === "number" ? limit : undefined, offset: typeof offset === "number" ? offset : undefined }),
   identityTransitionOpen: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
     ipcRenderer.invoke("fedos-app:identity-transition-open", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
-  identityTransitionAccept: () => ipcRenderer.invoke("fedos-app:identity-transition-accept"),
-  identityTransitionReject: () => ipcRenderer.invoke("fedos-app:identity-transition-reject"),
-  identityTransitionDefer: () => ipcRenderer.invoke("fedos-app:identity-transition-defer"),
+  // Secure Runtime Alpha 8121-8200 -- Security Finding 3: the exact id
+  // tuple travels WITH the decision, never an implicit "currently
+  // selected" server-side reference.
+  identityTransitionAccept: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-accept", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
+  identityTransitionReject: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-reject", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
+  identityTransitionDefer: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-defer", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
   identityTransitionRecordManualVerification: (method: string, noteCode: string) =>
     ipcRenderer.invoke("fedos-app:identity-transition-record-manual-verification", { method: boundedString(method, MAX_LABEL_CHARS), noteCode: boundedString(noteCode, MAX_LABEL_CHARS) }),
   deletionRequestListReceived: () => ipcRenderer.invoke("fedos-app:deletion-request-list-received"),
   deletionRequestOpen: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-open", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
-  deletionRequestApprove: () => ipcRenderer.invoke("fedos-app:deletion-request-approve"),
-  deletionRequestReject: () => ipcRenderer.invoke("fedos-app:deletion-request-reject"),
+  // Secure Runtime Alpha 8121-8200 -- Security Finding 3: exact requestId travels with the decision.
+  deletionRequestApprove: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-approve", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
+  deletionRequestReject: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-reject", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
   safetyCenterOverview: () => ipcRenderer.invoke("fedos-app:safety-center-overview"),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
+  relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),
 });
 
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);
 contextBridge.exposeInMainWorld("fedosBeta", fedosBeta);
-contextBridge.exposeInMainWorld("fedosAcceptance", fedosAcceptance);
+// Secure Runtime Alpha 8121-8200 -- Security Finding 1: only exposed into
+// the Renderer's isolated world when explicit acceptance mode is active
+// (see `ACCEPTANCE_MODE_ENABLED` above). An ordinary packaged production
+// launch (or any other AUTOTEST_MODE value) never defines
+// `window.fedosAcceptance` at all -- not merely unused by the page, but
+// genuinely absent from `window`.
+if (ACCEPTANCE_MODE_ENABLED) {
+  contextBridge.exposeInMainWorld("fedosAcceptance", fedosAcceptance);
+}
 contextBridge.exposeInMainWorld("fedosApp", fedosApp);

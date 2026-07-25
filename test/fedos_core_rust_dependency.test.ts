@@ -8,6 +8,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /**
  * Stage 74 — `chacha20poly1305` dependency adoption tests.
@@ -384,19 +385,13 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
   });
 
   it("19. no .wasm file is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    for (const path of Object.keys(files)) {
+    for (const path of fedosCoreRustGitTrackedPaths()) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
     }
   });
 
   it("20. no target/ or build artifacts (including Cargo.lock) are committed", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     const forbiddenCompiled = /\.(rlib|so|dll|dylib|node|a|o)$/i;
     const forbiddenDir = /\/(target|build)\//i;
     const forbiddenLock = /\/Cargo\.lock$/i;

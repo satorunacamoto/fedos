@@ -25,7 +25,11 @@ export type FedosDesktopBetaLimitationId =
   | "registry-may-not-auto-sync"
   | "delivery-not-guaranteed"
   | "no-automatic-update"
-  | "no-recovery-service";
+  | "no-recovery-service"
+  | "chat-live-update-is-polled"
+  | "identity-replacement-evidence-may-be-incomplete"
+  | "relay-has-no-automatic-reconnect"
+  | "no-guaranteed-memory-erasure";
 
 /** Where in the product this limitation must be surfaced. Closed vocabulary. */
 export type FedosDesktopBetaLimitationSurface = "onboarding" | "about" | "beta-status";
@@ -129,6 +133,39 @@ const FEDOS_DESKTOP_BETA_LIMITATIONS_V1: FedosDesktopBetaLimitationsV1 = Object.
       label: "No recovery service",
       statement: "There is no cloud account or recovery service; all recovery depends on your own local backups.",
       surfaces: ["onboarding", "about"],
+    }),
+    // Secure Runtime Alpha 8121-8200 -- two real, disclosed boundaries
+    // introduced by the Desktop Beta User-Facing Product UI Completion
+    // Arc's own real screens (Alpha 8041-8120), reconciling the
+    // release-claims patch plan's own finding that this closed
+    // vocabulary under-discloses relative to what the shipped product
+    // now actually does.
+    lim({
+      limitationId: "chat-live-update-is-polled",
+      label: "New messages may take a few seconds to appear",
+      statement: "An open conversation checks for new messages periodically (about every two seconds), not instantly — this is not a live push connection.",
+      surfaces: ["about", "beta-status"],
+    }),
+    lim({
+      limitationId: "identity-replacement-evidence-may-be-incomplete",
+      label: "Some Identity Replacement items cannot yet be opened",
+      statement: "An Identity Replacement item with no matching known Device evidence is shown but cannot be opened for a decision yet — it is never silently hidden or auto-decided.",
+      surfaces: ["about", "beta-status"],
+    }),
+    // Secure Runtime Alpha 8121-8200 -- Phase L closed-pilot safety
+    // controls; both entries reconcile a real finding from this Arc's
+    // own external security audit delta / reproducibility review work.
+    lim({
+      limitationId: "relay-has-no-automatic-reconnect",
+      label: "A disconnected Relay does not reconnect on its own",
+      statement: "If a Relay connection drops, this Beta does not retry automatically — lock and unlock again to reconnect. The nav bar's own status text always shows current Relay connectivity honestly.",
+      surfaces: ["about", "beta-status"],
+    }),
+    lim({
+      limitationId: "no-guaranteed-memory-erasure",
+      label: "Locking clears visible content, not guaranteed memory erasure",
+      statement: "Locking removes messages, search results, and other content from the screen and from this app's own in-memory state, but does not guarantee the underlying memory pages are erased at the operating-system level.",
+      surfaces: ["about", "beta-status"],
     }),
   ]),
 });

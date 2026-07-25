@@ -30,6 +30,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /**
  * Stage 401–408 — "FedOS Execution Backend Architecture": FedOS Core
@@ -166,10 +167,7 @@ describe("FedOS Execution Backend, not connected, fail-closed everywhere (Stage 
   });
 
   it("15. no compiled/native artifact exists -- no .wasm/.node/.dll/.so/.dylib anywhere in packages/fedos-core-rust", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
     for (const path of paths) {
       expect(forbidden.test(path), `unexpected compiled/native artifact: ${path}`).toBe(false);

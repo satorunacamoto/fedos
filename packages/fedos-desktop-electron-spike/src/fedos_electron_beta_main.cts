@@ -119,6 +119,35 @@ const AUTOTEST_MODE = process.env.FEDOS_ELECTRON_BETA_AUTOTEST ?? "";
 /** TEST-INJECTION ONLY — see `fedos_electron_unlock_main.cts`'s own identical note. Never read on a normal launch. */
 const AUTOTEST_SECRET = process.env.FEDOS_BETA_AUTOTEST_SECRET ?? "";
 
+/**
+ * Secure Runtime Alpha 8121-8200 — Security Finding 1 (external audit
+ * delta `6873d24f`): `fedos-acceptance:*` used to be registered
+ * unconditionally in every launch mode, relying ONLY on each handler's own
+ * `requireBoundary()` (real-unlocked-profile) check as its security
+ * boundary — meaning a compromised/scripted renderer or a CDP session
+ * attached to an ORDINARY packaged production launch could still reach
+ * the entire acceptance vocabulary once a profile was unlocked, with no
+ * visible product surface disclosing that this second bridge exists.
+ * `ACCEPTANCE_MODE_ENABLED` is a SECOND, independent gate, additive to
+ * (never a replacement for) `requireBoundary()`: the channel itself is
+ * now only ever registered when this exact, closed value is present.
+ * Checked against a closed literal (`=== "acceptance"`), never a truthy/
+ * non-empty check, so a malformed or accidental non-empty
+ * `FEDOS_ELECTRON_BETA_AUTOTEST` value (e.g. a typo, or a stray value
+ * leaked from an unrelated tool) cannot enable it — only the exact,
+ * deliberately-set test-harness value can. This env var is a real OS
+ * process environment variable, set once at process spawn by whoever
+ * launches Electron; no code running inside the sandboxed, isolated
+ * Renderer world can read or influence it. A release build never sets
+ * it (confirmed: `scripts/build_release.mjs`/`run_electron_builder_package_beta.mjs`
+ * launch the packaged app with no such variable). The preload
+ * (`fedos_electron_beta_preload.cts`) independently re-derives this SAME
+ * check from its own `process.env` read — two independent enforcement
+ * points (channel registration here, bridge exposure there), never one
+ * hidden only in the page.
+ */
+const ACCEPTANCE_MODE_ENABLED = AUTOTEST_MODE === "acceptance";
+
 const MAX_LABEL_CHARS = 128;
 const MAX_SECRET_BYTES = 1024;
 const MAX_ID_LENGTH = 512;
@@ -354,6 +383,10 @@ interface BoundaryLike {
     acceptSelected(): Promise<void>;
     rejectSelected(): Promise<void>;
     deferSelected(): Promise<void>;
+    // Secure Runtime Alpha 8121-8200 -- Security Finding 3: the real, exact-id authorization boundary.
+    accept(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): Promise<void>;
+    reject(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): Promise<void>;
+    defer(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): Promise<void>;
     recordManualVerification(method: unknown, verifiedAt: number, noteCode: unknown): Promise<void>;
     readonly manualVerificationState: { readonly status: string; readonly [key: string]: unknown };
   };
@@ -364,6 +397,9 @@ interface BoundaryLike {
     readonly consentDetailState: { readonly status: string; readonly [key: string]: unknown };
     approveSelected(): Promise<void>;
     rejectSelected(): Promise<void>;
+    // Secure Runtime Alpha 8121-8200 -- Security Finding 3: the real, exact-id authorization boundary.
+    approve(requestId: string): Promise<void>;
+    reject(requestId: string): Promise<void>;
   };
 }
 interface AssemblyLike {
@@ -390,6 +426,8 @@ interface SettingsControllerLike {
 /** Secure Runtime Alpha 6761-6840 -- the real, production `FedosRelay` implementation (`WebSocketRelay`, Node 22+'s own global `WebSocket`, no new dependency) and its one real socket factory. Never `NullRelay` (test-only, no real network I/O) in this canonical packaged entry point. */
 interface RelayLike {
   readonly url: string;
+  /** Secure Runtime Alpha 8121-8200 -- `WebSocketRelay.isConnected()` (Alpha 215, unmodified) was already real and public; this file simply never read it before this Arc. A PURE, SYNCHRONOUS accessor -- no new capability. */
+  isConnected(): boolean;
 }
 interface NotificationPortLike {
   status(): "available" | "unavailable";
@@ -533,6 +571,8 @@ let activeCoordinator: CoordinatorLike | null = null;
 let activeAssembly: AssemblyLike | null = null;
 /** Secure Runtime Alpha 8041-8120 — the local viewer's own participant reference, set once alongside `activeAssembly` on a successful create/unlock (SAME value `startAssembly()` already derives for `viewerParticipant` below), never re-derived elsewhere. Required by `sendMessage()`/`issuedInvitations()`, which take the LOCAL sender/issuer explicitly rather than reading it from a session. */
 let activeViewerParticipant: ParticipantRefLike | null = null;
+/** Secure Runtime Alpha 8121-8200 — the real, currently-configured Relay instances this Runtime's own Coordinator constructed (`secureRuntimeBundleConfig()`, unmodified), kept here ONLY so the ordinary UI can honestly report per-Relay connectivity (Phase K "show offline/retry state") — never a second Relay set, never a new connection, just a read-only reference to what already exists. Empty until a real relay is configured and a profile is unlocked. */
+let activeRelays: readonly RelayLike[] = [];
 const notificationAdapter = new FedosElectronNotificationAdapter();
 const trayAdapter = new FedosElectronTrayAdapter();
 let badgeAdapter: FedosElectronBadgeAdapter | null = null;
@@ -664,6 +704,17 @@ function secureRuntimeBundleConfig(m: RootModules, signer: unknown): Record<stri
   }
   const socketFactory = m.createNodeWebSocketRelaySocketFactory();
   const relays = relayUrls.map((url) => new m.WebSocketRelay(url, socketFactory));
+  // Secure Runtime Alpha 8121-8200 -- captured here (the ONE real
+  // construction site) so the ordinary UI can honestly report per-Relay
+  // connectivity later. Safe even though this function is also called by
+  // the throwaway status-check path (`handleStatus()`'s own
+  // `buildFreshCoordinator()` call, which never starts a real Runtime and
+  // is always discarded): by the time any `fedos-app:*` command reads
+  // `activeRelays` (gated on a real unlocked profile), a real
+  // `handleCreate()`/`handleUnlock()` success is guaranteed to have run
+  // this same line last, since each attempt calls this function exactly
+  // once and only a successful attempt ever sets `activeAssembly`.
+  activeRelays = relays;
   // Secure Runtime Alpha 7001-7080 -- see `FedosDesktopRuntimeConfig.directRatchetMessageDeliveryRemoteDeviceRef`'s
   // own doc comment. TEST-INJECTION ONLY, mirrors `AUTOTEST_SECRET`'s own
   // discipline exactly -- unset on every ordinary launch, so `sendMessage()`
@@ -901,6 +952,7 @@ async function handleLock() {
     activeCoordinator = null;
     activeAssembly = null;
     activeViewerParticipant = null;
+    activeRelays = [];
     if (assembly !== null) await assembly.shutdown();
     await coordinator.lock();
     if (badgeAdapter !== null) {
@@ -1028,6 +1080,7 @@ async function performCleanShutdown(): Promise<void> {
     activeCoordinator = null;
     activeAssembly = null;
     activeViewerParticipant = null;
+    activeRelays = [];
     try {
       if (assembly !== null) await assembly.shutdown();
       await coordinator.lock();
@@ -1486,12 +1539,29 @@ async function handleAppIdentityTransitionOpen(payload: unknown) {
   return resultFromViewModelState(boundary.identityTransitions.detailState);
 }
 
-async function handleAppIdentityTransitionDecide(decision: "accept" | "reject" | "defer") {
+/**
+ * Secure Runtime Alpha 8121-8200 — Security Finding 3 (`6873d24f`): now
+ * requires the exact identifying tuple in `payload`, validated the SAME
+ * way `handleAppIdentityTransitionOpen()` already validates it, and
+ * dispatches to the Controller's own exact-id `accept()`/`reject()`/
+ * `defer()` methods -- never `acceptSelected()`/`rejectSelected()`/
+ * `deferSelected()` (which trust a mutable "currently selected" field).
+ * A stale/mismatched id still fails closed: the Shell's own real
+ * transition lookup (unchanged) rejects an id that no longer exists or
+ * no longer matches, exactly as it always has for `identityTransitionOpen()`.
+ */
+async function handleAppIdentityTransitionDecide(decision: "accept" | "reject" | "defer", payload: unknown) {
   const boundary = requireBoundary();
   if (boundary === null) return acceptanceGateRejection();
-  if (decision === "accept") await boundary.identityTransitions.acceptSelected();
-  else if (decision === "reject") await boundary.identityTransitions.rejectSelected();
-  else await boundary.identityTransitions.deferSelected();
+  const peerAccountRef = (payload as { peerAccountRef?: unknown } | null)?.peerAccountRef;
+  const peerDeviceRef = (payload as { peerDeviceRef?: unknown } | null)?.peerDeviceRef;
+  const transitionId = (payload as { transitionId?: unknown } | null)?.transitionId;
+  if (typeof peerAccountRef !== "object" || peerAccountRef === null || !isBoundedString(peerDeviceRef, MAX_ID_LENGTH) || !isBoundedString(transitionId, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed identity-transition-decide request" };
+  }
+  if (decision === "accept") await boundary.identityTransitions.accept(peerAccountRef as never, peerDeviceRef, transitionId);
+  else if (decision === "reject") await boundary.identityTransitions.reject(peerAccountRef as never, peerDeviceRef, transitionId);
+  else await boundary.identityTransitions.defer(peerAccountRef as never, peerDeviceRef, transitionId);
   return resultFromViewModelState(boundary.identityTransitions.detailState);
 }
 
@@ -1530,11 +1600,14 @@ async function handleAppDeletionRequestOpen(payload: unknown) {
   return resultFromViewModelState(boundary.deletionRequests.consentDetailState);
 }
 
-async function handleAppDeletionRequestDecide(decision: "approve" | "reject") {
+/** Secure Runtime Alpha 8121-8200 — Security Finding 3 (`6873d24f`): requires the exact `requestId` in `payload`, dispatches to the Controller's own exact-id `approve()`/`reject()`, never `approveSelected()`/`rejectSelected()`. */
+async function handleAppDeletionRequestDecide(decision: "approve" | "reject", payload: unknown) {
   const boundary = requireBoundary();
   if (boundary === null) return acceptanceGateRejection();
-  if (decision === "approve") await boundary.deletionRequests.approveSelected();
-  else await boundary.deletionRequests.rejectSelected();
+  const requestId = (payload as { requestId?: unknown } | null)?.requestId;
+  if (!isBoundedString(requestId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed deletion-request-decide request" };
+  if (decision === "approve") await boundary.deletionRequests.approve(requestId);
+  else await boundary.deletionRequests.reject(requestId);
   return resultFromViewModelState(boundary.deletionRequests.inboxState);
 }
 
@@ -1582,6 +1655,41 @@ async function handleAppSettingsLoad() {
   return controller.load();
 }
 
+/**
+ * Secure Runtime Alpha 8121-8200 -- real, disclosed Phase K gap this Arc's
+ * own extended vertical slice found live: the nav bar's own `#app-status-area`
+ * was wired in the renderer but never actually populated with real Relay
+ * connectivity, so "one unreachable Relay does not invalidate the whole
+ * profile" had no VISIBLE confirmation anywhere in the shipped UI. Fixed
+ * with a thin, read-only wrapper over the ALREADY-REAL, ALREADY-PUBLIC
+ * `WebSocketRelay.isConnected()` accessor (Alpha 215, unmodified) -- never
+ * a new connection, never a new protocol, never a second Relay set.
+ */
+async function handleAppRelayStatus() {
+  if (activeAssembly === null) return acceptanceGateRejection();
+  return { outcome: "ok", value: activeRelays.map((r) => ({ url: r.url, connected: r.isConnected() })) };
+}
+
+/**
+ * Secure Runtime Alpha 8121-8200 — Security Finding 1 (`6873d24f`):
+ * the ACCEPTANCE-mode counterpart to the `ui-script` mode's own
+ * `readGlobal` action (see that block's own comment) — same closed
+ * allowlist, same `typeof window[<name>]` check, reached here via
+ * `mainWindow.webContents.executeJavaScript()` since acceptance mode's
+ * own command loop otherwise never touches the DOM. Exists ONLY to let
+ * this Arc's own test suite prove `window.fedosAcceptance` genuinely IS
+ * present when acceptance mode is the very thing that's active — never
+ * reachable from the ordinary page itself.
+ */
+async function handleAcceptanceReadGlobal(payload: unknown) {
+  const name = (payload as { name?: unknown } | null)?.name;
+  const allowedGlobals = new Set(["fedosProfile", "fedosBeta", "fedosAcceptance", "fedosApp"]);
+  if (typeof name !== "string" || !allowedGlobals.has(name)) return { outcome: "invalid-input", reason: "unrecognized readGlobal selector" };
+  if (mainWindow === null) return { outcome: "unavailable", reason: "no window" };
+  const value = await mainWindow.webContents.executeJavaScript(`typeof window[${JSON.stringify(name)}]`);
+  return { outcome: "ok", value };
+}
+
 // ---------------------------------------------------------------------
 // IPC — `fedos-profile:*` REUSED verbatim (Phase P). Additive `fedos-beta:*`
 // namespace for status/settings-application/tray/badge/background.
@@ -1604,29 +1712,47 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-beta:badge-mark-viewed", async (_e: IpcMainInvokeEvent, payload: unknown) => handleBadgeMarkViewed(payload));
 
   // Secure Runtime Alpha 7001-7080 — Phase C closed acceptance vocabulary.
-  // Every handler above rejects with `{outcome:"unavailable"}` unless
-  // AUTOTEST_MODE is set (`requireShell()`); registering the CHANNEL
-  // itself unconditionally matches every other channel in this file --
-  // the security boundary is the handler's own runtime check, not
-  // whether `ipcMain.handle` was called.
-  ipcMain.handle("fedos-acceptance:create-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateDirectConversation(payload));
-  ipcMain.handle("fedos-acceptance:activate-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
-  ipcMain.handle("fedos-acceptance:device-pairing-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
-  ipcMain.handle("fedos-acceptance:device-pairing-inspect", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
-  ipcMain.handle("fedos-acceptance:device-pairing-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
-  ipcMain.handle("fedos-acceptance:device-pairing-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
-  ipcMain.handle("fedos-acceptance:establish-direct-ratchet-session", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceEstablishDirectRatchetSession(payload));
-  ipcMain.handle("fedos-acceptance:send-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSendMessage(payload));
-  ipcMain.handle("fedos-acceptance:list-messages", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceListMessages(payload));
-  ipcMain.handle("fedos-acceptance:read-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceReadMessage(payload));
-  ipcMain.handle("fedos-acceptance:direct-ratchet-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDirectRatchetStatus(payload));
-  // Secure Runtime Alpha 7321-7400 -- see this section's own updated
-  // header comment: these four channels close Release Readiness Review
-  // B-2/B-7, reachable whenever a real profile is unlocked, in ANY mode.
-  ipcMain.handle("fedos-acceptance:create-conversation-invitation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
-  ipcMain.handle("fedos-acceptance:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
-  ipcMain.handle("fedos-acceptance:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
-  ipcMain.handle("fedos-acceptance:safety-center-overview", async () => handleAcceptanceSafetyCenterOverview());
+  //
+  // Secure Runtime Alpha 8121-8200 — Security Finding 1 (`6873d24f`):
+  // these channels are now registered ONLY when `ACCEPTANCE_MODE_ENABLED`
+  // (see its own header comment above). In an ordinary packaged
+  // production launch, or in any OTHER AUTOTEST_MODE value (`create`,
+  // `unlock`, `ui-script`), `ipcMain.handle` is never called for any
+  // `fedos-acceptance:*` channel at all — `ipcRenderer.invoke()` against
+  // one of these channel names then rejects with Electron's own real "no
+  // handler registered" error, a genuine absence, not a UI-layer hint.
+  // The acceptance-mode SCRIPT RUNNER below (`AUTOTEST_MODE === "acceptance"`)
+  // is entirely unaffected either way: it calls each handler FUNCTION
+  // directly from its own command map, never through `ipcMain`/
+  // `ipcRenderer` — confirmed by direct read of that block, so this gate
+  // narrows only the renderer-reachable IPC surface, never the test
+  // harness's own internal capability.
+  if (ACCEPTANCE_MODE_ENABLED) {
+    ipcMain.handle("fedos-acceptance:create-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateDirectConversation(payload));
+    ipcMain.handle("fedos-acceptance:activate-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
+    ipcMain.handle("fedos-acceptance:device-pairing-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
+    ipcMain.handle("fedos-acceptance:device-pairing-inspect", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
+    ipcMain.handle("fedos-acceptance:device-pairing-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
+    ipcMain.handle("fedos-acceptance:device-pairing-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
+    ipcMain.handle("fedos-acceptance:establish-direct-ratchet-session", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceEstablishDirectRatchetSession(payload));
+    ipcMain.handle("fedos-acceptance:send-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSendMessage(payload));
+    ipcMain.handle("fedos-acceptance:list-messages", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceListMessages(payload));
+    ipcMain.handle("fedos-acceptance:read-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceReadMessage(payload));
+    ipcMain.handle("fedos-acceptance:direct-ratchet-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDirectRatchetStatus(payload));
+    // Secure Runtime Alpha 7321-7400 -- these four channels close Release
+    // Readiness Review B-2/B-7; Secure Runtime Alpha 8121-8200 narrows
+    // "reachable whenever a real profile is unlocked, in ANY mode" (the
+    // ORIGINAL 7321-7400 wording) to the same `ACCEPTANCE_MODE_ENABLED`
+    // gate as every other `fedos-acceptance:*` channel above -- the
+    // ordinary UI has had its own equivalent `fedos-app:*` channel for
+    // each of these four since Alpha 8041-8120 (`create-invitation`,
+    // `search`, `archive`, `safety-center-overview`), so no real
+    // capability is lost, only the SECOND, acceptance-only path to it.
+    ipcMain.handle("fedos-acceptance:create-conversation-invitation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
+    ipcMain.handle("fedos-acceptance:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
+    ipcMain.handle("fedos-acceptance:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
+    ipcMain.handle("fedos-acceptance:safety-center-overview", async () => handleAcceptanceSafetyCenterOverview());
+  }
 
   // Secure Runtime Alpha 8041-8120 -- Phase B-K: the ordinary, user-facing
   // `fedos-app:*` vocabulary. Every handler is registered unconditionally
@@ -1670,19 +1796,20 @@ function registerIpcHandlers(): void {
   // Phase I -- Identity Replacement.
   ipcMain.handle("fedos-app:identity-transition-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionList(payload));
   ipcMain.handle("fedos-app:identity-transition-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionOpen(payload));
-  ipcMain.handle("fedos-app:identity-transition-accept", async () => handleAppIdentityTransitionDecide("accept"));
-  ipcMain.handle("fedos-app:identity-transition-reject", async () => handleAppIdentityTransitionDecide("reject"));
-  ipcMain.handle("fedos-app:identity-transition-defer", async () => handleAppIdentityTransitionDecide("defer"));
+  ipcMain.handle("fedos-app:identity-transition-accept", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionDecide("accept", payload));
+  ipcMain.handle("fedos-app:identity-transition-reject", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionDecide("reject", payload));
+  ipcMain.handle("fedos-app:identity-transition-defer", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionDecide("defer", payload));
   ipcMain.handle("fedos-app:identity-transition-record-manual-verification", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionRecordManualVerification(payload));
   // Phase J -- Signed Deletion.
   ipcMain.handle("fedos-app:deletion-request-list-received", async () => handleAppDeletionRequestListReceived());
   ipcMain.handle("fedos-app:deletion-request-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestOpen(payload));
-  ipcMain.handle("fedos-app:deletion-request-approve", async () => handleAppDeletionRequestDecide("approve"));
-  ipcMain.handle("fedos-app:deletion-request-reject", async () => handleAppDeletionRequestDecide("reject"));
+  ipcMain.handle("fedos-app:deletion-request-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestDecide("approve", payload));
+  ipcMain.handle("fedos-app:deletion-request-reject", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestDecide("reject", payload));
   // Phase K -- reuse the SAME handler `fedos-acceptance:safety-center-overview` already dispatches to.
   ipcMain.handle("fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview());
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
   ipcMain.handle("fedos-app:settings-load", async () => handleAppSettingsLoad());
+  ipcMain.handle("fedos-app:relay-status", async () => handleAppRelayStatus());
 }
 
 // ---------------------------------------------------------------------
@@ -1828,7 +1955,9 @@ app.whenReady().then(async () => {
         "app-deletion-request-list-received": () => handleAppDeletionRequestListReceived(),
         "app-safety-center-overview": () => handleAppSafetyCenterOverview(),
         "app-settings-load": () => handleAppSettingsLoad(),
+        "app-relay-status": () => handleAppRelayStatus(),
         "acceptance-safety-center-overview": () => handleAcceptanceSafetyCenterOverview(),
+        "read-global": (payload) => handleAcceptanceReadGlobal(payload),
       };
       try {
         const scriptRaw = process.env.FEDOS_BETA_ACCEPTANCE_SCRIPT ?? "[]";
@@ -1893,7 +2022,7 @@ app.whenReady().then(async () => {
       }
       try {
         const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
-        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "read" | "wait"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number }> = JSON.parse(scriptRaw);
+        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number }> = JSON.parse(scriptRaw);
         for (let i = 0; i < script.length; i++) {
           const step = script[i]!;
           if (step.action === "wait") {
@@ -1913,6 +2042,32 @@ app.whenReady().then(async () => {
             result = await window.webContents.executeJavaScript(
               `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; el.click(); return { outcome: "ok" }; })()`,
             );
+          } else if (step.action === "doubleClick") {
+            // Secure Runtime Alpha 8121-8200 -- Security Finding 2
+            // (`6873d24f`): fires TWO real `.click()` calls back-to-back,
+            // synchronously, with NO await between them -- the real
+            // browser DOM dispatches the first click's own listener
+            // synchronously up to its first `await`, so this genuinely
+            // exercises "does the SECOND click reach the handler before
+            // the first one's own disable-while-in-flight guard takes
+            // effect," never a scripted delay that would hide a real race.
+            result = await window.webContents.executeJavaScript(
+              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; el.click(); el.click(); return { outcome: "ok" }; })()`,
+            );
+          } else if (step.action === "readGlobal") {
+            // Secure Runtime Alpha 8121-8200 -- Security Finding 1
+            // (`6873d24f`): reads `typeof window[<selector>]` for a small,
+            // closed set of top-level bridge names ONLY (never an
+            // arbitrary property path, never a value read) -- exists
+            // solely to prove a bridge is genuinely ABSENT (`"undefined"`)
+            // or genuinely PRESENT (`"object"`) from a real running page,
+            // the same DevTools-injection technique every other action in
+            // this block already uses, just checking presence rather than
+            // DOM text.
+            const allowedGlobals = new Set(["fedosProfile", "fedosBeta", "fedosAcceptance", "fedosApp"]);
+            result = allowedGlobals.has(selector)
+              ? { outcome: "ok", value: await window.webContents.executeJavaScript(`typeof window[${JSON.stringify(selector)}]`) }
+              : { outcome: "invalid-input", reason: "unrecognized readGlobal selector" };
           } else {
             const as = step.as ?? "text";
             result = await window.webContents.executeJavaScript(

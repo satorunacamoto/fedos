@@ -14,6 +14,7 @@ import versioningDocSource from "../docs/public_boundary_versioning.md?raw";
 import runtimeSource from "../src/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/worker.ts?raw";
+import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /**
  * Stage 103 — consolidated placeholder API boundary additions.
@@ -406,10 +407,7 @@ describe("FedOS Rust crate — consolidated placeholder API boundary (Stage 103)
   });
 
   it("19. no .wasm / target / Cargo.lock artifact is committed to the package", () => {
-    const files = (
-      import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
-    ).glob("../packages/fedos-core-rust/**/*");
-    const paths = Object.keys(files);
+    const paths = fedosCoreRustGitTrackedPaths();
     for (const path of paths) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
       expect(/\/(target|build)\//i.test(path), `unexpected build dir artifact: ${path}`).toBe(

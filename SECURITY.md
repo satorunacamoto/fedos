@@ -19,6 +19,27 @@ before relying on it for anything sensitive.
 - Group messaging, post-quantum cryptography, and MLS-style group ratchets
   are **not implemented** in this codebase. Only Direct (pairwise)
   conversations use the real production Ratchet.
+- **"Double Ratchet" here means this codebase's own FedOS protocol
+  implementation of the Double Ratchet algorithm** (forward secrecy +
+  post-compromise security for Direct conversations) — it is not the
+  Signal Protocol library, and it is not interoperable with Signal or any
+  other Double-Ratchet-based messenger.
+- Message transport uses NIP-17 (Nostr gift-wrapped direct messages) with
+  this project's own additive extensions (e.g. real-time invitation
+  delivery, an authenticated route-binding field inside the encrypted
+  Rumor content for same-peer multi-conversation routing). These
+  extensions are proprietary to this codebase, layered on top of the
+  standard NIP-17 envelope — a generic NIP-17 client will not understand
+  them, and this application does not claim broader Nostr-client
+  interoperability beyond standard NIP-17 delivery itself.
+- **No `mlock`/`VirtualLock` (or equivalent OS memory-pinning) guarantee
+  exists.** Secrets held in process memory may be paged to disk by the
+  operating system under memory pressure, like any ordinary application
+  that does not use OS-level memory locking.
+- **A compromised operating system, kernel, hypervisor, keylogger, or
+  screen-capture tool is entirely outside this application's protection
+  boundary.** No application-level defense against any of these exists or
+  is claimed.
 
 ## Reporting a vulnerability
 

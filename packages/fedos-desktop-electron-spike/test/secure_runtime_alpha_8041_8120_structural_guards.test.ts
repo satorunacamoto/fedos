@@ -56,12 +56,17 @@ describe("Secure Runtime Alpha 8041-8120 -- structural guards", () => {
     expect(scriptTags[0]).toMatch(/src="fedos_electron_beta_renderer\.js"/);
   });
 
-  it("3. fedosAcceptance / fedos-acceptance:* remain byte-for-byte reachable -- this Arc reuses several of their handler FUNCTIONS internally but never renames or removes the acceptance vocabulary itself (Phase P)", () => {
+  it("3. fedosAcceptance / fedos-acceptance:* remain byte-for-byte reachable -- this Arc reuses several of their handler FUNCTIONS internally but never renames or removes the acceptance vocabulary itself (Phase P). Secure Runtime Alpha 8121-8200 (Security Finding 1, `6873d24f`) narrows WHEN it is reachable, never removes it: the vocabulary itself, and its exposure/registration under explicit acceptance mode, both remain intact.", () => {
     const source = stripComments(read(MAIN_PATH));
     expect(source).toMatch(/ipcMain\.handle\("fedos-acceptance:create-direct-conversation",/);
     expect(source).toMatch(/ipcMain\.handle\("fedos-acceptance:safety-center-overview",/);
+    // Secure Runtime Alpha 8121-8200 -- both registrations now live inside
+    // the SAME `if (ACCEPTANCE_MODE_ENABLED)` block, not unconditionally.
+    expect(source).toMatch(/if \(ACCEPTANCE_MODE_ENABLED\) \{[\s\S]{0,4000}ipcMain\.handle\("fedos-acceptance:create-direct-conversation",/);
+    expect(source).toMatch(/AUTOTEST_MODE === "acceptance"/);
     const preloadSource = stripComments(read(PRELOAD_PATH));
     expect(preloadSource).toMatch(/contextBridge\.exposeInMainWorld\("fedosAcceptance", fedosAcceptance\);/);
+    expect(preloadSource).toMatch(/if \(ACCEPTANCE_MODE_ENABLED\) \{[\s\S]{0,300}contextBridge\.exposeInMainWorld\("fedosAcceptance", fedosAcceptance\);/);
   });
 
   it("4. the NEW fedos-app:* vocabulary is additive, gated on requireShell()/requireBoundary() (the SAME real-profile-unlocked precondition every other command in this file already requires), and reuses existing handler functions rather than duplicating business logic where an acceptance handler already does the same real work", () => {
@@ -121,7 +126,10 @@ describe("Secure Runtime Alpha 8041-8120 -- structural guards", () => {
     const source = stripComments(read(WINDOW_DTS_PATH));
     expect(source).toMatch(/readonly fedosProfile: FedosProfileBridge;/);
     expect(source).toMatch(/readonly fedosBeta: FedosBetaBridge;/);
-    expect(source).toMatch(/readonly fedosAcceptance: FedosAcceptanceBridge;/);
+    // Secure Runtime Alpha 8121-8200 -- Security Finding 1: genuinely
+    // optional now (absent unless acceptance mode is active), not a
+    // weakening of the signature -- see `secure_runtime_alpha_8121_8200_acceptance_bridge_isolation.test.ts`.
+    expect(source).toMatch(/readonly fedosAcceptance\?: FedosAcceptanceBridge;/);
     expect(source).toMatch(/readonly fedosApp: FedosAppBridge;/);
   });
 
@@ -151,9 +159,15 @@ describe("Secure Runtime Alpha 8041-8120 -- structural guards", () => {
       const body = rendererSource.slice(start, start + 1200);
       expect(body, `${fnName} must never call a decision function itself`).not.toMatch(/decideIdentityTransition\(|decideDeletionRequest\(/);
     }
-    // the decision functions themselves are wired ONLY from within a real click listener.
-    expect(rendererSource).toMatch(/addEventListener\("click", \(\) => void decideIdentityTransition\("accept"\)\)/);
-    expect(rendererSource).toMatch(/addEventListener\("click", \(\) => void decideDeletionRequest\("approve"\)\)/);
+    // the decision functions themselves are wired ONLY from within a real
+    // click listener. Secure Runtime Alpha 8121-8200 (Security Finding 3)
+    // added a second argument (the exact target id, closed over from the
+    // render call, never re-read from mutable "current selection" state
+    // at click time); Security Finding 2 added a third (the sibling
+    // decision buttons, disabled together while any one is in flight) --
+    // the click-only wiring discipline is unchanged.
+    expect(rendererSource).toMatch(/addEventListener\("click", \(\) => void decideIdentityTransition\("accept", target, decisionButtons\)\)/);
+    expect(rendererSource).toMatch(/addEventListener\("click", \(\) => void decideDeletionRequest\("approve", targetRequestId, decisionButtons\)\)/);
   });
 
   it("10. no false security score -- the Safety Center renderer shows each section's own independent state text, never a single numeric/percentage score", () => {
@@ -170,7 +184,24 @@ describe("Secure Runtime Alpha 8041-8120 -- structural guards", () => {
     expect(diffNames("src/conversation/ratchet/fedos_direct_ratchet_cryptographic_session.ts").trim()).toBe("");
     expect(diffNames("src/identity").trim()).toBe("");
     expect(diffNames("src/desktop/production_activation").trim()).toBe("");
-    expect(diffNames("src/desktop/presentation").trim()).toBe("");
+    // Secure Runtime Alpha 8121-8200 (Security Finding 3, external audit
+    // delta `6873d24f`) later, disclosed, additively touched exactly these
+    // two presentation-layer Controllers -- adding exact-id `accept()`/
+    // `reject()`/`defer()`/`approve()` methods alongside the pre-existing
+    // selection-based ones (kept, unmodified in behavior, for their own
+    // historical callers) -- never a redesign, never removing a capability.
+    // This Alpha 8041-8120 Arc's own original diff at 97f26f0f remains
+    // otherwise unchanged; this file's own name/scope predates that later
+    // Arc, so this ONE assertion is widened rather than the whole test
+    // renamed.
+    const presentationDiff = diffNames("src/desktop/presentation")
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .sort();
+    expect(presentationDiff).toEqual([
+      "src/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts",
+      "src/desktop/presentation/identity_transition/fedos_identity_transition_controller.ts",
+    ]);
     // Real, disclosed gaps this Arc's own real user-facing vertical slice found live:
     // (a) `createConversationInvitation()` never registered its own new conversation into
     //     `#knownConversationIds`, so the INVITER never saw their own new conversation;

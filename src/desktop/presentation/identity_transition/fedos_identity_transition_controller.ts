@@ -141,30 +141,64 @@ export class FedosIdentityTransitionController {
   // like `FedosDeletionRequestController`'s own `#actionInFlight`.
   // ---------------------------------------------------------------------
 
-  async acceptSelected(): Promise<void> {
-    await this.#decide("accept");
+  /**
+   * Secure Runtime Alpha 8121-8200 — Security Finding 3 (external audit
+   * delta `6873d24f`): the REAL authorization boundary. Takes the exact
+   * identifying tuple the caller already holds (the Shell's own
+   * `identityTransitionAccept()`/etc. were ALREADY id-based, never
+   * selection-based — only this Controller's OWN `#selector` field was
+   * the mutable, race-prone layer). A decision now always targets EXACTLY
+   * the tuple passed in, regardless of what `openTransition()` has since
+   * navigated to — switching the open item mid-flight can no longer
+   * redirect an in-flight decision. `#actionInFlight` still guards against
+   * concurrent double-submission (Security Finding 2), now keyed to this
+   * exact-id path rather than the selector.
+   */
+  async accept(peerAccountRef: FedosDeviceBindingAccountRef, peerDeviceRef: string, transitionId: string): Promise<void> {
+    await this.#decideById(peerAccountRef, peerDeviceRef, transitionId, "accept");
   }
 
-  async rejectSelected(): Promise<void> {
-    await this.#decide("reject");
+  async reject(peerAccountRef: FedosDeviceBindingAccountRef, peerDeviceRef: string, transitionId: string): Promise<void> {
+    await this.#decideById(peerAccountRef, peerDeviceRef, transitionId, "reject");
   }
 
-  async deferSelected(): Promise<void> {
-    await this.#decide("defer");
+  async defer(peerAccountRef: FedosDeviceBindingAccountRef, peerDeviceRef: string, transitionId: string): Promise<void> {
+    await this.#decideById(peerAccountRef, peerDeviceRef, transitionId, "defer");
   }
 
-  async #decide(decision: "accept" | "reject" | "defer"): Promise<void> {
-    if (this.#actionInFlight || this.#selector === null) return;
+  async #decideById(peerAccountRef: FedosDeviceBindingAccountRef, peerDeviceRef: string, transitionId: string, decision: "accept" | "reject" | "defer"): Promise<void> {
+    if (this.#actionInFlight) return;
     this.#actionInFlight = true;
     try {
-      const { peerAccountRef, peerDeviceRef, transitionId } = this.#selector;
       if (decision === "accept") await this.#shell.identityTransitionAccept(peerAccountRef, peerDeviceRef, transitionId);
       else if (decision === "reject") await this.#shell.identityTransitionReject(peerAccountRef, peerDeviceRef, transitionId);
       else await this.#shell.identityTransitionDefer(peerAccountRef, peerDeviceRef, transitionId);
-      await this.#refreshDetail();
+      // Only refresh the visible detail state if the decided item is STILL
+      // the current selection -- a decision made against an item the user
+      // has since navigated away from must never clobber the newer item's
+      // own detail view with a stale refresh.
+      if (this.#selector !== null && this.#selector.transitionId === transitionId && this.#selector.peerDeviceRef === peerDeviceRef) {
+        await this.#refreshDetail();
+      }
     } finally {
       this.#actionInFlight = false;
     }
+  }
+
+  /** Retained for existing selection-based callers (Alpha 6121-6200/6201-6280/6361-6440's own vertical slices) — delegates to the exact-id path above using whatever `openTransition()` most recently selected. New callers (the ordinary `fedos-app:*` IPC path, Alpha 8121-8200) should prefer `accept()`/`reject()`/`defer()` directly. */
+  async acceptSelected(): Promise<void> {
+    if (this.#selector === null) return;
+    await this.accept(this.#selector.peerAccountRef, this.#selector.peerDeviceRef, this.#selector.transitionId);
+  }
+
+  async rejectSelected(): Promise<void> {
+    if (this.#selector === null) return;
+    await this.reject(this.#selector.peerAccountRef, this.#selector.peerDeviceRef, this.#selector.transitionId);
+  }
+
+  async deferSelected(): Promise<void> {
+    if (this.#selector === null) return;
+    await this.defer(this.#selector.peerAccountRef, this.#selector.peerDeviceRef, this.#selector.transitionId);
   }
 
   // ---------------------------------------------------------------------
