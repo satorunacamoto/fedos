@@ -7,6 +7,47 @@ findings, re-checked against the actual pipeline this Arc ran end-to-end
 (a real `npm run release:beta` producing a checksummed, unsigned NSIS
 installer + portable ZIP for `release/fedos-desktop-beta-0.1`).
 
+## Exact toolchain versions
+
+This repository pins its toolchain via standard version files rather
+than prose alone — read these, don't just trust this document's own
+text, since the files are the actual enforced/checked source of truth:
+
+- **Node.js**: `.nvmrc` (major version `24`) + `package.json`'s
+  `"engines"` field (`>=24.0.0 <25.0.0`). Verified working with Node
+  `v24.15.0` and npm `11.12.1` (also pinned via `package.json`'s
+  `"packageManager"` field) as of Secure Runtime Alpha 8441-8520.
+- **Rust**: `rust-toolchain.toml` at the repository root, pinning
+  `channel = "1.95.0"` and pre-declaring the `wasm32-unknown-unknown`
+  target — `rustup` will fetch and use this automatically inside this
+  repository's own directory tree; you do not need to `rustup target
+  add` it manually if you have `rustup` installed (only needed with a
+  non-rustup Rust installation).
+- **`wasm-bindgen-cli`**: must match `packages/fedos-core-rust/Cargo.toml`'s
+  own `wasm-bindgen` dependency version exactly (verified `0.2.126` as
+  of this writing — re-check that file, don't assume this number stays
+  current). Install with:
+  `cargo install wasm-bindgen-cli --version <exact version> --locked`.
+- **Electron**: version pinned in `packages/fedos-desktop-electron-spike/package.json`'s
+  own `devDependencies` (`^43.1.1` as of this writing) — installed via
+  the ordinary `npm install`/junction-node_modules process below, not a
+  separate step, except for binary provisioning (see below).
+
+## A known, harmless fresh-worktree/junction artifact
+
+If you set up a new `git worktree` and link its `node_modules` via a
+directory junction from a sibling worktree (see below) rather than a
+full `npm install`, you may see `npx tsc --noEmit` report a spurious
+`Cannot find module 'node:fs'` (or similar `node:*`) error on brand-new
+files specifically, while identical imports in pre-existing files
+resolve fine. Verified in this session: this is a `tsc`-only resolution
+quirk tied to the junction — the affected file's real tests still run
+and pass correctly under `vitest` (which uses its own esbuild-based
+transform, not `tsc`, to execute tests). A genuine `npm install` (not a
+junction) does not reproduce this. Don't chase it as a code bug; a full
+`npm install` in that worktree resolves it if it matters for your own
+`tsc --noEmit` run.
+
 ## The single most common false "regression" a fresh contributor hits
 
 **The compiled Rust/WASM crypto core (`packages/fedos-core-rust/pkg/`) is

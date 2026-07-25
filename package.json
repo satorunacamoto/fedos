@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0"
+  },
   "description": "FedOS Desktop — a focused, end-to-end encrypted Direct-message secure messenger (Closed Beta), built on Nostr (NIP-17) with a Double Ratchet session per conversation. Originally began as \"nostr-window,\" a broader Reddit-style window into Nostr (MVP prototype, Stage 1: read-only event ingest); see README.md for the full history.",
   "scripts": {
     "typecheck:core": "tsc --noEmit",
