@@ -103,7 +103,7 @@
  * existing `fedos-acceptance:*` command already used before this Arc.
  */
 
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, type IpcMainInvokeEvent } from "electron";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -292,12 +292,78 @@ interface ShellDiagnosticLike {
   search(query: string): { readonly outcome: string; readonly [key: string]: unknown };
   /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.archive()` (Alpha 3081-3160, unmodified). */
   archive(command: unknown): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  /** Secure Runtime Alpha 8041-8120 — narrows four already-real, unmodified Shell methods (`devicesList`/`deviceDetail`/`deviceRevoke`/`deviceSyncStatus`) this file never called before this Arc. */
+  devicesList(): { readonly outcome: string; readonly [key: string]: unknown };
+  deviceDetail(deviceId: string): { readonly outcome: string; readonly [key: string]: unknown };
+  deviceRevoke(deviceId: string, devicePublicKeyHex: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  deviceSyncStatus(): { readonly outcome: string; readonly [key: string]: unknown };
+  /** Secure Runtime Alpha 8041-8120 — narrows `peerCapabilityListObserved()`/`identityTransitionStatus()`, used ONLY to reconcile an Identity Transition inbox item's own `transitionId` back to the `(peerAccountRef, peerDeviceRef)` pair `identityTransitionOpen()`/`Accept()`/`Reject()`/`Defer()` require as input — the Shell/Controller layer has no listing call that returns that pair directly (see this Arc's own Phase A reconciliation report); this main-process-only cross-reference invents no new identity-transition business rule, it only composes two already-public read-only calls, mirroring `FedosSafetyCenterController`'s own established cross-domain reconciliation style. */
+  peerCapabilityListObserved(): { readonly outcome: string; readonly [key: string]: unknown };
+  identityTransitionStatus(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): { readonly outcome: string; readonly [key: string]: unknown };
 }
-/** Secure Runtime Alpha 7321-7400 — narrows `FedosSafetyCenterController` (`src/desktop/presentation/safety_center/`, unmodified). */
+/** Secure Runtime Alpha 7321-7400 — narrows `FedosSafetyCenterController` (`src/desktop/presentation/safety_center/`, unmodified). Secure Runtime Alpha 8041-8120 — widened (never redesigned) to narrow the REST of `FedosDesktopConversationUiPresentationBoundary`'s own already-real ViewModels/Controllers (`src/desktop/presentation/`, unmodified) this file never read before this Arc: conversation list/detail, message list/compose, membership/invitations, search, archive, device inventory, Identity Transition, Signed Deletion. Every accessor below already exists on the real class; this interface only narrows the TYPE, granting no new capability. */
 interface BoundaryLike {
   readonly safetyCenter: {
     refreshOverview(ratchetPairs?: readonly unknown[]): Promise<void>;
     readonly overviewState: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly conversationList: {
+    load(filter?: unknown): Promise<unknown>;
+    readonly state: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly conversationDetail: {
+    load(conversationId: string): Promise<unknown>;
+    readonly state: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly messageList: {
+    load(conversationId: string): Promise<unknown>;
+    reveal(messageId: string): Promise<unknown>;
+    readonly state: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly composeMessage: {
+    setBody(body: string): void;
+    send(conversationId: string, sender: unknown): Promise<unknown>;
+    readonly state: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly membership: {
+    load(conversationId: string): Promise<unknown>;
+    loadInvitations(conversationId: string, issuer: unknown): Promise<unknown>;
+    readonly state: { readonly status: string; readonly [key: string]: unknown };
+    readonly invitations: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly search: {
+    setQuery(query: string): void;
+    search(): Promise<unknown>;
+  };
+  readonly archive: {
+    inspect(sourcePath: string): Promise<unknown>;
+    export(request: unknown): Promise<unknown>;
+    preflightRestore(request: unknown): Promise<unknown>;
+    restore(request: unknown): Promise<unknown>;
+    workflowWarnings(operation: "inspect" | "preflightRestore" | "export" | "restore"): readonly { readonly [key: string]: unknown }[];
+  };
+  readonly deviceInventory: {
+    refresh(): Promise<unknown>;
+    selectDevice(deviceId: string): Promise<unknown>;
+  };
+  readonly identityTransitions: {
+    refreshInbox(limit: number, offset: number): Promise<void>;
+    readonly inboxState: { readonly status: string; readonly [key: string]: unknown };
+    openTransition(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): Promise<void>;
+    readonly detailState: { readonly status: string; readonly [key: string]: unknown };
+    acceptSelected(): Promise<void>;
+    rejectSelected(): Promise<void>;
+    deferSelected(): Promise<void>;
+    recordManualVerification(method: unknown, verifiedAt: number, noteCode: unknown): Promise<void>;
+    readonly manualVerificationState: { readonly status: string; readonly [key: string]: unknown };
+  };
+  readonly deletionRequests: {
+    openReceivedInbox(): Promise<void>;
+    readonly inboxState: { readonly status: string; readonly [key: string]: unknown };
+    openReceivedRequest(requestId: string, policy: string): Promise<void>;
+    readonly consentDetailState: { readonly status: string; readonly [key: string]: unknown };
+    approveSelected(): Promise<void>;
+    rejectSelected(): Promise<void>;
   };
 }
 interface AssemblyLike {
@@ -465,6 +531,8 @@ let modules: RootModules | null = null;
 let mainWindow: BrowserWindow | null = null;
 let activeCoordinator: CoordinatorLike | null = null;
 let activeAssembly: AssemblyLike | null = null;
+/** Secure Runtime Alpha 8041-8120 — the local viewer's own participant reference, set once alongside `activeAssembly` on a successful create/unlock (SAME value `startAssembly()` already derives for `viewerParticipant` below), never re-derived elsewhere. Required by `sendMessage()`/`issuedInvitations()`, which take the LOCAL sender/issuer explicitly rather than reading it from a session. */
+let activeViewerParticipant: ParticipantRefLike | null = null;
 const notificationAdapter = new FedosElectronNotificationAdapter();
 const trayAdapter = new FedosElectronTrayAdapter();
 let badgeAdapter: FedosElectronBadgeAdapter | null = null;
@@ -777,6 +845,7 @@ async function handleCreate(payload: unknown) {
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
       await attachPresentationLayer(assembly);
       return readyResult(result.value);
     }
@@ -810,6 +879,7 @@ async function handleUnlock(payload: unknown) {
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
       await attachPresentationLayer(assembly);
       return readyResult(result.value);
     }
@@ -830,6 +900,7 @@ async function handleLock() {
     const assembly = activeAssembly;
     activeCoordinator = null;
     activeAssembly = null;
+    activeViewerParticipant = null;
     if (assembly !== null) await assembly.shutdown();
     await coordinator.lock();
     if (badgeAdapter !== null) {
@@ -956,6 +1027,7 @@ async function performCleanShutdown(): Promise<void> {
     const assembly = activeAssembly;
     activeCoordinator = null;
     activeAssembly = null;
+    activeViewerParticipant = null;
     try {
       if (assembly !== null) await assembly.shutdown();
       await coordinator.lock();
@@ -1220,6 +1292,297 @@ async function handleAcceptanceSafetyCenterOverview(): Promise<{ readonly outcom
 }
 
 // ---------------------------------------------------------------------
+// Secure Runtime Alpha 8041-8120 — Phase B-K: the ORDINARY, user-facing
+// `fedos-app:*` command vocabulary. This is the FedOS Desktop Beta
+// User-Facing Product UI Completion Arc's own closure of the Phase A
+// reconciliation report's central finding: `FedosDesktopConversationUiPresentationBoundary`
+// (`src/desktop/presentation/`, unmodified) already composes a real
+// conversation list/detail, message list/compose, membership/invitation,
+// search, archive, device inventory, Identity Transition, and Signed
+// Deletion Controller/ViewModel over the SAME Shell/Runtime every
+// `fedos-acceptance:*` command already uses -- it was simply never read by
+// this file before this Arc. Every handler below is a THIN delegation to
+// one of those already-real, already-tested ViewModels/Controllers (never
+// a second business-logic implementation, never a raw Runtime/Store/handle)
+// and gates on the SAME real-profile-unlocked precondition
+// (`requireShell()`/`requireBoundary()`) every other command in this file
+// already requires. This vocabulary is the ONLY one the ordinary page may
+// ever call -- `fedosAcceptance`/`fedos-acceptance:*` remains untouched,
+// reachable only by the pre-existing acceptance-mode test harness (Phase P
+// "do not rename existing accepted surfaces"; Phase Q "acceptance API
+// remains test-gated/clearly internal").
+// ---------------------------------------------------------------------
+
+/** Maps ANY `FedosDesktopViewModelState<T>` (`{status:"idle"|"loading"}` | `{status:"loaded",data}` | `{status:"error",outcome,reason}`) onto the SAME `{outcome:"ok",value}` / `{outcome,reason}` shape every `fedos-acceptance:*`/`fedos-profile:*` result in this file already uses -- one uniform result vocabulary across both command sets, never a second. */
+function resultFromViewModelState(state: { readonly status: string; readonly data?: unknown; readonly outcome?: string; readonly reason?: string }): { readonly outcome: string; readonly [key: string]: unknown } {
+  if (state.status === "loaded") return { outcome: "ok", value: state.data };
+  if (state.status === "error") return { outcome: state.outcome ?? "failed", reason: state.reason ?? "" };
+  return { outcome: "unavailable", reason: state.status };
+}
+
+function requireViewerParticipant(): ParticipantRefLike | null {
+  return activeViewerParticipant;
+}
+
+async function handleAppConversationsList() {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  await boundary.conversationList.load();
+  return resultFromViewModelState(boundary.conversationList.state);
+}
+
+async function handleAppConversationOpen(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  await boundary.conversationDetail.load(conversationId);
+  return resultFromViewModelState(boundary.conversationDetail.state);
+}
+
+async function handleAppMessagesList(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  await boundary.messageList.load(conversationId);
+  return resultFromViewModelState(boundary.messageList.state);
+}
+
+async function handleAppMessageReveal(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const messageId = (payload as { messageId?: unknown } | null)?.messageId;
+  if (!isBoundedString(messageId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed messageId" };
+  await boundary.messageList.reveal(messageId);
+  return resultFromViewModelState(boundary.messageList.state);
+}
+
+async function handleAppMessageSend(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const viewer = requireViewerParticipant();
+  if (viewer === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const body = (payload as { body?: unknown } | null)?.body;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || !isBoundedString(body, MAX_MESSAGE_BODY_CHARS)) {
+    return { outcome: "invalid-input", reason: "malformed message-send request" };
+  }
+  boundary.composeMessage.setBody(body);
+  await boundary.composeMessage.send(conversationId, viewer);
+  return resultFromViewModelState(boundary.composeMessage.state);
+}
+
+async function handleAppMembershipList(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  await boundary.membership.load(conversationId);
+  return resultFromViewModelState(boundary.membership.state);
+}
+
+async function handleAppInvitationsList(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const viewer = requireViewerParticipant();
+  if (viewer === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  await boundary.membership.loadInvitations(conversationId, viewer);
+  return resultFromViewModelState(boundary.membership.invitations);
+}
+
+async function handleAppArchiveWorkflowWarnings(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const operation = (payload as { operation?: unknown } | null)?.operation;
+  if (operation !== "inspect" && operation !== "preflightRestore" && operation !== "export" && operation !== "restore") {
+    return { outcome: "invalid-input", reason: "unknown archive operation" };
+  }
+  return { outcome: "ok", value: boundary.archive.workflowWarnings(operation) };
+}
+
+async function handleAppDevicesList() {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  return shell.devicesList();
+}
+
+async function handleAppDeviceDetail(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const deviceId = (payload as { deviceId?: unknown } | null)?.deviceId;
+  if (!isBoundedString(deviceId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed deviceId" };
+  return shell.deviceDetail(deviceId);
+}
+
+async function handleAppDeviceRevoke(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const deviceId = (payload as { deviceId?: unknown } | null)?.deviceId;
+  const devicePublicKeyHex = (payload as { devicePublicKeyHex?: unknown } | null)?.devicePublicKeyHex;
+  if (!isBoundedString(deviceId, MAX_ID_LENGTH) || !isBoundedString(devicePublicKeyHex, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed device-revoke request" };
+  }
+  return shell.deviceRevoke(deviceId, devicePublicKeyHex);
+}
+
+async function handleAppDeviceSyncStatus() {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  return shell.deviceSyncStatus();
+}
+
+/**
+ * Secure Runtime Alpha 8041-8120 — see `BoundaryLike`'s own updated header
+ * comment: `identityTransitionList()`/its Controller-built inbox item never
+ * carries the `(peerAccountRef, peerDeviceRef)` pair `openTransition()`/
+ * `Accept()`/`Reject()`/`Defer()` require as input -- no Shell/Controller
+ * listing call returns that pair directly on this base. This handler
+ * reconciles two ALREADY-REAL, already-public read-only calls
+ * (`identityTransitionList()`'s own inbox items plus `peerCapabilityListObserved()`'s
+ * known peer Device pairs, cross-referenced via the ALREADY-PUBLIC
+ * `identityTransitionStatus()` probe) to attach the pair each item needs --
+ * inventing no new identity-transition business rule, mirroring
+ * `FedosSafetyCenterController`'s own established cross-domain
+ * reconciliation style. An item with no resolvable pair is marked
+ * `openable: false` (fail closed) rather than fabricated.
+ */
+async function handleAppIdentityTransitionList(payload: unknown) {
+  const boundary = requireBoundary();
+  const shell = requireShell();
+  if (boundary === null || shell === null) return acceptanceGateRejection();
+  const limit = (payload as { limit?: unknown } | null)?.limit;
+  const offset = (payload as { offset?: unknown } | null)?.offset;
+  await boundary.identityTransitions.refreshInbox(typeof limit === "number" ? limit : 50, typeof offset === "number" ? offset : 0);
+  const inbox = boundary.identityTransitions.inboxState;
+  if (inbox.status !== "loaded") return resultFromViewModelState(inbox);
+  const peersResult = shell.peerCapabilityListObserved();
+  const peers = (peersResult.outcome === "ok" ? (peersResult as unknown as { readonly value: readonly { readonly peerAccountRef: unknown; readonly peerDeviceRef: string }[] }).value : []) ?? [];
+  const items = (inbox.data as readonly { readonly transitionId: string; readonly [key: string]: unknown }[]) ?? [];
+  const enriched = items.map((item) => {
+    for (const peer of peers) {
+      const statusResult = shell.identityTransitionStatus(peer.peerAccountRef, peer.peerDeviceRef, item.transitionId);
+      if (statusResult.outcome === "ok" && (statusResult as unknown as { readonly value: unknown }).value !== null) {
+        return { ...item, openable: true, peerAccountRef: peer.peerAccountRef, peerDeviceRef: peer.peerDeviceRef };
+      }
+    }
+    return { ...item, openable: false, peerAccountRef: null, peerDeviceRef: null };
+  });
+  return { outcome: "ok", value: enriched };
+}
+
+async function handleAppIdentityTransitionOpen(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const peerAccountRef = (payload as { peerAccountRef?: unknown } | null)?.peerAccountRef;
+  const peerDeviceRef = (payload as { peerDeviceRef?: unknown } | null)?.peerDeviceRef;
+  const transitionId = (payload as { transitionId?: unknown } | null)?.transitionId;
+  if (typeof peerAccountRef !== "object" || peerAccountRef === null || !isBoundedString(peerDeviceRef, MAX_ID_LENGTH) || !isBoundedString(transitionId, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed identity-transition-open request" };
+  }
+  await boundary.identityTransitions.openTransition(peerAccountRef, peerDeviceRef, transitionId);
+  return resultFromViewModelState(boundary.identityTransitions.detailState);
+}
+
+async function handleAppIdentityTransitionDecide(decision: "accept" | "reject" | "defer") {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  if (decision === "accept") await boundary.identityTransitions.acceptSelected();
+  else if (decision === "reject") await boundary.identityTransitions.rejectSelected();
+  else await boundary.identityTransitions.deferSelected();
+  return resultFromViewModelState(boundary.identityTransitions.detailState);
+}
+
+async function handleAppIdentityTransitionRecordManualVerification(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const method = (payload as { method?: unknown } | null)?.method;
+  const noteCode = (payload as { noteCode?: unknown } | null)?.noteCode;
+  if (typeof method !== "string" || typeof noteCode !== "string") return { outcome: "invalid-input", reason: "malformed manual-verification request" };
+  await boundary.identityTransitions.recordManualVerification(method, Date.now(), noteCode);
+  return resultFromViewModelState(boundary.identityTransitions.manualVerificationState);
+}
+
+/** Secure Runtime Alpha 8041-8120 — a dedicated `fedos-app:*` wrapper, distinct from `handleAcceptanceSafetyCenterOverview()` above: that handler returns `boundary.safetyCenter.overviewState` RAW (a `{status,data}` ViewModelState nested one level inside `value`, matching the `fedos-acceptance:*` vocabulary's own established shape for this one call) — flattened here via `resultFromViewModelState()` so `fedos-app:*` keeps ONE consistent `{outcome:"ok",value:<content>}` shape across every command, never two different unwrapping conventions for the ordinary page to guess between. */
+async function handleAppSafetyCenterOverview() {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  await boundary.safetyCenter.refreshOverview([]);
+  return resultFromViewModelState(boundary.safetyCenter.overviewState);
+}
+
+async function handleAppDeletionRequestListReceived() {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  await boundary.deletionRequests.openReceivedInbox();
+  return resultFromViewModelState(boundary.deletionRequests.inboxState);
+}
+
+/** The recipient-side local review policy is fixed to `"always-review"` -- the SAME conservative, never-auto-accept value `secureRuntimeBundleConfig()` already configures Runtime-wide (`deletionRequestResolveLocalPolicy`); a per-click UI override of this trust policy is deliberately never offered. */
+async function handleAppDeletionRequestOpen(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const requestId = (payload as { requestId?: unknown } | null)?.requestId;
+  if (!isBoundedString(requestId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed requestId" };
+  await boundary.deletionRequests.openReceivedRequest(requestId, "always-review");
+  return resultFromViewModelState(boundary.deletionRequests.consentDetailState);
+}
+
+async function handleAppDeletionRequestDecide(decision: "approve" | "reject") {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  if (decision === "approve") await boundary.deletionRequests.approveSelected();
+  else await boundary.deletionRequests.rejectSelected();
+  return resultFromViewModelState(boundary.deletionRequests.inboxState);
+}
+
+/**
+ * Secure Runtime Alpha 8041-8120 — Phase G's own "choose destination through
+ * an existing safe path boundary" requirement: no file/save picker existed
+ * anywhere in this package before this Arc (confirmed by the Phase A
+ * reconciliation report's own file inventory). A native OS picker, gated
+ * behind ONE specific named channel that returns ONE user-chosen path back
+ * to the caller, is the safe primitive Phase G names -- never a generic
+ * "read/write arbitrary path" IPC command (the prohibited kind): the
+ * renderer receives only the chosen path string, and that string is only
+ * ever accepted afterward by the ALREADY-VALIDATED `fedos-app:archive`
+ * export/restore commands, never used for any other file operation.
+ */
+async function handleAppArchiveChooseExportDestination(payload: unknown): Promise<{ readonly outcome: string; readonly path?: string }> {
+  if (activeAssembly === null || mainWindow === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const safeName = isBoundedString(conversationId, MAX_ID_LENGTH) ? conversationId.replace(/[^a-zA-Z0-9_-]/g, "_") : "conversation";
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: "Export Conversation Archive",
+    defaultPath: `${safeName}.fedosarchive`,
+    filters: [{ name: "FedOS Archive", extensions: ["fedosarchive"] }],
+  });
+  if (result.canceled || result.filePath === undefined) return { outcome: "cancelled" };
+  return { outcome: "ok", path: result.filePath };
+}
+
+async function handleAppArchiveChooseSource(): Promise<{ readonly outcome: string; readonly path?: string }> {
+  if (activeAssembly === null || mainWindow === null) return acceptanceGateRejection();
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Choose a FedOS Archive",
+    properties: ["openFile"],
+    filters: [{ name: "FedOS Archive", extensions: ["fedosarchive"] }, { name: "All Files", extensions: ["*"] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { outcome: "cancelled" };
+  return { outcome: "ok", path: result.filePaths[0] };
+}
+
+/** Reads current persisted Settings fresh -- mirrors `secureRuntimeBundleConfig()`'s own established "construct one stateless, file-backed controller, `.load()`, discard" pattern exactly; never a second, divergent Settings owner. */
+async function handleAppSettingsLoad() {
+  if (activeAssembly === null) return acceptanceGateRejection();
+  const m = requireModules();
+  const controller = m.createFileBackedSettingsController(settingsFilePath());
+  return controller.load();
+}
+
+// ---------------------------------------------------------------------
 // IPC — `fedos-profile:*` REUSED verbatim (Phase P). Additive `fedos-beta:*`
 // namespace for status/settings-application/tray/badge/background.
 // ---------------------------------------------------------------------
@@ -1264,6 +1627,62 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-acceptance:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
   ipcMain.handle("fedos-acceptance:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
   ipcMain.handle("fedos-acceptance:safety-center-overview", async () => handleAcceptanceSafetyCenterOverview());
+
+  // Secure Runtime Alpha 8041-8120 -- Phase B-K: the ordinary, user-facing
+  // `fedos-app:*` vocabulary. Every handler is registered unconditionally
+  // (mirrors every channel above); the security boundary is each handler's
+  // own `requireShell()`/`requireBoundary()` runtime check, not whether the
+  // channel itself was registered.
+  ipcMain.handle("fedos-app:conversations-list", async () => handleAppConversationsList());
+  ipcMain.handle("fedos-app:conversation-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppConversationOpen(payload));
+  // Phase E -- a genuinely restarted Runtime must re-activate a Direct
+  // conversation before it can send/receive (a real, per-Runtime-lifetime
+  // precondition -- Alpha 2041-2120, unmodified, unrelated to this Arc);
+  // reuses the SAME handler `fedos-acceptance:activate-direct-conversation`
+  // already dispatches to, never a second implementation.
+  ipcMain.handle("fedos-app:conversation-activate", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
+  ipcMain.handle("fedos-app:messages-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMessagesList(payload));
+  ipcMain.handle("fedos-app:message-reveal", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMessageReveal(payload));
+  ipcMain.handle("fedos-app:message-send", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMessageSend(payload));
+  ipcMain.handle("fedos-app:membership-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMembershipList(payload));
+  ipcMain.handle("fedos-app:invitations-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppInvitationsList(payload));
+  // Phase D -- creating an invitation IS creating the Direct conversation and
+  // sending it over the real relay; reuses the SAME handler
+  // `fedos-acceptance:create-conversation-invitation` already dispatches to,
+  // never a second implementation.
+  ipcMain.handle("fedos-app:create-invitation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
+  // Phase F/G -- reuse the SAME handlers `fedos-acceptance:search`/`:archive` already dispatch to.
+  ipcMain.handle("fedos-app:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
+  ipcMain.handle("fedos-app:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
+  ipcMain.handle("fedos-app:archive-workflow-warnings", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppArchiveWorkflowWarnings(payload));
+  ipcMain.handle("fedos-app:archive-choose-export-destination", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppArchiveChooseExportDestination(payload));
+  ipcMain.handle("fedos-app:archive-choose-source", async () => handleAppArchiveChooseSource());
+  // Phase H -- Device management.
+  ipcMain.handle("fedos-app:devices-list", async () => handleAppDevicesList());
+  ipcMain.handle("fedos-app:device-detail", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeviceDetail(payload));
+  ipcMain.handle("fedos-app:device-revoke", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeviceRevoke(payload));
+  ipcMain.handle("fedos-app:device-sync-status", async () => handleAppDeviceSyncStatus());
+  // Phase H (pairing) -- reuse the SAME handlers the acceptance vocabulary already dispatches to.
+  ipcMain.handle("fedos-app:device-pairing-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
+  ipcMain.handle("fedos-app:device-pairing-inspect", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
+  ipcMain.handle("fedos-app:device-pairing-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
+  ipcMain.handle("fedos-app:device-pairing-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
+  // Phase I -- Identity Replacement.
+  ipcMain.handle("fedos-app:identity-transition-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionList(payload));
+  ipcMain.handle("fedos-app:identity-transition-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionOpen(payload));
+  ipcMain.handle("fedos-app:identity-transition-accept", async () => handleAppIdentityTransitionDecide("accept"));
+  ipcMain.handle("fedos-app:identity-transition-reject", async () => handleAppIdentityTransitionDecide("reject"));
+  ipcMain.handle("fedos-app:identity-transition-defer", async () => handleAppIdentityTransitionDecide("defer"));
+  ipcMain.handle("fedos-app:identity-transition-record-manual-verification", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionRecordManualVerification(payload));
+  // Phase J -- Signed Deletion.
+  ipcMain.handle("fedos-app:deletion-request-list-received", async () => handleAppDeletionRequestListReceived());
+  ipcMain.handle("fedos-app:deletion-request-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestOpen(payload));
+  ipcMain.handle("fedos-app:deletion-request-approve", async () => handleAppDeletionRequestDecide("approve"));
+  ipcMain.handle("fedos-app:deletion-request-reject", async () => handleAppDeletionRequestDecide("reject"));
+  // Phase K -- reuse the SAME handler `fedos-acceptance:safety-center-overview` already dispatches to.
+  ipcMain.handle("fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview());
+  // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
+  ipcMain.handle("fedos-app:settings-load", async () => handleAppSettingsLoad());
 }
 
 // ---------------------------------------------------------------------
@@ -1297,6 +1716,15 @@ function createBetaWindow(): BrowserWindow {
     },
   });
   applySecureWindowPolicy(window);
+  if (AUTOTEST_MODE.length > 0) {
+    // Test-only: forwards the real page's own `console.*` calls into this
+    // process's stdout so a spawned-subprocess test (`ui-script`/`acceptance`)
+    // can see a renderer-side error without a devtools window. Never active
+    // on an ordinary launch (`AUTOTEST_MODE` is always empty then).
+    window.webContents.on("console-message", (_e, _level, message) => {
+      console.log(`FEDOS_ELECTRON_BETA_RENDERER_CONSOLE:${message}`);
+    });
+  }
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
     if (activeAssembly !== null) {
@@ -1384,6 +1812,22 @@ app.whenReady().then(async () => {
         "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
         "acceptance-search": (payload) => handleAcceptanceSearch(payload),
         "acceptance-archive": (payload) => handleAcceptanceArchive(payload),
+        // Secure Runtime Alpha 8041-8120 -- non-DOM regression coverage for
+        // the SAME `fedos-app:*` handler functions the real page's own
+        // `window.fedosApp` bridge calls; useful both as a lower-level
+        // regression suite (Phase O's own "a lower-level acceptance suite
+        // may remain as regression coverage") and to isolate a main-process
+        // handler bug from a renderer/DOM bug during development.
+        "app-conversations-list": () => handleAppConversationsList(),
+        "app-conversation-open": (payload) => handleAppConversationOpen(payload),
+        "app-messages-list": (payload) => handleAppMessagesList(payload),
+        "app-message-send": (payload) => handleAppMessageSend(payload),
+        "app-devices-list": () => handleAppDevicesList(),
+        "app-device-revoke": (payload) => handleAppDeviceRevoke(payload),
+        "app-identity-transition-list": (payload) => handleAppIdentityTransitionList(payload),
+        "app-deletion-request-list-received": () => handleAppDeletionRequestListReceived(),
+        "app-safety-center-overview": () => handleAppSafetyCenterOverview(),
+        "app-settings-load": () => handleAppSettingsLoad(),
         "acceptance-safety-center-overview": () => handleAcceptanceSafetyCenterOverview(),
       };
       try {
@@ -1413,6 +1857,72 @@ app.whenReady().then(async () => {
         }
       } catch (err) {
         console.error("fedos-beta: acceptance script error", err instanceof Error ? err.message : String(err));
+      } finally {
+        await performCleanShutdown();
+      }
+    })();
+  }
+
+  if (AUTOTEST_MODE === "ui-script") {
+    // Secure Runtime Alpha 8041-8120 -- Phase O's own explicit requirement:
+    // "the headline test must interact with visible user-facing controls...
+    // do not substitute webContents calls directly into internal acceptance
+    // methods for user-facing proof." Unlike `AUTOTEST_MODE=acceptance`
+    // above (which calls this file's own internal handler functions
+    // directly, bypassing the DOM entirely), this mode drives the REAL
+    // rendered page through `webContents.executeJavaScript()` -- filling
+    // real `<input>`/`<textarea>` elements, dispatching real `click()` calls
+    // on real `<button>` elements, and reading back real rendered
+    // `textContent`/`value` -- the exact same DOM `fedos_electron_beta_renderer.ts`
+    // itself listens on, so every action still traverses the real
+    // preload bridge -> real IPC channel -> real handler path, never a
+    // shortcut around it. Test-only (`AUTOTEST_MODE` is never set on an
+    // ordinary launch); does not weaken `contextIsolation`/`sandbox` for the
+    // page itself -- `executeJavaScript` is a main-process-initiated
+    // DevTools-protocol-level injection into the page's own world, the same
+    // technique every Electron UI test harness (Spectron/Playwright) uses,
+    // not a new capability exposed TO the page.
+    void (async () => {
+      const window = mainWindow;
+      if (window === null) {
+        await performCleanShutdown();
+        return;
+      }
+      if (window.webContents.isLoadingMainFrame()) {
+        await new Promise<void>((resolve) => window.webContents.once("did-finish-load", () => resolve()));
+      }
+      try {
+        const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
+        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "read" | "wait"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number }> = JSON.parse(scriptRaw);
+        for (let i = 0; i < script.length; i++) {
+          const step = script[i]!;
+          if (step.action === "wait") {
+            const ms = step.ms;
+            await new Promise((resolve) => setTimeout(resolve, typeof ms === "number" && ms > 0 && ms <= 30000 ? ms : 0));
+            console.log(`FEDOS_ELECTRON_BETA_UI_STEP_JSON:${JSON.stringify({ index: i, action: "wait", selector: "", result: { outcome: "ok" } })}`);
+            continue;
+          }
+          const selector = step.selector ?? "";
+          let result: unknown;
+          if (step.action === "fill") {
+            const value = step.value ?? "";
+            result = await window.webContents.executeJavaScript(
+              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event("input", { bubbles: true })); return { outcome: "ok" }; })()`,
+            );
+          } else if (step.action === "click") {
+            result = await window.webContents.executeJavaScript(
+              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; el.click(); return { outcome: "ok" }; })()`,
+            );
+          } else {
+            const as = step.as ?? "text";
+            result = await window.webContents.executeJavaScript(
+              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; return { outcome: "ok", value: ${as === "value" ? "el.value" : "el.textContent"} }; })()`,
+            );
+          }
+          console.log(`FEDOS_ELECTRON_BETA_UI_STEP_JSON:${JSON.stringify({ index: i, action: step.action, selector, result })}`);
+        }
+      } catch (err) {
+        console.error("fedos-beta: ui-script error", err instanceof Error ? err.message : String(err));
       } finally {
         await performCleanShutdown();
       }

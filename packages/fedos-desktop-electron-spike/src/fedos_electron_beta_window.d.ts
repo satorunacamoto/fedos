@@ -90,8 +90,66 @@ interface FedosAcceptanceBridge {
   readonly safetyCenterOverview: () => Promise<FedosAcceptanceCommandResult>;
 }
 
+/**
+ * Secure Runtime Alpha 8041-8120 (FedOS Desktop Beta User-Facing Product UI
+ * Completion Arc) — the ORDINARY, user-facing command vocabulary. Every
+ * method is reachable in ordinary packaged production mode once a real
+ * profile is unlocked, gated by the SAME `requireShell()`/`requireBoundary()`
+ * precondition every other bridge already uses. This is the ONLY bridge
+ * `fedos_electron_beta_renderer.ts` may call for Conversations/Search/
+ * Archive/Devices/Identity Replacement/Signed Deletion/Safety Center/
+ * Settings — `fedosAcceptance` remains reachable only by the pre-existing
+ * acceptance-mode test harness.
+ */
+interface FedosAppCommandResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly [key: string]: unknown;
+}
+
+interface FedosAppBridge {
+  readonly conversationsList: () => Promise<FedosAppCommandResult>;
+  readonly conversationOpen: (conversationId: string) => Promise<FedosAppCommandResult>;
+  readonly conversationActivate: (conversationId: string) => Promise<FedosAppCommandResult>;
+  readonly messagesList: (conversationId: string) => Promise<FedosAppCommandResult>;
+  readonly messageReveal: (messageId: string) => Promise<FedosAppCommandResult>;
+  readonly messageSend: (conversationId: string, body: string) => Promise<FedosAppCommandResult>;
+  readonly membershipList: (conversationId: string) => Promise<FedosAppCommandResult>;
+  readonly invitationsList: (conversationId: string) => Promise<FedosAppCommandResult>;
+  readonly createInvitation: (invitee: { readonly authority: string; readonly publicIdentifier: string }, expiresInMs?: number) => Promise<FedosAppCommandResult>;
+  readonly search: (query: string) => Promise<FedosAppCommandResult>;
+  readonly archiveInspect: (sourcePath: string) => Promise<FedosAppCommandResult>;
+  readonly archiveExport: (request: unknown) => Promise<FedosAppCommandResult>;
+  readonly archivePreflightRestore: (request: unknown) => Promise<FedosAppCommandResult>;
+  readonly archiveRestore: (request: unknown) => Promise<FedosAppCommandResult>;
+  readonly archiveWorkflowWarnings: (operation: "inspect" | "preflightRestore" | "export" | "restore") => Promise<FedosAppCommandResult>;
+  readonly archiveChooseExportDestination: (conversationId: string) => Promise<{ readonly outcome: string; readonly path?: string }>;
+  readonly archiveChooseSource: () => Promise<{ readonly outcome: string; readonly path?: string }>;
+  readonly devicesList: () => Promise<FedosAppCommandResult>;
+  readonly deviceDetail: (deviceId: string) => Promise<FedosAppCommandResult>;
+  readonly deviceRevoke: (deviceId: string, devicePublicKeyHex: string) => Promise<FedosAppCommandResult>;
+  readonly deviceSyncStatus: () => Promise<FedosAppCommandResult>;
+  readonly devicePairingCreate: (deviceId: string, expectedAccountRef: unknown) => Promise<FedosAppCommandResult>;
+  readonly devicePairingInspect: (encodedRequest: string) => Promise<FedosAppCommandResult>;
+  readonly devicePairingApprove: (encodedRequest: string) => Promise<FedosAppCommandResult>;
+  readonly devicePairingComplete: (pairingId: string, encodedApproval: string) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionList: (limit?: number, offset?: number) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionOpen: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionAccept: () => Promise<FedosAppCommandResult>;
+  readonly identityTransitionReject: () => Promise<FedosAppCommandResult>;
+  readonly identityTransitionDefer: () => Promise<FedosAppCommandResult>;
+  readonly identityTransitionRecordManualVerification: (method: string, noteCode: string) => Promise<FedosAppCommandResult>;
+  readonly deletionRequestListReceived: () => Promise<FedosAppCommandResult>;
+  readonly deletionRequestOpen: (requestId: string) => Promise<FedosAppCommandResult>;
+  readonly deletionRequestApprove: () => Promise<FedosAppCommandResult>;
+  readonly deletionRequestReject: () => Promise<FedosAppCommandResult>;
+  readonly safetyCenterOverview: () => Promise<FedosAppCommandResult>;
+  readonly settingsLoad: () => Promise<FedosAppCommandResult>;
+}
+
 interface Window {
   readonly fedosProfile: FedosProfileBridge;
   readonly fedosBeta: FedosBetaBridge;
   readonly fedosAcceptance: FedosAcceptanceBridge;
+  readonly fedosApp: FedosAppBridge;
 }

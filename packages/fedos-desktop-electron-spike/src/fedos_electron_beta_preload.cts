@@ -102,6 +102,69 @@ const fedosAcceptance: FedosAcceptanceBridge = Object.freeze({
   safetyCenterOverview: () => ipcRenderer.invoke("fedos-acceptance:safety-center-overview"),
 });
 
+/**
+ * Secure Runtime Alpha 8041-8120 — the ORDINARY, user-facing bridge. Every
+ * method below is a validated, single-purpose `ipcRenderer.invoke()` call
+ * over its own named `fedos-app:*` channel (the SAME discipline as
+ * `fedosAcceptance` above — never a generic `invoke(channel, any)`, never a
+ * raw filesystem path where a picker exists). This is the ONLY bridge the
+ * ordinary page (`fedos_electron_beta_renderer.ts`) may call for
+ * Conversations/Search/Archive/Devices/Identity Replacement/Signed
+ * Deletion/Safety Center/Settings — `fedosAcceptance` remains reachable only
+ * by the pre-existing acceptance-mode test harness (Phase Q).
+ */
+const fedosApp: FedosAppBridge = Object.freeze({
+  conversationsList: () => ipcRenderer.invoke("fedos-app:conversations-list"),
+  conversationOpen: (conversationId: string) => ipcRenderer.invoke("fedos-app:conversation-open", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
+  conversationActivate: (conversationId: string) => ipcRenderer.invoke("fedos-app:conversation-activate", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
+  messagesList: (conversationId: string) => ipcRenderer.invoke("fedos-app:messages-list", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
+  messageReveal: (messageId: string) => ipcRenderer.invoke("fedos-app:message-reveal", { messageId: boundedString(messageId, MAX_ID_CHARS) }),
+  messageSend: (conversationId: string, body: string) =>
+    ipcRenderer.invoke("fedos-app:message-send", { conversationId: boundedString(conversationId, MAX_ID_CHARS), body: boundedString(body, MAX_MESSAGE_BODY_CHARS) }),
+  membershipList: (conversationId: string) => ipcRenderer.invoke("fedos-app:membership-list", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
+  invitationsList: (conversationId: string) => ipcRenderer.invoke("fedos-app:invitations-list", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
+  createInvitation: (invitee: { readonly authority: string; readonly publicIdentifier: string }, expiresInMs?: number) =>
+    ipcRenderer.invoke("fedos-app:create-invitation", {
+      invitee: { authority: boundedString(invitee?.authority, MAX_ID_CHARS), publicIdentifier: boundedString(invitee?.publicIdentifier, MAX_ID_CHARS) },
+      expiresInMs: typeof expiresInMs === "number" ? expiresInMs : undefined,
+    }),
+  search: (query: string) => ipcRenderer.invoke("fedos-app:search", { query: boundedString(query, MAX_SEARCH_QUERY_CHARS) }),
+  archiveInspect: (sourcePath: string) => ipcRenderer.invoke("fedos-app:archive", { operation: "inspect", sourcePath: boundedString(sourcePath, MAX_ARCHIVE_PATH_CHARS) }),
+  archiveExport: (request: unknown) => ipcRenderer.invoke("fedos-app:archive", { operation: "export", request }),
+  archivePreflightRestore: (request: unknown) => ipcRenderer.invoke("fedos-app:archive", { operation: "preflightRestore", request }),
+  archiveRestore: (request: unknown) => ipcRenderer.invoke("fedos-app:archive", { operation: "restore", request }),
+  archiveWorkflowWarnings: (operation: "inspect" | "preflightRestore" | "export" | "restore") => ipcRenderer.invoke("fedos-app:archive-workflow-warnings", { operation }),
+  archiveChooseExportDestination: (conversationId: string) => ipcRenderer.invoke("fedos-app:archive-choose-export-destination", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
+  archiveChooseSource: () => ipcRenderer.invoke("fedos-app:archive-choose-source"),
+  devicesList: () => ipcRenderer.invoke("fedos-app:devices-list"),
+  deviceDetail: (deviceId: string) => ipcRenderer.invoke("fedos-app:device-detail", { deviceId: boundedString(deviceId, MAX_ID_CHARS) }),
+  deviceRevoke: (deviceId: string, devicePublicKeyHex: string) =>
+    ipcRenderer.invoke("fedos-app:device-revoke", { deviceId: boundedString(deviceId, MAX_ID_CHARS), devicePublicKeyHex: boundedString(devicePublicKeyHex, MAX_ID_CHARS) }),
+  deviceSyncStatus: () => ipcRenderer.invoke("fedos-app:device-sync-status"),
+  devicePairingCreate: (deviceId: string, expectedAccountRef: unknown) =>
+    ipcRenderer.invoke("fedos-app:device-pairing-create", { deviceId: boundedString(deviceId, MAX_ID_CHARS), expectedAccountRef }),
+  devicePairingInspect: (encodedRequest: string) => ipcRenderer.invoke("fedos-app:device-pairing-inspect", { encodedRequest: boundedString(encodedRequest, MAX_PAIRING_ENVELOPE_CHARS) }),
+  devicePairingApprove: (encodedRequest: string) => ipcRenderer.invoke("fedos-app:device-pairing-approve", { encodedRequest: boundedString(encodedRequest, MAX_PAIRING_ENVELOPE_CHARS) }),
+  devicePairingComplete: (pairingId: string, encodedApproval: string) =>
+    ipcRenderer.invoke("fedos-app:device-pairing-complete", { pairingId: boundedString(pairingId, MAX_ID_CHARS), encodedApproval: boundedString(encodedApproval, MAX_PAIRING_ENVELOPE_CHARS) }),
+  identityTransitionList: (limit?: number, offset?: number) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-list", { limit: typeof limit === "number" ? limit : undefined, offset: typeof offset === "number" ? offset : undefined }),
+  identityTransitionOpen: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-open", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
+  identityTransitionAccept: () => ipcRenderer.invoke("fedos-app:identity-transition-accept"),
+  identityTransitionReject: () => ipcRenderer.invoke("fedos-app:identity-transition-reject"),
+  identityTransitionDefer: () => ipcRenderer.invoke("fedos-app:identity-transition-defer"),
+  identityTransitionRecordManualVerification: (method: string, noteCode: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-record-manual-verification", { method: boundedString(method, MAX_LABEL_CHARS), noteCode: boundedString(noteCode, MAX_LABEL_CHARS) }),
+  deletionRequestListReceived: () => ipcRenderer.invoke("fedos-app:deletion-request-list-received"),
+  deletionRequestOpen: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-open", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
+  deletionRequestApprove: () => ipcRenderer.invoke("fedos-app:deletion-request-approve"),
+  deletionRequestReject: () => ipcRenderer.invoke("fedos-app:deletion-request-reject"),
+  safetyCenterOverview: () => ipcRenderer.invoke("fedos-app:safety-center-overview"),
+  settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
+});
+
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);
 contextBridge.exposeInMainWorld("fedosBeta", fedosBeta);
 contextBridge.exposeInMainWorld("fedosAcceptance", fedosAcceptance);
+contextBridge.exposeInMainWorld("fedosApp", fedosApp);

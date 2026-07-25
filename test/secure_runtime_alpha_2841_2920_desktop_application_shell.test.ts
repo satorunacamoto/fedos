@@ -273,8 +273,21 @@ describe("20. restart recovers durable state", () => {
     expect(reread.outcome).toBe("ok");
     if (reread.outcome !== "ok") throw new Error("expected ok");
     expect(reread.value.lifecycleState).toBe("draft");
-    // Not in shell2's own creation-session registry -- listConversations legitimately does not show it.
-    expect(shell2.listConversations()).toEqual({ outcome: "ok", value: [] });
+    // Secure Runtime Alpha 8041-8120 -- previously this asserted an empty
+    // list here ("not in shell2's own creation-session registry"), a real
+    // gap that Arc's own real user-facing vertical slice found live: a
+    // restarted Beta process's own Conversations screen never showed a
+    // conversation the user had every real right to see. `listConversations()`
+    // now ALSO enumerates `conversationRuntime().listDrafts()` (the same
+    // real, durable Draft persistence `getConversation()` above already
+    // reads) — so a fresh shell instance over the SAME durable paths now
+    // correctly re-discovers it, matching restart-durability expectations
+    // elsewhere in this codebase (e.g. "restart preserves accepted
+    // conversation").
+    const relisted = shell2.listConversations();
+    expect(relisted.outcome).toBe("ok");
+    if (relisted.outcome !== "ok") throw new Error("expected ok");
+    expect(relisted.value.map((v) => v.conversationId)).toEqual([created.value.conversationId]);
     await shell2.stop();
   });
 });

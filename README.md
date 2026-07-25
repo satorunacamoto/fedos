@@ -8,6 +8,57 @@ digital goods, and promotion.
 The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
 first), targeting Cloudflare Workers + D1 + KV + R2.
 
+> **Status: Secure Runtime Alpha 8041–8120 — FedOS Desktop Beta
+> User-Facing Product UI Completion Arc (FULL COMPLETION).** Closes the
+> headline gap both the Desktop Beta UX Acceptance Review (`9c238a11`) and
+> the Public Documentation and Security-Claims Audit (`dbc1386`)
+> independently found: the real packaged Desktop UI visibly supported only
+> profile creation, unlock, a read-only "ready" screen, and lock — every
+> other already-implemented, already-tested backend capability (Relay
+> configuration, invitation, conversations/messaging, Search, Archive,
+> Device management, Identity Replacement, Signed Deletion, Safety Center)
+> was reachable only through `window.fedosAcceptance`, a test-only bridge
+> the ordinary page never called. Adds a new, additive, non-test-branded
+> `window.fedosApp` preload bridge and a canonical navigation shell
+> (Conversations / Search / Archive / Devices / Safety Center / Settings,
+> Identity Replacement and Signed Deletion nested as inboxes inside Safety
+> Center) — one BrowserWindow, one Desktop Runtime generation, unchanged.
+> `fedosAcceptance`/`fedos-acceptance:*` remain byte-for-byte untouched,
+> reachable only by the pre-existing acceptance-mode test harness. Found
+> and fixed three real, previously-undiscovered gaps via this Arc's own
+> real, visible-control packaged vertical slice (driving the actual
+> rendered DOM through `webContents.executeJavaScript()`, never an
+> internal-handler shortcut): (1) `createConversationInvitation()` never
+> registered its own new conversation into the Shell's own tracking Set,
+> so the inviter never saw their own new conversation; (2)
+> `listConversations()` had no way to discover a conversation known only
+> through real-time inbound delivery, so the invitee never saw it either
+> — fixed by additionally enumerating the already-real, already-public
+> `FedosConversationRuntime.listDrafts()`, no new persistence or protocol
+> change; (3) the chat view had no live-update mechanism for a message
+> arriving in the background — fixed with a bounded 2-second poll, started/
+> stopped alongside screen navigation, plus a client-side revealed-
+> plaintext cache so an already-shown message is never silently re-hidden
+> by the next poll tick. Honestly reconciled the mission's own Phase D
+> "Bob pastes/imports invitation" description against the real backend:
+> `redeemInvitation()` is a permanent stub, so no manual-accept UI was
+> fabricated — acceptance is, and remains, automatic real-time delivery.
+> Full verification: `packages/fedos-desktop-electron-spike`'s entire
+> vitest suite (14 files, 199 tests, serialized) passes, including three
+> new files this Arc adds (structural guards, failure matrix, and the real
+> visible-control vertical slice); `cargo test --release` 639 passed/1
+> pre-existing known failure; a full-root `npx vitest run` shows 303 of
+> 1168 files failing, confirmed via `git stash` A/B comparison against the
+> unmodified base commit to be pre-existing baseline noise (the documented
+> worktree raw-import artifact class plus tautological "review scope"
+> lock tests), never a regression — with the sole exception of one
+> existing test that explicitly asserted the OLD, now-fixed
+> `listConversations()` limitation, updated to assert the corrected
+> behavior. See
+> `docs/secure_runtime_alpha_8041_8120_completion_declaration.md`.
+>
+> Prior status:
+>
 > **Status: Secure Runtime Alpha 7961–8040 — FedOS Secure Runtime Staged
 > Master Landing and Desktop Beta Release Candidate Arc (FULL
 > COMPLETION).** Lands the complete, converged Secure Runtime lineage
@@ -767,8 +818,18 @@ first), targeting Cloudflare Workers + D1 + KV + R2.
 > 3 of the 4 previously-BLOCKED Release Freeze rows for real: a real
 > packaged Electron process, real compiled WASM, real profile creation/
 > unlock/wrong-passphrase-rejection/lock/re-unlock/clean-shutdown, and a
-> real NSIS installer + portable ZIP built via `electron-builder` with
-> real code-signing and independently-re-derived checksums. A real, new,
+> real NSIS installer + portable ZIP built via `electron-builder`, with
+> independently-re-derived checksums.
+> **Correction (Secure Runtime Alpha 8041-8120):** the phrase "real
+> code-signing" that previously appeared on this line was a false claim,
+> reconciled against `docs/secure_runtime_alpha_5321_5400_certificate_custody_and_signing_seam.md`'s
+> own explicit statement that "FedOS Desktop Beta 0.1 ships **unsigned**"
+> — that Arc built only a future signing *integration seam* (a documented
+> design plus a readiness/verification check), never an actual signing
+> operation or certificate. No release artifact produced by this
+> repository has ever been code-signed; treat any build as unsigned unless
+> independently proven otherwise for the specific copy you have. A real,
+> new,
 > READ-ONLY AUTOTEST diagnostic (`unifiedGraphDiagnostics()`, no renderer-
 > facing IPC added) proved the Store-backed production crypto authority
 > IS live and reachable through the real packaged path

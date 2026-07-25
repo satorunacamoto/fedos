@@ -127,7 +127,11 @@ describe("Alpha 6761-6840 — structural guards over the real source", () => {
 
   it("2. the Settings read for relay config uses the SAME real, file-backed controller factory startAssembly() already uses -- never a second Settings persistence implementation", () => {
     const calls = clean.match(/m\.createFileBackedSettingsController\(/g) ?? [];
-    expect(calls.length).toBe(2); // once early (this Arc's own secureRuntimeBundleConfig), once in startAssembly() -- both stateless reads of the ONE file, never a stored second owner.
+    // once early (this Arc's own secureRuntimeBundleConfig), once in startAssembly(), and once
+    // in Secure Runtime Alpha 8041-8120's own `handleAppSettingsLoad()` (the real Settings
+    // screen's "read current settings" command) -- all three are stateless reads of the ONE
+    // file, never a stored second owner.
+    expect(calls.length).toBe(3);
   });
 
   it("3. no relay is ever fabricated -- the real subsystem flags are only set inside the relayUrls.length === 0 early-return's else branch, gated on genuinely loaded Settings", () => {

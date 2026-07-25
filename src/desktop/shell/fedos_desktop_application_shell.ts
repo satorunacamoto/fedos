@@ -367,6 +367,17 @@ export class FedosDesktopApplicationShell {
     const invitation = this.#runtime.conversationRuntime().conversationInvitation();
     if (invitation === null) return fedosDesktopShellFailure("unavailable", "conversation invitation Runtime is not configured");
     const outcome = await invitation.createAndSendInvitation(invitee, expiresInMs);
+    // Secure Runtime Alpha 8041-8120 -- real gap this Arc's own real
+    // user-facing vertical slice found live: `createAndSendInvitation()`
+    // creates a brand-new Direct conversation through a DIFFERENT facade
+    // than `createDirectConversation()`/`createPrivateGroup()` (both of
+    // which already register into `#knownConversationIds` via
+    // `#mapConstructionResult()` above) -- so the inviter's OWN new
+    // conversation never appeared in their OWN `listConversations()`,
+    // even though it was genuinely created and activated. Never a second
+    // tracking mechanism: the SAME `#knownConversationIds` set every other
+    // creation path already populates.
+    if (outcome.outcome === "sent") this.#knownConversationIds.add(outcome.conversationId);
     return fedosDesktopShellOk(outcome);
   }
 
@@ -383,10 +394,31 @@ export class FedosDesktopApplicationShell {
     return fedosDesktopShellOk(detail);
   }
 
+  /**
+   * Secure Runtime Alpha 8041-8120 -- real gap this Arc's own real
+   * user-facing vertical slice found live: `#knownConversationIds` is
+   * populated ONLY by a creation call this Shell itself made
+   * (`createDirectConversation`/`createPrivateGroup`/`createConversationInvitation`)
+   * -- a conversation this account learns about ENTIRELY through real-time
+   * inbound NIP-17 delivery (the invitee's own side of `createConversationInvitation`'s
+   * automatic-acceptance design, `FedosConversationRuntime.receiveNip17Rumor()`,
+   * unmodified) never reaches this Set at all, so it silently never appeared
+   * in `listConversations()` even though it was genuinely created,
+   * activated, and already usable via `getConversation()`/`sendMessage()`
+   * (both of which resolve a conversation by id directly, bypassing this
+   * Set entirely). `listDrafts()` (`FedosConversationRuntime`, Alpha
+   * 1841-1920, unmodified, already public) reads the SAME real, durable
+   * Draft persistence every creation path (inbound or outbound) already
+   * writes through -- this method only widens its OWN enumeration source
+   * to include it, inventing no new persistence, business rule, or Runtime
+   * capability.
+   */
   listConversations(filter?: FedosConversationListFilter): FedosDesktopShellResult<readonly FedosConversationSummaryView[]> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
     const summaries: FedosConversationSummaryView[] = [];
-    for (const id of this.#knownConversationIds) {
+    const allIds = new Set(this.#knownConversationIds);
+    for (const draft of this.#runtime.conversationRuntime().listDrafts()) allIds.add(draft.id);
+    for (const id of allIds) {
       const summary = this.#toSummaryView(id);
       if (summary === null) continue;
       if (filter?.mode !== undefined && summary.mode !== filter.mode) continue;

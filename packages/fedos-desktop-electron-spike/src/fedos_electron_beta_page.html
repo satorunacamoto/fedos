@@ -8,16 +8,25 @@
     />
     <title>FedOS Desktop — Beta</title>
     <style>
-      body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #14161a; color: #e8eaed; }
+      :root { color-scheme: dark; }
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 1.25rem 2rem 2rem; background: #14161a; color: #e8eaed; }
       h1 { font-size: 1.3rem; }
-      h2 { font-size: 1rem; margin-top: 1.5rem; }
-      section { display: none; max-width: 34rem; }
+      h2 { font-size: 1.05rem; margin-top: 0; }
+      h3 { font-size: 0.92rem; margin-top: 1.25rem; border-top: 1px solid #2a2d33; padding-top: 0.75rem; }
+      section { display: none; max-width: 46rem; }
       section.active { display: block; }
+      .app-screen { display: none; max-width: 46rem; }
+      .app-screen.active { display: block; }
       label { display: block; margin: 0.75rem 0 0.25rem; font-size: 0.85rem; color: #aab; }
-      input { width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 4px; border: 1px solid #333; background: #0f1114; color: #e8eaed; }
+      input, textarea, select { width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 4px; border: 1px solid #333; background: #0f1114; color: #e8eaed; font: inherit; }
+      textarea { min-height: 4.5rem; resize: vertical; }
       button { margin-top: 1rem; margin-right: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid #445; background: #1f2937; color: #e8eaed; cursor: pointer; }
       button:disabled { opacity: 0.5; cursor: default; }
+      button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible {
+        outline: 2px solid #6cf; outline-offset: 2px;
+      }
       .error { color: #f7a; min-height: 1.2rem; font-size: 0.85rem; margin-top: 0.5rem; }
+      .error:empty { display: none; }
       .field { font-family: ui-monospace, monospace; font-size: 0.8rem; color: #9bd; word-break: break-all; }
       .muted { color: #889; font-size: 0.8rem; }
       .warn { color: #fc6; font-size: 0.8rem; }
@@ -30,6 +39,25 @@
       .status-available-development-only, .status-experimental { background: #3a341a; color: #fd7; }
       .status-blocked, .status-unavailable { background: #3a1a1a; color: #f97; }
       .status-deferred { background: #23262b; color: #889; }
+      /* Phase M -- never color alone: every state badge also carries a text glyph prefix set by the renderer. */
+      nav#app-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; border-bottom: 1px solid #2a2d33; padding-bottom: 0.75rem; margin-bottom: 1rem; max-width: 60rem; }
+      nav#app-nav button { margin: 0; padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+      nav#app-nav button[aria-current="page"] { background: #33415a; border-color: #6cf; }
+      #app-status-area { margin-left: auto; font-size: 0.78rem; color: #9bd; }
+      #app-content { max-width: 60rem; }
+      ul.plain-list { list-style: none; padding: 0; margin: 0; }
+      ul.plain-list > li { border: 1px solid #2a2d33; border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.5rem; }
+      ul.plain-list > li button { margin: 0.4rem 0.4rem 0 0; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+      .chat-msg { border-radius: 6px; padding: 0.4rem 0.6rem; margin-bottom: 0.4rem; font-size: 0.88rem; }
+      .chat-msg.mine { background: #1a2a3a; }
+      .chat-msg.theirs { background: #23262b; }
+      .chat-msg .meta { font-size: 0.68rem; color: #889; margin-top: 0.2rem; }
+      fieldset { border: 1px solid #2a2d33; border-radius: 6px; margin-top: 0.75rem; }
+      legend { font-size: 0.82rem; color: #aab; padding: 0 0.4rem; }
+      .relay-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+      .relay-row span { flex: 1; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+      .relay-row button { margin: 0; }
+      [role="alert"]:empty { display: none; }
     </style>
   </head>
   <body>
@@ -50,10 +78,10 @@
       <label for="create-label">Profile label</label>
       <input id="create-label" type="text" autocomplete="off" maxlength="128" />
       <label for="create-pass">Passphrase</label>
-      <input id="create-pass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <input id="create-pass" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
       <label for="create-pass-confirm">Confirm passphrase</label>
-      <input id="create-pass-confirm" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
-      <div id="create-error" class="error"></div>
+      <input id="create-pass-confirm" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
+      <div id="create-error" class="error" role="alert"></div>
       <button id="create-submit" type="button">Create profile</button>
     </section>
 
@@ -61,44 +89,182 @@
       <p>This device has a locked profile. Enter your passphrase to unlock.</p>
       <p class="muted">Profile: <span id="unlock-label" class="field"></span></p>
       <label for="unlock-pass">Passphrase</label>
-      <input id="unlock-pass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
-      <div id="unlock-error" class="error"></div>
+      <input id="unlock-pass" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" />
+      <div id="unlock-error" class="error" role="alert"></div>
       <button id="unlock-submit" type="button">Unlock</button>
     </section>
 
     <section id="screen-initializing">
-      <p>Working…</p>
+      <p role="status" aria-live="polite">Working…</p>
     </section>
 
     <section id="screen-unlock-failed">
       <p>Unlock failed. The passphrase did not match. The profile is still locked.</p>
-      <div class="error" id="unlock-failed-reason"></div>
+      <div class="error" id="unlock-failed-reason" role="alert"></div>
       <button id="retry-btn" type="button">Try again</button>
     </section>
 
     <section id="screen-recovery">
-      <p>This profile requires recovery. A partial or corrupt profile was detected and cannot be unlocked.</p>
-      <p class="muted" id="recovery-reason"></p>
+      <p>This profile could not be unlocked normally.</p>
+      <p class="muted">Diagnostic code: <span id="recovery-reason" class="field"></span></p>
+      <div id="recovery-actions"></div>
+      <p class="muted" id="recovery-explain"></p>
+      <button id="recovery-retry-btn" type="button">Retry unlock</button>
+      <button id="recovery-copy-btn" type="button">Copy diagnostic code</button>
+      <p id="recovery-copy-feedback" role="status" aria-live="polite" class="muted"></p>
       <button id="quit-btn-recovery" type="button">Quit</button>
     </section>
 
     <section id="screen-ready">
-      <p><strong>Profile unlocked — Runtime ready.</strong></p>
-      <p>Label: <span id="ready-label" class="field"></span></p>
-      <p>Account public identity: <span id="ready-account" class="field"></span></p>
-      <p>Local device: <span id="ready-device" class="field"></span></p>
-      <p>Device trust: <span id="ready-trust" class="field"></span></p>
+      <details>
+        <summary>Profile unlocked — Runtime ready</summary>
+        <p>Label: <span id="ready-label" class="field"></span></p>
+        <p>Account public identity: <span id="ready-account" class="field"></span></p>
+        <p>Local device: <span id="ready-device" class="field"></span></p>
+        <p>Device trust: <span id="ready-trust" class="field"></span></p>
+        <h2>Capabilities</h2>
+        <ul class="capabilities" id="capabilities-list"></ul>
+        <h2>Beta limitations</h2>
+        <ul class="limitations" id="limitations-list"></ul>
+        <p class="muted" id="release-info"></p>
+      </details>
 
-      <h2>Capabilities</h2>
-      <ul class="capabilities" id="capabilities-list"></ul>
+      <nav id="app-nav" aria-label="Primary">
+        <button id="nav-conversations" type="button">Conversations</button>
+        <button id="nav-search" type="button">Search</button>
+        <button id="nav-archive" type="button">Archive</button>
+        <button id="nav-devices" type="button">Devices</button>
+        <button id="nav-safety" type="button">Safety Center</button>
+        <button id="nav-settings" type="button">Settings</button>
+        <span id="app-status-area" role="status" aria-live="polite"></span>
+        <button id="lock-btn" type="button">Lock</button>
+        <button id="quit-btn" type="button">Quit</button>
+      </nav>
 
-      <h2>Beta limitations</h2>
-      <ul class="limitations" id="limitations-list"></ul>
+      <div id="app-content">
+        <div class="app-screen" id="app-screen-conversations">
+          <h2>Conversations</h2>
+          <div id="conversations-error" class="error" role="alert"></div>
+          <label for="conversations-filter">Filter</label>
+          <input id="conversations-filter" type="text" placeholder="Filter by title or id" />
+          <ul class="plain-list" id="conversations-list"></ul>
 
-      <p class="muted" id="release-info"></p>
+          <h3>Invite a contact</h3>
+          <p class="muted">Sending an invitation creates a new Direct Conversation and delivers it over your configured Relay. There is no code for your contact to paste — the conversation appears in their own list automatically once they are unlocked and connected.</p>
+          <label for="invite-identifier">Contact's public identifier (nostr)</label>
+          <input id="invite-identifier" type="text" maxlength="512" autocomplete="off" />
+          <div id="invite-error" class="error" role="alert"></div>
+          <button id="invite-submit" type="button">Send invitation</button>
+        </div>
 
-      <button id="lock-btn" type="button">Lock</button>
-      <button id="quit-btn" type="button">Quit</button>
+        <div class="app-screen" id="app-screen-chat">
+          <button id="chat-back" type="button">&larr; Back to Conversations</button>
+          <h2 id="chat-title">Conversation</h2>
+          <p class="muted" id="chat-meta"></p>
+          <div id="chat-error" class="error" role="alert"></div>
+          <ul class="plain-list" id="chat-messages"></ul>
+          <label for="chat-compose">Message</label>
+          <textarea id="chat-compose" maxlength="8192"></textarea>
+          <button id="chat-send" type="button">Send</button>
+          <p id="chat-send-feedback" role="status" aria-live="polite" class="muted"></p>
+        </div>
+
+        <div class="app-screen" id="app-screen-search">
+          <h2>Search</h2>
+          <p class="muted">Search matches locally-held plaintext using a keyword index derived from your own messages. This is not an encrypted blind index — see Safety Center for details.</p>
+          <label for="search-query">Query</label>
+          <input id="search-query" type="text" maxlength="256" />
+          <div id="search-error" class="error" role="alert"></div>
+          <button id="search-submit" type="button">Search</button>
+          <ul class="plain-list" id="search-results"></ul>
+        </div>
+
+        <div class="app-screen" id="app-screen-archive">
+          <h2>Archive</h2>
+          <h3>Export a Direct Conversation</h3>
+          <p class="muted" id="archive-export-warnings"></p>
+          <label for="archive-export-conversation-id">Conversation id</label>
+          <input id="archive-export-conversation-id" type="text" maxlength="512" />
+          <button id="archive-export-choose-dest" type="button">Choose destination…</button>
+          <p class="muted" id="archive-export-dest-label"></p>
+          <div id="archive-export-error" class="error" role="alert"></div>
+          <button id="archive-export-submit" type="button" disabled>Export</button>
+          <p class="muted">Exporting does not remove or invalidate your live, active encrypted session — restoring history later never resumes that live session automatically.</p>
+
+          <h3>Restore an Archive</h3>
+          <p class="muted" id="archive-restore-warnings"></p>
+          <button id="archive-restore-choose-source" type="button">Choose archive file…</button>
+          <p class="muted" id="archive-restore-source-label"></p>
+          <div id="archive-restore-manifest"></div>
+          <label for="archive-restore-counterparty">Counterparty's public identifier (nostr)</label>
+          <input id="archive-restore-counterparty" type="text" maxlength="512" autocomplete="off" />
+          <div id="archive-restore-error" class="error" role="alert"></div>
+          <button id="archive-restore-inspect" type="button" disabled>Inspect manifest</button>
+          <button id="archive-restore-submit" type="button" disabled>Restore</button>
+          <p class="muted">Restore applies your current Retention/suppression state — some restored items may be reported as redacted or tombstoned rather than fully recovered. A Device that never received a related deletion/suppression fact remains outside this guarantee.</p>
+        </div>
+
+        <div class="app-screen" id="app-screen-devices">
+          <h2>Devices</h2>
+          <div id="devices-error" class="error" role="alert"></div>
+          <ul class="plain-list" id="devices-list"></ul>
+          <p class="muted">Revoking a Device removes its trust for future messages — it does not delete copies that Device already has, and does not affect Relay-side or foreign Archive copies.</p>
+        </div>
+
+        <div class="app-screen" id="app-screen-safety">
+          <h2>Safety Center</h2>
+          <p class="muted">Every section below is reported independently. There is no overall security score — a partial or unavailable section does not mean the rest of the application is unsafe, and a fully "supported" section is not an external audit result.</p>
+          <div id="safety-error" class="error" role="alert"></div>
+          <ul class="plain-list" id="safety-sections"></ul>
+
+          <h3>Identity Replacement</h3>
+          <p class="muted">A pending item means a contact's account signed a NEW identity claiming continuity with an existing conversation. Never auto-accepted — review it yourself before trusting it.</p>
+          <ul class="plain-list" id="identity-transition-list"></ul>
+          <div id="identity-transition-detail"></div>
+
+          <h3>Signed Deletion requests</h3>
+          <p class="muted">A signed request to delete something locally. Approving it never guarantees removal from a Relay, another Device, or a foreign Archive copy — this policy always requires your own review.</p>
+          <ul class="plain-list" id="deletion-request-list"></ul>
+          <div id="deletion-request-detail"></div>
+        </div>
+
+        <div class="app-screen" id="app-screen-settings">
+          <h2>Settings</h2>
+          <div id="settings-error" class="error" role="alert"></div>
+          <div id="settings-report" role="status" aria-live="polite" class="muted"></div>
+
+          <fieldset>
+            <legend>Relays</legend>
+            <div id="settings-relay-list"></div>
+            <label for="settings-relay-new">Add a Relay URL (wss:// or ws://)</label>
+            <input id="settings-relay-new" type="text" maxlength="512" autocomplete="off" placeholder="wss://relay.example.org" />
+            <button id="settings-relay-add" type="button">Add</button>
+            <div id="settings-relay-error" class="error" role="alert"></div>
+            <label for="settings-default-relay">Default Relay</label>
+            <select id="settings-default-relay"></select>
+          </fieldset>
+
+          <fieldset>
+            <legend>Preferences</legend>
+            <label for="settings-theme">Theme</label>
+            <select id="settings-theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <label for="settings-language">Language</label>
+            <select id="settings-language">
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+            </select>
+            <label><input id="settings-notifications" type="checkbox" style="width:auto;display:inline-block" /> Enable notifications</label>
+            <label><input id="settings-background-sync" type="checkbox" style="width:auto;display:inline-block" /> Enable background sync</label>
+          </fieldset>
+
+          <p class="muted">Relay changes require a restart of this application to take effect. Nothing is applied until you press Save.</p>
+          <button id="settings-save" type="button">Save settings</button>
+        </div>
+      </div>
     </section>
 
     <script src="fedos_electron_beta_renderer.js"></script>
