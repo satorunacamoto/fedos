@@ -79,6 +79,10 @@ import type { FedosConversationDirectMessageSummary } from "./fedos_conversation
 import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
 import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
 import { encodeFedosDirectConversationPlainMessagePayload } from "../delivery/nostr/nip17/fedos_direct_conversation_plain_message_payload.js";
+import {
+  describeFedosForwardSecrecyRoute,
+  type FedosDirectConversationForwardSecrecyRoute,
+} from "../ratchet/fedos_direct_conversation_forward_secrecy_route.js";
 
 /** The ONE encryption suite this facade ever selects — never caller-chosen (Alpha 1127). */
 export const FIXED_DIRECT_MESSAGE_SUITE: FedosConversationEnvelopeEncryptionSuite = "ChaCha20Poly1305";
@@ -161,6 +165,22 @@ export interface FedosConversationDirectMessagingCoordinatorDependencies {
    * heuristic.
    */
   readonly ratchetDelivery?: FedosConversationDirectMessageRatchetDeliveryDependencies;
+  /**
+   * FedOS Conversation Forward Secrecy (Phase 1) — OPTIONAL, REPORTING-ONLY.
+   *
+   * Answers, per conversation and at send time, "did this message get
+   * forward secrecy, and if not, exactly why". It NEVER changes which route
+   * runs: routing stays governed by `ratchetDelivery`/`delivery` above,
+   * byte-for-byte as before. Omitted, `sent-locally` carries no
+   * `forwardSecrecy` field at all and every existing caller is unaffected.
+   *
+   * It exists because the honest answer for an ordinary packaged launch is
+   * "no forward secrecy", and before this field that fact was invisible: a
+   * legacy static-NIP-17 send and a forward-secret ratchet send produced
+   * indistinguishable results. Reporting it is a precondition for fixing
+   * it — see `../ratchet/fedos_direct_conversation_forward_secrecy_route.ts`.
+   */
+  readonly forwardSecrecySelector?: (conversationId: string) => FedosDirectConversationForwardSecrecyRoute;
 }
 
 export class FedosConversationDirectMessagingCoordinator {
@@ -215,9 +235,17 @@ export class FedosConversationDirectMessagingCoordinator {
     // doc comment for why the two are mutually exclusive in practice,
     // never a per-message heuristic). Omitting BOTH leaves this method
     // byte-for-byte unchanged from before this Arc.
+    // FedOS Conversation Forward Secrecy (Phase 1) — computed ONCE, before
+    // any route runs, and attached to whichever result is returned below.
+    // Reporting only: it never selects a route.
+    const forwardSecrecy =
+      result.outcome === "sent-locally" && this.#deps.forwardSecrecySelector !== undefined
+        ? describeFedosForwardSecrecyRoute(this.#deps.forwardSecrecySelector(conversationId))
+        : undefined;
+
     if (result.outcome === "sent-locally" && this.#deps.ratchetDelivery !== undefined) {
       const delivery = await this.#deps.ratchetDelivery.sendRatchetMailboxNip17(result.envelopeId, conversationId, plaintext);
-      return { ...result, delivery };
+      return forwardSecrecy === undefined ? { ...result, delivery } : { ...result, delivery, forwardSecrecy };
     }
     if (result.outcome === "sent-locally" && this.#deps.delivery !== undefined) {
       // Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route
@@ -251,9 +279,10 @@ export class FedosConversationDirectMessagingCoordinator {
         }),
       );
       const delivery = await this.#deps.delivery.sendMailboxNip17(result.envelopeId, conversationId, wireBytes);
-      return { ...result, delivery };
+      return forwardSecrecy === undefined ? { ...result, delivery } : { ...result, delivery, forwardSecrecy };
     }
 
+    if (result.outcome === "sent-locally" && forwardSecrecy !== undefined) return { ...result, forwardSecrecy };
     return result;
   }
 

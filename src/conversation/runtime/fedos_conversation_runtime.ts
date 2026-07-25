@@ -201,6 +201,7 @@ import {
 import type { FedosDirectRatchetInboundReceiveResult } from "../ratchet/fedos_direct_ratchet_inbound_integration.js";
 import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
 import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import { selectFedosDirectConversationForwardSecrecyRoute } from "../ratchet/fedos_direct_conversation_forward_secrecy_route.js";
 import type { FedosRatchetPeerCapabilityEntry } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
 import type { FedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
 import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
@@ -684,6 +685,30 @@ export class FedosConversationRuntime {
     // built above — never a second, divergent graph. Constructed BEFORE
     // the direct-messaging facade below so its own `sendDirectRatchetMessage()`
     // can be wired into that facade's own optional `ratchetDelivery` seam.
+  // FedOS Conversation Forward Secrecy (Phase 1) — the local account the
+  // selector matches sessions against. Resolved fresh from the SAME
+  // `identityResolver` every other identity-gated operation in this file
+  // already uses (never a caller-supplied identity, never cached across
+  // calls, so an Identity Replacement is observed on the very next send).
+  // A conversation whose sessions were bound to a REPLACED account will
+  // correctly stop matching and report `"no-session-for-conversation"` —
+  // that is the honest answer, not a bug: the old sessions are not usable
+  // under the new identity.
+  const resolveLocalAccountRefForForwardSecrecy = (): FedosDeviceBindingAccountRef => {
+    const identity = identityResolver.resolveLocalParticipant();
+    return identity.outcome === "unavailable"
+      ? { authority: "nostr", publicIdentifier: "", identityId: null }
+      : { authority: identity.creator.authority, publicIdentifier: identity.creator.publicIdentifier, identityId: null };
+  };
+
+  // FedOS Conversation Forward Secrecy (Phase 1) — hoisted so the Ratchet
+  // Runtime and the forward-secrecy selector read the SAME session store; two
+  // instances would let the selector report a session the Runtime cannot use.
+  const directRatchetSessionPersistence =
+    deps.directRatchet === undefined
+      ? undefined
+      : deps.directRatchet.sessionPersistence ?? new InMemoryFedosDirectRatchetSessionPersistence();
+
     this.#directRatchetRuntime =
       deps.directRatchet === undefined
         ? null
@@ -693,7 +718,7 @@ export class FedosConversationRuntime {
             membershipAuthority: deps.membershipAuthority,
             identityResolver,
             deviceRegistry: deps.directRatchet.deviceRegistry,
-            sessionPersistence: deps.directRatchet.sessionPersistence ?? new InMemoryFedosDirectRatchetSessionPersistence(),
+            sessionPersistence: directRatchetSessionPersistence!,
             sealedSecretPersistence:
               deps.directRatchet.sealedSecretPersistence ?? new InMemoryFedosSealedDirectRatchetSecretPersistence(),
             remotePublicKeyPersistence:
@@ -904,6 +929,23 @@ export class FedosConversationRuntime {
       decryptionCoordinator: this.#decryptionCoordinator,
       delivery: deps.directMessageDelivery,
       ratchetDelivery,
+      // FedOS Conversation Forward Secrecy (Phase 1) — wired whenever the
+      // Ratchet dependencies exist at all, so the honest per-conversation
+      // answer is available even when no ratchet ROUTE is configured (the
+      // ordinary packaged case, which reports `"ratchet-not-configured"`).
+      // Reporting only: it never changes which route runs.
+      forwardSecrecySelector:
+        deps.directRatchet === undefined
+          ? undefined
+          : (conversationId: string) =>
+              selectFedosDirectConversationForwardSecrecyRoute({
+                conversationId: conversationId as FedosConversationId,
+                localAccountRef: resolveLocalAccountRefForForwardSecrecy(),
+                localDeviceRef: deps.directRatchet!.localDeviceRef,
+                ratchetConfigured: ratchetDelivery !== undefined,
+                sessionPersistence: directRatchetSessionPersistence!,
+                deviceRegistry: deps.directRatchet!.deviceRegistry,
+              }),
     });
 
     // Secure Runtime Alpha 1841–1920 Phase D (Alpha 1856–1861) — reuses

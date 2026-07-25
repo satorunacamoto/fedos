@@ -35,12 +35,32 @@
  */
 import type { FedosPrivateWireDeliveryQueueOutcome } from "../transport/fedos_private_wire_prepared_delivery.js";
 import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
+import type { FedosForwardSecrecyUnavailableReason } from "../ratchet/fedos_direct_conversation_forward_secrecy_route.js";
 
 export type FedosConversationDirectMessageSendResult =
   | {
       readonly outcome: "sent-locally";
       readonly envelopeId: string;
       readonly delivery?: FedosPrivateWireDeliveryQueueOutcome | FedosDirectRatchetSendOutcome;
+      /**
+       * FedOS Conversation Forward Secrecy (Phase 1) — ADDITIVE, OPTIONAL,
+       * present only when a caller supplied `forwardSecrecySelector`.
+       *
+       * A SEPARATE fact from both local storage and `delivery`, in exactly
+       * the same spirit Alpha 1851 established for `delivery` itself: it
+       * says whether THIS message got forward secrecy, and when it did not,
+       * names the specific reason from a closed vocabulary. `forwardSecrecy:
+       * false` is the honest answer for an ordinary packaged launch; before
+       * this field existed, that fact had no representation anywhere in the
+       * result and a non-forward-secret send was indistinguishable from a
+       * forward-secret one.
+       *
+       * Carries no key material, no Device id, and no account id.
+       */
+      readonly forwardSecrecy?: {
+        readonly forwardSecrecy: boolean;
+        readonly reason: FedosForwardSecrecyUnavailableReason | null;
+      };
     }
   | { readonly outcome: "invalid-input" }
   | { readonly outcome: "conversation-not-found" }
