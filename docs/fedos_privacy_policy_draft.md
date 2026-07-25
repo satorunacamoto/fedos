@@ -1,12 +1,22 @@
 # FedOS Desktop Beta — Privacy Policy (DRAFT)
 
-**This is a DRAFT, not a final, legally-reviewed Privacy Policy.** It has
-not been reviewed by a lawyer, does not yet name a real legal entity as
-data controller, and should not be published or presented to end users
-as a final policy until a human with the authority to do so completes
-that review. It is written to be factually accurate about what this
-software actually does, verified against its current source, as a
-starting point for that review — not a substitute for it.
+> **STATUS: DRAFT — NOT LEGALLY REVIEWED — HUMAN OWNER/JURISDICTION
+> REQUIRED — NOT YET ACCEPTED AS RELEASE POLICY.**
+> This document has no legal effect. It has not been reviewed by a
+> lawyer, names no real legal entity as data controller, states no
+> jurisdiction or governing law, and has not been approved by anyone
+> with the authority to adopt it as this project's real Privacy Policy.
+> **The application itself does not present this document to users or
+> claim their acceptance of it anywhere in its UI** (independently
+> verified this Arc — no "I agree"/"I accept" control exists in the
+> shipped app). Do not publish, link from the packaged application, or
+> represent this as approved policy until a human completes real legal
+> review and formally adopts it.
+
+This is a DRAFT, not a final, legally-reviewed Privacy Policy. It is
+written to be factually accurate about what this software actually
+does, verified against its current source, as a starting point for
+real legal review — not a substitute for it.
 
 ## Summary
 

@@ -1,9 +1,37 @@
 # FedOS Desktop Beta — Terms of Use (DRAFT)
 
-**This is a DRAFT, not a final, legally-reviewed Terms of Use document.**
-It has not been reviewed by a lawyer, does not name a real legal entity,
+> **STATUS: DRAFT — NOT LEGALLY REVIEWED — HUMAN OWNER/JURISDICTION
+> REQUIRED — NOT YET ACCEPTED AS RELEASE POLICY.**
+> This document has no legal effect. It has not been reviewed by a
+> lawyer, names no real legal entity, states no jurisdiction or
+> governing law, and has not been approved by anyone with the authority
+> to adopt it as this project's real Terms of Use. **The application
+> itself does not present these terms to users or claim their
+> acceptance anywhere in its UI** (independently verified this Arc — no
+> "I agree"/"I accept" control exists in the shipped app, so no user has
+> been asked to accept, and none has accepted, anything described here).
+> Do not publish, link from the packaged application, or represent this
+> as approved policy until a human completes real legal review and
+> formally adopts it.
+
+This is a DRAFT, not a final, legally-reviewed Terms of Use document. It
+has not been reviewed by a lawyer, does not name a real legal entity,
 and should not be published or presented to end users as final terms
 until a human with the authority to do so completes that review.
+
+## Closed Beta pilot: informed consent instead of public Terms
+
+**The Closed Beta pilot does not need this document to operate.** A
+small, directly-recruited pilot cohort can proceed under **informed
+pilot consent** instead — each participant individually briefed on what
+this Beta is, its real limitations (`KNOWN_LIMITATIONS.md`), and the
+risks of pre-release, unaudited, unsigned software, by whoever recruits
+them, with their own explicit agreement to participate before receiving
+the build. This is a real, already-sufficient basis for a Closed Beta
+and does not require these Terms to be finalized first. **Public Beta
+(anonymous, self-serve distribution) is a different matter — it remains
+blocked pending real Terms adoption**, since there is no individual
+briefing step to substitute informed consent at that scale.
 
 ## Beta software, no warranty
 
