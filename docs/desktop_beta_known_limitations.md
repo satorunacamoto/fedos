@@ -4,7 +4,13 @@ Organized by consequence to a user, not by engineering Arc. This document
 reconciles `docs/reviews/public_docs_security_claims_audit_v1/07_known_limitations.md`
 (commit `dbc1386`) against the current build; each item below is re-verified
 against the landed source at Secure Runtime Alpha 8041-8120, not carried
-forward unverified.
+forward unverified. Items 17-20 additionally reconcile four parallel V1/V2
+reviews (Dead Runtime Paths, Technical Debt/Performance, Original
+Vision/Expected-Behavior V2, Closed Beta Operations/Audit Readiness) run
+alongside Secure Runtime Alpha 8201-8280 — see
+`docs/secure_runtime_alpha_8201_8280_deferred_findings_roadmap.md` for
+every finding from those reviews NOT folded in here (forward-looking
+engineering work, out of this Arc's own scope).
 
 ## Reachability
 
@@ -148,4 +154,31 @@ review wording.
     future work — it touches the NIP-17 inbound decode path, a
     protocol-frozen boundary this Arc's own mission does not permit
     redesigning — and is named as a recommended next Arc, not attempted
-    here.
+    here. **Correction (reconciled against the parallel Original Vision
+    and Expected-Behavior Validation V2 review, `09140dd5`):** a real,
+    tested Sender-Key rotation prototype (`rotateSenderKeyEpoch()`, Alpha
+    2121-2200 "Group Sender-Key Foundation Arc," `01fef390`, continued
+    through a Rotation V1 review, `41da82d9`) does exist — but on a
+    permanently unmerged branch lineage, with a disclosed flaw
+    (`Math.random()`, not a CSPRNG, for key material) and zero production
+    callers even on its own branch. Independently reconfirmed here:
+    `01fef390` is not an ancestor of `master`, and `master`'s own `src/`
+    has zero occurrences of `rotateSenderKeyEpoch`/`SenderKeyAuthority`.
+    This does not change the finding above — master ships pairwise fanout
+    only — but "no Sender-Key work exists" would overstate it; more
+    precisely, a substantially real prototype exists and was never
+    adopted, for reasons (including the CSPRNG flaw) that would need
+    revisiting before any future Arc merges it, not merely reviving it
+    as-is.
+20. **Version rollback during the pilot is blocked by a real structural
+    fact, not a process gap** (reconciled against the parallel Closed Beta
+    Operations and Independent Security Audit Readiness V1 review,
+    `600157b9`): `Cargo.lock` is deliberately not committed (see
+    `docs/secure_runtime_alpha_8121_8200_cargo_lock_policy_decision.md`),
+    and no schema-migration code exists for the on-disk profile/settings/
+    archive formats. If a pilot build needs to be rolled back after a
+    participant has already run a newer one, there is currently no tested
+    path back to an older on-disk schema. Operationally: back up a
+    profile directory before upgrading a pilot install, and treat
+    "upgrade forward only" as the real constraint for this pilot, not an
+    oversight.

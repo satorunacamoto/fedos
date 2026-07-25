@@ -24,6 +24,15 @@ before relying on it for anything sensitive.
   post-compromise security for Direct conversations) — it is not the
   Signal Protocol library, and it is not interoperable with Signal or any
   other Double-Ratchet-based messenger.
+- **A Relay operator, or anyone observing a Relay's traffic, can see WHO
+  is sending to WHOM and WHEN**, and can correlate that pattern over time
+  (which accounts talk to which other accounts, how often, message
+  timing and size) — encryption protects message contents, not this
+  metadata. NIP-17's gift-wrap does not by itself defeat this kind of
+  traffic analysis; no onion-style routing or mixing exists in this
+  codebase to hide it (design-only, unimplemented — see the original
+  project vision section of `README.md`). Treat this as public
+  information to any Relay you connect through.
 - Message transport uses NIP-17 (Nostr gift-wrapped direct messages) with
   this project's own additive extensions (e.g. real-time invitation
   delivery, an authenticated route-binding field inside the encrypted
