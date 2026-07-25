@@ -1,12 +1,36 @@
-# nostr-window
+# FedOS Desktop — Secure Messenger (Closed Beta)
 
-A Reddit-style **window into Nostr**. Where Damus/Primal render Nostr as a
-Twitter-like timeline, this product organizes the same underlying Nostr events
-into Reddit-style threads, with paths toward communities, channels, groups, DMs,
-digital goods, and promotion.
+**FedOS Desktop is a focused, end-to-end encrypted Direct-message secure
+messenger**, built on the Nostr protocol (NIP-17 private Direct messages)
+with a real Double-Ratchet session per conversation. It is currently in
+**Closed Beta**: no independent, external security audit has been performed,
+the installer is not code-signed, and Group Messaging is intentionally not
+exposed in this pilot (see `docs/desktop_beta_known_limitations.md` and the
+in-app Safety Center for the full, honest limitations list). This repository
+began as a much broader "Reddit-style window into Nostr" project — that
+original, broader vision is preserved below as historical/future-roadmap
+material; it is **not** what the shipped Desktop Beta product is today.
 
-The architecture is a **Nostr + own-DB hybrid** (not fully decentralized at
-first), targeting Cloudflare Workers + D1 + KV + R2.
+## Original project vision (historical / future roadmap, not shipped today)
+
+The project's original working name was `nostr-window`, described as:
+
+> A Reddit-style **window into Nostr**. Where Damus/Primal render Nostr as a
+> Twitter-like timeline, this product organizes the same underlying Nostr
+> events into Reddit-style threads, with paths toward communities, channels,
+> groups, DMs, digital goods, and promotion.
+>
+> The architecture is a **Nostr + own-DB hybrid** (not fully decentralized
+> at first), targeting Cloudflare Workers + D1 + KV + R2.
+
+That broader Board/community/commerce vision guided much of this
+repository's early history and remains a possible future direction, but it
+is **not** what the Closed Beta ships. The shipped product (see Status
+above) is the focused Secure Messenger only: Direct (1:1) end-to-end
+encrypted conversations, Search, Archive, Devices, Identity Replacement,
+Signed Deletion, and Safety Center. No community/board/channel UI, no
+digital-goods/commerce feature, and no Group Messaging UI are exposed in
+this pilot.
 
 > **Status: Secure Runtime Alpha 8041–8120 — FedOS Desktop Beta
 > User-Facing Product UI Completion Arc (FULL COMPLETION).** Closes the

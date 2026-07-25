@@ -2022,7 +2022,7 @@ app.whenReady().then(async () => {
       }
       try {
         const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
-        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number }> = JSON.parse(scriptRaw);
+        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number; readonly targetSelector?: string }> = JSON.parse(scriptRaw);
         for (let i = 0; i < script.length; i++) {
           const step = script[i]!;
           if (step.action === "wait") {
@@ -2053,6 +2053,23 @@ app.whenReady().then(async () => {
             // effect," never a scripted delay that would hide a real race.
             result = await window.webContents.executeJavaScript(
               `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; el.click(); el.click(); return { outcome: "ok" }; })()`,
+            );
+          } else if (step.action === "copy") {
+            // Secure Runtime Alpha 8201-8280 -- a purely client-side
+            // "copy the visible text/value from one element into another
+            // element's `.value`" step, added ONLY to this pre-existing
+            // `ui-script` autotest execution loop (same gate as every other
+            // action here). Stands in for the real, manual copy/paste a
+            // human performs when moving a pairing request/approval string
+            // between two Devices (or, as this Arc's own Device Pairing
+            // vertical slice uses it, between two fields on the SAME real
+            // rendered page within one script run) -- never a Node-side
+            // round-trip, never a shortcut around the real DOM/IPC path any
+            // other step in this file already takes.
+            const targetSelector = step.targetSelector ?? "";
+            const as = step.as ?? "value";
+            result = await window.webContents.executeJavaScript(
+              `(() => { const src = document.querySelector(${JSON.stringify(selector)}); const dst = document.querySelector(${JSON.stringify(targetSelector)}); if (!src || !dst) return { outcome: "not-found" }; const v = ${as === "text" ? "src.textContent" : "src.value"}; dst.value = v; dst.dispatchEvent(new Event("input", { bubbles: true })); return { outcome: "ok", value: v }; })()`,
             );
           } else if (step.action === "readGlobal") {
             // Secure Runtime Alpha 8121-8200 -- Security Finding 1

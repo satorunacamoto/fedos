@@ -29,7 +29,12 @@ export type FedosDesktopBetaLimitationId =
   | "chat-live-update-is-polled"
   | "identity-replacement-evidence-may-be-incomplete"
   | "relay-has-no-automatic-reconnect"
-  | "no-guaranteed-memory-erasure";
+  | "no-guaranteed-memory-erasure"
+  | "group-messaging-unavailable"
+  | "device-revocation-not-remote-erasure"
+  | "no-secure-memory-locking"
+  | "no-independent-security-audit"
+  | "installer-unsigned";
 
 /** Where in the product this limitation must be surfaced. Closed vocabulary. */
 export type FedosDesktopBetaLimitationSurface = "onboarding" | "about" | "beta-status";
@@ -166,6 +171,46 @@ const FEDOS_DESKTOP_BETA_LIMITATIONS_V1: FedosDesktopBetaLimitationsV1 = Object.
       label: "Locking clears visible content, not guaranteed memory erasure",
       statement: "Locking removes messages, search results, and other content from the screen and from this app's own in-memory state, but does not guarantee the underlying memory pages are erased at the operating-system level.",
       surfaces: ["about", "beta-status"],
+    }),
+    // Secure Runtime Alpha 8201-8280 (FedOS Desktop Closed-Beta Product Gap
+    // Closure and Final Polish Arc) — Phase A of this Arc found the current
+    // Group Messaging transport is receive-blind (only the sender's own
+    // Device can render a group thread; recipients receive ordinary 1:1
+    // messages with no reconstruction path — see this Arc's own
+    // `docs/secure_runtime_alpha_8201_8280_phase_a_reconciliation_report.md`).
+    // Exposing a Group Conversation UI on top of that would misrepresent a
+    // feature that does not work for anyone but its creator, so this Arc
+    // deliberately did not build one. This is the one, honest, user-visible
+    // statement of that decision.
+    lim({
+      limitationId: "group-messaging-unavailable",
+      label: "Group messaging is not available in this pilot",
+      statement: "This Beta only supports Direct (1:1) conversations. Group messaging exists at a technical level but is not reliable for real use yet (a recipient other than the sender cannot currently see a group's messages), so no group conversation screen is offered.",
+      surfaces: ["onboarding", "about", "beta-status"],
+    }),
+    lim({
+      limitationId: "device-revocation-not-remote-erasure",
+      label: "Revoking a Device removes trust, not its copies of your data",
+      statement: "Revoking a Device stops it from being trusted for future messages and Sync. It does not delete messages that Device already has, and this app has no way to confirm or force deletion on another Device.",
+      surfaces: ["about", "beta-status"],
+    }),
+    lim({
+      limitationId: "no-secure-memory-locking",
+      label: "No guaranteed protection against secrets being swapped to disk",
+      statement: "This Beta does not lock sensitive memory pages (no mlock/VirtualLock guarantee) — while unlocked, the operating system could in principle swap sensitive in-memory data to disk, outside this app's control.",
+      surfaces: ["about", "beta-status"],
+    }),
+    lim({
+      limitationId: "no-independent-security-audit",
+      label: "No independent security audit has occurred",
+      statement: "This Beta's cryptography and code have not yet been reviewed by an independent, external security auditor — all verification so far is internal to this project.",
+      surfaces: ["onboarding", "about", "beta-status"],
+    }),
+    lim({
+      limitationId: "installer-unsigned",
+      label: "The installer is not code-signed",
+      statement: "This Beta's installer and application binaries are not code-signed. Your operating system may show an unrecognized-publisher warning; checksums verify the file was not corrupted in transit, not who published it.",
+      surfaces: ["about"],
     }),
   ]),
 });

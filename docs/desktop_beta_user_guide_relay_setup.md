@@ -2,9 +2,13 @@
 
 A Relay is a real Nostr relay server your Desktop app connects to for
 delivering and receiving invitations and messages. Without at least one
-configured, invitations, messaging, Device pairing, Identity Replacement,
-and Signed Deletion all stay honestly disabled — nothing is fabricated as
-working when it is not.
+configured, invitations, messaging, Identity Replacement, and Signed
+Deletion all stay honestly disabled — nothing is fabricated as working
+when it is not. **Device Pairing is the one exception:** it never sends
+anything over a Relay (the pairing request/approval strings are moved
+between Devices manually, by whatever channel you already trust), so it
+works with no Relay configured at all — verified directly by this Arc's
+own real, visible-control pairing test.
 
 ## Adding a Relay
 

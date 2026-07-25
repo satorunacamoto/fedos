@@ -94,6 +94,20 @@ const OUTCOME_TEXT: Readonly<Record<string, string>> = {
   "requires-activation": "This conversation is still finishing setup.",
   "requires-unlock": "Please unlock first.",
   "acceptance-only": "This isn't available right now.",
+  malformed: "That pairing text looks corrupted or incomplete. Copy it again in full.",
+  expired: "This pairing request has expired. Start over on the new Device.",
+  replayed: "This pairing request was already used.",
+  revoked: "This Device was previously revoked and cannot be re-trusted.",
+  "wrong-account": "This approval is from a different account than expected.",
+  disabled: "This Device cannot approve or revoke pairings — no account signing capability is configured here.",
+  // Real, currently-reachable outcome for Device Pairing specifically:
+  // `FedosDesktopApplicationShell` translates the facade's own
+  // `"wrong-account"` into this Shell-layer name before it ever reaches
+  // `window.fedosApp` (`DEVICE_PAIRING_OUTCOME_TO_SHELL_OUTCOME` in
+  // `fedos_desktop_application_shell.ts`) -- found live by this Arc's own
+  // real visible-control pairing test, which got the unhelpful generic
+  // fallback text here before this entry existed.
+  unauthorized: "This approval is from a different account than expected.",
 };
 
 function describeOutcome(outcome: string): string {
@@ -694,6 +708,198 @@ async function onDeviceRevoke(deviceId: string, devicePublicKeyHex: string, labe
     await refreshDevicesList();
   } finally {
     revokeBtn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Secure Runtime Alpha 8201-8280 (FedOS Desktop Closed-Beta Product Gap
+// Closure and Final Polish Arc) — Device Pairing UI. Every method here
+// calls the SAME `window.fedosApp.devicePairing*` channels that were
+// already wired to the real `FedosDevicePairingFacade` in an earlier Arc
+// but had no renderer caller (Phase A of this Arc's own reconciliation
+// report, `docs/secure_runtime_alpha_8201_8280_phase_a_reconciliation_report.md`).
+// No new IPC channel, no new crypto, no Device private key crosses this
+// boundary -- the Joining Device's keypair is generated and held entirely
+// in the Electron main process (`FedosDesktopApplicationShell`); this
+// renderer only ever sees the bounded, public `encoded`/`encodedApproval`
+// strings and a `pairingId`.
+// ---------------------------------------------------------------------
+
+/** Remembers this session's own in-process pairing id (Step 1 -> Step 3), mirroring the Shell's own "ephemeral, in-process bookkeeping only" discipline -- lost on restart by design, matching the underlying keypair's own lifetime. */
+let pendingDevicePairingId: string | null = null;
+
+async function onDevicePairingCreateSubmit(): Promise<void> {
+  clearError("device-pairing-create-error");
+  const deviceId = byId<HTMLInputElement>("device-pairing-create-label").value.trim();
+  const expectedAccountPublicIdentifier = byId<HTMLInputElement>("device-pairing-create-account").value.trim();
+  if (deviceId.length === 0) {
+    byId("device-pairing-create-error").textContent = "Enter a Device ID first.";
+    return;
+  }
+  if (expectedAccountPublicIdentifier.length === 0) {
+    byId("device-pairing-create-error").textContent = "Enter the account you're joining first.";
+    return;
+  }
+  setBusy(true, "device-pairing-create-submit");
+  try {
+    const result = await window.fedosApp.devicePairingCreate(deviceId, { authority: "nostr", publicIdentifier: expectedAccountPublicIdentifier });
+    if (result.outcome !== "ok") {
+      showError("device-pairing-create-error", result);
+      byId("device-pairing-create-result").hidden = true;
+      return;
+    }
+    const value = result.value as { readonly pairingId: string; readonly encoded: string };
+    pendingDevicePairingId = value.pairingId;
+    byId<HTMLTextAreaElement>("device-pairing-create-output").value = value.encoded;
+    byId("device-pairing-create-expiry").textContent = `Device ID: ${deviceId} (pairing id ${value.pairingId})`;
+    byId("device-pairing-create-copy-feedback").textContent = "";
+    byId("device-pairing-create-result").hidden = false;
+    byId<HTMLButtonElement>("device-pairing-complete-submit").disabled = false;
+  } finally {
+    setBusy(false, "device-pairing-create-submit");
+  }
+}
+
+async function onDevicePairingCreateCopy(): Promise<void> {
+  const text = byId<HTMLTextAreaElement>("device-pairing-create-output").value;
+  try {
+    await navigator.clipboard.writeText(text);
+    byId("device-pairing-create-copy-feedback").textContent = "Copied.";
+  } catch {
+    byId("device-pairing-create-copy-feedback").textContent = "Could not copy automatically — select the text above and copy it manually.";
+  }
+}
+
+async function onDevicePairingApproveInspect(): Promise<void> {
+  clearError("device-pairing-approve-error");
+  const encodedRequest = byId<HTMLTextAreaElement>("device-pairing-approve-input").value.trim();
+  disarmDevicePairingApproveConfirm();
+  byId<HTMLButtonElement>("device-pairing-approve-submit").disabled = true;
+  byId("device-pairing-approve-inspection").textContent = "";
+  if (encodedRequest.length === 0) {
+    byId("device-pairing-approve-error").textContent = "Paste the pairing request first.";
+    return;
+  }
+  setBusy(true, "device-pairing-approve-inspect");
+  try {
+    const result = await window.fedosApp.devicePairingInspect(encodedRequest);
+    if (result.outcome !== "ok") {
+      showError("device-pairing-approve-error", result);
+      return;
+    }
+    const view = result.value as { readonly pairingId: string; readonly deviceId: string; readonly devicePublicKeyHex: string; readonly issuedAt: number; readonly expiresAt: number; readonly expired: boolean; readonly deviceProofValid: boolean };
+    const issued = new Date(view.issuedAt * 1000).toLocaleString();
+    const expires = new Date(view.expiresAt * 1000).toLocaleString();
+    byId("device-pairing-approve-inspection").textContent =
+      `Device ID: ${view.deviceId} · key ${view.devicePublicKeyHex.slice(0, 16)}… · issued ${issued} · expires ${expires}` +
+      (view.expired ? " · EXPIRED" : "") +
+      (view.deviceProofValid ? " · device proof valid" : " · device proof INVALID — do not approve");
+    byId<HTMLButtonElement>("device-pairing-approve-submit").disabled = view.expired || !view.deviceProofValid;
+  } finally {
+    setBusy(false, "device-pairing-approve-inspect");
+  }
+}
+
+/**
+ * Secure Runtime Alpha 8201-8280 -- deliberately NOT `window.confirm()`: a
+ * native JS dialog in Electron blocks the renderer's own event loop on a
+ * synchronous main-process round-trip with no programmatic way to answer
+ * it, which this Arc's own real visible-control test discovered hangs
+ * indefinitely under scripted/automated control. A real inline two-step
+ * confirmation (this function arms it; `onDevicePairingApproveConfirm()`/
+ * `onDevicePairingApproveCancel()` resolve it) gives the identical
+ * "explain the effect, require a second explicit action" guarantee while
+ * remaining fully driven by ordinary DOM clicks -- more accessible than a
+ * native dialog too, and consistent with this file's other multi-step
+ * confirmations (Archive restore, Signed Deletion) rather than a one-off
+ * native-dialog pattern.
+ */
+function armDevicePairingApproveConfirm(): void {
+  byId("device-pairing-approve-confirm-explain").hidden = false;
+  byId<HTMLButtonElement>("device-pairing-approve-confirm").hidden = false;
+  byId<HTMLButtonElement>("device-pairing-approve-cancel").hidden = false;
+  byId<HTMLButtonElement>("device-pairing-approve-submit").hidden = true;
+}
+
+function disarmDevicePairingApproveConfirm(): void {
+  byId("device-pairing-approve-confirm-explain").hidden = true;
+  byId<HTMLButtonElement>("device-pairing-approve-confirm").hidden = true;
+  byId<HTMLButtonElement>("device-pairing-approve-cancel").hidden = true;
+  byId<HTMLButtonElement>("device-pairing-approve-submit").hidden = false;
+}
+
+function onDevicePairingApproveCancel(): void {
+  disarmDevicePairingApproveConfirm();
+}
+
+async function onDevicePairingApproveConfirm(): Promise<void> {
+  clearError("device-pairing-approve-error");
+  const encodedRequest = byId<HTMLTextAreaElement>("device-pairing-approve-input").value.trim();
+  if (encodedRequest.length === 0) {
+    disarmDevicePairingApproveConfirm();
+    return;
+  }
+  const confirmBtn = byId<HTMLButtonElement>("device-pairing-approve-confirm");
+  if (confirmBtn.disabled) return;
+  confirmBtn.disabled = true;
+  byId<HTMLButtonElement>("device-pairing-approve-cancel").disabled = true;
+  setBusy(true, "device-pairing-approve-inspect");
+  try {
+    const result = await window.fedosApp.devicePairingApprove(encodedRequest);
+    if (result.outcome !== "ok") {
+      showError("device-pairing-approve-error", result);
+      return;
+    }
+    const value = result.value as { readonly encoded: string; readonly localRegistration: string };
+    byId<HTMLTextAreaElement>("device-pairing-approve-output").value = value.encoded;
+    byId("device-pairing-approve-copy-feedback").textContent = "";
+    byId("device-pairing-approve-result").hidden = false;
+    await refreshDevicesList();
+  } finally {
+    confirmBtn.disabled = false;
+    byId<HTMLButtonElement>("device-pairing-approve-cancel").disabled = false;
+    // Consumed regardless of outcome on success (single-use approval, matches the underlying facade's own "no re-approving the same request" reality); collapses the confirm affordance back either way so a failure leaves the user able to try again from Inspect.
+    disarmDevicePairingApproveConfirm();
+    setBusy(false, "device-pairing-approve-inspect");
+  }
+}
+
+async function onDevicePairingApproveCopy(): Promise<void> {
+  const text = byId<HTMLTextAreaElement>("device-pairing-approve-output").value;
+  try {
+    await navigator.clipboard.writeText(text);
+    byId("device-pairing-approve-copy-feedback").textContent = "Copied.";
+  } catch {
+    byId("device-pairing-approve-copy-feedback").textContent = "Could not copy automatically — select the text above and copy it manually.";
+  }
+}
+
+async function onDevicePairingCompleteSubmit(): Promise<void> {
+  clearError("device-pairing-complete-error");
+  const encodedApproval = byId<HTMLTextAreaElement>("device-pairing-complete-input").value.trim();
+  if (pendingDevicePairingId === null) {
+    byId("device-pairing-complete-error").textContent = "Create a pairing request on this Device first (Step 1).";
+    return;
+  }
+  if (encodedApproval.length === 0) {
+    byId("device-pairing-complete-error").textContent = "Paste the approval from the other Device first.";
+    return;
+  }
+  setBusy(true, "device-pairing-complete-submit");
+  try {
+    const result = await window.fedosApp.devicePairingComplete(pendingDevicePairingId, encodedApproval);
+    if (result.outcome !== "ok") {
+      showError("device-pairing-complete-error", result);
+      return;
+    }
+    const view = result.value as { readonly deviceId: string; readonly trustState: string };
+    byId("device-pairing-complete-result").textContent = `Pairing complete — "${view.deviceId}" is now ${view.trustState}.`;
+    pendingDevicePairingId = null;
+    byId<HTMLButtonElement>("device-pairing-complete-submit").disabled = true;
+    byId<HTMLTextAreaElement>("device-pairing-complete-input").value = "";
+    await refreshDevicesList();
+  } finally {
+    setBusy(false, "device-pairing-complete-submit");
   }
 }
 
@@ -1300,7 +1506,7 @@ const RECOVERY_EXPLANATIONS: Readonly<Record<string, string>> = {
 
 function renderRecoveryScreen(outcomeCode: string): void {
   byId("recovery-reason").textContent = outcomeCode;
-  byId("recovery-explain").textContent = RECOVERY_EXPLANATIONS[outcomeCode] ?? "This profile could not be unlocked. You can retry, restore from an Archive, or quit.";
+  byId("recovery-explain").textContent = RECOVERY_EXPLANATIONS[outcomeCode] ?? "This profile could not be unlocked. You can retry, copy the diagnostic code for support, or quit.";
   showScreen("recovery");
 }
 
@@ -1361,6 +1567,7 @@ function clearAllRendererContentState(): void {
   archiveRestoreSourcePath = null;
   settingsWorkingCopy = null;
   localAccountPublicIdentifier = "";
+  pendingDevicePairingId = null;
 
   // Content-bearing DOM containers (list/detail views, error text, status/feedback text).
   const textContentOnlyIds = [
@@ -1385,6 +1592,14 @@ function clearAllRendererContentState(): void {
     "deletion-request-list",
     "devices-list",
     "devices-error",
+    "device-pairing-create-error",
+    "device-pairing-create-expiry",
+    "device-pairing-create-copy-feedback",
+    "device-pairing-approve-error",
+    "device-pairing-approve-inspection",
+    "device-pairing-approve-copy-feedback",
+    "device-pairing-complete-error",
+    "device-pairing-complete-result",
     "safety-sections",
     "safety-error",
     "invite-error",
@@ -1404,10 +1619,38 @@ function clearAllRendererContentState(): void {
   }
 
   // Free-text input fields a prior session's own typing/paste may have left behind.
-  const inputValueOnlyIds = ["chat-compose", "conversations-filter", "search-query", "invite-identifier", "archive-export-conversation-id", "settings-relay-new"];
+  const inputValueOnlyIds = [
+    "chat-compose",
+    "conversations-filter",
+    "search-query",
+    "invite-identifier",
+    "archive-export-conversation-id",
+    "settings-relay-new",
+    "device-pairing-create-label",
+    "device-pairing-create-account",
+    "device-pairing-create-output",
+    "device-pairing-approve-input",
+    "device-pairing-approve-output",
+    "device-pairing-complete-input",
+  ];
   for (const id of inputValueOnlyIds) {
     const el = document.getElementById(id);
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.value = "";
+  }
+
+  // Pairing is a trust decision -- restart-safe visible state means every
+  // stale in-flight affordance from a prior session is closed, never left
+  // clickable (the underlying `pendingDevicePairingId`/keypair are already
+  // gone by construction -- see the reset above and the Shell's own
+  // process-memory-only pairing bookkeeping).
+  for (const id of ["device-pairing-approve-submit", "device-pairing-complete-submit"]) {
+    const el = document.getElementById(id);
+    if (el instanceof HTMLButtonElement) el.disabled = true;
+  }
+  disarmDevicePairingApproveConfirm();
+  for (const id of ["device-pairing-create-result", "device-pairing-approve-result"]) {
+    const el = document.getElementById(id);
+    if (el !== null) el.hidden = true;
   }
 }
 
@@ -1529,6 +1772,16 @@ byId<HTMLButtonElement>("archive-export-submit").addEventListener("click", () =>
 byId<HTMLButtonElement>("archive-restore-choose-source").addEventListener("click", () => void onArchiveChooseSource());
 byId<HTMLButtonElement>("archive-restore-inspect").addEventListener("click", () => void onArchiveRestoreInspect());
 byId<HTMLButtonElement>("archive-restore-submit").addEventListener("click", () => void onArchiveRestoreSubmit());
+
+// Device Pairing.
+byId<HTMLButtonElement>("device-pairing-create-submit").addEventListener("click", () => void onDevicePairingCreateSubmit());
+byId<HTMLButtonElement>("device-pairing-create-copy").addEventListener("click", () => void onDevicePairingCreateCopy());
+byId<HTMLButtonElement>("device-pairing-approve-inspect").addEventListener("click", () => void onDevicePairingApproveInspect());
+byId<HTMLButtonElement>("device-pairing-approve-submit").addEventListener("click", () => armDevicePairingApproveConfirm());
+byId<HTMLButtonElement>("device-pairing-approve-confirm").addEventListener("click", () => void onDevicePairingApproveConfirm());
+byId<HTMLButtonElement>("device-pairing-approve-cancel").addEventListener("click", () => onDevicePairingApproveCancel());
+byId<HTMLButtonElement>("device-pairing-approve-copy").addEventListener("click", () => void onDevicePairingApproveCopy());
+byId<HTMLButtonElement>("device-pairing-complete-submit").addEventListener("click", () => void onDevicePairingCompleteSubmit());
 
 // Settings.
 byId<HTMLButtonElement>("settings-relay-add").addEventListener("click", onSettingsRelayAdd);

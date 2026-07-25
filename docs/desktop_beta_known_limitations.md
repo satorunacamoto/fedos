@@ -90,3 +90,62 @@ forward unverified.
     fabricated — a real, disclosed boundary of how this Arc reconciled the
     inbox listing against the peer-capability listing (see the Completion
     Declaration).
+
+## Device Pairing and Group Messaging (Secure Runtime Alpha 8201-8280)
+
+This Arc's own Phase A reconciliation report
+(`docs/secure_runtime_alpha_8201_8280_phase_a_reconciliation_report.md`)
+re-verified both areas directly against source rather than trusting prior
+review wording.
+
+17. **RESOLVED as of Secure Runtime Alpha 8201-8280.** Device Pairing (create
+    a pairing request on a new Device, inspect/approve it on an existing
+    trusted Device, complete it back on the new Device) is now reachable
+    through the real Devices screen — previously the crypto and IPC
+    channels were real and production-wired but no renderer code called
+    them. Pairing requires both Devices to already have their own separate
+    local profile; there is no "restore an existing account from a seed"
+    onboarding flow in this Beta, so pairing binds a second Device's own
+    key as trusted under the FIRST Device's account — it does not merge or
+    share message history between the two Devices' own local profiles.
+    Because the Joining Device's own pairing keypair lives only in that
+    process's memory, the pairing request is lost if the app is closed
+    before Step 3 completes — the Devices screen's own copy states this.
+18. **RESOLVED as of Secure Runtime Alpha 8201-8280 (real, previously
+    undiscovered build defect, not a Rust/protocol change).**
+    `packages/fedos-desktop-electron-spike/tsconfig.json`'s own `exclude`
+    list omitted `src/fedos_electron_beta_renderer.ts` — the ONE Beta
+    renderer file — even though the sibling `tsconfig.browser-scripts.json`
+    (the config meant to compile it, unwrapped, for plain `<script>`-tag
+    loading) already included it, and every other browser-context renderer
+    file was already correctly excluded from `tsconfig.json`. Because
+    `npm run build`'s two `tsc` invocations both target the same `dist/`
+    path and TypeScript's incremental output caching does not reliably
+    guarantee the second pass re-emits a file it considers unchanged, the
+    shipped `dist/fedos_electron_beta_renderer.js` would intermittently end
+    up as the WRONG, CommonJS-wrapped compile (`Object.defineProperty(exports,
+    "__esModule", ...)`) — which throws `Uncaught ReferenceError: exports is
+    not defined` in the real page and leaves it stuck on the loading screen
+    forever. This is the SAME defect class Alpha 4101-4180 already fixed
+    once for the older spike scripts (`docs/secure_runtime_alpha_4101_4180_execution_spec.md`)
+    but never propagated to this later-added Beta renderer file. Found via
+    this Arc's own real visible-control pairing test failing unpredictably
+    (sometimes passing in under 7s, sometimes hanging until timeout) even
+    though the underlying feature code was independently verified correct
+    both ways; root-caused by inspecting the actual compiled `dist/` output
+    byte-for-byte rather than assuming environmental flakiness. Fixed by
+    adding the missing exclusion.
+19. **Group Messaging is not exposed in this pilot, and this is intentional,
+    not merely undone.** The current transport is independent pairwise
+    Double-Ratchet fanout (N separate 1:1 sends), not a group ratchet and
+    not Sender-Key (no Sender-Key code is present in `master` at all).
+    Worse than a mere security-model gap: the **receive side was never
+    built** — a group message lands on a recipient's device as an ordinary
+    1:1 message; only the sender's own device can render a group thread.
+    Exposing a Group UI on top of that would misrepresent a feature that
+    does not work for anyone but its creator, so this Arc deliberately did
+    not build one. Reconstructing the receive side is real, necessary
+    future work — it touches the NIP-17 inbound decode path, a
+    protocol-frozen boundary this Arc's own mission does not permit
+    redesigning — and is named as a recommended next Arc, not attempted
+    here.

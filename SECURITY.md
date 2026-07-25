@@ -32,6 +32,15 @@ before relying on it for anything sensitive.
   standard NIP-17 envelope — a generic NIP-17 client will not understand
   them, and this application does not claim broader Nostr-client
   interoperability beyond standard NIP-17 delivery itself.
+- **Device Pairing trusts a Device, not a person, and every trust fact is
+  local.** Pairing a second Device binds its own signing key as trusted
+  under an account; there is no cross-Device Registry synchronization, so
+  each Device's own view of "trusted"/"revoked" is a local fact recorded on
+  that Device, not a guarantee the other side agrees. **Revoking a Device
+  removes its trust for future messages and Sync — it does not delete
+  messages that Device already has, and this application has no way to
+  confirm or force deletion on another Device.** Offline is never treated
+  as revoked.
 - **No `mlock`/`VirtualLock` (or equivalent OS memory-pinning) guarantee
   exists.** Secrets held in process memory may be paged to disk by the
   operating system under memory pressure, like any ordinary application

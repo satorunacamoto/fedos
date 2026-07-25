@@ -209,6 +209,52 @@
           <div id="devices-error" class="error" role="alert"></div>
           <ul class="plain-list" id="devices-list"></ul>
           <p class="muted">Revoking a Device removes its trust for future messages — it does not delete copies that Device already has, and does not affect Relay-side or foreign Archive copies.</p>
+
+          <h3>Pair a New Device</h3>
+          <p class="muted">Pairing has three steps across two Devices — the NEW Device (this one has its own separate local profile) and your EXISTING, already-trusted Device that holds your account. Pairing trusts this Device under that account for Sync; it does not merge or replace either Device's own local profile. Do this step first on the NEW Device you want to add.</p>
+
+          <h4>Step 1 — On the NEW Device: create a pairing request</h4>
+          <label for="device-pairing-create-label">Device ID for this Device (a name you choose — shown to other Devices, and cannot be changed later)</label>
+          <input id="device-pairing-create-label" type="text" maxlength="128" autocomplete="off" />
+          <label for="device-pairing-create-account">Account you're joining (the existing Device's own "Account public identity", shown on its Ready screen)</label>
+          <input id="device-pairing-create-account" type="text" maxlength="512" autocomplete="off" />
+          <div id="device-pairing-create-error" class="error" role="alert"></div>
+          <button id="device-pairing-create-submit" type="button">Create pairing request</button>
+          <div id="device-pairing-create-result" hidden>
+            <p class="muted">Send this request to your existing, trusted Device by any channel you already trust (it proves only this new Device's own key — it carries no secret). It expires; if it expires before you finish, start over.</p>
+            <label for="device-pairing-create-output">Pairing request</label>
+            <textarea id="device-pairing-create-output" maxlength="8192" readonly></textarea>
+            <button id="device-pairing-create-copy" type="button">Copy</button>
+            <p id="device-pairing-create-copy-feedback" role="status" aria-live="polite" class="muted"></p>
+            <p class="muted" id="device-pairing-create-expiry"></p>
+            <p class="muted"><strong>Keep this application open</strong> until you complete Step 3 below — the request is lost if you quit before finishing.</p>
+          </div>
+
+          <h4>Step 2 — On the EXISTING, trusted Device: inspect and approve</h4>
+          <label for="device-pairing-approve-input">Paste the pairing request from the new Device</label>
+          <textarea id="device-pairing-approve-input" maxlength="8192"></textarea>
+          <div id="device-pairing-approve-error" class="error" role="alert"></div>
+          <button id="device-pairing-approve-inspect" type="button">Inspect</button>
+          <div id="device-pairing-approve-inspection" class="muted" role="status" aria-live="polite"></div>
+          <button id="device-pairing-approve-submit" type="button" disabled>Approve &amp; trust this Device</button>
+          <p class="muted" id="device-pairing-approve-confirm-explain" hidden>Approving trusts this Device for future Sync and messaging with this account, and cannot be undone from here (only Revoke, afterward, can remove trust again).</p>
+          <button id="device-pairing-approve-confirm" type="button" hidden>Yes, approve &amp; trust this Device</button>
+          <button id="device-pairing-approve-cancel" type="button" hidden>Cancel</button>
+          <div id="device-pairing-approve-result" hidden>
+            <label for="device-pairing-approve-output">Approval</label>
+            <textarea id="device-pairing-approve-output" maxlength="8192" readonly></textarea>
+            <button id="device-pairing-approve-copy" type="button">Copy</button>
+            <p id="device-pairing-approve-copy-feedback" role="status" aria-live="polite" class="muted"></p>
+            <p class="muted">Send this approval back to the new Device. Approving here also trusts the new Device locally on THIS Device right away.</p>
+          </div>
+
+          <h4>Step 3 — Back on the NEW Device: complete pairing</h4>
+          <label for="device-pairing-complete-input">Paste the approval from the existing Device</label>
+          <textarea id="device-pairing-complete-input" maxlength="8192"></textarea>
+          <div id="device-pairing-complete-error" class="error" role="alert"></div>
+          <button id="device-pairing-complete-submit" type="button" disabled>Complete pairing</button>
+          <p class="muted" id="device-pairing-complete-result" role="status" aria-live="polite"></p>
+          <p class="muted">Pairing trusts this Device for future Sync and messaging with this account. It does not itself prove the other Device has erased anything, and offline does not mean revoked.</p>
         </div>
 
         <div class="app-screen" id="app-screen-safety">

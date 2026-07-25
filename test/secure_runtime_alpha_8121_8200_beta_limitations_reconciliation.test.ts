@@ -59,7 +59,6 @@ describe("Alpha 8121-8200 -- Beta limitations model reconciliation", () => {
     const ids = fedosDesktopBetaLimitationsV1().limitations.map((l) => l.limitationId);
     expect(ids).toContain("relay-has-no-automatic-reconnect");
     expect(ids).toContain("no-guaranteed-memory-erasure");
-    expect(ids.length).toBe(17);
     const betaStatusIds = fedosDesktopBetaLimitationsForSurface("beta-status").map((l) => l.limitationId);
     expect(betaStatusIds).toContain("relay-has-no-automatic-reconnect");
     expect(betaStatusIds).toContain("no-guaranteed-memory-erasure");
@@ -68,6 +67,28 @@ describe("Alpha 8121-8200 -- Beta limitations model reconciliation", () => {
     const memory = all.find((l) => l.limitationId === "no-guaranteed-memory-erasure")!;
     expect(relay.statement).toMatch(/does not retry automatically|lock and unlock again/i);
     expect(memory.statement).toMatch(/does not guarantee/i);
+  });
+
+  it("Alpha 8201-8280 (Closed-Beta Product Gap Closure and Final Polish Arc) adds exactly five MORE entries, reconciling this Arc's own real Phase A findings (Device Pairing UI closed a real gap; Group Messaging is honestly disclosed as unavailable, not merely undone; the pilot's own no-audit/unsigned-installer/memory-locking facts move from docs-only into this user-visible model) -- 22 total now", () => {
+    const ids = fedosDesktopBetaLimitationsV1().limitations.map((l) => l.limitationId);
+    for (const newId of [
+      "group-messaging-unavailable",
+      "device-revocation-not-remote-erasure",
+      "no-secure-memory-locking",
+      "no-independent-security-audit",
+      "installer-unsigned",
+    ]) {
+      expect(ids).toContain(newId);
+    }
+    expect(ids.length).toBe(22);
+    const betaStatusIds = fedosDesktopBetaLimitationsForSurface("beta-status").map((l) => l.limitationId);
+    for (const newId of ["group-messaging-unavailable", "device-revocation-not-remote-erasure", "no-secure-memory-locking", "no-independent-security-audit"]) {
+      expect(betaStatusIds).toContain(newId);
+    }
+    const all = fedosDesktopBetaLimitationsV1().limitations;
+    const group = all.find((l) => l.limitationId === "group-messaging-unavailable")!;
+    expect(group.statement).toMatch(/only supports Direct/i);
+    expect(group.statement).not.toMatch(/Signal-equivalent|MLS|Sender-Key/i);
   });
 
   it("the model remains a pure, frozen, non-secret value object -- no Runtime/Electron/persistence import anywhere in the source", () => {
