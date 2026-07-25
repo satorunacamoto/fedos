@@ -70,11 +70,13 @@
 
     <section id="screen-welcome">
       <p>Welcome. No local profile was found on this device.</p>
+      <p class="warn" id="welcome-security-notice">This is a Closed Beta build: no independent, external security audit has been performed, and the installer is not code-signed. Do not use it to protect information where compromise would cause serious harm. See <code>KNOWN_LIMITATIONS.md</code> and the in-app Safety Center for the current, honest security state.</p>
       <button id="welcome-create-btn" type="button">Create a profile</button>
     </section>
 
     <section id="screen-create">
       <p>Create a new local profile. Your passphrase seals the account Master Seed; it is never stored and cannot be recovered.</p>
+      <p class="warn">Because your passphrase is never stored, losing it means losing access to this profile permanently — there is no password reset. Write it down somewhere safe before continuing.</p>
       <label for="create-label">Profile label</label>
       <input id="create-label" type="text" autocomplete="off" maxlength="128" />
       <label for="create-pass">Passphrase</label>
@@ -106,6 +108,7 @@
 
     <section id="screen-recovery">
       <p>This profile could not be unlocked normally.</p>
+      <p class="warn">There is no built-in repair path beyond retrying below. If you have a prior Archive export for your conversations, keep it — it is currently the only way to recover conversation history if this profile cannot be unlocked. Restoring an Archive does not recover this profile itself.</p>
       <p class="muted">Diagnostic code: <span id="recovery-reason" class="field"></span></p>
       <div id="recovery-actions"></div>
       <p class="muted" id="recovery-explain"></p>
@@ -276,12 +279,14 @@
 
         <div class="app-screen" id="app-screen-settings">
           <h2>Settings</h2>
+          <p class="warn">This is a Closed Beta build. Settings changes are saved locally to this profile only — they are not backed up, synced, or recoverable if this profile is lost.</p>
           <div id="settings-error" class="error" role="alert"></div>
           <div id="settings-report" role="status" aria-live="polite" class="muted"></div>
 
           <fieldset>
             <legend>Relays</legend>
             <div id="settings-relay-list"></div>
+            <p class="muted">A Relay operator (or a network observer) can see who you are messaging and when, even though it cannot read message contents. Adding a Relay you do not trust exposes this metadata to it.</p>
             <label for="settings-relay-new">Add a Relay URL (wss:// or ws://)</label>
             <input id="settings-relay-new" type="text" maxlength="512" autocomplete="off" placeholder="wss://relay.example.org" />
             <button id="settings-relay-add" type="button">Add</button>
@@ -303,12 +308,16 @@
               <option value="en">English</option>
               <option value="ja">日本語</option>
             </select>
+            <p class="muted" id="settings-language-note">This saves your preference, but the interface text itself is English-only in this Beta — no translated interface exists yet.</p>
             <label><input id="settings-notifications" type="checkbox" style="width:auto;display:inline-block" /> Enable notifications</label>
             <label><input id="settings-background-sync" type="checkbox" style="width:auto;display:inline-block" /> Enable background sync</label>
           </fieldset>
 
           <p class="muted">Relay changes require a restart of this application to take effect. Nothing is applied until you press Save.</p>
           <button id="settings-save" type="button">Save settings</button>
+
+          <h3>Feedback</h3>
+          <p class="muted">Please report bugs and feedback through whatever channel the maintainers of this pilot currently designate for that purpose — see this repository's own <code>SECURITY.md</code> for how to report a security issue specifically.</p>
         </div>
       </div>
     </section>
