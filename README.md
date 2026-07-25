@@ -19,6 +19,17 @@ process), `ROADMAP.md` (deferred and future work), `CONTRIBUTING.md`
 repository's append-only, newest-first changelog of every landed Arc —
 useful for history, not the place to start.
 
+**Using or piloting this Beta?** See the FedOS Public Beta Documentation
+Pack under `docs/`: `desktop_beta_user_guide_*.md` (installation,
+first-run, relay setup, invitation and chat, search, safety center,
+identity replacement, device pairing, archive and deletion, backup,
+recovery and troubleshooting), `fedos_desktop_beta_faq.md`,
+`fedos_desktop_beta_known_issues.md`, `fedos_desktop_beta_migration_guide.md`,
+`fedos_desktop_beta_release_notes.md`, `desktop_beta_feedback_guide.md`,
+and the `fedos_privacy_policy_draft.md` / `fedos_terms_draft.md`
+drafts (unreviewed by counsel — see each file's own header before
+publishing either as final).
+
 ## Original project vision (historical / future roadmap, not shipped today)
 
 The project's original working name was `nostr-window`, described as:

@@ -40,5 +40,14 @@ than falling back to a placeholder.
 
 Open Settings and confirm the Relay URL is correct. One unreachable Relay
 does not block the rest of the app — other configured Relays keep
-working, and features requiring connectivity will recover automatically
-once the Relay is reachable again.
+working. **This Beta does not reconnect a dropped Relay automatically.**
+The nav bar's own status text always shows current Relay connectivity
+honestly — if it says disconnected, **lock and unlock again** to
+reconnect; there is no other way to force a reconnect from the running
+app.
+
+## Where is my profile stored, and can I move it?
+
+See the Backup Guide for the exact profile directory location and what
+to copy if you want a manual backup before reinstalling, upgrading, or
+moving to a new computer.
