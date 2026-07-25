@@ -83,6 +83,38 @@ branch and proven via a new, real visible-control regression test.
   acceptance guarantee, are both protected by new structural guard
   tests, not merely asserted in prose.
 
+## Phase J — release build proof (two independent full runs)
+
+Both runs executed `npm run release:beta` end-to-end (all 9 steps:
+clean-tree check, allowlist verify, beta-runtime build, Electron build,
+electron-builder NSIS+ZIP, manifest, checksums, checksum verification,
+staging secret scan) from the same clean commit `fa6e4be2`
+(`gitCommit=fa6e4be29e8dd376b264cc9a728ba6c37eae3b87`), with a full
+`rm -rf dist-package-beta release` between them. Both exited `0` with
+`[build-release] OK`.
+
+| | Run 1 | Run 2 |
+|---|---|---|
+| `productVersion` | `0.1.0-beta.1` | `0.1.0-beta.1` |
+| `unsigned` | `true` | `true` |
+| installer size | 101,838,673 bytes | 101,838,673 bytes |
+| zip size | 368,536,842 bytes | 368,536,842 bytes |
+| `[verify-checksums]` | OK, 3/3 files | OK, 3/3 files |
+| `[secret-scan]` | OK, 752 files, 0 findings | OK, 752 files, 0 findings |
+
+Per-run SHA-256 digests differ between runs (electron-builder/NSIS embed
+non-deterministic build metadata such as timestamps in the packed
+containers); artifact identity, sizes, signed-state, and pass/fail
+outcomes are identical across both runs. This is consistent with this
+Arc's own `docs/secure_runtime_alpha_8441_8520_code_signing_distribution_truth.md`
+finding (unsigned build, no reproducible-build tooling claimed or
+required by this mission) and does not affect any claim made in this
+declaration. One earlier attempt at this same step failed transiently
+with a native-tool access violation (`0xC0000005`) during checksum
+generation — the same known transient-crash signature seen twice
+earlier this session with other native subprocesses (`7za.exe`) — and
+succeeded cleanly on immediate retry, consistent with prior occurrences.
+
 ## Cross-validation with independent parallel sessions
 
 This session ran alongside two independent read-only reviews that
