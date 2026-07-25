@@ -1,0 +1,79 @@
+name: Feature request
+description: Suggest a capability or an improvement to an existing one.
+title: "[feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Two things worth knowing before you
+        write, so your time is well spent:
+
+        - FedOS is in **Closed Pilot**. The current priority is
+          correctness, honesty of claims, and fixing what pilot users
+          actually hit — not breadth. A good idea may still be declined
+          or deferred for that reason, and that is not a judgement on
+          the idea.
+        - Some things are **deliberately** not present. Group messaging,
+          anonymity/onion routing, and remote deletion are named
+          non-goals for this stage, not oversights. See
+          [`KNOWN_LIMITATIONS.md`](../blob/main/KNOWN_LIMITATIONS.md) and
+          [`ROADMAP.md`](../blob/main/ROADMAP.md) first.
+
+        For open-ended design discussion, **Discussions** is usually a
+        better fit than an Issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >-
+        Describe the underlying need, not just the feature. "I want X"
+        is harder to act on than "when I do Y, Z goes wrong, and X would
+        fix it."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like FedOS to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried, or what alternatives did you consider?
+      description: >-
+        Including "I currently work around it by ..." — workarounds tell
+        us how much the gap actually costs you.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: >-
+            I have read `KNOWN_LIMITATIONS.md` and `ROADMAP.md`, and this
+            is not already listed there as a known non-goal.
+          required: true
+        - label: >-
+            This request contains no private keys, seeds, personal data,
+            or message content.
+          required: true
+
+  - type: dropdown
+    id: security-relevant
+    attributes:
+      label: Does this proposal touch cryptography, key handling, or the security model?
+      description: >-
+        If yes, expect a slower and more sceptical review. That is
+        deliberate — see `SECURITY.md`. If the proposal is prompted by a
+        weakness you have found, report it **privately** instead.
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true

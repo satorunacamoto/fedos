@@ -1,5 +1,82 @@
 # Contributing to FedOS
 
+Thanks for looking. FedOS is in **Closed Pilot** — early, unaudited, and
+deliberately narrow in scope. Contributions are welcome, and the fastest
+way to have one accepted is to read this section first.
+
+## Start here (outside contributors)
+
+### Licensing
+
+This project is licensed under the **Mozilla Public License 2.0**
+(MPL-2.0) — see [`LICENSE`](LICENSE) for the full text and
+[`LICENSE_STATUS.md`](LICENSE_STATUS.md) for the decision record and a
+plain-language summary of what MPL-2.0 actually requires.
+
+**By opening a pull request you are submitting your contribution under
+MPL-2.0**, on the ordinary inbound=outbound convention, and confirming
+you have the right to do so. There is no CLA and no DCO sign-off
+requirement.
+
+Two consequences worth knowing up front:
+
+- MPL-2.0 is a **file-level** copyleft. If you modify an existing
+  MPL-covered file, that file stays MPL-2.0. Files you add are yours to
+  license as you choose, though matching the project keeps things
+  simple.
+- If you bring in **third-party code or data**, its origin and license
+  must be recorded alongside it, not left implicit.
+  [`LICENSE_STATUS.md`](LICENSE_STATUS.md) §4 shows how the existing
+  third-party test vectors are handled — that is the standard to match.
+
+### Reporting things
+
+- **Security vulnerability** — **never** a public Issue or PR. Use
+  GitHub Private Vulnerability Reporting; read
+  [`SECURITY.md`](SECURITY.md) first, including its safe-first-report
+  checklist. If you are unsure whether something is sensitive, treat it
+  as sensitive.
+- **Ordinary bug** — a public Issue, using the bug report template.
+- **Question, idea, or design discussion** — Discussions.
+
+Never put a private key, `nsec`, Master Seed, passphrase, profile
+directory, Archive export, message plaintext, or personal relay
+credential into **any** of those channels.
+
+### Before you write code
+
+- **Open an Issue or Discussion first** for anything substantial. This
+  project declines features for scope reasons fairly often — see
+  [`ROADMAP.md`](ROADMAP.md) and
+  [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md) — and it is better to
+  learn that before you build it than after. Small, focused fixes do
+  not need prior discussion.
+- **Read [`BUILDING.md`](BUILDING.md)** and get a build working first.
+- **Cryptography and protocol changes face a deliberately high bar.**
+  Expect a slow, sceptical review, and expect to be asked for
+  test-vector evidence. That is not distrust of you; it is how a
+  messenger avoids shipping a confident mistake.
+
+### Absolutely do not
+
+- Add telemetry, analytics, crash reporting, or auto-update.
+- Add a claim about a security property that the repository does not
+  already demonstrate to be true.
+- Commit secrets, real profile data, local absolute paths, or personal
+  information.
+
+See "Absolute prohibitions" below for the full, repository-wide list.
+
+---
+
+## How this repository organizes work (Arc conventions)
+
+The rest of this document describes the internal working conventions
+this repository has followed across its history. **You do not need to
+follow the Arc process to contribute a bug fix.** It is documented so
+the commit history and branch layout make sense to you, and so larger
+pieces of work stay consistent with what came before.
+
 This repository's work is organized into **Arcs** — focused, single-
 purpose units of work, each on its own dedicated `git worktree` and
 branch, each claiming a reserved numeric range ("Secure Runtime Alpha
@@ -15,9 +92,11 @@ history.
    real tip — it is frequently many commits/Arc-ranges behind the
    furthest-landed work on unmerged branches. Verify via
    `git merge-base` before assuming a starting point.
-2. Inspect `README.md`'s newest-first status-blurb stack (prepended, not
-   appended — the most recent Arc's blurb is always closest to the top
-   of the status section) to see what's actually landed on `master`.
+2. Inspect `docs/ALPHA_HISTORY.md`'s newest-first status-blurb stack
+   (prepended, not appended — the most recent Arc's blurb is always
+   closest to the top of the file) to see what's actually landed on
+   `master`. This chronology previously lived in `README.md` and was
+   moved, unmodified, when the repository was prepared for publication.
 3. Reserve an Alpha number range only after confirming it's free (search
    `git log --all --oneline | grep -i "Alpha <range>"`); record the
    historical Alpha 5401-5480 collision (two unrelated Arcs once claimed

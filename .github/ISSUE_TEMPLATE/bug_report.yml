@@ -1,0 +1,137 @@
+name: Bug report
+description: Report a reproducible, NON-SENSITIVE bug in FedOS Desktop.
+title: "[bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Before you file this
+
+        **If this bug has security impact, stop and do not file it here.**
+        Anything that could let someone read messages they should not
+        read, recover a key or Master Seed, impersonate another user, or
+        bypass unlock belongs in a **private** report — see
+        [`SECURITY.md`](../blob/main/SECURITY.md). Public Issues are
+        world-readable the moment you press submit, and cannot be truly
+        un-published afterwards.
+
+        Ordinary, non-sensitive bugs are very welcome here.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety checklist (required)
+      description: >-
+        Please confirm each of these. They exist because a bug report is
+        public, and because FedOS handles material that must never be
+        pasted into one.
+      options:
+        - label: >-
+            This report has **no security impact** (if unsure, use private
+            reporting instead — see SECURITY.md).
+          required: true
+        - label: >-
+            I have **not** included any private key, `nsec`, Master Seed,
+            passphrase, or recovery phrase.
+          required: true
+        - label: >-
+            I have **not** attached a profile directory, an Archive
+            export, a database file, or message plaintext.
+          required: true
+        - label: >-
+            I have **not** included personal relay credentials, auth
+            tokens, or API keys.
+          required: true
+        - label: >-
+            Any logs or screenshots I attach have been reviewed by me and
+            redacted where needed (npubs, contact names, message text).
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you observe? Describe the actual behaviour.
+      placeholder: >-
+        Example: after unlocking, the conversation list stayed empty even
+        though the relay was connected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        Numbered steps, starting from a state you can describe. A report
+        we can reproduce is worth far more than a detailed one we cannot.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      placeholder: "every time / about half the time / saw it once"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: How did you install FedOS?
+      options:
+        - NSIS installer (.exe) from a Closed Pilot artifact
+        - Portable ZIP from a Closed Pilot artifact
+        - Built from source
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / build
+      description: >-
+        The version shown in the app, or the commit you built from
+        (`git rev-parse --short HEAD`).
+      placeholder: "0.1.0-beta.1, or commit 4bd79d11"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 Pro 24H2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, errors, or screenshots (optional)
+      description: >-
+        **Redact before pasting.** Remove npubs, contact names, and any
+        message content. Rendered as a code block; no formatting needed.
+      render: text
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: >-
+        Workarounds you found, whether it started after a specific
+        action, anything unusual about your setup.

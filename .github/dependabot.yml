@@ -1,0 +1,80 @@
+# Dependabot — dependency update PRs.
+#
+# Safe to enable: Dependabot only opens pull requests. It cannot merge
+# anything, and this repository has no auto-merge configured. Every
+# update still goes through human review and the full test suite.
+#
+# Context at the time this was added: `npm audit` reported 5 advisories
+# (1 critical, 1 high, 3 moderate), ALL of them in dev-only tooling
+# (`vitest` / `vite` / `esbuild`). `npm audit --omit=dev` reported
+# **0 vulnerabilities** -- nothing in the shipped dependency tree. The
+# shipped runtime dependencies are just `@noble/curves` and
+# `@noble/hashes`.
+#
+# Weekly, with low PR limits, deliberately: this is a small project and
+# a flood of update PRs would be ignored, which is worse than none.
+
+version: 2
+updates:
+  # Root package -- the application's own TypeScript dependency graph.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      # Group dev tooling so the vitest/vite/esbuild chain arrives as one
+      # reviewable PR instead of four that must be merged together.
+      dev-tooling:
+        dependency-type: "development"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+
+  # Electron application package -- kept separate because Electron major
+  # bumps carry real security and packaging consequences and deserve
+  # their own review, not a grouped one.
+  - package-ecosystem: "npm"
+    directory: "/packages/fedos-desktop-electron-spike"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "electron"
+    commit-message:
+      prefix: "deps"
+
+  # Rust crypto core.
+  #
+  # NOTE: this crate's own `.gitignore` excludes `Cargo.lock`. Without a
+  # committed lockfile, Cargo updates are less precise and builds are not
+  # version-pinned. Committing `Cargo.lock` is the normal practice for an
+  # application (as opposed to a library) and would improve both
+  # reproducibility and supply-chain auditability -- see the publication
+  # reconciliation report, which raises this as a recommendation rather
+  # than changing build policy unilaterally.
+  - package-ecosystem: "cargo"
+    directory: "/packages/fedos-core-rust"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "rust"
+      - "crypto"
+    commit-message:
+      prefix: "deps"
+
+  # GitHub Actions -- included so that if workflows are added later,
+  # their pinned action versions do not silently rot. Harmless while no
+  # workflow exists.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"

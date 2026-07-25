@@ -75,19 +75,56 @@ primitive inventory this status list summarizes.
 
 ## Reporting a vulnerability
 
-### SECURITY CONTACT — HUMAN INPUT REQUIRED BEFORE PUBLIC BETA
+### Where to report
 
-**No real contact channel (email address, web form, or otherwise) has
-been designated yet.** This file will not invent one. A human with the
-authority to do so must add a real channel here before this Beta is
-distributed beyond a Closed Beta pilot with its own separate,
-human-controlled contact channel (see "Closed Beta pilot participants"
-below). Until then:
+**Use GitHub Private Vulnerability Reporting.** On this repository:
+**Security → Advisories → Report a vulnerability**, or open
+`https://github.com/<owner>/<repo>/security/advisories/new` directly.
 
-- Do not open a public GitHub issue for an unpatched vulnerability.
-- Closed Beta pilot participants: use the pilot's own separate contact
-  channel (outside this repository) that your pilot coordinator gave
-  you directly — not this file, which has no live channel yet.
+That channel is private between you and the maintainers. The report, and
+the draft advisory it creates, are not visible to the public unless and
+until a maintainer publishes them.
+
+**Do not open a public GitHub Issue for a vulnerability.** A public
+Issue is world-readable the instant it is submitted, is mirrored and
+indexed by third parties within minutes, and cannot be meaningfully
+un-published afterwards. Deleting it later does not undo the exposure.
+
+**No email address is offered, deliberately.** This project has no
+monitored security mailbox, and this file will not print an address that
+nobody reads. If you cannot use GitHub Private Vulnerability Reporting
+for some reason, say so in a public Issue **without any detail about the
+vulnerability itself** — just ask for a private channel — and a
+maintainer will arrange one.
+
+> #### Status of this channel
+>
+> **HUMAN ACTION REQUIRED — Private Vulnerability Reporting must be
+> enabled in the repository's Settings → Security before the Closed
+> Pilot is announced.** It is not on by default. Until the repository
+> owner enables it, the "Report a vulnerability" link above returns a
+> 404, and **this channel is not live**. This file states that rather
+> than implying a channel exists that does not.
+>
+> Closed Pilot participants: until you have confirmed the link works,
+> use the contact route your pilot coordinator gave you directly. See
+> [`docs/pilot/CLOSED_PILOT.md`](docs/pilot/CLOSED_PILOT.md).
+
+### Non-sensitive bugs, questions, and feedback
+
+Those are welcome in the **public** tracker, and do not belong in the
+private channel:
+
+- **Bugs with no security impact** — public Issues, using the bug report
+  template.
+- **Questions, setup help, design discussion, general pilot feedback** —
+  Discussions.
+
+If you are not sure which one your finding is: **treat it as sensitive
+and report it privately.** Over-reporting to the private channel costs a
+maintainer a few minutes. Under-reporting publishes a live weakness to
+everyone at once. The asymmetry is not close, and nobody will criticise
+you for choosing the private channel.
 
 ### Supported versions
 
@@ -98,8 +135,8 @@ Beta build for your pilot cohort.
 
 ### What counts as a security issue here
 
-Report through the private channel above (once live) rather than the
-ordinary Feedback Guide if the issue is any of: a way to read another
+Report through the private channel above rather than the ordinary
+Feedback Guide if the issue is any of: a way to read another
 user's message contents or Master Seed material without their
 passphrase; a way to bypass or forge Device Pairing, Identity
 Replacement, or Signed Deletion authorization; a memory-safety issue in
@@ -114,12 +151,44 @@ not a new finding — check there first.
 
 ### What NOT to include in your first message
 
-**Do not send your passphrase, Master Seed, private key material, or
-another person's private message contents or personal information** in
-a first-contact report, even to the private channel above. Describe the
-issue and how to reproduce it using synthetic/test data. If a
-maintainer needs a specific artifact from you to investigate further,
-they will ask for it explicitly, over the same private channel.
+**This applies to the private channel too.** A private advisory is not a
+safe place to put secrets either — it is still stored on a third party's
+servers, and it may later be published.
+
+Never include, in a first report:
+
+- your passphrase, Master Seed, recovery code, `nsec`, or any private
+  key material;
+- a copy of your profile directory, database, or Archive export;
+- another person's message contents or personal information;
+- personal relay credentials, auth tokens, or API keys.
+
+Describe the issue and how to reproduce it using **synthetic or test
+data**. If a maintainer needs a specific artifact to investigate
+further, they will ask for it explicitly, over the same private channel,
+and explain why.
+
+### Safe first-report checklist
+
+Before you submit, confirm:
+
+- [ ] I am using **GitHub Private Vulnerability Reporting**, not a
+      public Issue, Discussion, or pull request.
+- [ ] I reproduced this against a **throwaway profile**, not my real
+      one, wherever that was possible.
+- [ ] My report contains **no** private key, `nsec`, Master Seed,
+      passphrase, or recovery code.
+- [ ] I have attached **no** profile directory, database file, or
+      Archive export.
+- [ ] My report contains **no** real message plaintext and **no** third
+      party's personal data.
+- [ ] I have attached **no** personal relay credentials, tokens, or API
+      keys.
+- [ ] Any logs or screenshots are **redacted** — npubs, contact names,
+      and message text removed.
+- [ ] I have checked `KNOWN_LIMITATIONS.md`, in case this is an
+      already-disclosed limitation rather than a new finding.
+- [ ] I have said what the **impact** is, not only what the bug is.
 
 ### Encryption key request policy
 
@@ -131,17 +200,28 @@ claiming to be a maintainer, as itself a security incident.
 
 ### Expected acknowledgement
 
-**HUMAN INPUT REQUIRED** — no acknowledgement-time or fix-time
-commitment exists yet for this pre-release Beta. A human with the
-authority to commit to a real SLA should add one here once a real
-contact channel exists.
+**There is no response-time commitment, and none is invented here.**
+FedOS is maintained by a very small team without a staffed on-call
+rotation. Reports are read and taken seriously, but you should not
+assume a fixed acknowledgement or fix window, and you should not treat
+silence as dismissal.
+
+If a real service-level commitment is ever made, it will be stated here
+explicitly, with the actual numbers.
 
 ### Disclosure coordination
 
-Once a real contact channel exists: please allow the maintainers a
-reasonable opportunity to investigate and address a report before any
-public disclosure. Specific coordinated-disclosure timelines are
-**HUMAN INPUT REQUIRED** — not fabricated here.
+Please allow the maintainers a reasonable opportunity to investigate and
+address a report before disclosing it publicly. **No specific
+coordinated-disclosure timeline is fixed here** — inventing a number
+this project cannot currently honour would be worse than admitting there
+isn't one.
+
+In practice: tell us what you found, tell us if and when you intend to
+publish, and we will tell you honestly whether that is achievable. If
+you believe users are at active risk and we are not moving, say so —
+that is a legitimate reason to accelerate, and we would rather hear it
+from you than read it elsewhere.
 
 ### Safe reproduction guidance
 
@@ -178,11 +258,19 @@ back.
 
 ### Closed Beta pilot participants
 
-If you are in the Closed Beta pilot specifically, your pilot
-coordinator's own separate, human-controlled contact channel (outside
-this repository) is the correct first point of contact for anything
-urgent — this file's own placeholder channel is not yet live. See
-`docs/desktop_beta_feedback_guide.md` for the distinction between
+If you are in the Closed Pilot specifically:
+
+- **Security findings** — use GitHub Private Vulnerability Reporting
+  (see "Where to report" above). If you have confirmed that link is not
+  yet enabled, fall back to the contact route your pilot coordinator
+  gave you directly.
+- **Everything else** — public Issues and Discussions, or the pilot
+  feedback route in
+  [`docs/pilot/FEEDBACK.md`](docs/pilot/FEEDBACK.md).
+- **When to stop using the build entirely** —
+  [`docs/pilot/STOP_USE_CRITERIA.md`](docs/pilot/STOP_USE_CRITERIA.md).
+
+See `docs/desktop_beta_feedback_guide.md` for the distinction between
 ordinary feedback and a security report.
 
 ## Scope notes

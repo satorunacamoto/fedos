@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
+// OSS publication preparation: the append-only Alpha status chronology
+// this test asserts against was moved verbatim out of `README.md` into
+// `docs/ALPHA_HISTORY.md`, so first-time visitors to the public
+// repository meet a readable overview instead of ~11,800 lines of
+// chronology. Nothing was edited in the move -- the assertions below are
+// unchanged and still verify the same preserved, nested banners; only the
+// file holding them changed.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readme from "../README.md?raw";
+import readme from "../docs/ALPHA_HISTORY.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_517_readme_status_update.md?raw";
 
