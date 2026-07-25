@@ -1330,10 +1330,19 @@ async function onSettingsSave(): Promise<void> {
   setBusy(true, "settings-save");
   try {
     const report = (await window.fedosBeta.settingsApply(candidate)) as { readonly outcome: string; readonly reason: string };
+    // Public Beta Final Readiness Arc -- the backend genuinely persists
+    // `language` (candidate.language above) even though this Beta build's
+    // interface text stays English-only regardless of the value chosen
+    // (no translation layer exists yet). Without this, a plain "Saved."
+    // after picking a non-English language reads as if the interface
+    // itself was about to change -- a real "persisted, but the change is
+    // blocked from having any visible effect" display bug, not merely an
+    // undisclosed limitation.
+    const languageNote = candidate.language !== "en" ? " Your language preference is saved, but this Beta's interface text stays English-only — it does not change what you see." : "";
     if (report.outcome === "persisted-pending-runtime-restart" || report.outcome === "persisted-pending-application-restart") {
-      byId("settings-report").textContent = "Saved. Restart the application for Relay changes to take effect.";
+      byId("settings-report").textContent = `Saved. Restart the application for Relay changes to take effect.${languageNote}`;
     } else if (report.outcome === "persisted-and-applied" || report.outcome === "no-change") {
-      byId("settings-report").textContent = "Saved.";
+      byId("settings-report").textContent = `Saved.${languageNote}`;
     } else {
       byId("settings-error").textContent = describeOutcome(report.outcome);
     }
