@@ -157,16 +157,18 @@ the full source-to-doc mapping.
 
 ## Legal and licensing
 
-28. **No open-source (or other) license has been selected for this
-    repository's own original code.** Under default copyright law, this
-    means "all rights reserved" — nobody outside this project currently
-    has explicit permission to copy, modify, or redistribute this
-    code. This blocks Public Beta (a wider release than the current
-    Closed Beta pilot) until resolved. See `LICENSE_STATUS.md` and
-    `THIRD_PARTY_NOTICES.md`.
+28. **This repository's own original code is licensed under MPL-2.0**
+    (`LICENSE`, official text, unmodified). MPL-2.0 is a *file-level*
+    copyleft: modify an MPL-covered file and that file stays MPL-2.0, but
+    combining FedOS with your own separately licensed files does not
+    relicense them. Two carve-outs apply — dependencies keep their own
+    licenses (`THIRD_PARTY_NOTICES.md`), and the third-party
+    cryptographic test vectors under `test-vectors/` are not covered by
+    it. See `LICENSE_STATUS.md` for the decision record and both
+    carve-outs.
 29. Dependency licenses are real and already inventoried
     (`THIRD_PARTY_NOTICES.md`, regenerate with
     `node scripts/generate_third_party_notices.mjs`) — no forced-copyleft
     dependency was found across 313 npm packages / 82 Rust crates as of
     this writing, but that inventory is a preliminary scan, not a
-    substitute for real legal review once a project license is chosen.
+    substitute for real legal review.

@@ -17,13 +17,21 @@ before relying on it for anything sensitive.
   see the in-app Safety Center screen for this build's own real, live
   status, never a generic claim.
 - Group messaging, post-quantum cryptography, and MLS-style group ratchets
-  are **not implemented** in this codebase. Only Direct (pairwise)
-  conversations use the real production Ratchet.
+  are **not implemented** in this codebase. The Ratchet exists only for
+  Direct (pairwise) conversations.
+- **The Double Ratchet is not the delivery route the pilot build uses by
+  default.** The implementation is real and exercised by the test suite,
+  and the Runtime constructs it, but ordinary sending goes over the plain
+  NIP-17 route unless a build explicitly opts a conversation into the
+  ratchet route. **Treat forward secrecy and post-compromise recovery as
+  unavailable for ordinary pilot messages.** Message confidentiality
+  itself is unaffected: every message is still end-to-end encrypted with
+  NIP-44 v2 inside a NIP-59 gift wrap.
 - **"Double Ratchet" here means this codebase's own FedOS protocol
   implementation of the Double Ratchet algorithm** (forward secrecy +
-  post-compromise security for Direct conversations) — it is not the
-  Signal Protocol library, and it is not interoperable with Signal or any
-  other Double-Ratchet-based messenger.
+  post-compromise security for Direct conversations, when that route is
+  in use) — it is not the Signal Protocol library, and it is not
+  interoperable with Signal or any other Double-Ratchet-based messenger.
 - **A Relay operator, or anyone observing a Relay's traffic, can see WHO
   is sending to WHOM and WHEN**, and can correlate that pattern over time
   (which accounts talk to which other accounts, how often, message

@@ -1,7 +1,7 @@
 # FedOS Desktop
 
 **An end-to-end encrypted direct-message client for Windows, built on
-Nostr, with a Double Ratchet session per conversation.**
+Nostr (NIP-17).**
 
 FedOS is a focused secure messenger: 1:1 private conversations, and the
 things a real messenger needs around them — search, archive, multiple
@@ -34,8 +34,15 @@ client, not a feed reader, and not a group chat.
 These are implemented and exercised by the test suite — not planned:
 
 - **Direct (1:1) encrypted conversations** over Nostr **NIP-17** private
-  direct messages, with a **Double Ratchet** session per conversation
-  providing forward secrecy and post-compromise recovery.
+  direct messages. Every message is end-to-end encrypted with NIP-44 v2
+  inside a NIP-59 gift wrap.
+- **A Double Ratchet implementation**, real and exercised by the test
+  suite, for Direct conversations — **but it is not the delivery route
+  the pilot build uses by default.** Ordinary sending goes over the
+  plain NIP-17 route unless a build explicitly opts a conversation into
+  the ratchet route, so **forward secrecy and post-compromise recovery
+  are not active for ordinary pilot messages.** See
+  [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md).
 - **Local, passphrase-protected profile.** A Master Seed is derived with
   Argon2id and held under an explicit lock/unlock boundary; the app
   starts locked.
@@ -106,6 +113,7 @@ assumed to make:
 | | |
 | --- | --- |
 | Independent security audit | **None.** Never performed. |
+| Forward secrecy for your messages | **Not active by default.** The ratchet exists; the pilot build does not route ordinary messages through it. |
 | Code signing | **None.** Windows artifacts are unsigned. |
 | Anonymity / IP protection | **None.** |
 | Onion routing | **None.** |
