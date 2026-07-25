@@ -127,3 +127,29 @@ test-vectors/
   a separate, future, explicitly-reviewed Stage.
 - **`XChaCha20-Poly1305` remains unimported** pending a source decision
   ([`../docs/crypto_vector_sources.md`](../docs/crypto_vector_sources.md) §4).
+
+## 8. Licensing — this data is NOT covered by the project's own license
+
+**Nothing in this directory is FedOS's own work, and the project's
+`LICENSE` (MPL-2.0) does not extend to any of it.** Each file records its
+own `source` / `section` / `revision` / `license` fields inline; those
+fields, not the root `LICENSE`, govern the data.
+
+- **RFC-derived files** (`chacha20poly1305-rfc8439.json`,
+  `hkdf-rfc5869.json`, `argon2id-rfc9106.json`) — IETF Trust Legal
+  Provisions; code components extracted from an RFC (which is what these
+  octet values are) are licensed under the Simplified BSD License.
+- **`aes256gcm-nist.json`** — NIST CAVP publication.
+- **`nip44-v2.json`** — published by NIP-44 itself, which is public
+  domain per `nostr-protocol/nips`' README, and bound by the SHA-256
+  checksum printed inside `44.md`. Its provenance was previously
+  classified **unresolved**; it was re-verified from primary sources on
+  2026-07-26 and resolved to **retain**. The full evidence chain, the
+  reproduction commands, and the one residual caveat that remains open
+  (neither upstream repository carries a formal `LICENSE` file) are
+  recorded in [`../LICENSE_STATUS.md`](../LICENSE_STATUS.md) §4 — read
+  that before relying on this file's status.
+
+**These files are test-only.** They are consumed by `cargo test` through
+`include_str!` in `#[cfg(test)]` modules and are not compiled into, or
+shipped inside, any release artifact.

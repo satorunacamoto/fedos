@@ -64,6 +64,15 @@ name = "fedos-core-rust"
 version = "0.0.0"
 edition = "2021"
 publish = false
+# Project license, selected by the repository owner (MPL-2.0). The full,
+# unmodified official text lives in `LICENSE` at the repository root; the
+# decision record is `LICENSE_STATUS.md`. This field covers THIS crate's
+# own original source only -- NOT its dependencies (each keeps its own
+# license; inventory in `THIRD_PARTY_NOTICES.md`) and NOT the third-party
+# test-vector data under `test-vectors/`, which this crate reads via
+# `include_str!` from `#[cfg(test)]` modules and which this field does not
+# relicense (see `test-vectors/README.md` and `LICENSE_STATUS.md`).
+license = "MPL-2.0"
 
 [lib]
 # `rlib` (kept, native `cargo test`/`cargo check` link against it) +
