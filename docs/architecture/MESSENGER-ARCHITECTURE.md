@@ -1,11 +1,22 @@
 # FedOS Messenger — Capability Boundary
 
-Status: architecture draft accompanying this arc's scaffolding + Port
-adapters. Describes the target shape of the `os/messenger` capability, most
-of which has not physically moved yet — see
-`docs/architecture/MESSENGER-MIGRATION-MAPPING.md` (the complete file-by-file
-mapping) and `docs/architecture/MESSENGER-MIGRATION-STAGING.md` (the
-proposed move order) for the mechanics of getting there.
+Status: **the physical migration described below as a future plan has
+since been executed** (`4132a500`, all 764 files, 6 stages, exactly per
+`docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+`docs/architecture/MESSENGER-MIGRATION-STAGING.md`, both of which remain
+accurate as historical records of what moved where and in what order — one
+exception: `desktop/beta/fedos_desktop_beta_capability_manifest.ts` was
+deliberately excluded from the move, see that stage's own commit message).
+Everything under `src/os/messenger/**` described below as "scaffolding" or
+"not yet physically moved" is now real, live code — this document's body
+text was written before that migration and is kept below largely as-is
+since its REASONING (why `conversations/` stays one bucket, why `contacts/`
+is empty, the Port adapter design) remains accurate; only the physical-move
+status has changed. See `docs/architecture/CIRCULAR-DEPENDENCY-BREAK-PLAN.md`,
+`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`,
+`docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md`, and
+`docs/architecture/FACTORY-PORT-COMPLETION-PLAN.md` for the architecture
+debt that remains after the migration.
 
 No legal/compliance/regulatory content — this document is pure software
 architecture.

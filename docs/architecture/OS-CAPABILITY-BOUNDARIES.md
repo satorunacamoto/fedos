@@ -1,10 +1,21 @@
 # FedOS — OS Capability Boundaries
 
-Status: top-level overview for the "OS Capability Modularization" arc.
-Pure software architecture — dependency direction, ownership, composition,
-and migration status only. No legal, compliance, AML, law-enforcement,
-anonymous-market, or regulatory content anywhere in this document or the
-three it links to.
+Status: top-level overview, originally written for the "OS Capability
+Modularization" arc and since updated by the follow-up "Capability /
+Adapter Modularization & OSS Developer Experience" arc. Pure software
+architecture — dependency direction, ownership, composition, and migration
+status only. No legal, compliance, AML, law-enforcement, anonymous-market,
+or regulatory content anywhere in this document or the ones it links to.
+
+**Status update: the Messenger physical migration is now complete**
+(`4132a500`, 764 files, 6 stages). Every place below that still says
+"physical move deferred" or "no physical file move" describes the state
+BEFORE that migration ran — see the corrected `Ownership summary` table
+and `docs/architecture/CIRCULAR-DEPENDENCY-BREAK-PLAN.md`,
+`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`,
+`docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md`, and
+`docs/architecture/FACTORY-PORT-COMPLETION-PLAN.md` for the current,
+post-migration architecture debt this repo still carries.
 
 ## Why this arc exists
 
@@ -93,8 +104,8 @@ arc, but its physical move is deferred to a follow-up arc. See
 
 | Capability | Owns | Does not own |
 |---|---|---|
-| `os/core` | identity, crypto (TS wrapper; WASM crate stays at `packages/fedos-core-rust/`, referenced by packaging path, not moved), storage, vault (secret store), settings, the four Port contracts | any UI, any transport implementation, any domain business logic |
-| `os/messenger` (target; mostly not yet physically moved) | conversations (construction/membership/encryption/ratchet/delivery/persistence/archive/search/retention/deletion), contacts (currently nested inside conversations — see `MESSENGER-ARCHITECTURE.md`), device pairing/sync, board (public federated posting), Nostr adapter, notifications, Electron composition (`desktop/`) | commerce concepts; owns its own adapters (Nostr) but not Telegram/BTCPay |
+| `os/core` | identity, crypto (TS wrapper; WASM crate stays at `packages/fedos-core-rust/`, referenced by packaging path, not moved), settings, the four Port contracts | any UI, any transport implementation, any domain business logic; **NOT actually the secret-store or generic-storage owner in practice** — `os/core/vault/` and `os/core/storage/` are unwired placeholders with zero production consumers; the REAL secrets authority is `src/runtime/master_seed/`, outside `os/core` entirely (correction made this arc — see `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md` for the full finding and the recommended fix, not yet executed) |
+| `os/messenger` — **physically migrated as of the Messenger migration arc** (`4132a500`, 764 files, 6 stages) | conversations (construction/membership/encryption/ratchet/delivery/persistence/archive/search/retention/deletion), contacts (currently nested inside conversations — see `MESSENGER-ARCHITECTURE.md`), device pairing/sync, board (public federated posting), Nostr adapters (three separate, unconsolidated implementations — see `docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`), notifications, Electron composition (`desktop/`). One file, `desktop/beta/fedos_desktop_beta_capability_manifest.ts`, was deliberately excluded from the move (unrelated in-progress work on this branch) and remains at its original path. | commerce concepts; owns its own adapters (Nostr) but not Telegram/BTCPay |
 | `os/commerce` | catalog, payment (seam only — `NoopPaymentProvider`/`PlaceholderPaymentProvider`, nothing charges), marketplace, creator — all inert; reserved Telegram/BTCPay adapter seams | Order/Support/Delivery/Seller-State (none exist); Messenger implementation |
 | `os/_legacy_prototype` | the dead pre-pivot "nostr-window" product, kept only for its own historical test coverage | nothing live depends on it in the shipped app, with one exception below |
 

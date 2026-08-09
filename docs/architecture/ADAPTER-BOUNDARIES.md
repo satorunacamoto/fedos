@@ -11,26 +11,32 @@ domain-owned type.**
 
 ## Nostr
 
-**Status: real, live, adapter-shaped code already exists — mostly not yet
-physically relocated into an `adapters/` directory.**
+**Status update: the physical migration below is now complete, but Nostr
+is NOT one implementation — it is three, unconsolidated.** A follow-up
+arc's Phase 1 audit found a THIRD Nostr implementation this document
+originally missed entirely: `src/os/messenger/desktop/`'s ~24 top-level
+files (`websocket_relay.ts`, `fedos_nostr_wire_event.ts`, etc.) are a
+deliberately independent second wire/relay implementation, not part of
+`src/nostr/`'s primitives. See `docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`
+for the full three-implementation inventory, the duplication between them,
+and the recommended consolidation (not executed — documentation only).
 
 Nostr is not a third-party SDK in this codebase — every type
 (`NostrEvent`, `NostrTag`, relay/crypto/signature types) is this repo's own,
-hand-rolled in `src/nostr/` (12 files), with no external Nostr package
-dependency. Whether Nostr counts as "generic transport" or
-"Messenger-specific" was an open question at the start of this arc
-(section 10 of the kickoff brief warned against over-abstracting it); the
-audit resolved it empirically: Nostr is consumed by the live messenger
-(`src/conversation/delivery/nostr/`, `src/conversation/transport/`,
-`src/board/publish/nostr/`) and, before this arc's fix, was also consumed
-directly by the dormant commerce prototype — see the Commerce section
-below. It is not consumed by anything that would make it a true
+hand-rolled, with no external Nostr package dependency. Whether Nostr
+counts as "generic transport" or "Messenger-specific" was an open question
+at the start of the original arc; the audit resolved it empirically: Nostr
+is consumed by the live messenger and, before that arc's fix, was also
+consumed directly by the dormant commerce prototype — see the Commerce
+section below. It is not consumed by anything that would make it a true
 core-generic seam today (no second, non-Nostr transport exists to abstract
-against), so it stays classified as a **Messenger adapter**:
-`src/os/messenger/adapters/nostr/` is its target location
-(`src/nostr/**` + `conversation/delivery/nostr/**` +
-`conversation/transport/**`), not yet physically populated — see
-`MESSENGER-MIGRATION-MAPPING.md`.
+against — only competing Nostr-specific implementations, per the
+consolidation plan above), so it stays classified as a **Messenger
+adapter**: `src/os/messenger/adapters/nostr/` (physically populated as of
+the Messenger migration, `4132a500`) plus the still-unconsolidated
+`src/os/messenger/desktop/` top-level files — see
+`MESSENGER-MIGRATION-MAPPING.md` for the historical move record and
+`NOSTR-CONSOLIDATION-PLAN.md` for what remains.
 
 **The one enforced exception:** `src/os/commerce/catalog/adapters/nostr/`
 (`bridge.ts`'s `productFromEvent`, all of `classify.ts`) is the only place

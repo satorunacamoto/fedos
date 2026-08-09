@@ -43,7 +43,34 @@ Commerce as siblings talking only through Ports, one Nostr adapter, a
 composition root that's the only place concrete adapters are chosen. **Do
 not read this diagram as the current state.**
 
-## Current, measured shape (this arc's actual finding)
+## Status update: the Messenger physical migration is now complete
+
+Everything below this line was written from the Phase 1 inventory,
+BEFORE the Messenger physical migration ran. That migration has since
+completed (`4132a500`, all 764 files across 6 stages) — `src/conversation/`,
+`src/board/`, `src/desktop/` (minus its `beta/` capability-manifest carve-out,
+see below), `src/device/`, and `src/nostr/` are now all physically inside
+`src/os/messenger/**`, with one-line shims left at every old path. The
+directory-name-grained SCC picture below is now STALE in its labels (it
+names `desktop`, `conversation`, `board`, `device`, `nostr` as if they were
+still separate top-level directories) — see
+`docs/architecture/CIRCULAR-DEPENDENCY-BREAK-PLAN.md` for the fresh,
+post-migration re-measurement, which found the migration itself collapsed
+5 of the 8 SCC module-groups into one capability (`os/messenger`), leaving
+3 real cross-capability edges (`os/messenger ⇄ runtime`,
+`os/messenger ⇄ os/_legacy_prototype`, `os/_legacy_prototype ⇄ os/commerce`)
+plus file-level cycles now living inside `os/messenger` itself. The
+qualitative shape below (three independent Nostr implementations, unwired
+Ports, orphaned `os/core/storage`+`vault`) is all still accurate — only the
+specific directory names in the SCC diagram are pre-migration.
+
+One file was deliberately excluded from the physical migration:
+`src/desktop/beta/fedos_desktop_beta_capability_manifest.ts` carries an
+unrelated, uncommitted, in-progress edit from a different arc on this
+branch and was left at its original path rather than folded into this
+arc's commits — see the Messenger migration Stage 6 commit message.
+
+## Current, measured shape (as captured at Phase 1, before the physical migration — directory names below are pre-migration; see the status note above)
 
 ```
    os/core (sink — verified clean, 0 reverse edges)
@@ -117,9 +144,14 @@ staged-refactor arc should measure itself against.
 
 ## Pointers
 
-- `docs/architecture/CAPABILITY-CATALOG.md` — every capability, tabulated
-- `docs/architecture/ADAPTER-CATALOG.md` — every adapter (including the
-  three-Nostr-implementations finding), tabulated
+- `docs/architecture/CIRCULAR-DEPENDENCY-BREAK-PLAN.md` — fresh,
+  post-migration dependency re-measurement + exact break sequence
+- `docs/architecture/NOSTR-CONSOLIDATION-PLAN.md` — the three Nostr
+  implementations, responsibilities, duplication, migration order
+- `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md` — `runtime/master_seed`
+  vs. `os/core/storage`/`vault`, the real ownership boundary
+- `docs/architecture/FACTORY-PORT-COMPLETION-PLAN.md` — Port gaps and the
+  `createCommerce()`/`createMessenger()` design
 - `docs/architecture/OS-CAPABILITY-BOUNDARIES.md` — corrected this arc
   (ownership table no longer claims `os/core` owns a working vault)
 - `docs/architecture/CAPABILITY-MODULARIZATION-FINAL-VALIDATION.md` — full
