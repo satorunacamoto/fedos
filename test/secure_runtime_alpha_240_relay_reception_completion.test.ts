@@ -22,13 +22,13 @@ import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import parserSource from "../src/desktop/relay_inbound_parser.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyRelaySource from "../src/nostr/relay.ts?raw";
+import legacyRelaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyWsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import legacyWsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyPublishSource from "../src/nostr/publish.ts?raw";
+import legacyPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyMessagesSource from "../src/nostr/messages.ts?raw";
+import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
   "create_runtime.ts": createRuntimeSource,

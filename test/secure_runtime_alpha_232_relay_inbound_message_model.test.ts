@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_232_relay_inbound_mess
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import messageModelSource from "../src/desktop/fedos_relay_inbound_message.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyMessagesSource from "../src/nostr/messages.ts?raw";
+import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 
 function codeOnly(source: string): string {
   return source

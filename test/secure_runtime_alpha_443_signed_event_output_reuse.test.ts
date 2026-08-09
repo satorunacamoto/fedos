@@ -4,7 +4,7 @@ import doc from "../docs/secure_runtime_alpha_443_signed_event_output_reuse.md?r
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wireEventSource from "../src/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import signingAuthoritySource from "../src/nostr/sign/fedos_nostr_signing_authority.ts?raw";
+import signingAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.ts?raw";
 
 describe("Secure Runtime Alpha 443 -- Signed Event Output Reuse", () => {
   it("the signing authority contract returns FedosNostrWireEvent, never a fourth duplicate type", () => {

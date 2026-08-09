@@ -8,9 +8,9 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrEventSource from "../src/nostr/event.ts?raw";
+import nostrEventSource from "../src/os/messenger/adapters/nostr/protocol/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrTypesSource from "../src/nostr/types.ts?raw";
+import nostrTypesSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
 
 /**
  * Secure Runtime Alpha 191 -- "Nostr Event Model Inventory": Stage 1

@@ -4,9 +4,9 @@ import designDocSource from "../docs/secure_runtime_alpha_187_event_builder_comp
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrTypesSource from "../src/nostr/types.ts?raw";
+import nostrTypesSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrEventSource from "../src/nostr/event.ts?raw";
+import nostrEventSource from "../src/os/messenger/adapters/nostr/protocol/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 

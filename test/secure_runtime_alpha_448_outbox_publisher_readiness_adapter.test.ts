@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_448_outbox_publisher_readiness_adapter.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import signingAuthoritySource from "../src/nostr/sign/fedos_nostr_signing_authority.ts?raw";
+import signingAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmSigningAuthoritySource from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.ts?raw";
+import wasmSigningAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 

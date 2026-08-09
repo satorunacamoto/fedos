@@ -26,11 +26,11 @@ import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip07Source from "../src/os/_legacy_prototype/sign/nip07.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyRelaySource from "../src/nostr/relay.ts?raw";
+import legacyRelaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyWsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import legacyWsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyPublishSource from "../src/nostr/publish.ts?raw";
+import legacyPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 
 /**
  * Secure Runtime Alpha 220 -- "Relay Foundation Completion": Stage 10,

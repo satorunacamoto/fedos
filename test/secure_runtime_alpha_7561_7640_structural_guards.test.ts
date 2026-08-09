@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import privateTransportSource from "../src/conversation/transport/fedos_private_transport.ts?raw";
+import privateTransportSource from "../src/os/messenger/adapters/nostr/transport/fedos_private_transport.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/conversation/transport/fedos_conversation_transport_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hydrationSource from "../src/conversation/transport/fedos_conversation_transport_delivery_recovery_hydration.ts?raw";
+import hydrationSource from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_delivery_recovery_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardHydrationSource from "../src/desktop/host/fedos_delivery_recovery_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

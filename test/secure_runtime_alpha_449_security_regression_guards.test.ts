@@ -8,9 +8,9 @@ import masterSeedAuthoritySource from "../src/runtime/master_seed/fedos_wasm_mas
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import sealedEnvelopeSource from "../src/runtime/master_seed/fedos_sealed_master_seed_envelope.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import signingAuthoritySource from "../src/nostr/sign/fedos_nostr_signing_authority.ts?raw";
+import signingAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmSigningAuthoritySource from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.ts?raw";
+import wasmSigningAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";
 
 const NEW_TS_SOURCES = [masterSeedAuthoritySource, sealedEnvelopeSource, signingAuthoritySource, wasmSigningAuthoritySource];
 

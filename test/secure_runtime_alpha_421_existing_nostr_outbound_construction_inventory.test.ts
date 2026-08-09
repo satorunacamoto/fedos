@@ -4,9 +4,9 @@ import designDocSource from "../docs/secure_runtime_alpha_421_existing_nostr_out
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import signatureSource from "../src/nostr/signature.ts?raw";
+import signatureSource from "../src/os/messenger/adapters/nostr/protocol/signature.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 

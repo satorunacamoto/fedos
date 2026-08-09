@@ -16,7 +16,7 @@ import { join } from "node:path";
 // @ts-expect-error `node:process` has no type declarations without `@types/node` in this project's tsconfig.
 import process from "node:process";
 
-const DELIVERY_DIR = join(process.cwd(), "src/conversation/delivery/nostr");
+const DELIVERY_DIR = join(process.cwd(), "src/os/messenger/adapters/nostr/conversation_delivery");
 
 function deliverySourceFiles(): readonly string[] {
   return readdirSync(DELIVERY_DIR)

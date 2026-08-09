@@ -5,9 +5,9 @@ import doc from "../docs/secure_runtime_alpha_451_existing_publisher_boundary_in
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import relaySource from "../src/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import signingAuthoritySource from "../src/nostr/sign/fedos_nostr_signing_authority.ts?raw";
+import signingAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmSigningAuthoritySource from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.ts?raw";
+import wasmSigningAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";
 
 describe("Secure Runtime Alpha 451 -- Existing Publisher Boundary Inventory", () => {
   it("the doc is substantial and names the gap this Arc resolves", () => {

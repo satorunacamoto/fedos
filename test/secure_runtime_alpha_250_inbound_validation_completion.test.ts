@@ -20,9 +20,9 @@ import fedosRelaySource from "../src/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nullRelaySource from "../src/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyEventSource from "../src/nostr/event.ts?raw";
+import legacyEventSource from "../src/os/messenger/adapters/nostr/protocol/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyNobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import legacyNobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import validatedEventTypeSource from "../src/desktop/fedos_validated_nostr_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -6,7 +6,7 @@ import relaySource from "../src/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publishSource from "../src/nostr/publish.ts?raw";
+import publishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 
 /**
  * Secure Runtime Alpha 411 -- "Existing Delivery / Queue / Outbox

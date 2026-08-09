@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_471_existing_scheduler
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import persistenceSource from "../src/os/messenger/board/outbox/fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relayPublishSource from "../src/nostr/publish.ts?raw";
+import relayPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 
 /**
  * Secure Runtime Alpha 471 -- "Existing Scheduler and Publisher

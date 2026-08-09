@@ -46,13 +46,13 @@ import sessionBoundarySource from "../src/os/core/identity/session_boundary.ts?r
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import recoveryPolicySource from "../src/os/core/identity/recovery_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublishSource from "../src/nostr/publish.ts?raw";
+import nostrPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrRelaySource from "../src/nostr/relay.ts?raw";
+import nostrRelaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrCryptoSource from "../src/nostr/crypto.ts?raw";
+import nostrCryptoSource from "../src/os/messenger/adapters/nostr/protocol/crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import devicePreviewSource from "../src/os/_legacy_prototype/render/device_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

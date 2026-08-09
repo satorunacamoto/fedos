@@ -4,17 +4,17 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopRuntimeSource from "../src/desktop/runtime/fedos_desktop_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import privateTransportSource from "../src/conversation/transport/fedos_private_transport.ts?raw";
+import privateTransportSource from "../src/os/messenger/adapters/nostr/transport/fedos_private_transport.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/conversation/transport/fedos_conversation_transport_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import eventSource from "../src/conversation/transport/fedos_conversation_transport_event.ts?raw";
+import eventSource from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import multiRelayPublisherSource from "../src/conversation/transport/relay/fedos_multi_relay_ok_correlated_conversation_transport_publisher.ts?raw";
+import multiRelayPublisherSource from "../src/os/messenger/adapters/nostr/transport/relay/fedos_multi_relay_ok_correlated_conversation_transport_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySetSource from "../src/conversation/transport/relay/fedos_conversation_relay_set.ts?raw";
+import relaySetSource from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inboundSubscriptionSource from "../src/conversation/transport/relay/fedos_conversation_inbound_subscription.ts?raw";
+import inboundSubscriptionSource from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_inbound_subscription.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 

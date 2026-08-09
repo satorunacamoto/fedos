@@ -6,7 +6,7 @@ import designDocSource from "../docs/secure_runtime_alpha_224_req_generation.md?
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import messagesSource from "../src/desktop/subscription_messages.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyMessagesSource from "../src/nostr/messages.ts?raw";
+import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 
 /**
  * Secure Runtime Alpha 224 -- "REQ Generation": Stage 4 of the Nostr

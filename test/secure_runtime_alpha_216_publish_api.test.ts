@@ -12,9 +12,9 @@ import nullRelaySource from "../src/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import wsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publishSource from "../src/nostr/publish.ts?raw";
+import publishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 
 function fakeSocket(): {
   socket: FedosRelaySocket;
