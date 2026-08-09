@@ -29,9 +29,9 @@
  *     `FedosConversationRecord.createdAt`'s own convention.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationCapabilityId } from "./fedos_conversation_capability_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 
 /** Alpha 776 — V1 supports exactly one action. A future Arc widens this additively, never rewriting this one. */
 export type FedosConversationCapabilityAction = "join-conversation";

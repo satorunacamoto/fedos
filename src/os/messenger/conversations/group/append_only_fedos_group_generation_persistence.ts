@@ -18,7 +18,7 @@ import {
   type FedosGroupGenerationPersistence,
   type FedosGroupGenerationPersistenceWriteResult,
   type FedosGroupGenerationRecord,
-} from "../../../../conversation/group/fedos_group_generation.js";
+} from "./fedos_group_generation.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

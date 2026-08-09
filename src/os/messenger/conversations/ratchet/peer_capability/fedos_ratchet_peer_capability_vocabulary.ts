@@ -27,8 +27,8 @@
  * this Arc's own codec/authority files MUST reject on a `false` result
  * rather than pass an unrecognized value through.
  */
-import type { FedosPrivateWireRouteRequest } from "../../../../../conversation/transport/fedos_private_wire_route.js";
-import type { FedosDirectRatchetSuite } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosPrivateWireRouteRequest } from "../../../adapters/nostr/transport/fedos_private_wire_route.js";
+import type { FedosDirectRatchetSuite } from "../fedos_direct_ratchet_session_id.js";
 
 export const FEDOS_RATCHET_PEER_CAPABILITY_SCHEMA_VERSION = 1 as const;
 

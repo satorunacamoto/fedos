@@ -75,9 +75,9 @@
  *     constructor" discipline `FedosBoardPost` already established.
  */
 
-import type { FedosBoardId, FedosBoardPostId, FedosThreadId } from "../../../board/fedos_board_identifiers.js";
-import type { FedosConversationMode } from "../../../board/runtime/policy/fedos_conversation_mode.js";
-import type { FedosConversationId } from "../../../conversation/fedos_conversation_id.js";
+import type { FedosBoardId, FedosBoardPostId, FedosThreadId } from "../board/fedos_board_identifiers.js";
+import type { FedosConversationMode } from "../board/runtime/policy/fedos_conversation_mode.js";
+import type { FedosConversationId } from "./fedos_conversation_id.js";
 
 /** Alpha 746 — see this file's own header. The only V1 value; a future Arc introduces new tags additively, never rewriting this one. */
 export type FedosConversationPolicyReference = "public-v1";

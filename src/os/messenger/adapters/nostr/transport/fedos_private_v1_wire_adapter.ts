@@ -36,7 +36,7 @@
  *     §2 and this Arc's own structural guard test).
  */
 
-import type { FedosEventDescriptor } from "../../../../../desktop/fedos_event_descriptor.js";
+import type { FedosEventDescriptor } from "../../../desktop/fedos_event_descriptor.js";
 import {
   buildFedosPrivateTransportUnsignedEventRequest,
   parseFedosPrivateTransportEventDescriptor,

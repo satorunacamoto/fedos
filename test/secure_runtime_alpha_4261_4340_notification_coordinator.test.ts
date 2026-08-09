@@ -7,11 +7,11 @@
  * inspectable log), not a stub library.
  */
 import { describe, it, expect } from "vitest";
-import { FedosDesktopNotificationCoordinator } from "../src/desktop/notification/fedos_desktop_notification_coordinator.js";
-import { NoopFedosDesktopNotificationPort } from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import type { FedosDesktopNotificationView } from "../src/desktop/notification/fedos_desktop_notification_types.js";
-import { validateFedosDesktopNotificationRequest, FEDOS_DESKTOP_NOTIFICATION_KINDS } from "../src/desktop/notification/fedos_desktop_notification_types.js";
+import { FedosDesktopNotificationCoordinator } from "../src/os/messenger/notifications/fedos_desktop_notification_coordinator.js";
+import { NoopFedosDesktopNotificationPort } from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import type { FedosDesktopNotificationView } from "../src/os/messenger/notifications/fedos_desktop_notification_types.js";
+import { validateFedosDesktopNotificationRequest, FEDOS_DESKTOP_NOTIFICATION_KINDS } from "../src/os/messenger/notifications/fedos_desktop_notification_types.js";
 
 class FakeTrackingPort implements FedosDesktopNotificationPort {
   #available = true;

@@ -40,9 +40,9 @@
  * exactly as before this Arc.
  */
 import { FedosWasmLoaderSkeleton } from "../../../../runtime/fedos_wasm_loader.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import { FedosWasmMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosProductionDirectRatchetSessionModule } from "../../../../desktop/production_activation/fedos_production_wasm_master_seed_facade.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosProductionDirectRatchetSessionModule } from "../../desktop/production_activation/fedos_production_wasm_master_seed_facade.js";
 
 /** PRIVATE — the narrow slice of `FedosWasmLoaderSkeleton` this authority depends on. */
 export interface FedosDirectRatchetWasmLoaderBoundary {

@@ -1,23 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { FEDOS_DELETION_REQUEST_SCOPES, isFedosDeletionRequestScope } from "../src/conversation/deletion_request/fedos_deletion_request_scope.js";
-import { FEDOS_DELETION_REQUEST_TARGET_TYPES, isFedosDeletionRequestTargetType } from "../src/conversation/deletion_request/fedos_deletion_request_target_type.js";
+import { FEDOS_DELETION_REQUEST_SCOPES, isFedosDeletionRequestScope } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_scope.js";
+import { FEDOS_DELETION_REQUEST_TARGET_TYPES, isFedosDeletionRequestTargetType } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_target_type.js";
 import {
   FEDOS_DELETION_REQUEST_LIFECYCLE_STATES,
   isFedosDeletionRequestLifecycleState,
   isFedosDeletionRequestLifecycleTransitionReachableByThisArc,
-} from "../src/conversation/deletion_request/fedos_deletion_request_lifecycle_state.js";
-import { FEDOS_DELETION_RECIPIENT_DECISION_STATES, isFedosDeletionRecipientDecisionState } from "../src/conversation/deletion_request/fedos_deletion_recipient_decision_state.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_lifecycle_state.js";
+import { FEDOS_DELETION_RECIPIENT_DECISION_STATES, isFedosDeletionRecipientDecisionState } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_recipient_decision_state.js";
 import {
   FEDOS_DELETION_REQUEST_ACKNOWLEDGEMENT_OUTCOMES,
   isFedosDeletionRequestAcknowledgementOutcome,
-} from "../src/conversation/deletion_request/fedos_deletion_request_acknowledgement_outcome.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_acknowledgement_outcome.js";
 import {
   FEDOS_DELETION_REQUEST_AUTHORIZATION_OUTCOMES,
   coarsenFedosDeletionRequestAuthorizationOutcome,
-} from "../src/conversation/deletion_request/fedos_deletion_request_authorization_outcome.js";
-import { generateFedosDeletionRequestId, isFedosDeletionRequestId } from "../src/conversation/deletion_request/fedos_deletion_request_id.js";
-import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_request_record.js";
-import { canonicalizeFedosDeletionRequestRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_request_canonical_bytes.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_authorization_outcome.js";
+import { generateFedosDeletionRequestId, isFedosDeletionRequestId } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_id.js";
+import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_record.js";
+import { canonicalizeFedosDeletionRequestRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_canonical_bytes.js";
 
 /**
  * Secure Runtime Alpha 5641-5720 -- closed vocabularies, request record

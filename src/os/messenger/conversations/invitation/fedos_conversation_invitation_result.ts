@@ -21,9 +21,9 @@
  * re-implemented here.
  */
 
-import type { FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosConversationInvitationToken } from "../../../../conversation/invitation/fedos_conversation_invitation_token.js";
+import type { FedosConversationCapabilityDescriptor } from "../capability/fedos_conversation_capability_descriptor.js";
+import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
+import type { FedosConversationInvitationToken } from "./fedos_conversation_invitation_token.js";
 
 /**
  * Result of creating an invitation (= issuing a join Capability). Maps

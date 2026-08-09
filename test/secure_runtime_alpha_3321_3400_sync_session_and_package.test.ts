@@ -3,18 +3,18 @@ import {
   isWellFormedFedosDeviceSyncSessionV1,
   validateFedosDeviceSyncSession,
   type FedosDeviceSyncSessionV1,
-} from "../src/device/sync_session/fedos_device_sync_session.js";
+} from "../src/os/messenger/device/sync_session/fedos_device_sync_session.js";
 import {
   deserializeFedosDeviceSyncSessionFromBytes,
   serializeFedosDeviceSyncSessionToBytes,
-} from "../src/device/sync_session/fedos_device_sync_session_codec.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
+} from "../src/os/messenger/device/sync_session/fedos_device_sync_session_codec.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
 import {
   FedosWasmDeviceSyncPackageEncryptionAuthority,
   type FedosDeviceSyncPackageEncryptionRuntimeBoundary,
-} from "../src/device/sync_package/fedos_device_sync_package_encryption.js";
-import { deserializeFedosDeviceSyncPackageFromBytes, serializeFedosDeviceSyncPackageToBytes } from "../src/device/sync_package/fedos_device_sync_package.js";
-import type { FedosMasterSeedAuthority } from "../src/runtime/master_seed/fedos_master_seed_authority.js";
+} from "../src/os/messenger/device/sync_package/fedos_device_sync_package_encryption.js";
+import { deserializeFedosDeviceSyncPackageFromBytes, serializeFedosDeviceSyncPackageToBytes } from "../src/os/messenger/device/sync_package/fedos_device_sync_package.js";
+import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
 
 const ACCOUNT_PUBLIC_KEY_HEX = "ab".repeat(32);

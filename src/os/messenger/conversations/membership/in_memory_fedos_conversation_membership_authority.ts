@@ -25,17 +25,17 @@
  *   - `listMemberships()` returns a NEW array every call.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
-import { toFedosConversationMembershipId, type FedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationMembership } from "./fedos_conversation_membership.js";
+import { toFedosConversationMembershipId, type FedosConversationMembershipId } from "./fedos_conversation_membership_id.js";
+import type { FedosConversationMembershipAuthority } from "./fedos_conversation_membership_authority.js";
 import type {
   FedosConversationMembershipAdmissionPreview,
   FedosConversationMembershipMutationResult,
-} from "../../../../conversation/membership/fedos_conversation_membership_result.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationRole } from "../../../../conversation/membership/fedos_conversation_role.js";
-import { isFedosConversationMembershipTransitionAllowed } from "../../../../conversation/membership/fedos_conversation_membership_transition.js";
+} from "./fedos_conversation_membership_result.js";
+import type { FedosConversationParticipantReference } from "./fedos_conversation_participant_reference.js";
+import type { FedosConversationRole } from "./fedos_conversation_role.js";
+import { isFedosConversationMembershipTransitionAllowed } from "./fedos_conversation_membership_transition.js";
 
 function freezeMembership(membership: FedosConversationMembership): FedosConversationMembership {
   return Object.freeze({

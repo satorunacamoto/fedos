@@ -8,23 +8,23 @@ import { join } from "node:path";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../src/board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import { FedosNostrSigningPublicAuthorAuthority } from "../src/board/runtime/identity/fedos_nostr_signing_public_author_authority.js";
-import { FedosSigningAuthorityBoardPostEventSource } from "../src/board/publish/nostr/fedos_signing_authority_board_post_event_source.js";
-import { FedosOutcomeAwareNostrBoardPublisherAdapter } from "../src/board/publish/nostr/fedos_outcome_aware_nostr_board_publisher_adapter.js";
-import { FedosRelayOkCorrelatedNostrBoardPublisher } from "../src/board/publish/nostr/fedos_relay_ok_correlated_nostr_board_publisher.js";
-import type { FedosRelay } from "../src/desktop/fedos_relay.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
-import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/desktop/fedos_relay_listeners.js";
-import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../src/os/messenger/board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import { FedosNostrSigningPublicAuthorAuthority } from "../src/os/messenger/board/runtime/identity/fedos_nostr_signing_public_author_authority.js";
+import { FedosSigningAuthorityBoardPostEventSource } from "../src/os/messenger/board/publish/nostr/fedos_signing_authority_board_post_event_source.js";
+import { FedosOutcomeAwareNostrBoardPublisherAdapter } from "../src/os/messenger/board/publish/nostr/fedos_outcome_aware_nostr_board_publisher_adapter.js";
+import { FedosRelayOkCorrelatedNostrBoardPublisher } from "../src/os/messenger/board/publish/nostr/fedos_relay_ok_correlated_nostr_board_publisher.js";
+import type { FedosRelay } from "../src/os/messenger/desktop/fedos_relay.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/os/messenger/desktop/fedos_relay_listeners.js";
+import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
 import type {
   FedosNostrSigningAuthority,
   FedosNostrUnsignedEventRequest,
-} from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
-import type { FedosRunningDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
+} from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
+import type { FedosRunningDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
 
 const dirs: string[] = [];
 function freshDir(): string {

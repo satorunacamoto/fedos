@@ -2,17 +2,17 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_379_four_protocol_query_verification.md?raw";
 
-import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
+import { FedosBoardQuery } from "../src/os/messenger/board/query/fedos_board_query.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
 
-import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
-import { validateActivityPubBoardPost } from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
-import { validateAtprotoBoardPost } from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
-import { validateSessionBoardPost } from "../src/board/session/fedos_session_board_adapter.js";
-import type { FedosValidatedSessionPost } from "../src/board/session/fedos_validated_session_post.js";
+import { validateNostrBoardPost } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
+import { validateActivityPubBoardPost } from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
+import { validateAtprotoBoardPost } from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
+import { validateSessionBoardPost } from "../src/os/messenger/board/session/fedos_session_board_adapter.js";
+import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
 
 const BOARD_ID = "board-379";
 

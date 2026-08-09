@@ -14,8 +14,8 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { createFileBackedFedosDesktopSettingsController } from "../src/desktop/settings/fedos_desktop_settings_controller.js";
-import { AppendOnlyFedosBoardOutboxPersistence } from "../src/board/outbox/append_only_fedos_board_outbox_persistence.js";
+import { createFileBackedFedosDesktopSettingsController } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_controller.js";
+import { AppendOnlyFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.js";
 
 function makeDir(): string {
   return mkdtempSync(join(tmpdir(), "fedos-7961-8040-upgrade-"));

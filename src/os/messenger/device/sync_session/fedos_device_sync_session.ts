@@ -23,12 +23,12 @@
  * `"target-not-trusted"`, independent of the session's own `expiresAt`.
  */
 
-import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1, FedosDeviceTrustState } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1, FedosDeviceTrustState } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import {
   FedosSecureRandomDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeNonceGenerator,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
+} from "../binding_challenge/fedos_device_binding_challenge.js";
 
 export const FEDOS_DEVICE_SYNC_SESSION_SCHEMA_VERSION = 1 as const;
 

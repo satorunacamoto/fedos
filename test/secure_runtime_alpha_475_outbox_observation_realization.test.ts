@@ -6,8 +6,8 @@ import persistenceSource from "../src/os/messenger/board/outbox/fedos_board_outb
 import {
   createFedosBoardOutboxObservation,
   isFedosBoardOutboxObservationKind,
-} from "../src/board/outbox/fedos_board_outbox_observation.js";
-import type { FedosBoardOutboxId } from "../src/board/outbox/fedos_board_outbox_types.js";
+} from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.js";
+import type { FedosBoardOutboxId } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
 
 /**
  * Secure Runtime Alpha 475 -- "Outbox Observation Realization": Stage 5

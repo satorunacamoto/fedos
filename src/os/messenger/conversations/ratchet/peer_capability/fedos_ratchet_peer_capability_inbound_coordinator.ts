@@ -26,36 +26,36 @@
  * Observation store's own idempotent `"already-present"` write result —
  * safe, merely not free.
  */
-import type { FedosDeviceBindingAccountRef, FedosDeviceTrustState } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceTrustState } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../../device/persistence/fedos_device_registry_persistence.js";
 import {
   canonicalSerializeFedosRatchetPeerCapabilityAdvertisementContent,
   FEDOS_RATCHET_PEER_CAPABILITY_ADVERTISEMENT_DEVICE_SIGNATURE_PREFIX,
   type FedosRatchetPeerCapabilityAdvertisementV1,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_advertisement.js";
+} from "./fedos_ratchet_peer_capability_advertisement.js";
 import {
   canonicalSerializeFedosRatchetPeerLifecycleNotificationContent,
   FEDOS_RATCHET_PEER_LIFECYCLE_NOTIFICATION_DEVICE_SIGNATURE_PREFIX,
   type FedosRatchetPeerLifecycleNotificationV1,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
-import { decodeFedosRatchetPeerCapabilityControlPayloadFromContent } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+} from "./fedos_ratchet_peer_lifecycle_notification.js";
+import { decodeFedosRatchetPeerCapabilityControlPayloadFromContent } from "./fedos_ratchet_peer_capability_control_payload.js";
 import {
   evaluateFedosRatchetPeerCapabilityEvidence,
   verifyFedosRatchetPeerCapabilityAccountAuthorization,
   verifyFedosRatchetPeerCapabilityDeviceSignature,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+} from "./fedos_ratchet_peer_capability_authentication.js";
 import {
   evaluateFedosRatchetPeerCapabilityAcceptance,
   type FedosRatchetPeerCapabilityPriorAcceptedSummary,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_policy.js";
-import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_outcome.js";
+} from "./fedos_ratchet_peer_capability_acceptance_policy.js";
+import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "./fedos_ratchet_peer_capability_acceptance_outcome.js";
 import {
   recommendFedosRatchetPeerSessionAction,
   type FedosRatchetPeerSessionActionRecommendation,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_session_action_recommendation.js";
-import { entriesOfKindRoutes, type FedosRatchetPeerCapabilityEntry, type FedosRatchetPeerCapabilityRoute } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import type { FedosRatchetPeerCapabilityObservationPersistence } from "../../../../../conversation/ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
-import type { FedosRatchetPeerCapabilityObservationV1 } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_observation.js";
+} from "./fedos_ratchet_peer_capability_session_action_recommendation.js";
+import { entriesOfKindRoutes, type FedosRatchetPeerCapabilityEntry, type FedosRatchetPeerCapabilityRoute } from "./fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosRatchetPeerCapabilityObservationPersistence } from "./persistence/fedos_ratchet_peer_capability_observation_persistence.js";
+import type { FedosRatchetPeerCapabilityObservationV1 } from "./fedos_ratchet_peer_capability_observation.js";
 
 export interface FedosRatchetPeerCapabilityInboundDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;

@@ -10,8 +10,8 @@
  * return internal authority/repository references").
  */
 
-import type { FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationCapabilityBearerSecret } from "../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationCapabilityDescriptor } from "./fedos_conversation_capability_descriptor.js";
+import type { FedosConversationCapabilityBearerSecret } from "./fedos_conversation_capability_bearer_secret.js";
 
 export type FedosConversationCapabilityIssuanceResult =
   | {

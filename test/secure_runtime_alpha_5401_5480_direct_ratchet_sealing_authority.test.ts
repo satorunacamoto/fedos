@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import { FedosWasmLoaderSkeleton } from "../src/runtime/fedos_wasm_loader.js";
 
 declare const process: { cwd(): string; env: { NODE_ENV?: string; [key: string]: string | undefined } };

@@ -21,7 +21,7 @@
  */
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosIdentityTransitionRecordV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_record.js";
+import type { FedosIdentityTransitionRecordV1 } from "./fedos_identity_transition_record.js";
 
 function digest(canonicalJson: string): Uint8Array {
   return sha256(new TextEncoder().encode(canonicalJson));

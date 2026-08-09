@@ -46,16 +46,16 @@
 import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
 import { decrypt as runtimeDecrypt } from "../../../../runtime/fedos_runtime_decrypt.js";
 import { importCiphertext as runtimeImportCiphertext } from "../../../../runtime/fedos_runtime_import_ciphertext.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   encodeFedosConversationEnvelopeAssociatedData,
   fedosConversationEnvelopeAssociatedDataBytesAreEqual,
-} from "../../../../conversation/envelope/fedos_conversation_envelope_associated_data.js";
+} from "../envelope/fedos_conversation_envelope_associated_data.js";
 import type {
   FedosConversationDecryptionAuthority,
   FedosConversationDecryptionRequest,
   FedosConversationDecryptionResult,
-} from "../../../../conversation/encryption/fedos_conversation_decryption_authority.js";
+} from "./fedos_conversation_decryption_authority.js";
 
 /** Alpha 856's own coarse domain label — SAME value Alpha 870's own Encryption Authority uses. */
 const FEDOS_CONVERSATION_ENVELOPE_AAD_DOMAIN: AeadAadDomain = "Conversation";

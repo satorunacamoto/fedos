@@ -27,19 +27,19 @@
  *     ratchet must first `resetDirectRatchetSession()` (Phase M), never
  *     achieve it by simply requesting a different route.
  */
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
 import {
   resolveFedosPrivateWireRoute,
   type FedosPrivateWireRouteAvailability,
   type FedosPrivateWireRouteRequest,
-} from "../../../../conversation/transport/fedos_private_wire_route.js";
+} from "../../adapters/nostr/transport/fedos_private_wire_route.js";
 import {
   resolveFedosDirectRatchetDevicePair,
   type FedosDirectRatchetDevicePairRequest,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_device_pair_resolver.js";
-import type { FedosDirectRatchetSessionPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
-import { FedosDirectRatchetStateRuntime, fedosDirectRatchetReadinessIsReady } from "../../../../conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
-import type { FedosDirectRatchetSessionId } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+} from "./fedos_direct_ratchet_device_pair_resolver.js";
+import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
+import { FedosDirectRatchetStateRuntime, fedosDirectRatchetReadinessIsReady } from "./fedos_direct_ratchet_state_runtime.js";
+import type { FedosDirectRatchetSessionId } from "./fedos_direct_ratchet_session_id.js";
 
 export type FedosDirectRatchetRouteUnsupportedReason =
   | "unknown-route"

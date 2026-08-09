@@ -16,8 +16,8 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/board/observation/append_only_fedos_delivery_observation_persistence.js";
-import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/board/observation/fedos_delivery_observation_codec.js";
+import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/append_only_fedos_delivery_observation_persistence.js";
+import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.js";
 
 function makeDir(): string {
   return mkdtempSync(join(tmpdir(), "fedos-7881-7960-perf-"));

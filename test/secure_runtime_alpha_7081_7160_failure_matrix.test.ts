@@ -7,17 +7,17 @@
  * codebase's own failure-matrix test files.
  */
 import { describe, it, expect } from "vitest";
-import { FedosConversationInvitationInboundCoordinator } from "../src/conversation/invitation_bootstrap/fedos_conversation_invitation_inbound_coordinator.js";
-import { FedosConversationInvitationOutboundCoordinator } from "../src/conversation/invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
-import { InMemoryFedosConversationInvitationReceivedPersistence } from "../src/conversation/invitation_bootstrap/persistence/in_memory_fedos_conversation_invitation_received_persistence.js";
-import { canonicalSerializeFedosConversationInvitationContent } from "../src/conversation/invitation_bootstrap/fedos_conversation_invitation_advertisement.js";
-import { encodeFedosConversationInvitationControlPayload } from "../src/conversation/invitation_bootstrap/fedos_conversation_invitation_control_payload.js";
-import { authorizeFedosConversationInvitationContent } from "../src/conversation/invitation_bootstrap/fedos_conversation_invitation_authentication.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
+import { FedosConversationInvitationInboundCoordinator } from "../src/os/messenger/conversations/invitation_bootstrap/fedos_conversation_invitation_inbound_coordinator.js";
+import { FedosConversationInvitationOutboundCoordinator } from "../src/os/messenger/conversations/invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
+import { InMemoryFedosConversationInvitationReceivedPersistence } from "../src/os/messenger/conversations/invitation_bootstrap/persistence/in_memory_fedos_conversation_invitation_received_persistence.js";
+import { canonicalSerializeFedosConversationInvitationContent } from "../src/os/messenger/conversations/invitation_bootstrap/fedos_conversation_invitation_advertisement.js";
+import { encodeFedosConversationInvitationControlPayload } from "../src/os/messenger/conversations/invitation_bootstrap/fedos_conversation_invitation_control_payload.js";
+import { authorizeFedosConversationInvitationContent } from "../src/os/messenger/conversations/invitation_bootstrap/fedos_conversation_invitation_authentication.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { serializeForId } from "../src/nostr/event.js";
+import { serializeForId } from "../src/os/messenger/adapters/nostr/protocol/event.js";
 
 // Real BIP-340 Schnorr keypairs (not mocks) -- so the REAL `NobleSignatureVerifier`
 // this feature's own inbound coordinator uses can genuinely verify these signatures.

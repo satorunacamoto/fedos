@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { verifyNostrEventSignature } from "../src/desktop/nostr_signature_verifier.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { verifyNostrEventSignature } from "../src/os/messenger/desktop/nostr_signature_verifier.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_244_bip340_signature_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

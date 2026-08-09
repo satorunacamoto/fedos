@@ -20,7 +20,7 @@
  *   - Synchronous, matching every other port in this codebase.
  */
 
-import type { FedosPersistedConversationInvitationRevocationV1 } from "../../../../conversation/invitation/fedos_persisted_conversation_invitation_revocation_v1.js";
+import type { FedosPersistedConversationInvitationRevocationV1 } from "./fedos_persisted_conversation_invitation_revocation_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationInvitationRevocationWriteResult = "inserted" | "already-present" | "conflict" | "failed";

@@ -20,12 +20,12 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
-import { FedosDeviceSyncEventBridge } from "../src/device/sync_events/fedos_device_sync_event_bridge.js";
-import { FEDOS_DEVICE_SYNC_EVENT_KINDS, type FedosDeviceSyncEvent } from "../src/device/sync_events/fedos_device_sync_event.js";
-import type { FedosDeviceSyncAttemptFn } from "../src/device/sync_scheduler/fedos_device_sync_attempt.js";
-import type { FedosDeviceSyncAttemptOutcomeCode } from "../src/device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import { FedosDeviceSyncEventBridge } from "../src/os/messenger/device/sync_events/fedos_device_sync_event_bridge.js";
+import { FEDOS_DEVICE_SYNC_EVENT_KINDS, type FedosDeviceSyncEvent } from "../src/os/messenger/device/sync_events/fedos_device_sync_event.js";
+import type { FedosDeviceSyncAttemptFn } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_attempt.js";
+import type { FedosDeviceSyncAttemptOutcomeCode } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_retry_policy.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "npub-account-bridge", identityId: null };
 const ABANDONMENT_POLICY = { maxAttempts: 5, laterDelaySeconds: 1 };

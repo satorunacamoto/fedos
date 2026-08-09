@@ -21,7 +21,7 @@
  * secret.
  */
 
-import type { FedosConversationParticipantAuthority } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationParticipantAuthority } from "../membership/fedos_conversation_participant_reference.js";
 
 /** Caller preferences for an optional initial join Capability — NEVER an id/secret/current-use-count (Alpha 901/907). */
 export interface FedosPrivateConversationInitialCapabilityRequest {

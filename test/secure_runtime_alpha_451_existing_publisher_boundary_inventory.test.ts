@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_451_existing_publisher_boundary_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

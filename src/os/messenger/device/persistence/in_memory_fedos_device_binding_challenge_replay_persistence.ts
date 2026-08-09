@@ -11,8 +11,8 @@ import {
   fedosPersistedDeviceBindingChallengeConsumptionRecordsAreEqual,
   type FedosDeviceBindingChallengeReplayPersistence,
   type FedosDeviceBindingChallengeReplayWriteResult,
-} from "../../../../device/persistence/fedos_device_binding_challenge_replay_persistence.js";
-import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "../../../../device/persistence/fedos_persisted_device_binding_challenge_consumption_v1.js";
+} from "./fedos_device_binding_challenge_replay_persistence.js";
+import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "./fedos_persisted_device_binding_challenge_consumption_v1.js";
 
 export class InMemoryFedosDeviceBindingChallengeReplayPersistence implements FedosDeviceBindingChallengeReplayPersistence {
   readonly #records = new Map<string, FedosPersistedDeviceBindingChallengeConsumptionV1>();

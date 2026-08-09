@@ -49,7 +49,7 @@
  *     id can never itself smuggle a path-traversal segment.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 
 /** Closed, versioned suite/version literal (review §10 §2's own example, `"fedos-direct-ratchet-v1"`). Reserved for future additive suite values only via an explicit, separate review — never widened silently. */
 export type FedosDirectRatchetSuite = "fedos-direct-ratchet-v1";

@@ -6,16 +6,16 @@ import {
   buildFedosDeviceRelaySyncWirePayload,
   extractFedosDeviceTransferPackageFromWirePayload,
   computeFedosDeviceRelaySyncPackageContentHash,
-} from "../src/device/relay_sync/fedos_device_relay_sync_wire_payload.js";
+} from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_wire_payload.js";
 import {
   buildFedosDeviceRelaySyncUnsignedEventRequest,
   parseFedosDeviceRelaySyncEventDescriptor,
   FEDOS_DEVICE_RELAY_SYNC_MAX_CONTENT_BYTES,
-} from "../src/device/relay_sync/fedos_device_relay_sync_event.js";
-import { nostrWireEventToFedosEventDescriptor } from "../src/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
+} from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_event.js";
+import { nostrWireEventToFedosEventDescriptor } from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
 import { reviewFedosSyncRecordForJournal } from "../src/sync/fedos_sync_record_allowlist.js";
-import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../src/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
-import { queryFedosDeviceRelaySyncStatusForSession } from "../src/device/relay_sync/fedos_device_relay_sync_observation.js";
+import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../src/os/messenger/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
+import { queryFedosDeviceRelaySyncStatusForSession } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_observation.js";
 import {
   buildDeviceRelaySyncFixture,
   driveDeviceRelaySyncSessionToApproved,

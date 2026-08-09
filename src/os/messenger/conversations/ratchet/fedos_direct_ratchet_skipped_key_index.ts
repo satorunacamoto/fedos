@@ -11,7 +11,7 @@
  * `skippedKeyRetentionMs` (14 days) -- see
  * `./fedos_direct_ratchet_limits.ts` for the citation.
  */
-import { FEDOS_DIRECT_RATCHET_LIMITS } from "../../../../conversation/ratchet/fedos_direct_ratchet_limits.js";
+import { FEDOS_DIRECT_RATCHET_LIMITS } from "./fedos_direct_ratchet_limits.js";
 
 export interface FedosDirectRatchetSkippedKeyReference {
   /** The receiving-chain position this reference stands in for -- never itself a key. */

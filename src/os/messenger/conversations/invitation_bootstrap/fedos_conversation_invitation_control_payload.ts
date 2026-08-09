@@ -21,7 +21,7 @@
 import {
   isWellFormedFedosConversationInvitationAdvertisementV1,
   type FedosConversationInvitationAdvertisementV1,
-} from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_advertisement.js";
+} from "./fedos_conversation_invitation_advertisement.js";
 
 export const FEDOS_CONVERSATION_INVITATION_CONTROL_PAYLOAD_SCHEMA_VERSION = 1 as const;
 

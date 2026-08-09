@@ -24,7 +24,7 @@
  * to a user as "deleted everywhere" — see `fedos_deletion_non_guarantees.ts`.
  */
 
-import type { FedosPayloadDeletionMeaning } from "../../../../conversation/retention/fedos_payload_retention_state.js";
+import type { FedosPayloadDeletionMeaning } from "../retention/fedos_payload_retention_state.js";
 
 export type FedosDeletionStatus =
   | "present"

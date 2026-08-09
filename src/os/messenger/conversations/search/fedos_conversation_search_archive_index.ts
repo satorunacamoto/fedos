@@ -39,10 +39,10 @@
  *     every sibling index in this directory.
  */
 
-import { deserializeFedosConversationMessageEnvelope } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_codec.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationSearchEnvelopeDocument } from "../../../../conversation/search/fedos_conversation_search_document.js";
+import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationArchiveBundleV1 } from "../archive/fedos_conversation_archive_bundle.js";
+import type { FedosConversationSearchEnvelopeDocument } from "./fedos_conversation_search_document.js";
 
 /**
  * Converts every valid Envelope in `bundle` into a search document.

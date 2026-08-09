@@ -4,7 +4,7 @@ import descriptorSource from "../src/os/messenger/conversations/payload_storage/
 import {
   validateFedosConversationPayloadDescriptor,
   type FedosConversationPayloadDescriptorInput,
-} from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor_validator.js";
+} from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor_validator.js";
 
 function codeOnlyLines(source: string): string {
   return source

@@ -10,7 +10,7 @@ import {
   toFedosExternalReference,
   type FedosBoardId,
   type FedosThreadId,
-} from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 /**
  * Secure Runtime Alpha 252 -- "Canonical Board Identifiers": Stage 2 of

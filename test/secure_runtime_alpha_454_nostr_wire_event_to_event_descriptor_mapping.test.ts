@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { nostrWireEventToFedosEventDescriptor } from "../src/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { nostrWireEventToFedosEventDescriptor } from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import source from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.ts?raw";
 

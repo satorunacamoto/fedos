@@ -12,7 +12,7 @@
  * the same id from the same inputs.
  */
 import { randomBytes, bytesToHex } from "@noble/hashes/utils.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "./fedos_identity_transition_id_limits.js";
 
 const ID_PREFIX = "fedos-identity-transition-";
 const ID_PATTERN = /^fedos-identity-transition-[0-9a-f]{32}$/;

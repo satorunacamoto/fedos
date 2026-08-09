@@ -6,13 +6,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { assembleFedosConversationRuntimeDependencies } from "../src/conversation/runtime/fedos_conversation_runtime_assembly.js";
-import { createFedosConversationRuntime } from "../src/conversation/runtime/fedos_conversation_runtime.js";
+import { assembleFedosConversationRuntimeDependencies } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.js";
+import { createFedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
 import {
   StaticFedosConversationCreatorIdentityAuthority,
   type FedosConversationCreatorIdentityAuthority,
   type FedosConversationCreatorIdentityResolution,
-} from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
+} from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
 
 const FIXED_NOW = 1_700_000_500;
 const clock = () => FIXED_NOW;

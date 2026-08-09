@@ -15,14 +15,14 @@ import { readFileSync, appendFileSync } from "node:fs";
 import {
   decodeFedosDeviceReplacementRecordV1,
   encodeFedosDeviceReplacementRecordV1,
-} from "../../../../device/fedos_device_replacement_record.js";
+} from "../fedos_device_replacement_record.js";
 import {
   fedosDeviceReplacementRecordKey,
   fedosDeviceReplacementRecordsAreEqual,
   type FedosDeviceReplacementPersistence,
   type FedosDeviceReplacementWriteResult,
-} from "../../../../device/persistence/fedos_device_replacement_persistence.js";
-import type { FedosDeviceReplacementRecordV1 } from "../../../../device/fedos_device_replacement_record.js";
+} from "./fedos_device_replacement_persistence.js";
+import type { FedosDeviceReplacementRecordV1 } from "../fedos_device_replacement_record.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

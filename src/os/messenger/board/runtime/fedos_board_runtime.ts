@@ -149,7 +149,7 @@
  * 10: existing public Board behavior remains compatible).
  */
 
-import type { FedosDesktopHost, FedosDesktopHostSubmitPostResult } from "../../../../desktop/host/fedos_desktop_host.js";
+import type { FedosDesktopHost, FedosDesktopHostSubmitPostResult } from "../../desktop/host/fedos_desktop_host.js";
 import type { FedosBoardPost } from "../fedos_board_post.js";
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../fedos_board_post_validator.js";
 import {

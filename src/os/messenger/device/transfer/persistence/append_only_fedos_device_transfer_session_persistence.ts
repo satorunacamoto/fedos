@@ -10,16 +10,16 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import { deserializeFedosDeviceTransferEvent } from "../../../../../device/transfer/persistence/fedos_device_transfer_event_codec.js";
+import { deserializeFedosDeviceTransferEvent } from "./fedos_device_transfer_event_codec.js";
 import {
   fedosDeviceTransferEventKey,
   fedosPersistedDeviceTransferEventsAreEqual,
   reconstructFedosDeviceTransferSessionRecord,
   type FedosDeviceTransferSessionPersistence,
   type FedosDeviceTransferSessionPersistenceWriteResult,
-} from "../../../../../device/transfer/persistence/fedos_device_transfer_session_persistence.js";
-import type { FedosPersistedDeviceTransferEventV1 } from "../../../../../device/transfer/persistence/fedos_persisted_device_transfer_event_v1.js";
-import type { FedosDeviceTransferSessionV1 } from "../../../../../device/transfer/fedos_device_transfer_session.js";
+} from "./fedos_device_transfer_session_persistence.js";
+import type { FedosPersistedDeviceTransferEventV1 } from "./fedos_persisted_device_transfer_event_v1.js";
+import type { FedosDeviceTransferSessionV1 } from "../fedos_device_transfer_session.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

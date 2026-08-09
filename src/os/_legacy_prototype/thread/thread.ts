@@ -16,7 +16,7 @@
  * (and cannot act as parents — a reply pointing at one becomes an orphan root).
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 import type { IngestedEvent } from "../ingest/types.js";
 import type {
   ThreadBuildResult,

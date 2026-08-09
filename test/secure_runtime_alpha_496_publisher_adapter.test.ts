@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { FedosNostrBoardPublisherAdapter } from "../src/board/publish/nostr/fedos_nostr_board_publisher_adapter.js";
-import type { FedosNostrBoardPublisher, FedosNostrBoardPublishEntry } from "../src/board/publish/nostr/fedos_nostr_board_publisher.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { FedosNostrBoardPublisherAdapter } from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher_adapter.js";
+import type { FedosNostrBoardPublisher, FedosNostrBoardPublishEntry } from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import source from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher_adapter.ts?raw";
 

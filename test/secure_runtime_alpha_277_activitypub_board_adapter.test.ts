@@ -6,8 +6,8 @@ import adapterModuleSource from "../src/os/messenger/board/activitypub/fedos_act
 import {
   validateActivityPubBoardPost,
   mapValidatedActivityPubPostToBoardPostInput,
-} from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
+} from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
 
 const VALID_POST: FedosValidatedActivityPubPost = {
   objectId: "https://example.social/users/alice/statuses/1",

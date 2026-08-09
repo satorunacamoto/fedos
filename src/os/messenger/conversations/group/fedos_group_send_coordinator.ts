@@ -31,22 +31,22 @@
  * already provided for free.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { toFedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationIdentityResolver } from "../../../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
-import type { FedosConversationDirectMessagingCoordinator } from "../../../../conversation/messaging/fedos_conversation_direct_messaging_coordinator.js";
-import { validateFedosConversationDirectMessageBody } from "../../../../conversation/messaging/fedos_conversation_direct_message_plaintext_policy.js";
-import type { FedosGroupGenerationPersistence } from "../../../../conversation/group/fedos_group_generation.js";
-import { toFedosGroupDirectPathId, type FedosGroupDirectPathPersistence } from "../../../../conversation/group/fedos_group_direct_path.js";
-import type { FedosGroupDirectPathAuthority } from "../../../../conversation/group/fedos_group_direct_path_authority.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { toFedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import type { FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationDirectMessagingCoordinator } from "../messaging/fedos_conversation_direct_messaging_coordinator.js";
+import { validateFedosConversationDirectMessageBody } from "../messaging/fedos_conversation_direct_message_plaintext_policy.js";
+import type { FedosGroupGenerationPersistence } from "./fedos_group_generation.js";
+import { toFedosGroupDirectPathId, type FedosGroupDirectPathPersistence } from "./fedos_group_direct_path.js";
+import type { FedosGroupDirectPathAuthority } from "./fedos_group_direct_path_authority.js";
 import {
   toFedosGroupMessageId,
   type FedosGroupMessagePersistence,
   type FedosGroupMessageRecord,
-} from "../../../../conversation/group/fedos_group_message.js";
-import type { FedosGroupFanoutDeliveryPersistence } from "../../../../conversation/group/fedos_group_fanout_delivery.js";
+} from "./fedos_group_message.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "./fedos_group_fanout_delivery.js";
 
 export interface FedosGroupSendMessageCommand {
   readonly groupConversationId: string;

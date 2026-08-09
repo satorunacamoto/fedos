@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
-import { resolveFedosConversationTransportRoute } from "../src/conversation/transport/fedos_conversation_transport_routing.js";
+import { resolveFedosConversationTransportRoute } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_routing.js";
 import {
   buildFedosPrivateTransportUnsignedEventRequest,
   parseFedosPrivateTransportEventDescriptor,
   FEDOS_PRIVATE_TRANSPORT_MARKER_TAG,
-} from "../src/conversation/transport/fedos_conversation_transport_event.js";
-import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
-import type { FedosConversationMembership } from "../src/conversation/membership/fedos_conversation_membership.js";
-import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_event.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/os/messenger/adapters/nostr/conversation_delivery/fedos_private_nostr_delivery_mode.js";
+import type { FedosConversationMembership } from "../src/os/messenger/conversations/membership/fedos_conversation_membership.js";
+import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
 
 const LOCAL_PUBKEY = "a".repeat(64);
 const COUNTERPARTY_PUBKEY = "b".repeat(64);

@@ -38,23 +38,23 @@
  * encrypted transfer/session package."
  */
 
-import type { FedosEventDescriptor } from "../../../../desktop/fedos_event_descriptor.js";
-import { NobleSignatureVerifier } from "../../../../nostr/noble_signature.js";
-import type { NostrEvent, NostrTag } from "../../../../nostr/types.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceSyncSessionV1 } from "../../../../device/sync_session/fedos_device_sync_session.js";
-import type { FedosDeviceSyncPackageEncryptionAuthority } from "../../../../device/sync_package/fedos_device_sync_package_encryption.js";
-import type { FedosDeviceTransferCoordinator } from "../../../../device/transfer/fedos_device_transfer_coordinator.js";
+import type { FedosEventDescriptor } from "../../desktop/fedos_event_descriptor.js";
+import { NobleSignatureVerifier } from "../../adapters/nostr/protocol/noble_signature.js";
+import type { NostrEvent, NostrTag } from "../../adapters/nostr/protocol/types.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
+import type { FedosDeviceSyncPackageEncryptionAuthority } from "../sync_package/fedos_device_sync_package_encryption.js";
+import type { FedosDeviceTransferCoordinator } from "../transfer/fedos_device_transfer_coordinator.js";
 import type { AeadAlgorithm } from "../../../../runtime/fedos_wasm_loader.js";
 import {
   extractFedosDeviceTransferPackageFromWirePayload,
   isFedosDeviceRelaySyncWirePayloadExpired,
   computeFedosDeviceRelaySyncPackageContentHash,
-} from "../../../../device/relay_sync/fedos_device_relay_sync_wire_payload.js";
-import { parseFedosDeviceRelaySyncEventDescriptor } from "../../../../device/relay_sync/fedos_device_relay_sync_event.js";
-import type { FedosDeviceRelaySyncObservationRepository } from "../../../../device/relay_sync/fedos_device_relay_sync_observation.js";
-import type { FedosDeviceRelaySyncInboundDedupPersistence } from "../../../../device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
+} from "./fedos_device_relay_sync_wire_payload.js";
+import { parseFedosDeviceRelaySyncEventDescriptor } from "./fedos_device_relay_sync_event.js";
+import type { FedosDeviceRelaySyncObservationRepository } from "./fedos_device_relay_sync_observation.js";
+import type { FedosDeviceRelaySyncInboundDedupPersistence } from "./persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
 
 export type FedosDeviceRelaySyncInboundOutcome =
   | "imported"

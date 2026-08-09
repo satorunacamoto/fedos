@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { fedosPersistedConversationRecordsAreEqual } from "../src/conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
+import { fedosPersistedConversationRecordsAreEqual } from "../src/os/messenger/conversations/persistence/fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/os/messenger/conversations/persistence/fedos_persisted_conversation_record_v1.js";
 import {
   serializeFedosConversationRecord,
   deserializeFedosConversationRecord,
-} from "../src/conversation/persistence/fedos_conversation_record_codec.js";
-import { validateFedosConversationRecord } from "../src/conversation/fedos_conversation_record_validator.js";
+} from "../src/os/messenger/conversations/persistence/fedos_conversation_record_codec.js";
+import { validateFedosConversationRecord } from "../src/os/messenger/conversations/fedos_conversation_record_validator.js";
 
 const RECORD: FedosPersistedConversationRecordV1 = {
   schemaVersion: 1,

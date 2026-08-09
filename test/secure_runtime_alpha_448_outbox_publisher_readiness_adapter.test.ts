@@ -32,8 +32,13 @@ describe("Secure Runtime Alpha 448 -- Outbox Publisher Readiness Adapter", () =>
   });
 
   it("signEvent()'s own signature is already the shape a future Publisher would depend on", () => {
+    // Nostr Consolidation Plan, Step 3 (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`)
+    // fixed this file's backward dependency on `desktop/fedos_nostr_wire_event.ts`
+    // by importing the canonical `NostrEvent` from its own `../types.ts`
+    // instead -- the SAME type `FedosNostrWireEvent` aliases (Step 1), just
+    // named/imported locally rather than reached for across the boundary.
     expect(signingAuthoritySource).toContain(
-      "signEvent(request: FedosNostrUnsignedEventRequest): Promise<FedosNostrWireEvent | null>;",
+      "signEvent(request: FedosNostrUnsignedEventRequest): Promise<NostrEvent | null>;",
     );
   });
 });

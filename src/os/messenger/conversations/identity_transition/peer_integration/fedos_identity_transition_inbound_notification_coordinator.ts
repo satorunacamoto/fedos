@@ -36,27 +36,27 @@
  * purely from the sender's own unverifiable say-so. Cross-account Device
  * attestation is named as future work, not fabricated here.
  */
-import type { FedosDeviceBindingAccountRef, FedosDeviceTrustState } from "../../../../../device/fedos_device_binding.js";
-import { isFedosDeviceBindingRevoked } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../../device/persistence/fedos_device_registry_persistence.js";
-import { decodeFedosRatchetPeerCapabilityControlPayloadFromContent } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import { verifyFedosRatchetPeerCapabilityAccountAuthorization } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceTrustState } from "../../../device/fedos_device_binding.js";
+import { isFedosDeviceBindingRevoked } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../../device/persistence/fedos_device_registry_persistence.js";
+import { decodeFedosRatchetPeerCapabilityControlPayloadFromContent } from "../../ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+import { verifyFedosRatchetPeerCapabilityAccountAuthorization } from "../../ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
 import {
   canonicalSerializeFedosIdentityTransitionNotificationContent,
   reconstructFedosIdentityTransitionRecordFromNotification,
   type FedosIdentityTransitionNotificationV1,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_notification.js";
-import { verifyFedosIdentityTransitionNewKeyProof } from "../../../../../conversation/identity_transition/fedos_identity_transition_new_key_proof.js";
-import { verifyFedosIdentityTransitionContinuityEvidence } from "../../../../../conversation/identity_transition/fedos_identity_transition_continuity_evidence.js";
+} from "./fedos_identity_transition_notification.js";
+import { verifyFedosIdentityTransitionNewKeyProof } from "../fedos_identity_transition_new_key_proof.js";
+import { verifyFedosIdentityTransitionContinuityEvidence } from "../fedos_identity_transition_continuity_evidence.js";
 import {
   evaluateFedosIdentityTransitionEvidence,
   FEDOS_IDENTITY_TRANSITION_DEFAULT_LOCAL_POLICY,
   type FedosIdentityTransitionEvidenceOutcome,
   type FedosIdentityTransitionLocalPolicy,
-} from "../../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
-import { computeFedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionAcceptanceState } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
-import type { FedosIdentityTransitionPeerObservationPersistence } from "../../../../../conversation/identity_transition/peer_integration/persistence/fedos_identity_transition_peer_observation_persistence.js";
-import type { FedosIdentityTransitionPeerObservationV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
+} from "../fedos_identity_transition_evidence_evaluation.js";
+import { computeFedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionAcceptanceState } from "../fedos_identity_transition_acceptance_state.js";
+import type { FedosIdentityTransitionPeerObservationPersistence } from "./persistence/fedos_identity_transition_peer_observation_persistence.js";
+import type { FedosIdentityTransitionPeerObservationV1 } from "./fedos_identity_transition_peer_observation.js";
 
 function accountRefsEqual(a: FedosDeviceBindingAccountRef, b: FedosDeviceBindingAccountRef): boolean {
   return a.authority === b.authority && a.publicIdentifier === b.publicIdentifier && a.identityId === b.identityId;

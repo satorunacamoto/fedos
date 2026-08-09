@@ -2,33 +2,33 @@ import { describe, it, expect, vi } from "vitest";
 import {
   deserializeFedosConversationArchiveCliMultiPackageFromBytes,
   serializeFedosConversationArchiveCliMultiPackageToBytes,
-} from "../src/conversation/archive_cli/fedos_conversation_archive_cli_package_codec.js";
-import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliMultiPackageV1 } from "../src/conversation/archive_cli/fedos_conversation_archive_cli_package.js";
-import { summarizeFedosConversationArchiveCliManifests } from "../src/conversation/archive_cli/fedos_conversation_archive_cli_metadata.js";
-import { exportFedosConversationArchiveCliPackage, type FedosConversationArchiveCliExportRequest } from "../src/conversation/archive_cli/fedos_conversation_archive_cli_export.js";
-import { importFedosConversationArchiveCliPackage } from "../src/conversation/archive_cli/fedos_conversation_archive_cli_import.js";
+} from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_package_codec.js";
+import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliMultiPackageV1 } from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_package.js";
+import { summarizeFedosConversationArchiveCliManifests } from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_metadata.js";
+import { exportFedosConversationArchiveCliPackage, type FedosConversationArchiveCliExportRequest } from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_export.js";
+import { importFedosConversationArchiveCliPackage } from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_import.js";
 import {
   exportFedosConversationArchiveCliDirectory,
   importFedosConversationArchiveCliDirectory,
   listFedosConversationArchiveCliDirectory,
-} from "../src/conversation/archive_cli/fedos_conversation_archive_cli_directory.js";
-import type { FedosConversationArchiveCliFileSystem } from "../src/conversation/archive_cli/fedos_conversation_archive_cli_file_system.js";
-import { FedosWasmConversationArchiveEncryptionAuthority, type FedosConversationArchiveEncryptionRuntimeBoundary } from "../src/conversation/archive/fedos_conversation_archive_encryption.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import { InMemoryFedosConversationMembershipPersistence } from "../src/conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
-import { InMemoryFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreDependencies } from "../src/conversation/archive/fedos_conversation_archive_restore.js";
-import type { FedosConversationArchiveCollectorDependencies } from "../src/conversation/archive/fedos_conversation_archive_collector.js";
-import type { FedosConversationArchiveBundleV1 } from "../src/conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosPersistedConversationMessageEnvelopeV1 } from "../src/conversation/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
-import type { FedosPersistedConversationPayloadV1 } from "../src/conversation/payload_storage/fedos_persisted_conversation_payload_v1.js";
-import type { FedosMasterSeedAuthority } from "../src/runtime/master_seed/fedos_master_seed_authority.js";
+} from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_directory.js";
+import type { FedosConversationArchiveCliFileSystem } from "../src/os/messenger/conversations/archive_cli/fedos_conversation_archive_cli_file_system.js";
+import { FedosWasmConversationArchiveEncryptionAuthority, type FedosConversationArchiveEncryptionRuntimeBoundary } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_encryption.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_schema_version.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../src/os/messenger/conversations/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreDependencies } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_restore.js";
+import type { FedosConversationArchiveCollectorDependencies } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_collector.js";
+import type { FedosConversationArchiveBundleV1 } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_bundle.js";
+import type { FedosPersistedConversationMessageEnvelopeV1 } from "../src/os/messenger/conversations/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
+import type { FedosPersistedConversationPayloadV1 } from "../src/os/messenger/conversations/payload_storage/fedos_persisted_conversation_payload_v1.js";
+import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 // @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 

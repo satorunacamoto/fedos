@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_282_normalized_atproto_post_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import postModelSource from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.ts?raw";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 function codeOnly(source: string): string {
   return source

@@ -17,36 +17,36 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { createFedosDesktopConversationUiPresentationBoundary } from "../src/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import { toFedosConversationInvitationToken } from "../src/conversation/invitation/fedos_conversation_invitation_token.js";
+import { createFedosDesktopConversationUiPresentationBoundary } from "../src/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import { toFedosConversationInvitationToken } from "../src/os/messenger/conversations/invitation/fedos_conversation_invitation_token.js";
 import type {
   FedosConversationEncryptionAuthority,
   FedosConversationEncryptionRequest,
   FedosConversationEncryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
 import type {
   FedosConversationDecryptionAuthority,
   FedosConversationDecryptionRequest,
   FedosConversationDecryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { FedosDesktopConversationWindowRegistry } from "../src/desktop/navigation/fedos_desktop_conversation_window_registry.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { FedosDesktopConversationWindowRegistry } from "../src/os/messenger/desktop/navigation/fedos_desktop_conversation_window_registry.js";
 import {
   FedosDesktopBadgeCoordinator,
   type FedosDesktopBadgeRegistryView,
-} from "../src/desktop/badge/fedos_desktop_badge_coordinator.js";
-import { NoopFedosDesktopBadgePort } from "../src/desktop/badge/fedos_desktop_badge_port.js";
-import type { FedosDesktopBadgePort } from "../src/desktop/badge/fedos_desktop_badge_port.js";
+} from "../src/os/messenger/desktop/badge/fedos_desktop_badge_coordinator.js";
+import { NoopFedosDesktopBadgePort } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_port.js";
+import type { FedosDesktopBadgePort } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_port.js";
 import {
   FEDOS_DESKTOP_BADGE_STATES,
   fedosDesktopBadgeCount,
   fedosDesktopBadgeNone,
   fedosDesktopBadgeViewsEqual,
   type FedosDesktopBadgeView,
-} from "../src/desktop/badge/fedos_desktop_badge_types.js";
+} from "../src/os/messenger/desktop/badge/fedos_desktop_badge_types.js";
 
 class FakeTrackingBadgePort implements FedosDesktopBadgePort {
   readonly rendered: FedosDesktopBadgeView[] = [];

@@ -18,8 +18,8 @@ import {
   resolveCurrentConstructionCoordinationRecord,
   type FedosConversationConstructionCoordinationPersistence,
   type FedosConversationConstructionCoordinationWriteResult,
-} from "../../../../../conversation/construction/coordination/fedos_conversation_construction_coordination_persistence.js";
-import type { FedosPersistedConversationConstructionCoordinationV1 } from "../../../../../conversation/construction/coordination/fedos_persisted_conversation_construction_coordination_v1.js";
+} from "./fedos_conversation_construction_coordination_persistence.js";
+import type { FedosPersistedConversationConstructionCoordinationV1 } from "./fedos_persisted_conversation_construction_coordination_v1.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

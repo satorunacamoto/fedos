@@ -16,7 +16,7 @@
  */
 
 import type { RuntimeCryptoCapability } from "./crypto_provider.js";
-import type { CryptoCapability } from "../crypto/types.js";
+import type { CryptoCapability } from "../os/core/crypto/types.js";
 import { RUNTIME_CRYPTO_CAPABILITIES } from "./crypto_provider.js";
 
 /**

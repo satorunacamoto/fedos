@@ -22,7 +22,7 @@
  * `invalid-transition`/`not-found`/`unavailable`) are untouched.
  */
 
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
+import type { FedosConversationMembership } from "./fedos_conversation_membership.js";
 
 export type FedosConversationMembershipMutationOutcome =
   | "admitted"

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   planFedosIdentityTransitionAffectedSessions,
   authorizeFedosIdentityTransitionRatchetReset,
-} from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_authorization.js";
-import { InMemoryFedosIdentityTransitionRatchetResetLinkPersistence } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../src/conversation/ratchet/fedos_direct_ratchet_session_record.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+} from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_authorization.js";
+import { InMemoryFedosIdentityTransitionRatchetResetLinkPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_record.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 const OLD_ACCOUNT: FedosDeviceBindingAccountRef = { authority: "nostr", publicIdentifier: "a".repeat(64), identityId: null };
 const OTHER_ACCOUNT: FedosDeviceBindingAccountRef = { authority: "nostr", publicIdentifier: "c".repeat(64), identityId: null };

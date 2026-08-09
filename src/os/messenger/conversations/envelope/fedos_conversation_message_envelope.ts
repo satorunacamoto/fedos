@@ -60,10 +60,10 @@
  *     own convention.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "./fedos_conversation_envelope_id.js";
+import type { FedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
 
 /** The ONLY two real, Rust-backed AEAD suites this Arc's own Alpha 864 Suite Decision recognizes. Mirrors `FedosAeadAlgorithm` (`../../runtime/fedos_wasm_loader.ts`) exactly — never Seam 1's wider, aspirational union. */
 export type FedosConversationEnvelopeEncryptionSuite = "ChaCha20Poly1305" | "Aes256Gcm";

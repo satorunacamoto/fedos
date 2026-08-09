@@ -19,9 +19,9 @@
  * "feel" complete.
  */
 
-import { type FedosDeletionTarget, isFedosDeletionTarget } from "../../../../conversation/deletion/fedos_deletion_target.js";
-import type { FedosDeletionOperation } from "../../../../conversation/deletion/fedos_deletion_operation.js";
-import type { FedosDeletionEvidence } from "../../../../conversation/deletion/fedos_deletion_evidence.js";
+import { type FedosDeletionTarget, isFedosDeletionTarget } from "./fedos_deletion_target.js";
+import type { FedosDeletionOperation } from "./fedos_deletion_operation.js";
+import type { FedosDeletionEvidence } from "./fedos_deletion_evidence.js";
 
 /** Closed, versioned limitation codes — never free text, so a UI cannot accidentally invent an overclaiming phrase. */
 export type FedosDeletionLimitationCode =

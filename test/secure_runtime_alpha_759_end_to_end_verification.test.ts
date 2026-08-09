@@ -5,15 +5,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { createFedosBoardRuntime } from "../src/board/runtime/fedos_board_runtime.js";
-import type { FedosBoardRuntimeIdGenerator } from "../src/board/runtime/fedos_board_runtime_id_generator.js";
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import type { FedosConversationPersistence, FedosConversationPersistenceWriteResult } from "../src/conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { createFedosBoardRuntime } from "../src/os/messenger/board/runtime/fedos_board_runtime.js";
+import type { FedosBoardRuntimeIdGenerator } from "../src/os/messenger/board/runtime/fedos_board_runtime_id_generator.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import type { FedosConversationPersistence, FedosConversationPersistenceWriteResult } from "../src/os/messenger/conversations/persistence/fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/os/messenger/conversations/persistence/fedos_persisted_conversation_record_v1.js";
 
 const dirs: string[] = [];
 function freshDir(): string {

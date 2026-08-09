@@ -10,9 +10,9 @@
  * scope here; they layer on top of this pure core in later stages.
  */
 
-import { validateEventStructure } from "../../../nostr/event.js";
-import type { NostrEvent } from "../../../nostr/types.js";
-import type { SignatureVerifier } from "../../../nostr/signature.js";
+import { validateEventStructure } from "../../messenger/adapters/nostr/protocol/event.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
+import type { SignatureVerifier } from "../../messenger/adapters/nostr/protocol/signature.js";
 import type {
   IngestContext,
   IngestResult,

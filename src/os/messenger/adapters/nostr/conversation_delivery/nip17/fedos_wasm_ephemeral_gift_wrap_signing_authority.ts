@@ -46,7 +46,7 @@
  */
 import type { FedosWasmLoaderGiftWrapBuildExecution } from "../../../../../../runtime/fedos_wasm_loader.js";
 import { FedosWasmLoaderSkeleton } from "../../../../../../runtime/fedos_wasm_loader.js";
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
 
 /** NIP-59's own two Gift-Wrap kinds — the ONLY `kind` values this authority ever builds. Matches the Rust boundary's own closed `kind` check exactly (`build_and_sign_nip17_gift_wrap`, `lib.rs`) — this is defense in depth, not the sole guard. */
 export const FEDOS_GIFT_WRAP_KIND = 1059;

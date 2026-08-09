@@ -13,9 +13,9 @@
  * Alpha 624).
  */
 
-import type { FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationCapabilityBearerSecret } from "../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationCapabilityId } from "./fedos_conversation_capability_id.js";
+import type { FedosConversationCapabilityBearerSecret } from "./fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 
 export interface FedosConversationCapabilityRedemptionRequest {
   readonly capabilityId: FedosConversationCapabilityId;

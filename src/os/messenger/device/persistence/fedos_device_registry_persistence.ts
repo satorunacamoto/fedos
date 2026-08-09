@@ -18,13 +18,13 @@ import {
   revokeFedosDeviceBinding,
   trustFedosDeviceBinding,
   type FedosDeviceBindingV1,
-} from "../../../../device/fedos_device_binding.js";
+} from "../fedos_device_binding.js";
 import {
   fedosDeviceBindingEventKey,
   fedosPersistedDeviceBindingEventsAreEqual,
   type FedosPersistedDeviceBindingEventV1,
   type FedosPersistedDeviceBindingRegisteredEventV1,
-} from "../../../../device/persistence/fedos_persisted_device_binding_event_v1.js";
+} from "./fedos_persisted_device_binding_event_v1.js";
 
 /** Mirrors `FedosConversationCapabilityPersistenceWriteResult` exactly (Alpha 837). */
 export type FedosDeviceRegistryPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

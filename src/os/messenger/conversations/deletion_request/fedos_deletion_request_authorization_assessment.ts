@@ -46,14 +46,14 @@
  * may revisit it with real source-grounded evidence.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationPersistence } from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosConversationMessageEnvelopePersistence } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantAuthority, FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { getFedosDeletionCapabilityDescriptor } from "../../../../conversation/deletion/fedos_deletion_capability_descriptor.js";
-import { verifyFedosSignedDeletionRequestV1, type FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRequestAuthorizationOutcome } from "../../../../conversation/deletion_request/fedos_deletion_request_authorization_outcome.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantAuthority, FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { getFedosDeletionCapabilityDescriptor } from "../deletion/fedos_deletion_capability_descriptor.js";
+import { verifyFedosSignedDeletionRequestV1, type FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
+import type { FedosDeletionRequestAuthorizationOutcome } from "./fedos_deletion_request_authorization_outcome.js";
 
 /**
  * Secure Runtime Alpha 5881-5960 (FedOS Signed Recipient Deletion

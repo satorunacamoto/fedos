@@ -32,7 +32,7 @@
  *     Arc's own instruction forbids ("Never invent semantics").
  */
 
-import type { FedosValidatedNostrEvent } from "../../../desktop/fedos_validated_nostr_event.js";
+import type { FedosValidatedNostrEvent } from "../desktop/fedos_validated_nostr_event.js";
 import type { FedosBoardPost } from "./fedos_board_post.js";
 import { validateFedosBoardPost, type FedosBoardPostInput } from "./fedos_board_post_validator.js";
 

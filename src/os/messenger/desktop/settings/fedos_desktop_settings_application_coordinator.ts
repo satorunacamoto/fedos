@@ -33,14 +33,14 @@
 import {
   defaultFedosSettingsDescriptorV1,
   type FedosSettingsDescriptorV1,
-} from "../../../../settings/fedos_settings_descriptor.js";
-import type { FedosSettingsResult } from "../../../../settings/fedos_settings_authority.js";
+} from "../../../core/settings/fedos_settings_descriptor.js";
+import type { FedosSettingsResult } from "../../../core/settings/fedos_settings_authority.js";
 import type { FedosDesktopSettingsController } from "./fedos_desktop_settings_controller.js";
 import {
   planFedosSettingsApplication,
   type FedosSettingsApplicationPlan,
   type FedosSettingsApplicationPlanEntry,
-} from "../../../../settings/application/fedos_settings_application_plan.js";
+} from "../../../core/settings/application/fedos_settings_application_plan.js";
 import {
   fedosSettingsEffectiveStateFromLoaded,
   fedosSettingsEffectiveStateAfterApplication,
@@ -49,7 +49,7 @@ import {
   type FedosSettingsEffectiveStateView,
   type FedosSettingsFieldApplicationRecord,
   type FedosSettingsFieldApplicationStatus,
-} from "../../../../settings/application/fedos_settings_effective_state.js";
+} from "../../../core/settings/application/fedos_settings_effective_state.js";
 import type {
   FedosSettingsPresentationSink,
   FedosSettingsNotificationPresentationGate,

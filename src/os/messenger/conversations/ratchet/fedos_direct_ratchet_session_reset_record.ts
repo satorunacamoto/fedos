@@ -16,9 +16,9 @@
  * defend against (identical to the Device Binding Challenge replay
  * ledger's own stated position).
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDirectRatchetSuite } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDirectRatchetSessionResetReason } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionResetReason } from "./fedos_direct_ratchet_session_reset_reason.js";
 
 export type FedosDirectRatchetSessionResetInitiator = "local" | "remote";
 

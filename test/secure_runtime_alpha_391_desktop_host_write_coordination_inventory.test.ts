@@ -8,12 +8,12 @@ import persistenceSource from "../src/os/messenger/board/persistence/fedos_board
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import persistedRepositorySource from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.ts?raw";
 
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { PersistedFedosBoardRepository } from "../src/board/persistence/persisted_fedos_board_repository.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { hydrateFedosBoardService } from "../src/board/persistence/fedos_board_hydration.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { PersistedFedosBoardRepository } from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { hydrateFedosBoardService } from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
 
 const INPUT: FedosBoardPostInput = {
   id: "post-391",

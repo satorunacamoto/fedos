@@ -51,7 +51,7 @@
  *     `p2p/` anywhere in this file.
  */
 
-import type { FedosRelay } from "../../../../../desktop/fedos_relay.js";
+import type { FedosRelay } from "../../../desktop/fedos_relay.js";
 import type {
   FedosNostrBoardPublishEntry,
   FedosNostrBoardPublisher,

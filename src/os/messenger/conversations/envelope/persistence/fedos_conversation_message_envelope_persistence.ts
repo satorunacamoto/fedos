@@ -14,8 +14,8 @@
  * Storage port satisfies).
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosPersistedConversationMessageEnvelopeV1 } from "../../../../../conversation/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosPersistedConversationMessageEnvelopeV1 } from "./fedos_persisted_conversation_message_envelope_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationMessageEnvelopePersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

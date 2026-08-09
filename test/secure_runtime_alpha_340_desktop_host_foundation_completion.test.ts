@@ -22,9 +22,9 @@ import atprotoAdapterSource from "../src/os/messenger/board/atproto/fedos_atprot
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import sessionAdapterSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
 
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import type { FedosDesktopHostState } from "../src/desktop/host/fedos_desktop_host_state.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import type { FedosDesktopHostState } from "../src/os/messenger/desktop/host/fedos_desktop_host_state.js";
 
 /**
  * Secure Runtime Alpha 340 -- "Desktop Host Foundation Completion":

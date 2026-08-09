@@ -14,8 +14,8 @@
  * apply, un-apply, or overwrite anything in the Sync Journal.
  */
 
-import type { FedosDeviceSyncConflictKind } from "../../../../device/sync_scheduler/fedos_device_sync_conflict.js";
-import type { FedosDeviceSyncConflictPersistence, FedosDeviceSyncConflictRecordV1, FedosDeviceSyncConflictResolutionAction } from "../../../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import type { FedosDeviceSyncConflictKind } from "./fedos_device_sync_conflict.js";
+import type { FedosDeviceSyncConflictPersistence, FedosDeviceSyncConflictRecordV1, FedosDeviceSyncConflictResolutionAction } from "./persistence/fedos_device_sync_conflict_persistence.js";
 
 const SAFE_ACTIONS_BY_KIND: Readonly<Record<FedosDeviceSyncConflictKind, readonly FedosDeviceSyncConflictResolutionAction[]>> = Object.freeze({
   none: [],

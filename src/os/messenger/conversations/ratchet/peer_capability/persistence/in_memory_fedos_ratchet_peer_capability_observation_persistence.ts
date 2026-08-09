@@ -4,17 +4,17 @@
  * `../../persistence/in_memory_fedos_direct_ratchet_session_reset_record_persistence.ts`'s
  * private-`Map`-backed convention exactly.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
 import {
   fedosRatchetPeerCapabilityObservationKey,
   fedosRatchetPeerCapabilityObservationsAreEqual,
   fedosRatchetPeerCapabilityObservationSubjectKey,
   type FedosRatchetPeerCapabilityObservationV1,
-} from "../../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_observation.js";
+} from "../fedos_ratchet_peer_capability_observation.js";
 import type {
   FedosRatchetPeerCapabilityObservationPersistence,
   FedosRatchetPeerCapabilityObservationWriteResult,
-} from "../../../../../../conversation/ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
+} from "./fedos_ratchet_peer_capability_observation_persistence.js";
 
 export class InMemoryFedosRatchetPeerCapabilityObservationPersistence implements FedosRatchetPeerCapabilityObservationPersistence {
   readonly #records = new Map<string, FedosRatchetPeerCapabilityObservationV1>();

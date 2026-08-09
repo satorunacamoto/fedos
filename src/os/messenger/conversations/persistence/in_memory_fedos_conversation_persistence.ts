@@ -22,9 +22,9 @@ import {
   fedosPersistedConversationRecordsAreEqual,
   type FedosConversationPersistence,
   type FedosConversationPersistenceWriteResult,
-} from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../../../../conversation/persistence/fedos_persisted_conversation_record_v1.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+} from "./fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "./fedos_persisted_conversation_record_v1.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 
 export class InMemoryFedosConversationPersistence implements FedosConversationPersistence {
   readonly #records = new Map<string, FedosPersistedConversationRecordV1>();

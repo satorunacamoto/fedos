@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_439_authority_persistence_ownership_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import authoritySource from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.ts?raw";
+import authoritySource from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.ts?raw";
 
 describe("Secure Runtime Alpha 439 -- Authority Persistence Ownership Review", () => {
   it("adopts Option E (no Host integration yet)", () => {

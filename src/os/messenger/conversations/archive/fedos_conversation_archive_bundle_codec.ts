@@ -47,10 +47,10 @@
  *   - Pure, deterministic, synchronous.
  */
 
-import { fedosConversationCapabilityEventKey } from "../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationArchiveGroupSectionV1 } from "../../../../conversation/archive/fedos_conversation_archive_group_section.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
+import { fedosConversationCapabilityEventKey } from "../capability/persistence/fedos_conversation_capability_persistence.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "./fedos_conversation_archive_schema_version.js";
 
 const TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
   "schemaVersion",

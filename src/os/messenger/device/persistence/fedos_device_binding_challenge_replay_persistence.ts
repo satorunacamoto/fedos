@@ -15,7 +15,7 @@ import {
   fedosDeviceBindingChallengeConsumptionKey,
   fedosPersistedDeviceBindingChallengeConsumptionRecordsAreEqual,
   type FedosPersistedDeviceBindingChallengeConsumptionV1,
-} from "../../../../device/persistence/fedos_persisted_device_binding_challenge_consumption_v1.js";
+} from "./fedos_persisted_device_binding_challenge_consumption_v1.js";
 
 /** Mirrors `FedosDeviceRegistryPersistenceWriteResult` exactly. */
 export type FedosDeviceBindingChallengeReplayWriteResult = "inserted" | "already-present" | "conflict" | "failed";

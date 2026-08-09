@@ -57,7 +57,7 @@ import {
   fedosConversationCapabilityBearerSecretsMatch,
   toFedosConversationCapabilityBearerSecret,
   type FedosConversationCapabilityBearerSecret,
-} from "../../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
+} from "../fedos_conversation_capability_bearer_secret.js";
 
 export type FedosConversationCapabilityBearerVerifier = string & { readonly __brand: "FedosConversationCapabilityBearerVerifier" };
 

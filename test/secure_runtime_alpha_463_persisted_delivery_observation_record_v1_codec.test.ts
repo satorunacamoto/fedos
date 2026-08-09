@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   createFedosDeliveryObservation,
   toFedosDeliveryObservationSubjectId,
-} from "../src/board/observation/fedos_delivery_observation.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
 import {
   deserializeFedosDeliveryObservation,
   serializeFedosDeliveryObservation,
-} from "../src/board/observation/fedos_delivery_observation_codec.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.js";
 
 /**
  * Secure Runtime Alpha 463 -- "Persisted Delivery Observation Record V1

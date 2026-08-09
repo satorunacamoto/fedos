@@ -29,21 +29,21 @@
  *   - Never throws.
  */
 
-import type { FedosConversationArchiveCollectorDependencies } from "../../../../conversation/archive/fedos_conversation_archive_collector.js";
-import type { FedosConversationArchiveEncryptionAuthority } from "../../../../conversation/archive/fedos_conversation_archive_encryption.js";
-import type { FedosConversationArchiveManifestV1 } from "../../../../conversation/archive/fedos_conversation_archive_manifest.js";
-import { deserializeFedosConversationArchiveManifest } from "../../../../conversation/archive/fedos_conversation_archive_manifest_codec.js";
-import type { FedosConversationArchiveRestoreDependencies, FedosConversationArchiveRestoreResult } from "../../../../conversation/archive/fedos_conversation_archive_restore.js";
-import type { FedosConversationEnvelopeEncryptionSuite } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { exportFedosConversationArchiveCliPackage, type FedosConversationArchiveCliExportRequest } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_export.js";
-import { fedosConversationArchiveCliNodeFileSystem, joinFedosConversationArchiveCliPath, type FedosConversationArchiveCliFileSystem } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_file_system.js";
-import { importFedosConversationArchiveCliPackage } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_import.js";
-import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliPackageFormatVersion } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package.js";
+import type { FedosConversationArchiveCollectorDependencies } from "../archive/fedos_conversation_archive_collector.js";
+import type { FedosConversationArchiveEncryptionAuthority } from "../archive/fedos_conversation_archive_encryption.js";
+import type { FedosConversationArchiveManifestV1 } from "../archive/fedos_conversation_archive_manifest.js";
+import { deserializeFedosConversationArchiveManifest } from "../archive/fedos_conversation_archive_manifest_codec.js";
+import type { FedosConversationArchiveRestoreDependencies, FedosConversationArchiveRestoreResult } from "../archive/fedos_conversation_archive_restore.js";
+import type { FedosConversationEnvelopeEncryptionSuite } from "../envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { exportFedosConversationArchiveCliPackage, type FedosConversationArchiveCliExportRequest } from "./fedos_conversation_archive_cli_export.js";
+import { fedosConversationArchiveCliNodeFileSystem, joinFedosConversationArchiveCliPath, type FedosConversationArchiveCliFileSystem } from "./fedos_conversation_archive_cli_file_system.js";
+import { importFedosConversationArchiveCliPackage } from "./fedos_conversation_archive_cli_import.js";
+import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliPackageFormatVersion } from "./fedos_conversation_archive_cli_package.js";
 import {
   deserializeFedosConversationArchiveCliPackageFromBytes,
   serializeFedosConversationArchiveCliPackageToBytes,
-} from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package_codec.js";
+} from "./fedos_conversation_archive_cli_package_codec.js";
 
 export const FEDOS_CONVERSATION_ARCHIVE_CLI_DIRECTORY_MANIFEST_FILE_NAME = "index.fedos-archive-manifest.json";
 const PACKAGE_FILE_EXTENSION = ".fedos-archive.json";

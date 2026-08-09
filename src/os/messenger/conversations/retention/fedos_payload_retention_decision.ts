@@ -34,7 +34,7 @@
  *     a value of this type.
  */
 
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
 
 /** Alpha 795 — deliberately excludes `"active"` (see this file's own header). */
 export type FedosPayloadRetentionAction = "tombstoned" | "payload-removed";

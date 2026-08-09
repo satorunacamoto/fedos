@@ -20,8 +20,8 @@
  *   - Synchronous, matching every other port in this codebase.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "./fedos_persisted_conversation_draft_record_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationDraftPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

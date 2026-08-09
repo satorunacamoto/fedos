@@ -10,13 +10,13 @@
  * (independent Runtime isolation), 29 (interruption recovery, restart).
  */
 import { describe, it, expect } from "vitest";
-import { FedosDirectRatchetStateRuntime } from "../src/conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
-import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
-import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { FedosDirectRatchetStateRuntime } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_state_runtime.js";
+import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
+import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
 import { FakeFedosDirectRatchetSealingAuthority } from "./support/fake_direct_ratchet_sealing_authority.js";
-import type { FedosDirectRatchetSessionBinding } from "../src/conversation/ratchet/fedos_direct_ratchet_session_binding.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosDirectRatchetSessionId } from "../src/conversation/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionBinding } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_binding.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosDirectRatchetSessionId } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_id.js";
 
 function binding(overrides: Partial<FedosDirectRatchetSessionBinding> = {}): FedosDirectRatchetSessionBinding {
   return {

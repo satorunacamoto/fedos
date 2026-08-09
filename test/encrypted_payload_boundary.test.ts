@@ -4,7 +4,7 @@ import {
   reviewPayloadPreview,
   type EncryptedPayloadDescriptor,
   type PayloadPreviewDescriptor,
-} from "../src/storage/encrypted_payload.js";
+} from "../src/os/core/storage/encrypted_payload.js";
 // Source-level checks: prove no payload/plaintext/raw-key field and no wiring.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import encryptedPayloadSource from "../src/os/core/storage/encrypted_payload.ts?raw";

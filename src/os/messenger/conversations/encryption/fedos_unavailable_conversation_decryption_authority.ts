@@ -12,7 +12,7 @@ import type {
   FedosConversationDecryptionAuthority,
   FedosConversationDecryptionRequest,
   FedosConversationDecryptionResult,
-} from "../../../../conversation/encryption/fedos_conversation_decryption_authority.js";
+} from "./fedos_conversation_decryption_authority.js";
 
 export class UnavailableFedosConversationDecryptionAuthority implements FedosConversationDecryptionAuthority {
   async decrypt(_request: FedosConversationDecryptionRequest): Promise<FedosConversationDecryptionResult> {

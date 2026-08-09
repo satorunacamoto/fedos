@@ -60,15 +60,15 @@ import {
   type FedosConversationPayload,
   type FedosConversationPayloadStorage,
   type FedosConversationPayloadStorageWriteResult,
-} from "../../../../conversation/payload_storage/fedos_conversation_payload_storage.js";
-import type { FedosConversationPayloadDescriptor } from "../../../../conversation/payload_storage/fedos_conversation_payload_descriptor.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosPersistedConversationPayloadV1 } from "../../../../conversation/payload_storage/fedos_persisted_conversation_payload_v1.js";
+} from "./fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadDescriptor } from "./fedos_conversation_payload_descriptor.js";
+import type { FedosConversationPayloadId } from "./fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosPersistedConversationPayloadV1 } from "./fedos_persisted_conversation_payload_v1.js";
 import {
   deserializeFedosConversationPayload,
   serializeFedosConversationPayload,
-} from "../../../../conversation/payload_storage/fedos_conversation_payload_codec.js";
+} from "./fedos_conversation_payload_codec.js";
 
 /** PRIVATE — narrow, dependency-free check for a Node `ENOENT` error, without `@types/node`. Mirrors every other backend's own identical helper. */
 function isEnoent(err: unknown): boolean {

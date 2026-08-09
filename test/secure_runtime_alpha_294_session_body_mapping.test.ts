@@ -6,9 +6,9 @@ import adapterModuleSource from "../src/os/messenger/board/session/fedos_session
 import {
   mapValidatedSessionPostToBoardPostInput,
   validateSessionBoardPost,
-} from "../src/board/session/fedos_session_board_adapter.js";
-import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
-import type { FedosValidatedSessionPost } from "../src/board/session/fedos_validated_session_post.js";
+} from "../src/os/messenger/board/session/fedos_session_board_adapter.js";
+import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
 
 function codeOnly(source: string): string {
   return source

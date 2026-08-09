@@ -4,10 +4,10 @@ import designDocSource from "../docs/secure_runtime_alpha_345_crash_recovery_rev
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import portSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 
-import { fedosPersistedBoardPostRecordsAreEqual } from "../src/board/persistence/fedos_board_persistence.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import { fedosPersistedBoardPostRecordsAreEqual } from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");

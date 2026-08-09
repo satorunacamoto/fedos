@@ -25,9 +25,9 @@
  *     mirrors `isWellFormedFedosNostrUnsignedEventRequest`, Alpha 442).
  */
 
-import { isFedosDeletionRequestScope, type FedosDeletionRequestScope } from "../../../../conversation/deletion_request/fedos_deletion_request_scope.js";
-import { isFedosDeletionRequestReasonCode, type FedosDeletionRequestReasonCode } from "../../../../conversation/deletion_request/fedos_deletion_request_reason_code.js";
-import { isFedosDeletionRequestId } from "../../../../conversation/deletion_request/fedos_deletion_request_id.js";
+import { isFedosDeletionRequestScope, type FedosDeletionRequestScope } from "./fedos_deletion_request_scope.js";
+import { isFedosDeletionRequestReasonCode, type FedosDeletionRequestReasonCode } from "./fedos_deletion_request_reason_code.js";
+import { isFedosDeletionRequestId } from "./fedos_deletion_request_id.js";
 
 export const FEDOS_DELETION_REQUEST_SCHEMA_VERSION = 1 as const;
 export const FEDOS_DELETION_REQUEST_CAPABILITY_VERSION = 1 as const;

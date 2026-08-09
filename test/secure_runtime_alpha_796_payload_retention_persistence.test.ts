@@ -5,10 +5,10 @@ import { mkdtempSync, rmSync, existsSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { InMemoryFedosPayloadRetentionPersistence } from "../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
-import { AppendOnlyFedosPayloadRetentionPersistence } from "../src/conversation/retention/append_only_fedos_payload_retention_persistence.js";
-import type { FedosPayloadRetentionPersistence } from "../src/conversation/retention/fedos_payload_retention_persistence.js";
-import type { FedosPersistedPayloadRetentionDecisionV1 } from "../src/conversation/retention/fedos_persisted_payload_retention_decision_v1.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
+import { AppendOnlyFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/append_only_fedos_payload_retention_persistence.js";
+import type { FedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/fedos_payload_retention_persistence.js";
+import type { FedosPersistedPayloadRetentionDecisionV1 } from "../src/os/messenger/conversations/retention/fedos_persisted_payload_retention_decision_v1.js";
 
 const RECORD: FedosPersistedPayloadRetentionDecisionV1 = {
   schemaVersion: 1,

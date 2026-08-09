@@ -7,7 +7,7 @@
  * characters to demonstrate that the render layer escapes event content.
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 
 const PUB_A = "a".repeat(64);
 const PUB_B = "b".repeat(64);

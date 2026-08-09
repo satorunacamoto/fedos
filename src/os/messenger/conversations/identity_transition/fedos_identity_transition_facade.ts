@@ -16,26 +16,26 @@
  * Phase J's own "durable facts store outcomes, not raw evidence" design:
  * a draft's raw proofs are never themselves written to disk by this Arc.
  */
-import { fedosIdentityTransitionAccountRefsEqual, type FedosIdentityTransitionRecordV1, type FedosIdentityTransitionTimestampCheck } from "../../../../conversation/identity_transition/fedos_identity_transition_record.js";
-import { createFedosIdentityTransitionRecordV1, isWellFormedFedosIdentityTransitionRecordV1, checkFedosIdentityTransitionTimestamps, type FedosIdentityTransitionRecordCreateInput } from "../../../../conversation/identity_transition/fedos_identity_transition_record.js";
-import { generateFedosIdentityTransitionId } from "../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { fedosIdentityTransitionBodyHash } from "../../../../conversation/identity_transition/fedos_identity_transition_canonical.js";
-import { verifyFedosIdentityTransitionNewKeyProof, type FedosIdentityTransitionNewKeyProofV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_new_key_proof.js";
-import { verifyFedosIdentityTransitionContinuityEvidence, type FedosIdentityTransitionContinuityEvidenceV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_continuity_evidence.js";
-import { verifyFedosIdentityTransitionDeviceCorroboration, type FedosIdentityTransitionDeviceCorroborationV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_device_corroboration.js";
-import type { FedosDeviceBindingV1 } from "../../../../device/fedos_device_binding.js";
+import { fedosIdentityTransitionAccountRefsEqual, type FedosIdentityTransitionRecordV1, type FedosIdentityTransitionTimestampCheck } from "./fedos_identity_transition_record.js";
+import { createFedosIdentityTransitionRecordV1, isWellFormedFedosIdentityTransitionRecordV1, checkFedosIdentityTransitionTimestamps, type FedosIdentityTransitionRecordCreateInput } from "./fedos_identity_transition_record.js";
+import { generateFedosIdentityTransitionId } from "./fedos_identity_transition_id.js";
+import { fedosIdentityTransitionBodyHash } from "./fedos_identity_transition_canonical.js";
+import { verifyFedosIdentityTransitionNewKeyProof, type FedosIdentityTransitionNewKeyProofV1 } from "./fedos_identity_transition_new_key_proof.js";
+import { verifyFedosIdentityTransitionContinuityEvidence, type FedosIdentityTransitionContinuityEvidenceV1 } from "./fedos_identity_transition_continuity_evidence.js";
+import { verifyFedosIdentityTransitionDeviceCorroboration, type FedosIdentityTransitionDeviceCorroborationV1 } from "./fedos_identity_transition_device_corroboration.js";
+import type { FedosDeviceBindingV1 } from "../../device/fedos_device_binding.js";
 import {
   evaluateFedosIdentityTransitionEvidence,
   FEDOS_IDENTITY_TRANSITION_DEFAULT_LOCAL_POLICY,
   type FedosIdentityTransitionEvidenceOutcome,
   type FedosIdentityTransitionLocalPolicy,
-} from "../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
-import { computeFedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionExplicitLocalDecision } from "../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
-import { isFedosIdentityTransitionFactSuperseded, type FedosIdentityTransitionFactWriteOutcome } from "../../../../conversation/identity_transition/fedos_identity_transition_fact_conflict_detection.js";
-import type { FedosIdentityTransitionFactV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_fact.js";
-import type { FedosIdentityTransitionFactPersistence } from "../../../../conversation/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
-import type { FedosIdentityTransitionSafeStatusV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_safe_status.js";
-import { planFedosIdentityTransitionRatchetImpact, type FedosIdentityTransitionRatchetImpactPlanV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_ratchet_impact_plan.js";
+} from "./fedos_identity_transition_evidence_evaluation.js";
+import { computeFedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionExplicitLocalDecision } from "./fedos_identity_transition_acceptance_state.js";
+import { isFedosIdentityTransitionFactSuperseded, type FedosIdentityTransitionFactWriteOutcome } from "./fedos_identity_transition_fact_conflict_detection.js";
+import type { FedosIdentityTransitionFactV1 } from "./fedos_identity_transition_fact.js";
+import type { FedosIdentityTransitionFactPersistence } from "./persistence/fedos_identity_transition_fact_persistence.js";
+import type { FedosIdentityTransitionSafeStatusV1 } from "./fedos_identity_transition_safe_status.js";
+import { planFedosIdentityTransitionRatchetImpact, type FedosIdentityTransitionRatchetImpactPlanV1 } from "./fedos_identity_transition_ratchet_impact_plan.js";
 
 const MAX_DEVICE_CORROBORATIONS_PER_TRANSITION = 8;
 

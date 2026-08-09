@@ -23,42 +23,42 @@
  * a caller inspects one step's own outcome before deciding to invoke the
  * next, exactly like the real vertical-slice test in this Arc does.
  */
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 import {
   FedosDeletionRequestOutboundCoordinator,
   type FedosDeletionRequestCreateParams,
   type FedosDeletionRequestOutboundDependencies,
   type FedosDeletionRequestOutboundOutcome,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_outbound_coordinator.js";
+} from "./fedos_deletion_request_outbound_coordinator.js";
 import {
   FedosDeletionRequestInboundCoordinator,
   type FedosDeletionRequestInboundDependencies,
   type FedosDeletionRequestInboundOutcome,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_inbound_coordinator.js";
+} from "./fedos_deletion_request_inbound_coordinator.js";
 import {
   FedosDeletionAcknowledgementOutboundCoordinator,
   type FedosDeletionAcknowledgementOutboundDependencies,
   type FedosDeletionAcknowledgementOutboundOutcome,
-} from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_outbound_coordinator.js";
+} from "./fedos_deletion_acknowledgement_outbound_coordinator.js";
 import {
   FedosDeletionAcknowledgementInboundCoordinator,
   type FedosDeletionAcknowledgementInboundDependencies,
   type FedosDeletionAcknowledgementInboundOutcome,
-} from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_inbound_coordinator.js";
+} from "./fedos_deletion_acknowledgement_inbound_coordinator.js";
 import {
   evaluateFedosDeletionRecipientPolicy,
   type FedosDeletionRecipientPolicy,
   type FedosDeletionRecipientPolicyDecision,
-} from "../../../../conversation/deletion_request/fedos_deletion_recipient_policy.js";
-import type { FedosDeletionRequestScope } from "../../../../conversation/deletion_request/fedos_deletion_request_scope.js";
-import type { FedosDeletionRecipientDecisionState } from "../../../../conversation/deletion_request/fedos_deletion_recipient_decision_state.js";
-import type { FedosDeletionAcknowledgementRecordV1, FedosDeletionAcknowledgementAppliedScope } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
-import type { FedosDeletionRequestAcknowledgementOutcome } from "../../../../conversation/deletion_request/fedos_deletion_request_acknowledgement_outcome.js";
-import type { FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRequestStatePersistence } from "../../../../conversation/deletion_request/fedos_deletion_request_state_persistence.js";
-import { safeStatusForFedosDeletionRequestLifecycle, type FedosDeletionRequestSafeStatus } from "../../../../conversation/deletion_request/fedos_deletion_request_safe_status.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
-import type { FedosDeletionRequestInboxSummaryV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_inbox_summary.js";
+} from "./fedos_deletion_recipient_policy.js";
+import type { FedosDeletionRequestScope } from "./fedos_deletion_request_scope.js";
+import type { FedosDeletionRecipientDecisionState } from "./fedos_deletion_recipient_decision_state.js";
+import type { FedosDeletionAcknowledgementRecordV1, FedosDeletionAcknowledgementAppliedScope } from "./fedos_deletion_acknowledgement_record.js";
+import type { FedosDeletionRequestAcknowledgementOutcome } from "./fedos_deletion_request_acknowledgement_outcome.js";
+import type { FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
+import type { FedosDeletionRequestStatePersistence } from "./fedos_deletion_request_state_persistence.js";
+import { safeStatusForFedosDeletionRequestLifecycle, type FedosDeletionRequestSafeStatus } from "./fedos_deletion_request_safe_status.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
+import type { FedosDeletionRequestInboxSummaryV1 } from "./fedos_deletion_request_inbox_summary.js";
 
 export interface FedosDeletionRequestRuntimeDependencies {
   readonly outbound: FedosDeletionRequestOutboundDependencies;

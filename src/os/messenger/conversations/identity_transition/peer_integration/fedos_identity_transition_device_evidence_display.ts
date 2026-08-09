@@ -16,7 +16,7 @@
  * evidence outcome), so this file's own mapping function only ever
  * produces the subset those durable facts can honestly support.
  */
-import type { FedosIdentityTransitionPeerObservationV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
+import type { FedosIdentityTransitionPeerObservationV1 } from "./fedos_identity_transition_peer_observation.js";
 
 export type FedosIdentityTransitionDeviceEvidenceStatus =
   | "unknown"

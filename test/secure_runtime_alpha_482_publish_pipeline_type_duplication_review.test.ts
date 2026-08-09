@@ -7,8 +7,8 @@ import deliveryObservationSource from "../src/os/messenger/board/observation/fed
 import genericPublisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nostrPublisherInterfaceSource from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
-import { isFedosBoardOutboxObservationKind } from "../src/board/outbox/fedos_board_outbox_observation.js";
-import { isFedosDeliveryObservationState } from "../src/board/observation/fedos_delivery_observation.js";
+import { isFedosBoardOutboxObservationKind } from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.js";
+import { isFedosDeliveryObservationState } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
 
 /**
  * Secure Runtime Alpha 482 -- "Publish Pipeline Type Duplication

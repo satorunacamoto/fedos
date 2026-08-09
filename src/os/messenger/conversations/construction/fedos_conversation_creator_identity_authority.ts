@@ -38,7 +38,7 @@
  * `publicIdentifier`/`identityId`), never a display name (Alpha 904).
  */
 
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 
 export type FedosConversationCreatorIdentityResolution =
   | { readonly outcome: "resolved"; readonly creator: FedosConversationParticipantReference }

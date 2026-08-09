@@ -10,7 +10,7 @@
  * second read.
  */
 
-import type { FedosConversationDraftSummary } from "../../../../conversation/construction/fedos_conversation_managed_draft_state.js";
+import type { FedosConversationDraftSummary } from "./fedos_conversation_managed_draft_state.js";
 
 /**
  * Result of deleting (tombstoning) a draft.

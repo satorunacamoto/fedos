@@ -27,12 +27,12 @@
  * because it cannot honestly do so yet.
  */
 
-import type { FedosDeviceBindingV1 } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingV1 } from "./fedos_device_binding.js";
 import type {
   FedosDeviceRegistrationAuthority,
   FedosDeviceRegistrationAuthorityDecision,
   FedosDeviceRegistrationRequest,
-} from "../../../device/fedos_device_registration_authority.js";
+} from "./fedos_device_registration_authority.js";
 
 const REGISTRATION_REASON =
   "no real account-to-device signature-verification boundary exists in this codebase (Secure Runtime Alpha 2921-3000 Phase E blocker) -- recorded as an unavailable-capability registration, never verified";

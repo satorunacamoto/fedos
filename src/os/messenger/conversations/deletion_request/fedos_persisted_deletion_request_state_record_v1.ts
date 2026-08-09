@@ -30,10 +30,10 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosDeletionRequestScope } from "../../../../conversation/deletion_request/fedos_deletion_request_scope.js";
-import type { FedosDeletionRequestLifecycleState } from "../../../../conversation/deletion_request/fedos_deletion_request_lifecycle_state.js";
-import { canonicalBytesForFedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_canonical_bytes.js";
-import type { FedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
+import type { FedosDeletionRequestScope } from "./fedos_deletion_request_scope.js";
+import type { FedosDeletionRequestLifecycleState } from "./fedos_deletion_request_lifecycle_state.js";
+import { canonicalBytesForFedosDeletionRequestRecordV1 } from "./fedos_deletion_request_canonical_bytes.js";
+import type { FedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
 
 export interface FedosPersistedDeletionRequestStateRecordV1 {
   readonly schemaVersion: 1;

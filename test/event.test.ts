@@ -5,9 +5,9 @@ import {
   serializeForId,
   computeEventId,
   verifyEventId,
-} from "../src/nostr/event.js";
-import { webCryptoSha256Hex } from "../src/nostr/crypto.js";
-import type { NostrEvent, EventCore } from "../src/nostr/types.js";
+} from "../src/os/messenger/adapters/nostr/protocol/event.js";
+import { webCryptoSha256Hex } from "../src/os/messenger/adapters/nostr/protocol/crypto.js";
+import type { NostrEvent, EventCore } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 const HEX64 = "a".repeat(64);
 const HEX128 = "b".repeat(128);

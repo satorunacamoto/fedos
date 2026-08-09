@@ -4,8 +4,8 @@ import designDocSource from "../docs/secure_runtime_alpha_372_canonical_board_qu
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import typesSource from "../src/os/messenger/board/query/fedos_board_query_types.ts?raw";
 
-import type { FedosBoardQuerySource } from "../src/board/query/fedos_board_query_types.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
+import type { FedosBoardQuerySource } from "../src/os/messenger/board/query/fedos_board_query_types.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
 
 /**
  * Secure Runtime Alpha 372 -- "Canonical Board Query Contract": Stage

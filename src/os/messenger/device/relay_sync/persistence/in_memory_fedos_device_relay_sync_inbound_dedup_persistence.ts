@@ -9,7 +9,7 @@ import {
   type FedosDeviceRelaySyncImportWriteResult,
   type FedosDeviceRelaySyncInboundDedupPersistence,
   type FedosPersistedDeviceRelaySyncImportRecordV1,
-} from "../../../../../device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
+} from "./fedos_device_relay_sync_inbound_dedup_persistence.js";
 
 function sessionHashKey(transferSessionId: string, packageContentHash: string): string {
   return `${transferSessionId}::${packageContentHash}`;

@@ -33,8 +33,8 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import { serializeFedosConversationArchiveBundleToBytes } from "../../../../conversation/archive/fedos_conversation_archive_bundle_codec.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import { serializeFedosConversationArchiveBundleToBytes } from "./fedos_conversation_archive_bundle_codec.js";
 
 /** SHA-256 hex digest over `bundle`'s own canonical byte encoding. */
 export function computeFedosConversationArchiveContentHash(bundle: FedosConversationArchiveBundleV1): string {

@@ -13,7 +13,7 @@
  * (`fedos_device_transfer_coordinator.ts`'s own `"conflict"` outcome).
  */
 
-import { isWellFormedFedosDeviceSyncPackageV1, type FedosDeviceSyncPackageV1 } from "../../../../device/sync_package/fedos_device_sync_package.js";
+import { isWellFormedFedosDeviceSyncPackageV1, type FedosDeviceSyncPackageV1 } from "../sync_package/fedos_device_sync_package.js";
 
 export const FEDOS_DEVICE_TRANSFER_PACKAGE_FORMAT_VERSION = 1 as const;
 

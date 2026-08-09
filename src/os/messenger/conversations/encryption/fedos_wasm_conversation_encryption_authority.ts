@@ -58,13 +58,13 @@
 import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
 import { encrypt as runtimeEncrypt } from "../../../../runtime/fedos_runtime_encrypt.js";
 import { exportCiphertext as runtimeExportCiphertext } from "../../../../runtime/fedos_runtime_export_ciphertext.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import { encodeFedosConversationEnvelopeAssociatedData } from "../../../../conversation/envelope/fedos_conversation_envelope_associated_data.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
+import { encodeFedosConversationEnvelopeAssociatedData } from "../envelope/fedos_conversation_envelope_associated_data.js";
 import type {
   FedosConversationEncryptionAuthority,
   FedosConversationEncryptionRequest,
   FedosConversationEncryptionResult,
-} from "../../../../conversation/encryption/fedos_conversation_encryption_authority.js";
+} from "./fedos_conversation_encryption_authority.js";
 
 /** Alpha 856's own coarse domain label — the ONE `AeadAadDomain` value every Envelope encryption/decryption call in this Arc uses (`14_associated_data.md`'s "beyond the coarse Conversation domain label" finding is what the length-prefixed header above exists to close; the domain label itself stays exactly this one value). */
 const FEDOS_CONVERSATION_ENVELOPE_AAD_DOMAIN: AeadAadDomain = "Conversation";

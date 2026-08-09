@@ -10,7 +10,7 @@ import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_h
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import codecSource from "../src/os/messenger/board/persistence/fedos_board_post_codec.ts?raw";
 
-import type { FedosBoardPersistence } from "../src/board/persistence/fedos_board_persistence.js";
+import type { FedosBoardPersistence } from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");

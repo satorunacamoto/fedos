@@ -29,13 +29,13 @@
  * that fails it".
  */
 import { describe, it, expect } from "vitest";
-import { FEDOS_BOARD_SOURCE_PROTOCOLS } from "../src/board/fedos_board_source.js";
-import { FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { MembershipFedosConversationParticipantResolver } from "../src/conversation/encryption/identity/fedos_conversation_participant_resolver.js";
-import { resolveFedosConversationCounterpartyPublicKeyHex } from "../src/conversation/encryption/identity/fedos_conversation_counterparty_public_key_resolver.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference, FedosConversationParticipantAuthority } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+import { FEDOS_BOARD_SOURCE_PROTOCOLS } from "../src/os/messenger/board/fedos_board_source.js";
+import { FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { MembershipFedosConversationParticipantResolver } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.js";
+import { resolveFedosConversationCounterpartyPublicKeyHex } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_counterparty_public_key_resolver.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationParticipantReference, FedosConversationParticipantAuthority } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 
 const CONVERSATION_ID = "private-draft::direct::alpha-4proto" as FedosConversationId;
 const ALICE: FedosConversationParticipantReference = { authority: "fedos", publicIdentifier: "alice-local", identityId: null };

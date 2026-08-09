@@ -20,7 +20,7 @@
 import type {
   FedosConversationConstructionCoordinationPhase,
   FedosPersistedConversationConstructionCoordinationV1,
-} from "../../../../../conversation/construction/coordination/fedos_persisted_conversation_construction_coordination_v1.js";
+} from "./fedos_persisted_conversation_construction_coordination_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationConstructionCoordinationWriteResult = "inserted" | "already-present" | "conflict" | "failed";

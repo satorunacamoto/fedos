@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { validateInboundNostrEvent } from "../src/desktop/combined_inbound_event_validator.js";
-import { verifyNostrEventId } from "../src/desktop/nostr_event_id_verifier.js";
-import { verifyNostrEventSignature } from "../src/desktop/nostr_signature_verifier.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { validateInboundNostrEvent } from "../src/os/messenger/desktop/combined_inbound_event_validator.js";
+import { verifyNostrEventId } from "../src/os/messenger/desktop/nostr_event_id_verifier.js";
+import { verifyNostrEventSignature } from "../src/os/messenger/desktop/nostr_signature_verifier.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 
 /**
  * Captured from a real, generated `FedosMasterSeedAuthority` via a

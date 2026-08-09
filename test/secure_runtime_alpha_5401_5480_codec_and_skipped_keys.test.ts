@@ -10,11 +10,11 @@ import {
   encodeFedosDirectRatchetSessionRecordV1,
   isWellFormedFedosDirectRatchetSessionRecordV1,
   type FedosDirectRatchetSessionRecordV1,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_session_record.js";
-import { FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "../src/conversation/ratchet/fedos_direct_ratchet_counters.js";
-import { FedosDirectRatchetSkippedKeyIndex } from "../src/conversation/ratchet/fedos_direct_ratchet_skipped_key_index.js";
-import { FEDOS_DIRECT_RATCHET_LIMITS } from "../src/conversation/ratchet/fedos_direct_ratchet_limits.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_record.js";
+import { FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_counters.js";
+import { FedosDirectRatchetSkippedKeyIndex } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_skipped_key_index.js";
+import { FEDOS_DIRECT_RATCHET_LIMITS } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_limits.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 function validRecord(overrides: Partial<FedosDirectRatchetSessionRecordV1> = {}): FedosDirectRatchetSessionRecordV1 {
   return {

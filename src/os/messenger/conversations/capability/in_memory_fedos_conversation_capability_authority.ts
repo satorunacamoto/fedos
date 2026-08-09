@@ -40,26 +40,26 @@
  * own "no mutation after terminal exhaustion" check).
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import { toFedosConversationCapabilityId, type FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "./fedos_conversation_capability_descriptor.js";
+import { toFedosConversationCapabilityId, type FedosConversationCapabilityId } from "./fedos_conversation_capability_id.js";
 import {
   fedosConversationCapabilityBearerSecretsMatch,
   type FedosConversationCapabilityBearerSecret,
   type FedosConversationCapabilitySecretGenerator,
-} from "../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import type { FedosConversationCapabilityIssuanceResult } from "../../../../conversation/capability/fedos_conversation_capability_issuance_result.js";
+} from "./fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationCapabilityIssuanceResult } from "./fedos_conversation_capability_issuance_result.js";
 import type {
   FedosConversationCapabilityIssueRequest,
   FedosConversationCapabilityIssuerAuthority,
   FedosConversationExistenceCheck,
   FedosConversationCapabilityIssuanceAuthorizationCheck,
-} from "../../../../conversation/capability/fedos_conversation_capability_issuer_authority.js";
-import type { FedosConversationCapabilityRedemptionRequest } from "../../../../conversation/capability/fedos_conversation_capability_redemption_request.js";
-import type { FedosConversationCapabilityRedemptionResult } from "../../../../conversation/capability/fedos_conversation_capability_redemption_result.js";
-import type { FedosConversationCapabilityRedemptionAuthority } from "../../../../conversation/capability/fedos_conversation_capability_redemption_authority.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+} from "./fedos_conversation_capability_issuer_authority.js";
+import type { FedosConversationCapabilityRedemptionRequest } from "./fedos_conversation_capability_redemption_request.js";
+import type { FedosConversationCapabilityRedemptionResult } from "./fedos_conversation_capability_redemption_result.js";
+import type { FedosConversationCapabilityRedemptionAuthority } from "./fedos_conversation_capability_redemption_authority.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 
 /** Injected — this Arc mints no real random capability id itself, mirroring `FedosConversationCapabilitySecretGenerator`'s own "generation stays out of scope" boundary (Alpha 778). */
 export interface FedosConversationCapabilityIdGenerator {

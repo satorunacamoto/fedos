@@ -14,7 +14,7 @@ import type { AeadCiphertextWire } from "../../../../runtime/fedos_wasm_loader.j
 import {
   isWellFormedFedosDeviceSyncPackageManifestV1,
   type FedosDeviceSyncPackageManifestV1,
-} from "../../../../device/sync_package/fedos_device_sync_package_manifest.js";
+} from "./fedos_device_sync_package_manifest.js";
 
 export const FEDOS_DEVICE_SYNC_PACKAGE_FORMAT_VERSION = 1 as const;
 

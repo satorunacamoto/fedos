@@ -67,7 +67,7 @@
  * No Relay Pool, no reconnect logic, no new dependency.
  */
 
-import type { FedosRelay } from "../../../../../desktop/fedos_relay.js";
+import type { FedosRelay } from "../../../desktop/fedos_relay.js";
 import type { FedosOutboundPublishResult } from "../fedos_outbound_publish_result.js";
 import type {
   FedosNostrBoardPublishEntry,

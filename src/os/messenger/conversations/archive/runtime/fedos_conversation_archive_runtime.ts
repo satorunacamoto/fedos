@@ -69,33 +69,33 @@
  * possible, and is not a streaming guarantee.
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationPersistence } from "../../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosConversationDraftPersistence } from "../../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationActivationPersistence } from "../../../../../conversation/activation/fedos_conversation_activation_persistence.js";
-import { resolveFedosConversationActiveConversation } from "../../../../../conversation/activation/fedos_conversation_active_lookup.js";
-import type { FedosConversationMembershipPersistence } from "../../../../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
-import type { FedosConversationCapabilityPersistence } from "../../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
-import type { FedosConversationMessageEnvelopePersistence } from "../../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosConversationPayloadStorage } from "../../../../../conversation/payload_storage/fedos_conversation_payload_storage.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { toFedosConversationMembershipId } from "../../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationEnvelopeEncryptionSuite } from "../../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosBoardRuntimeClock } from "../../../../../board/runtime/fedos_board_runtime_clock.js";
-import type { FedosGroupGenerationPersistence } from "../../../../../conversation/group/fedos_group_generation.js";
-import type { FedosGroupDirectPathPersistence } from "../../../../../conversation/group/fedos_group_direct_path.js";
-import type { FedosGroupMessagePersistence } from "../../../../../conversation/group/fedos_group_message.js";
-import type { FedosGroupFanoutDeliveryPersistence } from "../../../../../conversation/group/fedos_group_fanout_delivery.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import { collectFedosConversationArchiveBundle } from "../../../../../conversation/archive/fedos_conversation_archive_collector.js";
-import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreResult, type FedosConversationArchiveSingleRecordOutcome, type FedosConversationArchiveRestoreOutcomeCounts } from "../../../../../conversation/archive/fedos_conversation_archive_restore.js";
-import { detectFedosConversationArchiveDuplicates, type FedosConversationArchiveDuplicateReport } from "../../../../../conversation/archive/fedos_conversation_archive_duplicate_detection.js";
-import type { FedosConversationArchiveEncryptionAuthority } from "../../../../../conversation/archive/fedos_conversation_archive_encryption.js";
-import type { FedosConversationArchiveManifestV1 } from "../../../../../conversation/archive/fedos_conversation_archive_manifest.js";
-import type { FedosPayloadRetentionAuthority } from "../../../../../conversation/retention/fedos_payload_retention_authority.js";
-import type { FedosArchiveSuppressionObservationAuthority } from "../../../../../conversation/retention/fedos_archive_suppression_observation_authority.js";
-import type { FedosConversationArchiveFileAuthority } from "../../../../../conversation/archive/fs/fedos_conversation_archive_file_authority.js";
-import { encodeFedosConversationArchiveFileContainer, decodeFedosConversationArchiveFileContainer } from "../../../../../conversation/archive/fs/fedos_conversation_archive_file_container.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationPersistence } from "../../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationDraftPersistence } from "../../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationActivationPersistence } from "../../activation/fedos_conversation_activation_persistence.js";
+import { resolveFedosConversationActiveConversation } from "../../activation/fedos_conversation_active_lookup.js";
+import type { FedosConversationMembershipPersistence } from "../../membership/persistence/fedos_conversation_membership_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../../capability/persistence/fedos_conversation_capability_persistence.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationPayloadStorage } from "../../payload_storage/fedos_conversation_payload_storage.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
+import { toFedosConversationMembershipId } from "../../membership/fedos_conversation_membership_id.js";
+import type { FedosConversationEnvelopeEncryptionSuite } from "../../envelope/fedos_conversation_message_envelope.js";
+import type { FedosBoardRuntimeClock } from "../../../board/runtime/fedos_board_runtime_clock.js";
+import type { FedosGroupGenerationPersistence } from "../../group/fedos_group_generation.js";
+import type { FedosGroupDirectPathPersistence } from "../../group/fedos_group_direct_path.js";
+import type { FedosGroupMessagePersistence } from "../../group/fedos_group_message.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "../../group/fedos_group_fanout_delivery.js";
+import type { FedosConversationArchiveBundleV1 } from "../fedos_conversation_archive_bundle.js";
+import { collectFedosConversationArchiveBundle } from "../fedos_conversation_archive_collector.js";
+import { restoreFedosConversationArchiveBundle, type FedosConversationArchiveRestoreResult, type FedosConversationArchiveSingleRecordOutcome, type FedosConversationArchiveRestoreOutcomeCounts } from "../fedos_conversation_archive_restore.js";
+import { detectFedosConversationArchiveDuplicates, type FedosConversationArchiveDuplicateReport } from "../fedos_conversation_archive_duplicate_detection.js";
+import type { FedosConversationArchiveEncryptionAuthority } from "../fedos_conversation_archive_encryption.js";
+import type { FedosConversationArchiveManifestV1 } from "../fedos_conversation_archive_manifest.js";
+import type { FedosPayloadRetentionAuthority } from "../../retention/fedos_payload_retention_authority.js";
+import type { FedosArchiveSuppressionObservationAuthority } from "../../retention/fedos_archive_suppression_observation_authority.js";
+import type { FedosConversationArchiveFileAuthority } from "../fs/fedos_conversation_archive_file_authority.js";
+import { encodeFedosConversationArchiveFileContainer, decodeFedosConversationArchiveFileContainer } from "../fs/fedos_conversation_archive_file_container.js";
 
 /** Phase B item 7's own explicit choice: this Arc's own default, not a Foundation default (the Foundation itself declares no bound). */
 export const DEFAULT_FEDOS_CONVERSATION_ARCHIVE_MAX_BYTE_LENGTH = 64 * 1024 * 1024; // 64 MiB

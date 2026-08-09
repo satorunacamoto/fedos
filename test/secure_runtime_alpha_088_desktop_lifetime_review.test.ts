@@ -27,7 +27,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import packageJsonSource from "../package.json?raw";
 import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { FedosRuntimeIdentity } from "../src/runtime/fedos_runtime_identity.js";
-import { FedosIdentityService } from "../src/identity/fedos_identity_service.js";
+import { FedosIdentityService } from "../src/os/core/identity/fedos_identity_service.js";
 
 /**
  * Secure Runtime Alpha 088 -- "Desktop Lifetime Review": a REVIEW /

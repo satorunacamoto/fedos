@@ -8,7 +8,7 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import { isWellFormedFedosDeviceSyncConflictRecordV1, type FedosDeviceSyncConflictPersistence, type FedosDeviceSyncConflictRecordV1, type FedosDeviceSyncConflictResolutionAction } from "../../../../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import { isWellFormedFedosDeviceSyncConflictRecordV1, type FedosDeviceSyncConflictPersistence, type FedosDeviceSyncConflictRecordV1, type FedosDeviceSyncConflictResolutionAction } from "./fedos_device_sync_conflict_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

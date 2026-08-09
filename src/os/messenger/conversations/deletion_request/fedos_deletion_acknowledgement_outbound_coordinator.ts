@@ -26,14 +26,14 @@
  * recipient-side truth (which this coordinator has none of — it is
  * itself the recipient).
  */
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { isWellFormedFedosDeletionAcknowledgementRecordV1, type FedosDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
-import { isFedosDeletionAcknowledgementRecordHonest } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
-import { signFedosDeletionAcknowledgementRecordV1, type FedosSignedDeletionAcknowledgementV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_signing.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosDeletionAcknowledgementPersistence } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_persistence.js";
-import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
-import { encodeFedosDeletionRequestControlPayload } from "../../../../conversation/deletion_request/fedos_deletion_request_control_payload.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { isWellFormedFedosDeletionAcknowledgementRecordV1, type FedosDeletionAcknowledgementRecordV1 } from "./fedos_deletion_acknowledgement_record.js";
+import { isFedosDeletionAcknowledgementRecordHonest } from "./fedos_deletion_acknowledgement_record.js";
+import { signFedosDeletionAcknowledgementRecordV1, type FedosSignedDeletionAcknowledgementV1 } from "./fedos_deletion_acknowledgement_signing.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosDeletionAcknowledgementPersistence } from "./fedos_deletion_acknowledgement_persistence.js";
+import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "./fedos_persisted_deletion_acknowledgement_record_v1.js";
+import { encodeFedosDeletionRequestControlPayload } from "./fedos_deletion_request_control_payload.js";
 
 export interface FedosDeletionAcknowledgementOutboundSendResult {
   readonly outcome: string;

@@ -5,12 +5,12 @@
  * written (never overwrites one), and serves `getSession`/`listSessions`
  * from the highest revision per `sessionId`.
  */
-import { fedosDirectRatchetSessionRecordsEqual, type FedosDirectRatchetSessionRecordV1 } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
-import type { FedosDirectRatchetSessionId } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+import { fedosDirectRatchetSessionRecordsEqual, type FedosDirectRatchetSessionRecordV1 } from "../fedos_direct_ratchet_session_record.js";
+import type { FedosDirectRatchetSessionId } from "../fedos_direct_ratchet_session_id.js";
 import type {
   FedosDirectRatchetSessionPersistence,
   FedosDirectRatchetSessionPersistenceWriteResult,
-} from "../../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
+} from "./fedos_direct_ratchet_session_persistence.js";
 
 export class InMemoryFedosDirectRatchetSessionPersistence implements FedosDirectRatchetSessionPersistence {
   /** sessionId -> revision -> record. */

@@ -38,7 +38,7 @@
  *     `JSON.stringify`-escaped string — never an omitted key.
  */
 
-import type { FedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
+import type { FedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
 
 function integerLiteral(value: number): string {
   if (!Number.isInteger(value)) {

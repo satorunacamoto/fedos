@@ -13,11 +13,11 @@ import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosPersistedArchiveSuppressionObservationsAreEqual,
   type FedosPersistedArchiveSuppressionObservationV1,
-} from "../../../../conversation/retention/fedos_persisted_archive_suppression_observation_v1.js";
+} from "./fedos_persisted_archive_suppression_observation_v1.js";
 import type {
   FedosArchiveSuppressionObservationPersistence,
   FedosArchiveSuppressionObservationPersistenceWriteResult,
-} from "../../../../conversation/retention/fedos_archive_suppression_observation_persistence.js";
+} from "./fedos_archive_suppression_observation_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

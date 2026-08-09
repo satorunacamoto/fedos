@@ -8,24 +8,24 @@ import hostStateSource from "../src/os/messenger/desktop/host/fedos_desktop_host
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import factorySource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import type { FedosPublicIdentityReader } from "../src/desktop/fedos_public_identity_reader.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import type { FedosPersistedBoardPostRecordV1 } from "../src/board/persistence/fedos_persisted_board_post_v1.js";
-import { toFedosBoardId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId } from "../src/board/fedos_board_identifiers.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import type { FedosPublicIdentityReader } from "../src/os/messenger/desktop/fedos_public_identity_reader.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import type { FedosPersistedBoardPostRecordV1 } from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.js";
+import { toFedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
-import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
-import { validateActivityPubBoardPost } from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
-import { validateAtprotoBoardPost } from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
-import { validateSessionBoardPost } from "../src/board/session/fedos_session_board_adapter.js";
-import type { FedosValidatedSessionPost } from "../src/board/session/fedos_validated_session_post.js";
+import { validateNostrBoardPost } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
+import { validateActivityPubBoardPost } from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
+import { validateAtprotoBoardPost } from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
+import { validateSessionBoardPost } from "../src/os/messenger/board/session/fedos_session_board_adapter.js";
+import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
 
 function codeOnly(source: string): string {
   return source

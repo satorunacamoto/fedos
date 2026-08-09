@@ -32,11 +32,11 @@
  * own attempts, before the legacy chat-message fallback ever sees the
  * Rumor).
  */
-import { isWellFormedFedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
-import { isWellFormedFedosDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
-import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
-import type { FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosSignedDeletionAcknowledgementV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_signing.js";
+import { isWellFormedFedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
+import { isWellFormedFedosDeletionAcknowledgementRecordV1 } from "./fedos_deletion_acknowledgement_record.js";
+import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
+import type { FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
+import type { FedosSignedDeletionAcknowledgementV1 } from "./fedos_deletion_acknowledgement_signing.js";
 
 export const FEDOS_DELETION_REQUEST_CONTROL_PAYLOAD_SCHEMA_VERSION = 1 as const;
 

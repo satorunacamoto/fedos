@@ -44,10 +44,10 @@ import {
   isWellFormedFedosDevicePublicKeyHex,
   verifyFedosDeviceSigningSignature,
   type FedosDeviceSigningKeypair,
-} from "../../../../device/crypto/fedos_device_signing_keypair.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDirectRatchetSuite } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDirectRatchetSessionResetReason } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+} from "../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionResetReason } from "./fedos_direct_ratchet_session_reset_reason.js";
 
 /** Fixed, distinct from every other preimage prefix this codebase signs (device-binding proof of possession, account authorization) — a reset signature can never be replayed as either. */
 const RESET_SIGNATURE_PREIMAGE_PREFIX = "fedos-direct-ratchet-session-reset-v1:";

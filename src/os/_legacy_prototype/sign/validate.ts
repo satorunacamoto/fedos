@@ -7,7 +7,7 @@
  * job (Stage 8) and can be run separately on the returned event.
  */
 
-import { isValidHex } from "../../../nostr/noble_signature.js";
+import { isValidHex } from "../../messenger/adapters/nostr/protocol/noble_signature.js";
 import type { SignedNostrEvent } from "./types.js";
 
 function isHexOfBytes(value: unknown, byteLength: number): boolean {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { createDesktopApplication } from "../src/desktop/create_desktop_application.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { FedosIdentityService } from "../src/identity/fedos_identity_service.js";
+import { createDesktopApplication } from "../src/os/messenger/desktop/create_desktop_application.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { FedosIdentityService } from "../src/os/core/identity/fedos_identity_service.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_109_desktop_wiring.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

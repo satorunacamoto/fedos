@@ -39,7 +39,7 @@
  *     names, nothing more.
  */
 
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 import type { FedosConversationEnvelopeId } from "../../../conversations/envelope/fedos_conversation_envelope_id.js";
 import type { FedosConversationId } from "../../../conversations/fedos_conversation_id.js";
 

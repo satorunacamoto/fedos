@@ -5,15 +5,15 @@ import { mkdtempSync, rmSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { InMemoryFedosDeletionRequestStatePersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_request_state_persistence.js";
-import { AppendOnlyFedosDeletionRequestStatePersistence } from "../src/conversation/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
-import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
-import { AppendOnlyFedosDeletionRecipientDecisionPersistence } from "../src/conversation/deletion_request/append_only_fedos_deletion_recipient_decision_persistence.js";
-import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "../src/conversation/deletion_request/fedos_persisted_deletion_recipient_decision_record_v1.js";
-import { InMemoryFedosDeletionAcknowledgementPersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_acknowledgement_persistence.js";
-import { AppendOnlyFedosDeletionAcknowledgementPersistence } from "../src/conversation/deletion_request/append_only_fedos_deletion_acknowledgement_persistence.js";
-import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "../src/conversation/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
+import { InMemoryFedosDeletionRequestStatePersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_request_state_persistence.js";
+import { AppendOnlyFedosDeletionRequestStatePersistence } from "../src/os/messenger/conversations/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
+import { AppendOnlyFedosDeletionRecipientDecisionPersistence } from "../src/os/messenger/conversations/deletion_request/append_only_fedos_deletion_recipient_decision_persistence.js";
+import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_persisted_deletion_recipient_decision_record_v1.js";
+import { InMemoryFedosDeletionAcknowledgementPersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_acknowledgement_persistence.js";
+import { AppendOnlyFedosDeletionAcknowledgementPersistence } from "../src/os/messenger/conversations/deletion_request/append_only_fedos_deletion_acknowledgement_persistence.js";
+import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
 
 /**
  * Secure Runtime Alpha 5641-5720 -- durable state for all three domains

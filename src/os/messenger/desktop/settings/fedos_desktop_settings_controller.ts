@@ -26,16 +26,16 @@
 
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join, isAbsolute } from "node:path";
-import type { FedosSettingsDescriptorV1 } from "../../../../settings/fedos_settings_descriptor.js";
+import type { FedosSettingsDescriptorV1 } from "../../../core/settings/fedos_settings_descriptor.js";
 import {
   FedosSettingsAuthority,
   type FedosSettingsResult,
-} from "../../../../settings/fedos_settings_authority.js";
+} from "../../../core/settings/fedos_settings_authority.js";
 import {
   FileFedosSettingsPersistence,
   InMemoryFedosSettingsPersistence,
   type FedosSettingsPersistence,
-} from "../../../../settings/fedos_settings_persistence.js";
+} from "../../../core/settings/fedos_settings_persistence.js";
 
 /** Derives the deterministic `settings.json` leaf under a profile root, or `null` if the root is not an absolute path. Pure; creates no file. */
 export function fedosDesktopSettingsFilePath(root: string): string | null {

@@ -8,21 +8,21 @@ import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
-import { AppendOnlyFedosBoardPersistence } from "../src/board/persistence/append_only_fedos_board_persistence.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import { hydrateFedosBoardService } from "../src/board/persistence/fedos_board_hydration.js";
-import { FedosBoardFeed } from "../src/board/repository/fedos_board_feed.js";
-import { toFedosBoardId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId } from "../src/board/fedos_board_identifiers.js";
+import { AppendOnlyFedosBoardPersistence } from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import { hydrateFedosBoardService } from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
+import { FedosBoardFeed } from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { toFedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
-import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
-import { validateActivityPubBoardPost } from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
-import { validateAtprotoBoardPost } from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
-import { validateSessionBoardPost } from "../src/board/session/fedos_session_board_adapter.js";
-import type { FedosValidatedSessionPost } from "../src/board/session/fedos_validated_session_post.js";
+import { validateNostrBoardPost } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
+import { validateActivityPubBoardPost } from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
+import { validateAtprotoBoardPost } from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
+import { validateSessionBoardPost } from "../src/os/messenger/board/session/fedos_session_board_adapter.js";
+import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
 
 let dir: string | undefined;
 afterEach(() => {

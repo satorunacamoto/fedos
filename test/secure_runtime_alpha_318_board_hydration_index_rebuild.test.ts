@@ -3,13 +3,13 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_318_board_hydration_index_rebuild.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
-import { hydrateFedosBoardService } from "../src/board/persistence/fedos_board_hydration.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId, FedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosPersistedBoardPostRecordV1 } from "../src/board/persistence/fedos_persisted_board_post_v1.js";
+import { hydrateFedosBoardService } from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId, FedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosPersistedBoardPostRecordV1 } from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.js";
 
 const BOARD_1 = toFedosBoardId("board-1") as FedosBoardId;
 const THREAD_ROOT_1 = toFedosThreadId("root-1") as FedosThreadId;

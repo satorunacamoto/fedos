@@ -7,8 +7,8 @@ import {
   validateNostrBoardPost,
   mapValidatedNostrEventToBoardPostInput,
   FEDOS_BOARD_NOSTR_SUPPORTED_KIND,
-} from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
+} from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
 
 const VALID_EVENT: FedosValidatedNostrEvent = {
   id: "a".repeat(64),

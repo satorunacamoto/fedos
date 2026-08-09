@@ -21,18 +21,18 @@
  * by two different local Devices (e.g. Alice's desktop and Alice's
  * tablet, both talking to Bob) must never share a row.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosRatchetPeerCapabilityEvidenceLevel } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosRatchetPeerCapabilityEvidenceLevel } from "./fedos_ratchet_peer_capability_authentication.js";
 import {
   FEDOS_RATCHET_PEER_CAPABILITY_KNOWN_ACCEPTANCE_OUTCOMES,
   type FedosRatchetPeerCapabilityAcceptanceOutcome,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_outcome.js";
+} from "./fedos_ratchet_peer_capability_acceptance_outcome.js";
 import {
   FEDOS_RATCHET_PEER_CAPABILITY_MAX_ENTRIES,
   isKnownFedosRatchetPeerCapabilityRoute,
   type FedosRatchetPeerCapabilityRoute,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import type { FedosRatchetPeerLifecycleFact } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
+} from "./fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosRatchetPeerLifecycleFact } from "./fedos_ratchet_peer_lifecycle_notification.js";
 
 const KNOWN_LIFECYCLE_FACT_KINDS: readonly FedosRatchetPeerLifecycleFact["kind"][] = [
   "device-added",

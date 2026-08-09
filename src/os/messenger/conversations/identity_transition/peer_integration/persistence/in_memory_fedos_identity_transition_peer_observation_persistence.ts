@@ -2,9 +2,9 @@ import {
   fedosIdentityTransitionPeerObservationKey,
   fedosIdentityTransitionPeerObservationLineageKeyParts,
   type FedosIdentityTransitionPeerObservationV1,
-} from "../../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
-import { determineFedosIdentityTransitionPeerObservationWriteOutcome, type FedosIdentityTransitionPeerObservationWriteOutcome } from "../../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation_conflict_detection.js";
-import type { FedosIdentityTransitionPeerObservationPersistence } from "../../../../../../conversation/identity_transition/peer_integration/persistence/fedos_identity_transition_peer_observation_persistence.js";
+} from "../fedos_identity_transition_peer_observation.js";
+import { determineFedosIdentityTransitionPeerObservationWriteOutcome, type FedosIdentityTransitionPeerObservationWriteOutcome } from "../fedos_identity_transition_peer_observation_conflict_detection.js";
+import type { FedosIdentityTransitionPeerObservationPersistence } from "./fedos_identity_transition_peer_observation_persistence.js";
 
 export class InMemoryFedosIdentityTransitionPeerObservationPersistence implements FedosIdentityTransitionPeerObservationPersistence {
   readonly #observations = new Map<string, FedosIdentityTransitionPeerObservationV1>();

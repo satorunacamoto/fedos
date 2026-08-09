@@ -31,7 +31,7 @@
  * reinterpreted.
  */
 
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
 
 /** Alpha 687's own "hex only" decision, restated verbatim — see this file's own header. */
 const NOSTR_PUBLIC_KEY_HEX_PATTERN = /^[0-9a-f]{64}$/;

@@ -61,8 +61,8 @@
 import { DesktopApplication } from "./desktop_application.js";
 import { NostrPublicIdentityReader } from "./nostr_public_identity_reader.js";
 import { StaticNostrPublicIdentitySource } from "./static_nostr_public_identity_source.js";
-import { resolveNostrPublicIdentitySource } from "../../../identity/fedos_nostr_public_identity_source_resolver.js";
-import type { FedosNostrPublicIdentitySnapshot } from "../../../identity/fedos_nostr_public_identity_source.js";
+import { resolveNostrPublicIdentitySource } from "../../core/identity/fedos_nostr_public_identity_source_resolver.js";
+import type { FedosNostrPublicIdentitySnapshot } from "../../core/identity/fedos_nostr_public_identity_source.js";
 
 export function createDesktopApplication(
   publicIdentity?: FedosNostrPublicIdentitySnapshot,

@@ -12,7 +12,7 @@
 import type { ChatRoom, ChatMessage } from "../chat/types.js";
 import type { SpaceBase } from "../community/types.js";
 import type { Product } from "../../commerce/catalog/types.js";
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 import type { NotificationChannel, NotificationPayload } from "../../../notification/types.js";
 
 const DEFAULT_CHANNEL: NotificationChannel = "local_placeholder";

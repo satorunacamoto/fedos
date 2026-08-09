@@ -17,11 +17,11 @@ import {
   fedosConversationInvitationRevocationRecordKey,
   fedosPersistedConversationInvitationRevocationsAreEqual,
   type FedosPersistedConversationInvitationRevocationV1,
-} from "../../../../conversation/invitation/fedos_persisted_conversation_invitation_revocation_v1.js";
+} from "./fedos_persisted_conversation_invitation_revocation_v1.js";
 import {
   type FedosConversationInvitationRevocationRegistry,
   type FedosConversationInvitationRevocationWriteResult,
-} from "../../../../conversation/invitation/fedos_conversation_invitation_revocation_registry.js";
+} from "./fedos_conversation_invitation_revocation_registry.js";
 
 export class InMemoryFedosConversationInvitationRevocationRegistry implements FedosConversationInvitationRevocationRegistry {
   readonly #records = new Map<string, FedosPersistedConversationInvitationRevocationV1>();

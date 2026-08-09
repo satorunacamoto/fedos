@@ -31,7 +31,7 @@
  * requirement) — never a bare enum value with no explanation.
  */
 
-import type { FedosDeviceSyncConflictKind } from "../../../../device/sync_scheduler/fedos_device_sync_conflict.js";
+import type { FedosDeviceSyncConflictKind } from "./fedos_device_sync_conflict.js";
 
 export type FedosDeviceSyncResolutionDecision =
   | "apply"

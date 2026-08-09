@@ -8,15 +8,15 @@
  */
 import { describe, it, expect } from "vitest";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
-import { createFedosDeviceBindingBoundary } from "../src/device/binding_challenge/fedos_device_binding_boundary_factory.js";
-import { authorizeFedosDeviceBindingChallenge } from "../src/device/binding_challenge/fedos_device_binding_account_authorization.js";
-import { createFedosDeviceBindingProofOfPossession } from "../src/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
-import { InMemoryFedosDeviceReplacementPersistence } from "../src/device/persistence/in_memory_fedos_device_replacement_persistence.js";
-import { FedosDeviceReplacementCoordinator } from "../src/device/fedos_device_replacement_coordinator.js";
-import { deriveFedosDeviceLifecycleState } from "../src/device/fedos_device_lifecycle.js";
+import { createFedosDeviceBindingBoundary } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_boundary_factory.js";
+import { authorizeFedosDeviceBindingChallenge } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_account_authorization.js";
+import { createFedosDeviceBindingProofOfPossession } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { InMemoryFedosDeviceReplacementPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_replacement_persistence.js";
+import { FedosDeviceReplacementCoordinator } from "../src/os/messenger/device/fedos_device_replacement_coordinator.js";
+import { deriveFedosDeviceLifecycleState } from "../src/os/messenger/device/fedos_device_lifecycle.js";
 
 const ACCOUNT_INDEX = 0;
 

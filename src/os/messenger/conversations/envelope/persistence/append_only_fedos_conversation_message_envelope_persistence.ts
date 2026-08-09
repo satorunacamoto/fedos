@@ -34,9 +34,9 @@ import {
   fedosPersistedConversationMessageEnvelopesAreEqual,
   type FedosConversationMessageEnvelopePersistence,
   type FedosConversationMessageEnvelopePersistenceWriteResult,
-} from "../../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosPersistedConversationMessageEnvelopeV1 } from "../../../../../conversation/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
+} from "./fedos_conversation_message_envelope_persistence.js";
+import type { FedosPersistedConversationMessageEnvelopeV1 } from "./fedos_persisted_conversation_message_envelope_v1.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

@@ -18,22 +18,22 @@
  * silently-merged result.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import { toFedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationIdentityResolver } from "../../../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import { toFedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import type { FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
 import {
   toFedosGroupGenerationId,
   validateFedosGroupGenerationRecord,
   type FedosGroupGenerationPersistence,
   type FedosGroupGenerationRecord,
-} from "../../../../conversation/group/fedos_group_generation.js";
-import type { FedosGroupParticipantLimitPolicy } from "../../../../conversation/group/fedos_group_participant_limit.js";
+} from "./fedos_group_generation.js";
+import type { FedosGroupParticipantLimitPolicy } from "./fedos_group_participant_limit.js";
 import {
   toFedosGroupDirectPathId,
   type FedosGroupDirectPathPersistence,
-} from "../../../../conversation/group/fedos_group_direct_path.js";
+} from "./fedos_group_direct_path.js";
 
 export type FedosGroupCreateNextGenerationResult =
   | { readonly outcome: "created"; readonly generation: FedosGroupGenerationRecord }

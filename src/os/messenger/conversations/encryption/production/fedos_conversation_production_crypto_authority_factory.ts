@@ -43,23 +43,23 @@
  */
 
 import { FedosWasmLoaderSkeleton } from "../../../../../runtime/fedos_wasm_loader.js";
-import { FedosWasmMasterSeedAuthority } from "../../../../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosMasterSeedAuthority } from "../../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import type { FedosSealedMasterSeedEnvelopePersistence } from "../../../../../runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
-import type { FedosPassphraseProvider } from "../../../../../runtime/master_seed/fedos_passphrase_provider.js";
-import { FedosWasmNostrSigningAuthority } from "../../../../../nostr/sign/fedos_wasm_nostr_signing_authority.js";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../../../../../board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import type { FedosNostrAuthorBindingAuthority } from "../../../../../board/runtime/identity/fedos_nostr_author_binding_types.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../../../../../conversation/construction/fedos_conversation_creator_identity_authority.js";
-import type { FedosConversationCreatorIdentityAuthority } from "../../../../../conversation/construction/fedos_conversation_creator_identity_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { FedosWasmConversationEncryptionAuthority } from "../../../../../conversation/encryption/fedos_wasm_conversation_encryption_authority.js";
-import { FedosWasmConversationDecryptionAuthority } from "../../../../../conversation/encryption/fedos_wasm_conversation_decryption_authority.js";
-import type { FedosConversationEncryptionAuthority } from "../../../../../conversation/encryption/fedos_conversation_encryption_authority.js";
-import type { FedosConversationDecryptionAuthority } from "../../../../../conversation/encryption/fedos_conversation_decryption_authority.js";
-import { FixedFedosConversationLocalAccountIndexAuthority } from "../../../../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
-import type { FedosConversationLocalAccountIndexAuthority } from "../../../../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
-import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../../../../conversation/encryption/production/fedos_conversation_production_crypto_capability_result.js";
+import { FedosWasmMasterSeedAuthority } from "../../../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../../core/vault/wasm/fedos_master_seed_authority.js";
+import type { FedosSealedMasterSeedEnvelopePersistence } from "../../../../core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";
+import type { FedosPassphraseProvider } from "../../../../core/vault/wasm/fedos_passphrase_provider.js";
+import { FedosWasmNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../../../board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import type { FedosNostrAuthorBindingAuthority } from "../../../board/runtime/identity/fedos_nostr_author_binding_types.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../../construction/fedos_conversation_creator_identity_authority.js";
+import type { FedosConversationCreatorIdentityAuthority } from "../../construction/fedos_conversation_creator_identity_authority.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
+import { FedosWasmConversationEncryptionAuthority } from "../fedos_wasm_conversation_encryption_authority.js";
+import { FedosWasmConversationDecryptionAuthority } from "../fedos_wasm_conversation_decryption_authority.js";
+import type { FedosConversationEncryptionAuthority } from "../fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority } from "../fedos_conversation_decryption_authority.js";
+import { FixedFedosConversationLocalAccountIndexAuthority } from "../identity/fedos_conversation_local_account_index_authority.js";
+import type { FedosConversationLocalAccountIndexAuthority } from "../identity/fedos_conversation_local_account_index_authority.js";
+import type { FedosConversationProductionCryptoCapabilityOutcome } from "./fedos_conversation_production_crypto_capability_result.js";
 
 const U32_MAX = 4_294_967_295;
 

@@ -25,7 +25,7 @@
  *   - This file defines a TYPE ONLY — no function, no class.
  */
 
-import type { FedosConversationArchiveSchemaVersion } from "../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationArchiveSchemaVersion } from "./fedos_conversation_archive_schema_version.js";
 
 export interface FedosConversationArchiveManifestV1 {
   readonly schemaVersion: FedosConversationArchiveSchemaVersion;

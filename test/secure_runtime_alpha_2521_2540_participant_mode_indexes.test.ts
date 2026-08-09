@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationDraftPersistence } from "../src/conversation/construction/in_memory_fedos_conversation_draft_persistence.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../src/conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
-import { FedosConversationSearchParticipantIndex } from "../src/conversation/search/fedos_conversation_search_participant_index.js";
-import { FedosConversationSearchModeIndex } from "../src/conversation/search/fedos_conversation_search_mode_index.js";
-import type { FedosConversationSearchEnvelopeDocument } from "../src/conversation/search/fedos_conversation_search_document.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationMembershipId } from "../src/conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationDraftPersistence } from "../src/os/messenger/conversations/construction/in_memory_fedos_conversation_draft_persistence.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "../src/os/messenger/conversations/construction/fedos_persisted_conversation_draft_record_v1.js";
+import { FedosConversationSearchParticipantIndex } from "../src/os/messenger/conversations/search/fedos_conversation_search_participant_index.js";
+import { FedosConversationSearchModeIndex } from "../src/os/messenger/conversations/search/fedos_conversation_search_mode_index.js";
+import type { FedosConversationSearchEnvelopeDocument } from "../src/os/messenger/conversations/search/fedos_conversation_search_document.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationMembershipId } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_id.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 
 const DIRECT_ID = "private-draft::direct::req-1" as FedosConversationId;
 const GROUP_ID = "private-draft::private-group::req-2" as FedosConversationId;

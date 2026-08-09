@@ -54,13 +54,13 @@
  *   claim for that backend specifically; this Arc does not.
  */
 
-import { validateFedosPayloadRetentionDecision, type FedosPayloadRetentionDecisionInput } from "../../../../conversation/retention/fedos_payload_retention_decision_validator.js";
-import { serializeFedosPayloadRetentionDecision } from "../../../../conversation/retention/fedos_payload_retention_decision_codec.js";
-import type { FedosPayloadRetentionReasonCode } from "../../../../conversation/retention/fedos_payload_retention_decision.js";
-import type { FedosPayloadRetentionState } from "../../../../conversation/retention/fedos_payload_retention_state.js";
-import type { FedosPayloadRetentionPersistence } from "../../../../conversation/retention/fedos_payload_retention_persistence.js";
-import type { FedosConversationPayload, FedosConversationPayloadStorage } from "../../../../conversation/payload_storage/fedos_conversation_payload_storage.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import { validateFedosPayloadRetentionDecision, type FedosPayloadRetentionDecisionInput } from "./fedos_payload_retention_decision_validator.js";
+import { serializeFedosPayloadRetentionDecision } from "./fedos_payload_retention_decision_codec.js";
+import type { FedosPayloadRetentionReasonCode } from "./fedos_payload_retention_decision.js";
+import type { FedosPayloadRetentionState } from "./fedos_payload_retention_state.js";
+import type { FedosPayloadRetentionPersistence } from "./fedos_payload_retention_persistence.js";
+import type { FedosConversationPayload, FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
 
 export interface FedosPayloadRetentionAuthorityDependencies {
   readonly retentionPersistence: FedosPayloadRetentionPersistence;

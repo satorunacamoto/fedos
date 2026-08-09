@@ -10,7 +10,7 @@
 import { canRead } from "./policy.js";
 import { eventMatchesSpace } from "./classify.js";
 import type { Space } from "./types.js";
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 
 /** A source of space definitions (synchronous, process-local). */
 export interface SpaceDirectory {

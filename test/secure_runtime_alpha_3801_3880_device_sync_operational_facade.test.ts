@@ -6,10 +6,10 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
-import { fedosDeviceSyncConflictId } from "../src/device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
-import type { FedosDeviceSyncAttemptFn, FedosDeviceSyncAttemptResult } from "../src/device/sync_scheduler/fedos_device_sync_attempt.js";
+import { fedosDeviceSyncConflictId } from "../src/os/messenger/device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import type { FedosDeviceSyncAttemptFn, FedosDeviceSyncAttemptResult } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_attempt.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "npub-account-a", identityId: null };
 const ACCOUNT_B = { authority: "nostr", publicIdentifier: "npub-account-b", identityId: null };

@@ -22,9 +22,9 @@
  *     `test/secure_runtime_alpha_825_826_membership_codec.test.ts`.
  */
 
-import { validateFedosConversationMembership, type FedosConversationMembershipInput } from "../../../../../conversation/membership/fedos_conversation_membership_validator.js";
-import type { FedosConversationMembership } from "../../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosPersistedConversationMembershipV1 } from "../../../../../conversation/membership/persistence/fedos_persisted_conversation_membership_v1.js";
+import { validateFedosConversationMembership, type FedosConversationMembershipInput } from "../fedos_conversation_membership_validator.js";
+import type { FedosConversationMembership } from "../fedos_conversation_membership.js";
+import type { FedosPersistedConversationMembershipV1 } from "./fedos_persisted_conversation_membership_v1.js";
 
 /** Deep-copies `membership` into the persisted V1 wire shape, flattening `participant`. */
 export function serializeFedosConversationMembership(membership: FedosConversationMembership): FedosPersistedConversationMembershipV1 {

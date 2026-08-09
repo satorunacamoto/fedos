@@ -41,44 +41,44 @@
  */
 
 import { randomBytes as nobleRandomBytes, bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosBoardRuntimeClock } from "../../../../board/runtime/fedos_board_runtime_clock.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { validateFedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference_validator.js";
-import type { FedosConversationCapabilityIssuerAuthority } from "../../../../conversation/capability/fedos_conversation_capability_issuer_authority.js";
-import type { FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationReadinessAxisState } from "../../../../conversation/readiness/fedos_conversation_readiness_axis.js";
+import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { validateFedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference_validator.js";
+import type { FedosConversationCapabilityIssuerAuthority } from "../capability/fedos_conversation_capability_issuer_authority.js";
+import type { FedosConversationCapabilityId } from "../capability/fedos_conversation_capability_id.js";
+import type { FedosConversationReadinessAxisState } from "../readiness/fedos_conversation_readiness_axis.js";
 import {
   evaluateFedosConversationReadiness,
   type FedosConversationReadiness,
   type FedosConversationReadinessAxisStates,
-} from "../../../../conversation/readiness/fedos_conversation_readiness.js";
-import type { FedosConversationEncryptionReadinessAuthority } from "../../../../conversation/readiness/fedos_conversation_encryption_readiness_authority.js";
-import { toFedosPrivateConversationId, type FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
-import { validateFedosConversationDraftRecord } from "../../../../conversation/construction/fedos_conversation_draft_record_validator.js";
-import type { FedosConversationDraftRecord, FedosPrivateConversationPolicyReference } from "../../../../conversation/construction/fedos_conversation_draft_record.js";
-import { serializeFedosConversationDraftRecord } from "../../../../conversation/construction/fedos_conversation_draft_record_codec.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import { resolveFedosPrivateConversationPolicy } from "../../../../conversation/construction/fedos_private_conversation_policy.js";
-import type { FedosConversationCreatorIdentityAuthority } from "../../../../conversation/construction/fedos_conversation_creator_identity_authority.js";
+} from "../readiness/fedos_conversation_readiness.js";
+import type { FedosConversationEncryptionReadinessAuthority } from "../readiness/fedos_conversation_encryption_readiness_authority.js";
+import { toFedosPrivateConversationId, type FedosPrivateConversationMode } from "./fedos_private_conversation_id.js";
+import { validateFedosConversationDraftRecord } from "./fedos_conversation_draft_record_validator.js";
+import type { FedosConversationDraftRecord, FedosPrivateConversationPolicyReference } from "./fedos_conversation_draft_record.js";
+import { serializeFedosConversationDraftRecord } from "./fedos_conversation_draft_record_codec.js";
+import type { FedosConversationDraftPersistence } from "./fedos_conversation_draft_persistence.js";
+import { resolveFedosPrivateConversationPolicy } from "./fedos_private_conversation_policy.js";
+import type { FedosConversationCreatorIdentityAuthority } from "./fedos_conversation_creator_identity_authority.js";
 import type {
   CreateDirectDraftCommand,
   CreatePrivateGroupDraftCommand,
   FedosPrivateConversationInitialCapabilityRequest,
-} from "../../../../conversation/construction/fedos_private_conversation_construction_command.js";
+} from "./fedos_private_conversation_construction_command.js";
 import type {
   FedosConversationDraftView,
   FedosPrivateConversationInitialCapabilityGrant,
-} from "../../../../conversation/construction/fedos_conversation_draft_view.js";
-import type { FedosPrivateConversationConstructionResult } from "../../../../conversation/construction/fedos_private_conversation_construction_result.js";
+} from "./fedos_conversation_draft_view.js";
+import type { FedosPrivateConversationConstructionResult } from "./fedos_private_conversation_construction_result.js";
 import {
   fedosConversationConstructionCoordinationId,
   type FedosConversationConstructionCoordinationPhase,
   type FedosPersistedConversationConstructionCoordinationV1,
-} from "../../../../conversation/construction/coordination/fedos_persisted_conversation_construction_coordination_v1.js";
-import type { FedosConversationConstructionCoordinationPersistence } from "../../../../conversation/construction/coordination/fedos_conversation_construction_coordination_persistence.js";
+} from "./coordination/fedos_persisted_conversation_construction_coordination_v1.js";
+import type { FedosConversationConstructionCoordinationPersistence } from "./coordination/fedos_conversation_construction_coordination_persistence.js";
 
 /** Injected — mints the opaque request id a Conversation id is derived from (Alpha 908). Never caller-supplied. */
 export interface FedosConversationConstructionIdGenerator {

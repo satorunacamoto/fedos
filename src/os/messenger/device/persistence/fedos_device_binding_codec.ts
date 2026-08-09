@@ -23,7 +23,7 @@ import type {
   FedosPersistedDeviceBindingRegisteredEventV1,
   FedosPersistedDeviceBindingRevokedEventV1,
   FedosPersistedDeviceBindingTrustedEventV1,
-} from "../../../../device/persistence/fedos_persisted_device_binding_event_v1.js";
+} from "./fedos_persisted_device_binding_event_v1.js";
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;

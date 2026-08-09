@@ -8,11 +8,11 @@ import noopCryptoSource from "../../../src/os/core/crypto/noop_crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import vaultBridgeSource from "../../../src/os/core/crypto/vault_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import masterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_master_seed_authority.ts?raw";
+import masterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sealedEnvelopeSource from "../../../src/runtime/master_seed/fedos_sealed_master_seed_envelope.ts?raw";
+import sealedEnvelopeSource from "../../../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmMasterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_wasm_master_seed_authority.ts?raw";
+import wasmMasterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import vaultTypesSource from "../../../src/os/core/vault/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

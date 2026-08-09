@@ -4,8 +4,8 @@ import {
   WebSocketRelayPublisher,
   parseOkMessage,
   validateBeforePublish,
-} from "../src/nostr/publish.js";
-import { NobleSignatureVerifier } from "../src/nostr/noble_signature.js";
+} from "../src/os/messenger/adapters/nostr/protocol/publish.js";
+import { NobleSignatureVerifier } from "../src/os/messenger/adapters/nostr/protocol/noble_signature.js";
 import {
   canPublishToSpace,
   preparePublishDecision,
@@ -14,7 +14,7 @@ import type {
   RelaySocketEvent,
   RelaySocketEventType,
   RelaySocketLike,
-} from "../src/nostr/ws_relay.js";
+} from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
 import type { SignedNostrEvent } from "../src/os/_legacy_prototype/sign/types.js";
 import type { ChannelSpace, CommunitySpace } from "../src/os/_legacy_prototype/community/types.js";
 

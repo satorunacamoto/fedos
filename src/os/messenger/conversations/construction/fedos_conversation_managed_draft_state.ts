@@ -21,10 +21,10 @@
  * free-form predicate function, no arbitrary metadata bag.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
-import type { FedosPrivateConversationPolicyReference } from "../../../../conversation/construction/fedos_conversation_draft_record.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosPrivateConversationMode } from "./fedos_private_conversation_id.js";
+import type { FedosPrivateConversationPolicyReference } from "./fedos_conversation_draft_record.js";
 
 /** The managed lifecycle a Draft Manager recognizes — a subset of `FedosConversationLifecycleState` (Alpha 893). */
 export type FedosConversationManagedDraftState = "draft" | "tombstoned";

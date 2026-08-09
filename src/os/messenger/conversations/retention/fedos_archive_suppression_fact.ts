@@ -37,8 +37,8 @@
  *     type.
  */
 
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
 
 /** Closed vocabulary (Phase C). An unrecognized value fails closed, never treated as a new/unsupported-but-tolerated kind. */
 export type FedosArchiveSuppressionMeaning =

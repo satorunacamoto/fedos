@@ -34,20 +34,20 @@
  * cannot fail.
  */
 
-import type { FedosMasterSeedAuthority } from "../../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../../../../../board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../../../../../conversation/construction/fedos_conversation_creator_identity_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { FedosWasmConversationEncryptionAuthority } from "../../../../../conversation/encryption/fedos_wasm_conversation_encryption_authority.js";
-import { FedosWasmConversationDecryptionAuthority } from "../../../../../conversation/encryption/fedos_wasm_conversation_decryption_authority.js";
-import { FixedFedosConversationLocalAccountIndexAuthority } from "../../../../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
-import type { FedosConversationProductionCryptoGraph } from "../../../../../conversation/encryption/production/fedos_conversation_production_crypto_authority_factory.js";
-import type { FedosProductionConversationAeadHandleSource } from "../../../../../desktop/production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
+import type { FedosMasterSeedAuthority } from "../../../../core/vault/wasm/fedos_master_seed_authority.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../../../board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../../construction/fedos_conversation_creator_identity_authority.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
+import { FedosWasmConversationEncryptionAuthority } from "../fedos_wasm_conversation_encryption_authority.js";
+import { FedosWasmConversationDecryptionAuthority } from "../fedos_wasm_conversation_decryption_authority.js";
+import { FixedFedosConversationLocalAccountIndexAuthority } from "../identity/fedos_conversation_local_account_index_authority.js";
+import type { FedosConversationProductionCryptoGraph } from "./fedos_conversation_production_crypto_authority_factory.js";
+import type { FedosProductionConversationAeadHandleSource } from "../../../desktop/production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
 import {
   FedosProductionConversationEncryptionRuntimeBoundary,
   FedosProductionConversationDecryptionRuntimeBoundary,
-} from "../../../../../desktop/production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
+} from "../../../desktop/production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
 
 const U32_MAX = 4_294_967_295;
 

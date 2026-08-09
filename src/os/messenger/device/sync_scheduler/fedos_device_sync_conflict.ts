@@ -35,7 +35,7 @@
 
 import type { FedosSyncConflictKind } from "../../../../sync/fedos_sync_conflict.js";
 import { reviewFedosSyncRecordForJournal } from "../../../../sync/fedos_sync_record_allowlist.js";
-import type { FedosDeviceTrustState } from "../../../../device/fedos_device_binding.js";
+import type { FedosDeviceTrustState } from "../fedos_device_binding.js";
 
 export type FedosDeviceSyncConflictKind =
   | "none"

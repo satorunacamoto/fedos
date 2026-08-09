@@ -15,8 +15,8 @@ import {
   type FedosDeletionRequestPendingReviewLogEntryV1,
   type FedosDeletionRequestPendingReviewPersistence,
   type FedosDeletionRequestPendingReviewWriteResult,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_pending_review_persistence.js";
-import type { FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
+} from "./fedos_deletion_request_pending_review_persistence.js";
+import type { FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

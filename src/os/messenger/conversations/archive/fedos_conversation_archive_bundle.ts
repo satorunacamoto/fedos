@@ -35,14 +35,14 @@
  *   - This file defines a TYPE ONLY — no function, no class.
  */
 
-import type { FedosConversationArchiveSchemaVersion } from "../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
-import type { FedosPersistedConversationRecordV1 } from "../../../../conversation/persistence/fedos_persisted_conversation_record_v1.js";
-import type { FedosPersistedConversationMembershipV1 } from "../../../../conversation/membership/persistence/fedos_persisted_conversation_membership_v1.js";
-import type { FedosPersistedConversationCapabilityEventV1 } from "../../../../conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
-import type { FedosPersistedConversationMessageEnvelopeV1 } from "../../../../conversation/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
-import type { FedosPersistedConversationPayloadV1 } from "../../../../conversation/payload_storage/fedos_persisted_conversation_payload_v1.js";
-import type { FedosConversationArchiveGroupSectionV1 } from "../../../../conversation/archive/fedos_conversation_archive_group_section.js";
-import type { FedosConversationArchiveSubject } from "../../../../conversation/archive/fedos_conversation_archive_direct_subject.js";
+import type { FedosConversationArchiveSchemaVersion } from "./fedos_conversation_archive_schema_version.js";
+import type { FedosPersistedConversationRecordV1 } from "../persistence/fedos_persisted_conversation_record_v1.js";
+import type { FedosPersistedConversationMembershipV1 } from "../membership/persistence/fedos_persisted_conversation_membership_v1.js";
+import type { FedosPersistedConversationCapabilityEventV1 } from "../capability/persistence/fedos_persisted_conversation_capability_v1.js";
+import type { FedosPersistedConversationMessageEnvelopeV1 } from "../envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
+import type { FedosPersistedConversationPayloadV1 } from "../payload_storage/fedos_persisted_conversation_payload_v1.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
+import type { FedosConversationArchiveSubject } from "./fedos_conversation_archive_direct_subject.js";
 
 export interface FedosConversationArchiveBundleV1 {
   readonly schemaVersion: FedosConversationArchiveSchemaVersion;

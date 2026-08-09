@@ -52,27 +52,27 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   FedosProfileInitializationCoordinator,
   type FedosProfileInitializationDependencies,
-} from "../src/desktop/onboarding/fedos_profile_initialization_coordinator.js";
-import { FileFedosLocalProfilePersistence } from "../src/desktop/onboarding/fedos_local_profile_persistence.js";
-import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
-import { planFedosLocalProfilePaths, ensureFedosLocalProfileDirectories } from "../src/desktop/onboarding/fedos_local_profile_paths.js";
-import { DevelopmentFedosMasterSeedAuthority } from "../src/desktop/onboarding/fedos_development_master_seed_authority.js";
-import { fedosProfileUnlockSecretFromUtf8 } from "../src/desktop/onboarding/fedos_profile_unlock_secret.js";
-import { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
-import { FedosDesktopConversationUiPresentationBoundary } from "../src/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.js";
+import { FileFedosLocalProfilePersistence } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_persistence.js";
+import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";
+import { planFedosLocalProfilePaths, ensureFedosLocalProfileDirectories } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_paths.js";
+import { DevelopmentFedosMasterSeedAuthority } from "../src/os/messenger/desktop/onboarding/fedos_development_master_seed_authority.js";
+import { fedosProfileUnlockSecretFromUtf8 } from "../src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.js";
+import { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
+import { FedosDesktopConversationUiPresentationBoundary } from "../src/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
-import { FedosIdentityTransitionOutboundNotificationCoordinator } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_outbound_notification_coordinator.js";
-import { createFedosIdentityTransitionRecordV1 } from "../src/conversation/identity_transition/fedos_identity_transition_record.js";
-import { generateFedosIdentityTransitionId } from "../src/conversation/identity_transition/fedos_identity_transition_id.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
+import { FedosIdentityTransitionOutboundNotificationCoordinator } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_outbound_notification_coordinator.js";
+import { createFedosIdentityTransitionRecordV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_record.js";
+import { generateFedosIdentityTransitionId } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_id.js";
 import {
   fedosIdentityTransitionBodyHash,
   fedosIdentityTransitionNewKeyProofDigest,
   fedosIdentityTransitionContinuityProofDigest,
-} from "../src/conversation/identity_transition/fedos_identity_transition_canonical.js";
-import { encodeFedosRatchetPeerCapabilityControlPayload } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+} from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_canonical.js";
+import { encodeFedosRatchetPeerCapabilityControlPayload } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 // Secure Runtime Alpha 6521-6600 -- unlike every prior Arc's own vertical
 // slice this session (which supplied its OWN `clock` to a hand-built

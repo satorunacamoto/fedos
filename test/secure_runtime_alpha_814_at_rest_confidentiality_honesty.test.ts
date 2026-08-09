@@ -5,8 +5,8 @@ import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
-import type { FedosConversationPayloadDescriptor } from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadDescriptor } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import codecSource from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -33,16 +33,16 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/board/observation/append_only_fedos_delivery_observation_persistence.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/append_only_fedos_delivery_observation_persistence.js";
 import type {
   FedosDeliveryObservationPersistence,
   FedosDeliveryObservationPersistenceWriteResult,
-} from "../src/board/observation/fedos_delivery_observation_persistence.js";
-import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/board/observation/fedos_delivery_observation_codec.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_observation_persistence.js";
+import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.js";
 
 const subjectA = toFedosDeliveryObservationSubjectId("subject-a")!;
 const subjectB = toFedosDeliveryObservationSubjectId("subject-b")!;

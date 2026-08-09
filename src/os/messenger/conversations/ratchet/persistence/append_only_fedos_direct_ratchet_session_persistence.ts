@@ -23,12 +23,12 @@ import {
   encodeFedosDirectRatchetSessionRecordV1,
   fedosDirectRatchetSessionRecordsEqual,
   type FedosDirectRatchetSessionRecordV1,
-} from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
-import type { FedosDirectRatchetSessionId } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+} from "../fedos_direct_ratchet_session_record.js";
+import type { FedosDirectRatchetSessionId } from "../fedos_direct_ratchet_session_id.js";
 import type {
   FedosDirectRatchetSessionPersistence,
   FedosDirectRatchetSessionPersistenceWriteResult,
-} from "../../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
+} from "./fedos_direct_ratchet_session_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

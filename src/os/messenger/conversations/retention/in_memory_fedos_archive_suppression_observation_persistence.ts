@@ -13,11 +13,11 @@
 import {
   fedosPersistedArchiveSuppressionObservationsAreEqual,
   type FedosPersistedArchiveSuppressionObservationV1,
-} from "../../../../conversation/retention/fedos_persisted_archive_suppression_observation_v1.js";
+} from "./fedos_persisted_archive_suppression_observation_v1.js";
 import type {
   FedosArchiveSuppressionObservationPersistence,
   FedosArchiveSuppressionObservationPersistenceWriteResult,
-} from "../../../../conversation/retention/fedos_archive_suppression_observation_persistence.js";
+} from "./fedos_archive_suppression_observation_persistence.js";
 
 export class InMemoryFedosArchiveSuppressionObservationPersistence implements FedosArchiveSuppressionObservationPersistence {
   readonly #records = new Map<string, FedosPersistedArchiveSuppressionObservationV1>();

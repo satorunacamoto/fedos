@@ -25,10 +25,10 @@
  * discipline exactly, extended with the one additional log-entry kind a
  * consumable (as opposed to purely additive) fact needs.
  */
-import { isWellFormedFedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
-import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
-import type { FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
-import { isFedosDeletionRequestId } from "../../../../conversation/deletion_request/fedos_deletion_request_id.js";
+import { isWellFormedFedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
+import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
+import type { FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
+import { isFedosDeletionRequestId } from "./fedos_deletion_request_id.js";
 
 /** A concrete resource limit — this is a SMALL, transient review queue (a human's own pending inbox), never an unbounded audit log. */
 export const FEDOS_DELETION_REQUEST_PENDING_REVIEW_MAX_LIVE_ENTRIES = 500;

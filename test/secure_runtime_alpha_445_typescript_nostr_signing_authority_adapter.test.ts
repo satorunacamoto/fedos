@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosWasmNostrSigningAuthority,
   type FedosNostrSigningWasmLoaderBoundary,
-} from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.js";
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosMasterSeedWasmLoaderBoundary } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+} from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosMasterSeedWasmLoaderBoundary } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import type { FedosMasterSeedAuthorityHandle } from "../src/runtime/fedos_wasm_loader.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import adapterSource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";

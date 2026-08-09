@@ -32,7 +32,7 @@
  * `direct` mode.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 
 export type FedosConversationEncryptionReadinessState = "ready" | "unavailable" | "unsupported" | "failed";
 

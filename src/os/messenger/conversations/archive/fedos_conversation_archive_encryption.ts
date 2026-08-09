@@ -67,14 +67,14 @@ import { encrypt as runtimeEncrypt } from "../../../../runtime/fedos_runtime_enc
 import { decrypt as runtimeDecrypt } from "../../../../runtime/fedos_runtime_decrypt.js";
 import { exportCiphertext as runtimeExportCiphertext } from "../../../../runtime/fedos_runtime_export_ciphertext.js";
 import { importCiphertext as runtimeImportCiphertext } from "../../../../runtime/fedos_runtime_import_ciphertext.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import type { FedosConversationEnvelopeEncryptionSuite } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import { deserializeFedosConversationArchiveBundleFromBytes, serializeFedosConversationArchiveBundleToBytes } from "../../../../conversation/archive/fedos_conversation_archive_bundle_codec.js";
-import { encodeFedosConversationArchiveHeader, fedosConversationArchiveHeaderBytesAreEqual, splitFedosConversationArchiveHeader } from "../../../../conversation/archive/fedos_conversation_archive_header.js";
-import { fedosConversationArchiveContentHashesAreEqual, computeFedosConversationArchiveContentHash } from "../../../../conversation/archive/fedos_conversation_archive_integrity.js";
-import { buildFedosConversationArchiveManifest } from "../../../../conversation/archive/fedos_conversation_archive_manifest_codec.js";
-import type { FedosConversationArchiveManifestV1 } from "../../../../conversation/archive/fedos_conversation_archive_manifest.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
+import type { FedosConversationEnvelopeEncryptionSuite } from "../envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import { deserializeFedosConversationArchiveBundleFromBytes, serializeFedosConversationArchiveBundleToBytes } from "./fedos_conversation_archive_bundle_codec.js";
+import { encodeFedosConversationArchiveHeader, fedosConversationArchiveHeaderBytesAreEqual, splitFedosConversationArchiveHeader } from "./fedos_conversation_archive_header.js";
+import { fedosConversationArchiveContentHashesAreEqual, computeFedosConversationArchiveContentHash } from "./fedos_conversation_archive_integrity.js";
+import { buildFedosConversationArchiveManifest } from "./fedos_conversation_archive_manifest_codec.js";
+import type { FedosConversationArchiveManifestV1 } from "./fedos_conversation_archive_manifest.js";
 
 /** The ONE `AeadAadDomain` this Arc uses — the SAME domain this conversation's own Envelopes already seal under (Alpha 870). No new domain variant is added. */
 const FEDOS_CONVERSATION_ARCHIVE_AAD_DOMAIN: AeadAadDomain = "Conversation";

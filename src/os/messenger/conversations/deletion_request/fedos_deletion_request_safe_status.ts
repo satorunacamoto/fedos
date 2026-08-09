@@ -9,8 +9,8 @@
  * own durable/acknowledgement records.
  */
 
-import type { FedosDeletionRequestLifecycleState } from "../../../../conversation/deletion_request/fedos_deletion_request_lifecycle_state.js";
-import type { FedosDeletionRequestAcknowledgementOutcome } from "../../../../conversation/deletion_request/fedos_deletion_request_acknowledgement_outcome.js";
+import type { FedosDeletionRequestLifecycleState } from "./fedos_deletion_request_lifecycle_state.js";
+import type { FedosDeletionRequestAcknowledgementOutcome } from "./fedos_deletion_request_acknowledgement_outcome.js";
 
 export type FedosDeletionRequestSafeStatus =
   | "draft"

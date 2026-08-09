@@ -39,10 +39,10 @@
  * distinct domain string so a signature over one record type can never
  * be replayed as authenticating the other.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDirectRatchetSessionResetReason } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
-import { isWellFormedFedosRatchetPeerCapabilityNonce } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_nonce.js";
-import type { FedosRatchetPeerCapabilityAccountAuthorizationV1 } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosDirectRatchetSessionResetReason } from "../fedos_direct_ratchet_session_reset_reason.js";
+import { isWellFormedFedosRatchetPeerCapabilityNonce } from "./fedos_ratchet_peer_capability_nonce.js";
+import type { FedosRatchetPeerCapabilityAccountAuthorizationV1 } from "./fedos_ratchet_peer_capability_authentication.js";
 
 export const FEDOS_RATCHET_PEER_LIFECYCLE_NOTIFICATION_DOMAIN = "fedos-ratchet-peer-lifecycle-notification-v1";
 export const FEDOS_RATCHET_PEER_LIFECYCLE_NOTIFICATION_DEVICE_SIGNATURE_PREFIX =

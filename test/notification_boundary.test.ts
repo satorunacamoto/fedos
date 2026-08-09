@@ -15,7 +15,7 @@ import {
 } from "../src/os/_legacy_prototype/notification/bridge.js";
 import type { NotificationPayload } from "../src/notification/types.js";
 import type { ChatMessage, ChatRoom } from "../src/os/_legacy_prototype/chat/types.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 import { SAMPLE_SPACES } from "../src/os/_legacy_prototype/community/sample_spaces.js";
 import { SAMPLE_PRODUCTS } from "../src/os/commerce/catalog/sample_products.js";
 // Notification sources as strings: prove no transport import and no send/fetch call.

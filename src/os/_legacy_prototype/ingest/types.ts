@@ -1,5 +1,5 @@
-import type { NostrEvent } from "../../../nostr/types.js";
-import type { StructureIssue } from "../../../nostr/event.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
+import type { StructureIssue } from "../../messenger/adapters/nostr/protocol/event.js";
 
 /** A validated event annotated with where/when we ingested it. */
 export interface IngestedEvent {

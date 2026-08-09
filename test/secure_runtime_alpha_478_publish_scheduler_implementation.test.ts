@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_478_publish_scheduler_implementation.md?raw";
-import { FedosPublishScheduler } from "../src/board/outbox/fedos_publish_scheduler.js";
-import { MockFedosBoardOutboxPublisher } from "../src/board/outbox/fedos_board_outbox_publisher.js";
-import type { FedosBoardOutboxPublisher } from "../src/board/outbox/fedos_board_outbox_publisher.js";
-import { createFedosBoardOutboxObservation } from "../src/board/outbox/fedos_board_outbox_observation.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { FedosPublishScheduler } from "../src/os/messenger/board/outbox/fedos_publish_scheduler.js";
+import { MockFedosBoardOutboxPublisher } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
+import type { FedosBoardOutboxPublisher } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
+import { createFedosBoardOutboxObservation } from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 
 /**
  * Secure Runtime Alpha 478 -- "Publish Scheduler Implementation and

@@ -48,10 +48,20 @@ const FORBIDDEN_PREFIXES = [
 
 const TELEGRAM_ADAPTER_DIR = "src/os/commerce/support/adapters/telegram/";
 const BTCPAY_ADAPTER_DIR = "src/os/commerce/payment/adapters/btcpay/";
-// The only place under src/os/commerce allowed to import src/nostr/ directly —
-// catalog/bridge.ts's productFromEvent and classify.ts both take a raw
-// NostrEvent, so they live here instead of in domain-layer catalog/ code.
+// The only place under src/os/commerce allowed to import the Nostr protocol
+// layer directly — catalog/bridge.ts's productFromEvent and classify.ts
+// both take a raw NostrEvent, so they live here instead of in domain-layer
+// catalog/ code. Factory/Port Completion pass: both real Nostr TYPE
+// locations are allowed here — the OLD compatibility shim (`src/nostr/`,
+// still resolvable by any not-yet-repointed importer) AND the NEW
+// canonical post-Nostr-consolidation location
+// (`src/os/messenger/adapters/nostr/protocol/`, Agent N's arc) — this
+// file's own internal imports were repointed to the canonical location
+// this same pass (see `docs/architecture/FACTORY-PORT-COMPLETION-PLAN.md`'s
+// internal-old-path-import sweep), so the canonical prefix must be
+// recognized too, not just the shim.
 const NOSTR_ADAPTER_DIR = "src/os/commerce/catalog/adapters/nostr/";
+const NOSTR_TARGET_PREFIXES = ["src/nostr/", "src/os/messenger/adapters/nostr/protocol/"];
 
 function listTsFilesRecursive(dir: string): string[] {
   const out: string[] = [];
@@ -110,7 +120,7 @@ function findViolations(): Violation[] {
         const resolvedRepoRelative =
           posix.normalize(toRepoRelativePosix(resolvedAbs).split("\\").join("/")) + "/";
         const isNostrAdapterFile = fileRepoRelative.startsWith(NOSTR_ADAPTER_DIR);
-        const isNostrTarget = resolvedRepoRelative.startsWith("src/nostr/");
+        const isNostrTarget = NOSTR_TARGET_PREFIXES.some((prefix) => resolvedRepoRelative.startsWith(prefix));
         if (
           FORBIDDEN_PREFIXES.some((prefix) => (resolvedRepoRelative + "/").startsWith(prefix)) &&
           !(isNostrAdapterFile && isNostrTarget)

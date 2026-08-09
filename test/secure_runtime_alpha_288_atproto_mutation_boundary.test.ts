@@ -12,7 +12,7 @@ import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 import {
   FEDOS_ATPROTO_OBSERVED_RECORD_EVENT_KINDS,
   type FedosAtprotoRecordObservation,
-} from "../src/board/atproto/fedos_atproto_mutation_boundary.js";
+} from "../src/os/messenger/board/atproto/fedos_atproto_mutation_boundary.js";
 
 function codeOnly(source: string): string {
   return source

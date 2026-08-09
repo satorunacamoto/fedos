@@ -14,9 +14,9 @@ import {
   fedosPersistedConversationDraftRecordsAreEqual,
   type FedosConversationDraftPersistence,
   type FedosConversationDraftPersistenceWriteResult,
-} from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+} from "./fedos_conversation_draft_persistence.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "./fedos_persisted_conversation_draft_record_v1.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 
 export class InMemoryFedosConversationDraftPersistence implements FedosConversationDraftPersistence {
   readonly #records = new Map<string, FedosPersistedConversationDraftRecordV1>();

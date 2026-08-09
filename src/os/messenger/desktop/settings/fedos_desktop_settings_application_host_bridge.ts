@@ -23,14 +23,14 @@
  */
 
 import type { FedosDesktopSettingsApplicationCoordinator } from "./fedos_desktop_settings_application_coordinator.js";
-import type { FedosSettingsResult } from "../../../../settings/fedos_settings_authority.js";
+import type { FedosSettingsResult } from "../../../core/settings/fedos_settings_authority.js";
 import {
   fedosHostOk,
   fedosHostFailure,
   type FedosDesktopHostResponse,
 } from "../host_boundary/fedos_desktop_host_response.js";
 import { validateFedosDesktopSettingsApplicationHostCommand } from "./fedos_desktop_settings_application_host_command.js";
-import { fedosSettingsEffectiveStateView } from "../../../../settings/application/fedos_settings_effective_state.js";
+import { fedosSettingsEffectiveStateView } from "../../../core/settings/application/fedos_settings_effective_state.js";
 
 function responseFromResult<T>(result: FedosSettingsResult<T>, requestId?: string): FedosDesktopHostResponse<T> {
   switch (result.outcome) {

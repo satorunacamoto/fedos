@@ -52,9 +52,9 @@
  *   - No network, no Relay, no Ontology inference, no background task.
  */
 
-import type { FedosBoardReader } from "../../../board/repository/fedos_board_reader.js";
-import type { FedosConversationPersistence } from "../../../conversation/persistence/fedos_conversation_persistence.js";
-import { deserializeFedosConversationRecord } from "../../../conversation/persistence/fedos_conversation_record_codec.js";
+import type { FedosBoardReader } from "../board/repository/fedos_board_reader.js";
+import type { FedosConversationPersistence } from "./persistence/fedos_conversation_persistence.js";
+import { deserializeFedosConversationRecord } from "./persistence/fedos_conversation_record_codec.js";
 
 export type FedosConversationHydrationOutcome =
   | "hydrated"

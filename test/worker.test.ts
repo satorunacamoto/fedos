@@ -11,7 +11,7 @@ import type {
   D1LikeDatabase,
   D1LikePreparedStatement,
 } from "../src/os/_legacy_prototype/indexer/d1_index.js";
-import { NoopSignatureVerifier } from "../src/nostr/signature.js";
+import { NoopSignatureVerifier } from "../src/os/messenger/adapters/nostr/protocol/signature.js";
 import { SAMPLE_VAULT_MEMBER } from "../src/os/_legacy_prototype/community/sample_spaces.js";
 import { SAMPLE_PRODUCT_BUYER, SAMPLE_PRODUCT_CREATOR } from "../src/os/commerce/catalog/sample_products.js";
 import { SAMPLE_DM_PARTICIPANT } from "../src/os/_legacy_prototype/chat/sample_chats.js";
@@ -20,8 +20,8 @@ import type {
   RelaySocketEventType,
   RelaySocketLike,
   WebSocketFactory,
-} from "../src/nostr/ws_relay.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+} from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 import type {
   AssetCache,
   AssetKey,

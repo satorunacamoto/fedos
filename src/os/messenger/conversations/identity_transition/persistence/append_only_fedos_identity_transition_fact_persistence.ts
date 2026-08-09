@@ -12,9 +12,9 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import { decodeFedosIdentityTransitionFactV1, encodeFedosIdentityTransitionFactV1, fedosIdentityTransitionFactKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_fact.js";
-import { determineFedosIdentityTransitionFactWriteOutcome, type FedosIdentityTransitionFactWriteOutcome } from "../../../../../conversation/identity_transition/fedos_identity_transition_fact_conflict_detection.js";
-import type { FedosIdentityTransitionFactPersistence } from "../../../../../conversation/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
+import { decodeFedosIdentityTransitionFactV1, encodeFedosIdentityTransitionFactV1, fedosIdentityTransitionFactKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../fedos_identity_transition_fact.js";
+import { determineFedosIdentityTransitionFactWriteOutcome, type FedosIdentityTransitionFactWriteOutcome } from "../fedos_identity_transition_fact_conflict_detection.js";
+import type { FedosIdentityTransitionFactPersistence } from "./fedos_identity_transition_fact_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

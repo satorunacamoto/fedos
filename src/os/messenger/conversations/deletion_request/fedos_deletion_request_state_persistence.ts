@@ -14,8 +14,8 @@
  * if the lifecycle move itself is not one this Arc's own code produces).
  */
 
-import { fedosPersistedDeletionRequestStateRecordsAreEqual, type FedosPersistedDeletionRequestStateRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
-import { isFedosDeletionRequestLifecycleTransitionReachableByThisArc } from "../../../../conversation/deletion_request/fedos_deletion_request_lifecycle_state.js";
+import { fedosPersistedDeletionRequestStateRecordsAreEqual, type FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
+import { isFedosDeletionRequestLifecycleTransitionReachableByThisArc } from "./fedos_deletion_request_lifecycle_state.js";
 
 export type FedosDeletionRequestStatePersistenceWriteResult =
   | "inserted"

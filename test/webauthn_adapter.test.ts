@@ -5,7 +5,7 @@ import {
   WEBAUTHN_ADAPTER_CAPABILITIES,
   webauthnReportToPasskeyRequest,
   type WebAuthnAdapterRequest,
-} from "../src/identity/webauthn_adapter.js";
+} from "../src/os/core/identity/webauthn_adapter.js";
 // Adapter source as a string: prove no browser-credential API / crypto import.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import webauthnAdapterSource from "../src/os/core/identity/webauthn_adapter.ts?raw";

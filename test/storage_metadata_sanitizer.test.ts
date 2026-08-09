@@ -3,7 +3,7 @@ import {
   isLocationDerivedValue,
   isSensitiveStorageValue,
   sanitizeStorageMetadata,
-} from "../src/storage/policy.js";
+} from "../src/os/core/storage/policy.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storagePolicySource from "../src/os/core/storage/policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

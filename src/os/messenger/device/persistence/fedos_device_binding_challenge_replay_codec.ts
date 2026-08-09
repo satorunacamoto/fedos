@@ -7,7 +7,7 @@
  * top-level field. `schemaVersion` checked exactly against `1`.
  */
 
-import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "../../../../device/persistence/fedos_persisted_device_binding_challenge_consumption_v1.js";
+import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "./fedos_persisted_device_binding_challenge_consumption_v1.js";
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;

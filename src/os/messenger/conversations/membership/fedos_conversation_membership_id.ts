@@ -40,8 +40,8 @@
  * inherited from that established precedent.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "./fedos_conversation_participant_reference.js";
 
 export type FedosConversationMembershipId = string & { readonly __brand: "FedosConversationMembershipId" };
 

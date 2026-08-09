@@ -16,7 +16,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 // @ts-expect-error see above.
 import { fileURLToPath } from "node:url";
-import { validateFedosDesktopHostCommand } from "../src/desktop/host_boundary/fedos_desktop_host_command.js";
+import { validateFedosDesktopHostCommand } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PRESENTATION_DIR = join(REPO_ROOT, "src", "os", "messenger", "desktop", "presentation", "safety_center");

@@ -44,13 +44,13 @@ import {
   type FedosBoardId,
   type FedosBoardPostId,
   type FedosThreadId,
-} from "../../../board/fedos_board_identifiers.js";
+} from "../board/fedos_board_identifiers.js";
 import {
   FEDOS_BOARD_POST_MAX_CREATED_AT,
   FEDOS_BOARD_POST_MIN_CREATED_AT,
-} from "../../../board/fedos_board_post_validator.js";
-import type { FedosConversationId } from "../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationRecord, FedosConversationPolicyReference } from "../../../conversation/fedos_conversation_record.js";
+} from "../board/fedos_board_post_validator.js";
+import type { FedosConversationId } from "./fedos_conversation_id.js";
+import type { FedosConversationRecord, FedosConversationPolicyReference } from "./fedos_conversation_record.js";
 
 /** The typed candidate `FedosBoardRuntime` builds before calling `validateFedosConversationRecord`. */
 export interface FedosConversationRecordInput {

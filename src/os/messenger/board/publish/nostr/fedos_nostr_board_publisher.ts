@@ -50,7 +50,7 @@
  */
 
 import type { FedosBoardOutboxIntent } from "../../outbox/fedos_board_outbox_types.js";
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 
 export interface FedosNostrBoardPublishEntry {
   readonly intent: FedosBoardOutboxIntent;

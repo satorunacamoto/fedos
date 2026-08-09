@@ -13,8 +13,8 @@
 import {
   fedosPersistedDeletionRecipientDecisionRecordsAreEqual,
   type FedosPersistedDeletionRecipientDecisionRecordV1,
-} from "../../../../conversation/deletion_request/fedos_persisted_deletion_recipient_decision_record_v1.js";
-import { isFedosDeletionRecipientDecisionTransitionReachableByThisArc } from "../../../../conversation/deletion_request/fedos_deletion_recipient_decision_state.js";
+} from "./fedos_persisted_deletion_recipient_decision_record_v1.js";
+import { isFedosDeletionRecipientDecisionTransitionReachableByThisArc } from "./fedos_deletion_recipient_decision_state.js";
 
 export type FedosDeletionRecipientDecisionPersistenceWriteResult =
   | "inserted"

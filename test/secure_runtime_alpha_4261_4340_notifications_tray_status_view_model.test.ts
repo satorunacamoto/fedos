@@ -5,10 +5,10 @@
  * `BackgroundLifecycleCoordinator` -- no Renderer/Boundary redesign.
  */
 import { describe, it, expect } from "vitest";
-import { FedosDesktopNotificationCoordinator } from "../src/desktop/notification/fedos_desktop_notification_coordinator.js";
-import { NoopFedosDesktopNotificationPort } from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import { BackgroundLifecycleCoordinator } from "../src/desktop/background/fedos_desktop_background_lifecycle_coordinator.js";
-import { FedosDesktopNotificationsTrayStatusViewModel } from "../src/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.js";
+import { FedosDesktopNotificationCoordinator } from "../src/os/messenger/notifications/fedos_desktop_notification_coordinator.js";
+import { NoopFedosDesktopNotificationPort } from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import { BackgroundLifecycleCoordinator } from "../src/os/messenger/desktop/background/fedos_desktop_background_lifecycle_coordinator.js";
+import { FedosDesktopNotificationsTrayStatusViewModel } from "../src/os/messenger/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.js";
 
 describe("Alpha 4261-4340 -- Notifications/Tray Status ViewModel: status only, real coordinators", () => {
   it("reflects live background state and notification counters without mutating either coordinator", async () => {

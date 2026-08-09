@@ -38,7 +38,7 @@
  *   - Synchronous, matching every other port in this codebase.
  */
 
-import type { FedosPersistedConversationMembershipV1 } from "../../../../../conversation/membership/persistence/fedos_persisted_conversation_membership_v1.js";
+import type { FedosPersistedConversationMembershipV1 } from "./fedos_persisted_conversation_membership_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationMembershipPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

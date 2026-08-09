@@ -52,10 +52,10 @@ import {
   isWellFormedFedosDeviceBindingChallengeV1,
   serializeFedosDeviceBindingChallengeV1,
   type FedosDeviceBindingChallengeV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
-import type { FedosDeviceBindingProofOfPossessionV1 } from "../../../../device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import type { FedosDeviceBindingAccountAuthorizationV1 } from "../../../../device/binding_challenge/fedos_device_binding_account_authorization.js";
-import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
+} from "./fedos_device_binding_challenge.js";
+import type { FedosDeviceBindingProofOfPossessionV1 } from "./fedos_device_binding_proof_of_possession.js";
+import type { FedosDeviceBindingAccountAuthorizationV1 } from "./fedos_device_binding_account_authorization.js";
+import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
 
 /** Hard size ceiling for either encoded exchange record — generous for a real challenge + Nostr event + two 128-hex signatures, still a real, enforced bound (Phase C's own "size limits" requirement). */
 export const FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH = 16_384;

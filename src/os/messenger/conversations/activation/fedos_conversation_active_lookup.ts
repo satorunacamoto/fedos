@@ -22,11 +22,11 @@
  * no activation information of its own.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
-import type { FedosConversationActivationPersistence } from "../../../../conversation/activation/fedos_conversation_activation_persistence.js";
-import { fedosConversationActivationId } from "../../../../conversation/activation/fedos_persisted_conversation_activation_v1.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "../construction/fedos_persisted_conversation_draft_record_v1.js";
+import type { FedosConversationActivationPersistence } from "./fedos_conversation_activation_persistence.js";
+import { fedosConversationActivationId } from "./fedos_persisted_conversation_activation_v1.js";
 
 export type FedosConversationActiveLookupResult =
   | { readonly outcome: "active"; readonly draft: FedosPersistedConversationDraftRecordV1 }

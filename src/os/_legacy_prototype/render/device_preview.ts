@@ -17,13 +17,13 @@
 import {
   reviewDeviceRegistration,
   type DeviceRegistrationDescriptor,
-} from "../../../identity/device_registration.js";
-import { reviewDeviceTrust, type DeviceTrustDescriptor } from "../../../identity/device_trust.js";
-import { reviewSessionRequest, type SessionRequestDescriptor } from "../../../identity/session_boundary.js";
+} from "../../core/identity/device_registration.js";
+import { reviewDeviceTrust, type DeviceTrustDescriptor } from "../../core/identity/device_trust.js";
+import { reviewSessionRequest, type SessionRequestDescriptor } from "../../core/identity/session_boundary.js";
 import {
   reviewIdentityRecoveryRequest,
   type IdentityRecoveryRequestDescriptor,
-} from "../../../identity/recovery_policy.js";
+} from "../../core/identity/recovery_policy.js";
 import { escapeHtml } from "./html.js";
 
 /** Static sample device registrations for the preview page. Never paired, never live. */

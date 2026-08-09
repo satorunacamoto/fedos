@@ -2,20 +2,20 @@ import { describe, it, expect } from "vitest";
 import {
   reviewDeviceRegistration,
   isSensitiveDeviceRegistrationValue,
-} from "../src/identity/device_registration.js";
-import type { DeviceRegistrationDescriptor } from "../src/identity/device_registration.js";
-import { DEVICE_TRUST_LABELS, reviewDeviceTrust } from "../src/identity/device_trust.js";
-import type { DeviceTrustDescriptor } from "../src/identity/device_trust.js";
+} from "../src/os/core/identity/device_registration.js";
+import type { DeviceRegistrationDescriptor } from "../src/os/core/identity/device_registration.js";
+import { DEVICE_TRUST_LABELS, reviewDeviceTrust } from "../src/os/core/identity/device_trust.js";
+import type { DeviceTrustDescriptor } from "../src/os/core/identity/device_trust.js";
 import {
   SESSION_REQUESTED_ACTIONS,
   reviewSessionRequest,
-} from "../src/identity/session_boundary.js";
-import type { SessionRequestDescriptor } from "../src/identity/session_boundary.js";
+} from "../src/os/core/identity/session_boundary.js";
+import type { SessionRequestDescriptor } from "../src/os/core/identity/session_boundary.js";
 import {
   IDENTITY_RECOVERY_REQUEST_KINDS,
   reviewIdentityRecoveryRequest,
-} from "../src/identity/recovery_policy.js";
-import type { IdentityRecoveryRequestDescriptor } from "../src/identity/recovery_policy.js";
+} from "../src/os/core/identity/recovery_policy.js";
+import type { IdentityRecoveryRequestDescriptor } from "../src/os/core/identity/recovery_policy.js";
 import {
   renderDevicePreviewPage,
   SAMPLE_DEVICE_REGISTRATIONS,

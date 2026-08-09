@@ -5,8 +5,8 @@ import { mkdtempSync, rmSync, readFileSync, existsSync, appendFileSync } from "n
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { startFedosDesktopRuntime, type FedosRunningDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import { startFedosDesktopRuntime, type FedosRunningDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 /**
  * Secure Runtime Alpha 606 -- "Runtime Assembly": Stage 6 of the Alpha

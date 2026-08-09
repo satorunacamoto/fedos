@@ -8,7 +8,7 @@ import {
   fedosConversationInvitationReceivedRecordKey,
   fedosConversationInvitationReceivedRecordsAreEqual,
   type FedosConversationInvitationReceivedRecordV1,
-} from "../../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_received_record.js";
+} from "../fedos_conversation_invitation_received_record.js";
 
 export type FedosConversationInvitationReceivedWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

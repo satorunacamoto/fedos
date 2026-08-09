@@ -13,7 +13,7 @@ import {
   type FedosGroupMessagePersistence,
   type FedosGroupMessagePersistenceWriteResult,
   type FedosGroupMessageRecord,
-} from "../../../../conversation/group/fedos_group_message.js";
+} from "./fedos_group_message.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

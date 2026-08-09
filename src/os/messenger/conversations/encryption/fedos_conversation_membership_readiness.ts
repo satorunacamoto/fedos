@@ -32,10 +32,10 @@
  * this Arc's own Encryption Authority ever writes a different one.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { FEDOS_CONVERSATION_ENVELOPE_ENCRYPTION_SUITES } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { FEDOS_CONVERSATION_ENVELOPE_ENCRYPTION_SUITES } from "../envelope/fedos_conversation_message_envelope.js";
 
 /** Alpha 850's own adopted answer to `11_key_epochs.md`'s open question — see this file's own header. */
 export const FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH = 0;

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 // @ts-expect-error `node:url` has no type declarations without `@types/node` in this project's tsconfig.
 import { fileURLToPath } from "node:url";
-import { validateFedosDesktopHostCommand } from "../src/desktop/host_boundary/fedos_desktop_host_command.js";
+import { validateFedosDesktopHostCommand } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.js";
 
 describe("Secure Runtime Alpha 6041-6120 -- Phase G/L Host command structural validation", () => {
   it("1. deletion-request-create requires every structural field, rejects a malformed one", () => {

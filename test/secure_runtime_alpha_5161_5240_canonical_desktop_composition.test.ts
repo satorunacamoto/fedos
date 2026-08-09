@@ -29,24 +29,24 @@ import { tmpdir } from "node:os";
 import {
   FedosProfileInitializationCoordinator,
   type FedosProfileInitializationDependencies,
-} from "../src/desktop/onboarding/fedos_profile_initialization_coordinator.js";
-import { planFedosLocalProfilePaths, ensureFedosLocalProfileDirectories } from "../src/desktop/onboarding/fedos_local_profile_paths.js";
-import { FileFedosLocalProfilePersistence } from "../src/desktop/onboarding/fedos_local_profile_persistence.js";
-import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
-import { DevelopmentFedosMasterSeedAuthority } from "../src/desktop/onboarding/fedos_development_master_seed_authority.js";
-import { fedosProfileUnlockSecretFromUtf8 } from "../src/desktop/onboarding/fedos_profile_unlock_secret.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.js";
+import { planFedosLocalProfilePaths, ensureFedosLocalProfileDirectories } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_paths.js";
+import { FileFedosLocalProfilePersistence } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_persistence.js";
+import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";
+import { DevelopmentFedosMasterSeedAuthority } from "../src/os/messenger/desktop/onboarding/fedos_development_master_seed_authority.js";
+import { fedosProfileUnlockSecretFromUtf8 } from "../src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
-import { createInMemoryFedosDesktopSettingsController } from "../src/desktop/settings/fedos_desktop_settings_controller.js";
-import { defaultFedosSettingsDescriptorV1, type FedosSettingsDescriptorV1 } from "../src/settings/fedos_settings_descriptor.js";
-import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import type { FedosDesktopNotificationView } from "../src/desktop/notification/fedos_desktop_notification_types.js";
-import type { FedosDesktopBadgePort, FedosDesktopBadgePortStatus } from "../src/desktop/badge/fedos_desktop_badge_port.js";
-import type { FedosDesktopBadgeView } from "../src/desktop/badge/fedos_desktop_badge_types.js";
-import { FedosDeviceSyncEventBridge } from "../src/device/sync_events/fedos_device_sync_event_bridge.js";
+import { createInMemoryFedosDesktopSettingsController } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_controller.js";
+import { defaultFedosSettingsDescriptorV1, type FedosSettingsDescriptorV1 } from "../src/os/core/settings/fedos_settings_descriptor.js";
+import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import type { FedosDesktopNotificationView } from "../src/os/messenger/notifications/fedos_desktop_notification_types.js";
+import type { FedosDesktopBadgePort, FedosDesktopBadgePortStatus } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_port.js";
+import type { FedosDesktopBadgeView } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_types.js";
+import { FedosDeviceSyncEventBridge } from "../src/os/messenger/device/sync_events/fedos_device_sync_event_bridge.js";
 
-import { FedosDesktopBetaApplicationAssembly } from "../src/desktop/beta/fedos_desktop_beta_application_assembly.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
+import { FedosDesktopBetaApplicationAssembly } from "../src/os/messenger/desktop/beta/fedos_desktop_beta_application_assembly.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
 
 // ---------------------------------------------------------------------
 // Helpers.

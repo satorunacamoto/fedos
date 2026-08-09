@@ -18,7 +18,7 @@
  * drift out of sync across those layers.
  */
 
-import type { FedosDeletionTarget } from "../../../../conversation/deletion/fedos_deletion_target.js";
+import type { FedosDeletionTarget } from "./fedos_deletion_target.js";
 
 export type FedosDeletionNonGuaranteeCode =
   | "no-remote-erasure"

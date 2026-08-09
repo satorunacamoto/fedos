@@ -12,7 +12,7 @@
  * and produces no second Membership admission attempt, no second
  * `reactivateRestoredConversation()` call.
  */
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 
 export interface FedosConversationInvitationReceivedRecordV1 {
   readonly schemaVersion: 1;

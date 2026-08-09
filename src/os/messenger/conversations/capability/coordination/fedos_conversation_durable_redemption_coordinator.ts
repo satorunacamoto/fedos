@@ -65,27 +65,27 @@
  * durably succeeded.
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationMembershipAuthority } from "../../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
 import {
   fedosConversationCapabilityBearerVerifierMatches,
   type FedosConversationCapabilityBearerVerifier,
-} from "../../../../../conversation/capability/persistence/fedos_conversation_capability_bearer_verifier.js";
-import { serializeFedosConversationCapabilityRedeemedEvent } from "../../../../../conversation/capability/persistence/fedos_conversation_capability_codec.js";
-import type { FedosConversationCapabilityPersistence } from "../../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+} from "../persistence/fedos_conversation_capability_bearer_verifier.js";
+import { serializeFedosConversationCapabilityRedeemedEvent } from "../persistence/fedos_conversation_capability_codec.js";
+import type { FedosConversationCapabilityPersistence } from "../persistence/fedos_conversation_capability_persistence.js";
 import {
   descriptorFromPersistedCapabilityRecord,
   intendedRecipientFromPersistedCapabilityRecord,
-} from "../../../../../conversation/capability/persistence/persisted_fedos_conversation_capability_authority.js";
-import type { FedosConversationCapabilityRedemptionRequest } from "../../../../../conversation/capability/fedos_conversation_capability_redemption_request.js";
-import type { FedosConversationCapabilityRedemptionResult } from "../../../../../conversation/capability/fedos_conversation_capability_redemption_result.js";
-import { fedosConversationRedemptionCoordinationId } from "../../../../../conversation/capability/coordination/fedos_persisted_conversation_redemption_coordination_v1.js";
+} from "../persistence/persisted_fedos_conversation_capability_authority.js";
+import type { FedosConversationCapabilityRedemptionRequest } from "../fedos_conversation_capability_redemption_request.js";
+import type { FedosConversationCapabilityRedemptionResult } from "../fedos_conversation_capability_redemption_result.js";
+import { fedosConversationRedemptionCoordinationId } from "./fedos_persisted_conversation_redemption_coordination_v1.js";
 import type {
   FedosConversationRedemptionCoordinationPhase,
   FedosPersistedConversationRedemptionCoordinationV1,
-} from "../../../../../conversation/capability/coordination/fedos_persisted_conversation_redemption_coordination_v1.js";
-import type { FedosConversationRedemptionCoordinationPersistence } from "../../../../../conversation/capability/coordination/fedos_conversation_redemption_coordination_persistence.js";
+} from "./fedos_persisted_conversation_redemption_coordination_v1.js";
+import type { FedosConversationRedemptionCoordinationPersistence } from "./fedos_conversation_redemption_coordination_persistence.js";
 
 function participantsEqual(a: FedosConversationParticipantReference, b: FedosConversationParticipantReference): boolean {
   return a.authority === b.authority && a.publicIdentifier === b.publicIdentifier;

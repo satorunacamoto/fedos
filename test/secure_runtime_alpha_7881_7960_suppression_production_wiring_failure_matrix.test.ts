@@ -20,19 +20,19 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
-import { DevelopmentFedosMasterSeedAuthority } from "../src/desktop/onboarding/fedos_development_master_seed_authority.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import type { FedosConversationEncryptionAuthority, FedosConversationEncryptionResult } from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
-import type { FedosConversationDecryptionAuthority, FedosConversationDecryptionResult } from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
+import { DevelopmentFedosMasterSeedAuthority } from "../src/os/messenger/desktop/onboarding/fedos_development_master_seed_authority.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import type { FedosConversationEncryptionAuthority, FedosConversationEncryptionResult } from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority, FedosConversationDecryptionResult } from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import type { FedosPersistedDeviceBindingEventV1 } from "../src/device/persistence/fedos_persisted_device_binding_event_v1.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
-import type { FedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosArchiveSuppressionFact } from "../src/conversation/retention/fedos_archive_suppression_fact.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import type { FedosPersistedDeviceBindingEventV1 } from "../src/os/messenger/device/persistence/fedos_persisted_device_binding_event_v1.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosArchiveSuppressionFact } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_fact.js";
 
 class FakeEncryptionAuthority implements FedosConversationEncryptionAuthority {
   async encrypt(): Promise<FedosConversationEncryptionResult> {

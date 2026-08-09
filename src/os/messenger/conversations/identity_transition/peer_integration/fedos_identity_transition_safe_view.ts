@@ -17,13 +17,13 @@
  * safe status (`fedos_identity_transition_safe_status.ts`), never
  * collapsed into one boolean.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosIdentityTransitionEvidenceOutcome } from "../../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
-import type { FedosIdentityTransitionAcceptanceState } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
-import type { FedosIdentityTransitionPeerObservationV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
-import type { FedosIdentityTransitionManualVerificationFactV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
-import { fedosIdentityTransitionBuildDeviceEvidenceRows, type FedosIdentityTransitionDeviceEvidenceRowV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_device_evidence_display.js";
-import { type FedosIdentityTransitionWarningCode } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_warning_codes.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosIdentityTransitionEvidenceOutcome } from "../fedos_identity_transition_evidence_evaluation.js";
+import type { FedosIdentityTransitionAcceptanceState } from "../fedos_identity_transition_acceptance_state.js";
+import type { FedosIdentityTransitionPeerObservationV1 } from "./fedos_identity_transition_peer_observation.js";
+import type { FedosIdentityTransitionManualVerificationFactV1 } from "./fedos_identity_transition_manual_verification.js";
+import { fedosIdentityTransitionBuildDeviceEvidenceRows, type FedosIdentityTransitionDeviceEvidenceRowV1 } from "./fedos_identity_transition_device_evidence_display.js";
+import { type FedosIdentityTransitionWarningCode } from "./fedos_identity_transition_warning_codes.js";
 
 export interface FedosIdentityTransitionSafeViewV1 {
   readonly transitionId: string;

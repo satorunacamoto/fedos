@@ -12,8 +12,8 @@ import type { Space, SpaceDecision } from "../community/types.js";
 import {
   validateBeforePublish,
   type PublishDecision,
-} from "../../../nostr/publish.js";
-import type { SignatureVerifier } from "../../../nostr/signature.js";
+} from "../../messenger/adapters/nostr/protocol/publish.js";
+import type { SignatureVerifier } from "../../messenger/adapters/nostr/protocol/signature.js";
 import type { SignedNostrEvent } from "./types.js";
 
 /**

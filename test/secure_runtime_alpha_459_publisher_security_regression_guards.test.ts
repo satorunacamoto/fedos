@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import conversionSource from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

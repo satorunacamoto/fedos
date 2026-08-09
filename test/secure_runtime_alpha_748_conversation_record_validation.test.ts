@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   validateFedosConversationRecord,
   type FedosConversationRecordInput,
-} from "../src/conversation/fedos_conversation_record_validator.js";
+} from "../src/os/messenger/conversations/fedos_conversation_record_validator.js";
 
 const VALID: FedosConversationRecordInput = {
   id: "board-a::thread-1",

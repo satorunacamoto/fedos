@@ -24,19 +24,19 @@
  *   - Every returned `FedosConversationMembership` is deep-frozen.
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembership } from "../../../../../conversation/membership/fedos_conversation_membership.js";
-import { toFedosConversationMembershipId } from "../../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../../conversation/membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationMembership } from "../fedos_conversation_membership.js";
+import { toFedosConversationMembershipId } from "../fedos_conversation_membership_id.js";
+import type { FedosConversationMembershipAuthority } from "../fedos_conversation_membership_authority.js";
 import type {
   FedosConversationMembershipAdmissionPreview,
   FedosConversationMembershipMutationResult,
-} from "../../../../../conversation/membership/fedos_conversation_membership_result.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationRole } from "../../../../../conversation/membership/fedos_conversation_role.js";
-import { isFedosConversationMembershipTransitionAllowed } from "../../../../../conversation/membership/fedos_conversation_membership_transition.js";
-import { deserializeFedosConversationMembership, serializeFedosConversationMembership } from "../../../../../conversation/membership/persistence/fedos_conversation_membership_codec.js";
-import type { FedosConversationMembershipPersistence } from "../../../../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
+} from "../fedos_conversation_membership_result.js";
+import type { FedosConversationParticipantReference } from "../fedos_conversation_participant_reference.js";
+import type { FedosConversationRole } from "../fedos_conversation_role.js";
+import { isFedosConversationMembershipTransitionAllowed } from "../fedos_conversation_membership_transition.js";
+import { deserializeFedosConversationMembership, serializeFedosConversationMembership } from "./fedos_conversation_membership_codec.js";
+import type { FedosConversationMembershipPersistence } from "./fedos_conversation_membership_persistence.js";
 
 function freezeMembership(membership: FedosConversationMembership): FedosConversationMembership {
   return Object.freeze({ ...membership, participant: Object.freeze({ ...membership.participant }) });

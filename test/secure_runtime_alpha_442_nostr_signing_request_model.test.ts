@@ -3,7 +3,7 @@ import {
   isWellFormedFedosNostrUnsignedEventRequest,
   freezeFedosNostrUnsignedEventRequest,
   type FedosNostrUnsignedEventRequest,
-} from "../src/nostr/sign/fedos_nostr_signing_authority.js";
+} from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 
 function validRequest(overrides: Partial<FedosNostrUnsignedEventRequest> = {}): FedosNostrUnsignedEventRequest {
   return {

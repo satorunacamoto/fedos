@@ -38,10 +38,10 @@
  *     one Relay's own failure to unsubscribe cleanly never blocks another.
  */
 
-import type { FedosConversationRelaySet } from "../../../../conversation/transport/relay/fedos_conversation_relay_set.js";
-import type { FedosSubscription } from "../../../../desktop/fedos_subscription.js";
-import { nostrWireEventToFedosEventDescriptor } from "../../../../board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
-import type { FedosArchiveSuppressionInboundHandler } from "../../../../device/archive_suppression_sync/fedos_archive_suppression_inbound_handler.js";
+import type { FedosConversationRelaySet } from "../../adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import type { FedosSubscription } from "../../desktop/fedos_subscription.js";
+import { nostrWireEventToFedosEventDescriptor } from "../../board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
+import type { FedosArchiveSuppressionInboundHandler } from "./fedos_archive_suppression_inbound_handler.js";
 
 const SUPPRESSION_SYNC_SUBSCRIPTION_KIND = 1;
 

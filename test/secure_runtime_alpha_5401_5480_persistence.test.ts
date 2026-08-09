@@ -13,18 +13,18 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
-import { AppendOnlyFedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/append_only_fedos_direct_ratchet_session_persistence.js";
-import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
-import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../src/conversation/ratchet/persistence/append_only_fedos_sealed_direct_ratchet_secret_persistence.js";
-import { FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "../src/conversation/ratchet/fedos_direct_ratchet_counters.js";
+import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
+import { AppendOnlyFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/append_only_fedos_direct_ratchet_session_persistence.js";
+import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../src/os/messenger/conversations/ratchet/persistence/append_only_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_counters.js";
 import {
   createFedosSealedDirectRatchetSecretRecordV1,
   fedosSealedDirectRatchetSecretRecordKey,
-} from "../src/conversation/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../src/conversation/ratchet/fedos_direct_ratchet_session_record.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosDirectRatchetSessionId } from "../src/conversation/ratchet/fedos_direct_ratchet_session_id.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_record.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosDirectRatchetSessionId } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_id.js";
 
 const tmpDirs: string[] = [];
 function makeTmpDir(): string {

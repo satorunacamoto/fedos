@@ -27,7 +27,7 @@
  *     never a mutable object.
  */
 
-import type { FedosBoardId, FedosThreadId } from "../../../board/fedos_board_identifiers.js";
+import type { FedosBoardId, FedosThreadId } from "../board/fedos_board_identifiers.js";
 
 export type FedosConversationId = string & { readonly __brand: "FedosConversationId" };
 

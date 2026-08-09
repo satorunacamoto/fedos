@@ -1,19 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { validateFedosConversationRecord, type FedosConversationRecordInput } from "../../../src/conversation/fedos_conversation_record_validator.js";
-import { validateFedosConversationPolicy } from "../../../src/board/runtime/policy/fedos_conversation_policy.js";
-import { toFedosConversationMembershipId } from "../../../src/conversation/membership/fedos_conversation_membership_id.js";
-import { isFedosConversationMembershipTransitionAllowed } from "../../../src/conversation/membership/fedos_conversation_membership_transition.js";
-import { InMemoryFedosConversationMembershipPersistence } from "../../../src/conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
-import { PersistedFedosConversationMembershipAuthority } from "../../../src/conversation/membership/persistence/persisted_fedos_conversation_membership_authority.js";
-import type { FedosConversationId } from "../../../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { InMemoryFedosConversationCapabilityAuthority } from "../../../src/conversation/capability/in_memory_fedos_conversation_capability_authority.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../../../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { toFedosConversationCapabilityBearerSecret } from "../../../src/conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import { InMemoryFedosConversationPayloadStorage } from "../../../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { InMemoryFedosPayloadRetentionPersistence } from "../../../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
-import { FedosPayloadRetentionAuthority } from "../../../src/conversation/retention/fedos_payload_retention_authority.js";
-import { NoopCryptoProvider } from "../../../src/crypto/noop_crypto.js";
+import { validateFedosConversationRecord, type FedosConversationRecordInput } from "../../../src/os/messenger/conversations/fedos_conversation_record_validator.js";
+import { validateFedosConversationPolicy } from "../../../src/os/messenger/board/runtime/policy/fedos_conversation_policy.js";
+import { toFedosConversationMembershipId } from "../../../src/os/messenger/conversations/membership/fedos_conversation_membership_id.js";
+import { isFedosConversationMembershipTransitionAllowed } from "../../../src/os/messenger/conversations/membership/fedos_conversation_membership_transition.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../../../src/os/messenger/conversations/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import { PersistedFedosConversationMembershipAuthority } from "../../../src/os/messenger/conversations/membership/persistence/persisted_fedos_conversation_membership_authority.js";
+import type { FedosConversationId } from "../../../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../../../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { InMemoryFedosConversationCapabilityAuthority } from "../../../src/os/messenger/conversations/capability/in_memory_fedos_conversation_capability_authority.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../../../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { toFedosConversationCapabilityBearerSecret } from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_bearer_secret.js";
+import { InMemoryFedosConversationPayloadStorage } from "../../../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../../../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
+import { FedosPayloadRetentionAuthority } from "../../../src/os/messenger/conversations/retention/fedos_payload_retention_authority.js";
+import { NoopCryptoProvider } from "../../../src/os/core/crypto/noop_crypto.js";
 import { FedosRuntimeCryptoProvider } from "../../../src/runtime/fedos_runtime_crypto_provider.js";
 
 /**

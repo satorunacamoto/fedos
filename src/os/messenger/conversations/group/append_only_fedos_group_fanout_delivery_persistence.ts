@@ -15,7 +15,7 @@ import {
   type FedosGroupFanoutDeliveryPersistence,
   type FedosGroupFanoutDeliveryPersistenceWriteResult,
   type FedosGroupFanoutDeliveryRecord,
-} from "../../../../conversation/group/fedos_group_fanout_delivery.js";
+} from "./fedos_group_fanout_delivery.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

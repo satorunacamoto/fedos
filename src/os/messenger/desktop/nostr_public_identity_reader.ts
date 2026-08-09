@@ -36,11 +36,11 @@
  *     the Identity Layer's own internal Bootstrap pipeline.
  */
 
-import type { FedosIdentityDescriptor } from "../../../identity/fedos_identity_descriptor.js";
+import type { FedosIdentityDescriptor } from "../../core/identity/fedos_identity_descriptor.js";
 import type {
   FedosNostrPublicIdentitySnapshot,
   FedosNostrPublicIdentitySource,
-} from "../../../identity/fedos_nostr_public_identity_source.js";
+} from "../../core/identity/fedos_nostr_public_identity_source.js";
 import type { FedosPublicIdentityReader } from "./fedos_public_identity_reader.js";
 
 export class NostrPublicIdentityReader implements FedosPublicIdentityReader {

@@ -48,9 +48,9 @@ import type {
 } from "../fedos_conversation_transport_publisher.js";
 import type { FedosPersistedConversationTransportOutboxRecord } from "../fedos_conversation_transport_outbox_codec.js";
 import type { FedosConversationRelaySet } from "./fedos_conversation_relay_set.js";
-import type { FedosRelay } from "../../../../../../desktop/fedos_relay.js";
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
-import type { FedosEventDescriptor } from "../../../../../../desktop/fedos_event_descriptor.js";
+import type { FedosRelay } from "../../../../desktop/fedos_relay.js";
+import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosEventDescriptor } from "../../../../desktop/fedos_event_descriptor.js";
 import { nostrWireEventToFedosEventDescriptor } from "../../../../board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
 
 export type FedosConversationTransportSignedEventSourceFn = (

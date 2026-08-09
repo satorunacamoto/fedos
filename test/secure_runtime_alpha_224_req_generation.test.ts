@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildReqMessage } from "../src/desktop/subscription_messages.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
+import { buildReqMessage } from "../src/os/messenger/desktop/subscription_messages.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_224_req_generation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -8,8 +8,8 @@ import type {
   FedosCoreCrypto,
   FedosCoreDecision,
 } from "../packages/fedos-core-rust/src/index.js";
-import { FedosCoreCryptoProvider } from "../src/crypto/fedos_core_adapter.js";
-import type { CryptoProvider, EncryptRequest } from "../src/crypto/types.js";
+import { FedosCoreCryptoProvider } from "../src/os/core/crypto/fedos_core_adapter.js";
+import type { CryptoProvider, EncryptRequest } from "../src/os/core/crypto/types.js";
 import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 // Sources as strings: prove no crypto-library import and no auto-wiring.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

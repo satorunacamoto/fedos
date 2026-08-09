@@ -4,12 +4,12 @@
  * In-Memory Outbound Request State Persistence.
  */
 
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
 import {
   evaluateFedosDeletionRequestStateWrite,
   type FedosDeletionRequestStatePersistence,
   type FedosDeletionRequestStatePersistenceWriteResult,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_state_persistence.js";
+} from "./fedos_deletion_request_state_persistence.js";
 
 export class InMemoryFedosDeletionRequestStatePersistence implements FedosDeletionRequestStatePersistence {
   readonly #latestByRequestId = new Map<string, FedosPersistedDeletionRequestStateRecordV1>();

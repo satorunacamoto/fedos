@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_274_activitypub_author_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import adapterModuleSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
-import { mapValidatedActivityPubPostToBoardPostInput } from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
+import { mapValidatedActivityPubPostToBoardPostInput } from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
 
 function codeOnly(source: string): string {
   return source

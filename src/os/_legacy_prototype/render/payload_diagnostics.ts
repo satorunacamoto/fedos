@@ -18,7 +18,7 @@
 import type {
   PayloadDiagnosticsDescriptor,
   PayloadPreviewDescriptor,
-} from "../../../storage/encrypted_payload.js";
+} from "../../core/storage/encrypted_payload.js";
 import { escapeHtml } from "./html.js";
 
 /**

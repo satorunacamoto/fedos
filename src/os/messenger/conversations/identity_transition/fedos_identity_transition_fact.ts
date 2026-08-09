@@ -15,9 +15,9 @@
  * Device private key, no root/chain/message key, no filesystem path, no
  * message plaintext.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_KNOWN_EVIDENCE_OUTCOMES, type FedosIdentityTransitionEvidenceOutcome } from "../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import { isWellFormedFedosIdentityTransitionId } from "./fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_KNOWN_EVIDENCE_OUTCOMES, type FedosIdentityTransitionEvidenceOutcome } from "./fedos_identity_transition_evidence_evaluation.js";
 
 export type FedosIdentityTransitionFactConflictState = "none" | "conflicting" | "rollback-detected";
 

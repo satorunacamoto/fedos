@@ -9,8 +9,8 @@ import {
   fedosDeviceReplacementRecordsAreEqual,
   type FedosDeviceReplacementPersistence,
   type FedosDeviceReplacementWriteResult,
-} from "../../../../device/persistence/fedos_device_replacement_persistence.js";
-import type { FedosDeviceReplacementRecordV1 } from "../../../../device/fedos_device_replacement_record.js";
+} from "./fedos_device_replacement_persistence.js";
+import type { FedosDeviceReplacementRecordV1 } from "../fedos_device_replacement_record.js";
 
 export class InMemoryFedosDeviceReplacementPersistence implements FedosDeviceReplacementPersistence {
   readonly #records = new Map<string, FedosDeviceReplacementRecordV1>();

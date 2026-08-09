@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { WebSocketRelay } from "../src/desktop/websocket_relay.js";
-import type { FedosRelaySocket } from "../src/desktop/websocket_relay.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
+import { WebSocketRelay } from "../src/os/messenger/desktop/websocket_relay.js";
+import type { FedosRelaySocket } from "../src/os/messenger/desktop/websocket_relay.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_215_connection_lifecycle.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

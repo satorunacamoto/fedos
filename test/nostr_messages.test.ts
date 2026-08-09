@@ -4,8 +4,8 @@ import {
   isEventMessage,
   isEoseMessage,
   isNoticeMessage,
-} from "../src/nostr/messages.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+} from "../src/os/messenger/adapters/nostr/protocol/messages.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 function validEvent(): NostrEvent {
   return {

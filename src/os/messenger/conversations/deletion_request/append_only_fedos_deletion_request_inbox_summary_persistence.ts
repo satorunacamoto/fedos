@@ -11,7 +11,7 @@ import {
   type FedosDeletionRequestInboxSummaryPersistence,
   type FedosDeletionRequestInboxSummaryV1,
   type FedosDeletionRequestInboxSummaryWriteResult,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_inbox_summary.js";
+} from "./fedos_deletion_request_inbox_summary.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

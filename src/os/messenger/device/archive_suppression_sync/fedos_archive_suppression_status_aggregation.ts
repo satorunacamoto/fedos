@@ -24,14 +24,14 @@
  * Arc only if warranted.
  */
 
-import type { FedosDeviceBindingAccountRef, FedosDeviceTrustState } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeliveryObservationRepository } from "../../../../board/observation/fedos_delivery_observation_repository.js";
-import { FedosDeliveryObservationQuery } from "../../../../board/observation/fedos_delivery_observation_query.js";
-import { toFedosDeliveryObservationSubjectId } from "../../../../board/observation/fedos_delivery_observation.js";
-import { fedosArchiveSuppressionFanoutSubjectId } from "../../../../device/archive_suppression_sync/fedos_archive_suppression_outbound_coordinator.js";
-import type { FedosArchiveSuppressionObservationAuthority } from "../../../../conversation/retention/fedos_archive_suppression_observation_authority.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceTrustState } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
+import { FedosDeliveryObservationQuery } from "../../board/observation/fedos_delivery_observation_query.js";
+import { toFedosDeliveryObservationSubjectId } from "../../board/observation/fedos_delivery_observation.js";
+import { fedosArchiveSuppressionFanoutSubjectId } from "./fedos_archive_suppression_outbound_coordinator.js";
+import type { FedosArchiveSuppressionObservationAuthority } from "../../conversations/retention/fedos_archive_suppression_observation_authority.js";
+import type { FedosConversationPayloadId } from "../../conversations/payload_storage/fedos_conversation_payload_id.js";
 
 /**
  * Per-Device status, from the SENDING Device's own local point of view.

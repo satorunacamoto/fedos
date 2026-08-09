@@ -1,8 +1,114 @@
 # FedOS — Factory / Port Completion Plan
 
-Status: follow-up-arc-ready plan. Pure software architecture, no legal/
-compliance content. Not executed this arc by explicit decision — Port gaps
-documented, `createCommerce()`/`createMessenger()` NOT implemented.
+Status: **MOSTLY EXECUTED** (Architecture Dependency Closure +
+Ports/Factories Completion + OSS Catalog Completion arc, Agent F). Pure
+software architecture, no legal/compliance content. See "Execution record"
+below for exactly what landed, what's still open, and why. The rest of
+this document is the ORIGINAL frozen analysis this pass started from; left
+unedited below except where marked, so the delta is visible.
+
+## Execution record (Agent F, this arc)
+
+**Landed:**
+- `MessagingPort`/`ConversationPort` widened exactly per this plan's own
+  gap list (`read`/`list`, `admit`/`revoke`/`leave`, `readiness`,
+  `createDirect`/`createGroup`, a structured `MessageSendFailureReason`/
+  `MessageReadFailureReason`/`MembershipMutationResult` in place of
+  stringly-typed `reason`, `replyToMessageId` support, speculative
+  `attachments?` REMOVED — nothing in the repo used it). Interface
+  segregation applied: `MessageSendPort`/`MessageHistoryPort`/
+  `MessageInboundPort` and `ConversationCreationPort`/`ConversationQueryPort`/
+  `ConversationMembershipPort`/`ConversationReadinessPort`, composed back
+  into the existing `MessagingPort`/`ConversationPort` names.
+  `NotificationPort`'s own doc comment widened to state the
+  title/body-non-forwarding gap (adapter already documented it; the Port
+  signature itself did not).
+- All 3 existing Port adapters (`messaging_port_adapter.ts`,
+  `conversation_port_adapter.ts`, `notification_port_adapter.ts`) updated
+  in the same pass to genuinely satisfy the widened interfaces against the
+  REAL coordinators (`FedosConversationDirectMessagingCoordinator`,
+  `FedosPrivateConversationConstructionCoordinator`,
+  `FedosConversationMembershipAuthority`) — verified via
+  `test/architecture_boundary_adapter_port_shapes.test.ts` (21 tests) and
+  full `typecheck:core`/`typecheck:electron`.
+- `PaymentProvider` shape test added
+  (`test/architecture_boundary_payment_provider_shape.test.ts`, 8 tests) —
+  the gap this plan and `COMMERCE-ARCHITECTURE.md` both flagged.
+  **`PaymentProvider` itself was NOT redesigned** — the invoice/payment
+  identity field, status-polling method, webhook/callback ingestion,
+  idempotency key, and refund/expiry states this plan's own "not
+  BTCPay-ready" section names are all still absent. Out of scope for this
+  pass; the shape test only proves the CURRENT interface is genuinely
+  implementable, not that it's complete for a real rail.
+- `createMessenger()`/`createCommerce()` both implemented
+  (`src/os/messenger/create_messenger.ts`, `src/os/commerce/create_commerce.ts`)
+  — took option (b) from this plan's own instruction for `createMessenger()`:
+  no `TransportPort` was added (confirmed: Agent N's Nostr type
+  unification did NOT create an injection seam a second transport could
+  use — the real pipeline is still hard-wired to Nostr-shaped delivery
+  internals); the factory instead accepts the 3 widened core Ports
+  directly, with `storage` deliberately OMITTED (not merely defaulted) —
+  see that file's own header for why. `createCommerce()`'s field names
+  were VERIFIED against real code rather than copied from this plan's
+  speculative `{ payments, messaging, storage }` snippet — neither
+  `messaging` nor `storage` is consumed by any real `os/commerce` code
+  today, so `CommerceDependencies` is `{ catalog?, payments?, marketplace? }`
+  instead. Both factories default every omitted dependency to a safe
+  `Noop*`/empty implementation (`noop_messenger_ports.ts`, new this pass) —
+  zero external contact by default, verified by
+  `test/architecture_factory_composition.test.ts` (9 tests).
+- Public API barrels added: `src/os/core/index.ts`,
+  `src/os/messenger/index.ts`, `src/os/commerce/index.ts` — re-export
+  factories + Port/contract types + each capability's real public surface
+  only. Cycle detector re-run after each addition; zero new SCCs.
+- `docs/architecture/CAPABILITY-CATALOG.md`, `ADAPTER-CATALOG.md`,
+  `ADDING-A-CAPABILITY.md`, `ADDING-AN-ADAPTER.md` (with a real, running,
+  4/4-passing worked example, `test/example_fake_transport_adapter.test.ts`)
+  all added this pass.
+- Dependency-rule regression guards added for the 3 rules that had no
+  dedicated test: domain -> Electron-concrete, domain -> third-party-
+  Nostr-SDK, protocol -> desktop-concrete
+  (`test/architecture_dependency_rules_electron_nostrsdk_protocol.test.ts`,
+  5 tests) — the last one also serves as a fresh regression-guard
+  confirming Agent N's backward-dependency fix (`protocol/sign/*.ts` no
+  longer imports from `desktop/`) holds.
+- Internal old-path-import sweep: **811 of 811** known compatibility
+  shims (764 Messenger-migration + 43 Core-extraction + a handful from
+  Agent S's `master_seed` move) had every REPO-INTERNAL importer
+  (`src/`, `test/`) repointed to the canonical location — before: 6,596
+  old-path import occurrences across 1,144 files; after: **0**. The shim
+  files themselves were left completely untouched (any external/unknown
+  consumer keeps resolving). One follow-on fix was required:
+  `test/architecture_boundary_commerce.test.ts`'s own Nostr carve-out
+  check recognized only the OLD `src/nostr/` path — widened to also
+  recognize the NEW canonical `os/messenger/adapters/nostr/protocol/`
+  location once `os/commerce/catalog/adapters/nostr/{bridge,classify}.ts`'s
+  own imports were repointed there.
+- Validation: `typecheck:core`/`typecheck:electron` stayed at the
+  documented 4/0 pre-existing-error baseline through every step (checked
+  after each significant change, not just at the end). All boundary +
+  cycle-detector + new tests pass (56 tests across the 8 architecture
+  test files, plus the 4-test worked example). A representative slice of
+  real Messenger vertical-slice/failure-matrix/structural-guard tests was
+  run; several pre-existing failures were found (`"unsupported-runtime"`
+  WASM/NODE_ENV-environment failures, and structural-guard tests that
+  `readFileSync` an old shim path expecting REAL source text) — each was
+  confirmed pre-existing, NOT caused by this pass, by swapping the
+  affected test file back to its exact `git show HEAD` content and
+  re-running: identical failures reproduce with zero changes from this
+  pass in place.
+
+**Deferred (this pass did not attempt):**
+- A real `TransportPort` and the Nostr-transport rewiring behind it — per
+  this plan's own "genuinely new design work, not a refactor" framing.
+- `PaymentProvider`'s own redesign (invoice identity, status polling,
+  webhooks, idempotency, refund/expiry).
+- `StorageBackend`'s placeholder-vs-real disposition (still reserved, per
+  `CORE-SECRETS-OWNERSHIP-PLAN.md`) — `createMessenger()`/`createCommerce()`
+  both deliberately omit it rather than accept-and-ignore it.
+- Promoting `PaymentProvider` into `os/core/ports/` (stays commerce-local;
+  `createCommerce()`'s own header explains why this pass didn't need to
+  resolve that question to still ship a real, honest factory).
 
 ## The target usage this plan works toward
 

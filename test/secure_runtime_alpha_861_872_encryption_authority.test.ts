@@ -2,11 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosWasmConversationEncryptionAuthority,
   type FedosConversationEncryptionRuntimeBoundary,
-} from "../src/conversation/encryption/fedos_wasm_conversation_encryption_authority.js";
-import type { FedosConversationEncryptionRequest } from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
-import type { FedosMasterSeedAuthority } from "../src/runtime/master_seed/fedos_master_seed_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_wasm_conversation_encryption_authority.js";
+import type { FedosConversationEncryptionRequest } from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
+import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
-import { encodeFedosConversationEnvelopeAssociatedData } from "../src/conversation/envelope/fedos_conversation_envelope_associated_data.js";
+import { encodeFedosConversationEnvelopeAssociatedData } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_associated_data.js";
 
 const REQUEST: FedosConversationEncryptionRequest = {
   envelopeId: "envelope-1" as any,

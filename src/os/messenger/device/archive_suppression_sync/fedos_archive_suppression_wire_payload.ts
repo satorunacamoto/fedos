@@ -30,8 +30,8 @@
 import {
   validateFedosArchiveSuppressionFact,
   type FedosArchiveSuppressionFact,
-} from "../../../../conversation/retention/fedos_archive_suppression_fact.js";
-import type { FedosArchiveSuppressionFactDeviceEvidenceV1 } from "../../../../conversation/retention/fedos_archive_suppression_fact_signing.js";
+} from "../../conversations/retention/fedos_archive_suppression_fact.js";
+import type { FedosArchiveSuppressionFactDeviceEvidenceV1 } from "../../conversations/retention/fedos_archive_suppression_fact_signing.js";
 
 export const FEDOS_ARCHIVE_SUPPRESSION_SYNC_SCHEMA_VERSION = 1 as const;
 

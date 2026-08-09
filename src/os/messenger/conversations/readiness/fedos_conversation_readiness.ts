@@ -44,7 +44,7 @@ import {
   type FedosConversationReadinessAxis,
   type FedosConversationReadinessAxisResult,
   type FedosConversationReadinessAxisState,
-} from "../../../../conversation/readiness/fedos_conversation_readiness_axis.js";
+} from "./fedos_conversation_readiness_axis.js";
 
 export type FedosConversationOverallReadinessOutcome = "draft-ready" | "activation-ready" | "blocked";
 

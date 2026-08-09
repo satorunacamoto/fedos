@@ -29,8 +29,8 @@
  *     "no speculative fields" discipline (Alpha 745).
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationPayloadId } from "./fedos_conversation_payload_id.js";
 
 /** Closed vocabulary of exactly one value — see this file's own header for why. */
 export type FedosConversationPayloadMediaType = "application/octet-stream";

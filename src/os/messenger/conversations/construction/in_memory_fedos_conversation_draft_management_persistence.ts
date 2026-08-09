@@ -19,11 +19,11 @@ import {
   fedosPersistedConversationDraftManagementStatesAreEqual,
   resolveCurrentDraftManagementState,
   type FedosPersistedConversationDraftManagementStateV1,
-} from "../../../../conversation/construction/fedos_persisted_conversation_draft_management_state_v1.js";
+} from "./fedos_persisted_conversation_draft_management_state_v1.js";
 import {
   type FedosConversationDraftManagementPersistence,
   type FedosConversationDraftManagementWriteResult,
-} from "../../../../conversation/construction/fedos_conversation_draft_management_persistence.js";
+} from "./fedos_conversation_draft_management_persistence.js";
 
 export class InMemoryFedosConversationDraftManagementPersistence implements FedosConversationDraftManagementPersistence {
   readonly #records = new Map<string, FedosPersistedConversationDraftManagementStateV1>();

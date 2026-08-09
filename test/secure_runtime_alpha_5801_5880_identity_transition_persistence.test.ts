@@ -5,12 +5,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error same as above.
 import { join } from "node:path";
-import { InMemoryFedosIdentityTransitionFactPersistence } from "../src/conversation/identity_transition/persistence/in_memory_fedos_identity_transition_fact_persistence.js";
-import { AppendOnlyFedosIdentityTransitionFactPersistence } from "../src/conversation/identity_transition/persistence/append_only_fedos_identity_transition_fact_persistence.js";
-import type { FedosIdentityTransitionFactPersistence } from "../src/conversation/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
-import type { FedosIdentityTransitionFactV1 } from "../src/conversation/identity_transition/fedos_identity_transition_fact.js";
-import { isFedosIdentityTransitionFactSuperseded } from "../src/conversation/identity_transition/fedos_identity_transition_fact_conflict_detection.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+import { InMemoryFedosIdentityTransitionFactPersistence } from "../src/os/messenger/conversations/identity_transition/persistence/in_memory_fedos_identity_transition_fact_persistence.js";
+import { AppendOnlyFedosIdentityTransitionFactPersistence } from "../src/os/messenger/conversations/identity_transition/persistence/append_only_fedos_identity_transition_fact_persistence.js";
+import type { FedosIdentityTransitionFactPersistence } from "../src/os/messenger/conversations/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
+import type { FedosIdentityTransitionFactV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_fact.js";
+import { isFedosIdentityTransitionFactSuperseded } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_fact_conflict_detection.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 const OLD_ACCOUNT: FedosDeviceBindingAccountRef = { authority: "nostr", publicIdentifier: "a".repeat(64), identityId: null };
 

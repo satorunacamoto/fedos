@@ -22,17 +22,17 @@
  *     never a raw `FedosConversationCapabilityBearerSecret`.
  */
 
-import { validateFedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference_validator.js";
-import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "../../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationCapabilityId } from "../../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { FEDOS_BOARD_POST_MIN_CREATED_AT, FEDOS_BOARD_POST_MAX_CREATED_AT } from "../../../../../board/fedos_board_post_validator.js";
+import { validateFedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference_validator.js";
+import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "../fedos_conversation_capability_descriptor.js";
+import type { FedosConversationCapabilityId } from "../fedos_conversation_capability_id.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
+import { FEDOS_BOARD_POST_MIN_CREATED_AT, FEDOS_BOARD_POST_MAX_CREATED_AT } from "../../../board/fedos_board_post_validator.js";
 import type {
   FedosPersistedConversationCapabilityIssuedEventV1,
   FedosPersistedConversationCapabilityRedeemedEventV1,
-} from "../../../../../conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
-import type { FedosConversationCapabilityBearerVerifier } from "../../../../../conversation/capability/persistence/fedos_conversation_capability_bearer_verifier.js";
+} from "./fedos_persisted_conversation_capability_v1.js";
+import type { FedosConversationCapabilityBearerVerifier } from "./fedos_conversation_capability_bearer_verifier.js";
 
 function isValidTimestamp(value: unknown): value is number {
   return (

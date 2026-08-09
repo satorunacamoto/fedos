@@ -5,7 +5,7 @@ import {
 } from "../src/os/commerce/catalog/bridge.js";
 import { productFromEvent } from "../src/os/commerce/catalog/adapters/nostr/bridge.js";
 import type { CommunitySpace, GroupSpace } from "../src/os/_legacy_prototype/community/types.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 const OWNER = "a".repeat(64);
 const MEMBER = "c".repeat(64);

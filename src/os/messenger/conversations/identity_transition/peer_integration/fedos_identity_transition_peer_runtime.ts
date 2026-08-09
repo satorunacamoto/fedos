@@ -12,32 +12,32 @@
  * keys, arbitrary profile mutation, direct Device Registry mutation, or a
  * generic trust override.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosDirectRatchetOutboundIntegration } from "../../../../../conversation/ratchet/fedos_direct_ratchet_outbound_integration.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosDirectRatchetOutboundIntegration } from "../../ratchet/fedos_direct_ratchet_outbound_integration.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "../../ratchet/fedos_direct_ratchet_session_record.js";
 import {
   FedosIdentityTransitionOutboundNotificationCoordinator,
   type FedosIdentityTransitionNotifyParams,
   type FedosIdentityTransitionOutboundOutcome,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_outbound_notification_coordinator.js";
+} from "./fedos_identity_transition_outbound_notification_coordinator.js";
 import {
   FedosIdentityTransitionInboundNotificationCoordinator,
   type FedosIdentityTransitionInboundOutcome,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_inbound_notification_coordinator.js";
-import type { FedosIdentityTransitionPeerObservationPersistence } from "../../../../../conversation/identity_transition/peer_integration/persistence/fedos_identity_transition_peer_observation_persistence.js";
-import type { FedosIdentityTransitionPeerObservationV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
-import { isFedosIdentityTransitionPeerObservationSuperseded } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation_conflict_detection.js";
-import { computeFedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionExplicitLocalDecision } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
+} from "./fedos_identity_transition_inbound_notification_coordinator.js";
+import type { FedosIdentityTransitionPeerObservationPersistence } from "./persistence/fedos_identity_transition_peer_observation_persistence.js";
+import type { FedosIdentityTransitionPeerObservationV1 } from "./fedos_identity_transition_peer_observation.js";
+import { isFedosIdentityTransitionPeerObservationSuperseded } from "./fedos_identity_transition_peer_observation_conflict_detection.js";
+import { computeFedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionAcceptanceState, type FedosIdentityTransitionExplicitLocalDecision } from "../fedos_identity_transition_acceptance_state.js";
 import {
   planFedosIdentityTransitionAffectedSessions,
   authorizeFedosIdentityTransitionRatchetReset,
   type FedosIdentityTransitionAffectedSession,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_authorization.js";
-import type { FedosIdentityTransitionRatchetResetLinkPersistence } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
-import type { FedosIdentityTransitionLocalPolicy } from "../../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+} from "./fedos_identity_transition_ratchet_reset_authorization.js";
+import type { FedosIdentityTransitionRatchetResetLinkPersistence } from "./fedos_identity_transition_ratchet_reset_link.js";
+import type { FedosIdentityTransitionLocalPolicy } from "../fedos_identity_transition_evidence_evaluation.js";
 import {
   isKnownFedosIdentityTransitionManualVerificationMethod,
   isKnownFedosIdentityTransitionManualVerificationNoteCode,
@@ -45,15 +45,15 @@ import {
   type FedosIdentityTransitionManualVerificationMethod,
   type FedosIdentityTransitionManualVerificationNoteCode,
   type FedosIdentityTransitionManualVerificationPersistence,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+} from "./fedos_identity_transition_manual_verification.js";
 import type {
   FedosIdentityTransitionConversationContinuityPersistence,
   FedosIdentityTransitionConversationContinuityRecordV1,
   FedosIdentityTransitionConversationContinuityWriteOutcome,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
-import { isFedosIdentityTransitionConversationContinuitySuperseded } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
-import { fedosIdentityTransitionBuildSafeView, type FedosIdentityTransitionSafeViewV1 } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_safe_view.js";
-import type { FedosIdentityTransitionLocalDecisionPersistence } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_local_decision.js";
+} from "./fedos_identity_transition_conversation_continuity.js";
+import { isFedosIdentityTransitionConversationContinuitySuperseded } from "./fedos_identity_transition_conversation_continuity.js";
+import { fedosIdentityTransitionBuildSafeView, type FedosIdentityTransitionSafeViewV1 } from "./fedos_identity_transition_safe_view.js";
+import type { FedosIdentityTransitionLocalDecisionPersistence } from "./fedos_identity_transition_local_decision.js";
 
 export interface FedosIdentityTransitionPeerRuntimeDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;

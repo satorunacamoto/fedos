@@ -10,8 +10,8 @@ import {
   fedosIdentityTransitionPeerObservationLineageKeyParts,
   fedosIdentityTransitionPeerObservationsAreEqual,
   type FedosIdentityTransitionPeerObservationV1,
-} from "../../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
-import type { FedosIdentityTransitionPeerObservationWriteOutcome } from "../../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation_conflict_detection.js";
+} from "../fedos_identity_transition_peer_observation.js";
+import type { FedosIdentityTransitionPeerObservationWriteOutcome } from "../fedos_identity_transition_peer_observation_conflict_detection.js";
 
 export interface FedosIdentityTransitionPeerObservationPersistence {
   putObservation(observation: FedosIdentityTransitionPeerObservationV1): FedosIdentityTransitionPeerObservationWriteOutcome;

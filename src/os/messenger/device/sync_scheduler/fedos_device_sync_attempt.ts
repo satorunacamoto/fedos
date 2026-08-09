@@ -13,7 +13,7 @@
  * `publisher: FedosConversationTransportPublisher` boundary exactly.
  */
 
-import type { FedosDeviceSyncAttemptOutcomeCode } from "../../../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncAttemptOutcomeCode } from "./fedos_device_sync_retry_policy.js";
 
 export interface FedosDeviceSyncAttemptRequest {
   readonly scheduleId: string;

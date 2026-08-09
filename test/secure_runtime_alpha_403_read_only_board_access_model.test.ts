@@ -6,9 +6,9 @@ import readerSource from "../src/os/messenger/board/repository/fedos_board_reade
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 
-import { FedosBoardServiceReader, type FedosBoardReader } from "../src/board/repository/fedos_board_reader.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import { FedosBoardServiceReader, type FedosBoardReader } from "../src/os/messenger/board/repository/fedos_board_reader.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 const BOARD_ID = "board-403";
 

@@ -6,8 +6,8 @@ import adapterModuleSource from "../src/os/messenger/board/atproto/fedos_atproto
 import {
   mapValidatedAtprotoPostToBoardPostInput,
   validateAtprotoBoardPost,
-} from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+} from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 const BASE_POST: FedosValidatedAtprotoPost = {
   uri: "at://did:plc:abc123/app.bsky.feed.post/xyz789",

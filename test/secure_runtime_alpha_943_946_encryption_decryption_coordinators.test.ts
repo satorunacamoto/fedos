@@ -14,27 +14,27 @@
  * path."
  */
 import { describe, it, expect } from "vitest";
-import { FedosConversationEncryptionCoordinator } from "../src/conversation/encryption/fedos_conversation_encryption_coordinator.js";
-import { FedosConversationDecryptionCoordinator } from "../src/conversation/encryption/fedos_conversation_decryption_coordinator.js";
-import { InMemoryFedosConversationDraftPersistence } from "../src/conversation/construction/in_memory_fedos_conversation_draft_persistence.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { InMemoryFedosConversationEncryptionCoordinationPersistence } from "../src/conversation/encryption/coordination/in_memory_fedos_conversation_encryption_coordination_persistence.js";
-import { DelegatingFedosConversationIdentityResolver } from "../src/conversation/encryption/identity/fedos_conversation_identity_resolver.js";
-import { MembershipFedosConversationParticipantResolver } from "../src/conversation/encryption/identity/fedos_conversation_participant_resolver.js";
-import { FixedFedosConversationLocalAccountIndexAuthority } from "../src/conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
-import { FedosConversationKeyResolver } from "../src/conversation/encryption/identity/fedos_conversation_key_resolver.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import { UnavailableFedosConversationEncryptionAuthority } from "../src/conversation/encryption/fedos_unavailable_conversation_encryption_authority.js";
-import { UnavailableFedosConversationDecryptionAuthority } from "../src/conversation/encryption/fedos_unavailable_conversation_decryption_authority.js";
-import { InMemoryFedosConversationActivationPersistence } from "../src/conversation/activation/in_memory_fedos_conversation_activation_persistence.js";
-import { fedosConversationActivationId } from "../src/conversation/activation/fedos_persisted_conversation_activation_v1.js";
-import type { FedosConversationEncryptionAuthority, FedosConversationEncryptionRequest, FedosConversationEncryptionResult } from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
-import type { FedosConversationDecryptionAuthority, FedosConversationDecryptionRequest, FedosConversationDecryptionResult } from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../src/conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+import { FedosConversationEncryptionCoordinator } from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.js";
+import { FedosConversationDecryptionCoordinator } from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_coordinator.js";
+import { InMemoryFedosConversationDraftPersistence } from "../src/os/messenger/conversations/construction/in_memory_fedos_conversation_draft_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { InMemoryFedosConversationEncryptionCoordinationPersistence } from "../src/os/messenger/conversations/encryption/coordination/in_memory_fedos_conversation_encryption_coordination_persistence.js";
+import { DelegatingFedosConversationIdentityResolver } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_identity_resolver.js";
+import { MembershipFedosConversationParticipantResolver } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.js";
+import { FixedFedosConversationLocalAccountIndexAuthority } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_local_account_index_authority.js";
+import { FedosConversationKeyResolver } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_key_resolver.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import { UnavailableFedosConversationEncryptionAuthority } from "../src/os/messenger/conversations/encryption/fedos_unavailable_conversation_encryption_authority.js";
+import { UnavailableFedosConversationDecryptionAuthority } from "../src/os/messenger/conversations/encryption/fedos_unavailable_conversation_decryption_authority.js";
+import { InMemoryFedosConversationActivationPersistence } from "../src/os/messenger/conversations/activation/in_memory_fedos_conversation_activation_persistence.js";
+import { fedosConversationActivationId } from "../src/os/messenger/conversations/activation/fedos_persisted_conversation_activation_v1.js";
+import type { FedosConversationEncryptionAuthority, FedosConversationEncryptionRequest, FedosConversationEncryptionResult } from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionAuthority, FedosConversationDecryptionRequest, FedosConversationDecryptionResult } from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "../src/os/messenger/conversations/construction/fedos_persisted_conversation_draft_record_v1.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 
 const CONVERSATION_ID = "private-draft::direct::alpha-943" as FedosConversationId;
 const ALICE: FedosConversationParticipantReference = { authority: "fedos", publicIdentifier: "alice-local", identityId: null };

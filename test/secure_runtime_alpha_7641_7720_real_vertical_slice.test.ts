@@ -23,18 +23,18 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
-import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
-import { makeFedosDeliveryAttemptSubjectId } from "../src/board/observation/fedos_delivery_attempt_subject_id.js";
-import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/board/observation/append_only_fedos_delivery_observation_persistence.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
-import { hydrateFedosDeliveryRecoveryState } from "../src/desktop/host/fedos_delivery_recovery_hydration.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { FedosValidatingDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosDeliveryRetryQuery } from "../src/os/messenger/board/observation/fedos_delivery_retry_query.js";
+import { makeFedosDeliveryAttemptSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_attempt_subject_id.js";
+import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/append_only_fedos_delivery_observation_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { hydrateFedosDeliveryRecoveryState } from "../src/os/messenger/desktop/host/fedos_delivery_recovery_hydration.js";
 
 function makeDir(): string {
   return mkdtempSync(join(tmpdir(), "fedos-7641-7720-vslice-"));

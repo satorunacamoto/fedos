@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_264_nostr_thread_mapping.md?raw";
-import { mapValidatedNostrEventToBoardPostInput } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
+import { mapValidatedNostrEventToBoardPostInput } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
 
 const ROOT_ID = "a".repeat(64);
 const PARENT_ID = "b".repeat(64);

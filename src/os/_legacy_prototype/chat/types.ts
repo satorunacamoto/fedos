@@ -12,7 +12,7 @@
  * lists; signature verification is a separate concern (Stage 8).
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 
 /** A chat is either a DM thread or a (multi-party) group chat. */
 export type ChatKind = "dm" | "group";

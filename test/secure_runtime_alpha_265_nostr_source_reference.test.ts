@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_265_nostr_source_reference.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import adapterModuleSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
-import { mapValidatedNostrEventToBoardPostInput } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
+import { mapValidatedNostrEventToBoardPostInput } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
 
 function codeOnly(source: string): string {
   return source

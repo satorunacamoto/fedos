@@ -11,10 +11,23 @@
  * and nothing here is wired into the UI or Worker. Publishing is a boundary that
  * exists to be tested and composed, not an auto-executed action. Callers are
  * expected to run `validateBeforePublish` (and any policy check) first.
+ *
+ * Circular Dependency Break Plan, Edge 2 (`docs/architecture/CIRCULAR-DEPENDENCY-BREAK-PLAN.md`)
+ * — this file used to import `isSignedEventLike()` and `SignedNostrEvent`
+ * from `_legacy_prototype/sign/{validate,types}.ts`, the one live→legacy
+ * dependency in the whole Messenger capability. Both are gone: `isNostrEvent()`
+ * (`./event.ts`) already validates the IDENTICAL structural shape
+ * (id/pubkey/created_at/kind/tags/content/sig, same hex-length checks) — it
+ * was a genuine duplicate of `isSignedEventLike()`, not a near-miss — so no
+ * new/copied function was needed, and `NostrEvent` (`./types.ts`, the
+ * canonical type per the Nostr Consolidation Plan's own Step 1) replaces
+ * `SignedNostrEvent` (structurally compatible: same seven fields, `NostrEvent`
+ * merely narrower on `tags` mutability, which every existing caller here
+ * already satisfies).
  */
 
-import type { SignedNostrEvent } from "../../../../_legacy_prototype/sign/types.js";
-import { isSignedEventLike } from "../../../../_legacy_prototype/sign/validate.js";
+import { isNostrEvent } from "./event.js";
+import type { NostrEvent } from "./types.js";
 import type { SignatureVerifier } from "./signature.js";
 import type { RelaySocketLike, WebSocketFactory } from "./ws_relay.js";
 
@@ -36,7 +49,7 @@ export interface PublishResult {
  * resolves a `PublishResult` with `accepted: false` instead.
  */
 export interface RelayPublisher {
-  publish(event: SignedNostrEvent): Promise<PublishResult>;
+  publish(event: NostrEvent): Promise<PublishResult>;
 }
 
 /**
@@ -68,7 +81,7 @@ export function parseOkMessage(raw: string): PublishResult | null {
  * never publishes — it only gates what is safe to hand to a `RelayPublisher`.
  */
 export type PublishDecision =
-  | { readonly ok: true; readonly event: SignedNostrEvent }
+  | { readonly ok: true; readonly event: NostrEvent }
   | { readonly ok: false; readonly reason: string };
 
 /**
@@ -81,7 +94,7 @@ export async function validateBeforePublish(
   event: unknown,
   verifier: SignatureVerifier,
 ): Promise<PublishDecision> {
-  if (!isSignedEventLike(event)) {
+  if (!isNostrEvent(event)) {
     return { ok: false, reason: "event is not a structurally valid signed event" };
   }
   const verified = await verifier.verify(event);
@@ -107,7 +120,7 @@ export interface MockRelayPublisherOptions {
  */
 export class MockRelayPublisher implements RelayPublisher {
   /** Every event handed to `publish`, in order. */
-  readonly published: SignedNostrEvent[] = [];
+  readonly published: NostrEvent[] = [];
   readonly #accepted: boolean;
   readonly #message: string;
   readonly #relayUrl: string | undefined;
@@ -118,7 +131,7 @@ export class MockRelayPublisher implements RelayPublisher {
     this.#relayUrl = options.relayUrl;
   }
 
-  publish(event: SignedNostrEvent): Promise<PublishResult> {
+  publish(event: NostrEvent): Promise<PublishResult> {
     this.published.push(event);
     const result: PublishResult = {
       eventId: event.id,
@@ -164,7 +177,7 @@ export class WebSocketRelayPublisher implements RelayPublisher {
     this.#onNotice = options.onNotice;
   }
 
-  async publish(event: SignedNostrEvent): Promise<PublishResult> {
+  async publish(event: NostrEvent): Promise<PublishResult> {
     const socket: RelaySocketLike = await this.#factory(this.url);
 
     return await new Promise<PublishResult>((resolve) => {

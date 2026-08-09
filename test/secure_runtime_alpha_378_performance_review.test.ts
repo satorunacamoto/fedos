@@ -6,11 +6,11 @@ import querySource from "../src/os/messenger/board/query/fedos_board_query.ts?ra
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import typesSource from "../src/os/messenger/board/query/fedos_board_query_types.ts?raw";
 
-import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { toFedosBoardId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId } from "../src/board/fedos_board_identifiers.js";
+import { FedosBoardQuery } from "../src/os/messenger/board/query/fedos_board_query.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { toFedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 function codeOnly(source: string): string {
   return source

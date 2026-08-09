@@ -11,8 +11,8 @@
  * result alone.
  */
 
-import type { FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
+import type { FedosConversationCapabilityDescriptor } from "./fedos_conversation_capability_descriptor.js";
+import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
 
 export type FedosConversationCapabilityRedemptionResult =
   | { readonly outcome: "redeemed"; readonly descriptor: FedosConversationCapabilityDescriptor; readonly membership: FedosConversationMembership }

@@ -7,11 +7,11 @@ import {
   FEDOS_BOARD_QUERY_MIN_LIMIT,
   FEDOS_BOARD_QUERY_MAX_LIMIT,
   FEDOS_BOARD_QUERY_DEFAULT_LIMIT,
-} from "../src/board/query/fedos_board_query.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { toFedosBoardId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/query/fedos_board_query.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { toFedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 function rootInput(id: string, createdAt: number): FedosBoardPostInput {
   return {

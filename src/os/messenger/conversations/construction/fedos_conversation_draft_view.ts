@@ -16,14 +16,14 @@
  * non-secret descriptor).
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationPolicy } from "../../../../board/runtime/policy/fedos_conversation_policy.js";
-import type { FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationCapabilityBearerSecret } from "../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import type { FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
-import type { FedosConversationLifecycleState } from "../../../../conversation/construction/fedos_conversation_lifecycle_state.js";
-import type { FedosPrivateConversationPolicyReference } from "../../../../conversation/construction/fedos_conversation_draft_record.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationPolicy } from "../../board/runtime/policy/fedos_conversation_policy.js";
+import type { FedosConversationCapabilityDescriptor } from "../capability/fedos_conversation_capability_descriptor.js";
+import type { FedosConversationCapabilityBearerSecret } from "../capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosPrivateConversationMode } from "./fedos_private_conversation_id.js";
+import type { FedosConversationLifecycleState } from "./fedos_conversation_lifecycle_state.js";
+import type { FedosPrivateConversationPolicyReference } from "./fedos_conversation_draft_record.js";
 
 /** An immutable read view of a private draft — the resolved policy is included so a caller never needs the policy authority itself. */
 export interface FedosConversationDraftView {

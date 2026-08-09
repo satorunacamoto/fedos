@@ -41,12 +41,12 @@
  * PURE: no I/O, no clock, no crypto, no mutation. Every input is injected.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import { isFedosDeviceBindingRevoked, isFedosDeviceBindingTrusted } from "../../../../device/fedos_device_binding.js";
-import type { FedosDirectRatchetSessionPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import { isFedosDeviceBindingRevoked, isFedosDeviceBindingTrusted } from "../../device/fedos_device_binding.js";
+import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "./fedos_direct_ratchet_session_record.js";
 
 /**
  * The closed set of reasons a message did NOT get forward secrecy. Every

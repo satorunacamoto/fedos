@@ -12,11 +12,11 @@ import persistenceSource from "../src/os/messenger/board/persistence/fedos_board
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
-import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId, FedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { FedosBoardQuery } from "../src/os/messenger/board/query/fedos_board_query.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId, FedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");

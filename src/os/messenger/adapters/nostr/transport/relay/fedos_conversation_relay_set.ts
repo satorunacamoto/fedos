@@ -17,7 +17,7 @@
  * failure.
  */
 
-import type { FedosRelay } from "../../../../../../desktop/fedos_relay.js";
+import type { FedosRelay } from "../../../../desktop/fedos_relay.js";
 
 export interface FedosConversationRelaySetConnectionOutcome {
   readonly url: string;

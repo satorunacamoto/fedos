@@ -10,8 +10,8 @@
 import {
   fedosPersistedDeletionExecutionRecordsAreEqual,
   type FedosPersistedDeletionExecutionRecordV1,
-} from "../../../../conversation/deletion/fedos_persisted_deletion_execution_record_v1.js";
-import type { FedosDeletionExecutionPersistence, FedosDeletionExecutionPersistenceWriteResult } from "../../../../conversation/deletion/fedos_deletion_execution_persistence.js";
+} from "./fedos_persisted_deletion_execution_record_v1.js";
+import type { FedosDeletionExecutionPersistence, FedosDeletionExecutionPersistenceWriteResult } from "./fedos_deletion_execution_persistence.js";
 
 export class InMemoryFedosDeletionExecutionPersistence implements FedosDeletionExecutionPersistence {
   readonly #records = new Map<string, FedosPersistedDeletionExecutionRecordV1>();

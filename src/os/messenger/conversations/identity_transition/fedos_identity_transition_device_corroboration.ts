@@ -26,11 +26,11 @@ import {
   isFedosDeviceBindingRevoked,
   isFedosDeviceBindingTrusted,
   type FedosDeviceBindingV1,
-} from "../../../../device/fedos_device_binding.js";
-import { verifyFedosDeviceSigningSignature } from "../../../../device/crypto/fedos_device_signing_keypair.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionDeviceCorroborationDigest } from "../../../../conversation/identity_transition/fedos_identity_transition_canonical.js";
-import { fedosIdentityTransitionAccountRefsEqual, type FedosIdentityTransitionRecordV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_record.js";
-import type { FedosIdentityTransitionEvidenceStatus } from "../../../../conversation/identity_transition/fedos_identity_transition_vocabulary.js";
+} from "../../device/fedos_device_binding.js";
+import { verifyFedosDeviceSigningSignature } from "../../device/crypto/fedos_device_signing_keypair.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionDeviceCorroborationDigest } from "./fedos_identity_transition_canonical.js";
+import { fedosIdentityTransitionAccountRefsEqual, type FedosIdentityTransitionRecordV1 } from "./fedos_identity_transition_record.js";
+import type { FedosIdentityTransitionEvidenceStatus } from "./fedos_identity_transition_vocabulary.js";
 
 const SCHNORR_SIGNATURE_HEX_PATTERN = /^[0-9a-f]{128}$/;
 

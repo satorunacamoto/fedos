@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_284_atproto_author_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import adapterModuleSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
-import { mapValidatedAtprotoPostToBoardPostInput } from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+import { mapValidatedAtprotoPostToBoardPostInput } from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 function codeOnly(source: string): string {
   return source

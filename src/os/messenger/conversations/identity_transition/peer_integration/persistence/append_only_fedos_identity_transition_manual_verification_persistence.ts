@@ -12,8 +12,8 @@ import {
   fedosIdentityTransitionManualVerificationFactsAreEqual,
   type FedosIdentityTransitionManualVerificationFactV1,
   type FedosIdentityTransitionManualVerificationPersistence,
-} from "../../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../../../device/fedos_device_binding.js";
+} from "../fedos_identity_transition_manual_verification.js";
+import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

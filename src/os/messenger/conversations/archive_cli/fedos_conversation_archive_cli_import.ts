@@ -29,19 +29,19 @@
  *     new failure vocabulary is invented for the decrypt step itself.
  */
 
-import type { FedosConversationArchiveEncryptionAuthority, FedosConversationArchiveImportResult } from "../../../../conversation/archive/fedos_conversation_archive_encryption.js";
+import type { FedosConversationArchiveEncryptionAuthority, FedosConversationArchiveImportResult } from "../archive/fedos_conversation_archive_encryption.js";
 import {
   detectFedosConversationArchiveDuplicates,
   type FedosConversationArchiveDuplicateDetectionDependencies,
   type FedosConversationArchiveDuplicateReport,
-} from "../../../../conversation/archive/fedos_conversation_archive_duplicate_detection.js";
+} from "../archive/fedos_conversation_archive_duplicate_detection.js";
 import {
   restoreFedosConversationArchiveBundle,
   type FedosConversationArchiveRestoreDependencies,
   type FedosConversationArchiveRestoreResult,
-} from "../../../../conversation/archive/fedos_conversation_archive_restore.js";
-import type { FedosConversationEnvelopeEncryptionSuite } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosConversationArchiveCliPackageV1 } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package.js";
+} from "../archive/fedos_conversation_archive_restore.js";
+import type { FedosConversationEnvelopeEncryptionSuite } from "../envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationArchiveCliPackageV1 } from "./fedos_conversation_archive_cli_package.js";
 
 export interface FedosConversationArchiveCliOpenRequest {
   readonly package: FedosConversationArchiveCliPackageV1;

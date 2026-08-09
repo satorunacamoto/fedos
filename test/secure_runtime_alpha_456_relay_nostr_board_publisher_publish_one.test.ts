@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { FedosRelayNostrBoardPublisher } from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
-import type { FedosNostrBoardPublishEntry } from "../src/board/publish/nostr/fedos_nostr_board_publisher.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
-import type { FedosRelay } from "../src/desktop/fedos_relay.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
-import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
+import { FedosRelayNostrBoardPublisher } from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
+import type { FedosNostrBoardPublishEntry } from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
+import type { FedosRelay } from "../src/os/messenger/desktop/fedos_relay.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
 import type {
   FedosRelayMessageListener,
   FedosSubscriptionListener,
-} from "../src/desktop/fedos_relay_listeners.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+} from "../src/os/messenger/desktop/fedos_relay_listeners.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import source from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
 

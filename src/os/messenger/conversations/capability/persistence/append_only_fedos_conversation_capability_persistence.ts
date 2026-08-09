@@ -30,12 +30,12 @@ import {
   reconstructFedosConversationCapabilityRecord,
   type FedosConversationCapabilityPersistence,
   type FedosConversationCapabilityPersistenceWriteResult,
-} from "../../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+} from "./fedos_conversation_capability_persistence.js";
 import {
   fedosConversationCapabilityRedeemedEventKey,
   type FedosPersistedConversationCapabilityEventV1,
   type FedosPersistedConversationCapabilityRecordV1,
-} from "../../../../../conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
+} from "./fedos_persisted_conversation_capability_v1.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

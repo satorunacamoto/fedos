@@ -13,10 +13,16 @@
  *   - no caller-supplied `pubkey`/`id`/`sig` field exists on this type.
  *   - no Relay destination, no Outbox identifier, no arbitrary metadata.
  *
- * Output reuses the EXISTING `FedosNostrWireEvent` shape
- * (`src/desktop/fedos_nostr_wire_event.ts`, Secure Runtime Alpha 234)
- * rather than a fourth duplicate signed-event type (Secure Runtime
- * Alpha 426's own reuse decision).
+ * Output reuses the canonical `NostrEvent` shape (`../types.ts`) — the
+ * SAME type `desktop/fedos_nostr_wire_event.ts` re-exports as
+ * `FedosNostrWireEvent` since the Nostr Consolidation Plan's Step 1
+ * unified the two (see that file's own header comment) — rather than a
+ * fourth duplicate signed-event type (Secure Runtime Alpha 426's own
+ * reuse decision). Nostr Consolidation Plan Step 3/4: this file used to
+ * import `FedosNostrWireEvent` from `../../../../desktop/fedos_nostr_wire_event.ts`,
+ * a logical backward dependency (this "protocol primitives" layer
+ * reaching UP into a desktop-composition-adjacent location); it now
+ * imports `NostrEvent` from its own `../types.ts` instead.
  *
  * Secure Runtime Alpha 1399/1402 (Alpha 1391–1470 Nostr Private Direct
  * and Pairwise Fanout Delivery Arc) — ADDITIVE extension: the closed
@@ -29,7 +35,7 @@
  * unchanged (still `kind` is a fixed CLOSED SET of exactly two values,
  * never an arbitrary caller-chosen number).
  */
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
+import type { NostrEvent } from "../types.js";
 import type { FedosNostrSigningPublicIdentity } from "./fedos_nostr_signing_public_identity.js";
 import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../../conversation_delivery/fedos_private_nostr_delivery_mode.js";
 
@@ -131,7 +137,7 @@ export function freezeFedosNostrUnsignedEventRequest(
 }
 
 export interface FedosNostrSigningAuthority {
-  signEvent(request: FedosNostrUnsignedEventRequest): Promise<FedosNostrWireEvent | null>;
+  signEvent(request: FedosNostrUnsignedEventRequest): Promise<NostrEvent | null>;
   /**
    * Secure Runtime Alpha 684 — derives the given account's public
    * identity WITHOUT signing anything. `accountIndex` is a `u32`

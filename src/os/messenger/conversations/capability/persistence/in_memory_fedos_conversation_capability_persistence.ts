@@ -17,12 +17,12 @@ import {
   reconstructFedosConversationCapabilityRecord,
   type FedosConversationCapabilityPersistence,
   type FedosConversationCapabilityPersistenceWriteResult,
-} from "../../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+} from "./fedos_conversation_capability_persistence.js";
 import {
   fedosConversationCapabilityRedeemedEventKey,
   type FedosPersistedConversationCapabilityEventV1,
   type FedosPersistedConversationCapabilityRecordV1,
-} from "../../../../../conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
+} from "./fedos_persisted_conversation_capability_v1.js";
 
 export class InMemoryFedosConversationCapabilityPersistence implements FedosConversationCapabilityPersistence {
   readonly #events = new Map<string, FedosPersistedConversationCapabilityEventV1>();

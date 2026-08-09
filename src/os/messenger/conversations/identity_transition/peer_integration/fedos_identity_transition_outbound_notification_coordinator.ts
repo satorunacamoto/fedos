@@ -29,29 +29,29 @@
  * coordinator has no way to know whether the peer ever imports what it
  * publishes.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import { isFedosDeviceBindingRevoked } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosDeviceSigningKeypair } from "../../../../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import { isFedosDeviceBindingRevoked } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosDeviceSigningKeypair } from "../../../device/crypto/fedos_device_signing_keypair.js";
 import {
   authorizeFedosRatchetPeerCapabilityContent,
   createFedosRatchetPeerCapabilityDeviceSignature,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
-import { encodeFedosRatchetPeerCapabilityControlPayload } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import { isWellFormedFedosIdentityTransitionRecordV1, type FedosIdentityTransitionRecordV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_record.js";
-import { fedosIdentityTransitionBodyHash } from "../../../../../conversation/identity_transition/fedos_identity_transition_canonical.js";
-import { verifyFedosIdentityTransitionNewKeyProof, type FedosIdentityTransitionNewKeyProofV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_new_key_proof.js";
-import { verifyFedosIdentityTransitionContinuityEvidence, type FedosIdentityTransitionContinuityEvidenceV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_continuity_evidence.js";
-import type { FedosIdentityTransitionDeviceCorroborationV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_device_corroboration.js";
+} from "../../ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+import { encodeFedosRatchetPeerCapabilityControlPayload } from "../../ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+import { isWellFormedFedosIdentityTransitionRecordV1, type FedosIdentityTransitionRecordV1 } from "../fedos_identity_transition_record.js";
+import { fedosIdentityTransitionBodyHash } from "../fedos_identity_transition_canonical.js";
+import { verifyFedosIdentityTransitionNewKeyProof, type FedosIdentityTransitionNewKeyProofV1 } from "../fedos_identity_transition_new_key_proof.js";
+import { verifyFedosIdentityTransitionContinuityEvidence, type FedosIdentityTransitionContinuityEvidenceV1 } from "../fedos_identity_transition_continuity_evidence.js";
+import type { FedosIdentityTransitionDeviceCorroborationV1 } from "../fedos_identity_transition_device_corroboration.js";
 import {
   FEDOS_IDENTITY_TRANSITION_NOTIFICATION_DEVICE_SIGNATURE_PREFIX,
   FEDOS_IDENTITY_TRANSITION_NOTIFICATION_MAX_DEVICE_CORROBORATIONS,
   canonicalSerializeFedosIdentityTransitionNotificationContent,
   isWellFormedFedosIdentityTransitionNotificationNonce,
   type FedosIdentityTransitionNotificationV1,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_notification.js";
+} from "./fedos_identity_transition_notification.js";
 
 export interface FedosIdentityTransitionNotificationSendResult {
   readonly outcome: "delivered" | "rejected" | "failed" | "later";

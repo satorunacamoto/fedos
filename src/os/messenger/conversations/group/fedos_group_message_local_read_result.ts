@@ -24,7 +24,7 @@
  *     recipient set for whatever reason, or a stale/foreign message id).
  */
 
-import type { FedosConversationDirectMessageReadResult } from "../../../../conversation/messaging/fedos_conversation_direct_message_read_result.js";
+import type { FedosConversationDirectMessageReadResult } from "../messaging/fedos_conversation_direct_message_read_result.js";
 
 export type FedosGroupMessageLocalReadResult =
   | FedosConversationDirectMessageReadResult

@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_307_board_application_service.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 function codeOnly(source: string): string {
   return source

@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   NoopStorageBackend,
   PlaceholderStorageBackend,
-} from "../src/storage/noop_storage.js";
+} from "../src/os/core/storage/noop_storage.js";
 import {
   isSensitiveStorageValue,
   looksLikeUrlOrPath,
   reviewStoragePacket,
-} from "../src/storage/policy.js";
-import type { StoragePacket, StorageRef } from "../src/storage/types.js";
-import { STORAGE_BACKEND_KINDS } from "../src/storage/types.js";
+} from "../src/os/core/storage/policy.js";
+import type { StoragePacket, StorageRef } from "../src/os/core/storage/types.js";
+import { STORAGE_BACKEND_KINDS } from "../src/os/core/storage/types.js";
 // Source-level checks: prove no real backend import and no runtime/worker auto-wire.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageTypesSource from "../src/os/core/storage/types.ts?raw";

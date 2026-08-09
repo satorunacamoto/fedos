@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
-import { makeFedosDeliveryAttemptSubjectId } from "../src/board/observation/fedos_delivery_attempt_subject_id.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosValidatingDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_write_validator.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
+import { makeFedosDeliveryAttemptSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_attempt_subject_id.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import transitionGraphSource from "../src/os/messenger/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

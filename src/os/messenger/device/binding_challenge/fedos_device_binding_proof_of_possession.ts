@@ -36,13 +36,13 @@ import {
   isWellFormedFedosDevicePublicKeyHex,
   verifyFedosDeviceSigningSignature,
   type FedosDeviceSigningKeypair,
-} from "../../../../device/crypto/fedos_device_signing_keypair.js";
+} from "../crypto/fedos_device_signing_keypair.js";
 import {
   isFedosDeviceBindingChallengeExpired,
   isWellFormedFedosDeviceBindingChallengeV1,
   serializeFedosDeviceBindingChallengeV1,
   type FedosDeviceBindingChallengeV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
+} from "./fedos_device_binding_challenge.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 

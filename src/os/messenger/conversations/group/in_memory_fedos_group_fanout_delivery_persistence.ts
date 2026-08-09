@@ -12,7 +12,7 @@ import {
   type FedosGroupFanoutDeliveryPersistence,
   type FedosGroupFanoutDeliveryPersistenceWriteResult,
   type FedosGroupFanoutDeliveryRecord,
-} from "../../../../conversation/group/fedos_group_fanout_delivery.js";
+} from "./fedos_group_fanout_delivery.js";
 
 export class InMemoryFedosGroupFanoutDeliveryPersistence implements FedosGroupFanoutDeliveryPersistence {
   readonly #records = new Map<string, FedosGroupFanoutDeliveryRecord>();

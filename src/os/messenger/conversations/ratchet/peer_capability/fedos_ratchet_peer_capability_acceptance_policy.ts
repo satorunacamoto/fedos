@@ -13,11 +13,11 @@
  * is a terminal, non-accepting outcome specifically so a caller can never
  * mistake it for acceptance.
  */
-import type { FedosDeviceTrustState } from "../../../../../device/fedos_device_binding.js";
-import type { FedosRatchetPeerCapabilityEntry, FedosRatchetPeerCapabilityRoute } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import { fedosRatchetPeerCapabilityEntryKey } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import type { FedosRatchetPeerCapabilityEvidenceLevel } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
-import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_outcome.js";
+import type { FedosDeviceTrustState } from "../../../device/fedos_device_binding.js";
+import type { FedosRatchetPeerCapabilityEntry, FedosRatchetPeerCapabilityRoute } from "./fedos_ratchet_peer_capability_vocabulary.js";
+import { fedosRatchetPeerCapabilityEntryKey } from "./fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosRatchetPeerCapabilityEvidenceLevel } from "./fedos_ratchet_peer_capability_authentication.js";
+import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "./fedos_ratchet_peer_capability_acceptance_outcome.js";
 
 export interface FedosRatchetPeerCapabilityPriorAcceptedSummary {
   readonly revision: number;

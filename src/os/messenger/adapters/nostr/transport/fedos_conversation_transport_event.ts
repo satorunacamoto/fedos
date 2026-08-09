@@ -68,7 +68,7 @@
 import { Buffer } from "node:buffer";
 import type { FedosConversationMessageEnvelope } from "../../../conversations/envelope/fedos_conversation_message_envelope.js";
 import type { FedosNostrUnsignedEventRequest } from "../protocol/sign/fedos_nostr_signing_authority.js";
-import type { FedosEventDescriptor } from "../../../../../desktop/fedos_event_descriptor.js";
+import type { FedosEventDescriptor } from "../../../desktop/fedos_event_descriptor.js";
 import { toFedosConversationEnvelopeId, type FedosConversationEnvelopeId } from "../../../conversations/envelope/fedos_conversation_envelope_id.js";
 import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../conversation_delivery/fedos_private_nostr_delivery_mode.js";
 

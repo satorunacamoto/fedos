@@ -53,9 +53,9 @@
  *     bytes this module frames are already sealed by the caller.
  */
 
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
-import { deserializeFedosConversationArchiveManifest } from "../../../../../conversation/archive/fedos_conversation_archive_manifest_codec.js";
-import type { FedosConversationArchiveManifestV1 } from "../../../../../conversation/archive/fedos_conversation_archive_manifest.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../fedos_conversation_archive_schema_version.js";
+import { deserializeFedosConversationArchiveManifest } from "../fedos_conversation_archive_manifest_codec.js";
+import type { FedosConversationArchiveManifestV1 } from "../fedos_conversation_archive_manifest.js";
 import type { AeadCiphertextWire } from "../../../../../runtime/fedos_wasm_loader.js";
 
 const CONTAINER_SCHEMA_VERSION_BYTE = 1;

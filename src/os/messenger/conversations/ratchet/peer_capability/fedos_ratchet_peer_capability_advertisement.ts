@@ -29,15 +29,15 @@
  * `isWellFormedFedosDirectRatchetNip17Payload`). Unknown fields fail
  * closed.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
 import {
   FEDOS_RATCHET_PEER_CAPABILITY_MAX_ENTRIES,
   FEDOS_RATCHET_PEER_CAPABILITY_SCHEMA_VERSION,
   isWellFormedFedosRatchetPeerCapabilityEntry,
   type FedosRatchetPeerCapabilityEntry,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import { isWellFormedFedosRatchetPeerCapabilityNonce } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_nonce.js";
-import type { FedosRatchetPeerCapabilityAccountAuthorizationV1 } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+} from "./fedos_ratchet_peer_capability_vocabulary.js";
+import { isWellFormedFedosRatchetPeerCapabilityNonce } from "./fedos_ratchet_peer_capability_nonce.js";
+import type { FedosRatchetPeerCapabilityAccountAuthorizationV1 } from "./fedos_ratchet_peer_capability_authentication.js";
 
 /** Distinct from every other signed-content domain in this codebase — see this file's own header. */
 export const FEDOS_RATCHET_PEER_CAPABILITY_ADVERTISEMENT_DOMAIN = "fedos-ratchet-peer-capability-advertisement-v1";

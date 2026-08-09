@@ -13,10 +13,10 @@
  * accept/reject/manual-verification decision") and Phase R ("restart …
  * decision … state reconstructs exactly").
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
-import type { FedosIdentityTransitionExplicitLocalDecision } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import { isWellFormedFedosIdentityTransitionId } from "../fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../fedos_identity_transition_id_limits.js";
+import type { FedosIdentityTransitionExplicitLocalDecision } from "../fedos_identity_transition_acceptance_state.js";
 
 export interface FedosIdentityTransitionLocalDecisionFactV1 {
   readonly schemaVersion: 1;

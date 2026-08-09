@@ -35,7 +35,7 @@ import {
   serializeFedosDeviceTransferPackageToBytes,
   deserializeFedosDeviceTransferPackageFromBytes,
   type FedosDeviceTransferPackageV1,
-} from "../../../../device/transfer/fedos_device_transfer_package.js";
+} from "../transfer/fedos_device_transfer_package.js";
 
 export const FEDOS_DEVICE_RELAY_SYNC_SCHEMA_VERSION = 1 as const;
 /** The ONE route version this Arc freezes (Phase B) — a proprietary kind:1 + marker-tag route, NOT NIP-17. No silent fallback to any other route exists anywhere in this Arc. */

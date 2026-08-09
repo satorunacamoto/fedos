@@ -37,7 +37,7 @@
  * place account index and identity are both already in hand together.
  */
 
-import type { FedosConversationCreatorIdentityAuthority, FedosConversationCreatorIdentityResolution } from "../../../../../conversation/construction/fedos_conversation_creator_identity_authority.js";
+import type { FedosConversationCreatorIdentityAuthority, FedosConversationCreatorIdentityResolution } from "../../construction/fedos_conversation_creator_identity_authority.js";
 
 /** Reuses `FedosConversationCreatorIdentityResolution`'s own closed vocabulary verbatim — see this file's own header for why no parallel type is introduced. */
 export type FedosConversationLocalIdentityResolution = FedosConversationCreatorIdentityResolution;

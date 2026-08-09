@@ -50,8 +50,8 @@
  */
 
 import type { FedosConversationRelaySet } from "./fedos_conversation_relay_set.js";
-import type { FedosSubscriptionFilter } from "../../../../../../desktop/fedos_subscription_filter.js";
-import type { FedosSubscription } from "../../../../../../desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../../../../desktop/fedos_subscription_filter.js";
+import type { FedosSubscription } from "../../../../desktop/fedos_subscription.js";
 import { FedosRelayEventDeduplicator } from "./fedos_relay_event_deduplicator.js";
 import { nostrWireEventToFedosEventDescriptor } from "../../../../board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
 import {

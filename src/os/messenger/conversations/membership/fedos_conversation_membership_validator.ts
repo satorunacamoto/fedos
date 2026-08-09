@@ -31,13 +31,13 @@
  *   - Deep-copies and `Object.freeze`s the result.
  */
 
-import { FEDOS_CONVERSATION_ROLES, type FedosConversationRole } from "../../../../conversation/membership/fedos_conversation_role.js";
-import { FEDOS_CONVERSATION_MEMBERSHIP_STATES, type FedosConversationMembershipState } from "../../../../conversation/membership/fedos_conversation_membership_state.js";
-import { validateFedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference_validator.js";
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import { FEDOS_BOARD_POST_MIN_CREATED_AT, FEDOS_BOARD_POST_MAX_CREATED_AT } from "../../../../board/fedos_board_post_validator.js";
+import { FEDOS_CONVERSATION_ROLES, type FedosConversationRole } from "./fedos_conversation_role.js";
+import { FEDOS_CONVERSATION_MEMBERSHIP_STATES, type FedosConversationMembershipState } from "./fedos_conversation_membership_state.js";
+import { validateFedosConversationParticipantReference } from "./fedos_conversation_participant_reference_validator.js";
+import type { FedosConversationMembership } from "./fedos_conversation_membership.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationMembershipId } from "./fedos_conversation_membership_id.js";
+import { FEDOS_BOARD_POST_MIN_CREATED_AT, FEDOS_BOARD_POST_MAX_CREATED_AT } from "../../board/fedos_board_post_validator.js";
 
 export interface FedosConversationMembershipInput {
   readonly id: string;

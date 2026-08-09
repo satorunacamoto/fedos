@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NullRelay } from "../src/desktop/null_relay.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_213_null_relay.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -32,21 +32,21 @@
  * `docs/reviews/private_protocol_delivery_group_v1/`).
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { toFedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosPrivateConversationConstructionCoordinator } from "../../../../conversation/construction/fedos_private_conversation_construction_coordinator.js";
-import type { FedosConversationCapabilityRedemptionAuthority } from "../../../../conversation/capability/fedos_conversation_capability_redemption_authority.js";
-import type { FedosConversationDirectActivationCoordinator } from "../../../../conversation/activation/fedos_conversation_direct_activation_coordinator.js";
-import { toFedosPrivateConversationId } from "../../../../conversation/construction/fedos_private_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { toFedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosPrivateConversationConstructionCoordinator } from "../construction/fedos_private_conversation_construction_coordinator.js";
+import type { FedosConversationCapabilityRedemptionAuthority } from "../capability/fedos_conversation_capability_redemption_authority.js";
+import type { FedosConversationDirectActivationCoordinator } from "../activation/fedos_conversation_direct_activation_coordinator.js";
+import { toFedosPrivateConversationId } from "../construction/fedos_private_conversation_id.js";
 import {
   toFedosGroupDirectPathId,
   toFedosGroupPairKey,
   type FedosGroupDirectPathPersistence,
   type FedosGroupDirectPathRecord,
-} from "../../../../conversation/group/fedos_group_direct_path.js";
+} from "./fedos_group_direct_path.js";
 
 export type FedosGroupPreparePathResult =
   | { readonly outcome: "ready"; readonly path: FedosGroupDirectPathRecord }

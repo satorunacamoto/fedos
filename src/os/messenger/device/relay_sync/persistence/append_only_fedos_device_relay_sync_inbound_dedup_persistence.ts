@@ -13,7 +13,7 @@ import {
   type FedosDeviceRelaySyncImportWriteResult,
   type FedosDeviceRelaySyncInboundDedupPersistence,
   type FedosPersistedDeviceRelaySyncImportRecordV1,
-} from "../../../../../device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
+} from "./fedos_device_relay_sync_inbound_dedup_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

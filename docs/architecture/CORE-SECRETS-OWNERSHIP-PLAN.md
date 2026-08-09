@@ -1,8 +1,42 @@
 # FedOS — Core Secrets Ownership Plan
 
-Status: follow-up-arc-ready plan. Pure software architecture, no legal/
-compliance content. Not executed this arc by explicit decision (documentation
-only — no source moved).
+Status: **EXECUTED** (Architecture Dependency Closure arc). Pure software
+architecture, no legal/compliance content. This plan's own "minimal safe
+migration order" (bottom of this doc) was carried out step by step:
+
+1. Investigated the exact `FedosDirectRatchetSealingAuthority` surface —
+   narrow (two methods, `sealDirectRatchetSecret`/`restoreDirectRatchetSecret`),
+   and the coupling was TYPE-ONLY: `FedosWasmMasterSeedAuthority` never
+   CALLS anything on a `FedosDirectRatchetSealingAuthority` instance — it
+   IMPLEMENTS that interface. Core PROVIDES this capability; only the
+   Messenger ratchet runtimes (`FedosDirectRatchetStateRuntime`,
+   `FedosDirectRatchetConversationRuntime`) hold a value of this type and
+   CALL its methods. The only other implementer,
+   `FedosProductionMasterSeedAuthority`, already lives inside
+   `os/messenger/desktop/production_activation/` (intra-domain, not a
+   boundary issue).
+2. Added `SealingAuthorityPort` to `src/os/core/ports/sealing_authority_port.ts`
+   — same two methods, identical names/signatures (a pure dependency-
+   direction fix, not a rename, to avoid rippling into every consumer call
+   site).
+3. `src/os/messenger/conversations/ratchet/fedos_direct_ratchet_sealing_authority.ts`
+   now re-exports `SealingAuthorityPort` under its original name
+   (`export type { SealingAuthorityPort as FedosDirectRatchetSealingAuthority }`)
+   — every existing Messenger-side import of this type, unchanged, still
+   resolves to the identical structural shape.
+4. `src/runtime/master_seed/` (5 files) moved to `src/os/core/vault/wasm/`,
+   old paths shimmed (`export * from "...";`). `fedos_wasm_master_seed_authority.ts`
+   now imports `SealingAuthorityPort` from `../../ports/sealing_authority_port.js`
+   instead of the concrete Messenger type — `os/core` no longer has any
+   import reaching into `os/messenger`.
+5. `test/architecture_boundary_core.test.ts` (which now genuinely scans
+   `os/core/vault/wasm/`, unlike before the move) confirms 0 reverse edges.
+
+`os/core/storage/`'s disposition was addressed separately: relabeled as an
+honestly-documented reserved seam (`src/os/core/storage/README.md`), the
+lowest-risk of the three options below given it's independent of the
+secrets-authority move and a real `AppendOnlyPersistence<T>` extraction
+deserves its own reviewed arc.
 
 ## The problem, stated precisely
 

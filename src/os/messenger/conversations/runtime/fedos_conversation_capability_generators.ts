@@ -29,8 +29,8 @@ import {
   toFedosConversationCapabilityBearerSecret,
   type FedosConversationCapabilityBearerSecret,
   type FedosConversationCapabilitySecretGenerator,
-} from "../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import type { FedosConversationCapabilityIdGenerator } from "../../../../conversation/capability/in_memory_fedos_conversation_capability_authority.js";
+} from "../capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationCapabilityIdGenerator } from "../capability/in_memory_fedos_conversation_capability_authority.js";
 
 export class FedosSecureRandomCapabilityIdGenerator implements FedosConversationCapabilityIdGenerator {
   generateCapabilityId(): string {

@@ -6,9 +6,9 @@ import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../../../src/
 import { canProtocolAdapterSupport, type ProtocolAdapterKind } from "../../../src/os/_legacy_prototype/federation/capability_matrix.js";
 import { canRead, canPost } from "../../../src/os/_legacy_prototype/community/policy.js";
 import type { CommunitySpace } from "../../../src/os/_legacy_prototype/community/types.js";
-import { FedosDesktopHost } from "../../../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../../../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../../../src/board/persistence/in_memory_fedos_board_persistence.js";
+import { FedosDesktopHost } from "../../../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../../../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../../../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import moderationSource from "../../../src/os/messenger/board/fedos_board_moderation.ts?raw";
 

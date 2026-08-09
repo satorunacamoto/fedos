@@ -8,23 +8,23 @@ import { join } from "node:path";
 import {
   toFedosConversationEnvelopeId,
   FedosSecureRandomConversationEnvelopeIdGenerator,
-} from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
+} from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
 import {
   validateFedosConversationMessageEnvelope,
   type FedosConversationMessageEnvelopeInput,
-} from "../src/conversation/envelope/fedos_conversation_message_envelope_validator.js";
+} from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope_validator.js";
 import {
   encodeFedosConversationEnvelopeAssociatedData,
   fedosConversationEnvelopeAssociatedDataBytesAreEqual,
-} from "../src/conversation/envelope/fedos_conversation_envelope_associated_data.js";
+} from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_associated_data.js";
 import {
   serializeFedosConversationMessageEnvelope,
   deserializeFedosConversationMessageEnvelope,
-} from "../src/conversation/envelope/persistence/fedos_conversation_message_envelope_codec.js";
-import { fedosPersistedConversationMessageEnvelopesAreEqual } from "../src/conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
-import type { FedosPersistedConversationMessageEnvelopeV1 } from "../src/conversation/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
+} from "../src/os/messenger/conversations/envelope/persistence/fedos_conversation_message_envelope_codec.js";
+import { fedosPersistedConversationMessageEnvelopesAreEqual } from "../src/os/messenger/conversations/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
+import type { FedosPersistedConversationMessageEnvelopeV1 } from "../src/os/messenger/conversations/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
 
 const VALID_INPUT: FedosConversationMessageEnvelopeInput = {
   id: "envelope-1",

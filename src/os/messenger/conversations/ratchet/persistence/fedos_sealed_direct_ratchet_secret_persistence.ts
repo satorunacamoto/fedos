@@ -8,7 +8,7 @@
  * Search -- this Arc's own Absolute Prohibitions and Phase J structural
  * guards forbid reusing any of those for secret-bearing state.
  */
-import type { FedosSealedDirectRatchetSecretRecordV1 } from "../../../../../conversation/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
+import type { FedosSealedDirectRatchetSecretRecordV1 } from "../fedos_sealed_direct_ratchet_secret_record.js";
 
 export type FedosSealedDirectRatchetSecretPersistenceWriteResult = "written" | "already-present" | "conflict" | "failed";
 

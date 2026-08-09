@@ -25,12 +25,12 @@
  *     structural marker.
  */
 
-import type { FedosNostrUnsignedEventRequest } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosEventDescriptor } from "../../../../desktop/fedos_event_descriptor.js";
+import type { FedosNostrUnsignedEventRequest } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosEventDescriptor } from "../../desktop/fedos_event_descriptor.js";
 import {
   isWellFormedFedosArchiveSuppressionWirePayloadV1,
   type FedosArchiveSuppressionWirePayloadV1,
-} from "../../../../device/archive_suppression_sync/fedos_archive_suppression_wire_payload.js";
+} from "./fedos_archive_suppression_wire_payload.js";
 
 /** Distinct from `FEDOS_DEVICE_RELAY_SYNC_TAG` (`["fedos-device-sync","1"]`) and `["fedos-private","1"]` — a recognizable, non-authenticating marker; the real route-identity boundary is `schemaVersion` inside the signed content plus this fixed tag together. */
 export const FEDOS_ARCHIVE_SUPPRESSION_SYNC_TAG: readonly [string, string] = ["fedos-archive-suppression-sync", "1"];

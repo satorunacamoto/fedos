@@ -14,7 +14,7 @@ import {
   type FedosDeviceRelaySyncObservationState,
   type FedosDeviceRelaySyncObservationV1,
   type FedosDeviceRelaySyncObservationWriteResult,
-} from "../../../../../device/relay_sync/fedos_device_relay_sync_observation.js";
+} from "../fedos_device_relay_sync_observation.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

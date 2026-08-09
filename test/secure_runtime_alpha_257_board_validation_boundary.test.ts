@@ -9,7 +9,7 @@ import {
   FEDOS_BOARD_POST_MIN_CREATED_AT,
   FEDOS_BOARD_POST_MAX_CREATED_AT,
   type FedosBoardPostInput,
-} from "../src/board/fedos_board_post_validator.js";
+} from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 const VALID: FedosBoardPostInput = {
   id: "post-1",

@@ -16,26 +16,26 @@
  *     status observation is asserted as a completed fact.
  */
 
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosPayloadRetentionAuthority } from "../../../../conversation/retention/fedos_payload_retention_authority.js";
-import { getFedosDeletionCapabilityDescriptor } from "../../../../conversation/deletion/fedos_deletion_capability_descriptor.js";
-import type { FedosDeletionOperation } from "../../../../conversation/deletion/fedos_deletion_operation.js";
-import type { FedosDeletionEvidence } from "../../../../conversation/deletion/fedos_deletion_evidence.js";
-import type { FedosDeletionTarget } from "../../../../conversation/deletion/fedos_deletion_target.js";
-import type { FedosDeletionStatus, FedosDeletionStatusObservation } from "../../../../conversation/deletion/fedos_deletion_status.js";
-import { fedosDeletionApplicableNonGuarantees, type FedosDeletionNonGuaranteeCode } from "../../../../conversation/deletion/fedos_deletion_non_guarantees.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
+import { getFedosDeletionCapabilityDescriptor } from "./fedos_deletion_capability_descriptor.js";
+import type { FedosDeletionOperation } from "./fedos_deletion_operation.js";
+import type { FedosDeletionEvidence } from "./fedos_deletion_evidence.js";
+import type { FedosDeletionTarget } from "./fedos_deletion_target.js";
+import type { FedosDeletionStatus, FedosDeletionStatusObservation } from "./fedos_deletion_status.js";
+import { fedosDeletionApplicableNonGuarantees, type FedosDeletionNonGuaranteeCode } from "./fedos_deletion_non_guarantees.js";
 import {
   resolveFedosDeletionArchiveFileHandle,
   type FedosDeletionArchiveFileHandle,
-} from "../../../../conversation/deletion/fedos_deletion_archive_file_authority.js";
+} from "./fedos_deletion_archive_file_authority.js";
 import {
   fedosConversationArchiveCliNodeFileSystem,
   type FedosConversationArchiveCliFileSystem,
-} from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_file_system.js";
+} from "../archive_cli/fedos_conversation_archive_cli_file_system.js";
 import type { FedosSyncDeviceRegistry } from "../../../../sync/fedos_sync_device_registry.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 
 export type FedosDeletionAssessmentBlocker = "none" | "not-found" | "already-terminal" | "unsupported";
 

@@ -30,7 +30,7 @@
  * `FedosConversationId` with no mode check) keys off it unchanged.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 
 export type FedosPrivateConversationMode = "private-group" | "direct";
 

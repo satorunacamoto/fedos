@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { FedosHostDeliveryController } from "../src/desktop/host/fedos_host_delivery_controller.js";
-import { FedosPublishScheduler } from "../src/board/outbox/fedos_publish_scheduler.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/board/outbox/fedos_board_outbox_publisher.js";
-import type { FedosPersistedBoardOutboxRecordV1 } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosHostDeliveryController } from "../src/os/messenger/desktop/host/fedos_host_delivery_controller.js";
+import { FedosPublishScheduler } from "../src/os/messenger/board/outbox/fedos_publish_scheduler.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
+import type { FedosPersistedBoardOutboxRecordV1 } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { FedosValidatingDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_write_validator.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import source from "../src/os/messenger/desktop/host/fedos_host_delivery_controller.ts?raw";
 

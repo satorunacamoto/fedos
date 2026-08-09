@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { MockFedosBoardOutboxPublisher } from "../src/board/outbox/fedos_board_outbox_publisher.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { MockFedosBoardOutboxPublisher } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_507_host_constructor_and_factory_wiring.md?raw";
 

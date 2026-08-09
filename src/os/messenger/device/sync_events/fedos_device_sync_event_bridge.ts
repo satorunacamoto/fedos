@@ -93,9 +93,9 @@ import type {
   FedosDeviceSyncAttemptFn,
   FedosDeviceSyncAttemptRequest,
   FedosDeviceSyncAttemptResult,
-} from "../../../../device/sync_scheduler/fedos_device_sync_attempt.js";
-import { classifyFedosDeviceSyncRetryDirective, type FedosDeviceSyncAttemptOutcomeCode } from "../../../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
-import type { FedosDeviceSyncEvent, FedosDeviceSyncEventListener } from "../../../../device/sync_events/fedos_device_sync_event.js";
+} from "../sync_scheduler/fedos_device_sync_attempt.js";
+import { classifyFedosDeviceSyncRetryDirective, type FedosDeviceSyncAttemptOutcomeCode } from "../sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncEvent, FedosDeviceSyncEventListener } from "./fedos_device_sync_event.js";
 
 function defaultNowSeconds(): number {
   return Math.floor(Date.now() / 1000);

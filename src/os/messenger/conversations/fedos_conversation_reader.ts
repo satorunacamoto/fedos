@@ -48,11 +48,11 @@
  *     corruption check, at restart, before any Runtime read ever runs).
  */
 
-import type { FedosBoardId, FedosThreadId } from "../../../board/fedos_board_identifiers.js";
-import { toFedosConversationId, type FedosConversationId } from "../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationRecord } from "../../../conversation/fedos_conversation_record.js";
-import { deserializeFedosConversationRecord } from "../../../conversation/persistence/fedos_conversation_record_codec.js";
-import type { FedosConversationPersistence } from "../../../conversation/persistence/fedos_conversation_persistence.js";
+import type { FedosBoardId, FedosThreadId } from "../board/fedos_board_identifiers.js";
+import { toFedosConversationId, type FedosConversationId } from "./fedos_conversation_id.js";
+import type { FedosConversationRecord } from "./fedos_conversation_record.js";
+import { deserializeFedosConversationRecord } from "./persistence/fedos_conversation_record_codec.js";
+import type { FedosConversationPersistence } from "./persistence/fedos_conversation_persistence.js";
 
 export class FedosConversationReader {
   readonly #persistence: FedosConversationPersistence;

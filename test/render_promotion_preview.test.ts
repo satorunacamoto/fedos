@@ -15,7 +15,7 @@ import type {
   RelaySocketEventType,
   RelaySocketLike,
   WebSocketFactory,
-} from "../src/nostr/ws_relay.js";
+} from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 

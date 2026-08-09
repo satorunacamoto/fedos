@@ -260,9 +260,9 @@
  */
 
 import { FedosRuntimeIdentity } from "../../../runtime/fedos_runtime_identity.js";
-import { resolveNostrPublicIdentitySource } from "../../../identity/fedos_nostr_public_identity_source_resolver.js";
-import type { FedosNostrPublicIdentitySnapshot } from "../../../identity/fedos_nostr_public_identity_source.js";
-import type { FedosIdentityDescriptor } from "../../../identity/fedos_identity_descriptor.js";
+import { resolveNostrPublicIdentitySource } from "../../core/identity/fedos_nostr_public_identity_source_resolver.js";
+import type { FedosNostrPublicIdentitySnapshot } from "../../core/identity/fedos_nostr_public_identity_source.js";
+import type { FedosIdentityDescriptor } from "../../core/identity/fedos_identity_descriptor.js";
 import type { FedosPublicIdentityReader } from "./fedos_public_identity_reader.js";
 import { NostrPublicIdentityReader } from "./nostr_public_identity_reader.js";
 

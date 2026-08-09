@@ -33,8 +33,8 @@
  *     or synthesized beyond `provider`.
  */
 
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
-import type { FedosEventDescriptor } from "../../../../../desktop/fedos_event_descriptor.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosEventDescriptor } from "../../../desktop/fedos_event_descriptor.js";
 
 export function nostrWireEventToFedosEventDescriptor(event: FedosNostrWireEvent): FedosEventDescriptor {
   return Object.freeze({

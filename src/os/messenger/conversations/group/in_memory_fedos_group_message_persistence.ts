@@ -11,7 +11,7 @@ import {
   type FedosGroupMessagePersistence,
   type FedosGroupMessagePersistenceWriteResult,
   type FedosGroupMessageRecord,
-} from "../../../../conversation/group/fedos_group_message.js";
+} from "./fedos_group_message.js";
 
 export class InMemoryFedosGroupMessagePersistence implements FedosGroupMessagePersistence {
   readonly #records = new Map<string, FedosGroupMessageRecord>();

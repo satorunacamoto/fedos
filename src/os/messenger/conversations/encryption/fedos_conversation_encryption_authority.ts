@@ -69,10 +69,10 @@
  * interface without them).
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosConversationEnvelopeEncryptionSuite } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import type { FedosConversationEnvelopeEncryptionSuite } from "../envelope/fedos_conversation_message_envelope.js";
 
 /**
  * Everything the Authority needs to build the associated-data header

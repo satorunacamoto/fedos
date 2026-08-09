@@ -23,10 +23,10 @@
  * claim of anything beyond "a real, currently-active Conversation with
  * this id exists locally".
  */
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationPersistence } from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../../../../conversation/persistence/fedos_persisted_conversation_record_v1.js";
-import type { FedosConversationActiveLookupResult } from "../../../../conversation/activation/fedos_conversation_active_lookup.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../persistence/fedos_persisted_conversation_record_v1.js";
+import type { FedosConversationActiveLookupResult } from "../activation/fedos_conversation_active_lookup.js";
 
 export class FedosDeletionRequestConversationExistenceAdapter implements Pick<FedosConversationPersistence, "getConversation"> {
   readonly #resolveActiveConversation: (conversationId: FedosConversationId) => FedosConversationActiveLookupResult;

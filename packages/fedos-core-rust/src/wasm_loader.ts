@@ -27,7 +27,12 @@
  *     WASM instantiation) requires its own separate, explicit stage.
  */
 
-import { PlaceholderFedosCoreCrypto } from "./index.js";
+// Architecture Dependency Closure arc — imports the placeholder core from
+// its own leaf file (`./placeholder_core.ts`), not from `./index.ts` (the
+// package's public barrel file, which itself re-exports this very module) —
+// that index.js <-> wasm_loader.ts pair used to be this package's one real
+// (runtime-level) file-to-file import cycle.
+import { PlaceholderFedosCoreCrypto } from "./placeholder_core.js";
 import type { FedosCoreCrypto } from "./types.js";
 
 /**

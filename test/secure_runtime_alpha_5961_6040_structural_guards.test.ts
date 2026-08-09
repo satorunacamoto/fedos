@@ -11,7 +11,7 @@ import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { FEDOS_DIRECT_RATCHET_SESSION_RESET_REASONS } from "../src/conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+import { FEDOS_DIRECT_RATCHET_SESSION_RESET_REASONS } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_reset_reason.js";
 
 declare const process: { cwd(): string };
 

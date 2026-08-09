@@ -43,13 +43,13 @@
  * `"nostr"` (Alpha 890's own pairwise/Direct-mode, ECDH-only scope).
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembershipId } from "../../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosNostrAuthorBindingAuthority } from "../../../../../board/runtime/identity/fedos_nostr_author_binding_types.js";
-import type { FedosConversationIdentityResolver } from "../../../../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
-import type { FedosConversationParticipantResolver } from "../../../../../conversation/encryption/identity/fedos_conversation_participant_resolver.js";
-import type { FedosConversationLocalAccountIndexAuthority } from "../../../../../conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
-import { resolveFedosConversationCounterpartyPublicKeyHex } from "../../../../../conversation/encryption/identity/fedos_conversation_counterparty_public_key_resolver.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationMembershipId } from "../../membership/fedos_conversation_membership_id.js";
+import type { FedosNostrAuthorBindingAuthority } from "../../../board/runtime/identity/fedos_nostr_author_binding_types.js";
+import type { FedosConversationIdentityResolver } from "./fedos_conversation_identity_resolver.js";
+import type { FedosConversationParticipantResolver } from "./fedos_conversation_participant_resolver.js";
+import type { FedosConversationLocalAccountIndexAuthority } from "./fedos_conversation_local_account_index_authority.js";
+import { resolveFedosConversationCounterpartyPublicKeyHex } from "./fedos_conversation_counterparty_public_key_resolver.js";
 
 export type FedosConversationKeyResolution =
   | {

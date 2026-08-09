@@ -37,7 +37,7 @@ import type {
   FedosBoardOutboxPublishResult,
 } from "../../outbox/fedos_board_outbox_publisher.js";
 import type { FedosNostrBoardPublisher } from "./fedos_nostr_board_publisher.js";
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 import { nostrPublishOneResultToOutboundPublishResult } from "./fedos_nostr_publish_result_to_outbound_publish_result.js";
 import { outboundPublishResultToFedosBoardOutboxPublishResult } from "../fedos_outbound_publish_result_to_board_outbox_publish_result.js";
 

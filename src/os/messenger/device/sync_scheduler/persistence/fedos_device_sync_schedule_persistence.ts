@@ -16,13 +16,13 @@ import {
   failFedosDeviceSyncSchedule,
   requireOperatorForFedosDeviceSyncSchedule,
   type FedosDeviceSyncScheduleV1,
-} from "../../../../../device/sync_scheduler/fedos_device_sync_schedule.js";
+} from "../fedos_device_sync_schedule.js";
 import {
   fedosDeviceSyncScheduleEventKey,
   fedosPersistedDeviceSyncScheduleEventsAreEqual,
   type FedosPersistedDeviceSyncScheduleEventV1,
   type FedosPersistedDeviceSyncScheduleCreatedEventV1,
-} from "../../../../../device/sync_scheduler/persistence/fedos_persisted_device_sync_schedule_event_v1.js";
+} from "./fedos_persisted_device_sync_schedule_event_v1.js";
 
 export type FedosDeviceSyncSchedulePersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

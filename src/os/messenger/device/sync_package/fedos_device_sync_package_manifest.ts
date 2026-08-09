@@ -12,8 +12,8 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { serializeFedosDeviceSyncSessionToBytes } from "../../../../device/sync_session/fedos_device_sync_session_codec.js";
-import type { FedosDeviceSyncSessionV1 } from "../../../../device/sync_session/fedos_device_sync_session.js";
+import { serializeFedosDeviceSyncSessionToBytes } from "../sync_session/fedos_device_sync_session_codec.js";
+import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
 
 export const FEDOS_DEVICE_SYNC_PACKAGE_MANIFEST_SCHEMA_VERSION = 1 as const;
 

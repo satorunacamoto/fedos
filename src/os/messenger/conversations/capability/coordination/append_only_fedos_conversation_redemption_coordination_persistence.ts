@@ -17,8 +17,8 @@ import {
   resolveCurrentCoordinationRecord,
   type FedosConversationRedemptionCoordinationPersistence,
   type FedosConversationRedemptionCoordinationWriteResult,
-} from "../../../../../conversation/capability/coordination/fedos_conversation_redemption_coordination_persistence.js";
-import type { FedosPersistedConversationRedemptionCoordinationV1 } from "../../../../../conversation/capability/coordination/fedos_persisted_conversation_redemption_coordination_v1.js";
+} from "./fedos_conversation_redemption_coordination_persistence.js";
+import type { FedosPersistedConversationRedemptionCoordinationV1 } from "./fedos_persisted_conversation_redemption_coordination_v1.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

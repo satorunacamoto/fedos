@@ -11,8 +11,8 @@ import {
   resolveCurrentActivationRecord,
   type FedosConversationActivationPersistence,
   type FedosConversationActivationPersistenceWriteResult,
-} from "../../../../conversation/activation/fedos_conversation_activation_persistence.js";
-import type { FedosPersistedConversationActivationV1 } from "../../../../conversation/activation/fedos_persisted_conversation_activation_v1.js";
+} from "./fedos_conversation_activation_persistence.js";
+import type { FedosPersistedConversationActivationV1 } from "./fedos_persisted_conversation_activation_v1.js";
 
 export class InMemoryFedosConversationActivationPersistence implements FedosConversationActivationPersistence {
   readonly #records = new Map<string, FedosPersistedConversationActivationV1>();

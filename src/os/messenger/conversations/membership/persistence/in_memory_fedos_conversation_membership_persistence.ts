@@ -22,8 +22,8 @@ import {
   resolveCurrentMembershipRecord,
   type FedosConversationMembershipPersistence,
   type FedosConversationMembershipPersistenceWriteResult,
-} from "../../../../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
-import type { FedosPersistedConversationMembershipV1 } from "../../../../../conversation/membership/persistence/fedos_persisted_conversation_membership_v1.js";
+} from "./fedos_conversation_membership_persistence.js";
+import type { FedosPersistedConversationMembershipV1 } from "./fedos_persisted_conversation_membership_v1.js";
 
 export class InMemoryFedosConversationMembershipPersistence implements FedosConversationMembershipPersistence {
   readonly #records = new Map<string, FedosPersistedConversationMembershipV1>();

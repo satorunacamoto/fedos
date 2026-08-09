@@ -46,22 +46,22 @@ import {
   createFedosDeviceBindingBoundary,
   type FedosDeviceBindingBoundary,
   type FedosDeviceBindingBoundaryDeps,
-} from "../../../../device/binding_challenge/fedos_device_binding_boundary_factory.js";
-import type { FedosDeviceBindingChallengeAction, FedosDeviceBindingChallengeV1 } from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
-import type { FedosDeviceBindingAccountAuthorizationV1 } from "../../../../device/binding_challenge/fedos_device_binding_account_authorization.js";
-import type { FedosDeviceBindingProofOfPossessionV1 } from "../../../../device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+} from "../binding_challenge/fedos_device_binding_boundary_factory.js";
+import type { FedosDeviceBindingChallengeAction, FedosDeviceBindingChallengeV1 } from "../binding_challenge/fedos_device_binding_challenge.js";
+import type { FedosDeviceBindingAccountAuthorizationV1 } from "../binding_challenge/fedos_device_binding_account_authorization.js";
+import type { FedosDeviceBindingProofOfPossessionV1 } from "../binding_challenge/fedos_device_binding_proof_of_possession.js";
 import type {
   FedosDeviceBindingRegistrationResult,
   FedosDeviceBindingRevocationResult,
-} from "../../../../device/binding_challenge/fedos_device_binding_registration_authority.js";
-import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1 } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
+} from "../binding_challenge/fedos_device_binding_registration_authority.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1 } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import {
   prepareFedosDeviceSyncSession,
   validateFedosDeviceSyncSession,
   type FedosDeviceSyncSessionPrepResult,
   type FedosDeviceSyncSessionValidationOutcome,
-} from "../../../../device/sync_session/fedos_device_sync_session.js";
+} from "../sync_session/fedos_device_sync_session.js";
 
 export interface FedosDeviceSyncDeviceStatusV1 {
   readonly deviceId: string;

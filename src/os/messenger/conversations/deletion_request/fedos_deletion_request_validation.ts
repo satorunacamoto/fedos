@@ -14,7 +14,7 @@
  * codebase supplies them.
  */
 
-import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
+import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
 
 /** PROPOSED (review Doc 10) — 14 days, in seconds. */
 export const FEDOS_DELETION_REQUEST_MAX_LIFETIME_SECONDS = 14 * 24 * 60 * 60;

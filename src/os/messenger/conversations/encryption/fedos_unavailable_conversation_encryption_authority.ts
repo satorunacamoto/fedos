@@ -29,7 +29,7 @@ import type {
   FedosConversationEncryptionAuthority,
   FedosConversationEncryptionRequest,
   FedosConversationEncryptionResult,
-} from "../../../../conversation/encryption/fedos_conversation_encryption_authority.js";
+} from "./fedos_conversation_encryption_authority.js";
 
 export class UnavailableFedosConversationEncryptionAuthority implements FedosConversationEncryptionAuthority {
   async encrypt(_request: FedosConversationEncryptionRequest): Promise<FedosConversationEncryptionResult> {

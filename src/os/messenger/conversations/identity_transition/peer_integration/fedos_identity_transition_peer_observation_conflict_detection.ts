@@ -20,7 +20,7 @@ import {
   fedosIdentityTransitionPeerObservationLineageKey,
   fedosIdentityTransitionPeerObservationsAreEqual,
   type FedosIdentityTransitionPeerObservationV1,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
+} from "./fedos_identity_transition_peer_observation.js";
 
 export type FedosIdentityTransitionPeerObservationWriteOutcome =
   | "inserted"

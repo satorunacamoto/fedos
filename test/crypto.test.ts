@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   webCryptoSha256Hex,
   constantTimeHexEqual,
-} from "../src/nostr/crypto.js";
+} from "../src/os/messenger/adapters/nostr/protocol/crypto.js";
 
 describe("webCryptoSha256Hex", () => {
   it("matches the known SHA-256 vector for 'abc'", async () => {

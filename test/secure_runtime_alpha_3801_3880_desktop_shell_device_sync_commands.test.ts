@@ -6,7 +6,7 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
+import { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "npub-account-a", identityId: null };

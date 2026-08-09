@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { NoopCryptoProvider } from "../src/crypto/noop_crypto.js";
+import { NoopCryptoProvider } from "../src/os/core/crypto/noop_crypto.js";
 import {
   CRYPTO_CAPABILITIES,
   type CryptoCapability,
   type EncryptRequest,
-} from "../src/crypto/types.js";
-import { cryptoCapabilitiesToVaultCapabilities } from "../src/crypto/vault_bridge.js";
+} from "../src/os/core/crypto/types.js";
+import { cryptoCapabilitiesToVaultCapabilities } from "../src/os/core/crypto/vault_bridge.js";
 // Crypto sources as strings: prove no XOR / no AEAD-library import lives here.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cryptoTypesSource from "../src/os/core/crypto/types.ts?raw";

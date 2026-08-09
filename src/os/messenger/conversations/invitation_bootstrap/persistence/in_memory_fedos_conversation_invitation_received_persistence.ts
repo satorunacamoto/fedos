@@ -9,8 +9,8 @@ import {
   fedosConversationInvitationReceivedRecordsAreEqual,
   type FedosConversationInvitationReceivedPersistence,
   type FedosConversationInvitationReceivedWriteResult,
-} from "../../../../../conversation/invitation_bootstrap/persistence/fedos_conversation_invitation_received_persistence.js";
-import type { FedosConversationInvitationReceivedRecordV1 } from "../../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_received_record.js";
+} from "./fedos_conversation_invitation_received_persistence.js";
+import type { FedosConversationInvitationReceivedRecordV1 } from "../fedos_conversation_invitation_received_record.js";
 
 export class InMemoryFedosConversationInvitationReceivedPersistence implements FedosConversationInvitationReceivedPersistence {
   readonly #byKey = new Map<string, FedosConversationInvitationReceivedRecordV1>();

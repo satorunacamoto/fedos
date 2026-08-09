@@ -3,7 +3,7 @@ import {
   renderEncryptedPayloadPreview,
   renderEncryptedPayloadPreviewPage,
 } from "../src/os/_legacy_prototype/render/encrypted_payload_preview.js";
-import type { PayloadPreviewDescriptor } from "../src/storage/encrypted_payload.js";
+import type { PayloadPreviewDescriptor } from "../src/os/core/storage/encrypted_payload.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import previewSource from "../src/os/_legacy_prototype/render/encrypted_payload_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { FedosPublishScheduler } from "../src/board/outbox/fedos_publish_scheduler.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
-import { fedosBoardOutboxObservationToDeliveryObservation } from "../src/board/outbox/fedos_board_outbox_observation_to_delivery_observation.js";
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
-import { FedosNostrBoardPublisherAdapter } from "../src/board/publish/nostr/fedos_nostr_board_publisher_adapter.js";
-import { FedosRelayNostrBoardPublisher } from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { FedosPublishScheduler } from "../src/os/messenger/board/outbox/fedos_publish_scheduler.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { fedosBoardOutboxObservationToDeliveryObservation } from "../src/os/messenger/board/outbox/fedos_board_outbox_observation_to_delivery_observation.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
+import { FedosNostrBoardPublisherAdapter } from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher_adapter.js";
+import { FedosRelayNostrBoardPublisher } from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

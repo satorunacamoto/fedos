@@ -1,24 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import { InMemoryFedosConversationMembershipPersistence } from "../src/conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { toFedosConversationEnvelopeId } from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../src/os/messenger/conversations/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { toFedosConversationEnvelopeId } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
 import {
   FedosNobleTestNostrSigningAuthority,
   fedosTestSecretKeyFromSeed,
   signFedosDeletionRequestRecordV1,
-} from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRequestRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_request_record.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import type { FedosDeletionRequestRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_record.js";
 import {
   assessFedosDeletionRequestAuthorization,
   participantReferenceForFedosDeletionRequestAccountRef,
   type FedosDeletionRequestAuthorizationAssessmentDependencies,
-} from "../src/conversation/deletion_request/fedos_deletion_request_authorization_assessment.js";
-import { coarsenFedosDeletionRequestAuthorizationOutcome } from "../src/conversation/deletion_request/fedos_deletion_request_authorization_outcome.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_authorization_assessment.js";
+import { coarsenFedosDeletionRequestAuthorizationOutcome } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_authorization_outcome.js";
 
 /**
  * Secure Runtime Alpha 5641-5720 -- read-only authorization assessment

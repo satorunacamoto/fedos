@@ -243,9 +243,9 @@ import { SAMPLE_SPACES } from "../community/sample_spaces.js";
 import { D1MetadataIndex } from "../indexer/d1_index.js";
 import { InMemoryMetadataIndex } from "../indexer/memory_index.js";
 import type { MetadataIndex } from "../indexer/types.js";
-import { NobleSignatureVerifier } from "../../../nostr/noble_signature.js";
-import type { SignatureVerifier } from "../../../nostr/signature.js";
-import { MockRelayPublisher, type RelayPublisher } from "../../../nostr/publish.js";
+import { NobleSignatureVerifier } from "../../messenger/adapters/nostr/protocol/noble_signature.js";
+import type { SignatureVerifier } from "../../messenger/adapters/nostr/protocol/signature.js";
+import { MockRelayPublisher, type RelayPublisher } from "../../messenger/adapters/nostr/protocol/publish.js";
 import {
   MockPromotionProvider,
   MockRecommendationProvider,
@@ -276,16 +276,16 @@ import {
   NoopWebAuthnProvider,
   PlaceholderWebAuthnProvider,
   type WebAuthnProvider,
-} from "../../../identity/webauthn_adapter.js";
-import { NoopCryptoProvider } from "../../../crypto/noop_crypto.js";
-import { FedosCoreCryptoProvider } from "../../../crypto/fedos_core_adapter.js";
-import type { CryptoProvider } from "../../../crypto/types.js";
+} from "../../core/identity/webauthn_adapter.js";
+import { NoopCryptoProvider } from "../../core/crypto/noop_crypto.js";
+import { FedosCoreCryptoProvider } from "../../core/crypto/fedos_core_adapter.js";
+import type { CryptoProvider } from "../../core/crypto/types.js";
 import { PlaceholderFedosCoreCrypto } from "../../../../packages/fedos-core-rust/src/index.js";
 import {
   NoopStorageBackend,
   PlaceholderStorageBackend,
-} from "../../../storage/noop_storage.js";
-import type { StorageBackend } from "../../../storage/types.js";
+} from "../../core/storage/noop_storage.js";
+import type { StorageBackend } from "../../core/storage/types.js";
 import { NoopFederationProvider } from "../federation/noop_federation.js";
 import type { FederationProvider } from "../federation/types.js";
 import { NoopChatProvider } from "../chat/noop_chat.js";

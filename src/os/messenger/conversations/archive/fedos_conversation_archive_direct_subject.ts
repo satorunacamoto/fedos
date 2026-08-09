@@ -51,8 +51,8 @@
  *     guard are the ONLY exports besides the union type alias.
  */
 
-import type { FedosPersistedConversationDraftRecordV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
-import type { FedosPersistedConversationRecordV1 } from "../../../../conversation/persistence/fedos_persisted_conversation_record_v1.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "../construction/fedos_persisted_conversation_draft_record_v1.js";
+import type { FedosPersistedConversationRecordV1 } from "../persistence/fedos_persisted_conversation_record_v1.js";
 
 export interface FedosConversationArchiveDirectConversationSubjectV1 {
   readonly kind: "direct";

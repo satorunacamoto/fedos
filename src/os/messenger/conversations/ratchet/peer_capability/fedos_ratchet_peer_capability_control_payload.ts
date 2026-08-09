@@ -27,15 +27,15 @@
 import {
   isWellFormedFedosRatchetPeerCapabilityAdvertisementV1,
   type FedosRatchetPeerCapabilityAdvertisementV1,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_advertisement.js";
+} from "./fedos_ratchet_peer_capability_advertisement.js";
 import {
   isWellFormedFedosRatchetPeerLifecycleNotificationV1,
   type FedosRatchetPeerLifecycleNotificationV1,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
+} from "./fedos_ratchet_peer_lifecycle_notification.js";
 import {
   isWellFormedFedosIdentityTransitionNotificationV1,
   type FedosIdentityTransitionNotificationV1,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_notification.js";
+} from "../../identity_transition/peer_integration/fedos_identity_transition_notification.js";
 
 export const FEDOS_RATCHET_PEER_CAPABILITY_CONTROL_PAYLOAD_SCHEMA_VERSION = 1 as const;
 

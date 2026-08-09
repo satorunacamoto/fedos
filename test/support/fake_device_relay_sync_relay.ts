@@ -16,12 +16,12 @@
  * in a test using this to keep it fast).
  */
 
-import type { FedosRelay } from "../../src/desktop/fedos_relay.js";
-import type { FedosEventDescriptor } from "../../src/desktop/fedos_event_descriptor.js";
-import type { FedosSubscription } from "../../src/desktop/fedos_subscription.js";
-import type { FedosSubscriptionFilter } from "../../src/desktop/fedos_subscription_filter.js";
-import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../../src/desktop/fedos_relay_listeners.js";
-import type { FedosNostrWireEvent } from "../../src/desktop/fedos_nostr_wire_event.js";
+import type { FedosRelay } from "../../src/os/messenger/desktop/fedos_relay.js";
+import type { FedosEventDescriptor } from "../../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosSubscription } from "../../src/os/messenger/desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../../src/os/messenger/desktop/fedos_subscription_filter.js";
+import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../../src/os/messenger/desktop/fedos_relay_listeners.js";
+import type { FedosNostrWireEvent } from "../../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 
 export type FakeDeviceRelaySyncOkBehavior = "accept" | "reject" | "timeout";
 

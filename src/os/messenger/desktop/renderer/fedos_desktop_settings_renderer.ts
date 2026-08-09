@@ -18,7 +18,7 @@
 
 import type { FedosDesktopSettingsViewModel, FedosDesktopSettingsScreen } from "../presentation/fedos_desktop_settings_view_model.js";
 import { FEDOS_DESKTOP_SETTINGS_SCREENS } from "../presentation/fedos_desktop_settings_view_model.js";
-import type { FedosSettingsDescriptorV1 } from "../../../../settings/fedos_settings_descriptor.js";
+import type { FedosSettingsDescriptorV1 } from "../../../core/settings/fedos_settings_descriptor.js";
 import { fedosRenderModel, type FedosDesktopRenderModel } from "./fedos_desktop_render_model.js";
 
 /** Build-embedded, non-secret about-screen facts. */

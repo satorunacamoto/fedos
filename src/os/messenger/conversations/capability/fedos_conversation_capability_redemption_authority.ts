@@ -13,8 +13,8 @@
  * parsing, GUI, or any protocol/network concern.
  */
 
-import type { FedosConversationCapabilityRedemptionRequest } from "../../../../conversation/capability/fedos_conversation_capability_redemption_request.js";
-import type { FedosConversationCapabilityRedemptionResult } from "../../../../conversation/capability/fedos_conversation_capability_redemption_result.js";
+import type { FedosConversationCapabilityRedemptionRequest } from "./fedos_conversation_capability_redemption_request.js";
+import type { FedosConversationCapabilityRedemptionResult } from "./fedos_conversation_capability_redemption_result.js";
 
 export interface FedosConversationCapabilityRedemptionAuthority {
   redeem(request: FedosConversationCapabilityRedemptionRequest, now: number): FedosConversationCapabilityRedemptionResult;

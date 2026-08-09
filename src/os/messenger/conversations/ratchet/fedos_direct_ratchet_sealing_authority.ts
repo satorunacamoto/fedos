@@ -9,7 +9,7 @@
  * that have no reason to know about ratchet sealing, and widening it
  * would force every implementer and every existing test fixture to grow
  * two new methods for a concern they don't own. `FedosWasmMasterSeedAuthority`
- * (`../../runtime/master_seed/fedos_wasm_master_seed_authority.ts`)
+ * (`../../../core/vault/wasm/fedos_wasm_master_seed_authority.ts`)
  * implements this port ADDITIONALLY, alongside its unchanged
  * `FedosMasterSeedAuthority` implementation.
  *
@@ -18,38 +18,15 @@
  * sealing authority is wired up (e.g. `DevelopmentFedosMasterSeedAuthority`),
  * matching this Arc's own "unavailable" lifecycle state rather than a
  * thrown error.
+ *
+ * Architecture Dependency Closure Arc — this type is now a plain alias of
+ * `SealingAuthorityPort` (`src/os/core/ports/sealing_authority_port.ts`).
+ * Core PROVIDES this capability (the real secrets authority implements
+ * it); Messenger only ever CONSUMES it — so the contract now lives in
+ * `os/core/ports/`, the direction Ports-and-Adapters expects, and this
+ * file re-exports the SAME shape under its original name so every
+ * pre-existing import of `FedosDirectRatchetSealingAuthority` from this
+ * path keeps resolving to an identical structural type, unchanged.
  */
 
-export interface FedosDirectRatchetSealingAuthority {
-  /**
-   * Seals `secretBytes` (opaque placeholder material only — this Arc
-   * implements no real ratchet cryptography) at rest, under a key that
-   * is a pure function of the full Direct Ratchet session-binding tuple
-   * (`localDeviceRef`, `remoteDeviceRef`, `conversationId`,
-   * `generation`). Returns an opaque sealed blob string, or `null` on
-   * any failure (no Master Seed held, CSPRNG failure, internal AEAD
-   * failure).
-   */
-  sealDirectRatchetSecret(
-    localDeviceRef: string,
-    remoteDeviceRef: string,
-    conversationId: string,
-    generation: number,
-    secretBytes: Uint8Array,
-  ): Promise<string | null>;
-
-  /**
-   * The restoring counterpart. Requires the EXACT SAME binding tuple the
-   * secret was sealed with; any difference (wrong local/remote device,
-   * wrong conversation, wrong generation) fails closed by AEAD
-   * authentication, not by a string comparison. `null` on ANY failure,
-   * including a tampered or malformed `sealedBlob`.
-   */
-  restoreDirectRatchetSecret(
-    localDeviceRef: string,
-    remoteDeviceRef: string,
-    conversationId: string,
-    generation: number,
-    sealedBlob: string,
-  ): Promise<Uint8Array | null>;
-}
+export type { SealingAuthorityPort as FedosDirectRatchetSealingAuthority } from "../../../core/ports/sealing_authority_port.js";

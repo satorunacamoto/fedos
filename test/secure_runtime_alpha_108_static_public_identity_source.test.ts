@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { StaticNostrPublicIdentitySource } from "../src/desktop/static_nostr_public_identity_source.js";
+import { StaticNostrPublicIdentitySource } from "../src/os/messenger/desktop/static_nostr_public_identity_source.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_108_static_public_identity_source.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -12,8 +12,8 @@ import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?r
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardPersistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");

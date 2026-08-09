@@ -24,17 +24,17 @@ import { tmpdir } from "node:os";
 // @ts-expect-error same as above.
 import { join } from "node:path";
 
-import { FedosIdentityTransitionFacade } from "../src/conversation/identity_transition/fedos_identity_transition_facade.js";
-import { AppendOnlyFedosIdentityTransitionFactPersistence } from "../src/conversation/identity_transition/persistence/append_only_fedos_identity_transition_fact_persistence.js";
-import type { FedosIdentityTransitionFactPersistence } from "../src/conversation/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest, fedosIdentityTransitionContinuityProofDigest, fedosIdentityTransitionDeviceCorroborationDigest } from "../src/conversation/identity_transition/fedos_identity_transition_canonical.js";
-import type { FedosIdentityTransitionNewKeyProofV1 } from "../src/conversation/identity_transition/fedos_identity_transition_new_key_proof.js";
-import type { FedosIdentityTransitionContinuityEvidenceV1 } from "../src/conversation/identity_transition/fedos_identity_transition_continuity_evidence.js";
-import type { FedosIdentityTransitionDeviceCorroborationV1 } from "../src/conversation/identity_transition/fedos_identity_transition_device_corroboration.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { createPendingFedosDeviceBinding, trustFedosDeviceBinding } from "../src/device/fedos_device_binding.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
-import type { FedosIdentityTransitionRecordV1 } from "../src/conversation/identity_transition/fedos_identity_transition_record.js";
+import { FedosIdentityTransitionFacade } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_facade.js";
+import { AppendOnlyFedosIdentityTransitionFactPersistence } from "../src/os/messenger/conversations/identity_transition/persistence/append_only_fedos_identity_transition_fact_persistence.js";
+import type { FedosIdentityTransitionFactPersistence } from "../src/os/messenger/conversations/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest, fedosIdentityTransitionContinuityProofDigest, fedosIdentityTransitionDeviceCorroborationDigest } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_canonical.js";
+import type { FedosIdentityTransitionNewKeyProofV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_new_key_proof.js";
+import type { FedosIdentityTransitionContinuityEvidenceV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_continuity_evidence.js";
+import type { FedosIdentityTransitionDeviceCorroborationV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_device_corroboration.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { createPendingFedosDeviceBinding, trustFedosDeviceBinding } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosIdentityTransitionRecordV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_record.js";
 
 function signedNewKeyProof(record: FedosIdentityTransitionRecordV1, newKey: Uint8Array, at: number): FedosIdentityTransitionNewKeyProofV1 {
   const bodyHash = fedosIdentityTransitionBodyHash(record);

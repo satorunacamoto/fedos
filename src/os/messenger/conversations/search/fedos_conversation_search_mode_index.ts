@@ -34,9 +34,9 @@
  *     conversation id twice never produces two entries.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosPrivateConversationMode } from "../construction/fedos_private_conversation_id.js";
 
 export interface FedosConversationSearchModeIndexDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;

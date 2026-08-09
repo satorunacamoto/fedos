@@ -10,8 +10,8 @@ import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
-import { AppendOnlyFedosBoardPersistence } from "../src/board/persistence/append_only_fedos_board_persistence.js";
-import type { FedosBoardPersistence } from "../src/board/persistence/fedos_board_persistence.js";
+import { AppendOnlyFedosBoardPersistence } from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.js";
+import type { FedosBoardPersistence } from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
 
 let dir: string | undefined;
 afterEach(() => {

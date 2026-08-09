@@ -800,13 +800,13 @@
  *     `packages/fedos-core-rust` file, `Cargo.toml`, or `package.json`.
  */
 
-import { FedosIdentityService } from "../identity/fedos_identity_service.js";
-import { FedosIdentityRegistry } from "../identity/fedos_identity_registry.js";
-import { FedosIdentityResolver } from "../identity/fedos_identity_resolver.js";
-import { resolveFedosIdentityProvider } from "../identity/fedos_identity_provider_resolver.js";
-import { NoopFedosIdentityProvider } from "../identity/fedos_noop_identity_provider.js";
-import type { FedosIdentityDescriptor } from "../identity/fedos_identity_descriptor.js";
-import type { FedosIdentityRecord } from "../identity/fedos_identity_record.js";
+import { FedosIdentityService } from "../os/core/identity/fedos_identity_service.js";
+import { FedosIdentityRegistry } from "../os/core/identity/fedos_identity_registry.js";
+import { FedosIdentityResolver } from "../os/core/identity/fedos_identity_resolver.js";
+import { resolveFedosIdentityProvider } from "../os/core/identity/fedos_identity_provider_resolver.js";
+import { NoopFedosIdentityProvider } from "../os/core/identity/fedos_noop_identity_provider.js";
+import type { FedosIdentityDescriptor } from "../os/core/identity/fedos_identity_descriptor.js";
+import type { FedosIdentityRecord } from "../os/core/identity/fedos_identity_record.js";
 
 export class FedosRuntimeIdentity {
   readonly #registry: FedosIdentityRegistry;

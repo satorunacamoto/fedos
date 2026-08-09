@@ -24,7 +24,7 @@
  *     `src/nostr/noble_signature.ts` anywhere in this file.
  */
 
-import type { FedosIdentityDescriptor } from "../../../identity/fedos_identity_descriptor.js";
+import type { FedosIdentityDescriptor } from "../../core/identity/fedos_identity_descriptor.js";
 
 export interface FedosPublicIdentityReader {
   readPublicIdentity(): Promise<FedosIdentityDescriptor | null>;

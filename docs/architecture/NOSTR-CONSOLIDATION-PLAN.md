@@ -1,8 +1,13 @@
 # FedOS — Nostr Consolidation Plan
 
-Status: follow-up-arc-ready plan. Pure software architecture, no legal/
-compliance content. Not executed this arc by explicit decision — this
-document exists so a follow-up arc can start immediately.
+Status: **Steps 1-4 EXECUTED** (Architecture Dependency Closure +
+Ports/Factories Completion + OSS Catalog Completion arc, Agent N). Pure
+software architecture, no legal/compliance content. Step 5 (duplicate
+relay/transport/subscription logic) intentionally NOT attempted at scale
+this pass — see "Execution record" below for exactly what landed, what's
+still open, and why. The rest of this document is the ORIGINAL frozen
+analysis this pass started from; it is left unedited below except where
+marked, so the delta is visible.
 
 ## The three current implementations (post-Messenger-migration paths)
 
@@ -158,3 +163,146 @@ shims alone won't fully insulate every caller — expect some genuine call-site
 updates wherever code destructures `NostrEvent`-specific fields that don't
 exist on the unified type, or vice versa. Budget real review time for step 1
 specifically; it is the one step in this plan that is not purely mechanical.
+
+## Execution record (this pass — Agent N, Architecture Dependency Closure arc)
+
+**Steps 1-2-3-4: DONE.** Step 5: not attempted at scale, see below.
+
+**Step 1 — re-verified before trusting the frozen analysis above, and found
+one of its own premises did not hold.** Reading `NostrEvent` (`adapters/nostr/protocol/types.ts`)
+and `FedosNostrWireEvent` (`desktop/fedos_nostr_wire_event.ts`) side by side:
+both ALREADY used NIP-01's own verbatim field names (`id`, `pubkey`,
+`created_at`, `kind`, `tags`, `content`, `sig`) — the plan's premise that
+`FedosNostrWireEvent`'s design "preserves NIP-01's own field names" as a
+differentiator from `NostrEvent` does not hold; `NostrEvent` already did
+too. The ONE real difference: `FedosNostrWireEvent.tags` was deep-readonly
+(`readonly (readonly string[])[]`), `NostrEvent.tags` was shallowly-typed
+mutable (`NostrTag[]`). A repo-wide grep for in-place tag mutation
+(`.tags.push/splice/pop/shift/unshift/sort/reverse(`, `tags[n] =`) found
+zero call sites anywhere in `src/`, so tightening `NostrEvent.tags` to
+match was a strict, safe narrowing, not a behavior change.
+
+Decision: **`NostrEvent` at `adapters/nostr/protocol/types.ts` is now the
+ONE canonical definition** (tightened to deep-readonly `tags`).
+`desktop/fedos_nostr_wire_event.ts` is now a one-line type-alias re-export
+(`export type { NostrEvent as FedosNostrWireEvent } from "../adapters/nostr/protocol/types.js";`)
+— NOT a duplicate interface. This deliberately OVERRIDES the plan's own
+suggested canonical shape-source (it recommended `FedosNostrWireEvent`'s
+shape "win," which in practice meant nothing once the field-name premise
+was found false) but keeps its recommended LOCATION reasoning: Step 3
+needed the canonical definition under `protocol/` (see below), and once
+the shapes were confirmed identical there was no reason to define it
+under `desktop/` and alias backward into `protocol/`. Kept the
+`FedosNostrWireEvent` NAME as an alias specifically so its ~30 existing
+import sites (relay/subscription/board-publish/device-sync/conversation-
+delivery code) needed zero call-site changes — only 3 files ended up
+needing real edits (see Step 2/3 below), all because they held a manual,
+now-redundant type-conversion function, not because the type moved.
+
+**Step 2 — done for the 2 named files, PLUS one identical unnamed instance
+found by grep.** `invitation_bootstrap/fedos_conversation_invitation_authentication.ts`
+and `ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.ts`
+each had a `toMutableNostrEvent()` helper converting `FedosNostrWireEvent`
+back to `NostrEvent` field-by-field just to satisfy
+`NobleSignatureVerifier.verify()`'s parameter type. `grep -r "function
+toMutableNostrEvent"` found a THIRD, byte-identical instance the plan
+didn't name: `device/binding_challenge/fedos_device_binding_account_authorization.ts`.
+Fixed all three identically: deleted the helper, call `verify(event)`
+directly (now type-checks with zero conversion since the two names are
+one type). Two OTHER files with a superficially similar
+`descriptorToNostrEvent()` helper (`device/archive_suppression_sync/fedos_archive_suppression_inbound_handler.ts`,
+`device/relay_sync/fedos_device_relay_sync_inbound_handler.ts`) were
+investigated and correctly LEFT ALONE — they convert from
+`FedosEventDescriptor` (a genuinely different type, with RENAMED fields:
+`author`/`createdAt`/`signature`, not `pubkey`/`created_at`/`sig`), not
+from `FedosNostrWireEvent` — Step 1's unification doesn't touch that
+conversion at all.
+
+**Step 3 — done, and the design choice fell out of Step 1's own location
+decision.** `protocol/sign/{fedos_nostr_signing_authority,fedos_wasm_nostr_signing_authority}.ts`
+now import `NostrEvent` from their own `../types.ts` instead of reaching
+into `desktop/fedos_nostr_wire_event.ts`. Since Step 1 put the canonical
+definition under `protocol/` (not `desktop/`), this resolved by
+construction rather than needing a separate design call — confirming the
+plan's own conditional guidance ("if the canonical location is under
+`desktop/`, move it to `protocol/` instead") by having already made that
+choice in Step 1.
+
+**Step 4 — done, and turned out simpler than "move or copy the function."**
+`protocol/publish.ts` used to import `isSignedEventLike()` and
+`SignedNostrEvent` from `_legacy_prototype/sign/{validate,types}.ts` (the
+one live→legacy edge, per `CIRCULAR-DEPENDENCY-BREAK-PLAN.md`'s Edge 2).
+Comparing `isSignedEventLike()`'s validation logic against `isNostrEvent()`
+(already defined in `protocol/event.ts`) found them to be a byte-for-byte
+functional duplicate — same seven fields, same hex-length checks, same
+tag-shape check. Rather than moving/copying `isSignedEventLike()` as the
+plan suggested, `publish.ts` now just calls the ALREADY-EXISTING
+`isNostrEvent()`, and uses `NostrEvent` (canonical, structurally
+compatible — `SignedNostrEvent` was itself always documented as
+"structurally a NIP-01 `NostrEvent`") in place of `SignedNostrEvent`. Net
+effect: zero new/copied code, and the live→legacy edge is gone entirely
+(confirmed: `grep _legacy_prototype src/os/messenger/adapters/nostr/protocol/publish.ts`
+now matches only the file's own doc-comment explaining the historical fix).
+
+**Fallout fix required by Step 1 (not originally listed as its own step):**
+`_legacy_prototype/sign/types.ts`'s `UnsignedNostrEvent.tags` also had to
+tighten from `NostrTag[]` to `readonly (readonly string[])[]` to stay
+assignable from the now-deep-readonly `NostrEvent` at one call site
+(`_legacy_prototype/sign/publish_flow.ts`). Same "no caller mutates tags
+in place" justification as Step 1's own main change applies. `NostrTag`
+itself (`string[]`) was deliberately left mutable — only the two
+interfaces' own `tags` FIELD type tightened, since `NostrTag` is still
+used elsewhere as a general mutable tag-building type (e.g.
+`_legacy_prototype/sign/build.ts`).
+
+**Test fallout (3 tests, all fixed, not skipped/loosened):** three tests
+did raw-source-text structural assertions that directly encoded the
+PRE-unification shape (a literal `export interface FedosNostrWireEvent {
+... }` declaration, or a literal `FedosNostrWireEvent` return-type
+string) — `test/secure_runtime_alpha_242_validated_nostr_event_model.test.ts`,
+`test/secure_runtime_alpha_426_signed_nostr_event_output_model.test.ts`,
+`test/secure_runtime_alpha_448_outbox_publisher_readiness_adapter.test.ts`.
+Updated (not weakened) to assert the new, stronger invariant — the
+literal alias re-export syntax, and the canonical type's field shape
+checked at its own new source location — rather than deleting the checks.
+
+**Validation:** `typecheck:core` and `typecheck:electron` both at exactly
+the pre-existing baseline (4 known errors in `typecheck:core`, 0 in
+`typecheck:electron`) — zero new errors. All 4 architecture-boundary test
+files pass. The full Nostr/nip17/nip59/signing/relay/subscription/publish
+keyword-matched test set (~157 files) plus `commerce_bridge`/`commerce_classify`
+were run; every remaining failure (26 across the set, all pre-existing —
+`SecretHandleKind`/`HkdfDomain` variant-count snapshots stale since an
+earlier NIP-44 arc, "byte-for-byte unchanged Rust source" snapshots stale
+since later arcs, two tests with a stale pre-Messenger-migration relative
+import-depth regex, one pure CRLF-vs-LF encoding artifact in an unrelated
+release-tooling test file, and one pre-existing envelope-dedup test
+failure) was individually confirmed pre-existing via a temporary, git-only
+A/B worktree at HEAD (`git worktree add --detach`, removed after use)
+before being left alone — never assumed.
+
+**Step 5 — deliberately NOT attempted at scale.** Beyond the `isNostrEvent`/
+`isSignedEventLike` duplicate resolved as a side effect of Step 4, the
+plan's other named duplication candidates remain genuinely open and
+UNAUDITED this pass:
+- **Relay/transport implementations** (`protocol/ws_relay.ts` vs
+  `desktop/websocket_relay.ts` + `node_websocket_relay_socket_factory.ts`)
+  — the "genuinely different protocols" claim (REQ/EOSE/CLOSE-oriented vs.
+  general-purpose) was NOT re-verified this pass; still needs the
+  side-by-side read the original plan called for before any merge/delete
+  decision.
+- **Signing/serialization/event-normalization/subscription-lifecycle/
+  reconnect/transport-error-handling duplication** across Impl 1/2/3 —
+  not audited this pass at all.
+- **Physical directory consolidation** (this plan's own Step 5,
+  renumbered — physically moving files into the `adapters/nostr/{crypto,
+  transport,subscription,identity,event_reader}/` tree this doc's
+  "Canonical location after consolidation" section sketches) — explicitly
+  OUT OF SCOPE for this arc's own binding scope note ("small, targeted
+  file moves... a wholesale re-layout... is not"), and still requires the
+  above audits to land first per this plan's own migration order.
+
+A follow-up arc picking up Step 5 should start with the relay/transport
+"different protocols" re-verification (cheapest to falsify or confirm),
+then the signing/serialization duplication (closest in kind to what this
+pass already touched), before considering any physical move.

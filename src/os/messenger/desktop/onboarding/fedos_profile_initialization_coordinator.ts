@@ -41,8 +41,8 @@
 
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { FEDOS_GIFT_WRAP_KIND } from "../../adapters/nostr/conversation_delivery/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import type { FedosSealedMasterSeedEnvelopePersistence } from "../../../../runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
+import type { FedosSealedMasterSeedEnvelopePersistence } from "../../../core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";
 import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import {
   FedosDeviceSigningKeypair,

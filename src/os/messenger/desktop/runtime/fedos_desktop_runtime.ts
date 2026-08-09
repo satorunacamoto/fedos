@@ -131,7 +131,7 @@ import {
   type FedosConversationIdentityTransitionIntegrationDependencies,
   type FedosConversationDeletionRequestIntegrationDependencies,
 } from "../../conversations/runtime/fedos_conversation_runtime.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import { assembleFedosConversationRuntimeDependencies } from "../../conversations/runtime/fedos_conversation_runtime_assembly.js";
 import { defaultFedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
 import {

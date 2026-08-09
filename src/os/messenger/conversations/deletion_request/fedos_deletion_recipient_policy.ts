@@ -26,7 +26,7 @@
  * free vocabulary `5641-5720` already restricted the wire request itself
  * to.
  */
-import { isFedosDeletionRequestScope, type FedosDeletionRequestScope } from "../../../../conversation/deletion_request/fedos_deletion_request_scope.js";
+import { isFedosDeletionRequestScope, type FedosDeletionRequestScope } from "./fedos_deletion_request_scope.js";
 
 export type FedosDeletionRecipientPolicy =
   | "always-review"

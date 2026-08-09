@@ -24,9 +24,9 @@
 import {
   validateFedosConversationMessageEnvelope,
   type FedosConversationMessageEnvelopeInput,
-} from "../../../../../conversation/envelope/fedos_conversation_message_envelope_validator.js";
-import type { FedosConversationMessageEnvelope } from "../../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosPersistedConversationMessageEnvelopeV1 } from "../../../../../conversation/envelope/persistence/fedos_persisted_conversation_message_envelope_v1.js";
+} from "../fedos_conversation_message_envelope_validator.js";
+import type { FedosConversationMessageEnvelope } from "../fedos_conversation_message_envelope.js";
+import type { FedosPersistedConversationMessageEnvelopeV1 } from "./fedos_persisted_conversation_message_envelope_v1.js";
 
 /** Deep-copies `envelope` into the persisted V1 wire shape. */
 export function serializeFedosConversationMessageEnvelope(

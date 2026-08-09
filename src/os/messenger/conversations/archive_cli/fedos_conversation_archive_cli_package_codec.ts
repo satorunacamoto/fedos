@@ -24,12 +24,12 @@
  *   - Pure, deterministic, synchronous.
  */
 
-import { deserializeFedosConversationArchiveManifest } from "../../../../conversation/archive/fedos_conversation_archive_manifest_codec.js";
+import { deserializeFedosConversationArchiveManifest } from "../archive/fedos_conversation_archive_manifest_codec.js";
 import type {
   FedosConversationArchiveCliMultiPackageV1,
   FedosConversationArchiveCliPackageV1,
-} from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package.js";
-import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package.js";
+} from "./fedos_conversation_archive_cli_package.js";
+import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION } from "./fedos_conversation_archive_cli_package.js";
 import type { AeadCiphertextWire } from "../../../../runtime/fedos_wasm_loader.js";
 
 const PACKAGE_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set(["formatVersion", "manifest", "ciphertext"]);

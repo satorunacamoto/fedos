@@ -18,7 +18,7 @@
  *   - Synchronous, matching every other port in this codebase.
  */
 
-import type { FedosPersistedConversationDraftManagementStateV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_management_state_v1.js";
+import type { FedosPersistedConversationDraftManagementStateV1 } from "./fedos_persisted_conversation_draft_management_state_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationDraftManagementWriteResult = "inserted" | "already-present" | "conflict" | "failed";

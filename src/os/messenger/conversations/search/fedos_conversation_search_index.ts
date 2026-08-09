@@ -156,27 +156,27 @@
  *     return value, never a `throw` surfaced to the caller.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationMessageEnvelope } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationRuntimeDependencies } from "../../../../conversation/runtime/fedos_conversation_runtime.js";
-import type { FedosPayloadRetentionAuthority } from "../../../../conversation/retention/fedos_payload_retention_authority.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import { deserializeFedosConversationMessageEnvelope } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_codec.js";
-import type { FedosConversationSearchEnvelopeDocument } from "../../../../conversation/search/fedos_conversation_search_document.js";
-import { FedosConversationSearchIncrementalIndex } from "../../../../conversation/search/fedos_conversation_search_incremental_index.js";
-import { FedosConversationSearchKeywordIndex } from "../../../../conversation/search/fedos_conversation_search_keyword_index.js";
-import { FedosConversationSearchDateIndex } from "../../../../conversation/search/fedos_conversation_search_date_index.js";
-import { FedosConversationSearchReplyIndex } from "../../../../conversation/search/fedos_conversation_search_reply_index.js";
-import { FedosConversationSearchParticipantIndex } from "../../../../conversation/search/fedos_conversation_search_participant_index.js";
-import { FedosConversationSearchModeIndex } from "../../../../conversation/search/fedos_conversation_search_mode_index.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationMessageEnvelope } from "../envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosPrivateConversationMode } from "../construction/fedos_private_conversation_id.js";
+import type { FedosConversationArchiveBundleV1 } from "../archive/fedos_conversation_archive_bundle.js";
+import type { FedosConversationRuntimeDependencies } from "../runtime/fedos_conversation_runtime.js";
+import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
+import type { FedosConversationSearchEnvelopeDocument } from "./fedos_conversation_search_document.js";
+import { FedosConversationSearchIncrementalIndex } from "./fedos_conversation_search_incremental_index.js";
+import { FedosConversationSearchKeywordIndex } from "./fedos_conversation_search_keyword_index.js";
+import { FedosConversationSearchDateIndex } from "./fedos_conversation_search_date_index.js";
+import { FedosConversationSearchReplyIndex } from "./fedos_conversation_search_reply_index.js";
+import { FedosConversationSearchParticipantIndex } from "./fedos_conversation_search_participant_index.js";
+import { FedosConversationSearchModeIndex } from "./fedos_conversation_search_mode_index.js";
 import {
   FedosConversationSearchArchiveIndex,
   fedosConversationSearchDocumentsFromArchiveBundle,
-} from "../../../../conversation/search/fedos_conversation_search_archive_index.js";
+} from "./fedos_conversation_search_archive_index.js";
 
 /**
  * Alpha 2581–2620 — the narrowest additive dependency boundary: ONLY the

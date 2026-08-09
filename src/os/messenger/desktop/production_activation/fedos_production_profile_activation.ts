@@ -16,7 +16,7 @@
  * decision — never a downgrade.
  */
 
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   authorizeAndActivateFedosProductionDesktopMasterSeed,
   type FedosProductionActivationDecision,

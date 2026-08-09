@@ -28,12 +28,12 @@
  * shape `FedosPrivateV1WireAdapter`'s own proprietary Group fanout
  * already uses) — this Arc does not add that orchestration.
  */
-import type { FedosEventDescriptor } from "../../../../../../desktop/fedos_event_descriptor.js";
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosEventDescriptor } from "../../../../desktop/fedos_event_descriptor.js";
+import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
 import type { FedosNostrSigningAuthority } from "../../protocol/sign/fedos_nostr_signing_authority.js";
 import { createFedosWasmNostrSigningAuthority } from "../../protocol/sign/fedos_wasm_nostr_signing_authority.js";
-import type { FedosMasterSeedAuthority } from "../../../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import { FedosWasmMasterSeedAuthority } from "../../../../../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../../../core/vault/wasm/fedos_master_seed_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../../../../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import {
   createFedosWasmEphemeralGiftWrapSigningAuthority,
   type FedosEphemeralGiftWrapSigningAuthority,

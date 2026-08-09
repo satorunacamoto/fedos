@@ -24,7 +24,7 @@
  * really was.
  */
 
-import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1 } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1 } from "./fedos_device_binding.js";
 
 export interface FedosDeviceRegistrationRequest {
   readonly deviceId: string;

@@ -33,7 +33,7 @@
 import type {
   FedosNostrPublicIdentitySnapshot,
   FedosNostrPublicIdentitySource,
-} from "../../../identity/fedos_nostr_public_identity_source.js";
+} from "../../core/identity/fedos_nostr_public_identity_source.js";
 
 export class StaticNostrPublicIdentitySource implements FedosNostrPublicIdentitySource {
   readonly #snapshot: FedosNostrPublicIdentitySnapshot;

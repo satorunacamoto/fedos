@@ -7,12 +7,12 @@ import packageJsonSource from "../package.json?raw";
 import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
-import * as identifiers from "../src/board/fedos_board_identifiers.js";
-import * as source from "../src/board/fedos_board_source.js";
-import * as author from "../src/board/fedos_board_author.js";
-import * as post from "../src/board/fedos_board_post.js";
-import * as validator from "../src/board/fedos_board_post_validator.js";
-import * as moderation from "../src/board/fedos_board_moderation.js";
+import * as identifiers from "../src/os/messenger/board/fedos_board_identifiers.js";
+import * as source from "../src/os/messenger/board/fedos_board_source.js";
+import * as author from "../src/os/messenger/board/fedos_board_author.js";
+import * as post from "../src/os/messenger/board/fedos_board_post.js";
+import * as validator from "../src/os/messenger/board/fedos_board_post_validator.js";
+import * as moderation from "../src/os/messenger/board/fedos_board_moderation.js";
 
 /**
  * Secure Runtime Alpha 260 -- "Canonical Board Model Completion":

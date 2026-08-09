@@ -23,10 +23,10 @@
  * through the NEW mechanism.
  */
 import { describe, it, expect } from "vitest";
-import { createFedosConversationRuntime } from "../src/conversation/runtime/fedos_conversation_runtime.js";
-import { assembleFedosConversationRuntimeDependencies } from "../src/conversation/runtime/fedos_conversation_runtime_assembly.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../src/conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
-import { fedosConversationActivationId } from "../src/conversation/activation/fedos_persisted_conversation_activation_v1.js";
+import { createFedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
+import { assembleFedosConversationRuntimeDependencies } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "../src/os/messenger/conversations/construction/fedos_persisted_conversation_draft_record_v1.js";
+import { fedosConversationActivationId } from "../src/os/messenger/conversations/activation/fedos_persisted_conversation_activation_v1.js";
 
 const clock = () => 1_700_005_000;
 

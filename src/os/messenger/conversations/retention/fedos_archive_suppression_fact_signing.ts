@@ -46,8 +46,8 @@ import {
   isWellFormedFedosDeviceSchnorrSignatureHex,
   verifyFedosDeviceSigningSignature,
   type FedosDeviceSigningKeypair,
-} from "../../../../device/crypto/fedos_device_signing_keypair.js";
-import { fedosArchiveSuppressionFactCanonicalBytes, type FedosArchiveSuppressionFact } from "../../../../conversation/retention/fedos_archive_suppression_fact.js";
+} from "../../device/crypto/fedos_device_signing_keypair.js";
+import { fedosArchiveSuppressionFactCanonicalBytes, type FedosArchiveSuppressionFact } from "./fedos_archive_suppression_fact.js";
 
 /** Fixed preimage prefix — distinct from every other Device-signature domain in this codebase (Proof of Possession, Peer Capability, Ratchet Session Reset, Identity Transition Device Corroboration each define their own; this Arc's is new and never reused elsewhere). */
 const SUPPRESSION_FACT_DEVICE_EVIDENCE_PREIMAGE_PREFIX = "fedos-archive-suppression-fact-device-evidence-v1:";

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { createValidatedEventListener } from "../src/desktop/validated_subscription_adapter.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
+import { createValidatedEventListener } from "../src/os/messenger/desktop/validated_subscription_adapter.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_246_validated_subscription_delivery.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

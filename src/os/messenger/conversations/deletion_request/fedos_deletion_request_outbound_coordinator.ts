@@ -40,27 +40,27 @@
  * different route.
  */
 import { randomBytes, bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationPersistence } from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosConversationMessageEnvelopePersistence } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantAuthority } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import { isFedosDeviceBindingRevoked } from "../../../../device/fedos_device_binding.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
-import type { FedosDeletionRequestScope } from "../../../../conversation/deletion_request/fedos_deletion_request_scope.js";
-import type { FedosDeletionRequestReasonCode } from "../../../../conversation/deletion_request/fedos_deletion_request_reason_code.js";
-import { generateFedosDeletionRequestId } from "../../../../conversation/deletion_request/fedos_deletion_request_id.js";
-import { signFedosDeletionRequestRecordV1, type FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantAuthority } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import { isFedosDeviceBindingRevoked } from "../../device/fedos_device_binding.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
+import type { FedosDeletionRequestScope } from "./fedos_deletion_request_scope.js";
+import type { FedosDeletionRequestReasonCode } from "./fedos_deletion_request_reason_code.js";
+import { generateFedosDeletionRequestId } from "./fedos_deletion_request_id.js";
+import { signFedosDeletionRequestRecordV1, type FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
 import {
   assessFedosDeletionRequestAuthorization,
   type FedosDeletionRequestAuthorizationAssessmentDependencies,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_authorization_assessment.js";
-import type { FedosDeletionRequestStatePersistence } from "../../../../conversation/deletion_request/fedos_deletion_request_state_persistence.js";
-import { fedosDeletionRequestBodyHash, type FedosPersistedDeletionRequestStateRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
-import { encodeFedosDeletionRequestControlPayload } from "../../../../conversation/deletion_request/fedos_deletion_request_control_payload.js";
+} from "./fedos_deletion_request_authorization_assessment.js";
+import type { FedosDeletionRequestStatePersistence } from "./fedos_deletion_request_state_persistence.js";
+import { fedosDeletionRequestBodyHash, type FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
+import { encodeFedosDeletionRequestControlPayload } from "./fedos_deletion_request_control_payload.js";
 
 export interface FedosDeletionRequestOutboundSendResult {
   readonly outcome: string;

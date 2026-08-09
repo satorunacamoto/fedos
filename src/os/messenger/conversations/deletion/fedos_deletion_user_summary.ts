@@ -22,9 +22,9 @@
  *     is ever presented as "deleted everywhere."
  */
 
-import type { FedosDeletionAssessment } from "../../../../conversation/deletion/fedos_deletion_assessment.js";
-import { FEDOS_DELETION_NON_GUARANTEE_TEXT } from "../../../../conversation/deletion/fedos_deletion_non_guarantees.js";
-import type { FedosPersistedDeletionExecutionRecordV1 } from "../../../../conversation/deletion/fedos_persisted_deletion_execution_record_v1.js";
+import type { FedosDeletionAssessment } from "./fedos_deletion_assessment.js";
+import { FEDOS_DELETION_NON_GUARANTEE_TEXT } from "./fedos_deletion_non_guarantees.js";
+import type { FedosPersistedDeletionExecutionRecordV1 } from "./fedos_persisted_deletion_execution_record_v1.js";
 
 export interface FedosDeletionUserSafeSummary {
   readonly targetExists: boolean;

@@ -11,7 +11,7 @@ import {
   fedosDeviceReplacementRecordKey,
   fedosDeviceReplacementRecordsAreEqual,
   type FedosDeviceReplacementRecordV1,
-} from "../../../../device/fedos_device_replacement_record.js";
+} from "../fedos_device_replacement_record.js";
 
 export type FedosDeviceReplacementWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

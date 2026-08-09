@@ -36,7 +36,7 @@ import runtimeCryptoProviderSource from "../../../src/runtime/fedos_runtime_cryp
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmArtifactSource from "../../../src/runtime/fedos_wasm_artifact.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import masterSeedWasmAuthoritySource from "../../../src/runtime/master_seed/fedos_wasm_master_seed_authority.ts?raw";
+import masterSeedWasmAuthoritySource from "../../../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import publicAuthorAuthoritySource from "../../../src/os/messenger/board/runtime/identity/fedos_public_author_authority.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.

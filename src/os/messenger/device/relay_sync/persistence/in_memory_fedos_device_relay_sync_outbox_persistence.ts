@@ -11,7 +11,7 @@ import {
   type FedosDeviceRelaySyncOutboxPersistence,
   type FedosDeviceRelaySyncOutboxWriteResult,
   type FedosPersistedDeviceRelaySyncOutboxRecordV1,
-} from "../../../../../device/relay_sync/persistence/fedos_device_relay_sync_outbox_persistence.js";
+} from "./fedos_device_relay_sync_outbox_persistence.js";
 
 export class InMemoryFedosDeviceRelaySyncOutboxPersistence implements FedosDeviceRelaySyncOutboxPersistence {
   readonly #records = new Map<string, FedosPersistedDeviceRelaySyncOutboxRecordV1>();

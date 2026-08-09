@@ -16,10 +16,10 @@
  * testable today.
  */
 
-import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
-import { validateInboundNostrEvent } from "../../../../desktop/combined_inbound_event_validator.js";
-import type { FedosNostrSigningAuthority, FedosNostrUnsignedEventRequest } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import { isWellFormedFedosDeletionAcknowledgementRecordV1, type FedosDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
+import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
+import { validateInboundNostrEvent } from "../../desktop/combined_inbound_event_validator.js";
+import type { FedosNostrSigningAuthority, FedosNostrUnsignedEventRequest } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import { isWellFormedFedosDeletionAcknowledgementRecordV1, type FedosDeletionAcknowledgementRecordV1 } from "./fedos_deletion_acknowledgement_record.js";
 
 const ACKNOWLEDGEMENT_NOSTR_KIND = 1;
 

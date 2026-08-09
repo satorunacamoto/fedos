@@ -7,8 +7,8 @@
 import {
   fedosPersistedDeletionAcknowledgementRecordsAreEqual,
   type FedosPersistedDeletionAcknowledgementRecordV1,
-} from "../../../../conversation/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
-import type { FedosDeletionAcknowledgementPersistence, FedosDeletionAcknowledgementPersistenceWriteResult } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_persistence.js";
+} from "./fedos_persisted_deletion_acknowledgement_record_v1.js";
+import type { FedosDeletionAcknowledgementPersistence, FedosDeletionAcknowledgementPersistenceWriteResult } from "./fedos_deletion_acknowledgement_persistence.js";
 
 export class InMemoryFedosDeletionAcknowledgementPersistence implements FedosDeletionAcknowledgementPersistence {
   readonly #records = new Map<string, FedosPersistedDeletionAcknowledgementRecordV1>();

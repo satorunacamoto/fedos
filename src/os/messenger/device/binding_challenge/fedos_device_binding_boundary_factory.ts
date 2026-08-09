@@ -26,10 +26,10 @@ import {
   type FedosDeviceBindingChallengeAction,
   type FedosDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
-import { FedosDeviceBindingRegistrationAuthority } from "../../../../device/binding_challenge/fedos_device_binding_registration_authority.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingChallengeReplayPersistence } from "../../../../device/persistence/fedos_device_binding_challenge_replay_persistence.js";
+} from "./fedos_device_binding_challenge.js";
+import { FedosDeviceBindingRegistrationAuthority } from "./fedos_device_binding_registration_authority.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingChallengeReplayPersistence } from "../persistence/fedos_device_binding_challenge_replay_persistence.js";
 
 /** Explicit operational limits — no unbounded/implicit default. */
 export interface FedosDeviceBindingBoundaryLimits {

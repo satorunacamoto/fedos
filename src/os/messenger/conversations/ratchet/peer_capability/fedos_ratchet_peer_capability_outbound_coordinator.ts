@@ -16,30 +16,30 @@
  * conflated with peer acceptance — this coordinator has no way to know
  * whether the peer ever imports, verifies, or accepts what it publishes.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import { isFedosDeviceBindingRevoked } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosDeviceSigningKeypair } from "../../../../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import { isFedosDeviceBindingRevoked } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosDeviceSigningKeypair } from "../../../device/crypto/fedos_device_signing_keypair.js";
 import {
   FEDOS_RATCHET_PEER_CAPABILITY_ADVERTISEMENT_DEVICE_SIGNATURE_PREFIX,
   canonicalSerializeFedosRatchetPeerCapabilityAdvertisementContent,
   type FedosRatchetPeerCapabilityAdvertisementV1,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_advertisement.js";
+} from "./fedos_ratchet_peer_capability_advertisement.js";
 import {
   FEDOS_RATCHET_PEER_LIFECYCLE_NOTIFICATION_DEVICE_SIGNATURE_PREFIX,
   canonicalSerializeFedosRatchetPeerLifecycleNotificationContent,
   type FedosRatchetPeerLifecycleFact,
   type FedosRatchetPeerLifecycleNotificationV1,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
+} from "./fedos_ratchet_peer_lifecycle_notification.js";
 import {
   authorizeFedosRatchetPeerCapabilityContent,
   createFedosRatchetPeerCapabilityDeviceSignature,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
-import { generateFedosRatchetPeerCapabilityNonce } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_nonce.js";
-import { encodeFedosRatchetPeerCapabilityControlPayload } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import type { FedosRatchetPeerCapabilityEntry } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
+} from "./fedos_ratchet_peer_capability_authentication.js";
+import { generateFedosRatchetPeerCapabilityNonce } from "./fedos_ratchet_peer_capability_nonce.js";
+import { encodeFedosRatchetPeerCapabilityControlPayload } from "./fedos_ratchet_peer_capability_control_payload.js";
+import type { FedosRatchetPeerCapabilityEntry } from "./fedos_ratchet_peer_capability_vocabulary.js";
 
 export interface FedosRatchetPeerCapabilitySendResult {
   readonly outcome: "delivered" | "rejected" | "failed" | "later";

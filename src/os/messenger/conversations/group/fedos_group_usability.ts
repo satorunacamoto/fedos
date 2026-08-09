@@ -11,13 +11,13 @@
  * can be attempted right now."
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { toFedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import type { FedosGroupGenerationPersistence } from "../../../../conversation/group/fedos_group_generation.js";
-import type { FedosGroupDirectPathPersistence } from "../../../../conversation/group/fedos_group_direct_path.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { toFedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import type { FedosGroupGenerationPersistence } from "./fedos_group_generation.js";
+import type { FedosGroupDirectPathPersistence } from "./fedos_group_direct_path.js";
 
 export type FedosGroupUsabilityResult =
   | { readonly outcome: "usable" }

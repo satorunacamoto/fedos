@@ -23,7 +23,7 @@ import {
   FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES,
   type FedosConversationParticipantAuthority,
   type FedosConversationParticipantReference,
-} from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+} from "./fedos_conversation_participant_reference.js";
 
 /** Generous enough for an npub/DID/ActivityPub Actor URI/Session ID; bounded against abuse. No existing repo-wide identifier bound to reuse (only `FEDOS_BOARD_POST_MAX_BODY_LENGTH` exists, a content bound, not an identifier bound). */
 export const FEDOS_CONVERSATION_PARTICIPANT_PUBLIC_IDENTIFIER_MAX_LENGTH = 512;

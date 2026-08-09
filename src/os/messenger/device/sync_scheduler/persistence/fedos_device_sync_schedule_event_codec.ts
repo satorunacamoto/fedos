@@ -14,7 +14,7 @@ import type {
   FedosPersistedDeviceSyncScheduleFailedEventV1,
   FedosPersistedDeviceSyncScheduleOperatorRequiredEventV1,
   FedosPersistedDeviceSyncScheduleRetryLaterEventV1,
-} from "../../../../../device/sync_scheduler/persistence/fedos_persisted_device_sync_schedule_event_v1.js";
+} from "./fedos_persisted_device_sync_schedule_event_v1.js";
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;

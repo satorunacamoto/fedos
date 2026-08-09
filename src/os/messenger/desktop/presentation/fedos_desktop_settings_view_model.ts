@@ -20,8 +20,8 @@
  * reason string, never a re-derived message).
  */
 
-import type { FedosSettingsDescriptorV1 } from "../../../../settings/fedos_settings_descriptor.js";
-import type { FedosSettingsResult } from "../../../../settings/fedos_settings_authority.js";
+import type { FedosSettingsDescriptorV1 } from "../../../core/settings/fedos_settings_descriptor.js";
+import type { FedosSettingsResult } from "../../../core/settings/fedos_settings_authority.js";
 import type { FedosDesktopSettingsController } from "../settings/fedos_desktop_settings_controller.js";
 import {
   fedosViewModelIdle,

@@ -23,11 +23,11 @@
  * never a default this file itself supplies.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationCapabilityIssuanceResult } from "../../../../conversation/capability/fedos_conversation_capability_issuance_result.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "./fedos_conversation_capability_descriptor.js";
+import type { FedosConversationCapabilityId } from "./fedos_conversation_capability_id.js";
+import type { FedosConversationCapabilityIssuanceResult } from "./fedos_conversation_capability_issuance_result.js";
 
 /** Injected — decouples the Issuer Authority from any one Conversation persistence implementation. */
 export type FedosConversationExistenceCheck = (conversationId: FedosConversationId) => boolean;

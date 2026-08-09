@@ -30,9 +30,9 @@
  *     contract.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationPayloadDescriptor } from "../../../../conversation/payload_storage/fedos_conversation_payload_descriptor.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationPayloadDescriptor } from "./fedos_conversation_payload_descriptor.js";
+import type { FedosConversationPayloadId } from "./fedos_conversation_payload_id.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749) — no new outcome invented, no outcome omitted. */
 export type FedosConversationPayloadStorageWriteResult = "inserted" | "already-present" | "conflict" | "failed";

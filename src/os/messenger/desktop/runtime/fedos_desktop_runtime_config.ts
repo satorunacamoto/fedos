@@ -61,7 +61,7 @@ import type { FedosRelay } from "../fedos_relay.js";
 import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationTransportPublisher } from "../../adapters/nostr/transport/fedos_conversation_transport_publisher.js";
 import type { FedosPrivateTransportInboundConfig } from "../../adapters/nostr/transport/fedos_private_transport.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import type { FedosConversationArchiveRuntimeBounds } from "../../conversations/archive/runtime/fedos_conversation_archive_runtime.js";
 import type { FedosConversationEncryptionAuthority } from "../../conversations/encryption/fedos_conversation_encryption_authority.js";
 import type { FedosConversationDecryptionAuthority } from "../../conversations/encryption/fedos_conversation_decryption_authority.js";

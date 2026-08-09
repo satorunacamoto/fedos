@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   fedosDesktopBetaLimitationsV1,
   fedosDesktopBetaLimitationsForSurface,
-} from "../src/desktop/beta/fedos_desktop_beta_limitations.js";
+} from "../src/os/messenger/desktop/beta/fedos_desktop_beta_limitations.js";
 
 /**
  * Secure Runtime Alpha 8121-8200 (FedOS Desktop Beta UI Integration,

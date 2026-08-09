@@ -15,7 +15,7 @@
 import type {
   FedosConversationRedemptionCoordinationPhase,
   FedosPersistedConversationRedemptionCoordinationV1,
-} from "../../../../../conversation/capability/coordination/fedos_persisted_conversation_redemption_coordination_v1.js";
+} from "./fedos_persisted_conversation_redemption_coordination_v1.js";
 
 /** Mirrors `FedosConversationMembershipPersistenceWriteResult` exactly (Alpha 827). */
 export type FedosConversationRedemptionCoordinationWriteResult = "inserted" | "already-present" | "conflict" | "failed";

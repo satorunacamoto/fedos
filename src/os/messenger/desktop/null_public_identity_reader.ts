@@ -29,7 +29,7 @@
  *     kind.
  */
 
-import type { FedosIdentityDescriptor } from "../../../identity/fedos_identity_descriptor.js";
+import type { FedosIdentityDescriptor } from "../../core/identity/fedos_identity_descriptor.js";
 import type { FedosPublicIdentityReader } from "./fedos_public_identity_reader.js";
 
 export class NullPublicIdentityReader implements FedosPublicIdentityReader {

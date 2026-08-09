@@ -7,19 +7,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifyFedosSyncConflict } from "../src/sync/fedos_sync_conflict.js";
 import type { FedosSyncJournalEntryV1 } from "../src/sync/fedos_sync_journal.js";
-import { classifyFedosDeviceSyncConflict } from "../src/device/sync_scheduler/fedos_device_sync_conflict.js";
-import { planFedosDeviceSyncResolution } from "../src/device/sync_scheduler/fedos_device_sync_conflict_authority.js";
+import { classifyFedosDeviceSyncConflict } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_conflict.js";
+import { planFedosDeviceSyncResolution } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_conflict_authority.js";
 import {
   fedosDeviceSyncConflictId,
   type FedosDeviceSyncConflictRecordV1,
-} from "../src/device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
-import { InMemoryFedosDeviceSyncConflictPersistence } from "../src/device/sync_scheduler/persistence/in_memory_fedos_device_sync_conflict_persistence.js";
-import { AppendOnlyFedosDeviceSyncConflictPersistence } from "../src/device/sync_scheduler/persistence/append_only_fedos_device_sync_conflict_persistence.js";
+} from "../src/os/messenger/device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import { InMemoryFedosDeviceSyncConflictPersistence } from "../src/os/messenger/device/sync_scheduler/persistence/in_memory_fedos_device_sync_conflict_persistence.js";
+import { AppendOnlyFedosDeviceSyncConflictPersistence } from "../src/os/messenger/device/sync_scheduler/persistence/append_only_fedos_device_sync_conflict_persistence.js";
 import {
   listSafeResolutionActionsForFedosDeviceSyncConflict,
   listUnresolvedFedosDeviceSyncConflicts,
   resolveFedosDeviceSyncConflict,
-} from "../src/device/sync_scheduler/fedos_device_sync_conflict_query.js";
+} from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_conflict_query.js";
 
 const NOW = 1_700_000_000;
 

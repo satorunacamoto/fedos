@@ -41,14 +41,14 @@
 import {
   FEDOS_BOARD_POST_MAX_CREATED_AT,
   FEDOS_BOARD_POST_MIN_CREATED_AT,
-} from "../../../../board/fedos_board_post_validator.js";
-import { validateFedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference_validator.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+} from "../../board/fedos_board_post_validator.js";
+import { validateFedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference_validator.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 import type {
   FedosConversationDraftRecord,
   FedosPrivateConversationPolicyReference,
-} from "../../../../conversation/construction/fedos_conversation_draft_record.js";
-import type { FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
+} from "./fedos_conversation_draft_record.js";
+import type { FedosPrivateConversationMode } from "./fedos_private_conversation_id.js";
 
 /** The typed candidate the coordinator builds before calling `validateFedosConversationDraftRecord`. */
 export interface FedosConversationDraftRecordInput {

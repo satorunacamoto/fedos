@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { AnonymousLocalPublicAuthorAuthority } from "../src/board/runtime/identity/anonymous_local_public_author_authority.js";
-import { FEDOS_BOARD_RUNTIME_ANONYMOUS_LOCAL_AUTHOR_PUBLIC_IDENTIFIER } from "../src/board/runtime/fedos_board_runtime_author_authority.js";
+import { AnonymousLocalPublicAuthorAuthority } from "../src/os/messenger/board/runtime/identity/anonymous_local_public_author_authority.js";
+import { FEDOS_BOARD_RUNTIME_ANONYMOUS_LOCAL_AUTHOR_PUBLIC_IDENTIFIER } from "../src/os/messenger/board/runtime/fedos_board_runtime_author_authority.js";
 
 /**
  * Secure Runtime Alpha 645 ("Anonymous Local Author Policy") — Stage 5

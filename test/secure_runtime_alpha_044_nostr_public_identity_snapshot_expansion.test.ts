@@ -8,15 +8,15 @@ import { decrypt } from "../src/runtime/fedos_runtime_decrypt.js";
 import { exportCiphertext } from "../src/runtime/fedos_runtime_export_ciphertext.js";
 import { importCiphertext } from "../src/runtime/fedos_runtime_import_ciphertext.js";
 import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtime/fedos_runtime_ciphertext_storage.js";
-import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
-import { NostrIdentityProvider } from "../src/identity/fedos_nostr_identity_provider.js";
-import { NullNostrPublicIdentitySource } from "../src/identity/fedos_null_nostr_public_identity_source.js";
-import { FedosIdentityRegistry } from "../src/identity/fedos_identity_registry.js";
-import { FedosIdentityResolver } from "../src/identity/fedos_identity_resolver.js";
+import { resolveFedosIdentityProvider } from "../src/os/core/identity/fedos_identity_provider_resolver.js";
+import { NostrIdentityProvider } from "../src/os/core/identity/fedos_nostr_identity_provider.js";
+import { NullNostrPublicIdentitySource } from "../src/os/core/identity/fedos_null_nostr_public_identity_source.js";
+import { FedosIdentityRegistry } from "../src/os/core/identity/fedos_identity_registry.js";
+import { FedosIdentityResolver } from "../src/os/core/identity/fedos_identity_resolver.js";
 import type {
   FedosNostrPublicIdentitySnapshot,
   FedosNostrPublicIdentitySource,
-} from "../src/identity/fedos_nostr_public_identity_source.js";
+} from "../src/os/core/identity/fedos_nostr_public_identity_source.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_044_nostr_public_identity_snapshot_expansion.md?raw";

@@ -21,14 +21,14 @@
  * HARD GUARDRAILS: no message plaintext, no secret, no historical-record
  * mutation.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
-import { FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES, type FedosIdentityTransitionAcceptanceState } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import { isWellFormedFedosIdentityTransitionId } from "../fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../fedos_identity_transition_id_limits.js";
+import { FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES, type FedosIdentityTransitionAcceptanceState } from "../fedos_identity_transition_acceptance_state.js";
 import {
   FEDOS_IDENTITY_TRANSITION_KNOWN_MANUAL_VERIFICATION_METHODS,
   type FedosIdentityTransitionManualVerificationMethod,
-} from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+} from "./fedos_identity_transition_manual_verification.js";
 
 export interface FedosIdentityTransitionConversationContinuityRecordV1 {
   readonly schemaVersion: 1;

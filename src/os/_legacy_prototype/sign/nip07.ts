@@ -7,7 +7,7 @@
  * generates, or stores a private key, and it never publishes.
  */
 
-import { isValidHex } from "../../../nostr/noble_signature.js";
+import { isValidHex } from "../../messenger/adapters/nostr/protocol/noble_signature.js";
 import { assertSignerPubkeyMatches, isSignedEventLike } from "./validate.js";
 import type {
   EventSigner,

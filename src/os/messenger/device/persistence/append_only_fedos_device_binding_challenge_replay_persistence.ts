@@ -13,14 +13,14 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import { deserializeFedosDeviceBindingChallengeConsumption } from "../../../../device/persistence/fedos_device_binding_challenge_replay_codec.js";
+import { deserializeFedosDeviceBindingChallengeConsumption } from "./fedos_device_binding_challenge_replay_codec.js";
 import {
   fedosDeviceBindingChallengeConsumptionKey,
   fedosPersistedDeviceBindingChallengeConsumptionRecordsAreEqual,
   type FedosDeviceBindingChallengeReplayPersistence,
   type FedosDeviceBindingChallengeReplayWriteResult,
-} from "../../../../device/persistence/fedos_device_binding_challenge_replay_persistence.js";
-import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "../../../../device/persistence/fedos_persisted_device_binding_challenge_consumption_v1.js";
+} from "./fedos_device_binding_challenge_replay_persistence.js";
+import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "./fedos_persisted_device_binding_challenge_consumption_v1.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

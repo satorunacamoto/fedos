@@ -26,24 +26,24 @@
  * corruption discipline); every operation returns a closed outcome token.
  */
 
-import type { FedosBoardRuntimeClock } from "../../../../board/runtime/fedos_board_runtime_clock.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { deserializeFedosConversationDraftRecord } from "../../../../conversation/construction/fedos_conversation_draft_record_codec.js";
-import type { FedosConversationDraftRecord } from "../../../../conversation/construction/fedos_conversation_draft_record.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationDraftManagementPersistence } from "../../../../conversation/construction/fedos_conversation_draft_management_persistence.js";
+import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { deserializeFedosConversationDraftRecord } from "./fedos_conversation_draft_record_codec.js";
+import type { FedosConversationDraftRecord } from "./fedos_conversation_draft_record.js";
+import type { FedosConversationDraftPersistence } from "./fedos_conversation_draft_persistence.js";
+import type { FedosConversationDraftManagementPersistence } from "./fedos_conversation_draft_management_persistence.js";
 import {
   isFedosConversationManagedDraftState,
   type FedosConversationDraftSearchQuery,
   type FedosConversationDraftSummary,
   type FedosConversationManagedDraftState,
-} from "../../../../conversation/construction/fedos_conversation_managed_draft_state.js";
+} from "./fedos_conversation_managed_draft_state.js";
 import type {
   FedosConversationDraftDeleteResult,
   FedosConversationDraftRestoreResult,
-} from "../../../../conversation/construction/fedos_conversation_draft_management_result.js";
-import type { FedosPersistedConversationDraftManagementStateV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_management_state_v1.js";
+} from "./fedos_conversation_draft_management_result.js";
+import type { FedosPersistedConversationDraftManagementStateV1 } from "./fedos_persisted_conversation_draft_management_state_v1.js";
 
 /**
  * Injected — decides whether `actor` may manage (delete/restore) `draft`. Kept

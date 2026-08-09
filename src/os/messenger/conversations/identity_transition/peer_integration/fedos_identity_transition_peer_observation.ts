@@ -22,11 +22,11 @@
  * Records ONLY safe, non-secret facts — no raw evidence, no signatures,
  * no keys.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import { FEDOS_IDENTITY_TRANSITION_KNOWN_EVIDENCE_OUTCOMES, type FedosIdentityTransitionEvidenceOutcome } from "../../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
-import { FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES, type FedosIdentityTransitionAcceptanceState } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import { FEDOS_IDENTITY_TRANSITION_KNOWN_EVIDENCE_OUTCOMES, type FedosIdentityTransitionEvidenceOutcome } from "../fedos_identity_transition_evidence_evaluation.js";
+import { FEDOS_IDENTITY_TRANSITION_KNOWN_ACCEPTANCE_STATES, type FedosIdentityTransitionAcceptanceState } from "../fedos_identity_transition_acceptance_state.js";
+import { isWellFormedFedosIdentityTransitionId } from "../fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../fedos_identity_transition_id_limits.js";
 
 export type FedosIdentityTransitionPeerObservationConflictState = "none" | "conflicting" | "rollback-detected";
 

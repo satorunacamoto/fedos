@@ -23,10 +23,10 @@
  * is not widened to fake a multi-party answer.
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembership } from "../../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosConversationMembershipAuthority } from "../../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationMembership } from "../../membership/fedos_conversation_membership.js";
+import type { FedosConversationMembershipAuthority } from "../../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
 
 export type FedosConversationParticipantResolution =
   | { readonly outcome: "resolved"; readonly local: FedosConversationMembership; readonly counterparty: FedosConversationMembership }

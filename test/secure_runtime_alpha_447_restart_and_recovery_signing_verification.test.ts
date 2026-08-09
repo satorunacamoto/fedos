@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import doc from "../docs/secure_runtime_alpha_447_restart_and_recovery_signing_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import lib from "../packages/fedos-core-rust/src/lib.rs?raw";
-import { verifyNostrEventId } from "../src/desktop/nostr_event_id_verifier.js";
-import { verifyNostrEventSignature } from "../src/desktop/nostr_signature_verifier.js";
+import { verifyNostrEventId } from "../src/os/messenger/desktop/nostr_event_id_verifier.js";
+import { verifyNostrEventSignature } from "../src/os/messenger/desktop/nostr_signature_verifier.js";
 
 describe("Secure Runtime Alpha 447 -- Restart and Recovery Signing Verification", () => {
   it("documents all eight required restart-simulation steps in order", () => {

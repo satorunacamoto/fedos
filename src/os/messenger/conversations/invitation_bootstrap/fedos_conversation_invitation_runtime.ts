@@ -6,23 +6,23 @@
  * "safe facade over a narrow, injected dependency bundle" shape exactly,
  * as a SIBLING Runtime, never a merge into that frozen class.
  */
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationIdentityResolver } from "../../../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
-import type { FedosConversationReactivationResult } from "../../../../conversation/activation/fedos_conversation_reactivation_result.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosPrivateWireDeliveryQueueOutcome } from "../../../../conversation/transport/fedos_private_wire_prepared_delivery.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationReactivationResult } from "../activation/fedos_conversation_reactivation_result.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../../adapters/nostr/transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 import {
   FedosConversationInvitationOutboundCoordinator,
   type FedosConversationInvitationIdGenerator,
   type FedosConversationInvitationOutboundOutcome,
-} from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
+} from "./fedos_conversation_invitation_outbound_coordinator.js";
 import {
   FedosConversationInvitationInboundCoordinator,
   type FedosConversationInvitationInboundOutcome,
-} from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_inbound_coordinator.js";
-import type { FedosConversationInvitationReceivedPersistence } from "../../../../conversation/invitation_bootstrap/persistence/fedos_conversation_invitation_received_persistence.js";
+} from "./fedos_conversation_invitation_inbound_coordinator.js";
+import type { FedosConversationInvitationReceivedPersistence } from "./persistence/fedos_conversation_invitation_received_persistence.js";
 
 export interface FedosConversationInvitationRuntimeDependencies {
   readonly membershipAuthority: FedosConversationMembershipAuthority;

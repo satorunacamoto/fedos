@@ -4,8 +4,8 @@ import {
   isFedosBoardOutboundProtocol,
   makeFedosBoardOutboxId,
   type FedosBoardOutboxTarget,
-} from "../src/board/outbox/fedos_board_outbox_types.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 /**
  * Secure Runtime Alpha 413 -- "Outbox Identifier and Target Model":

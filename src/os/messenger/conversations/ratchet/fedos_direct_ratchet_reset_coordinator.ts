@@ -21,19 +21,19 @@
  * (`evaluate()`) is the real security boundary; `applyConsequences()` runs
  * only after a caller has already acted on that evaluation.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDirectRatchetSuite } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDirectRatchetSessionId } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import { FedosDirectRatchetStateRuntime } from "../../../../conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
-import type { FedosDirectRatchetSessionPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionId } from "./fedos_direct_ratchet_session_id.js";
+import { FedosDirectRatchetStateRuntime } from "./fedos_direct_ratchet_state_runtime.js";
+import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
 import {
   FedosDirectRatchetSessionResetAuthority,
   type FedosDirectRatchetSessionResetEvaluation,
   type FedosDirectRatchetSessionResetEvaluationRequest,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_authority.js";
-import type { FedosDirectRatchetSessionResetRecordPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
-import type { FedosDirectRatchetSessionResetInitiator, FedosDirectRatchetSessionResetOutcome } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_record.js";
-import type { FedosDirectRatchetSessionResetReason } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+} from "./fedos_direct_ratchet_session_reset_authority.js";
+import type { FedosDirectRatchetSessionResetRecordPersistence } from "./persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
+import type { FedosDirectRatchetSessionResetInitiator, FedosDirectRatchetSessionResetOutcome } from "./fedos_direct_ratchet_session_reset_record.js";
+import type { FedosDirectRatchetSessionResetReason } from "./fedos_direct_ratchet_session_reset_reason.js";
 
 export interface FedosDirectRatchetResetCoordinatorDependencies {
   readonly stateRuntime: FedosDirectRatchetStateRuntime;

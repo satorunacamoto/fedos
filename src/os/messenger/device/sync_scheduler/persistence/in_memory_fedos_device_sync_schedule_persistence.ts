@@ -10,9 +10,9 @@ import {
   reconstructFedosDeviceSyncScheduleRecord,
   type FedosDeviceSyncSchedulePersistence,
   type FedosDeviceSyncSchedulePersistenceWriteResult,
-} from "../../../../../device/sync_scheduler/persistence/fedos_device_sync_schedule_persistence.js";
-import type { FedosPersistedDeviceSyncScheduleEventV1 } from "../../../../../device/sync_scheduler/persistence/fedos_persisted_device_sync_schedule_event_v1.js";
-import type { FedosDeviceSyncScheduleV1 } from "../../../../../device/sync_scheduler/fedos_device_sync_schedule.js";
+} from "./fedos_device_sync_schedule_persistence.js";
+import type { FedosPersistedDeviceSyncScheduleEventV1 } from "./fedos_persisted_device_sync_schedule_event_v1.js";
+import type { FedosDeviceSyncScheduleV1 } from "../fedos_device_sync_schedule.js";
 
 export class InMemoryFedosDeviceSyncSchedulePersistence implements FedosDeviceSyncSchedulePersistence {
   readonly #events = new Map<string, FedosPersistedDeviceSyncScheduleEventV1>();

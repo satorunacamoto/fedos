@@ -10,7 +10,7 @@ import {
   type WebAuthnAdapterRequest,
   type WebAuthnProvider,
   type WebAuthnReport,
-} from "../src/identity/webauthn_adapter.js";
+} from "../src/os/core/identity/webauthn_adapter.js";
 import { buildRuntimeStatusView } from "../src/os/_legacy_prototype/render/runtime_status.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";

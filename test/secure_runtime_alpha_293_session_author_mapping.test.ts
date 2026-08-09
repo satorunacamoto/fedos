@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_293_session_author_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import adapterModuleSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
-import { mapValidatedSessionPostToBoardPostInput } from "../src/board/session/fedos_session_board_adapter.js";
-import type { FedosValidatedSessionPost } from "../src/board/session/fedos_validated_session_post.js";
+import { mapValidatedSessionPostToBoardPostInput } from "../src/os/messenger/board/session/fedos_session_board_adapter.js";
+import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
 
 function codeOnly(source: string): string {
   return source

@@ -15,7 +15,7 @@ import {
   type FedosArchiveSuppressionInboundDedupPersistence,
   type FedosArchiveSuppressionInboundImportWriteResult,
   type FedosPersistedArchiveSuppressionInboundImportRecordV1,
-} from "../../../../../device/archive_suppression_sync/persistence/fedos_archive_suppression_inbound_dedup_persistence.js";
+} from "./fedos_archive_suppression_inbound_dedup_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

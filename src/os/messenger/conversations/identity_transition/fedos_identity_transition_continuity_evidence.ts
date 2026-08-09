@@ -19,9 +19,9 @@
  */
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { hexToBytes } from "@noble/hashes/utils.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionContinuityProofDigest } from "../../../../conversation/identity_transition/fedos_identity_transition_canonical.js";
-import type { FedosIdentityTransitionRecordV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_record.js";
-import type { FedosIdentityTransitionEvidenceStatus } from "../../../../conversation/identity_transition/fedos_identity_transition_vocabulary.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionContinuityProofDigest } from "./fedos_identity_transition_canonical.js";
+import type { FedosIdentityTransitionRecordV1 } from "./fedos_identity_transition_record.js";
+import type { FedosIdentityTransitionEvidenceStatus } from "./fedos_identity_transition_vocabulary.js";
 
 const NOSTR_PUBLIC_KEY_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const SCHNORR_SIGNATURE_HEX_PATTERN = /^[0-9a-f]{128}$/;

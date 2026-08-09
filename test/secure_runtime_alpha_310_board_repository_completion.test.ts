@@ -17,13 +17,13 @@ import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedo
 import atprotoAdapterSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import sessionAdapterSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
-import * as repositoryModule from "../src/board/repository/fedos_board_repository.js";
-import * as inMemoryModule from "../src/board/repository/in_memory_fedos_board_repository.js";
-import * as sourceIndexModule from "../src/board/repository/fedos_board_source_index.js";
-import * as boardIndexModule from "../src/board/repository/fedos_board_index.js";
-import * as serviceModule from "../src/board/repository/fedos_board_service.js";
-import * as feedModule from "../src/board/repository/fedos_board_feed.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import * as repositoryModule from "../src/os/messenger/board/repository/fedos_board_repository.js";
+import * as inMemoryModule from "../src/os/messenger/board/repository/in_memory_fedos_board_repository.js";
+import * as sourceIndexModule from "../src/os/messenger/board/repository/fedos_board_source_index.js";
+import * as boardIndexModule from "../src/os/messenger/board/repository/fedos_board_index.js";
+import * as serviceModule from "../src/os/messenger/board/repository/fedos_board_service.js";
+import * as feedModule from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 /**
  * Secure Runtime Alpha 310 -- "Canonical Board Repository, Index &

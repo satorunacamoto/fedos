@@ -23,19 +23,19 @@
  * itself constructs neither.
  */
 
-import { validateFedosDeletionRequestRecordV1Structure } from "../../../../conversation/deletion_request/fedos_deletion_request_validation.js";
+import { validateFedosDeletionRequestRecordV1Structure } from "./fedos_deletion_request_validation.js";
 import {
   assessFedosDeletionRequestAuthorization,
   type FedosDeletionRequestAuthorizationAssessmentDependencies,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_authorization_assessment.js";
-import { coarsenFedosDeletionRequestAuthorizationOutcome } from "../../../../conversation/deletion_request/fedos_deletion_request_authorization_outcome.js";
-import type { FedosSignedDeletionRequestV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRecipientDecisionState } from "../../../../conversation/deletion_request/fedos_deletion_recipient_decision_state.js";
+} from "./fedos_deletion_request_authorization_assessment.js";
+import { coarsenFedosDeletionRequestAuthorizationOutcome } from "./fedos_deletion_request_authorization_outcome.js";
+import type { FedosSignedDeletionRequestV1 } from "./fedos_deletion_request_signing.js";
+import type { FedosDeletionRecipientDecisionState } from "./fedos_deletion_recipient_decision_state.js";
 import type {
   FedosDeletionRecipientDecisionPersistence,
   FedosDeletionRecipientDecisionPersistenceWriteResult,
-} from "../../../../conversation/deletion_request/fedos_deletion_recipient_decision_persistence.js";
-import type { FedosDeletionRecipientSuppliedLocalOutcome, FedosPersistedDeletionRecipientDecisionRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_recipient_decision_record_v1.js";
+} from "./fedos_deletion_recipient_decision_persistence.js";
+import type { FedosDeletionRecipientSuppliedLocalOutcome, FedosPersistedDeletionRecipientDecisionRecordV1 } from "./fedos_persisted_deletion_recipient_decision_record_v1.js";
 
 export interface FedosDeletionRequestRecipientEvaluationDependencies {
   readonly authorization: FedosDeletionRequestAuthorizationAssessmentDependencies;

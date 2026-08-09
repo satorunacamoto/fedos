@@ -14,35 +14,35 @@ import {
   isFedosDeviceBindingChallengeExpired,
   FedosSecureRandomDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeV1,
-} from "../src/device/binding_challenge/fedos_device_binding_challenge.js";
+} from "../src/os/messenger/device/binding_challenge/fedos_device_binding_challenge.js";
 import {
   generateFedosDeviceSigningKeypair,
   verifyFedosDeviceSigningSignature,
   isWellFormedFedosDevicePublicKeyHex,
   isWellFormedFedosDeviceSchnorrSignatureHex,
-} from "../src/device/crypto/fedos_device_signing_keypair.js";
+} from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
 import {
   authorizeFedosDeviceBindingChallenge,
   verifyFedosDeviceBindingAccountAuthorization,
   FEDOS_DEVICE_BINDING_TAG,
   type FedosDeviceBindingAccountAuthorizationV1,
-} from "../src/device/binding_challenge/fedos_device_binding_account_authorization.js";
+} from "../src/os/messenger/device/binding_challenge/fedos_device_binding_account_authorization.js";
 import {
   createFedosDeviceBindingProofOfPossession,
   verifyFedosDeviceBindingProofOfPossession,
-} from "../src/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+} from "../src/os/messenger/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
 import {
   FedosDeviceBindingRegistrationAuthority,
   FEDOS_DEVICE_BINDING_NOSTR_ACCOUNT_AUTHORITY,
-} from "../src/device/binding_challenge/fedos_device_binding_registration_authority.js";
-import { AlreadyVerifiedFedosDeviceRegistrationAuthority } from "../src/device/binding_challenge/fedos_already_verified_device_registration_authority.js";
-import { UnavailableFedosDeviceRegistrationAuthority } from "../src/device/unavailable_fedos_device_registration_authority.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
-import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
-import { deserializeFedosDeviceBindingChallengeConsumption } from "../src/device/persistence/fedos_device_binding_challenge_replay_codec.js";
-import { createFedosDeviceBindingBoundary } from "../src/device/binding_challenge/fedos_device_binding_boundary_factory.js";
+} from "../src/os/messenger/device/binding_challenge/fedos_device_binding_registration_authority.js";
+import { AlreadyVerifiedFedosDeviceRegistrationAuthority } from "../src/os/messenger/device/binding_challenge/fedos_already_verified_device_registration_authority.js";
+import { UnavailableFedosDeviceRegistrationAuthority } from "../src/os/messenger/device/unavailable_fedos_device_registration_authority.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
+import { deserializeFedosDeviceBindingChallengeConsumption } from "../src/os/messenger/device/persistence/fedos_device_binding_challenge_replay_codec.js";
+import { createFedosDeviceBindingBoundary } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_boundary_factory.js";
 
 import { RealFedosNostrSigningAuthority, createStandaloneSchnorrSigner } from "./support/real_fedos_nostr_signing_authority.js";
 

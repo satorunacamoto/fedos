@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   NoopPasskeyBoundary,
   PlaceholderPasskeyBoundary,
-} from "../src/identity/passkey_boundary.js";
+} from "../src/os/core/identity/passkey_boundary.js";
 import {
   PASSKEY_CAPABILITIES,
   type PasskeyAuthenticationRequest,
-} from "../src/identity/types.js";
-import { passkeyAuthenticationToVaultRequest } from "../src/identity/vault_bridge.js";
+} from "../src/os/core/identity/types.js";
+import { passkeyAuthenticationToVaultRequest } from "../src/os/core/identity/vault_bridge.js";
 // Identity sources as strings: prove no crypto import and a type-only vault import.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import identityTypesSource from "../src/os/core/identity/types.ts?raw";

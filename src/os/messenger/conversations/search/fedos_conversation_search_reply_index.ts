@@ -26,8 +26,8 @@
  *     drops its own children linkage cleanly (see above).
  */
 
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationSearchEnvelopeDocument } from "../../../../conversation/search/fedos_conversation_search_document.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationSearchEnvelopeDocument } from "./fedos_conversation_search_document.js";
 
 export class FedosConversationSearchReplyIndex {
   readonly #childrenByParent = new Map<FedosConversationEnvelopeId, Set<FedosConversationEnvelopeId>>();

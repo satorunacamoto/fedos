@@ -24,32 +24,32 @@
  * root/chain/message key, no skipped key, no local path, no arbitrary
  * executable command, no user message plaintext.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosRatchetPeerCapabilityAccountAuthorizationV1 } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosRatchetPeerCapabilityAccountAuthorizationV1 } from "../../ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+import { isWellFormedFedosIdentityTransitionId } from "../fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../fedos_identity_transition_id_limits.js";
 import {
   isWellFormedFedosIdentityTransitionNewKeyProofV1,
   type FedosIdentityTransitionNewKeyProofV1,
-} from "../../../../../conversation/identity_transition/fedos_identity_transition_new_key_proof.js";
+} from "../fedos_identity_transition_new_key_proof.js";
 import {
   isWellFormedFedosIdentityTransitionContinuityEvidenceV1,
   type FedosIdentityTransitionContinuityEvidenceV1,
-} from "../../../../../conversation/identity_transition/fedos_identity_transition_continuity_evidence.js";
+} from "../fedos_identity_transition_continuity_evidence.js";
 import {
   isWellFormedFedosIdentityTransitionDeviceCorroborationV1,
   type FedosIdentityTransitionDeviceCorroborationV1,
-} from "../../../../../conversation/identity_transition/fedos_identity_transition_device_corroboration.js";
+} from "../fedos_identity_transition_device_corroboration.js";
 import {
   isKnownFedosIdentityTransitionReasonCategory,
   type FedosIdentityTransitionReasonCategory,
-} from "../../../../../conversation/identity_transition/fedos_identity_transition_vocabulary.js";
+} from "../fedos_identity_transition_vocabulary.js";
 import {
   createFedosIdentityTransitionRecordV1,
   isWellFormedFedosIdentityTransitionRecordV1,
   type FedosIdentityTransitionRecordV1,
-} from "../../../../../conversation/identity_transition/fedos_identity_transition_record.js";
-import { fedosIdentityTransitionBodyHash } from "../../../../../conversation/identity_transition/fedos_identity_transition_canonical.js";
+} from "../fedos_identity_transition_record.js";
+import { fedosIdentityTransitionBodyHash } from "../fedos_identity_transition_canonical.js";
 
 /** Distinct from every other signed-content domain in this codebase (peer-capability advertisement/lifecycle-notification, Session Reset, Device Binding challenge). */
 export const FEDOS_IDENTITY_TRANSITION_NOTIFICATION_DOMAIN = "fedos-identity-transition-notification-v1";

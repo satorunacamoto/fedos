@@ -10,7 +10,7 @@
  * lifecycle, Phase I, is what records "acknowledged" happened).
  */
 
-import type { FedosDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
+import type { FedosDeletionAcknowledgementRecordV1 } from "./fedos_deletion_acknowledgement_record.js";
 
 export interface FedosPersistedDeletionAcknowledgementRecordV1 {
   readonly schemaVersion: 1;

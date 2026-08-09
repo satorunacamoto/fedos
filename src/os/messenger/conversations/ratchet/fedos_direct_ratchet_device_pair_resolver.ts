@@ -35,16 +35,16 @@ import {
   isFedosDeviceBindingRevoked,
   isFedosDeviceBindingTrusted,
   type FedosDeviceBindingAccountRef,
-} from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+} from "../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 import {
   toFedosDirectRatchetSessionId,
   type FedosDirectRatchetSessionId,
   type FedosDirectRatchetSuite,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDirectRatchetSessionPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
+} from "./fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "./fedos_direct_ratchet_session_record.js";
 
 /** The fixed, closed suite this Arc ever resolves — reused, never redefined (`./fedos_direct_ratchet_session_id.js`). */
 export const FEDOS_DIRECT_RATCHET_DEFAULT_SUITE: FedosDirectRatchetSuite = "fedos-direct-ratchet-v1";

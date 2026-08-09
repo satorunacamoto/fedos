@@ -6,9 +6,9 @@ import { describe, it, expect } from "vitest";
 import {
   encodeFedosConversationArchiveFileContainer,
   decodeFedosConversationArchiveFileContainer,
-} from "../src/conversation/archive/fs/fedos_conversation_archive_file_container.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
-import type { FedosConversationArchiveManifestV1 } from "../src/conversation/archive/fedos_conversation_archive_manifest.js";
+} from "../src/os/messenger/conversations/archive/fs/fedos_conversation_archive_file_container.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationArchiveManifestV1 } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_manifest.js";
 import type { AeadCiphertextWire } from "../src/runtime/fedos_wasm_loader.js";
 
 function makeManifest(overrides: Partial<FedosConversationArchiveManifestV1> = {}): FedosConversationArchiveManifestV1 {

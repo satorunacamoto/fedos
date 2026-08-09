@@ -10,9 +10,9 @@ import {
   reconstructFedosDeviceTransferSessionRecord,
   type FedosDeviceTransferSessionPersistence,
   type FedosDeviceTransferSessionPersistenceWriteResult,
-} from "../../../../../device/transfer/persistence/fedos_device_transfer_session_persistence.js";
-import type { FedosPersistedDeviceTransferEventV1 } from "../../../../../device/transfer/persistence/fedos_persisted_device_transfer_event_v1.js";
-import type { FedosDeviceTransferSessionV1 } from "../../../../../device/transfer/fedos_device_transfer_session.js";
+} from "./fedos_device_transfer_session_persistence.js";
+import type { FedosPersistedDeviceTransferEventV1 } from "./fedos_persisted_device_transfer_event_v1.js";
+import type { FedosDeviceTransferSessionV1 } from "../fedos_device_transfer_session.js";
 
 export class InMemoryFedosDeviceTransferSessionPersistence implements FedosDeviceTransferSessionPersistence {
   readonly #events = new Map<string, FedosPersistedDeviceTransferEventV1>();

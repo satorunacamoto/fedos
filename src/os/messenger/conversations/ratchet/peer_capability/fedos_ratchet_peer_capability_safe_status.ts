@@ -7,8 +7,8 @@
  * Phase O's own requirement that self-advertisement alone never displays
  * as trust; the closest available value is `"compatible"`.
  */
-import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_outcome.js";
-import type { FedosRatchetPeerSessionActionRecommendation } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_session_action_recommendation.js";
+import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "./fedos_ratchet_peer_capability_acceptance_outcome.js";
+import type { FedosRatchetPeerSessionActionRecommendation } from "./fedos_ratchet_peer_capability_session_action_recommendation.js";
 
 export type FedosRatchetPeerCapabilitySafeStatus =
   | "unknown"

@@ -56,7 +56,7 @@ import type { FedosConversationPayloadStorage } from "../../../conversations/pay
 import type { FedosConversationMembership } from "../../../conversations/membership/fedos_conversation_membership.js";
 import type { FedosConversationId } from "../../../conversations/fedos_conversation_id.js";
 import type { FedosNostrSigningAuthority } from "../protocol/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 import { resolveFedosConversationTransportRoute } from "./fedos_conversation_transport_routing.js";
 import { buildFedosPrivateTransportUnsignedEventRequest } from "./fedos_conversation_transport_event.js";
 

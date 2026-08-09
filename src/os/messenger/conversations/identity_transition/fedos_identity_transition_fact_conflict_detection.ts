@@ -17,7 +17,7 @@
  * the lineage's current maximum, are exactly the "two competing
  * replacement transitions" / "revision rollback" cases Phase P names.
  */
-import { fedosIdentityTransitionFactsAreEqual, fedosIdentityTransitionLineageKey, type FedosIdentityTransitionFactV1 } from "../../../../conversation/identity_transition/fedos_identity_transition_fact.js";
+import { fedosIdentityTransitionFactsAreEqual, fedosIdentityTransitionLineageKey, type FedosIdentityTransitionFactV1 } from "./fedos_identity_transition_fact.js";
 
 export type FedosIdentityTransitionFactWriteOutcome =
   | "inserted"

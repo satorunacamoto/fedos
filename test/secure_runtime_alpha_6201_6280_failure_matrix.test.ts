@@ -7,11 +7,11 @@
  * paths with real crypto.
  */
 import { describe, it, expect } from "vitest";
-import { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
-import { FedosSafetyCenterController } from "../src/desktop/presentation/safety_center/fedos_safety_center_controller.js";
-import { AppendOnlyFedosDeletionRequestPendingReviewPersistence } from "../src/conversation/deletion_request/append_only_fedos_deletion_request_pending_review_persistence.js";
-import { InMemoryFedosDeletionRequestPendingReviewPersistence } from "../src/conversation/deletion_request/fedos_deletion_request_pending_review_persistence.js";
-import { validateFedosDesktopHostCommand } from "../src/desktop/host_boundary/fedos_desktop_host_command.js";
+import { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
+import { FedosSafetyCenterController } from "../src/os/messenger/desktop/presentation/safety_center/fedos_safety_center_controller.js";
+import { AppendOnlyFedosDeletionRequestPendingReviewPersistence } from "../src/os/messenger/conversations/deletion_request/append_only_fedos_deletion_request_pending_review_persistence.js";
+import { InMemoryFedosDeletionRequestPendingReviewPersistence } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_pending_review_persistence.js";
+import { validateFedosDesktopHostCommand } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.js";
 
 describe("Secure Runtime Alpha 6201-6280 -- failure matrix", () => {
   it("1. stopped Shell -- overview/events refresh honestly reports every section unavailable, never throws", async () => {

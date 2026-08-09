@@ -28,15 +28,15 @@ import boardIndexSource from "../src/os/messenger/board/repository/fedos_board_i
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import feedSource from "../src/os/messenger/board/repository/fedos_board_feed.ts?raw";
 
-import * as recordModule from "../src/board/persistence/fedos_persisted_board_post_v1.js";
-import * as codecModule from "../src/board/persistence/fedos_board_post_codec.js";
-import * as portModule from "../src/board/persistence/fedos_board_persistence.js";
-import * as inMemoryPersistenceModule from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import * as persistedRepositoryModule from "../src/board/persistence/persisted_fedos_board_repository.js";
-import * as hydrationModule from "../src/board/persistence/fedos_board_hydration.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { FedosBoardFeed } from "../src/board/repository/fedos_board_feed.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import * as recordModule from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.js";
+import * as codecModule from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import * as portModule from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
+import * as inMemoryPersistenceModule from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import * as persistedRepositoryModule from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.js";
+import * as hydrationModule from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { FedosBoardFeed } from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 /**
  * Secure Runtime Alpha 320 -- "Canonical Board Persistence Boundary

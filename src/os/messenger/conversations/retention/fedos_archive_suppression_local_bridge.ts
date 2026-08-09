@@ -27,14 +27,14 @@
  */
 
 import { randomBytes as nobleRandomBytes, bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
 import {
   createFedosArchiveSuppressionFact,
   type FedosArchiveSuppressionFact,
   type FedosArchiveSuppressionMeaning,
-} from "../../../../conversation/retention/fedos_archive_suppression_fact.js";
-import type { FedosArchiveSuppressionObservationAuthority } from "../../../../conversation/retention/fedos_archive_suppression_observation_authority.js";
+} from "./fedos_archive_suppression_fact.js";
+import type { FedosArchiveSuppressionObservationAuthority } from "./fedos_archive_suppression_observation_authority.js";
 
 export interface FedosCreateLocalSuppressionFactInput {
   readonly accountRef: FedosDeviceBindingAccountRef;

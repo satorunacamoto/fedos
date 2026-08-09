@@ -7,7 +7,7 @@
  */
 
 // Nostr core
-export type { NostrEvent, NostrTag, EventCore } from "../../nostr/types.js";
+export type { NostrEvent, NostrTag, EventCore } from "../messenger/adapters/nostr/protocol/types.js";
 export {
   validateEventStructure,
   isNostrEvent,
@@ -15,35 +15,35 @@ export {
   computeEventId,
   verifyEventId,
   type StructureIssue,
-} from "../../nostr/event.js";
+} from "../messenger/adapters/nostr/protocol/event.js";
 export {
   webCryptoSha256Hex,
   constantTimeHexEqual,
   type Sha256Hex,
-} from "../../nostr/crypto.js";
+} from "../messenger/adapters/nostr/protocol/crypto.js";
 export {
   InMemoryRelayAdapter,
   eventMatchesFilter,
   eventMatchesAnyFilter,
   type RelayAdapter,
   type NostrFilter,
-} from "../../nostr/relay.js";
+} from "../messenger/adapters/nostr/protocol/relay.js";
 export {
   parseRelayMessage,
   isEventMessage,
   isEoseMessage,
   isNoticeMessage,
   type RelayMessage,
-} from "../../nostr/messages.js";
+} from "../messenger/adapters/nostr/protocol/messages.js";
 export {
   NoopSignatureVerifier,
   RejectAllSignatureVerifier,
   type SignatureVerifier,
-} from "../../nostr/signature.js";
+} from "../messenger/adapters/nostr/protocol/signature.js";
 export {
   NobleSignatureVerifier,
   isValidHex,
-} from "../../nostr/noble_signature.js";
+} from "../messenger/adapters/nostr/protocol/noble_signature.js";
 export {
   WebSocketRelayAdapter,
   type WebSocketFactory,
@@ -51,7 +51,7 @@ export {
   type RelaySocketLike,
   type RelaySocketEvent,
   type RelaySocketEventType,
-} from "../../nostr/ws_relay.js";
+} from "../messenger/adapters/nostr/protocol/ws_relay.js";
 
 // Ingest
 export { ingestRawEvents, dedupeById } from "./ingest/ingest.js";

@@ -28,7 +28,7 @@
  *   - Never produces `outcome: "rejected"`.
  */
 
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 import type { FedosOutboundPublishResult } from "../fedos_outbound_publish_result.js";
 
 export function nostrPublishOneResultToOutboundPublishResult(

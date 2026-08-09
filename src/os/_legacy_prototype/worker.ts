@@ -25,15 +25,15 @@
  * is encrypted, and there is no send form/button or message delivery.
  */
 
-import { InMemoryRelayAdapter } from "../../nostr/relay.js";
-import type { RelayAdapter } from "../../nostr/relay.js";
+import { InMemoryRelayAdapter } from "../messenger/adapters/nostr/protocol/relay.js";
+import type { RelayAdapter } from "../messenger/adapters/nostr/protocol/relay.js";
 import {
   WebSocketRelayAdapter,
   type RelaySocketLike,
   type WebSocketFactory,
-} from "../../nostr/ws_relay.js";
-import { NoopSignatureVerifier } from "../../nostr/signature.js";
-import type { SignatureVerifier } from "../../nostr/signature.js";
+} from "../messenger/adapters/nostr/protocol/ws_relay.js";
+import { NoopSignatureVerifier } from "../messenger/adapters/nostr/protocol/signature.js";
+import type { SignatureVerifier } from "../messenger/adapters/nostr/protocol/signature.js";
 import { ingestRawEvents } from "./ingest/ingest.js";
 import { buildThreads } from "./thread/thread.js";
 import { queryThreads } from "./query/thread_query.js";
@@ -44,7 +44,7 @@ import {
 } from "./cache/event_cache.js";
 import type { KvLikeNamespace } from "./cache/kv_event_cache.js";
 import type { EventCache } from "./cache/types.js";
-import type { NostrFilter } from "../../nostr/relay.js";
+import type { NostrFilter } from "../messenger/adapters/nostr/protocol/relay.js";
 import type { IngestedEvent } from "./ingest/types.js";
 import { canPost, canRead } from "./community/policy.js";
 import {

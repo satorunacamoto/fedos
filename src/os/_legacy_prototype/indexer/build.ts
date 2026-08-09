@@ -7,7 +7,7 @@
  * resolvers; space refs reuse the Stage 9 classifier.
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 import type { IngestedEvent } from "../ingest/types.js";
 import type { ThreadBuildResult, ThreadNode } from "../thread/types.js";
 import { getReplyTarget, getRootTarget } from "../thread/thread.js";

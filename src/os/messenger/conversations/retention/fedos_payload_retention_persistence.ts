@@ -23,9 +23,9 @@
  *     contract.
  */
 
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosPayloadRetentionAction } from "../../../../conversation/retention/fedos_payload_retention_decision.js";
-import type { FedosPersistedPayloadRetentionDecisionV1 } from "../../../../conversation/retention/fedos_persisted_payload_retention_decision_v1.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosPayloadRetentionAction } from "./fedos_payload_retention_decision.js";
+import type { FedosPersistedPayloadRetentionDecisionV1 } from "./fedos_persisted_payload_retention_decision_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosPayloadRetentionPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

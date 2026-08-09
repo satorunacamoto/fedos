@@ -25,25 +25,25 @@
  *   - Never throws.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { fedosPersistedConversationRecordsAreEqual } from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosConversationPersistence } from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import { fedosPersistedConversationDraftRecordsAreEqual } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import { isFedosConversationArchiveDirectConversationSubject } from "../../../../conversation/archive/fedos_conversation_archive_direct_subject.js";
-import { fedosPersistedConversationMembershipsAreEqual } from "../../../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
-import type { FedosConversationMembershipPersistence } from "../../../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
-import type { FedosConversationCapabilityPersistence } from "../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
-import { fedosPersistedConversationMessageEnvelopesAreEqual } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosConversationMessageEnvelopePersistence } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosConversationPayloadStorage } from "../../../../conversation/payload_storage/fedos_conversation_payload_storage.js";
-import { fedosGroupGenerationRecordsAreEqual, type FedosGroupGenerationPersistence } from "../../../../conversation/group/fedos_group_generation.js";
-import { fedosGroupDirectPathRecordsAreEqual, type FedosGroupDirectPathPersistence } from "../../../../conversation/group/fedos_group_direct_path.js";
-import { fedosGroupMessageRecordsAreEqual, type FedosGroupMessagePersistence } from "../../../../conversation/group/fedos_group_message.js";
-import { fedosGroupFanoutDeliveryRecordsAreEqual, type FedosGroupFanoutDeliveryPersistence } from "../../../../conversation/group/fedos_group_fanout_delivery.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationArchiveGroupSectionV1 } from "../../../../conversation/archive/fedos_conversation_archive_group_section.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { fedosPersistedConversationRecordsAreEqual } from "../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import { fedosPersistedConversationDraftRecordsAreEqual } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import { isFedosConversationArchiveDirectConversationSubject } from "./fedos_conversation_archive_direct_subject.js";
+import { fedosPersistedConversationMembershipsAreEqual } from "../membership/persistence/fedos_conversation_membership_persistence.js";
+import type { FedosConversationMembershipPersistence } from "../membership/persistence/fedos_conversation_membership_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../capability/persistence/fedos_conversation_capability_persistence.js";
+import { fedosPersistedConversationMessageEnvelopesAreEqual } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import { fedosGroupGenerationRecordsAreEqual, type FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
+import { fedosGroupDirectPathRecordsAreEqual, type FedosGroupDirectPathPersistence } from "../group/fedos_group_direct_path.js";
+import { fedosGroupMessageRecordsAreEqual, type FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
+import { fedosGroupFanoutDeliveryRecordsAreEqual, type FedosGroupFanoutDeliveryPersistence } from "../group/fedos_group_fanout_delivery.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
 
 /** Secure Runtime Alpha 1921–1980 — the four Group-only ports this preflight needs to check Group facts. OPTIONAL: omitted, a bundle carrying a `group` section simply has no `group` report produced (mirrors the Collector's/Restore's own identical discipline). */
 export interface FedosConversationArchiveGroupDuplicateDetectionDependencies {

@@ -42,14 +42,14 @@ import {
   createFedosSealedDirectRatchetSecretRecordV1,
   fedosSealedDirectRatchetSecretRecordKey,
   FEDOS_DIRECT_RATCHET_SECRET_KINDS,
-} from "../../../../conversation/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
-import type { FedosSealedDirectRatchetSecretPersistence } from "../../../../conversation/ratchet/persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
-import type { FedosDirectRatchetLiveStateSnapshotPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
-import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+} from "./fedos_sealed_direct_ratchet_secret_record.js";
+import type { FedosSealedDirectRatchetSecretPersistence } from "./persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
+import type { FedosDirectRatchetLiveStateSnapshotPersistence } from "./persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
+import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
 import type {
   FedosDirectRatchetSealedSkippedKey,
   FedosDirectRatchetSealedState,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_cryptographic_session.js";
+} from "./fedos_direct_ratchet_cryptographic_session.js";
 
 function composeSkippedKeyBlob(entry: FedosDirectRatchetSealedSkippedKey): string {
   return `${entry.counter}:${entry.remoteRatchetPublicKeyHex}:${entry.createdAtMs}:${entry.sealedBlob}`;

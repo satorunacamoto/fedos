@@ -13,7 +13,7 @@ import {
   fedosDirectRatchetSessionResetRecordKey,
   fedosDirectRatchetSessionResetRecordsAreEqual,
   type FedosDirectRatchetSessionResetRecordV1,
-} from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_record.js";
+} from "../fedos_direct_ratchet_session_reset_record.js";
 
 export type FedosDirectRatchetSessionResetRecordWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

@@ -11,7 +11,7 @@
  * Anything else (including a plain ["t", "topic"] or a malformed tag) is ignored.
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 import type { ChatRoom } from "./types.js";
 
 const T_CHAT_PREFIX = "chat:";

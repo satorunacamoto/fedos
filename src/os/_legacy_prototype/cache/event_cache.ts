@@ -11,8 +11,8 @@
  * `InMemoryEventCache` is process-local and is lost on isolate restart.
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
-import type { NostrFilter } from "../../../nostr/relay.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
+import type { NostrFilter } from "../../messenger/adapters/nostr/protocol/relay.js";
 import type {
   CacheKey,
   CacheLookupResult,

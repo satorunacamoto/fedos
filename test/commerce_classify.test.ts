@@ -5,7 +5,7 @@ import {
   getProductTags,
 } from "../src/os/commerce/catalog/adapters/nostr/classify.js";
 import type { Product } from "../src/os/commerce/catalog/types.js";
-import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
+import type { NostrEvent, NostrTag } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 function event(tags: NostrTag[]): NostrEvent {
   return {

@@ -14,14 +14,14 @@ import { readFileSync, appendFileSync } from "node:fs";
 import {
   decodeFedosConversationInvitationReceivedRecordV1 as decodeFromLine,
   encodeFedosConversationInvitationReceivedRecordV1 as encodeToLine,
-} from "../../../../../conversation/invitation_bootstrap/persistence/fedos_conversation_invitation_received_codec.js";
+} from "./fedos_conversation_invitation_received_codec.js";
 import {
   fedosConversationInvitationReceivedRecordKey,
   fedosConversationInvitationReceivedRecordsAreEqual,
   type FedosConversationInvitationReceivedPersistence,
   type FedosConversationInvitationReceivedWriteResult,
-} from "../../../../../conversation/invitation_bootstrap/persistence/fedos_conversation_invitation_received_persistence.js";
-import type { FedosConversationInvitationReceivedRecordV1 } from "../../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_received_record.js";
+} from "./fedos_conversation_invitation_received_persistence.js";
+import type { FedosConversationInvitationReceivedRecordV1 } from "../fedos_conversation_invitation_received_record.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

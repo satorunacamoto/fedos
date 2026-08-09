@@ -3,10 +3,10 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_314_board_serialization_boundary.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import codecSource from "../src/os/messenger/board/persistence/fedos_board_post_codec.ts?raw";
-import { serializeFedosBoardPost, deserializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import { fedosBoardPostsAreStructurallyEqual } from "../src/board/repository/fedos_board_repository.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import type { FedosPersistedBoardPostRecordV1 } from "../src/board/persistence/fedos_persisted_board_post_v1.js";
+import { serializeFedosBoardPost, deserializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import { fedosBoardPostsAreStructurallyEqual } from "../src/os/messenger/board/repository/fedos_board_repository.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosPersistedBoardPostRecordV1 } from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.js";
 
 function codeOnly(source: string): string {
   return source

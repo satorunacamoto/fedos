@@ -8,10 +8,10 @@ import {
   FEDOS_BOARD_FEED_MIN_LIMIT,
   FEDOS_BOARD_FEED_MAX_LIMIT,
   type FedosBoardFeedSource,
-} from "../src/board/repository/fedos_board_feed.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import type { FedosBoardPost } from "../src/board/fedos_board_post.js";
+} from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosBoardPost } from "../src/os/messenger/board/fedos_board_post.js";
 
 function codeOnly(source: string): string {
   return source

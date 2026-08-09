@@ -16,7 +16,7 @@
     "src/os/messenger/desktop/production_activation/fedos_production_profile_activation.ts",
     "src/os/messenger/desktop/production_activation/fedos_production_nostr_signing_authority.ts",
     "src/os/messenger/desktop/production_activation/fedos_production_desktop_host_attestation.ts",
-    "src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.ts",
+    "src/os/core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.ts",
     "src/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.ts",
     "src/os/messenger/desktop/navigation/fedos_desktop_conversation_window_registry.ts",
     "src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.ts",

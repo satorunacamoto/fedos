@@ -39,7 +39,7 @@
  * identity, per the "B, not A-only" decision above.
  */
 
-import type { DesktopApplication } from "../../../../desktop/desktop_application.js";
+import type { DesktopApplication } from "../../desktop/desktop_application.js";
 import type { FedosBoardAuthorReference } from "../fedos_board_author.js";
 import { isFedosBoardSourceProtocol } from "../fedos_board_source.js";
 

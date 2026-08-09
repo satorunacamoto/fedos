@@ -7,16 +7,16 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import { deserializeFedosDeviceSyncScheduleEvent } from "../../../../../device/sync_scheduler/persistence/fedos_device_sync_schedule_event_codec.js";
+import { deserializeFedosDeviceSyncScheduleEvent } from "./fedos_device_sync_schedule_event_codec.js";
 import {
   fedosDeviceSyncScheduleEventKey,
   fedosPersistedDeviceSyncScheduleEventsAreEqual,
   reconstructFedosDeviceSyncScheduleRecord,
   type FedosDeviceSyncSchedulePersistence,
   type FedosDeviceSyncSchedulePersistenceWriteResult,
-} from "../../../../../device/sync_scheduler/persistence/fedos_device_sync_schedule_persistence.js";
-import type { FedosPersistedDeviceSyncScheduleEventV1 } from "../../../../../device/sync_scheduler/persistence/fedos_persisted_device_sync_schedule_event_v1.js";
-import type { FedosDeviceSyncScheduleV1 } from "../../../../../device/sync_scheduler/fedos_device_sync_schedule.js";
+} from "./fedos_device_sync_schedule_persistence.js";
+import type { FedosPersistedDeviceSyncScheduleEventV1 } from "./fedos_persisted_device_sync_schedule_event_v1.js";
+import type { FedosDeviceSyncScheduleV1 } from "../fedos_device_sync_schedule.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

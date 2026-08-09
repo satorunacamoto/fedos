@@ -4,7 +4,7 @@ import {
   renderPayloadDiagnostics,
   renderPayloadDiagnosticsFromPreview,
 } from "../src/os/_legacy_prototype/render/payload_diagnostics.js";
-import type { PayloadPreviewDescriptor } from "../src/storage/encrypted_payload.js";
+import type { PayloadPreviewDescriptor } from "../src/os/core/storage/encrypted_payload.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import diagnosticsSource from "../src/os/_legacy_prototype/render/payload_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

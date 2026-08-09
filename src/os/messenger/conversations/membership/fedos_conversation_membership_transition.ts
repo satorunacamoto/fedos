@@ -14,7 +14,7 @@
  * mutation — never itself reads or writes state.
  */
 
-import type { FedosConversationMembershipState } from "../../../../conversation/membership/fedos_conversation_membership_state.js";
+import type { FedosConversationMembershipState } from "./fedos_conversation_membership_state.js";
 
 export type FedosConversationMembershipTransition = "admit" | "revoke" | "leave";
 

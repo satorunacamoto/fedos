@@ -2,16 +2,16 @@ import { describe, it, expect } from "vitest";
 import {
   FEDOS_PAYLOAD_DELETION_MEANINGS,
   FEDOS_PAYLOAD_DELETION_MEANINGS_V1_ENFORCEABLE,
-} from "../src/conversation/retention/fedos_payload_retention_state.js";
-import { fedosPayloadRetentionDecisionKey } from "../src/conversation/retention/fedos_payload_retention_decision.js";
+} from "../src/os/messenger/conversations/retention/fedos_payload_retention_state.js";
+import { fedosPayloadRetentionDecisionKey } from "../src/os/messenger/conversations/retention/fedos_payload_retention_decision.js";
 import {
   validateFedosPayloadRetentionDecision,
   type FedosPayloadRetentionDecisionInput,
-} from "../src/conversation/retention/fedos_payload_retention_decision_validator.js";
+} from "../src/os/messenger/conversations/retention/fedos_payload_retention_decision_validator.js";
 import {
   serializeFedosPayloadRetentionDecision,
   deserializeFedosPayloadRetentionDecision,
-} from "../src/conversation/retention/fedos_payload_retention_decision_codec.js";
+} from "../src/os/messenger/conversations/retention/fedos_payload_retention_decision_codec.js";
 
 const VALID: FedosPayloadRetentionDecisionInput = {
   payloadId: "payload-1",

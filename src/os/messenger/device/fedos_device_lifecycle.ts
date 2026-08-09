@@ -9,7 +9,7 @@
  * with no successor" without either state colliding with the other or
  * requiring a new Registry event type.
  */
-import { type FedosDeviceBindingV1 } from "../../../device/fedos_device_binding.js";
+import { type FedosDeviceBindingV1 } from "./fedos_device_binding.js";
 
 export type FedosDeviceLifecycleState = "pending" | "active" | "replaced" | "revoked" | "unavailable";
 

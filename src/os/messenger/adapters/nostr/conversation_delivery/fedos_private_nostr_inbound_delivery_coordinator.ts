@@ -46,7 +46,7 @@
  *      meaningless in this runtime's own local Envelope-id namespace.
  */
 
-import type { FedosValidatedNostrEvent } from "../../../../../desktop/fedos_validated_nostr_event.js";
+import type { FedosValidatedNostrEvent } from "../../../desktop/fedos_validated_nostr_event.js";
 import type { FedosConversationDraftPersistence } from "../../../conversations/construction/fedos_conversation_draft_persistence.js";
 import type { FedosConversationActivationPersistence } from "../../../conversations/activation/fedos_conversation_activation_persistence.js";
 import type { FedosConversationMembershipAuthority } from "../../../conversations/membership/fedos_conversation_membership_authority.js";

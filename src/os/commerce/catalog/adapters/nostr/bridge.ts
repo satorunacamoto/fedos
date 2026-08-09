@@ -9,7 +9,7 @@
  * STATUS: inert scaffolding, not reachable from the shipped Electron app.
  */
 
-import type { NostrEvent } from "../../../../../nostr/types.js";
+import type { NostrEvent } from "../../../../messenger/adapters/nostr/protocol/types.js";
 import type { ProductDraftOptions } from "../../bridge.js";
 import type { Product } from "../../types.js";
 

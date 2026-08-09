@@ -14,7 +14,7 @@
  * 1139's own explicit rule).
  */
 
-import type { FedosPayloadRetentionState } from "../../../../conversation/retention/fedos_payload_retention_state.js";
+import type { FedosPayloadRetentionState } from "../retention/fedos_payload_retention_state.js";
 
 export interface FedosConversationDirectMessageSummary {
   readonly envelopeId: string;

@@ -5,7 +5,7 @@ import {
   getChatTags,
 } from "../src/os/_legacy_prototype/chat/classify.js";
 import type { GroupChat } from "../src/os/_legacy_prototype/chat/types.js";
-import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
+import type { NostrEvent, NostrTag } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 function event(tags: NostrTag[]): NostrEvent {
   return {

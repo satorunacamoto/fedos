@@ -13,7 +13,7 @@ import {
   runtimeCryptoCapabilityMappingPreview,
 } from "../src/runtime/runtime_crypto_capability.js";
 import { runtimeCryptoDiagnosticsPreview } from "../src/runtime/runtime_crypto_diagnostics.js";
-import { CRYPTO_CAPABILITIES } from "../src/crypto/types.js";
+import { CRYPTO_CAPABILITIES } from "../src/os/core/crypto/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cryptoProviderSource from "../src/runtime/crypto_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

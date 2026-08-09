@@ -11,8 +11,8 @@ import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
-import * as adapter from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
+import * as adapter from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
 
 /**
  * Secure Runtime Alpha 270 -- "Nostr Canonical Board Adapter

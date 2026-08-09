@@ -9,10 +9,10 @@
  * recipient's own Direct Conversation to reconstruct a group view.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosGroupGenerationPersistence, FedosGroupGenerationRecord } from "../../../../conversation/group/fedos_group_generation.js";
-import type { FedosGroupMessagePersistence } from "../../../../conversation/group/fedos_group_message.js";
-import type { FedosGroupFanoutDeliveryPersistence } from "../../../../conversation/group/fedos_group_fanout_delivery.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosGroupGenerationPersistence, FedosGroupGenerationRecord } from "./fedos_group_generation.js";
+import type { FedosGroupMessagePersistence } from "./fedos_group_message.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "./fedos_group_fanout_delivery.js";
 
 export interface FedosGroupMessageSummary {
   readonly id: string;

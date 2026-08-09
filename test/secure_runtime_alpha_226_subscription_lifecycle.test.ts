@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { WebSocketRelay } from "../src/desktop/websocket_relay.js";
-import type { FedosRelaySocket } from "../src/desktop/websocket_relay.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
+import { WebSocketRelay } from "../src/os/messenger/desktop/websocket_relay.js";
+import type { FedosRelaySocket } from "../src/os/messenger/desktop/websocket_relay.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_226_subscription_lifecycle.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

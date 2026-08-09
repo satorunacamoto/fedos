@@ -13,9 +13,9 @@
 import {
   FEDOS_BOARD_POST_MAX_CREATED_AT,
   FEDOS_BOARD_POST_MIN_CREATED_AT,
-} from "../../../../board/fedos_board_post_validator.js";
-import { toFedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosPayloadRetentionAction, FedosPayloadRetentionDecision, FedosPayloadRetentionReasonCode } from "../../../../conversation/retention/fedos_payload_retention_decision.js";
+} from "../../board/fedos_board_post_validator.js";
+import { toFedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosPayloadRetentionAction, FedosPayloadRetentionDecision, FedosPayloadRetentionReasonCode } from "./fedos_payload_retention_decision.js";
 
 export interface FedosPayloadRetentionDecisionInput {
   readonly payloadId: string;

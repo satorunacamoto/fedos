@@ -64,7 +64,7 @@ import type { FedosConversationPayloadStorage } from "../../../conversations/pay
 import type { FedosConversationMembership } from "../../../conversations/membership/fedos_conversation_membership.js";
 import type { FedosConversationId } from "../../../conversations/fedos_conversation_id.js";
 import type { FedosConversationEnvelopeId } from "../../../conversations/envelope/fedos_conversation_envelope_id.js";
-import type { FedosSubscriptionFilter } from "../../../../../desktop/fedos_subscription_filter.js";
+import type { FedosSubscriptionFilter } from "../../../desktop/fedos_subscription_filter.js";
 
 import { deserializeFedosConversationMessageEnvelope } from "../../../conversations/envelope/persistence/fedos_conversation_message_envelope_codec.js";
 import { FedosConversationTransportSignedEventSource } from "./fedos_conversation_transport_signed_event_source.js";

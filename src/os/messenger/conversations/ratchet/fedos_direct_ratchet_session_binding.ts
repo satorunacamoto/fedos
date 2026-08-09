@@ -6,9 +6,9 @@
  * (`../../device/fedos_device_binding.ts`, Alpha 2921-3000) for the
  * account references — reused, not redefined.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
 
 export interface FedosDirectRatchetSessionBinding {
   readonly sessionId: FedosDirectRatchetSessionId;

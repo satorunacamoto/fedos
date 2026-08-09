@@ -35,9 +35,9 @@ import { Buffer } from "node:buffer";
 import {
   validateFedosConversationPayloadDescriptor,
   type FedosConversationPayloadDescriptorInput,
-} from "../../../../conversation/payload_storage/fedos_conversation_payload_descriptor_validator.js";
-import type { FedosConversationPayload } from "../../../../conversation/payload_storage/fedos_conversation_payload_storage.js";
-import type { FedosPersistedConversationPayloadV1 } from "../../../../conversation/payload_storage/fedos_persisted_conversation_payload_v1.js";
+} from "./fedos_conversation_payload_descriptor_validator.js";
+import type { FedosConversationPayload } from "./fedos_conversation_payload_storage.js";
+import type { FedosPersistedConversationPayloadV1 } from "./fedos_persisted_conversation_payload_v1.js";
 
 /** Deep-copies `payload` into the persisted V1 wire shape, base64-encoding `bytes` for this persistence boundary only. */
 export function serializeFedosConversationPayload(payload: FedosConversationPayload): FedosPersistedConversationPayloadV1 {

@@ -32,7 +32,7 @@ import {
 } from "./fedos_conversation_transport_outbox_types.js";
 import { toFedosConversationEnvelopeId } from "../../../conversations/envelope/fedos_conversation_envelope_id.js";
 import type { FedosConversationId } from "../../../conversations/fedos_conversation_id.js";
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 
 export interface FedosPersistedConversationTransportOutboxRecordV1 {
   readonly schemaVersion: 1;

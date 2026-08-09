@@ -23,8 +23,8 @@ import { InMemorySpaceDirectory } from "../src/os/_legacy_prototype/community/di
 import { D1SpaceDirectory } from "../src/os/_legacy_prototype/community/d1_directory.js";
 import { InMemoryMetadataIndex } from "../src/os/_legacy_prototype/indexer/memory_index.js";
 import { D1MetadataIndex, type D1LikeDatabase, type D1LikePreparedStatement } from "../src/os/_legacy_prototype/indexer/d1_index.js";
-import { NobleSignatureVerifier } from "../src/nostr/noble_signature.js";
-import { MockRelayPublisher } from "../src/nostr/publish.js";
+import { NobleSignatureVerifier } from "../src/os/messenger/adapters/nostr/protocol/noble_signature.js";
+import { MockRelayPublisher } from "../src/os/messenger/adapters/nostr/protocol/publish.js";
 import {
   MockPromotionProvider,
   MockRecommendationProvider,

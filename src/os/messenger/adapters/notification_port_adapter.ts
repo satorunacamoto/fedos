@@ -1,13 +1,17 @@
 /**
  * OS Capability Modularization — `NotificationPort` adapter.
  *
- * Implements `NotificationPort` (`../../core/ports/notification_port.js`,
- * owned by a concurrent agent in this same arc) by delegating to the real
+ * Implements `NotificationPort` (`../../core/ports/notification_port.js`
+ * — its own doc comment widened this pass to be honest about the
+ * `title`/`body` non-forwarding gap this adapter has always documented, see
+ * that file's header) by delegating to the real
  * `FedosDesktopNotificationCoordinator`
  * (`../notifications/fedos_desktop_notification_coordinator.js`
  * — the LIVE notification coordinator, physically moved here by Stage 5 of
- * the FedOS Messenger migration; NOT the dormant top-level
- * `src/notification/`, which is unrelated and out of this arc's scope).
+ * the FedOS Messenger migration, and imported from that CANONICAL location
+ * rather than the `src/desktop/notification/` compatibility shim this file
+ * used before this pass; NOT the dormant top-level `src/notification/`,
+ * which is unrelated and out of this arc's scope).
  *
  * IMPORTANT SHAPE MISMATCH, handled deliberately rather than papered over:
  * `NotificationPort.notify(title, body, meta?)` accepts arbitrary caller

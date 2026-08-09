@@ -40,10 +40,10 @@
 import type {
   FedosArchiveSuppressionObservationOrigin,
   FedosPersistedArchiveSuppressionObservationV1,
-} from "../../../../conversation/retention/fedos_persisted_archive_suppression_observation_v1.js";
-import type { FedosArchiveSuppressionObservationPersistence } from "../../../../conversation/retention/fedos_archive_suppression_observation_persistence.js";
-import type { FedosArchiveSuppressionFact } from "../../../../conversation/retention/fedos_archive_suppression_fact.js";
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+} from "./fedos_persisted_archive_suppression_observation_v1.js";
+import type { FedosArchiveSuppressionObservationPersistence } from "./fedos_archive_suppression_observation_persistence.js";
+import type { FedosArchiveSuppressionFact } from "./fedos_archive_suppression_fact.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
 
 export type FedosArchiveSuppressionRecordOutcome = "recorded" | "already-present" | "rollback-rejected" | "conflict" | "failed";
 

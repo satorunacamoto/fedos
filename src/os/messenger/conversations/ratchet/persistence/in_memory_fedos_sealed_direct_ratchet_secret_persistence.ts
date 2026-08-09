@@ -2,11 +2,11 @@
 import {
   fedosSealedDirectRatchetSecretRecordKey,
   type FedosSealedDirectRatchetSecretRecordV1,
-} from "../../../../../conversation/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
+} from "../fedos_sealed_direct_ratchet_secret_record.js";
 import type {
   FedosSealedDirectRatchetSecretPersistence,
   FedosSealedDirectRatchetSecretPersistenceWriteResult,
-} from "../../../../../conversation/ratchet/persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
+} from "./fedos_sealed_direct_ratchet_secret_persistence.js";
 
 function recordsAreIdenticalByValue(
   a: FedosSealedDirectRatchetSecretRecordV1,

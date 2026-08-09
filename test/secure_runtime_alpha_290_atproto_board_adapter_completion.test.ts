@@ -15,9 +15,9 @@ import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 import nostrAdapterSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
-import * as atprotoAdapter from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import * as mutationBoundary from "../src/board/atproto/fedos_atproto_mutation_boundary.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+import * as atprotoAdapter from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import * as mutationBoundary from "../src/os/messenger/board/atproto/fedos_atproto_mutation_boundary.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 /**
  * Secure Runtime Alpha 290 -- "AT Protocol Canonical Board Adapter

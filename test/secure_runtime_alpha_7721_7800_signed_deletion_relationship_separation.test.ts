@@ -2,35 +2,35 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
 
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { toFedosConversationEnvelopeId } from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { toFedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import { FedosPayloadRetentionAuthority } from "../src/conversation/retention/fedos_payload_retention_authority.js";
-import { InMemoryFedosPayloadRetentionPersistence } from "../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
-import type { FedosConversationPersistence, FedosConversationPersistenceWriteResult } from "../src/conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { toFedosConversationEnvelopeId } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { toFedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import { FedosPayloadRetentionAuthority } from "../src/os/messenger/conversations/retention/fedos_payload_retention_authority.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
+import type { FedosConversationPersistence, FedosConversationPersistenceWriteResult } from "../src/os/messenger/conversations/persistence/fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/os/messenger/conversations/persistence/fedos_persisted_conversation_record_v1.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
 import {
   FedosNobleTestNostrSigningAuthority,
   fedosTestSecretKeyFromSeed,
-} from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import { InMemoryFedosDeletionRequestStatePersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_request_state_persistence.js";
-import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
-import { InMemoryFedosDeletionAcknowledgementPersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_acknowledgement_persistence.js";
-import { InMemoryFedosDeletionExecutionPersistence } from "../src/conversation/deletion/in_memory_fedos_deletion_execution_persistence.js";
-import { FedosDeletionRequestOutboundCoordinator } from "../src/conversation/deletion_request/fedos_deletion_request_outbound_coordinator.js";
-import { FedosDeletionRequestInboundCoordinator } from "../src/conversation/deletion_request/fedos_deletion_request_inbound_coordinator.js";
-import { FedosDeletionAcknowledgementOutboundCoordinator } from "../src/conversation/deletion_request/fedos_deletion_acknowledgement_outbound_coordinator.js";
-import { FedosDeletionAcknowledgementInboundCoordinator } from "../src/conversation/deletion_request/fedos_deletion_acknowledgement_inbound_coordinator.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import { InMemoryFedosDeletionRequestStatePersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_request_state_persistence.js";
+import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
+import { InMemoryFedosDeletionAcknowledgementPersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_acknowledgement_persistence.js";
+import { InMemoryFedosDeletionExecutionPersistence } from "../src/os/messenger/conversations/deletion/in_memory_fedos_deletion_execution_persistence.js";
+import { FedosDeletionRequestOutboundCoordinator } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_outbound_coordinator.js";
+import { FedosDeletionRequestInboundCoordinator } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_inbound_coordinator.js";
+import { FedosDeletionAcknowledgementOutboundCoordinator } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_acknowledgement_outbound_coordinator.js";
+import { FedosDeletionAcknowledgementInboundCoordinator } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_acknowledgement_inbound_coordinator.js";
 
-import { FedosArchiveSuppressionObservationAuthority } from "../src/conversation/retention/fedos_archive_suppression_observation_authority.js";
-import { InMemoryFedosArchiveSuppressionObservationPersistence } from "../src/conversation/retention/in_memory_fedos_archive_suppression_observation_persistence.js";
-import { createAndRecordLocalArchiveSuppressionFact } from "../src/conversation/retention/fedos_archive_suppression_local_bridge.js";
+import { FedosArchiveSuppressionObservationAuthority } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_observation_authority.js";
+import { InMemoryFedosArchiveSuppressionObservationPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_archive_suppression_observation_persistence.js";
+import { createAndRecordLocalArchiveSuppressionFact } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_local_bridge.js";
 
 /**
  * Secure Runtime Alpha 7721-7800 -- Phase L: Signed Deletion relationship

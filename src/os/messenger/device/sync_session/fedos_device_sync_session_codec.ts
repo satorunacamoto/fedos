@@ -8,7 +8,7 @@
  * opens EXACTLY these bytes.
  */
 
-import { isWellFormedFedosDeviceSyncSessionV1, type FedosDeviceSyncSessionV1 } from "../../../../device/sync_session/fedos_device_sync_session.js";
+import { isWellFormedFedosDeviceSyncSessionV1, type FedosDeviceSyncSessionV1 } from "./fedos_device_sync_session.js";
 
 function compareDeviceIds(a: { readonly deviceId: string }, b: { readonly deviceId: string }): number {
   if (a.deviceId < b.deviceId) return -1;

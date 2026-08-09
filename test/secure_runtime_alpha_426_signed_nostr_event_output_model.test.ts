@@ -5,6 +5,13 @@ import designDocSource from "../docs/secure_runtime_alpha_426_signed_nostr_event
 import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import validatedEventSource from "../src/os/messenger/desktop/fedos_validated_nostr_event.ts?raw";
+// Nostr Consolidation Plan, Step 1 (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`)
+// unified `FedosNostrWireEvent` with `NostrEvent`: `fedos_nostr_wire_event.ts`
+// now re-exports the canonical `protocol/types.ts` definition instead of
+// declaring the seven fields literally itself, so the field-shape check
+// below reads the canonical source it aliases.
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import canonicalNostrEventSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 
@@ -32,7 +39,14 @@ describe("Secure Runtime Alpha 426 -- Signed Event Output Model", () => {
   });
 
   it("4. structural: FedosNostrWireEvent and FedosValidatedNostrEvent both carry the exact seven NIP-01 wire fields", () => {
-    for (const source of [wireEventSource, validatedEventSource]) {
+    // `fedos_nostr_wire_event.ts` itself is a re-export alias of the
+    // canonical `NostrEvent` (Nostr Consolidation Plan, Step 1) -- check
+    // the canonical definition it aliases for the field shape, and check
+    // `validatedEventSource` (still a real, standalone interface) directly.
+    expect(wireEventSource).toMatch(
+      /export type \{ NostrEvent as FedosNostrWireEvent \} from ["']\.\.\/adapters\/nostr\/protocol\/types\.js["'];/,
+    );
+    for (const source of [canonicalNostrEventSource, validatedEventSource]) {
       expect(source).toMatch(/id:/);
       expect(source).toMatch(/pubkey:/);
       expect(source).toMatch(/created_at:/);

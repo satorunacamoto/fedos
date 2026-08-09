@@ -15,9 +15,9 @@
  * HARD GUARDRAILS: no arbitrary free-form secret, no external chat
  * transcript, no photo, no private key, no passphrase.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import { isWellFormedFedosIdentityTransitionId } from "../fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../fedos_identity_transition_id_limits.js";
 
 /** Closed set — "another locally selected closed method supported by the review" is deliberately NOT open-ended; a future Arc adds a new value here, never a free-form string. */
 export type FedosIdentityTransitionManualVerificationMethod =

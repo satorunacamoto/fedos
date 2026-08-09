@@ -7,7 +7,7 @@
 import {
   isWellFormedFedosConversationInvitationReceivedRecordV1,
   type FedosConversationInvitationReceivedRecordV1,
-} from "../../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_received_record.js";
+} from "../fedos_conversation_invitation_received_record.js";
 
 export function encodeFedosConversationInvitationReceivedRecordV1(record: FedosConversationInvitationReceivedRecordV1): string {
   return JSON.stringify(record);

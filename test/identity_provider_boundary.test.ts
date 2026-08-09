@@ -2,15 +2,15 @@ import { describe, it, expect } from "vitest";
 import {
   NoopIdentityProvider,
   PlaceholderIdentityProvider,
-} from "../src/identity/provider_boundary.js";
+} from "../src/os/core/identity/provider_boundary.js";
 import {
   IDENTITY_PROVIDER_CAPABILITIES,
   type IdentityProviderRequest,
-} from "../src/identity/provider_types.js";
+} from "../src/os/core/identity/provider_types.js";
 import {
   identityProviderToPasskeyRequest,
   identityProviderToVaultRequest,
-} from "../src/identity/provider_bridge.js";
+} from "../src/os/core/identity/provider_bridge.js";
 // Identity provider sources as strings: prove no OAuth/JWT/WebAuthn import and
 // type-only vault/passkey imports.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -32,9 +32,9 @@
  * `fedos_wasm_ephemeral_gift_wrap_signing_authority.ts`) — this module
  * is the outer layer that composes those two.
  */
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
 import type { FedosNostrSigningAuthority } from "../../protocol/sign/fedos_nostr_signing_authority.js";
-import type { FedosMasterSeedAuthority } from "../../../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   FEDOS_GIFT_WRAP_KIND,
   FEDOS_EPHEMERAL_GIFT_WRAP_KIND,

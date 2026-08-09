@@ -7,14 +7,21 @@
  * what comes back. No key generation, no key storage, no publishing.
  */
 
-import type { NostrTag } from "../../../nostr/types.js";
+import type { NostrTag } from "../../messenger/adapters/nostr/protocol/types.js";
 
 /** An event before `id`/`sig` exist (the input to a signer). */
 export interface UnsignedNostrEvent {
   readonly pubkey: string;
   readonly created_at: number;
   readonly kind: number;
-  readonly tags: NostrTag[];
+  /**
+   * Deep-readonly, matching `NostrEvent.tags` (`../../messenger/adapters/nostr/protocol/types.ts`)
+   * exactly — this interface's own `SignedNostrEvent` doc comment already
+   * claimed to be "structurally a NIP-01 `NostrEvent`"; this field now
+   * actually is (Nostr Consolidation Plan, Step 1 fallout — no caller here
+   * mutates a tags array in place, repo-wide search confirmed).
+   */
+  readonly tags: readonly (readonly string[])[];
   readonly content: string;
 }
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   toFedosConversationPayloadId,
   FedosSecureRandomConversationPayloadIdGenerator,
-} from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
+} from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
 
 /**
  * Secure Runtime Alpha 802 ("Payload Identifier") -- Stage 12 of the

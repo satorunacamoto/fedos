@@ -19,7 +19,7 @@
  * `"stale"`, `"superseded"`, `"rollback-detected"`) can never be
  * overridden into acceptance by an explicit decision — fail closed.
  */
-import type { FedosIdentityTransitionEvidenceOutcome } from "../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import type { FedosIdentityTransitionEvidenceOutcome } from "./fedos_identity_transition_evidence_evaluation.js";
 
 export type FedosIdentityTransitionAcceptanceState =
   | "observed"

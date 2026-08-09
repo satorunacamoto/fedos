@@ -19,9 +19,9 @@
 import {
   validateFedosConversationDraftRecord,
   type FedosConversationDraftRecordInput,
-} from "../../../../conversation/construction/fedos_conversation_draft_record_validator.js";
-import type { FedosConversationDraftRecord } from "../../../../conversation/construction/fedos_conversation_draft_record.js";
-import type { FedosPersistedConversationDraftRecordV1 } from "../../../../conversation/construction/fedos_persisted_conversation_draft_record_v1.js";
+} from "./fedos_conversation_draft_record_validator.js";
+import type { FedosConversationDraftRecord } from "./fedos_conversation_draft_record.js";
+import type { FedosPersistedConversationDraftRecordV1 } from "./fedos_persisted_conversation_draft_record_v1.js";
 
 /** Deep-copies `record` into the persisted V1 wire shape, flattening `creator`. */
 export function serializeFedosConversationDraftRecord(

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NullPublicIdentityReader } from "../src/desktop/null_public_identity_reader.js";
-import { createDesktopApplication } from "../src/desktop/create_desktop_application.js";
+import { NullPublicIdentityReader } from "../src/os/messenger/desktop/null_public_identity_reader.js";
+import { createDesktopApplication } from "../src/os/messenger/desktop/create_desktop_application.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_104_null_reader.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

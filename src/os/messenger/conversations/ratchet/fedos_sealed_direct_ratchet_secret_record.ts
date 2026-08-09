@@ -28,7 +28,7 @@
  *   - No filesystem path, no Master Seed, no wrapping key, no Device
  *     private key of any kind.
  */
-import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
 
 export type FedosDirectRatchetSecretKind =
   | "root-key"

@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { createFedosIdentityTransitionRecordV1 } from "../src/conversation/identity_transition/fedos_identity_transition_record.js";
-import { generateFedosIdentityTransitionId } from "../src/conversation/identity_transition/fedos_identity_transition_id.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest, fedosIdentityTransitionContinuityProofDigest, fedosIdentityTransitionDeviceCorroborationDigest } from "../src/conversation/identity_transition/fedos_identity_transition_canonical.js";
-import { verifyFedosIdentityTransitionNewKeyProof, type FedosIdentityTransitionNewKeyProofV1 } from "../src/conversation/identity_transition/fedos_identity_transition_new_key_proof.js";
-import { verifyFedosIdentityTransitionContinuityEvidence, type FedosIdentityTransitionContinuityEvidenceV1 } from "../src/conversation/identity_transition/fedos_identity_transition_continuity_evidence.js";
-import { verifyFedosIdentityTransitionDeviceCorroboration, type FedosIdentityTransitionDeviceCorroborationV1 } from "../src/conversation/identity_transition/fedos_identity_transition_device_corroboration.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { createPendingFedosDeviceBinding, trustFedosDeviceBinding, revokeFedosDeviceBinding } from "../src/device/fedos_device_binding.js";
+import { createFedosIdentityTransitionRecordV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_record.js";
+import { generateFedosIdentityTransitionId } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_id.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest, fedosIdentityTransitionContinuityProofDigest, fedosIdentityTransitionDeviceCorroborationDigest } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_canonical.js";
+import { verifyFedosIdentityTransitionNewKeyProof, type FedosIdentityTransitionNewKeyProofV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_new_key_proof.js";
+import { verifyFedosIdentityTransitionContinuityEvidence, type FedosIdentityTransitionContinuityEvidenceV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_continuity_evidence.js";
+import { verifyFedosIdentityTransitionDeviceCorroboration, type FedosIdentityTransitionDeviceCorroborationV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_device_corroboration.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { createPendingFedosDeviceBinding, trustFedosDeviceBinding, revokeFedosDeviceBinding } from "../src/os/messenger/device/fedos_device_binding.js";
 import {
   evaluateFedosIdentityTransitionEvidence,
   FEDOS_IDENTITY_TRANSITION_DEFAULT_LOCAL_POLICY,
   type FedosIdentityTransitionEvidenceEvaluationInput,
-} from "../src/conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+} from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 function accountRef(pubkey: string): FedosDeviceBindingAccountRef {
   return { authority: "nostr", publicIdentifier: pubkey, identityId: null };

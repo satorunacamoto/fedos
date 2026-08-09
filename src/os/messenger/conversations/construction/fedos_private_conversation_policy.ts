@@ -52,8 +52,8 @@ import {
   type FedosConversationPolicy,
   type FedosConversationReadAccess,
   type FedosConversationWriteAccess,
-} from "../../../../board/runtime/policy/fedos_conversation_policy.js";
-import type { FedosPrivateConversationPolicyReference } from "../../../../conversation/construction/fedos_conversation_draft_record.js";
+} from "../../board/runtime/policy/fedos_conversation_policy.js";
+import type { FedosPrivateConversationPolicyReference } from "./fedos_conversation_draft_record.js";
 
 /** Alpha 897 — the public factory. Returns the same fixed public policy Public Runtime already resolves. */
 export function createPublicConversationPolicy(): FedosConversationPolicy {

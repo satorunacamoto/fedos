@@ -25,9 +25,9 @@
 import {
   validateFedosConversationRecord,
   type FedosConversationRecordInput,
-} from "../../../../conversation/fedos_conversation_record_validator.js";
-import type { FedosConversationRecord } from "../../../../conversation/fedos_conversation_record.js";
-import type { FedosPersistedConversationRecordV1 } from "../../../../conversation/persistence/fedos_persisted_conversation_record_v1.js";
+} from "../fedos_conversation_record_validator.js";
+import type { FedosConversationRecord } from "../fedos_conversation_record.js";
+import type { FedosPersistedConversationRecordV1 } from "./fedos_persisted_conversation_record_v1.js";
 
 /** Deep-copies `record` into the persisted V1 wire shape. */
 export function serializeFedosConversationRecord(record: FedosConversationRecord): FedosPersistedConversationRecordV1 {

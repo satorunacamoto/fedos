@@ -10,7 +10,7 @@ import {
   type FedosDeviceRelaySyncObservationState,
   type FedosDeviceRelaySyncObservationV1,
   type FedosDeviceRelaySyncObservationWriteResult,
-} from "../../../../../device/relay_sync/fedos_device_relay_sync_observation.js";
+} from "../fedos_device_relay_sync_observation.js";
 
 function factsAreEqual(a: FedosDeviceRelaySyncObservationV1, b: FedosDeviceRelaySyncObservationV1): boolean {
   return a.subjectId === b.subjectId && a.state === b.state && a.observedAt === b.observedAt && a.reason === b.reason;

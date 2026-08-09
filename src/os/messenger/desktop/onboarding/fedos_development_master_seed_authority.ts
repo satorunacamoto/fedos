@@ -40,12 +40,12 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   toSealedMasterSeedEnvelopeV1,
   isWellFormedSealedMasterSeedEnvelopeV1Json,
   type FedosSealedMasterSeedEnvelopeV1,
-} from "../../../../runtime/master_seed/fedos_sealed_master_seed_envelope.js";
+} from "../../../core/vault/wasm/fedos_sealed_master_seed_envelope.js";
 import type { AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
 
 function computeVerifier(saltHex: string, passphrase: Uint8Array): string {

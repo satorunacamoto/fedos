@@ -6,7 +6,7 @@ import {
   decodeFedosPrivateNostrWirePayload,
   isWellFormedFedosPrivateNostrWirePayload,
   type FedosPrivateNostrWirePayloadV1,
-} from "../src/conversation/delivery/nostr/fedos_private_nostr_wire_payload.js";
+} from "../src/os/messenger/adapters/nostr/conversation_delivery/fedos_private_nostr_wire_payload.js";
 
 /**
  * Secure Runtime Alpha 1401/1402/1421 -- the inner wire payload codec:

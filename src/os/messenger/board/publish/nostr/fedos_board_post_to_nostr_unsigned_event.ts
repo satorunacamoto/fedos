@@ -36,7 +36,7 @@
  */
 
 import type { FedosBoardPost } from "../../fedos_board_post.js";
-import type { FedosNostrUnsignedEventRequest } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrUnsignedEventRequest } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 
 const NOSTR_POST_KIND = 1;
 

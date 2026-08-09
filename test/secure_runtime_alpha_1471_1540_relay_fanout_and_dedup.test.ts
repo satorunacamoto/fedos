@@ -1,21 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { FedosConversationRelaySet } from "../src/conversation/transport/relay/fedos_conversation_relay_set.js";
-import { FedosRelayEventDeduplicator } from "../src/conversation/transport/relay/fedos_relay_event_deduplicator.js";
-import { FedosMultiRelayOkCorrelatedConversationTransportPublisher } from "../src/conversation/transport/relay/fedos_multi_relay_ok_correlated_conversation_transport_publisher.js";
-import { FedosConversationInboundSubscription } from "../src/conversation/transport/relay/fedos_conversation_inbound_subscription.js";
+import { FedosConversationRelaySet } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import { FedosRelayEventDeduplicator } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_relay_event_deduplicator.js";
+import { FedosMultiRelayOkCorrelatedConversationTransportPublisher } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_multi_relay_ok_correlated_conversation_transport_publisher.js";
+import { FedosConversationInboundSubscription } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_inbound_subscription.js";
 import {
   buildFedosPrivateTransportUnsignedEventRequest,
-} from "../src/conversation/transport/fedos_conversation_transport_event.js";
-import type { FedosRelay } from "../src/desktop/fedos_relay.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
-import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/desktop/fedos_relay_listeners.js";
-import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_event.js";
+import type { FedosRelay } from "../src/os/messenger/desktop/fedos_relay.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/os/messenger/desktop/fedos_relay_listeners.js";
+import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 import type {
   FedosPersistedConversationTransportOutboxRecord,
   FedosPersistedConversationTransportOutboxRecordV1,
-} from "../src/conversation/transport/fedos_conversation_transport_outbox_codec.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_outbox_codec.js";
 
 /** Mirrors `ManualRelay` (`test/secure_runtime_alpha_730_ok_listener_lifecycle.test.ts`) -- a directly-controllable `FedosRelay` double, extended with subscribe/fireEvent for Inbound Subscription tests. */
 class ManualRelay implements FedosRelay {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   FEDOS_DELIVERY_OBSERVATION_TRANSITIONS,
   isAllowedFedosDeliveryObservationTransition,
-} from "../src/board/observation/fedos_delivery_observation_transition_graph.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_observation_transition_graph.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import source from "../src/os/messenger/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
 

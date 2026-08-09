@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { FedosDeletionRequestController } from "../src/desktop/presentation/deletion_request/fedos_deletion_request_controller.js";
-import type { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
-import { fedosDesktopShellOk } from "../src/desktop/shell/fedos_desktop_shell_result.js";
-import type { FedosDeletionRequestInboxSummaryV1 } from "../src/conversation/deletion_request/fedos_deletion_request_inbox_summary.js";
-import type { FedosDeletionRecipientDecisionState } from "../src/conversation/deletion_request/fedos_deletion_recipient_decision_state.js";
-import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import type { FedosDesktopNotificationView } from "../src/desktop/notification/fedos_desktop_notification_types.js";
+import { FedosDeletionRequestController } from "../src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_controller.js";
+import type { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
+import { fedosDesktopShellOk } from "../src/os/messenger/desktop/shell/fedos_desktop_shell_result.js";
+import type { FedosDeletionRequestInboxSummaryV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_inbox_summary.js";
+import type { FedosDeletionRecipientDecisionState } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_recipient_decision_state.js";
+import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import type { FedosDesktopNotificationView } from "../src/os/messenger/notifications/fedos_desktop_notification_types.js";
 
 /**
  * Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device

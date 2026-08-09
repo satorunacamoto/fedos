@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_283_atproto_source_provenance.md?raw";
-import { mapValidatedAtprotoPostToBoardPostInput } from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import { fedosBoardSourceKey } from "../src/board/fedos_board_source.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+import { mapValidatedAtprotoPostToBoardPostInput } from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import { fedosBoardSourceKey } from "../src/os/messenger/board/fedos_board_source.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 const POST: FedosValidatedAtprotoPost = {
   uri: "at://did:plc:abc123/app.bsky.feed.post/xyz789",

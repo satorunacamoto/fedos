@@ -50,7 +50,7 @@
  * this one respect.
  */
 
-import type { FedosDesktopHost } from "../../../../../desktop/host/fedos_desktop_host.js";
+import type { FedosDesktopHost } from "../../../desktop/host/fedos_desktop_host.js";
 import { isFedosBoardSourceProtocol } from "../../fedos_board_source.js";
 import type { FedosPublicAuthorAuthority, FedosPublicAuthorResolution } from "./fedos_public_author_authority.js";
 import {

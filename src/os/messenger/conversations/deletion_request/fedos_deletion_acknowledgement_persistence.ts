@@ -7,7 +7,7 @@
  * exactly — keyed by `requestId`, no delete method.
  */
 
-import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
+import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "./fedos_persisted_deletion_acknowledgement_record_v1.js";
 
 export type FedosDeletionAcknowledgementPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

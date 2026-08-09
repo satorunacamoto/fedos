@@ -22,8 +22,8 @@
  * file has no visibility into either.
  */
 
-import type { FedosRelay } from "../../../../../desktop/fedos_relay.js";
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosRelay } from "../../../desktop/fedos_relay.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
 import { nostrWireEventToFedosEventDescriptor } from "../../../board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
 
 const DEFAULT_OK_CORRELATION_TIMEOUT_MS = 10_000;

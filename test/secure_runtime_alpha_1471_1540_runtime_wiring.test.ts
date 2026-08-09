@@ -5,13 +5,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosRelay } from "../src/desktop/fedos_relay.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
-import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/desktop/fedos_relay_listeners.js";
-import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
-import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosRelay } from "../src/os/messenger/desktop/fedos_relay.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/os/messenger/desktop/fedos_relay_listeners.js";
+import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
+import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 
 class ManualRelay implements FedosRelay {
   readonly url = "wss://fake.test";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_126_desktop_public_identity_state.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

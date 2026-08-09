@@ -19,31 +19,31 @@
  * acceptance only").
  */
 
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceSyncSessionV1 } from "../../../../device/sync_session/fedos_device_sync_session.js";
-import type { FedosDeviceSyncPackageEncryptionAuthority } from "../../../../device/sync_package/fedos_device_sync_package_encryption.js";
-import type { FedosDeviceTransferApprovalV1 } from "../../../../device/transfer/fedos_device_transfer_proof.js";
-import { FedosDeviceTransferCoordinator } from "../../../../device/transfer/fedos_device_transfer_coordinator.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
+import type { FedosDeviceSyncPackageEncryptionAuthority } from "../sync_package/fedos_device_sync_package_encryption.js";
+import type { FedosDeviceTransferApprovalV1 } from "../transfer/fedos_device_transfer_proof.js";
+import { FedosDeviceTransferCoordinator } from "../transfer/fedos_device_transfer_coordinator.js";
 import {
   deserializeFedosDeviceTransferPackageFromBytes,
   serializeFedosDeviceTransferPackageToBytes,
   type FedosDeviceTransferPackageV1,
-} from "../../../../device/transfer/fedos_device_transfer_package.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
+} from "../transfer/fedos_device_transfer_package.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import type { AeadAlgorithm } from "../../../../runtime/fedos_wasm_loader.js";
 import {
   FedosSecureRandomDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeNonceGenerator,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
+} from "../binding_challenge/fedos_device_binding_challenge.js";
 import {
   buildFedosDeviceRelaySyncWirePayload,
   computeFedosDeviceRelaySyncPackageContentHash,
-} from "../../../../device/relay_sync/fedos_device_relay_sync_wire_payload.js";
-import { buildFedosDeviceRelaySyncUnsignedEventRequest } from "../../../../device/relay_sync/fedos_device_relay_sync_event.js";
-import { FedosDeviceRelaySyncPublisher, type FedosDeviceRelaySyncPublishOutcome } from "../../../../device/relay_sync/fedos_device_relay_sync_publisher.js";
-import type { FedosDeviceRelaySyncObservationRepository } from "../../../../device/relay_sync/fedos_device_relay_sync_observation.js";
-import type { FedosDeviceRelaySyncOutboxPersistence } from "../../../../device/relay_sync/persistence/fedos_device_relay_sync_outbox_persistence.js";
+} from "./fedos_device_relay_sync_wire_payload.js";
+import { buildFedosDeviceRelaySyncUnsignedEventRequest } from "./fedos_device_relay_sync_event.js";
+import { FedosDeviceRelaySyncPublisher, type FedosDeviceRelaySyncPublishOutcome } from "./fedos_device_relay_sync_publisher.js";
+import type { FedosDeviceRelaySyncObservationRepository } from "./fedos_device_relay_sync_observation.js";
+import type { FedosDeviceRelaySyncOutboxPersistence } from "./persistence/fedos_device_relay_sync_outbox_persistence.js";
 
 // @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";

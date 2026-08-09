@@ -13,7 +13,7 @@ import {
   type FedosGroupDirectPathPersistence,
   type FedosGroupDirectPathPersistenceWriteResult,
   type FedosGroupDirectPathRecord,
-} from "../../../../conversation/group/fedos_group_direct_path.js";
+} from "./fedos_group_direct_path.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

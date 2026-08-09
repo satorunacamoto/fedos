@@ -24,14 +24,14 @@
  *     the one new branch this file adds is itself a simple `null` check.
  */
 
-import { collectFedosConversationArchiveBundle, type FedosConversationArchiveCollectorDependencies } from "../../../../conversation/archive/fedos_conversation_archive_collector.js";
+import { collectFedosConversationArchiveBundle, type FedosConversationArchiveCollectorDependencies } from "../archive/fedos_conversation_archive_collector.js";
 import type {
   FedosConversationArchiveEncryptionAuthority,
   FedosConversationArchiveExportResult,
-} from "../../../../conversation/archive/fedos_conversation_archive_encryption.js";
-import type { FedosConversationEnvelopeEncryptionSuite } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliPackageV1 } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package.js";
+} from "../archive/fedos_conversation_archive_encryption.js";
+import type { FedosConversationEnvelopeEncryptionSuite } from "../envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliPackageV1 } from "./fedos_conversation_archive_cli_package.js";
 
 export interface FedosConversationArchiveCliExportRequest {
   readonly conversationId: FedosConversationId;

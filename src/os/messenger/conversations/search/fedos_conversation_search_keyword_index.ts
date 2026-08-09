@@ -36,8 +36,8 @@
  *     leaked directly.
  */
 
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationSearchEnvelopeDocument } from "../../../../conversation/search/fedos_conversation_search_document.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationSearchEnvelopeDocument } from "./fedos_conversation_search_document.js";
 
 const TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
 

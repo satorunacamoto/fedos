@@ -4,9 +4,9 @@
  * `../../ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.ts`'s
  * private-`Map`-backed convention exactly.
  */
-import { fedosIdentityTransitionFactKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_fact.js";
-import { determineFedosIdentityTransitionFactWriteOutcome, type FedosIdentityTransitionFactWriteOutcome } from "../../../../../conversation/identity_transition/fedos_identity_transition_fact_conflict_detection.js";
-import type { FedosIdentityTransitionFactPersistence } from "../../../../../conversation/identity_transition/persistence/fedos_identity_transition_fact_persistence.js";
+import { fedosIdentityTransitionFactKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../fedos_identity_transition_fact.js";
+import { determineFedosIdentityTransitionFactWriteOutcome, type FedosIdentityTransitionFactWriteOutcome } from "../fedos_identity_transition_fact_conflict_detection.js";
+import type { FedosIdentityTransitionFactPersistence } from "./fedos_identity_transition_fact_persistence.js";
 
 export class InMemoryFedosIdentityTransitionFactPersistence implements FedosIdentityTransitionFactPersistence {
   readonly #facts = new Map<string, FedosIdentityTransitionFactV1>();

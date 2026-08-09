@@ -7,7 +7,7 @@
  * generator, no new dependency.
  */
 import { randomBytes as nobleRandomBytes, bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosConversationInvitationIdGenerator } from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
+import type { FedosConversationInvitationIdGenerator } from "./fedos_conversation_invitation_outbound_coordinator.js";
 
 export class FedosSecureRandomConversationInvitationIdGenerator implements FedosConversationInvitationIdGenerator {
   generateRequestId(): string {

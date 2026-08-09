@@ -15,20 +15,20 @@
  * via the EXISTING, unmodified `reactivateRestoredConversation()`
  * (Alpha 2041-2120), and only then sends the real, signed invitation.
  */
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationIdentityResolver } from "../../../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
-import type { FedosConversationReactivationResult } from "../../../../conversation/activation/fedos_conversation_reactivation_result.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosPrivateWireDeliveryQueueOutcome } from "../../../../conversation/transport/fedos_private_wire_prepared_delivery.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { toFedosPrivateConversationId } from "../../../../conversation/construction/fedos_private_conversation_id.js";
-import { authorizeFedosConversationInvitationContent } from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_authentication.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
+import type { FedosConversationReactivationResult } from "../activation/fedos_conversation_reactivation_result.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../../adapters/nostr/transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { toFedosPrivateConversationId } from "../construction/fedos_private_conversation_id.js";
+import { authorizeFedosConversationInvitationContent } from "./fedos_conversation_invitation_authentication.js";
 import {
   canonicalSerializeFedosConversationInvitationContent,
   type FedosConversationInvitationAdvertisementV1,
-} from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_advertisement.js";
-import { encodeFedosConversationInvitationControlPayload } from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_control_payload.js";
+} from "./fedos_conversation_invitation_advertisement.js";
+import { encodeFedosConversationInvitationControlPayload } from "./fedos_conversation_invitation_control_payload.js";
 
 export interface FedosConversationInvitationIdGenerator {
   generateRequestId(): string;

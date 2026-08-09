@@ -17,14 +17,14 @@ import { readFileSync, appendFileSync } from "node:fs";
 import {
   decodeFedosDirectRatchetSessionResetRecordV1,
   encodeFedosDirectRatchetSessionResetRecordV1,
-} from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_record.js";
+} from "../fedos_direct_ratchet_session_reset_record.js";
 import {
   fedosDirectRatchetSessionResetRecordKey,
   fedosDirectRatchetSessionResetRecordsAreEqual,
   type FedosDirectRatchetSessionResetRecordPersistence,
   type FedosDirectRatchetSessionResetRecordWriteResult,
-} from "../../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
-import type { FedosDirectRatchetSessionResetRecordV1 } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_record.js";
+} from "./fedos_direct_ratchet_session_reset_record_persistence.js";
+import type { FedosDirectRatchetSessionResetRecordV1 } from "../fedos_direct_ratchet_session_reset_record.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   FedosSecureRandomBoardRuntimeIdGenerator,
   type FedosBoardRuntimeIdGenerator,
-} from "../src/board/runtime/fedos_board_runtime_id_generator.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/runtime/fedos_board_runtime_id_generator.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 

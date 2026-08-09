@@ -14,7 +14,7 @@
 import type {
   FedosConversationEncryptionCoordinationPhase,
   FedosPersistedConversationEncryptionCoordinationV1,
-} from "../../../../../conversation/encryption/coordination/fedos_persisted_conversation_encryption_coordination_v1.js";
+} from "./fedos_persisted_conversation_encryption_coordination_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationEncryptionCoordinationWriteResult = "inserted" | "already-present" | "conflict" | "failed";

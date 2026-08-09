@@ -57,10 +57,10 @@
  *     (`./fedos_conversation_draft_record_validator.ts`) constructs one.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosPrivateConversationMode } from "../../../../conversation/construction/fedos_private_conversation_id.js";
-import type { FedosConversationLifecycleState } from "../../../../conversation/construction/fedos_conversation_lifecycle_state.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosPrivateConversationMode } from "./fedos_private_conversation_id.js";
+import type { FedosConversationLifecycleState } from "./fedos_conversation_lifecycle_state.js";
 
 /** The V1 policy-reference tags a private draft may carry (Alpha 896). A future Arc adds tags additively, never rewriting these. */
 export type FedosPrivateConversationPolicyReference = "private-group-draft-v1" | "direct-draft-v1";

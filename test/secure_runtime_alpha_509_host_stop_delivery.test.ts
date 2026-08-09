@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
 
 function makeHost() {
   return new FedosDesktopHost({

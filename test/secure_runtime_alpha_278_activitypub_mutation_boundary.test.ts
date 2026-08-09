@@ -12,7 +12,7 @@ import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 import {
   FEDOS_ACTIVITYPUB_OBSERVED_MUTATION_KINDS,
   type FedosActivityPubMutationObservation,
-} from "../src/board/activitypub/fedos_activitypub_mutation_boundary.js";
+} from "../src/os/messenger/board/activitypub/fedos_activitypub_mutation_boundary.js";
 
 function codeOnly(source: string): string {
   return source

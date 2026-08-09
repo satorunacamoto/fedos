@@ -23,7 +23,7 @@
  * no filesystem path, no arbitrary executable command, no message
  * plaintext appears anywhere in this type.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
 import {
   isKnownFedosIdentityTransitionDevicePolicy,
   isKnownFedosIdentityTransitionRatchetPolicy,
@@ -33,9 +33,9 @@ import {
   type FedosIdentityTransitionRatchetPolicy,
   type FedosIdentityTransitionReasonCategory,
   type FedosIdentityTransitionType,
-} from "../../../../conversation/identity_transition/fedos_identity_transition_vocabulary.js";
-import { isWellFormedFedosIdentityTransitionId } from "../../../../conversation/identity_transition/fedos_identity_transition_id.js";
-import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "../../../../conversation/identity_transition/fedos_identity_transition_id_limits.js";
+} from "./fedos_identity_transition_vocabulary.js";
+import { isWellFormedFedosIdentityTransitionId } from "./fedos_identity_transition_id.js";
+import { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH } from "./fedos_identity_transition_id_limits.js";
 
 export { FEDOS_IDENTITY_TRANSITION_MAX_IDENTIFIER_LENGTH };
 

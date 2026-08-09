@@ -27,12 +27,12 @@
  * `fedos_device_binding_registration_authority.ts`.
  */
 
-import type { FedosDeviceBindingV1 } from "../../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingV1 } from "../fedos_device_binding.js";
 import type {
   FedosDeviceRegistrationAuthority,
   FedosDeviceRegistrationAuthorityDecision,
   FedosDeviceRegistrationRequest,
-} from "../../../../device/fedos_device_registration_authority.js";
+} from "../fedos_device_registration_authority.js";
 
 const REASON =
   "already verified by FedosDeviceBindingRegistrationAuthority's own real account-signature + device-proof-of-possession check (Secure Runtime Alpha 3161-3240) before this call was ever made";

@@ -10,13 +10,13 @@ import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
-import { AppendOnlyFedosBoardPersistence } from "../src/board/persistence/append_only_fedos_board_persistence.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { hydrateFedosBoardService } from "../src/board/persistence/fedos_board_hydration.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId, FedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { AppendOnlyFedosBoardPersistence } from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { hydrateFedosBoardService } from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId, FedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 let dir: string | undefined;
 afterEach(() => {

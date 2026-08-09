@@ -15,15 +15,15 @@
  * an ALREADY-`"accepted"` acceptance state; it never re-derives or
  * second-guesses that decision itself.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "../../ratchet/fedos_direct_ratchet_session_record.js";
 import type {
   FedosDirectRatchetEstablishOutcome,
   FedosDirectRatchetOutboundIntegration,
-} from "../../../../../conversation/ratchet/fedos_direct_ratchet_outbound_integration.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosIdentityTransitionAcceptanceState } from "../../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
-import type { FedosIdentityTransitionRatchetResetLinkPersistence } from "../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
+} from "../../ratchet/fedos_direct_ratchet_outbound_integration.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosIdentityTransitionAcceptanceState } from "../fedos_identity_transition_acceptance_state.js";
+import type { FedosIdentityTransitionRatchetResetLinkPersistence } from "./fedos_identity_transition_ratchet_reset_link.js";
 
 function accountRefsEqual(a: FedosDeviceBindingAccountRef, b: FedosDeviceBindingAccountRef): boolean {
   return a.authority === b.authority && a.publicIdentifier === b.publicIdentifier && a.identityId === b.identityId;

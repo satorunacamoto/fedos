@@ -37,13 +37,13 @@ import {
   isFedosDeviceBindingRevoked,
   isFedosDeviceBindingTrusted,
   type FedosDeviceBindingV1,
-} from "../../../../device/fedos_device_binding.js";
+} from "../../device/fedos_device_binding.js";
 import {
   verifyFedosDirectRatchetSessionResetDeviceSignature,
   type FedosDirectRatchetSessionResetSignableContent,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_authentication.js";
-import type { FedosDirectRatchetSessionResetOutcome } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_record.js";
-import type { FedosDirectRatchetSessionResetRecordPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
+} from "./fedos_direct_ratchet_session_reset_authentication.js";
+import type { FedosDirectRatchetSessionResetOutcome } from "./fedos_direct_ratchet_session_reset_record.js";
+import type { FedosDirectRatchetSessionResetRecordPersistence } from "./persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
 
 export type FedosDirectRatchetSessionResetEvaluation =
   | { readonly outcome: FedosDirectRatchetSessionResetOutcome }

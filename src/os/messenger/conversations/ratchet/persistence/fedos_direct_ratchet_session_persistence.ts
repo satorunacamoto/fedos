@@ -13,8 +13,8 @@
  *   - Synchronous, matching every other filesystem-backed port in this
  *     codebase.
  */
-import type { FedosDirectRatchetSessionId } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
+import type { FedosDirectRatchetSessionId } from "../fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "../fedos_direct_ratchet_session_record.js";
 
 export type FedosDirectRatchetSessionPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

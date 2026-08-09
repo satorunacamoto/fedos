@@ -33,45 +33,45 @@
  * This file never re-encrypts the same logical send using rolled-back
  * state, and never silently falls back to a static/legacy route.
  */
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosPrivateWireDeliveryQueueOutcome } from "../../../../conversation/transport/fedos_private_wire_prepared_delivery.js";
-import type { FedosPrivateWireRouteAvailability } from "../../../../conversation/transport/fedos_private_wire_route.js";
-import { resolveFedosDirectRatchetRoute } from "../../../../conversation/ratchet/fedos_direct_ratchet_route_resolution.js";
+import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../../adapters/nostr/transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosPrivateWireRouteAvailability } from "../../adapters/nostr/transport/fedos_private_wire_route.js";
+import { resolveFedosDirectRatchetRoute } from "./fedos_direct_ratchet_route_resolution.js";
 import {
   resolveFedosDirectRatchetDevicePair,
   findCurrentFedosDirectRatchetSession,
   FEDOS_DIRECT_RATCHET_DEFAULT_SUITE,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_device_pair_resolver.js";
-import type { FedosDirectRatchetSessionPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
-import type { FedosSealedDirectRatchetSecretPersistence } from "../../../../conversation/ratchet/persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
-import type { FedosDirectRatchetRemotePublicKeyPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_remote_public_key_persistence.js";
-import type { FedosDirectRatchetLiveStateSnapshotPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
-import { FedosDirectRatchetStateRuntime } from "../../../../conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
-import type { FedosDirectRatchetSessionId } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import { FedosDirectRatchetCryptographicSession } from "../../../../conversation/ratchet/fedos_direct_ratchet_cryptographic_session.js";
-import { FedosDirectRatchetLiveSessionCache } from "../../../../conversation/ratchet/fedos_direct_ratchet_live_session_cache.js";
+} from "./fedos_direct_ratchet_device_pair_resolver.js";
+import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
+import type { FedosSealedDirectRatchetSecretPersistence } from "./persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
+import type { FedosDirectRatchetRemotePublicKeyPersistence } from "./persistence/fedos_direct_ratchet_remote_public_key_persistence.js";
+import type { FedosDirectRatchetLiveStateSnapshotPersistence } from "./persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
+import { FedosDirectRatchetStateRuntime } from "./fedos_direct_ratchet_state_runtime.js";
+import type { FedosDirectRatchetSessionId } from "./fedos_direct_ratchet_session_id.js";
+import { FedosDirectRatchetCryptographicSession } from "./fedos_direct_ratchet_cryptographic_session.js";
+import { FedosDirectRatchetLiveSessionCache } from "./fedos_direct_ratchet_live_session_cache.js";
 import {
   checkpointFedosDirectRatchetSecretsV1,
   restoreFedosDirectRatchetSealedStateV1,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_secret_checkpoint.js";
+} from "./fedos_direct_ratchet_secret_checkpoint.js";
 import {
   encodeFedosDirectRatchetNip17PayloadToPlaintext,
   wireMessageBytesToBase64,
   type FedosDirectRatchetMessagePayloadV1,
   type FedosDirectRatchetSessionInitPayloadV1,
-} from "../../../../conversation/delivery/nostr/nip17/fedos_direct_ratchet_nip17_payload.js";
-import type { FedosDeviceSigningKeypair } from "../../../../device/crypto/fedos_device_signing_keypair.js";
-import type { FedosDirectRatchetSessionResetReason } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+} from "../../adapters/nostr/conversation_delivery/nip17/fedos_direct_ratchet_nip17_payload.js";
+import type { FedosDeviceSigningKeypair } from "../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDirectRatchetSessionResetReason } from "./fedos_direct_ratchet_session_reset_reason.js";
 import {
   createFedosDirectRatchetSessionResetDeviceSignature,
   type FedosDirectRatchetSessionResetSignableContent,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_authentication.js";
-import type { FedosDirectRatchetResetCoordinator } from "../../../../conversation/ratchet/fedos_direct_ratchet_reset_coordinator.js";
-import { generateFedosDirectRatchetSessionResetNonce } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_nonce.js";
+} from "./fedos_direct_ratchet_session_reset_authentication.js";
+import type { FedosDirectRatchetResetCoordinator } from "./fedos_direct_ratchet_reset_coordinator.js";
+import { generateFedosDirectRatchetSessionResetNonce } from "./fedos_direct_ratchet_session_reset_nonce.js";
 
 export type FedosDirectRatchetCounterpartyResolution =
   | { readonly outcome: "resolved"; readonly localAccountRef: FedosDeviceBindingAccountRef; readonly remoteAccountRef: FedosDeviceBindingAccountRef; readonly remoteAccountPublicKeyHex: string }

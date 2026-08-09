@@ -4,7 +4,7 @@
  * clearing an existing `resolved` state).
  */
 
-import type { FedosDeviceSyncConflictPersistence, FedosDeviceSyncConflictRecordV1, FedosDeviceSyncConflictResolutionAction } from "../../../../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
+import type { FedosDeviceSyncConflictPersistence, FedosDeviceSyncConflictRecordV1, FedosDeviceSyncConflictResolutionAction } from "./fedos_device_sync_conflict_persistence.js";
 
 export class InMemoryFedosDeviceSyncConflictPersistence implements FedosDeviceSyncConflictPersistence {
   readonly #records = new Map<string, FedosDeviceSyncConflictRecordV1>();

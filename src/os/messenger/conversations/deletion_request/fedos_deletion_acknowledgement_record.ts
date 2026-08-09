@@ -21,12 +21,12 @@
  *     present (one Device only, never omitted to imply broader scope).
  */
 
-import { isFedosDeletionRequestId } from "../../../../conversation/deletion_request/fedos_deletion_request_id.js";
+import { isFedosDeletionRequestId } from "./fedos_deletion_request_id.js";
 import {
   isFedosDeletionRequestAcknowledgementOutcome,
   type FedosDeletionRequestAcknowledgementOutcome,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_acknowledgement_outcome.js";
-import { isFedosDeletionEvidence, type FedosDeletionEvidence } from "../../../../conversation/deletion/fedos_deletion_evidence.js";
+} from "./fedos_deletion_request_acknowledgement_outcome.js";
+import { isFedosDeletionEvidence, type FedosDeletionEvidence } from "../deletion/fedos_deletion_evidence.js";
 
 export const FEDOS_DELETION_ACKNOWLEDGEMENT_SCHEMA_VERSION = 1 as const;
 export const FEDOS_DELETION_ACKNOWLEDGEMENT_PROTOCOL_VERSION = 1 as const;

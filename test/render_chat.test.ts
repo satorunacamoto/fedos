@@ -8,7 +8,7 @@ import {
   renderChatRoom,
 } from "../src/os/_legacy_prototype/render/chat.js";
 import type { ChatDecision, ChatMessage, ChatRoom } from "../src/os/_legacy_prototype/chat/types.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 const ALICE = "a".repeat(64);
 const BOB = "b".repeat(64);

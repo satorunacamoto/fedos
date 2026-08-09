@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardRuntime } from "../src/board/runtime/fedos_board_runtime.js";
-import type { FedosBoardRuntimeIdGenerator } from "../src/board/runtime/fedos_board_runtime_id_generator.js";
-import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
-import type { FedosPublicIdentityReader } from "../src/desktop/fedos_public_identity_reader.js";
-import type { FedosBoardOutboxPersistence } from "../src/board/outbox/fedos_board_outbox_persistence.js";
-import type { FedosBoardPersistence } from "../src/board/persistence/fedos_board_persistence.js";
-import { validateFedosBoardPost } from "../src/board/fedos_board_post_validator.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardRuntime } from "../src/os/messenger/board/runtime/fedos_board_runtime.js";
+import type { FedosBoardRuntimeIdGenerator } from "../src/os/messenger/board/runtime/fedos_board_runtime_id_generator.js";
+import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosPublicIdentityReader } from "../src/os/messenger/desktop/fedos_public_identity_reader.js";
+import type { FedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/fedos_board_outbox_persistence.js";
+import type { FedosBoardPersistence } from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
+import { validateFedosBoardPost } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 function fixedIdGenerator(...ids: string[]): FedosBoardRuntimeIdGenerator {
   let i = 0;

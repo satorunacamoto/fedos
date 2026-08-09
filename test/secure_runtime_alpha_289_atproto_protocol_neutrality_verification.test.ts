@@ -4,13 +4,13 @@ import designDocSource from "../docs/secure_runtime_alpha_289_atproto_protocol_n
 import {
   validateAtprotoBoardPost,
   mapValidatedAtprotoPostToBoardPostInput,
-} from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
-import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
-import { validateActivityPubBoardPost } from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
+} from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
+import { validateNostrBoardPost } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
+import { validateActivityPubBoardPost } from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
 
 const BLUESKY_ROOT: FedosValidatedAtprotoPost = {
   uri: "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3jwdwj2ctlk26",

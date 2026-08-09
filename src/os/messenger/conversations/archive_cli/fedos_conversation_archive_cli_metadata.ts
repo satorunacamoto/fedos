@@ -39,11 +39,11 @@
  *   - Pure, deterministic, synchronous, never throws.
  */
 
-import { computeFedosConversationArchiveContentHash, fedosConversationArchiveContentHashesAreEqual } from "../../../../conversation/archive/fedos_conversation_archive_integrity.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationArchiveManifestV1 } from "../../../../conversation/archive/fedos_conversation_archive_manifest.js";
-import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliPackageV1 } from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_package.js";
+import { computeFedosConversationArchiveContentHash, fedosConversationArchiveContentHashesAreEqual } from "../archive/fedos_conversation_archive_integrity.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationArchiveBundleV1 } from "../archive/fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveManifestV1 } from "../archive/fedos_conversation_archive_manifest.js";
+import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION, type FedosConversationArchiveCliPackageV1 } from "./fedos_conversation_archive_cli_package.js";
 
 /** "archive version display" — this Arc's own CLI packaging format version, alongside the (unmodified) Archive schema version it packages. */
 export const FEDOS_CONVERSATION_ARCHIVE_CLI_VERSION_INFO = {

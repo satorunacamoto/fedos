@@ -9,14 +9,14 @@ import {
   FEDOS_CONVERSATION_CONSTRUCTIBLE_LIFECYCLE_STATE,
   FEDOS_CONVERSATION_LIFECYCLE_STATES,
   isFedosConversationLifecycleState,
-} from "../src/conversation/construction/fedos_conversation_lifecycle_state.js";
-import { validateFedosConversationDraftRecord } from "../src/conversation/construction/fedos_conversation_draft_record_validator.js";
-import { validateFedosConversationRecord } from "../src/conversation/fedos_conversation_record_validator.js";
+} from "../src/os/messenger/conversations/construction/fedos_conversation_lifecycle_state.js";
+import { validateFedosConversationDraftRecord } from "../src/os/messenger/conversations/construction/fedos_conversation_draft_record_validator.js";
+import { validateFedosConversationRecord } from "../src/os/messenger/conversations/fedos_conversation_record_validator.js";
 import {
   evaluateFedosConversationReadiness,
   type FedosConversationReadinessAxisStates,
-} from "../src/conversation/readiness/fedos_conversation_readiness.js";
-import { FEDOS_CONVERSATION_READINESS_AXES } from "../src/conversation/readiness/fedos_conversation_readiness_axis.js";
+} from "../src/os/messenger/conversations/readiness/fedos_conversation_readiness.js";
+import { FEDOS_CONVERSATION_READINESS_AXES } from "../src/os/messenger/conversations/readiness/fedos_conversation_readiness_axis.js";
 
 const CREATOR = { authority: "fedos", publicIdentifier: "creator-1", identityId: null };
 

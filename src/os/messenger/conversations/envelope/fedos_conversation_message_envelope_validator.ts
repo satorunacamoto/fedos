@@ -33,16 +33,16 @@
  *     are, and `Object.freeze`s the result.
  */
 
-import { FEDOS_BOARD_POST_MAX_CREATED_AT, FEDOS_BOARD_POST_MIN_CREATED_AT } from "../../../../board/fedos_board_post_validator.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { toFedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationMembershipId } from "../../../../conversation/membership/fedos_conversation_membership_id.js";
-import { toFedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
+import { FEDOS_BOARD_POST_MAX_CREATED_AT, FEDOS_BOARD_POST_MIN_CREATED_AT } from "../../board/fedos_board_post_validator.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { toFedosConversationEnvelopeId } from "./fedos_conversation_envelope_id.js";
+import type { FedosConversationMembershipId } from "../membership/fedos_conversation_membership_id.js";
+import { toFedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
 import {
   FEDOS_CONVERSATION_ENVELOPE_ENCRYPTION_SUITES,
   type FedosConversationEnvelopeEncryptionSuite,
   type FedosConversationMessageEnvelope,
-} from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
+} from "./fedos_conversation_message_envelope.js";
 
 export interface FedosConversationMessageEnvelopeInput {
   readonly id: string;

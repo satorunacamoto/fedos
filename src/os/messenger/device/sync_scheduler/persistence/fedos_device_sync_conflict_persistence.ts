@@ -18,8 +18,8 @@
  * than fabricating a new one.
  */
 
-import type { FedosDeviceSyncConflictKind } from "../../../../../device/sync_scheduler/fedos_device_sync_conflict.js";
-import type { FedosDeviceSyncResolutionDecision } from "../../../../../device/sync_scheduler/fedos_device_sync_conflict_authority.js";
+import type { FedosDeviceSyncConflictKind } from "../fedos_device_sync_conflict.js";
+import type { FedosDeviceSyncResolutionDecision } from "../fedos_device_sync_conflict_authority.js";
 
 export type FedosDeviceSyncConflictResolutionAction = "accept-identical" | "discard-invalid" | "refresh-missing-dependency" | "acknowledge";
 

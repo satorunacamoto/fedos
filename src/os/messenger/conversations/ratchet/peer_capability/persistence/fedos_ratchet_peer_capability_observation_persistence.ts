@@ -7,13 +7,13 @@
  * existing Ratchet or Device Sync persistence port (this codebase's own
  * established convention, confirmed twice in Phase A).
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
 import {
   fedosRatchetPeerCapabilityObservationKey,
   fedosRatchetPeerCapabilityObservationsAreEqual,
   fedosRatchetPeerCapabilityObservationSubjectKey,
   type FedosRatchetPeerCapabilityObservationV1,
-} from "../../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_observation.js";
+} from "../fedos_ratchet_peer_capability_observation.js";
 
 export type FedosRatchetPeerCapabilityObservationWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

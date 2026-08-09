@@ -19,13 +19,13 @@ import {
   abortFedosDeviceTransferSession,
   failFedosDeviceTransferSession,
   type FedosDeviceTransferSessionV1,
-} from "../../../../../device/transfer/fedos_device_transfer_session.js";
+} from "../fedos_device_transfer_session.js";
 import {
   fedosDeviceTransferEventKey,
   fedosPersistedDeviceTransferEventsAreEqual,
   type FedosPersistedDeviceTransferEventV1,
   type FedosPersistedDeviceTransferInvitedEventV1,
-} from "../../../../../device/transfer/persistence/fedos_persisted_device_transfer_event_v1.js";
+} from "./fedos_persisted_device_transfer_event_v1.js";
 
 export type FedosDeviceTransferSessionPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

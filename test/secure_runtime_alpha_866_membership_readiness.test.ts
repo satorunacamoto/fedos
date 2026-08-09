@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { validateFedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference_validator.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { validateFedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference_validator.js";
 import {
   evaluateFedosConversationCryptoReadiness,
   FEDOS_CONVERSATION_ENVELOPE_SUPPORTED_KEY_EPOCH,
-} from "../src/conversation/encryption/fedos_conversation_membership_readiness.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_membership_readiness.js";
 
 const conversationId = toFedosConversationId(toFedosBoardId("board-a")!, toFedosThreadId("thread-a")!);
 const alice = validateFedosConversationParticipantReference({ authority: "nostr", publicIdentifier: "npub1alice", identityId: null })!;

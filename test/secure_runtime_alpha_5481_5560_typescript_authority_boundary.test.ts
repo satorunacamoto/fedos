@@ -8,9 +8,9 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosDirectRatchetCryptographicSession,
   type FedosDirectRatchetWasmLoaderBoundary,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_cryptographic_session.js";
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosMasterSeedWasmLoaderBoundary } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_cryptographic_session.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosMasterSeedWasmLoaderBoundary } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 
 function mockMasterSeedLoaderBoundary(): FedosMasterSeedWasmLoaderBoundary {
   return {

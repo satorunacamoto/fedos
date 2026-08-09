@@ -50,21 +50,21 @@ import {
   isWellFormedFedosDeviceBindingChallengeV1,
   serializeFedosDeviceBindingChallengeV1,
   type FedosDeviceBindingChallengeV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
+} from "./fedos_device_binding_challenge.js";
 import {
   verifyFedosDeviceBindingAccountAuthorization,
   type FedosDeviceBindingAccountAuthorizationV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_account_authorization.js";
+} from "./fedos_device_binding_account_authorization.js";
 import {
   verifyFedosDeviceBindingProofOfPossession,
   type FedosDeviceBindingProofOfPossessionV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import { AlreadyVerifiedFedosDeviceRegistrationAuthority } from "../../../../device/binding_challenge/fedos_already_verified_device_registration_authority.js";
-import { PersistedFedosDeviceTrustAuthority } from "../../../../device/persistence/persisted_fedos_device_trust_authority.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingChallengeReplayPersistence } from "../../../../device/persistence/fedos_device_binding_challenge_replay_persistence.js";
-import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "../../../../device/persistence/fedos_persisted_device_binding_challenge_consumption_v1.js";
-import type { FedosDeviceBindingV1 } from "../../../../device/fedos_device_binding.js";
+} from "./fedos_device_binding_proof_of_possession.js";
+import { AlreadyVerifiedFedosDeviceRegistrationAuthority } from "./fedos_already_verified_device_registration_authority.js";
+import { PersistedFedosDeviceTrustAuthority } from "../persistence/persisted_fedos_device_trust_authority.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingChallengeReplayPersistence } from "../persistence/fedos_device_binding_challenge_replay_persistence.js";
+import type { FedosPersistedDeviceBindingChallengeConsumptionV1 } from "../persistence/fedos_persisted_device_binding_challenge_consumption_v1.js";
+import type { FedosDeviceBindingV1 } from "../fedos_device_binding.js";
 
 /**
  * The fixed `FedosDeviceBindingAccountRef.authority` this Arc's own

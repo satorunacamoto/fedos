@@ -29,24 +29,24 @@
  * existing lookup in this codebase.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationPersistence } from "../../../../conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationActivationPersistence } from "../../../../conversation/activation/fedos_conversation_activation_persistence.js";
-import { resolveFedosConversationActiveConversation } from "../../../../conversation/activation/fedos_conversation_active_lookup.js";
-import type { FedosConversationMembershipPersistence } from "../../../../conversation/membership/persistence/fedos_conversation_membership_persistence.js";
-import type { FedosConversationCapabilityPersistence } from "../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
-import type { FedosConversationMessageEnvelopePersistence } from "../../../../conversation/envelope/persistence/fedos_conversation_message_envelope_persistence.js";
-import type { FedosConversationPayloadStorage } from "../../../../conversation/payload_storage/fedos_conversation_payload_storage.js";
-import { serializeFedosConversationPayload } from "../../../../conversation/payload_storage/fedos_conversation_payload_codec.js";
-import type { FedosPayloadRetentionAuthority } from "../../../../conversation/retention/fedos_payload_retention_authority.js";
-import type { FedosGroupGenerationPersistence } from "../../../../conversation/group/fedos_group_generation.js";
-import type { FedosGroupDirectPathPersistence, FedosGroupDirectPathRecord } from "../../../../conversation/group/fedos_group_direct_path.js";
-import type { FedosGroupMessagePersistence } from "../../../../conversation/group/fedos_group_message.js";
-import type { FedosGroupFanoutDeliveryPersistence, FedosGroupFanoutDeliveryRecord } from "../../../../conversation/group/fedos_group_fanout_delivery.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationArchiveGroupSectionV1 } from "../../../../conversation/archive/fedos_conversation_archive_group_section.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationPersistence } from "../persistence/fedos_conversation_persistence.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationActivationPersistence } from "../activation/fedos_conversation_activation_persistence.js";
+import { resolveFedosConversationActiveConversation } from "../activation/fedos_conversation_active_lookup.js";
+import type { FedosConversationMembershipPersistence } from "../membership/persistence/fedos_conversation_membership_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../capability/persistence/fedos_conversation_capability_persistence.js";
+import type { FedosConversationMessageEnvelopePersistence } from "../envelope/persistence/fedos_conversation_message_envelope_persistence.js";
+import type { FedosConversationPayloadStorage } from "../payload_storage/fedos_conversation_payload_storage.js";
+import { serializeFedosConversationPayload } from "../payload_storage/fedos_conversation_payload_codec.js";
+import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
+import type { FedosGroupGenerationPersistence } from "../group/fedos_group_generation.js";
+import type { FedosGroupDirectPathPersistence, FedosGroupDirectPathRecord } from "../group/fedos_group_direct_path.js";
+import type { FedosGroupMessagePersistence } from "../group/fedos_group_message.js";
+import type { FedosGroupFanoutDeliveryPersistence, FedosGroupFanoutDeliveryRecord } from "../group/fedos_group_fanout_delivery.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "./fedos_conversation_archive_group_section.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "./fedos_conversation_archive_schema_version.js";
 
 /** Secure Runtime Alpha 1921–1980 — the four Group-only persistence ports the Collector needs to additionally populate `FedosConversationArchiveBundleV1.group`. OPTIONAL on `FedosConversationArchiveCollectorDependencies` below: a caller archiving a plain Direct Conversation (or one who never wants Group support) omits this entirely and gets the IDENTICAL Direct-only bundle this codebase has always produced. */
 export interface FedosConversationArchiveGroupCollectorDependencies {

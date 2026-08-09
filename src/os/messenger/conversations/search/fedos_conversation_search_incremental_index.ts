@@ -35,7 +35,7 @@
  *     structure over already-durable data.
  */
 
-import type { FedosConversationEnvelopeId } from "../../../../conversation/envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationEnvelopeId } from "../envelope/fedos_conversation_envelope_id.js";
 
 export class FedosConversationSearchIncrementalIndex {
   readonly #indexed = new Set<string>();

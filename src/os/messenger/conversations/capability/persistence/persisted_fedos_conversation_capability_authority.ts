@@ -41,34 +41,34 @@
  *     when their own earlier success is what filled the last slot.
  */
 
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembershipAuthority } from "../../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "../../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import { toFedosConversationCapabilityId, type FedosConversationCapabilityId } from "../../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationCapabilitySecretGenerator } from "../../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosConversationMembershipAuthority } from "../../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationCapabilityAction, FedosConversationCapabilityDescriptor } from "../fedos_conversation_capability_descriptor.js";
+import { toFedosConversationCapabilityId, type FedosConversationCapabilityId } from "../fedos_conversation_capability_id.js";
+import type { FedosConversationCapabilitySecretGenerator } from "../fedos_conversation_capability_bearer_secret.js";
 import type {
   FedosConversationCapabilityIssueRequest,
   FedosConversationCapabilityIssuerAuthority,
   FedosConversationExistenceCheck,
   FedosConversationCapabilityIssuanceAuthorizationCheck,
-} from "../../../../../conversation/capability/fedos_conversation_capability_issuer_authority.js";
-import type { FedosConversationCapabilityIssuanceResult } from "../../../../../conversation/capability/fedos_conversation_capability_issuance_result.js";
-import type { FedosConversationCapabilityRedemptionRequest } from "../../../../../conversation/capability/fedos_conversation_capability_redemption_request.js";
-import type { FedosConversationCapabilityRedemptionResult } from "../../../../../conversation/capability/fedos_conversation_capability_redemption_result.js";
-import type { FedosConversationCapabilityRedemptionAuthority } from "../../../../../conversation/capability/fedos_conversation_capability_redemption_authority.js";
-import type { FedosConversationCapabilityIdGenerator } from "../../../../../conversation/capability/in_memory_fedos_conversation_capability_authority.js";
+} from "../fedos_conversation_capability_issuer_authority.js";
+import type { FedosConversationCapabilityIssuanceResult } from "../fedos_conversation_capability_issuance_result.js";
+import type { FedosConversationCapabilityRedemptionRequest } from "../fedos_conversation_capability_redemption_request.js";
+import type { FedosConversationCapabilityRedemptionResult } from "../fedos_conversation_capability_redemption_result.js";
+import type { FedosConversationCapabilityRedemptionAuthority } from "../fedos_conversation_capability_redemption_authority.js";
+import type { FedosConversationCapabilityIdGenerator } from "../in_memory_fedos_conversation_capability_authority.js";
 import {
   createFedosConversationCapabilityBearerVerifier,
   fedosConversationCapabilityBearerVerifierMatches,
   type FedosConversationCapabilityBearerVerifier,
-} from "../../../../../conversation/capability/persistence/fedos_conversation_capability_bearer_verifier.js";
+} from "./fedos_conversation_capability_bearer_verifier.js";
 import {
   serializeFedosConversationCapabilityIssuedEvent,
   serializeFedosConversationCapabilityRedeemedEvent,
-} from "../../../../../conversation/capability/persistence/fedos_conversation_capability_codec.js";
-import type { FedosConversationCapabilityPersistence } from "../../../../../conversation/capability/persistence/fedos_conversation_capability_persistence.js";
-import type { FedosPersistedConversationCapabilityRecordV1 } from "../../../../../conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
+} from "./fedos_conversation_capability_codec.js";
+import type { FedosConversationCapabilityPersistence } from "./fedos_conversation_capability_persistence.js";
+import type { FedosPersistedConversationCapabilityRecordV1 } from "./fedos_persisted_conversation_capability_v1.js";
 
 function isValidMaxUses(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1;

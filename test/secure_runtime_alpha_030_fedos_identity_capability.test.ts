@@ -8,7 +8,7 @@ import { decrypt } from "../src/runtime/fedos_runtime_decrypt.js";
 import { exportCiphertext } from "../src/runtime/fedos_runtime_export_ciphertext.js";
 import { importCiphertext } from "../src/runtime/fedos_runtime_import_ciphertext.js";
 import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtime/fedos_runtime_ciphertext_storage.js";
-import type { FedosIdentityCapability } from "../src/identity/fedos_identity_capability.js";
+import type { FedosIdentityCapability } from "../src/os/core/identity/fedos_identity_capability.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_030_fedos_identity_capability.md?raw";

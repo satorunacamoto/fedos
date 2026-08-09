@@ -27,19 +27,19 @@ import {
   defaultFedosSettingsDescriptorV1,
   withFedosSettings,
   type FedosSettingsDescriptorV1,
-} from "../src/settings/fedos_settings_descriptor.js";
-import { createFileBackedFedosDesktopSettingsController } from "../src/desktop/settings/fedos_desktop_settings_controller.js";
-import { fedosDesktopSettingsFilePath } from "../src/desktop/settings/fedos_desktop_settings_controller.js";
+} from "../src/os/core/settings/fedos_settings_descriptor.js";
+import { createFileBackedFedosDesktopSettingsController } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_controller.js";
+import { fedosDesktopSettingsFilePath } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_controller.js";
 import {
   fedosSettingsApplicationClassification,
   fedosSettingsFieldApplication,
-} from "../src/settings/application/fedos_settings_application_class.js";
-import { planFedosSettingsApplication } from "../src/settings/application/fedos_settings_application_plan.js";
-import { fedosSettingsEffectiveStateFromLoaded } from "../src/settings/application/fedos_settings_effective_state.js";
+} from "../src/os/core/settings/application/fedos_settings_application_class.js";
+import { planFedosSettingsApplication } from "../src/os/core/settings/application/fedos_settings_application_plan.js";
+import { fedosSettingsEffectiveStateFromLoaded } from "../src/os/core/settings/application/fedos_settings_effective_state.js";
 import {
   FedosDesktopSettingsApplicationCoordinator,
   type FedosDesktopSettingsApplicationCoordinatorDeps,
-} from "../src/desktop/settings/fedos_desktop_settings_application_coordinator.js";
+} from "../src/os/messenger/desktop/settings/fedos_desktop_settings_application_coordinator.js";
 import {
   InMemoryFedosSettingsPresentationSink,
   FedosSettingsNotificationPresentationGateHolder,
@@ -48,22 +48,22 @@ import {
   type FedosSettingsBackgroundSyncControl,
   type FedosSettingsPortOutcome,
   type FedosSettingsPresentationSink,
-} from "../src/desktop/settings/fedos_desktop_settings_application_ports.js";
-import { FedosDesktopSettingsApplicationHostBridge } from "../src/desktop/settings/fedos_desktop_settings_application_host_bridge.js";
-import { FedosDesktopSettingsApplicationViewModel } from "../src/desktop/presentation/fedos_desktop_settings_application_view_model.js";
+} from "../src/os/messenger/desktop/settings/fedos_desktop_settings_application_ports.js";
+import { FedosDesktopSettingsApplicationHostBridge } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_application_host_bridge.js";
+import { FedosDesktopSettingsApplicationViewModel } from "../src/os/messenger/desktop/presentation/fedos_desktop_settings_application_view_model.js";
 
-import { FedosDesktopNotificationCoordinator } from "../src/desktop/notification/fedos_desktop_notification_coordinator.js";
+import { FedosDesktopNotificationCoordinator } from "../src/os/messenger/notifications/fedos_desktop_notification_coordinator.js";
 import type {
   FedosDesktopNotificationPort,
   FedosDesktopNotificationDeliveryResult,
-} from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import type { FedosDesktopNotificationView } from "../src/desktop/notification/fedos_desktop_notification_types.js";
+} from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import type { FedosDesktopNotificationView } from "../src/os/messenger/notifications/fedos_desktop_notification_types.js";
 
-import { FedosDeviceSyncScheduler } from "../src/device/sync_scheduler/fedos_device_sync_scheduler.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { InMemoryFedosDeviceSyncSchedulePersistence } from "../src/device/sync_scheduler/persistence/in_memory_fedos_device_sync_schedule_persistence.js";
+import { FedosDeviceSyncScheduler } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_scheduler.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceSyncSchedulePersistence } from "../src/os/messenger/device/sync_scheduler/persistence/in_memory_fedos_device_sync_schedule_persistence.js";
 import { FedosSyncState } from "../src/sync/fedos_sync_state.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 // --------------------------------------------------------------------------
 // Real-boundary fixtures.

@@ -13,7 +13,7 @@ import {
   fedosIdentityTransitionRatchetResetLinksAreEqual,
   type FedosIdentityTransitionRatchetResetLinkPersistence,
   type FedosIdentityTransitionRatchetResetLinkV1,
-} from "../../../../../../conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
+} from "../fedos_identity_transition_ratchet_reset_link.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

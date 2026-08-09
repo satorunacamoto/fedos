@@ -22,28 +22,28 @@
 import {
   isFedosDirectRatchetSessionLifecycleTransitionAllowed,
   type FedosDirectRatchetSessionLifecycleState,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_lifecycle.js";
-import { fedosDirectRatchetSealingDeviceContext, type FedosDirectRatchetSessionBinding } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_binding.js";
+} from "./fedos_direct_ratchet_session_lifecycle.js";
+import { fedosDirectRatchetSealingDeviceContext, type FedosDirectRatchetSessionBinding } from "./fedos_direct_ratchet_session_binding.js";
 import {
   advanceFedosDirectRatchetCounters,
   isWellFormedFedosDirectRatchetCounters,
   FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS,
   type FedosDirectRatchetCounters,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_counters.js";
-import { FedosDirectRatchetSkippedKeyIndex, type FedosDirectRatchetSkippedKeyRejectionReason } from "../../../../conversation/ratchet/fedos_direct_ratchet_skipped_key_index.js";
-import type { FedosDirectRatchetSessionId } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_record.js";
-import type { FedosDirectRatchetSessionPersistence } from "../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
-import type { FedosSealedDirectRatchetSecretPersistence } from "../../../../conversation/ratchet/persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
+} from "./fedos_direct_ratchet_counters.js";
+import { FedosDirectRatchetSkippedKeyIndex, type FedosDirectRatchetSkippedKeyRejectionReason } from "./fedos_direct_ratchet_skipped_key_index.js";
+import type { FedosDirectRatchetSessionId } from "./fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "./fedos_direct_ratchet_session_record.js";
+import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
+import type { FedosSealedDirectRatchetSecretPersistence } from "./persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
 import {
   createFedosSealedDirectRatchetSecretRecordV1,
   fedosSealedDirectRatchetSecretRecordKey,
   type FedosDirectRatchetSecretKind,
-} from "../../../../conversation/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
-import type { FedosDirectRatchetSealingAuthority } from "../../../../conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
-import { fedosDirectRatchetReadinessIsReady, type FedosDirectRatchetReadiness } from "../../../../conversation/ratchet/fedos_direct_ratchet_readiness.js";
-import type { FedosDirectRatchetRecoveryOutcome } from "../../../../conversation/ratchet/fedos_direct_ratchet_recovery_outcome.js";
-import { FedosDirectRatchetRecoveredSecretHandle } from "../../../../conversation/ratchet/fedos_direct_ratchet_recovered_secret_handle.js";
+} from "./fedos_sealed_direct_ratchet_secret_record.js";
+import type { FedosDirectRatchetSealingAuthority } from "./fedos_direct_ratchet_sealing_authority.js";
+import { fedosDirectRatchetReadinessIsReady, type FedosDirectRatchetReadiness } from "./fedos_direct_ratchet_readiness.js";
+import type { FedosDirectRatchetRecoveryOutcome } from "./fedos_direct_ratchet_recovery_outcome.js";
+import { FedosDirectRatchetRecoveredSecretHandle } from "./fedos_direct_ratchet_recovered_secret_handle.js";
 
 const SEALING_SUITE = "direct-ratchet-sealing-v1" as const;
 

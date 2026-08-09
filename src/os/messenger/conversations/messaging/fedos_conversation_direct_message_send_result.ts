@@ -33,9 +33,9 @@
  * configured. Every existing caller that never configures either
  * `delivery`/`ratchetDelivery` still sees `delivery` entirely absent.
  */
-import type { FedosPrivateWireDeliveryQueueOutcome } from "../../../../conversation/transport/fedos_private_wire_prepared_delivery.js";
-import type { FedosDirectRatchetSendOutcome } from "../../../../conversation/ratchet/fedos_direct_ratchet_outbound_integration.js";
-import type { FedosForwardSecrecyUnavailableReason } from "../../../../conversation/ratchet/fedos_direct_conversation_forward_secrecy_route.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../../adapters/nostr/transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
+import type { FedosForwardSecrecyUnavailableReason } from "../ratchet/fedos_direct_conversation_forward_secrecy_route.js";
 
 export type FedosConversationDirectMessageSendResult =
   | {

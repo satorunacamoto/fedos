@@ -27,12 +27,12 @@ import {
   fedosDeviceBindingAccountRefsEqual,
   type FedosDeviceBindingAccountRef,
   type FedosDeviceBindingV1,
-} from "../../../../device/fedos_device_binding.js";
+} from "../fedos_device_binding.js";
 import type {
   FedosDeviceRegistrationAuthority,
   FedosDeviceRegistrationRequest,
-} from "../../../../device/fedos_device_registration_authority.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
+} from "../fedos_device_registration_authority.js";
+import type { FedosDeviceRegistryPersistence } from "./fedos_device_registry_persistence.js";
 
 export type FedosDeviceRegistrationOutcome =
   | "registered"

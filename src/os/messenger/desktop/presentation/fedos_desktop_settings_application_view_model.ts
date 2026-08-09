@@ -20,18 +20,18 @@ import type {
   FedosSettingsApplicationReport,
   FedosSettingsApplicationTransactionOutcome,
 } from "../settings/fedos_desktop_settings_application_coordinator.js";
-import type { FedosSettingsApplicationPlan } from "../../../../settings/application/fedos_settings_application_plan.js";
+import type { FedosSettingsApplicationPlan } from "../../../core/settings/application/fedos_settings_application_plan.js";
 import type {
   FedosSettingsEffectiveState,
   FedosSettingsFieldEffectiveEntry,
-} from "../../../../settings/application/fedos_settings_effective_state.js";
+} from "../../../core/settings/application/fedos_settings_effective_state.js";
 import {
   fedosSettingsFieldApplication,
   fedosSettingsApplicationClassification,
   type FedosSettingsApplicableField,
   type FedosSettingsApplicationClass,
-} from "../../../../settings/application/fedos_settings_application_class.js";
-import { fedosSettingsValueSummary } from "../../../../settings/application/fedos_settings_application_plan.js";
+} from "../../../core/settings/application/fedos_settings_application_class.js";
+import { fedosSettingsValueSummary } from "../../../core/settings/application/fedos_settings_application_plan.js";
 
 /** One row per applicable field, honestly distinguishing saved / effective / pending. */
 export interface FedosDesktopSettingsApplicationFieldRow {

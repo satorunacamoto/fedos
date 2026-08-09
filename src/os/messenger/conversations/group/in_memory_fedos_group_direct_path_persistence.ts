@@ -11,7 +11,7 @@ import {
   type FedosGroupDirectPathPersistence,
   type FedosGroupDirectPathPersistenceWriteResult,
   type FedosGroupDirectPathRecord,
-} from "../../../../conversation/group/fedos_group_direct_path.js";
+} from "./fedos_group_direct_path.js";
 
 export class InMemoryFedosGroupDirectPathPersistence implements FedosGroupDirectPathPersistence {
   readonly #records = new Map<string, FedosGroupDirectPathRecord>();

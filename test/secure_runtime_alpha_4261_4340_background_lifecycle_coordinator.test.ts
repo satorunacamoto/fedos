@@ -5,7 +5,7 @@
  * directly, no mock needed.
  */
 import { describe, it, expect } from "vitest";
-import { BackgroundLifecycleCoordinator } from "../src/desktop/background/fedos_desktop_background_lifecycle_coordinator.js";
+import { BackgroundLifecycleCoordinator } from "../src/os/messenger/desktop/background/fedos_desktop_background_lifecycle_coordinator.js";
 
 describe("Alpha 4261-4340 -- Background Lifecycle Coordinator: window close keeps runtime alive", () => {
   it("closing the last open window with keepAliveInBackground=true transitions to 'background', never 'shutting-down'", () => {

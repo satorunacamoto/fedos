@@ -8,7 +8,7 @@
  * `EventSigner`.
  */
 
-import type { NostrTag } from "../../../nostr/types.js";
+import type { NostrTag } from "../../messenger/adapters/nostr/protocol/types.js";
 import { canPost } from "../community/policy.js";
 import type { Space, SpaceDecision } from "../community/types.js";
 import type {

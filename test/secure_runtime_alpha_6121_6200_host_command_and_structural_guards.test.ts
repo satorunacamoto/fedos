@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { validateFedosDesktopHostCommand } from "../src/desktop/host_boundary/fedos_desktop_host_command.js";
+import { validateFedosDesktopHostCommand } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.js";
 
 declare const process: { cwd(): string };
 

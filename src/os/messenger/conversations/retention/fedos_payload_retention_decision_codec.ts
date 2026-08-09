@@ -13,12 +13,12 @@
 import {
   validateFedosPayloadRetentionDecision,
   type FedosPayloadRetentionDecisionInput,
-} from "../../../../conversation/retention/fedos_payload_retention_decision_validator.js";
+} from "./fedos_payload_retention_decision_validator.js";
 import {
   fedosPayloadRetentionDecisionKey,
   type FedosPayloadRetentionDecision,
-} from "../../../../conversation/retention/fedos_payload_retention_decision.js";
-import type { FedosPersistedPayloadRetentionDecisionV1 } from "../../../../conversation/retention/fedos_persisted_payload_retention_decision_v1.js";
+} from "./fedos_payload_retention_decision.js";
+import type { FedosPersistedPayloadRetentionDecisionV1 } from "./fedos_persisted_payload_retention_decision_v1.js";
 
 export function serializeFedosPayloadRetentionDecision(
   decision: FedosPayloadRetentionDecision,

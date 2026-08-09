@@ -14,22 +14,22 @@
  * ids, generations, messages, and usability results.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationDraftPersistence } from "../../../../conversation/construction/fedos_conversation_draft_persistence.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationIdentityResolver } from "../../../../conversation/encryption/identity/fedos_conversation_identity_resolver.js";
-import { evaluateFedosGroupUsability, type FedosGroupUsabilityResult } from "../../../../conversation/group/fedos_group_usability.js";
-import { FedosGroupGenerationAuthority, type FedosGroupCreateNextGenerationResult } from "../../../../conversation/group/fedos_group_generation_authority.js";
-import type { FedosGroupGenerationRecord } from "../../../../conversation/group/fedos_group_generation.js";
-import { FedosGroupAdmission, type FedosGroupAddMemberResult, type FedosGroupRemoveMemberResult } from "../../../../conversation/group/fedos_group_admission.js";
-import { FedosGroupSendCoordinator, type FedosGroupSendMessageCommand, type FedosGroupSendResult } from "../../../../conversation/group/fedos_group_send_coordinator.js";
-import { FedosGroupReadFacade, type FedosGroupMessageSummary } from "../../../../conversation/group/fedos_group_read_facade.js";
-import type { FedosGroupDirectPathPersistence } from "../../../../conversation/group/fedos_group_direct_path.js";
-import type { FedosGroupFanoutDeliveryPersistence } from "../../../../conversation/group/fedos_group_fanout_delivery.js";
-import type { FedosGroupMessagePersistence } from "../../../../conversation/group/fedos_group_message.js";
-import type { FedosConversationDirectMessagingCoordinator } from "../../../../conversation/messaging/fedos_conversation_direct_messaging_coordinator.js";
-import type { FedosGroupMessageLocalReadResult } from "../../../../conversation/group/fedos_group_message_local_read_result.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationDraftPersistence } from "../construction/fedos_conversation_draft_persistence.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationIdentityResolver } from "../encryption/identity/fedos_conversation_identity_resolver.js";
+import { evaluateFedosGroupUsability, type FedosGroupUsabilityResult } from "./fedos_group_usability.js";
+import { FedosGroupGenerationAuthority, type FedosGroupCreateNextGenerationResult } from "./fedos_group_generation_authority.js";
+import type { FedosGroupGenerationRecord } from "./fedos_group_generation.js";
+import { FedosGroupAdmission, type FedosGroupAddMemberResult, type FedosGroupRemoveMemberResult } from "./fedos_group_admission.js";
+import { FedosGroupSendCoordinator, type FedosGroupSendMessageCommand, type FedosGroupSendResult } from "./fedos_group_send_coordinator.js";
+import { FedosGroupReadFacade, type FedosGroupMessageSummary } from "./fedos_group_read_facade.js";
+import type { FedosGroupDirectPathPersistence } from "./fedos_group_direct_path.js";
+import type { FedosGroupFanoutDeliveryPersistence } from "./fedos_group_fanout_delivery.js";
+import type { FedosGroupMessagePersistence } from "./fedos_group_message.js";
+import type { FedosConversationDirectMessagingCoordinator } from "../messaging/fedos_conversation_direct_messaging_coordinator.js";
+import type { FedosGroupMessageLocalReadResult } from "./fedos_group_message_local_read_result.js";
 
 export type FedosGroupRuntimeAddMemberResult =
   | { readonly outcome: "admitted"; readonly generation: FedosGroupCreateNextGenerationResult }

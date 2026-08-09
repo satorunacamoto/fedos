@@ -28,12 +28,12 @@ import {
   type FedosDeviceBindingRegistrationAuthority,
   type FedosDeviceBindingRegistrationOutcome,
   type FedosDeviceBindingRevocationOutcome,
-} from "../../../device/binding_challenge/fedos_device_binding_registration_authority.js";
-import type { FedosDeviceBindingAccountAuthorizationV1 } from "../../../device/binding_challenge/fedos_device_binding_account_authorization.js";
-import type { FedosDeviceBindingProofOfPossessionV1 } from "../../../device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import type { FedosDeviceBindingV1 } from "../../../device/fedos_device_binding.js";
-import type { FedosDeviceReplacementPersistence } from "../../../device/persistence/fedos_device_replacement_persistence.js";
-import type { FedosDeviceReplacementReason } from "../../../device/fedos_device_replacement_record.js";
+} from "./binding_challenge/fedos_device_binding_registration_authority.js";
+import type { FedosDeviceBindingAccountAuthorizationV1 } from "./binding_challenge/fedos_device_binding_account_authorization.js";
+import type { FedosDeviceBindingProofOfPossessionV1 } from "./binding_challenge/fedos_device_binding_proof_of_possession.js";
+import type { FedosDeviceBindingV1 } from "./fedos_device_binding.js";
+import type { FedosDeviceReplacementPersistence } from "./persistence/fedos_device_replacement_persistence.js";
+import type { FedosDeviceReplacementReason } from "./fedos_device_replacement_record.js";
 
 export type FedosDeviceReplacementOutcome =
   | { readonly outcome: "replaced"; readonly newBinding: FedosDeviceBindingV1 }

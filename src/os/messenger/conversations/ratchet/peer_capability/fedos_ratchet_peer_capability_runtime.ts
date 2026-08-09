@@ -10,29 +10,29 @@
  * narrow, injected dependency bundle" shape, deliberately as a SIBLING
  * Runtime, never a merge into that frozen class.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosConversationId } from "../../../../../conversation/fedos_conversation_id.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosDeviceSigningKeypair } from "../../../../../device/crypto/fedos_device_signing_keypair.js";
-import type { FedosRatchetPeerCapabilityEntry } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import type { FedosRatchetPeerLifecycleFact } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
+import type { FedosDeviceBindingAccountRef } from "../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosConversationId } from "../../fedos_conversation_id.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosDeviceSigningKeypair } from "../../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosRatchetPeerCapabilityEntry } from "./fedos_ratchet_peer_capability_vocabulary.js";
+import type { FedosRatchetPeerLifecycleFact } from "./fedos_ratchet_peer_lifecycle_notification.js";
 import {
   FedosRatchetPeerCapabilityOutboundCoordinator,
   type FedosRatchetPeerCapabilityOutboundOutcome,
   type FedosRatchetPeerCapabilitySendResult,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_outbound_coordinator.js";
+} from "./fedos_ratchet_peer_capability_outbound_coordinator.js";
 import {
   FedosRatchetPeerCapabilityInboundCoordinator,
   type FedosRatchetPeerCapabilityInboundOutcome,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
-import type { FedosRatchetPeerCapabilityObservationPersistence } from "../../../../../conversation/ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
-import type { FedosRatchetPeerCapabilityObservationV1 } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_observation.js";
+} from "./fedos_ratchet_peer_capability_inbound_coordinator.js";
+import type { FedosRatchetPeerCapabilityObservationPersistence } from "./persistence/fedos_ratchet_peer_capability_observation_persistence.js";
+import type { FedosRatchetPeerCapabilityObservationV1 } from "./fedos_ratchet_peer_capability_observation.js";
 import {
   computeFedosRatchetPeerCapabilitySafeStatus,
   type FedosRatchetPeerCapabilitySafeStatus,
-} from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
-import { recommendFedosRatchetPeerSessionAction } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_session_action_recommendation.js";
+} from "./fedos_ratchet_peer_capability_safe_status.js";
+import { recommendFedosRatchetPeerSessionAction } from "./fedos_ratchet_peer_capability_session_action_recommendation.js";
 
 export interface FedosRatchetPeerCapabilityRuntimeDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;

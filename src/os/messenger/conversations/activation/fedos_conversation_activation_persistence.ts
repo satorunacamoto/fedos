@@ -22,7 +22,7 @@
 import type {
   FedosConversationActivationPhase,
   FedosPersistedConversationActivationV1,
-} from "../../../../conversation/activation/fedos_persisted_conversation_activation_v1.js";
+} from "./fedos_persisted_conversation_activation_v1.js";
 
 /** Mirrors `FedosConversationConstructionCoordinationWriteResult` exactly (Alpha 914). */
 export type FedosConversationActivationPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

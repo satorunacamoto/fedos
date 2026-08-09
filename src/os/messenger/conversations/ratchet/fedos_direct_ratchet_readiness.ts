@@ -4,7 +4,7 @@
  * codebase's own "closed outcome, not a bare boolean" discipline
  * (e.g. `FedosWasmLoaderDecision`, `FedosDeviceTrustState`).
  */
-import type { FedosDirectRatchetSessionLifecycleState } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_lifecycle.js";
+import type { FedosDirectRatchetSessionLifecycleState } from "./fedos_direct_ratchet_session_lifecycle.js";
 
 export type FedosDirectRatchetReadinessState =
   | "ready"

@@ -39,29 +39,29 @@
  * `FedosConversationTransportScheduler.tick()` exactly.
  */
 
-import type { FedosDeviceSyncSchedulePersistence } from "../../../../device/sync_scheduler/persistence/fedos_device_sync_schedule_persistence.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
+import type { FedosDeviceSyncSchedulePersistence } from "./persistence/fedos_device_sync_schedule_persistence.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
 import type { FedosSyncState } from "../../../../sync/fedos_sync_state.js";
-import { planFedosDeviceSyncTargets } from "../../../../device/sync_scheduler/fedos_device_sync_target_planning.js";
+import { planFedosDeviceSyncTargets } from "./fedos_device_sync_target_planning.js";
 import {
   classifyFedosDeviceSyncRetryDirective,
   isWellFormedFedosDeviceSyncAbandonmentPolicy,
   type FedosDeviceSyncAbandonmentPolicy,
   type FedosDeviceSyncAttemptOutcomeCode,
   type FedosDeviceSyncRetryDirective,
-} from "../../../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
-import type { FedosDeviceSyncAttemptFn } from "../../../../device/sync_scheduler/fedos_device_sync_attempt.js";
+} from "./fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncAttemptFn } from "./fedos_device_sync_attempt.js";
 import {
   createPendingFedosDeviceSyncSchedule,
   isFedosDeviceSyncScheduleTerminal,
   type FedosDeviceSyncScheduleV1,
-} from "../../../../device/sync_scheduler/fedos_device_sync_schedule.js";
-import { isWellFormedFedosDeviceSyncResourceLimits, type FedosDeviceSyncResourceLimits, FEDOS_DEVICE_SYNC_DEFAULT_RESOURCE_LIMITS } from "../../../../device/sync_scheduler/fedos_device_sync_resource_limits.js";
+} from "./fedos_device_sync_schedule.js";
+import { isWellFormedFedosDeviceSyncResourceLimits, type FedosDeviceSyncResourceLimits, FEDOS_DEVICE_SYNC_DEFAULT_RESOURCE_LIMITS } from "./fedos_device_sync_resource_limits.js";
 import {
   FedosSecureRandomDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeNonceGenerator,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
+} from "../binding_challenge/fedos_device_binding_challenge.js";
 
 export interface FedosDeviceSyncSchedulerDeps {
   readonly schedulePersistence: FedosDeviceSyncSchedulePersistence;

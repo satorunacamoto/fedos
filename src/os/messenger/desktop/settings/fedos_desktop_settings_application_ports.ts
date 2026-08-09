@@ -18,7 +18,7 @@
 import type {
   FedosSettingsTheme,
   FedosSettingsWindowLayout,
-} from "../../../../settings/fedos_settings_descriptor.js";
+} from "../../../core/settings/fedos_settings_descriptor.js";
 import type {
   FedosDesktopNotificationPort,
   FedosDesktopNotificationDeliveryResult,

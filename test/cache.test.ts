@@ -5,8 +5,8 @@ import {
   InMemoryEventCache,
   getCachedOrFetchEvents,
 } from "../src/os/_legacy_prototype/cache/event_cache.js";
-import type { NostrEvent } from "../src/nostr/types.js";
-import type { NostrFilter } from "../src/nostr/relay.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
+import type { NostrFilter } from "../src/os/messenger/adapters/nostr/protocol/relay.js";
 import type { CachedEventBatch } from "../src/os/_legacy_prototype/cache/types.js";
 
 function event(idChar: string): NostrEvent {

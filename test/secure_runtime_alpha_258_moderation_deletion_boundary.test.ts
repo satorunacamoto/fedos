@@ -9,7 +9,7 @@ import {
   FEDOS_BOARD_MODERATION_STATES,
   FEDOS_BOARD_MODERATION_REASON_CODES,
   type FedosBoardModerationRecord,
-} from "../src/board/fedos_board_moderation.js";
+} from "../src/os/messenger/board/fedos_board_moderation.js";
 
 function codeOnly(source: string): string {
   return source

@@ -39,14 +39,14 @@
  * only ever runs on an actually-received, actually-verified
  * acknowledgement payload.
  */
-import { decodeFedosDeletionRequestControlPayloadFromContent } from "../../../../conversation/deletion_request/fedos_deletion_request_control_payload.js";
-import { verifyFedosSignedDeletionAcknowledgementV1 } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_signing.js";
-import type { FedosDeletionAcknowledgementPersistence } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_persistence.js";
-import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
-import type { FedosDeletionRequestStatePersistence } from "../../../../conversation/deletion_request/fedos_deletion_request_state_persistence.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
-import type { FedosDeletionRequestLifecycleState } from "../../../../conversation/deletion_request/fedos_deletion_request_lifecycle_state.js";
-import { safeStatusForFedosDeletionRequestLifecycle, type FedosDeletionRequestSafeStatus } from "../../../../conversation/deletion_request/fedos_deletion_request_safe_status.js";
+import { decodeFedosDeletionRequestControlPayloadFromContent } from "./fedos_deletion_request_control_payload.js";
+import { verifyFedosSignedDeletionAcknowledgementV1 } from "./fedos_deletion_acknowledgement_signing.js";
+import type { FedosDeletionAcknowledgementPersistence } from "./fedos_deletion_acknowledgement_persistence.js";
+import type { FedosPersistedDeletionAcknowledgementRecordV1 } from "./fedos_persisted_deletion_acknowledgement_record_v1.js";
+import type { FedosDeletionRequestStatePersistence } from "./fedos_deletion_request_state_persistence.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
+import type { FedosDeletionRequestLifecycleState } from "./fedos_deletion_request_lifecycle_state.js";
+import { safeStatusForFedosDeletionRequestLifecycle, type FedosDeletionRequestSafeStatus } from "./fedos_deletion_request_safe_status.js";
 
 export interface FedosDeletionAcknowledgementInboundDependencies {
   readonly requestStatePersistence: FedosDeletionRequestStatePersistence;

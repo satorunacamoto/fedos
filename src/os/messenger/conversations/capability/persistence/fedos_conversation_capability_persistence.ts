@@ -46,7 +46,7 @@ import {
   type FedosPersistedConversationCapabilityIssuedEventV1,
   type FedosPersistedConversationCapabilityRecordV1,
   type FedosPersistedConversationCapabilityRedeemedEventV1,
-} from "../../../../../conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
+} from "./fedos_persisted_conversation_capability_v1.js";
 
 /** Mirrors `FedosConversationPersistenceWriteResult` exactly (Alpha 749). */
 export type FedosConversationCapabilityPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";

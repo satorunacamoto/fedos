@@ -7,7 +7,7 @@
  * recorded execution outcome is itself a permanent, append-only fact).
  */
 
-import type { FedosPersistedDeletionExecutionRecordV1 } from "../../../../conversation/deletion/fedos_persisted_deletion_execution_record_v1.js";
+import type { FedosPersistedDeletionExecutionRecordV1 } from "./fedos_persisted_deletion_execution_record_v1.js";
 
 export type FedosDeletionExecutionPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

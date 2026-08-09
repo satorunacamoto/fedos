@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { KvEventCache, type KvLikeNamespace } from "../src/os/_legacy_prototype/cache/kv_event_cache.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 import type { CachedEventBatch } from "../src/os/_legacy_prototype/cache/types.js";
 
 function event(idChar: string): NostrEvent {

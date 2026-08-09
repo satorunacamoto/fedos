@@ -26,7 +26,7 @@ import encryptedPayloadSource from "../../../src/os/core/storage/encrypted_paylo
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import chatTypesSource from "../../../src/os/_legacy_prototype/chat/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import masterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_master_seed_authority.ts?raw";
+import masterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
 

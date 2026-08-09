@@ -21,10 +21,10 @@
  *   - Every count must be a non-negative integer.
  */
 
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
-import { computeFedosConversationArchiveContentHash } from "../../../../conversation/archive/fedos_conversation_archive_integrity.js";
-import type { FedosConversationArchiveManifestV1 } from "../../../../conversation/archive/fedos_conversation_archive_manifest.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../../../../conversation/archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
+import { computeFedosConversationArchiveContentHash } from "./fedos_conversation_archive_integrity.js";
+import type { FedosConversationArchiveManifestV1 } from "./fedos_conversation_archive_manifest.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "./fedos_conversation_archive_schema_version.js";
 
 /** The ONLY constructor for a `FedosConversationArchiveManifestV1` — every count/hash is derived from `bundle` itself, never caller-supplied. */
 export function buildFedosConversationArchiveManifest(bundle: FedosConversationArchiveBundleV1): FedosConversationArchiveManifestV1 {

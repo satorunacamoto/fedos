@@ -31,13 +31,13 @@ import {
   isWellFormedFedosDeviceSchnorrSignatureHex,
   verifyFedosDeviceSigningSignature,
   type FedosDeviceSigningKeypair,
-} from "../../../../device/crypto/fedos_device_signing_keypair.js";
+} from "../crypto/fedos_device_signing_keypair.js";
 import {
   isFedosDeviceTransferChallengeExpired,
   isWellFormedFedosDeviceTransferChallengeV1,
   serializeFedosDeviceTransferChallengeV1,
   type FedosDeviceTransferChallengeV1,
-} from "../../../../device/transfer/fedos_device_transfer_challenge.js";
+} from "./fedos_device_transfer_challenge.js";
 
 const PROOF_PREIMAGE_PREFIX = "fedos-device-transfer-proof-v1:";
 const APPROVAL_PREIMAGE_PREFIX = "fedos-device-transfer-approval-v1:";

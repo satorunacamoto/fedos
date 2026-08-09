@@ -12,14 +12,22 @@
  *
  * Never signs in TypeScript, never selects a Relay, never reads the
  * Outbox, never retries.
+ *
+ * Nostr Consolidation Plan Step 3/4 — this file used to import
+ * `FedosNostrWireEvent` from `../../../../../../desktop/fedos_nostr_wire_event.ts`,
+ * a logical backward dependency (this "protocol primitives" layer
+ * reaching UP into a desktop-composition-adjacent location for its own
+ * output type). It now imports `NostrEvent` from its own `../types.ts` —
+ * the SAME type, since Step 1 unified `NostrEvent`/`FedosNostrWireEvent`
+ * into one (see `protocol/types.ts`'s own header comment).
  */
 import type {
   FedosWasmLoaderNostrPublicIdentityExecution,
   FedosWasmLoaderNostrSignEventExecution,
 } from "../../../../../../runtime/fedos_wasm_loader.js";
 import { FedosWasmLoaderSkeleton } from "../../../../../../runtime/fedos_wasm_loader.js";
-import { FedosWasmMasterSeedAuthority } from "../../../../../../runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
+import { FedosWasmMasterSeedAuthority } from "../../../../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { NostrEvent } from "../types.js";
 import {
   freezeFedosNostrUnsignedEventRequest,
   isWellFormedFedosNostrUnsignedEventRequest,
@@ -53,11 +61,11 @@ export interface FedosNostrSigningWasmLoaderBoundary {
 /**
  * Parses a signed-event JSON string this Arc's own Rust
  * `serialize_signed_nostr_event_internal` produced into a deep-frozen
- * `FedosNostrWireEvent`. This is our OWN signing output (a trusted
+ * `NostrEvent`. This is our OWN signing output (a trusted
  * source, not untrusted network input) — still fails closed (`null`,
  * never throws) on any unexpected shape.
  */
-function parseSignedNostrWireEventJson(json: string): FedosNostrWireEvent | null {
+function parseSignedNostrWireEventJson(json: string): NostrEvent | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -105,7 +113,7 @@ export class FedosWasmNostrSigningAuthority implements FedosNostrSigningAuthorit
     this.#loaderBoundary = loaderBoundary ?? new FedosWasmLoaderSkeleton();
   }
 
-  async signEvent(request: FedosNostrUnsignedEventRequest): Promise<FedosNostrWireEvent | null> {
+  async signEvent(request: FedosNostrUnsignedEventRequest): Promise<NostrEvent | null> {
     if (!isWellFormedFedosNostrUnsignedEventRequest(request)) return null;
     const frozen = freezeFedosNostrUnsignedEventRequest(request);
 

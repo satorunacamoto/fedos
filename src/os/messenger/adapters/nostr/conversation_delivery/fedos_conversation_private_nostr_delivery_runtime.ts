@@ -31,7 +31,7 @@ import type { FedosGroupMessagePersistence } from "../../../conversations/group/
 import type { FedosGroupFanoutDeliveryPersistence } from "../../../conversations/group/fedos_group_fanout_delivery.js";
 import type { FedosGroupDirectPathPersistence } from "../../../conversations/group/fedos_group_direct_path.js";
 import type { FedosNostrSigningAuthority } from "../protocol/sign/fedos_nostr_signing_authority.js";
-import type { FedosValidatedNostrEvent } from "../../../../../desktop/fedos_validated_nostr_event.js";
+import type { FedosValidatedNostrEvent } from "../../../desktop/fedos_validated_nostr_event.js";
 import { FedosDeliveryObservationRepository } from "../../../board/observation/fedos_delivery_observation_repository.js";
 import type { FedosPrivateNostrDeliveryMode } from "./fedos_private_nostr_delivery_mode.js";
 import type { FedosPrivateNostrDeliveryRequestPersistence } from "./fedos_private_nostr_delivery_request.js";

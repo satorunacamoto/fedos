@@ -48,8 +48,8 @@
 
 import type { FedosConversationMessageEnvelope } from "../../../conversations/envelope/fedos_conversation_message_envelope.js";
 import type { FedosNostrUnsignedEventRequest } from "../protocol/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrWireEvent } from "../../../../../desktop/fedos_nostr_wire_event.js";
-import type { FedosEventDescriptor } from "../../../../../desktop/fedos_event_descriptor.js";
+import type { FedosNostrWireEvent } from "../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosEventDescriptor } from "../../../desktop/fedos_event_descriptor.js";
 import type { FedosPrivateWireRouteRequest } from "./fedos_private_wire_route.js";
 
 export interface FedosPrivateWireBuildInput {

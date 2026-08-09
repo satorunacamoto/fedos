@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardRuntime } from "../src/board/runtime/fedos_board_runtime.js";
-import type { FedosBoardRuntimeIdGenerator } from "../src/board/runtime/fedos_board_runtime_id_generator.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import type { FedosBoardSourceProtocol } from "../src/board/fedos_board_source.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardRuntime } from "../src/os/messenger/board/runtime/fedos_board_runtime.js";
+import type { FedosBoardRuntimeIdGenerator } from "../src/os/messenger/board/runtime/fedos_board_runtime_id_generator.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosBoardSourceProtocol } from "../src/os/messenger/board/fedos_board_source.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeSource from "../src/os/messenger/board/runtime/fedos_board_runtime.ts?raw";
 

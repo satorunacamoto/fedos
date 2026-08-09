@@ -12,8 +12,8 @@ import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosPersistedDeletionAcknowledgementRecordsAreEqual,
   type FedosPersistedDeletionAcknowledgementRecordV1,
-} from "../../../../conversation/deletion_request/fedos_persisted_deletion_acknowledgement_record_v1.js";
-import type { FedosDeletionAcknowledgementPersistence, FedosDeletionAcknowledgementPersistenceWriteResult } from "../../../../conversation/deletion_request/fedos_deletion_acknowledgement_persistence.js";
+} from "./fedos_persisted_deletion_acknowledgement_record_v1.js";
+import type { FedosDeletionAcknowledgementPersistence, FedosDeletionAcknowledgementPersistenceWriteResult } from "./fedos_deletion_acknowledgement_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

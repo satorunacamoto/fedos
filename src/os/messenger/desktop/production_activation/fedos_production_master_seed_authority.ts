@@ -35,11 +35,11 @@
  */
 
 import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../../../runtime/fedos_wasm_loader.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   toSealedMasterSeedEnvelopeV1,
   type FedosSealedMasterSeedEnvelopeV1,
-} from "../../../../runtime/master_seed/fedos_sealed_master_seed_envelope.js";
+} from "../../../core/vault/wasm/fedos_sealed_master_seed_envelope.js";
 import type { FedosProductionMasterSeedFacade, FedosProductionDirectRatchetSessionModule } from "./fedos_production_wasm_master_seed_facade.js";
 import type { FedosDirectRatchetSealingAuthority } from "../../conversations/ratchet/fedos_direct_ratchet_sealing_authority.js";
 

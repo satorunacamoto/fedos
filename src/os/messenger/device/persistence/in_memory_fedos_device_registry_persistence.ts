@@ -13,9 +13,9 @@ import {
   reconstructFedosDeviceBindingRecord,
   type FedosDeviceRegistryPersistence,
   type FedosDeviceRegistryPersistenceWriteResult,
-} from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosPersistedDeviceBindingEventV1 } from "../../../../device/persistence/fedos_persisted_device_binding_event_v1.js";
-import type { FedosDeviceBindingV1 } from "../../../../device/fedos_device_binding.js";
+} from "./fedos_device_registry_persistence.js";
+import type { FedosPersistedDeviceBindingEventV1 } from "./fedos_persisted_device_binding_event_v1.js";
+import type { FedosDeviceBindingV1 } from "../fedos_device_binding.js";
 
 export class InMemoryFedosDeviceRegistryPersistence implements FedosDeviceRegistryPersistence {
   readonly #events = new Map<string, FedosPersistedDeviceBindingEventV1>();

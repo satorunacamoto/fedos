@@ -12,23 +12,23 @@
  */
 
 import { vi } from "vitest";
-import { createFedosDeviceSyncRuntime, FedosDeviceSyncRuntime } from "../../src/device/runtime/fedos_device_sync_runtime.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../../src/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
-import type { FedosDeviceRegistryPersistence } from "../../src/device/persistence/fedos_device_registry_persistence.js";
-import { generateFedosDeviceSigningKeypair, type FedosDeviceSigningKeypair } from "../../src/device/crypto/fedos_device_signing_keypair.js";
-import { authorizeFedosDeviceBindingChallenge } from "../../src/device/binding_challenge/fedos_device_binding_account_authorization.js";
-import { createFedosDeviceBindingProofOfPossession } from "../../src/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import type { FedosDeviceBindingAccountRef } from "../../src/device/fedos_device_binding.js";
-import { createFedosDeviceTransferProof } from "../../src/device/transfer/fedos_device_transfer_proof.js";
-import { createFedosDeviceTransferCoordinator, FedosDeviceTransferCoordinator } from "../../src/device/transfer/fedos_device_transfer_coordinator.js";
-import { InMemoryFedosDeviceTransferSessionPersistence } from "../../src/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
-import { prepareFedosDeviceSyncSession, type FedosDeviceSyncSessionV1 } from "../../src/device/sync_session/fedos_device_sync_session.js";
+import { createFedosDeviceSyncRuntime, FedosDeviceSyncRuntime } from "../../src/os/messenger/device/runtime/fedos_device_sync_runtime.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../../src/os/messenger/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import type { FedosDeviceRegistryPersistence } from "../../src/os/messenger/device/persistence/fedos_device_registry_persistence.js";
+import { generateFedosDeviceSigningKeypair, type FedosDeviceSigningKeypair } from "../../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { authorizeFedosDeviceBindingChallenge } from "../../src/os/messenger/device/binding_challenge/fedos_device_binding_account_authorization.js";
+import { createFedosDeviceBindingProofOfPossession } from "../../src/os/messenger/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+import type { FedosDeviceBindingAccountRef } from "../../src/os/messenger/device/fedos_device_binding.js";
+import { createFedosDeviceTransferProof } from "../../src/os/messenger/device/transfer/fedos_device_transfer_proof.js";
+import { createFedosDeviceTransferCoordinator, FedosDeviceTransferCoordinator } from "../../src/os/messenger/device/transfer/fedos_device_transfer_coordinator.js";
+import { InMemoryFedosDeviceTransferSessionPersistence } from "../../src/os/messenger/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
+import { prepareFedosDeviceSyncSession, type FedosDeviceSyncSessionV1 } from "../../src/os/messenger/device/sync_session/fedos_device_sync_session.js";
 import {
   FedosWasmDeviceSyncPackageEncryptionAuthority,
   type FedosDeviceSyncPackageEncryptionRuntimeBoundary,
-} from "../../src/device/sync_package/fedos_device_sync_package_encryption.js";
-import type { FedosMasterSeedAuthority } from "../../src/runtime/master_seed/fedos_master_seed_authority.js";
+} from "../../src/os/messenger/device/sync_package/fedos_device_sync_package_encryption.js";
+import type { FedosMasterSeedAuthority } from "../../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../src/runtime/fedos_wasm_loader.js";
 import { RealFedosNostrSigningAuthority } from "./real_fedos_nostr_signing_authority.js";
 

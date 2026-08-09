@@ -12,9 +12,9 @@
  * an additive, parallel mechanism — see the reconciliation report — the
  * old Capability/Invitation Transport is untouched and unused here).
  */
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import { validateFedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference_validator.js";
-import type { FedosConversationInvitationAccountAuthorizationV1 } from "../../../../conversation/invitation_bootstrap/fedos_conversation_invitation_authentication.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import { validateFedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference_validator.js";
+import type { FedosConversationInvitationAccountAuthorizationV1 } from "./fedos_conversation_invitation_authentication.js";
 
 /** Distinct from every other signed-content domain in this codebase. */
 export const FEDOS_CONVERSATION_INVITATION_DOMAIN = "fedos-conversation-invitation-v1";

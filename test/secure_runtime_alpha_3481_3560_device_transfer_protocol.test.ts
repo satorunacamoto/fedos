@@ -5,23 +5,23 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { createFedosDeviceSyncRuntime, FedosDeviceSyncRuntime } from "../src/device/runtime/fedos_device_sync_runtime.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
-import { generateFedosDeviceSigningKeypair, type FedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { authorizeFedosDeviceBindingChallenge } from "../src/device/binding_challenge/fedos_device_binding_account_authorization.js";
-import { createFedosDeviceBindingProofOfPossession } from "../src/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import type { FedosDeviceRegistryPersistence } from "../src/device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
-import { createFedosDeviceTransferProof } from "../src/device/transfer/fedos_device_transfer_proof.js";
+import { createFedosDeviceSyncRuntime, FedosDeviceSyncRuntime } from "../src/os/messenger/device/runtime/fedos_device_sync_runtime.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
+import { generateFedosDeviceSigningKeypair, type FedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { authorizeFedosDeviceBindingChallenge } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_account_authorization.js";
+import { createFedosDeviceBindingProofOfPossession } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+import type { FedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
+import { createFedosDeviceTransferProof } from "../src/os/messenger/device/transfer/fedos_device_transfer_proof.js";
 import {
   createFedosDeviceTransferCoordinator,
   FedosDeviceTransferCoordinator,
-} from "../src/device/transfer/fedos_device_transfer_coordinator.js";
-import { InMemoryFedosDeviceTransferSessionPersistence } from "../src/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
-import { AppendOnlyFedosDeviceTransferSessionPersistence } from "../src/device/transfer/persistence/append_only_fedos_device_transfer_session_persistence.js";
+} from "../src/os/messenger/device/transfer/fedos_device_transfer_coordinator.js";
+import { InMemoryFedosDeviceTransferSessionPersistence } from "../src/os/messenger/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
+import { AppendOnlyFedosDeviceTransferSessionPersistence } from "../src/os/messenger/device/transfer/persistence/append_only_fedos_device_transfer_session_persistence.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
 const NOW = 1_800_000_000;

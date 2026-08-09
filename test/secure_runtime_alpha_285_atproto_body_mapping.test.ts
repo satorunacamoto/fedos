@@ -6,9 +6,9 @@ import adapterModuleSource from "../src/os/messenger/board/atproto/fedos_atproto
 import {
   mapValidatedAtprotoPostToBoardPostInput,
   validateAtprotoBoardPost,
-} from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+} from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 function codeOnly(source: string): string {
   return source

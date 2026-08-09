@@ -20,10 +20,10 @@
  * Relay delivery exactly as Alpha 3641–3720 already proves.
  */
 
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
 import type { FedosSyncState } from "../../../../sync/fedos_sync_state.js";
-import type { FedosDeviceSyncResourceLimits } from "../../../../device/sync_scheduler/fedos_device_sync_resource_limits.js";
+import type { FedosDeviceSyncResourceLimits } from "./fedos_device_sync_resource_limits.js";
 
 export interface FedosDeviceSyncTargetPlan {
   readonly targetDeviceId: string;

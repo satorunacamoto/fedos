@@ -28,14 +28,14 @@
  * Runtime, not the Authority).
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationRole } from "../../../../conversation/membership/fedos_conversation_role.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationMembership } from "./fedos_conversation_membership.js";
+import type { FedosConversationParticipantReference } from "./fedos_conversation_participant_reference.js";
+import type { FedosConversationRole } from "./fedos_conversation_role.js";
 import type {
   FedosConversationMembershipAdmissionPreview,
   FedosConversationMembershipMutationResult,
-} from "../../../../conversation/membership/fedos_conversation_membership_result.js";
+} from "./fedos_conversation_membership_result.js";
 
 export interface FedosConversationMembershipAuthority {
   /** Pure — never mutates. What `admit()` would do right now, without doing it. */

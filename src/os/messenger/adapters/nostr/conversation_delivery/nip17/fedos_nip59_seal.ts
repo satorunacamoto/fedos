@@ -13,10 +13,10 @@
  * this Arc's own Phase B addition) — NEVER this crate's own generic
  * Envelope AEAD.
  */
-import type { FedosNostrWireEvent } from "../../../../../../desktop/fedos_nostr_wire_event.js";
+import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
 import type { FedosNostrSigningAuthority, FedosNostrUnsignedEventRequest } from "../../protocol/sign/fedos_nostr_signing_authority.js";
 import { FEDOS_NIP59_SEAL_KIND } from "../../protocol/sign/fedos_nostr_signing_authority.js";
-import type { FedosMasterSeedAuthority } from "../../../../../../runtime/master_seed/fedos_master_seed_authority.js";
+import type { FedosMasterSeedAuthority } from "../../../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   buildFedosNip17ChatMessageRumor,
   parseFedosNip17RumorFromPlaintext,

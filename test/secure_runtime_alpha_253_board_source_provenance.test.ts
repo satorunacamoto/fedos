@@ -8,7 +8,7 @@ import {
   isFedosBoardSourceProtocol,
   fedosBoardSourceKey,
   type FedosBoardSourceReference,
-} from "../src/board/fedos_board_source.js";
+} from "../src/os/messenger/board/fedos_board_source.js";
 
 /**
  * Secure Runtime Alpha 253 -- "Board Source Provenance": Stage 3 of the

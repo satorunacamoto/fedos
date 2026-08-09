@@ -38,20 +38,20 @@
  *     `"already-removed"`, never an error.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
 import {
   fedosConversationArchiveCliPackageFileName,
   listFedosConversationArchiveCliDirectory,
   removeFedosConversationArchiveCliDirectoryEntry,
-} from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_directory.js";
+} from "../archive_cli/fedos_conversation_archive_cli_directory.js";
 import {
   fedosConversationArchiveCliNodeFileSystem,
   type FedosConversationArchiveCliFileSystem,
-} from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_file_system.js";
+} from "../archive_cli/fedos_conversation_archive_cli_file_system.js";
 import {
   isFedosDeletionArchiveSingleSegmentFileName,
   validateFedosDeletionArchiveDirectoryRoot,
-} from "../../../../conversation/deletion/fedos_deletion_archive_path_authority.js";
+} from "./fedos_deletion_archive_path_authority.js";
 
 export interface FedosDeletionArchiveFileHandle {
   readonly directoryPath: string;

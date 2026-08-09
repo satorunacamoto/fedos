@@ -70,7 +70,7 @@
  *   - Never includes plaintext, ciphertext, or key material.
  */
 
-import type { FedosConversationMessageEnvelope } from "../../../../conversation/envelope/fedos_conversation_message_envelope.js";
+import type { FedosConversationMessageEnvelope } from "./fedos_conversation_message_envelope.js";
 
 const SCHEMA_VERSION = 1;
 

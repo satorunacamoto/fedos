@@ -11,7 +11,7 @@ import {
   type FedosGroupGenerationPersistence,
   type FedosGroupGenerationPersistenceWriteResult,
   type FedosGroupGenerationRecord,
-} from "../../../../conversation/group/fedos_group_generation.js";
+} from "./fedos_group_generation.js";
 
 export class InMemoryFedosGroupGenerationPersistence implements FedosGroupGenerationPersistence {
   readonly #records = new Map<string, FedosGroupGenerationRecord>();

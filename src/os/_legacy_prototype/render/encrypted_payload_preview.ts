@@ -21,7 +21,7 @@
  * `FederationProvider`/Nostr relay connection of any kind.
  */
 
-import type { PayloadPreviewDescriptor } from "../../../storage/encrypted_payload.js";
+import type { PayloadPreviewDescriptor } from "../../core/storage/encrypted_payload.js";
 import { escapeHtml } from "./html.js";
 
 /** Fixed, honest note shown on every preview — never varies per descriptor. */

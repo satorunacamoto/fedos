@@ -21,8 +21,8 @@
  *   - Synchronous, matching `FedosBoardPersistence`'s own contract.
  */
 
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosPersistedConversationRecordV1 } from "../../../../conversation/persistence/fedos_persisted_conversation_record_v1.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosPersistedConversationRecordV1 } from "./fedos_persisted_conversation_record_v1.js";
 
 /**
  * Mirrors `FedosBoardPersistenceWriteResult` exactly (Alpha 315) — no

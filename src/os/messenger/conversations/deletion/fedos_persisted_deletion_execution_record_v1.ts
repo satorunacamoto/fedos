@@ -25,10 +25,10 @@
  *     own "no delete method" discipline.
  */
 
-import type { FedosDeletionTarget } from "../../../../conversation/deletion/fedos_deletion_target.js";
-import type { FedosDeletionOperation } from "../../../../conversation/deletion/fedos_deletion_operation.js";
-import type { FedosDeletionEvidence } from "../../../../conversation/deletion/fedos_deletion_evidence.js";
-import type { FedosDeletionNonGuaranteeCode } from "../../../../conversation/deletion/fedos_deletion_non_guarantees.js";
+import type { FedosDeletionTarget } from "./fedos_deletion_target.js";
+import type { FedosDeletionOperation } from "./fedos_deletion_operation.js";
+import type { FedosDeletionEvidence } from "./fedos_deletion_evidence.js";
+import type { FedosDeletionNonGuaranteeCode } from "./fedos_deletion_non_guarantees.js";
 
 export type FedosDeletionExecutionStepOutcome = "applied" | "already-applied" | "skipped" | "unsupported" | "failed";
 

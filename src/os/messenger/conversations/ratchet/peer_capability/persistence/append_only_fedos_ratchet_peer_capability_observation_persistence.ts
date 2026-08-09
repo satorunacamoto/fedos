@@ -13,19 +13,19 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import type { FedosDeviceBindingAccountRef } from "../../../../../../device/fedos_device_binding.js";
+import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
 import {
   decodeFedosRatchetPeerCapabilityObservationV1,
   encodeFedosRatchetPeerCapabilityObservationV1,
-} from "../../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_observation.js";
+} from "../fedos_ratchet_peer_capability_observation.js";
 import {
   fedosRatchetPeerCapabilityObservationKey,
   fedosRatchetPeerCapabilityObservationsAreEqual,
   fedosRatchetPeerCapabilityObservationSubjectKey,
   type FedosRatchetPeerCapabilityObservationPersistence,
   type FedosRatchetPeerCapabilityObservationWriteResult,
-} from "../../../../../../conversation/ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
-import type { FedosRatchetPeerCapabilityObservationV1 } from "../../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_observation.js";
+} from "./fedos_ratchet_peer_capability_observation_persistence.js";
+import type { FedosRatchetPeerCapabilityObservationV1 } from "../fedos_ratchet_peer_capability_observation.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

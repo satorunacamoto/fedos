@@ -11,7 +11,7 @@ import {
   renderPage,
 } from "../src/os/_legacy_prototype/render/html.js";
 import { buildThreads } from "../src/os/_legacy_prototype/thread/thread.js";
-import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
+import type { NostrEvent, NostrTag } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 import type { IngestedEvent } from "../src/os/_legacy_prototype/ingest/types.js";
 import type { ThreadBuildWarning } from "../src/os/_legacy_prototype/thread/types.js";
 

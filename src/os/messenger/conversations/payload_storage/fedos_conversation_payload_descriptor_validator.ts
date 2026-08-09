@@ -25,10 +25,10 @@
 import {
   FEDOS_BOARD_POST_MAX_CREATED_AT,
   FEDOS_BOARD_POST_MIN_CREATED_AT,
-} from "../../../../board/fedos_board_post_validator.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import { toFedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosConversationPayloadDescriptor } from "../../../../conversation/payload_storage/fedos_conversation_payload_descriptor.js";
+} from "../../board/fedos_board_post_validator.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import { toFedosConversationPayloadId } from "./fedos_conversation_payload_id.js";
+import type { FedosConversationPayloadDescriptor } from "./fedos_conversation_payload_descriptor.js";
 
 /** The typed candidate a caller builds before calling `validateFedosConversationPayloadDescriptor`. */
 export interface FedosConversationPayloadDescriptorInput {

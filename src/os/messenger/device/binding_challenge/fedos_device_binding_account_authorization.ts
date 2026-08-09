@@ -33,18 +33,28 @@
  * cryptographically-verified `event.pubkey` after signature verification
  * succeeds. A caller cannot claim to be a different account than the one
  * that actually produced the signature.
+ *
+ * Nostr Consolidation Plan, Step 2 extension (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`
+ * names only `invitation_bootstrap/` and `ratchet/peer_capability/` explicitly,
+ * but this file had the IDENTICAL `toMutableNostrEvent()`-back-to-`NostrEvent`
+ * pattern — same mechanical fix, same risk profile) — this file used to
+ * convert its own `FedosNostrWireEvent` BACK into a raw `NostrEvent` via a
+ * local `toMutableNostrEvent()` helper, just to satisfy
+ * `NobleSignatureVerifier.verify()`'s signature. Step 1 unified
+ * `NostrEvent`/`FedosNostrWireEvent` into one type, so that conversion is
+ * now unnecessary — `NobleSignatureVerifier.verify()` accepts the event
+ * directly.
  */
 
-import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
-import { NobleSignatureVerifier } from "../../../../nostr/noble_signature.js";
-import type { NostrEvent, NostrTag } from "../../../../nostr/types.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
+import { NobleSignatureVerifier } from "../../adapters/nostr/protocol/noble_signature.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import {
   FEDOS_DEVICE_BINDING_DOMAIN_V1,
   isWellFormedFedosDeviceBindingChallengeV1,
   serializeFedosDeviceBindingChallengeV1,
   type FedosDeviceBindingChallengeV1,
-} from "../../../../device/binding_challenge/fedos_device_binding_challenge.js";
+} from "./fedos_device_binding_challenge.js";
 
 /** Recognizable, non-authenticating marker tag — the actual security boundary is `domain` inside the signed `content`, not this tag. */
 export const FEDOS_DEVICE_BINDING_TAG: readonly [string, string] = ["t", "fedos-device-binding-v1"];
@@ -97,18 +107,6 @@ export interface FedosDeviceBindingAccountAuthorizationVerification {
   readonly accountPublicKeyHex: string | null;
 }
 
-function toMutableNostrEvent(event: FedosNostrWireEvent): NostrEvent {
-  return {
-    id: event.id,
-    pubkey: event.pubkey,
-    created_at: event.created_at,
-    kind: event.kind,
-    tags: event.tags.map((tag): NostrTag => [...tag]),
-    content: event.content,
-    sig: event.sig,
-  };
-}
-
 function tagsMatch(tags: readonly (readonly string[])[]): boolean {
   return tags.length === 1 && tags[0]!.length === FEDOS_DEVICE_BINDING_TAG.length && tags[0]!.every((field, i) => field === FEDOS_DEVICE_BINDING_TAG[i]);
 }
@@ -139,7 +137,7 @@ export async function verifyFedosDeviceBindingAccountAuthorization(
     return { outcome: "content-mismatch", accountPublicKeyHex: null };
   }
 
-  const verified = await NobleSignatureVerifier.verify(toMutableNostrEvent(event));
+  const verified = await NobleSignatureVerifier.verify(event);
   if (!verified) {
     return { outcome: "invalid-signature", accountPublicKeyHex: null };
   }

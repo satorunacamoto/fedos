@@ -13,8 +13,8 @@ import { exportCiphertext } from "../src/runtime/fedos_runtime_export_ciphertext
 import { importCiphertext } from "../src/runtime/fedos_runtime_import_ciphertext.js";
 import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtime/fedos_runtime_ciphertext_storage.js";
 import { FedosRuntimeIdentity } from "../src/runtime/fedos_runtime_identity.js";
-import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
-import { NostrIdentityProvider } from "../src/identity/fedos_nostr_identity_provider.js";
+import { resolveFedosIdentityProvider } from "../src/os/core/identity/fedos_identity_provider_resolver.js";
+import { NostrIdentityProvider } from "../src/os/core/identity/fedos_nostr_identity_provider.js";
 import type { AppRuntime, RuntimeMode } from "../src/os/_legacy_prototype/runtime/types.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

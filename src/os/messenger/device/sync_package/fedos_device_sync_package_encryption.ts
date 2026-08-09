@@ -59,20 +59,20 @@ import { encrypt as runtimeEncrypt } from "../../../../runtime/fedos_runtime_enc
 import { decrypt as runtimeDecrypt } from "../../../../runtime/fedos_runtime_decrypt.js";
 import { exportCiphertext as runtimeExportCiphertext } from "../../../../runtime/fedos_runtime_export_ciphertext.js";
 import { importCiphertext as runtimeImportCiphertext } from "../../../../runtime/fedos_runtime_import_ciphertext.js";
-import type { FedosMasterSeedAuthority } from "../../../../runtime/master_seed/fedos_master_seed_authority.js";
-import type { FedosDeviceSyncSessionV1 } from "../../../../device/sync_session/fedos_device_sync_session.js";
-import { deserializeFedosDeviceSyncSessionFromBytes, serializeFedosDeviceSyncSessionToBytes } from "../../../../device/sync_session/fedos_device_sync_session_codec.js";
+import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
+import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
+import { deserializeFedosDeviceSyncSessionFromBytes, serializeFedosDeviceSyncSessionToBytes } from "../sync_session/fedos_device_sync_session_codec.js";
 import {
   encodeFedosDeviceSyncPackageHeader,
   fedosDeviceSyncPackageHeaderBytesAreEqual,
   splitFedosDeviceSyncPackageHeader,
-} from "../../../../device/sync_package/fedos_device_sync_package_header.js";
+} from "./fedos_device_sync_package_header.js";
 import {
   buildFedosDeviceSyncPackageManifest,
   computeFedosDeviceSyncPackageContentHash,
   fedosDeviceSyncPackageContentHashesAreEqual,
-} from "../../../../device/sync_package/fedos_device_sync_package_manifest.js";
-import { FEDOS_DEVICE_SYNC_PACKAGE_FORMAT_VERSION, isWellFormedFedosDeviceSyncPackageV1, type FedosDeviceSyncPackageV1 } from "../../../../device/sync_package/fedos_device_sync_package.js";
+} from "./fedos_device_sync_package_manifest.js";
+import { FEDOS_DEVICE_SYNC_PACKAGE_FORMAT_VERSION, isWellFormedFedosDeviceSyncPackageV1, type FedosDeviceSyncPackageV1 } from "./fedos_device_sync_package.js";
 
 /** The ONE `AeadAadDomain` this Arc uses — the SAME domain the Archive already reuses (see this file's own header). No new domain variant is added. */
 const FEDOS_DEVICE_SYNC_PACKAGE_AAD_DOMAIN: AeadAadDomain = "Conversation";

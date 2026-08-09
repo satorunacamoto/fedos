@@ -40,12 +40,12 @@
  *                               available at all.
  */
 
-import type { FedosConversationMembership } from "../../../../conversation/membership/fedos_conversation_membership.js";
-import type { FedosConversationReadiness } from "../../../../conversation/readiness/fedos_conversation_readiness.js";
+import type { FedosConversationMembership } from "../membership/fedos_conversation_membership.js";
+import type { FedosConversationReadiness } from "../readiness/fedos_conversation_readiness.js";
 import type {
   FedosConversationDraftView,
   FedosPrivateConversationInitialCapabilityGrant,
-} from "../../../../conversation/construction/fedos_conversation_draft_view.js";
+} from "./fedos_conversation_draft_view.js";
 
 /** The pending fact a `"partial-construction"` is missing — a closed, coarse token, never raw detail. */
 export type FedosPrivateConversationPartialConstructionDetail = "creator-membership-pending" | "recipient-capability-pending";

@@ -16,12 +16,12 @@ import {
   describeFedosForwardSecrecyRoute,
   selectFedosDirectConversationForwardSecrecyRoute,
   type FedosForwardSecrecyUnavailableReason,
-} from "../src/conversation/ratchet/fedos_direct_conversation_forward_secrecy_route.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1 } from "../src/device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../src/device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
-import type { FedosDirectRatchetSessionRecordV1 } from "../src/conversation/ratchet/fedos_direct_ratchet_session_record.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_conversation_forward_secrecy_route.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosDeviceBindingAccountRef, FedosDeviceBindingV1 } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/fedos_direct_ratchet_session_persistence.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_record.js";
 
 const CONVERSATION = "conv-alpha" as FedosConversationId;
 const OTHER_CONVERSATION = "conv-beta" as FedosConversationId;

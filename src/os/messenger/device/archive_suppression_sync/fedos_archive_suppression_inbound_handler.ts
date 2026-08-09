@@ -29,22 +29,22 @@
  * `searchIndex` directly.
  */
 
-import type { FedosEventDescriptor } from "../../../../desktop/fedos_event_descriptor.js";
-import { NobleSignatureVerifier } from "../../../../nostr/noble_signature.js";
-import type { NostrEvent, NostrTag } from "../../../../nostr/types.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosEventDescriptor } from "../../desktop/fedos_event_descriptor.js";
+import { NobleSignatureVerifier } from "../../adapters/nostr/protocol/noble_signature.js";
+import type { NostrEvent, NostrTag } from "../../adapters/nostr/protocol/types.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import {
   isFedosArchiveSuppressionWirePayloadExpired,
   type FedosArchiveSuppressionWirePayloadV1,
-} from "../../../../device/archive_suppression_sync/fedos_archive_suppression_wire_payload.js";
-import { parseFedosArchiveSuppressionEventDescriptor } from "../../../../device/archive_suppression_sync/fedos_archive_suppression_event.js";
-import type { FedosArchiveSuppressionInboundDedupPersistence } from "../../../../device/archive_suppression_sync/persistence/fedos_archive_suppression_inbound_dedup_persistence.js";
-import { verifyFedosArchiveSuppressionFactDeviceEvidence } from "../../../../conversation/retention/fedos_archive_suppression_fact_signing.js";
+} from "./fedos_archive_suppression_wire_payload.js";
+import { parseFedosArchiveSuppressionEventDescriptor } from "./fedos_archive_suppression_event.js";
+import type { FedosArchiveSuppressionInboundDedupPersistence } from "./persistence/fedos_archive_suppression_inbound_dedup_persistence.js";
+import { verifyFedosArchiveSuppressionFactDeviceEvidence } from "../../conversations/retention/fedos_archive_suppression_fact_signing.js";
 import type {
   FedosArchiveSuppressionObservationAuthority,
   FedosArchiveSuppressionRecordOutcome,
-} from "../../../../conversation/retention/fedos_archive_suppression_observation_authority.js";
+} from "../../conversations/retention/fedos_archive_suppression_observation_authority.js";
 
 export type FedosArchiveSuppressionInboundOutcome =
   | "recorded"

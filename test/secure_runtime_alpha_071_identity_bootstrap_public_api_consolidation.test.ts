@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { FedosRuntimeIdentity } from "../src/runtime/fedos_runtime_identity.js";
-import { FedosIdentityService } from "../src/identity/fedos_identity_service.js";
-import { FedosIdentityRegistry } from "../src/identity/fedos_identity_registry.js";
-import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
+import { FedosIdentityService } from "../src/os/core/identity/fedos_identity_service.js";
+import { FedosIdentityRegistry } from "../src/os/core/identity/fedos_identity_registry.js";
+import { resolveFedosIdentityProvider } from "../src/os/core/identity/fedos_identity_provider_resolver.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_071_identity_bootstrap_public_api_consolidation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

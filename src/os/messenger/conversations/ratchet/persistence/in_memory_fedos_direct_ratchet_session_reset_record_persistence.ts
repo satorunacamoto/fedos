@@ -9,8 +9,8 @@ import {
   fedosDirectRatchetSessionResetRecordsAreEqual,
   type FedosDirectRatchetSessionResetRecordPersistence,
   type FedosDirectRatchetSessionResetRecordWriteResult,
-} from "../../../../../conversation/ratchet/persistence/fedos_direct_ratchet_session_reset_record_persistence.js";
-import type { FedosDirectRatchetSessionResetRecordV1 } from "../../../../../conversation/ratchet/fedos_direct_ratchet_session_reset_record.js";
+} from "./fedos_direct_ratchet_session_reset_record_persistence.js";
+import type { FedosDirectRatchetSessionResetRecordV1 } from "../fedos_direct_ratchet_session_reset_record.js";
 
 export class InMemoryFedosDirectRatchetSessionResetRecordPersistence implements FedosDirectRatchetSessionResetRecordPersistence {
   readonly #records = new Map<string, FedosDirectRatchetSessionResetRecordV1>();

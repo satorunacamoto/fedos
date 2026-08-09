@@ -46,11 +46,11 @@
  *   - This file defines a TYPE ONLY — no function, no class.
  */
 
-import type { FedosGroupGenerationRecord } from "../../../../conversation/group/fedos_group_generation.js";
-import type { FedosGroupDirectPathRecord } from "../../../../conversation/group/fedos_group_direct_path.js";
-import type { FedosGroupMessageRecord } from "../../../../conversation/group/fedos_group_message.js";
-import type { FedosGroupFanoutDeliveryRecord } from "../../../../conversation/group/fedos_group_fanout_delivery.js";
-import type { FedosConversationArchiveBundleV1 } from "../../../../conversation/archive/fedos_conversation_archive_bundle.js";
+import type { FedosGroupGenerationRecord } from "../group/fedos_group_generation.js";
+import type { FedosGroupDirectPathRecord } from "../group/fedos_group_direct_path.js";
+import type { FedosGroupMessageRecord } from "../group/fedos_group_message.js";
+import type { FedosGroupFanoutDeliveryRecord } from "../group/fedos_group_fanout_delivery.js";
+import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";
 
 export interface FedosConversationArchiveGroupSectionV1 {
   /** EVERY generation record for this Group (`listGenerations()`), not just the current one. */

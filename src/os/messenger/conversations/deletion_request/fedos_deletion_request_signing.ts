@@ -49,18 +49,18 @@
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import type { FedosNostrWireEvent } from "../../../../desktop/fedos_nostr_wire_event.js";
-import { validateInboundNostrEvent } from "../../../../desktop/combined_inbound_event_validator.js";
+import type { FedosNostrWireEvent } from "../../desktop/fedos_nostr_wire_event.js";
+import { validateInboundNostrEvent } from "../../desktop/combined_inbound_event_validator.js";
 import type {
   FedosNostrSigningAuthority,
   FedosNostrUnsignedEventRequest,
-} from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrSigningPublicIdentity } from "../../../../nostr/sign/fedos_nostr_signing_public_identity.js";
+} from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrSigningPublicIdentity } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_public_identity.js";
 import {
   canonicalizeFedosDeletionRequestRecordV1,
   canonicalBytesForFedosDeletionRequestRecordV1,
-} from "../../../../conversation/deletion_request/fedos_deletion_request_canonical_bytes.js";
-import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "../../../../conversation/deletion_request/fedos_deletion_request_record.js";
+} from "./fedos_deletion_request_canonical_bytes.js";
+import { isWellFormedFedosDeletionRequestRecordV1, type FedosDeletionRequestRecordV1 } from "./fedos_deletion_request_record.js";
 
 const DELETION_REQUEST_NOSTR_KIND = 1;
 

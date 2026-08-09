@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   validateFedosConversationPolicy,
   FEDOS_CONVERSATION_POLICY_PUBLIC_V1,
-} from "../src/board/runtime/policy/fedos_conversation_policy.js";
+} from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy.js";
 
 /**
  * Secure Runtime Alpha 657 ("Policy Validation") — Stage 7 of the Alpha

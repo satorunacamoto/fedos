@@ -9,13 +9,13 @@
 import {
   fedosDirectRatchetSessionBindingsEqual,
   type FedosDirectRatchetSessionBinding,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_binding.js";
+} from "./fedos_direct_ratchet_session_binding.js";
 import {
   FEDOS_DIRECT_RATCHET_SESSION_LIFECYCLE_STATES,
   type FedosDirectRatchetSessionLifecycleState,
-} from "../../../../conversation/ratchet/fedos_direct_ratchet_session_lifecycle.js";
-import { isWellFormedFedosDirectRatchetCounters, type FedosDirectRatchetCounters } from "../../../../conversation/ratchet/fedos_direct_ratchet_counters.js";
-import type { FedosDirectRatchetSkippedKeyReference } from "../../../../conversation/ratchet/fedos_direct_ratchet_skipped_key_index.js";
+} from "./fedos_direct_ratchet_session_lifecycle.js";
+import { isWellFormedFedosDirectRatchetCounters, type FedosDirectRatchetCounters } from "./fedos_direct_ratchet_counters.js";
+import type { FedosDirectRatchetSkippedKeyReference } from "./fedos_direct_ratchet_skipped_key_index.js";
 
 export interface FedosDirectRatchetSessionRecordV1 {
   readonly schemaVersion: 1;

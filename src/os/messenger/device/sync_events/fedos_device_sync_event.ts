@@ -17,7 +17,7 @@
  * never a key, never a secret.
  */
 
-import type { FedosDeviceSyncAttemptOutcomeCode } from "../../../../device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import type { FedosDeviceSyncAttemptOutcomeCode } from "../sync_scheduler/fedos_device_sync_retry_policy.js";
 
 export type FedosDeviceSyncEventKind =
   | "sync-started"

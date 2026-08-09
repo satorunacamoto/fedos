@@ -28,7 +28,7 @@
  */
 
 import type { FedosBoardAuthorReference } from "../../fedos_board_author.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import type {
   FedosNostrAuthorBindingAuthority,
   FedosNostrAuthorBindingResult,

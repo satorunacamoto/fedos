@@ -10,8 +10,8 @@
  * 5401–5480/`f80889d`), reusing THAT Arc's own nonce/replay/audit
  * foundation rather than building a second one.
  */
-import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_outcome.js";
-import type { FedosRatchetPeerLifecycleFact } from "../../../../../conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
+import type { FedosRatchetPeerCapabilityAcceptanceOutcome } from "./fedos_ratchet_peer_capability_acceptance_outcome.js";
+import type { FedosRatchetPeerLifecycleFact } from "./fedos_ratchet_peer_lifecycle_notification.js";
 
 export type FedosRatchetPeerSessionActionRecommendation =
   | "none"

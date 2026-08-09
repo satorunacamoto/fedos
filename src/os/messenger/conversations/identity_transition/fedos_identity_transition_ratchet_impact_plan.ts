@@ -11,7 +11,7 @@
  * Identity Transition Peer Notification and Ratchet Reset Integration
  * Arc") would need to apply — it never applies anything itself.
  */
-import type { FedosIdentityTransitionAcceptanceState } from "../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
+import type { FedosIdentityTransitionAcceptanceState } from "./fedos_identity_transition_acceptance_state.js";
 
 export interface FedosIdentityTransitionRatchetImpactPlanV1 {
   readonly schemaVersion: 1;

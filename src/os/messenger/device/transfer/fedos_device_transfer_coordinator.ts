@@ -35,12 +35,12 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosDeviceSigningKeypair } from "../../../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosDeviceSigningKeypair } from "../crypto/fedos_device_signing_keypair.js";
 import type { AeadAlgorithm } from "../../../../runtime/fedos_wasm_loader.js";
-import type { FedosDeviceSyncSessionV1 } from "../../../../device/sync_session/fedos_device_sync_session.js";
-import type { FedosDeviceSyncPackageEncryptionAuthority } from "../../../../device/sync_package/fedos_device_sync_package_encryption.js";
+import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
+import type { FedosDeviceSyncPackageEncryptionAuthority } from "../sync_package/fedos_device_sync_package_encryption.js";
 import {
   FEDOS_DEVICE_TRANSFER_DOMAIN_V1,
   FedosSecureRandomDeviceTransferChallengeNonceGenerator,
@@ -48,22 +48,22 @@ import {
   serializeFedosDeviceTransferChallengeV1,
   type FedosDeviceTransferChallengeNonceGenerator,
   type FedosDeviceTransferChallengeV1,
-} from "../../../../device/transfer/fedos_device_transfer_challenge.js";
+} from "./fedos_device_transfer_challenge.js";
 import {
   createFedosDeviceTransferApproval,
   verifyFedosDeviceTransferApproval,
   verifyFedosDeviceTransferProof,
   type FedosDeviceTransferApprovalV1,
   type FedosDeviceTransferProofV1,
-} from "../../../../device/transfer/fedos_device_transfer_proof.js";
+} from "./fedos_device_transfer_proof.js";
 import {
   isFedosDeviceTransferInvitationExpired,
   isWellFormedFedosDeviceTransferInvitationV1,
   type FedosDeviceTransferInvitationV1,
-} from "../../../../device/transfer/fedos_device_transfer_invitation.js";
-import { isFedosDeviceTransferSessionTerminal, type FedosDeviceTransferSessionV1 } from "../../../../device/transfer/fedos_device_transfer_session.js";
-import { isWellFormedFedosDeviceTransferPackageV1, type FedosDeviceTransferPackageV1 } from "../../../../device/transfer/fedos_device_transfer_package.js";
-import type { FedosDeviceTransferSessionPersistence } from "../../../../device/transfer/persistence/fedos_device_transfer_session_persistence.js";
+} from "./fedos_device_transfer_invitation.js";
+import { isFedosDeviceTransferSessionTerminal, type FedosDeviceTransferSessionV1 } from "./fedos_device_transfer_session.js";
+import { isWellFormedFedosDeviceTransferPackageV1, type FedosDeviceTransferPackageV1 } from "./fedos_device_transfer_package.js";
+import type { FedosDeviceTransferSessionPersistence } from "./persistence/fedos_device_transfer_session_persistence.js";
 
 export interface FedosDeviceTransferCoordinatorLimits {
   readonly invitationTtlSeconds: number;

@@ -50,7 +50,7 @@ import { deserializeFedosBoardOutboxIntent } from "../../outbox/fedos_board_outb
 import type { FedosPersistedBoardOutboxRecordV1 } from "../../outbox/fedos_board_outbox_codec.js";
 import type { FedosNostrBoardPublisherAdapterEventSource } from "./fedos_nostr_board_publisher_adapter.js";
 import type { FedosBoardReader } from "../../repository/fedos_board_reader.js";
-import type { FedosNostrSigningAuthority } from "../../../../../nostr/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrSigningAuthority } from "../../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import { boardPostToNostrUnsignedEventRequest } from "./fedos_board_post_to_nostr_unsigned_event.js";
 
 export class FedosSigningAuthorityBoardPostEventSource {

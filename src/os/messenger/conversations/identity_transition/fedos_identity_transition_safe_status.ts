@@ -11,9 +11,9 @@
  * No private keys, no raw signature bytes, no filesystem paths, no
  * Ratchet secrets ever appear here.
  */
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosIdentityTransitionAcceptanceState } from "../../../../conversation/identity_transition/fedos_identity_transition_acceptance_state.js";
-import type { FedosIdentityTransitionEvidenceOutcome } from "../../../../conversation/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosIdentityTransitionAcceptanceState } from "./fedos_identity_transition_acceptance_state.js";
+import type { FedosIdentityTransitionEvidenceOutcome } from "./fedos_identity_transition_evidence_evaluation.js";
 
 export interface FedosIdentityTransitionSafeStatusV1 {
   readonly schemaVersion: 1;

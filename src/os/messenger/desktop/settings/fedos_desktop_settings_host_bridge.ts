@@ -26,7 +26,7 @@
  */
 
 import type { FedosDesktopSettingsController } from "./fedos_desktop_settings_controller.js";
-import type { FedosSettingsResult } from "../../../../settings/fedos_settings_authority.js";
+import type { FedosSettingsResult } from "../../../core/settings/fedos_settings_authority.js";
 import {
   fedosHostOk,
   fedosHostFailure,

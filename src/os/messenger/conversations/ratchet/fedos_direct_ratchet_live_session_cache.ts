@@ -16,8 +16,8 @@
  *   - `clear()`/`drop()` never touch durable state — only the Foundation
  *     Runtime's own `sealAndPersistSecret`/checkpoint helpers do that.
  */
-import type { FedosDirectRatchetCryptographicSession } from "../../../../conversation/ratchet/fedos_direct_ratchet_cryptographic_session.js";
-import type { FedosDirectRatchetSessionId } from "../../../../conversation/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetCryptographicSession } from "./fedos_direct_ratchet_cryptographic_session.js";
+import type { FedosDirectRatchetSessionId } from "./fedos_direct_ratchet_session_id.js";
 
 export class FedosDirectRatchetLiveSessionCache {
   readonly #sessions = new Map<string, FedosDirectRatchetCryptographicSession>();

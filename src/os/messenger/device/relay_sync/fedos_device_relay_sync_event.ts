@@ -50,12 +50,12 @@
  *     account identity or a structural marker.
  */
 
-import type { FedosNostrUnsignedEventRequest } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosEventDescriptor } from "../../../../desktop/fedos_event_descriptor.js";
+import type { FedosNostrUnsignedEventRequest } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosEventDescriptor } from "../../desktop/fedos_event_descriptor.js";
 import {
   isWellFormedFedosDeviceRelaySyncWirePayloadV1,
   type FedosDeviceRelaySyncWirePayloadV1,
-} from "../../../../device/relay_sync/fedos_device_relay_sync_wire_payload.js";
+} from "./fedos_device_relay_sync_wire_payload.js";
 
 /** Recognizable, non-authenticating marker tag — the actual route-identity boundary is `routeVersion` inside the signed content, not this tag. Distinct from `FEDOS_DEVICE_BINDING_TAG`/`["fedos-private","1"]`. */
 export const FEDOS_DEVICE_RELAY_SYNC_TAG: readonly [string, string] = ["fedos-device-sync", "1"];

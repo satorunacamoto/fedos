@@ -16,7 +16,7 @@ import type {
   FedosPersistedDeviceTransferInvitedEventV1,
   FedosPersistedDeviceTransferPackageSentEventV1,
   FedosPersistedDeviceTransferVerifiedEventV1,
-} from "../../../../../device/transfer/persistence/fedos_persisted_device_transfer_event_v1.js";
+} from "./fedos_persisted_device_transfer_event_v1.js";
 
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,256}$/;
 const NONCE_HEX_PATTERN = /^[0-9a-f]{32,64}$/;

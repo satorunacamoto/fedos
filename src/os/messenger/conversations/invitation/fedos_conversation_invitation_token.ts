@@ -28,8 +28,8 @@
  *     bearer secret it holds.
  */
 
-import type { FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationCapabilityBearerSecret } from "../../../../conversation/capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationCapabilityId } from "../capability/fedos_conversation_capability_id.js";
+import type { FedosConversationCapabilityBearerSecret } from "../capability/fedos_conversation_capability_bearer_secret.js";
 
 /** The recipient-facing redeemable pair — a public id plus the one-time bearer secret. Never a new secret; see this file's own header. */
 export interface FedosConversationInvitationToken {

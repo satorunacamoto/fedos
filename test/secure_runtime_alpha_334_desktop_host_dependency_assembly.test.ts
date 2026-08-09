@@ -6,10 +6,10 @@ import factorySource from "../src/os/messenger/desktop/host/create_fedos_desktop
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
 
 function codeOnly(source: string): string {
   return source

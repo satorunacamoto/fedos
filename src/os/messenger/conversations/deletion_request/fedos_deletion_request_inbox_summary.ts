@@ -16,9 +16,9 @@
  * path, no message plaintext (the target's own body is never read by this
  * domain at all).
  */
-import { isFedosDeletionRequestScope, type FedosDeletionRequestScope } from "../../../../conversation/deletion_request/fedos_deletion_request_scope.js";
-import { isFedosDeletionRequestReasonCode, type FedosDeletionRequestReasonCode } from "../../../../conversation/deletion_request/fedos_deletion_request_reason_code.js";
-import { isFedosDeletionRequestId } from "../../../../conversation/deletion_request/fedos_deletion_request_id.js";
+import { isFedosDeletionRequestScope, type FedosDeletionRequestScope } from "./fedos_deletion_request_scope.js";
+import { isFedosDeletionRequestReasonCode, type FedosDeletionRequestReasonCode } from "./fedos_deletion_request_reason_code.js";
+import { isFedosDeletionRequestId } from "./fedos_deletion_request_id.js";
 
 export interface FedosDeletionRequestInboxSummaryV1 {
   readonly schemaVersion: 1;

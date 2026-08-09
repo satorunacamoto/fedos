@@ -37,22 +37,22 @@
  *     (Alpha 782's "never reveal an almost-correct secret" preserved).
  */
 
-import type { FedosBoardRuntimeClock } from "../../../../board/runtime/fedos_board_runtime_clock.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationCapabilityDescriptor } from "../../../../conversation/capability/fedos_conversation_capability_descriptor.js";
-import type { FedosConversationCapabilityId } from "../../../../conversation/capability/fedos_conversation_capability_id.js";
-import type { FedosConversationCapabilityIssuerAuthority } from "../../../../conversation/capability/fedos_conversation_capability_issuer_authority.js";
-import type { FedosConversationCapabilityRedemptionAuthority } from "../../../../conversation/capability/fedos_conversation_capability_redemption_authority.js";
-import { toFedosConversationInvitationToken, type FedosConversationInvitationToken } from "../../../../conversation/invitation/fedos_conversation_invitation_token.js";
+import type { FedosBoardRuntimeClock } from "../../board/runtime/fedos_board_runtime_clock.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationCapabilityDescriptor } from "../capability/fedos_conversation_capability_descriptor.js";
+import type { FedosConversationCapabilityId } from "../capability/fedos_conversation_capability_id.js";
+import type { FedosConversationCapabilityIssuerAuthority } from "../capability/fedos_conversation_capability_issuer_authority.js";
+import type { FedosConversationCapabilityRedemptionAuthority } from "../capability/fedos_conversation_capability_redemption_authority.js";
+import { toFedosConversationInvitationToken, type FedosConversationInvitationToken } from "./fedos_conversation_invitation_token.js";
 import type {
   FedosConversationInvitationCreationResult,
   FedosConversationInvitationRedemptionResult,
   FedosConversationInvitationRevocationResult,
   FedosConversationInvitationSummary,
-} from "../../../../conversation/invitation/fedos_conversation_invitation_result.js";
-import type { FedosConversationInvitationRevocationRegistry } from "../../../../conversation/invitation/fedos_conversation_invitation_revocation_registry.js";
-import type { FedosPersistedConversationInvitationRevocationV1 } from "../../../../conversation/invitation/fedos_persisted_conversation_invitation_revocation_v1.js";
+} from "./fedos_conversation_invitation_result.js";
+import type { FedosConversationInvitationRevocationRegistry } from "./fedos_conversation_invitation_revocation_registry.js";
+import type { FedosPersistedConversationInvitationRevocationV1 } from "./fedos_persisted_conversation_invitation_revocation_v1.js";
 
 /**
  * Caller preferences for a new invitation — NEVER an id/secret/current-use

@@ -4,12 +4,12 @@
  * In-Memory Recipient Decision State Persistence.
  */
 
-import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_recipient_decision_record_v1.js";
+import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "./fedos_persisted_deletion_recipient_decision_record_v1.js";
 import {
   evaluateFedosDeletionRecipientDecisionWrite,
   type FedosDeletionRecipientDecisionPersistence,
   type FedosDeletionRecipientDecisionPersistenceWriteResult,
-} from "../../../../conversation/deletion_request/fedos_deletion_recipient_decision_persistence.js";
+} from "./fedos_deletion_recipient_decision_persistence.js";
 
 export class InMemoryFedosDeletionRecipientDecisionPersistence implements FedosDeletionRecipientDecisionPersistence {
   readonly #latestByRequestId = new Map<string, FedosPersistedDeletionRecipientDecisionRecordV1>();

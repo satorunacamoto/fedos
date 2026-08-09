@@ -17,12 +17,12 @@
  * into one confirmation prompt.
  */
 
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosDeletionTarget } from "../../../../conversation/deletion/fedos_deletion_target.js";
-import type { FedosDeletionOperation } from "../../../../conversation/deletion/fedos_deletion_operation.js";
-import type { FedosDeletionAssessment, FedosDeletionArchiveFileAssessmentInput } from "../../../../conversation/deletion/fedos_deletion_assessment.js";
-import { assessFedosLocalArchiveFileDeletion } from "../../../../conversation/deletion/fedos_deletion_assessment.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosDeletionTarget } from "./fedos_deletion_target.js";
+import type { FedosDeletionOperation } from "./fedos_deletion_operation.js";
+import type { FedosDeletionAssessment, FedosDeletionArchiveFileAssessmentInput } from "./fedos_deletion_assessment.js";
+import { assessFedosLocalArchiveFileDeletion } from "./fedos_deletion_assessment.js";
 
 export type FedosDeletionPlanStepKind = "retention-transition" | "purge-index" | "remove-archive-file" | "revoke-access";
 

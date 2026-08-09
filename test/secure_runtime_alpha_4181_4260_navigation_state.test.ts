@@ -10,7 +10,7 @@ import {
   fedosNavigationOpenFailed,
   fedosNavigationOpening,
   fedosNavigationStateConversationId,
-} from "../src/desktop/navigation/fedos_desktop_conversation_navigation_state.js";
+} from "../src/os/messenger/desktop/navigation/fedos_desktop_conversation_navigation_state.js";
 
 describe("Alpha 4181-4260 -- Navigation State: closed vocabulary", () => {
   it("empty carries no conversation id", () => {

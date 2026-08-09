@@ -5,8 +5,8 @@
  * own port shape exactly — a DELIBERATELY SEPARATE port, never merged
  * into any existing Ratchet/Device/Peer-Capability persistence port.
  */
-import { fedosIdentityTransitionFactKey, fedosIdentityTransitionFactsAreEqual, fedosIdentityTransitionLineageKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../../../../../conversation/identity_transition/fedos_identity_transition_fact.js";
-import type { FedosIdentityTransitionFactWriteOutcome } from "../../../../../conversation/identity_transition/fedos_identity_transition_fact_conflict_detection.js";
+import { fedosIdentityTransitionFactKey, fedosIdentityTransitionFactsAreEqual, fedosIdentityTransitionLineageKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../fedos_identity_transition_fact.js";
+import type { FedosIdentityTransitionFactWriteOutcome } from "../fedos_identity_transition_fact_conflict_detection.js";
 
 export interface FedosIdentityTransitionFactPersistence {
   putFact(fact: FedosIdentityTransitionFactV1): FedosIdentityTransitionFactWriteOutcome;

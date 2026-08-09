@@ -31,32 +31,32 @@
  *     failed while at least one other succeeded.
  */
 
-import type { FedosConversationPayloadId } from "../../../../conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosConversationId } from "../../../../conversation/fedos_conversation_id.js";
-import type { FedosPayloadRetentionAuthority, FedosPayloadRetentionResult } from "../../../../conversation/retention/fedos_payload_retention_authority.js";
-import type { FedosPayloadRetentionReasonCode } from "../../../../conversation/retention/fedos_payload_retention_decision.js";
-import type { FedosConversationSearchIndex } from "../../../../conversation/search/fedos_conversation_search_index.js";
+import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
+import type { FedosConversationId } from "../fedos_conversation_id.js";
+import type { FedosPayloadRetentionAuthority, FedosPayloadRetentionResult } from "../retention/fedos_payload_retention_authority.js";
+import type { FedosPayloadRetentionReasonCode } from "../retention/fedos_payload_retention_decision.js";
+import type { FedosConversationSearchIndex } from "../search/fedos_conversation_search_index.js";
 import type { FedosSyncDeviceRegistry } from "../../../../sync/fedos_sync_device_registry.js";
-import type { FedosConversationMembershipAuthority } from "../../../../conversation/membership/fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../../../../conversation/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 import {
   removeFedosDeletionArchiveFile,
   resolveFedosDeletionArchiveFileHandle,
   type FedosDeletionArchiveFileHandle,
-} from "../../../../conversation/deletion/fedos_deletion_archive_file_authority.js";
+} from "./fedos_deletion_archive_file_authority.js";
 import {
   fedosConversationArchiveCliNodeFileSystem,
   type FedosConversationArchiveCliFileSystem,
-} from "../../../../conversation/archive_cli/fedos_conversation_archive_cli_file_system.js";
-import type { FedosDeletionPlan } from "../../../../conversation/deletion/fedos_deletion_plan.js";
-import type { FedosDeletionExecutionPersistence } from "../../../../conversation/deletion/fedos_deletion_execution_persistence.js";
+} from "../archive_cli/fedos_conversation_archive_cli_file_system.js";
+import type { FedosDeletionPlan } from "./fedos_deletion_plan.js";
+import type { FedosDeletionExecutionPersistence } from "./fedos_deletion_execution_persistence.js";
 import type {
   FedosDeletionExecutionStepOutcome,
   FedosDeletionExecutionTerminalStatus,
   FedosPersistedDeletionExecutionRecordV1,
   FedosPersistedDeletionExecutionStepV1,
-} from "../../../../conversation/deletion/fedos_persisted_deletion_execution_record_v1.js";
-import { fedosDeletionApplicableNonGuarantees } from "../../../../conversation/deletion/fedos_deletion_non_guarantees.js";
+} from "./fedos_persisted_deletion_execution_record_v1.js";
+import { fedosDeletionApplicableNonGuarantees } from "./fedos_deletion_non_guarantees.js";
 
 function defaultClock(): number {
   return Math.floor(Date.now() / 1000);

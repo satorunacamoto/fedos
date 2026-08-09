@@ -27,13 +27,13 @@
  *      auto-`"locally-acceptable"`) or an explicit manual-verification
  *      fact can move it further.
  */
-import { isFedosIdentityTransitionCompromiseReason } from "../../../../conversation/identity_transition/fedos_identity_transition_vocabulary.js";
+import { isFedosIdentityTransitionCompromiseReason } from "./fedos_identity_transition_vocabulary.js";
 import type {
   FedosIdentityTransitionEvidenceStatus,
   FedosIdentityTransitionReasonCategory,
   FedosIdentityTransitionType,
-} from "../../../../conversation/identity_transition/fedos_identity_transition_vocabulary.js";
-import type { FedosIdentityTransitionTimestampCheck } from "../../../../conversation/identity_transition/fedos_identity_transition_record.js";
+} from "./fedos_identity_transition_vocabulary.js";
+import type { FedosIdentityTransitionTimestampCheck } from "./fedos_identity_transition_record.js";
 
 export type FedosIdentityTransitionEvidenceOutcome =
   | "invalid"

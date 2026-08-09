@@ -15,7 +15,7 @@
  *   - Synchronous, matching every other port in this codebase.
  */
 
-import type { FedosPersistedArchiveSuppressionObservationV1 } from "../../../../conversation/retention/fedos_persisted_archive_suppression_observation_v1.js";
+import type { FedosPersistedArchiveSuppressionObservationV1 } from "./fedos_persisted_archive_suppression_observation_v1.js";
 
 export type FedosArchiveSuppressionObservationPersistenceWriteResult = "inserted" | "already-present" | "conflict" | "failed";
 

@@ -10,7 +10,7 @@
  * HTML-special characters to prove the render layer escapes message content.
  */
 
-import type { NostrEvent } from "../../../nostr/types.js";
+import type { NostrEvent } from "../../messenger/adapters/nostr/protocol/types.js";
 import type { ChatMessage, ChatRoom } from "./types.js";
 
 const ALICE = "a".repeat(64);

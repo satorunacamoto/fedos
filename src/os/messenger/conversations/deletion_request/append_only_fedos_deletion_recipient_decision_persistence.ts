@@ -9,12 +9,12 @@
 
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
-import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_recipient_decision_record_v1.js";
+import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "./fedos_persisted_deletion_recipient_decision_record_v1.js";
 import {
   evaluateFedosDeletionRecipientDecisionWrite,
   type FedosDeletionRecipientDecisionPersistence,
   type FedosDeletionRecipientDecisionPersistenceWriteResult,
-} from "../../../../conversation/deletion_request/fedos_deletion_recipient_decision_persistence.js";
+} from "./fedos_deletion_recipient_decision_persistence.js";
 
 function isEnoent(err: unknown): boolean {
   return err !== null && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ENOENT";

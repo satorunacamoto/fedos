@@ -37,17 +37,17 @@
  * invents.
  */
 
-import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
-import type { FedosDeviceRegistryPersistence } from "../../../../device/persistence/fedos_device_registry_persistence.js";
-import type { FedosNostrSigningAuthority } from "../../../../nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosArchiveSuppressionFact } from "../../../../conversation/retention/fedos_archive_suppression_fact.js";
-import type { FedosArchiveSuppressionFactDeviceEvidenceV1 } from "../../../../conversation/retention/fedos_archive_suppression_fact_signing.js";
-import { buildFedosArchiveSuppressionWirePayload } from "../../../../device/archive_suppression_sync/fedos_archive_suppression_wire_payload.js";
-import { buildFedosArchiveSuppressionUnsignedEventRequest } from "../../../../device/archive_suppression_sync/fedos_archive_suppression_event.js";
-import { FedosDeviceRelaySyncPublisher, type FedosDeviceRelaySyncPublishOutcome } from "../../../../device/relay_sync/fedos_device_relay_sync_publisher.js";
-import type { FedosConversationRelaySet } from "../../../../conversation/transport/relay/fedos_conversation_relay_set.js";
-import type { FedosDeliveryObservationRepository } from "../../../../board/observation/fedos_delivery_observation_repository.js";
-import { toFedosDeliveryObservationSubjectId } from "../../../../board/observation/fedos_delivery_observation.js";
+import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
+import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosArchiveSuppressionFact } from "../../conversations/retention/fedos_archive_suppression_fact.js";
+import type { FedosArchiveSuppressionFactDeviceEvidenceV1 } from "../../conversations/retention/fedos_archive_suppression_fact_signing.js";
+import { buildFedosArchiveSuppressionWirePayload } from "./fedos_archive_suppression_wire_payload.js";
+import { buildFedosArchiveSuppressionUnsignedEventRequest } from "./fedos_archive_suppression_event.js";
+import { FedosDeviceRelaySyncPublisher, type FedosDeviceRelaySyncPublishOutcome } from "../relay_sync/fedos_device_relay_sync_publisher.js";
+import type { FedosConversationRelaySet } from "../../adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import type { FedosDeliveryObservationRepository } from "../../board/observation/fedos_delivery_observation_repository.js";
+import { toFedosDeliveryObservationSubjectId } from "../../board/observation/fedos_delivery_observation.js";
 import { randomBytes as nobleRandomBytes, bytesToHex } from "@noble/hashes/utils.js";
 
 const DEFAULT_TTL_SECONDS = 86_400; // 24h -- generous enough for a genuinely offline target Device (Phase B's own "offline Device" handling).

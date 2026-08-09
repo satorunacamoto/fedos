@@ -16,8 +16,8 @@
  * codebase supplies them.
  */
 
-import type { FedosDeletionRequestLifecycleState } from "../../../../conversation/deletion_request/fedos_deletion_request_lifecycle_state.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../../../../conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+import type { FedosDeletionRequestLifecycleState } from "./fedos_deletion_request_lifecycle_state.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "./fedos_persisted_deletion_request_state_record_v1.js";
 
 /** PROPOSED (review Doc 10) — 8 attempts, 1h/2h/4h/8h/16h/24h/24h/24h backoff (hours, converted to seconds below). */
 export const FEDOS_DELETION_REQUEST_MAX_RETRY_ATTEMPTS = 8;
