@@ -3,7 +3,7 @@ import { buildCloseMessage, buildReqMessage } from "../src/desktop/subscription_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_225_close_generation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import messagesSource from "../src/desktop/subscription_messages.ts?raw";
+import messagesSource from "../src/os/messenger/desktop/subscription_messages.ts?raw";
 
 /**
  * Secure Runtime Alpha 225 -- "CLOSE Generation": Stage 5 of the Nostr

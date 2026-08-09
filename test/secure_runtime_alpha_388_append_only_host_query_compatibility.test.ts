@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_388_append_only_host_query_compatibility.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import factorySource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
+import factorySource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.

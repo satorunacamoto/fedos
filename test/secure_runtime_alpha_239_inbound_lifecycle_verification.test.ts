@@ -4,7 +4,7 @@ import type { FedosRelaySocket, FedosRelaySocketEvent } from "../src/desktop/web
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_239_inbound_lifecycle_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 
 function fakeSocket(): {
   socket: FedosRelaySocket;
@@ -335,7 +335,7 @@ describe("Secure Runtime Alpha 239 -- Failure and Lifecycle Verification", () =>
   });
 
   it("21. cross-implementation parity: NullRelay's own connect/subscribe/unsubscribe/disconnect/reconnect cycle succeeds identically", async () => {
-    const { NullRelay } = await import("../src/desktop/null_relay.js");
+    const { NullRelay } = await import("../src/os/messenger/desktop/null_relay.js");
     const relay = new NullRelay("wss://relay.example.test");
 
     await relay.connect();

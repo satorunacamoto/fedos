@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_261_nostr_board_field_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatedEventSource from "../src/desktop/fedos_validated_nostr_event.ts?raw";
+import validatedEventSource from "../src/os/messenger/desktop/fedos_validated_nostr_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import postModuleSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 

@@ -297,7 +297,7 @@ describe("Secure Runtime Alpha 6361-6440 -- Threat Scenario 4/5: replay and down
 
 describe("Secure Runtime Alpha 6361-6440 -- Threat Scenario 6: duplicated notification", () => {
   it("6. Safety Center fires a device-revoked notification at most once per fact, even across repeated refreshes", async () => {
-    const { FedosSafetyCenterController } = await import("../src/desktop/presentation/safety_center/fedos_safety_center_controller.js");
+    const { FedosSafetyCenterController } = await import("../src/os/messenger/desktop/presentation/safety_center/fedos_safety_center_controller.js");
     const shell = FedosDesktopApplicationShell.create();
     const controller = new FedosSafetyCenterController(shell);
     let deliveredCount = 0;

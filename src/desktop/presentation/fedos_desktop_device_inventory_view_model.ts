@@ -1,49 +1,9 @@
 /**
- * Secure Runtime Alpha 3801-3880 — Device Inventory ViewModel.
- *
- * Wraps `FedosDesktopApplicationShell.devicesList()`/`deviceDetail()` only —
- * owns no Device Registry/Trust logic of its own. `refresh()` re-lists every
- * Device this account currently owns (any trust state, including revoked);
- * `selectDevice()` is a separate action loading one Device's own detail into
- * `#selected`, mirroring `FedosDesktopConversationDetailViewModel`'s own
- * "list + selected detail" composition one layer down.
+ * Shim — physically moved to `src/os/messenger/desktop/presentation/fedos_desktop_device_inventory_view_model.ts`
+ * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
+ * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+ * `docs/architecture/MESSENGER-MIGRATION-STAGING.md`). Kept here so any
+ * not-yet-updated importer elsewhere in the repo keeps resolving and
+ * compiling.
  */
-
-import type { FedosDesktopApplicationShell } from "../shell/fedos_desktop_application_shell.js";
-import type { FedosDeviceSyncDeviceView } from "../runtime/fedos_device_sync_operational_facade.js";
-import {
-  fedosViewModelIdle,
-  fedosViewModelLoading,
-  fedosViewModelFromShellResult,
-  type FedosDesktopViewModelState,
-} from "./fedos_desktop_view_model_state.js";
-
-export class FedosDesktopDeviceInventoryViewModel {
-  readonly #shell: FedosDesktopApplicationShell;
-  #listState: FedosDesktopViewModelState<readonly FedosDeviceSyncDeviceView[]> = fedosViewModelIdle();
-  #selectedState: FedosDesktopViewModelState<FedosDeviceSyncDeviceView> = fedosViewModelIdle();
-
-  constructor(shell: FedosDesktopApplicationShell) {
-    this.#shell = shell;
-  }
-
-  get listState(): FedosDesktopViewModelState<readonly FedosDeviceSyncDeviceView[]> {
-    return this.#listState;
-  }
-
-  get selectedState(): FedosDesktopViewModelState<FedosDeviceSyncDeviceView> {
-    return this.#selectedState;
-  }
-
-  async refresh(): Promise<FedosDesktopViewModelState<readonly FedosDeviceSyncDeviceView[]>> {
-    this.#listState = fedosViewModelLoading();
-    this.#listState = fedosViewModelFromShellResult(this.#shell.devicesList());
-    return this.#listState;
-  }
-
-  async selectDevice(deviceId: string): Promise<FedosDesktopViewModelState<FedosDeviceSyncDeviceView>> {
-    this.#selectedState = fedosViewModelLoading();
-    this.#selectedState = fedosViewModelFromShellResult(this.#shell.deviceDetail(deviceId));
-    return this.#selectedState;
-  }
-}
+export * from "../../os/messenger/desktop/presentation/fedos_desktop_device_inventory_view_model.js";

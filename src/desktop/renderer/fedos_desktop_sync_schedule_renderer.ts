@@ -1,22 +1,9 @@
 /**
- * Secure Runtime Alpha 3801-3880 — Sync Schedule Renderer.
- *
- * Consumes `FedosDesktopSyncScheduleViewModel` ONLY -- projects `.state`
- * through `fedosRenderList()`.
+ * Shim — physically moved to `src/os/messenger/desktop/renderer/fedos_desktop_sync_schedule_renderer.ts`
+ * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
+ * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+ * `docs/architecture/MESSENGER-MIGRATION-STAGING.md`). Kept here so any
+ * not-yet-updated importer elsewhere in the repo keeps resolving and
+ * compiling.
  */
-
-import type { FedosDesktopSyncScheduleViewModel } from "../presentation/fedos_desktop_sync_schedule_view_model.js";
-import type { FedosDeviceSyncScheduleView } from "../runtime/fedos_device_sync_operational_facade.js";
-import { fedosRenderModel, fedosRenderList, type FedosDesktopRenderModel, type FedosDesktopRenderList } from "./fedos_desktop_render_model.js";
-
-export class FedosDesktopSyncScheduleRenderer {
-  readonly #viewModel: FedosDesktopSyncScheduleViewModel;
-
-  constructor(viewModel: FedosDesktopSyncScheduleViewModel) {
-    this.#viewModel = viewModel;
-  }
-
-  render(): FedosDesktopRenderModel<FedosDesktopRenderList<FedosDeviceSyncScheduleView>> {
-    return fedosRenderModel(this.#viewModel.state, (schedules) => fedosRenderList(schedules));
-  }
-}
+export * from "../../os/messenger/desktop/renderer/fedos_desktop_sync_schedule_renderer.js";

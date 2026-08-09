@@ -118,10 +118,10 @@ interface NavigationRegistry {
 }
 
 async function loadNavigationRootModules(): Promise<NavigationRootModules> {
-  const presentation = (await import(distUrl("desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.js"))) as {
+  const presentation = (await import(distUrl("os", "messenger", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.js"))) as {
     createFedosDesktopConversationUiPresentationBoundary: () => unknown;
   };
-  const registry = (await import(distUrl("desktop", "navigation", "fedos_desktop_conversation_window_registry.js"))) as {
+  const registry = (await import(distUrl("os", "messenger", "desktop", "navigation", "fedos_desktop_conversation_window_registry.js"))) as {
     FedosDesktopConversationWindowRegistry: NavigationRootModules["WindowRegistry"];
   };
   const identity = (await import(distUrl("conversation", "construction", "fedos_conversation_creator_identity_authority.js"))) as {

@@ -8,9 +8,9 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -24,7 +24,7 @@ import nostrIdentityProviderSource from "../src/os/core/identity/fedos_nostr_ide
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import identityDescriptorSource from "../src/os/core/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopReaderSource from "../src/desktop/nostr_public_identity_reader.ts?raw";
+import desktopReaderSource from "../src/os/messenger/desktop/nostr_public_identity_reader.ts?raw";
 
 /**
  * Secure Runtime Alpha 180 -- "Nostr Public Identifier Runtime

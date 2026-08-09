@@ -6,9 +6,9 @@ import schedulerSource from "../src/os/messenger/adapters/nostr/transport/fedos_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hydrationSource from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_delivery_recovery_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardHydrationSource from "../src/desktop/host/fedos_delivery_recovery_hydration.ts?raw";
+import boardHydrationSource from "../src/os/messenger/desktop/host/fedos_delivery_recovery_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopRuntimeSource from "../src/desktop/runtime/fedos_desktop_runtime.ts?raw";
+import desktopRuntimeSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw";
 
 /**
  * Secure Runtime Alpha 7561-7640 ("FedOS Conversation Outbox Restart

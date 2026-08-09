@@ -153,11 +153,11 @@ describe("Secure Runtime Alpha 618 -- Operational Verification", () => {
 
   it("p2p/ untouched -- no file under this Arc's own runtime module IMPORTS from p2p/ (a doc comment naming the prohibition is not a reference)", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const assembly = (await import("../src/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
+    const assembly = (await import("../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const config = (await import("../src/desktop/runtime/fedos_desktop_runtime_config.ts?raw")).default as string;
+    const config = (await import("../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.ts?raw")).default as string;
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const main = (await import("../src/desktop/runtime/run_fedos_desktop_runtime.ts?raw")).default as string;
+    const main = (await import("../src/os/messenger/desktop/runtime/run_fedos_desktop_runtime.ts?raw")).default as string;
     for (const source of [assembly, config, main]) {
       const codeOnly = source
         .split("\n")

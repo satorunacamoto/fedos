@@ -4,7 +4,7 @@ import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memo
 import { MockFedosBoardOutboxPublisher } from "../src/board/outbox/fedos_board_outbox_publisher.js";
 import { DesktopApplication } from "../src/desktop/desktop_application.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 
 /**
  * Secure Runtime Alpha 544 -- "Lifecycle Audit": Stage 4 of the Alpha

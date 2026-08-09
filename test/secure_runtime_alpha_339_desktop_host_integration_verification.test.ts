@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_339_desktop_host_integration_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostStateSource from "../src/desktop/host/fedos_desktop_host_state.ts?raw";
+import hostStateSource from "../src/os/messenger/desktop/host/fedos_desktop_host_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import factorySource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
+import factorySource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 
 import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
 import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";

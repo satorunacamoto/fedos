@@ -34,11 +34,11 @@ interface FedosElectronSettingsModule {
 
 /** Compiled dist roots relative to this package (`packages/<name>/` → repo root `dist/`). */
 export function fedosElectronSettingsControllerCompiledPath(packageDir: string): string {
-  return join(packageDir, "..", "..", "dist", "desktop", "settings", "fedos_desktop_settings_controller.js");
+  return join(packageDir, "..", "..", "dist", "os", "messenger", "desktop", "settings", "fedos_desktop_settings_controller.js");
 }
 
 export function fedosElectronSettingsHostBridgeCompiledPath(packageDir: string): string {
-  return join(packageDir, "..", "..", "dist", "desktop", "settings", "fedos_desktop_settings_host_bridge.js");
+  return join(packageDir, "..", "..", "dist", "os", "messenger", "desktop", "settings", "fedos_desktop_settings_host_bridge.js");
 }
 
 export async function fedosElectronLoadSettingsModule(packageDir: string): Promise<FedosElectronSettingsModule> {

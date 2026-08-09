@@ -3,7 +3,7 @@ import { parseRelayInboundMessage } from "../src/desktop/relay_inbound_parser.js
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_233_nip01_relay_wire_parser.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import parserSource from "../src/desktop/relay_inbound_parser.ts?raw";
+import parserSource from "../src/os/messenger/desktop/relay_inbound_parser.ts?raw";
 
 const sampleWireEvent = {
   id: "a".repeat(64),

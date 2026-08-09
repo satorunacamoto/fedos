@@ -55,13 +55,13 @@ describe("Secure Runtime Alpha 6361-6440 -- structural guards (no protocol drift
   });
 
   it("3. exactly one FedosDesktopApplicationShell/FedosDesktopConversationUiPresentationBoundary/FedosDesktopRenderer/FedosDesktopHostBridge class exists in the whole codebase", () => {
-    const shellSource = readFileSync(join(REPO_ROOT, "src", "desktop", "shell", "fedos_desktop_application_shell.ts"), "utf8") as string;
+    const shellSource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "shell", "fedos_desktop_application_shell.ts"), "utf8") as string;
     expect((shellSource.match(/class FedosDesktopApplicationShell\b/g) ?? []).length).toBe(1);
-    const boundarySource = readFileSync(join(REPO_ROOT, "src", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.ts"), "utf8") as string;
+    const boundarySource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.ts"), "utf8") as string;
     expect((boundarySource.match(/class FedosDesktopConversationUiPresentationBoundary\b/g) ?? []).length).toBe(1);
-    const rendererSource = readFileSync(join(REPO_ROOT, "src", "desktop", "renderer", "fedos_desktop_renderer.ts"), "utf8") as string;
+    const rendererSource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "renderer", "fedos_desktop_renderer.ts"), "utf8") as string;
     expect((rendererSource.match(/class FedosDesktopRenderer\b/g) ?? []).length).toBe(1);
-    const bridgeSource = readFileSync(join(REPO_ROOT, "src", "desktop", "host_boundary", "fedos_desktop_host_bridge.ts"), "utf8") as string;
+    const bridgeSource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "host_boundary", "fedos_desktop_host_bridge.ts"), "utf8") as string;
     expect((bridgeSource.match(/class FedosDesktopHostBridge\b/g) ?? []).length).toBe(1);
   });
 

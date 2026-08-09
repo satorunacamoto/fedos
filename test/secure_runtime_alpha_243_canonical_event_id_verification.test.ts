@@ -4,7 +4,7 @@ import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_243_canonical_event_id_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import verifierSource from "../src/desktop/nostr_event_id_verifier.ts?raw";
+import verifierSource from "../src/os/messenger/desktop/nostr_event_id_verifier.ts?raw";
 
 const CANONICALIZATION_EVENT: FedosNostrWireEvent = {
   id: "42e04d5703c1ce6b135d167273eb4936720f008c517e2d9120445616b9e8c660",

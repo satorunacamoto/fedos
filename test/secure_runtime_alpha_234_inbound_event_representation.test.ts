@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_234_inbound_event_representation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wireEventSource from "../src/desktop/fedos_nostr_wire_event.ts?raw";
+import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosEventDescriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import fedosEventDescriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 
 /**
  * Secure Runtime Alpha 234 -- "Inbound Event Representation": Stage 4

@@ -12,9 +12,9 @@ import policySource from "../src/os/messenger/board/runtime/policy/fedos_convers
 // @ts-expect-error see above.
 import eligibilityEvaluatorSource from "../src/os/messenger/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.ts?raw";
 // @ts-expect-error see above.
-import desktopRuntimeSource from "../src/desktop/runtime/fedos_desktop_runtime.ts?raw";
+import desktopRuntimeSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw";
 // @ts-expect-error see above.
-import runtimeConfigSource from "../src/desktop/runtime/fedos_desktop_runtime_config.ts?raw";
+import runtimeConfigSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
 

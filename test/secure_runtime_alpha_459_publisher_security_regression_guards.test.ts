@@ -7,11 +7,11 @@ import interfaceSource from "../src/os/messenger/board/publish/nostr/fedos_nostr
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import publisherSource from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 
 const NEW_SOURCES = [conversionSource, interfaceSource, publisherSource] as string[];
 

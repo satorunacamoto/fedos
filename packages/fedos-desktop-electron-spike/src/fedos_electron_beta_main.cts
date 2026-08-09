@@ -485,56 +485,61 @@ interface RootModules {
 }
 
 async function loadRootModules(): Promise<RootModules> {
-  const attestation = (await import(distUrl("desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
+  const attestation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
     createElectronMainHostAttestation: RootModules["createElectronMainHostAttestation"];
   };
-  const activation = (await import(distUrl("desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
+  const activation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
     activateFedosProductionProfileMasterSeed: RootModules["activateFedosProductionProfileMasterSeed"];
   };
-  const signer = (await import(distUrl("desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
+  const signer = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
     FedosProductionNostrSigningAuthority: RootModules["NostrSigningAuthority"];
   };
-  const paths = (await import(distUrl("desktop", "onboarding", "fedos_local_profile_paths.js"))) as {
+  const paths = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_local_profile_paths.js"))) as {
     planFedosLocalProfilePaths: RootModules["planFedosLocalProfilePaths"];
     ensureFedosLocalProfileDirectories: RootModules["ensureFedosLocalProfileDirectories"];
   };
-  const profilePersistence = (await import(distUrl("desktop", "onboarding", "fedos_local_profile_persistence.js"))) as {
+  const profilePersistence = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_local_profile_persistence.js"))) as {
     FileFedosLocalProfilePersistence: RootModules["ProfilePersistence"];
   };
   const sealedPersistence = (await import(distUrl("runtime", "master_seed", "fedos_sealed_master_seed_envelope_persistence.js"))) as {
     FileFedosSealedMasterSeedEnvelopePersistence: RootModules["SealedSeedPersistence"];
   };
-  const coordinator = (await import(distUrl("desktop", "onboarding", "fedos_profile_initialization_coordinator.js"))) as {
+  const coordinator = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_initialization_coordinator.js"))) as {
     FedosProfileInitializationCoordinator: RootModules["Coordinator"];
   };
-  const secret = (await import(distUrl("desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
+  const secret = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
     FedosProfileUnlockSecret: RootModules["UnlockSecret"];
   };
-  const settingsController = (await import(distUrl("desktop", "settings", "fedos_desktop_settings_controller.js"))) as {
+  const settingsController = (await import(distUrl("os", "messenger", "desktop", "settings", "fedos_desktop_settings_controller.js"))) as {
     createFileBackedFedosDesktopSettingsController: RootModules["createFileBackedSettingsController"];
   };
-  const assembly = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_application_assembly.js"))) as {
+  const assembly = (await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_application_assembly.js"))) as {
     FedosDesktopBetaApplicationAssembly: RootModules["BetaApplicationAssembly"];
   };
+  // NOT migrated with its siblings above: this one file has an unrelated,
+  // uncommitted, in-progress edit from a different arc on this branch and was
+  // deliberately left at its original path -- see the Messenger migration
+  // Stage 6 commit message and fedos_desktop_beta_release_configuration.ts's
+  // own note.
   const capabilityManifest = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_capability_manifest.js"))) as {
     fedosDesktopBetaCapabilityManifestV1: RootModules["betaCapabilityManifestV1"];
   };
-  const releaseConfiguration = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_release_configuration.js"))) as {
+  const releaseConfiguration = (await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_release_configuration.js"))) as {
     fedosDesktopBetaReleaseConfigurationV1: RootModules["betaReleaseConfigurationV1"];
   };
-  const limitations = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_limitations.js"))) as {
+  const limitations = (await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_limitations.js"))) as {
     fedosDesktopBetaLimitationsV1: RootModules["betaLimitationsV1"];
   };
   const deviceSyncEventBridgeModule = (await import(distUrl("device", "sync_events", "fedos_device_sync_event_bridge.js"))) as {
     FedosDeviceSyncEventBridge: RootModules["DeviceSyncEventBridge"];
   };
-  const websocketRelay = (await import(distUrl("desktop", "websocket_relay.js"))) as {
+  const websocketRelay = (await import(distUrl("os", "messenger", "desktop", "websocket_relay.js"))) as {
     WebSocketRelay: RootModules["WebSocketRelay"];
   };
-  const websocketRelaySocketFactory = (await import(distUrl("desktop", "node_websocket_relay_socket_factory.js"))) as {
+  const websocketRelaySocketFactory = (await import(distUrl("os", "messenger", "desktop", "node_websocket_relay_socket_factory.js"))) as {
     createNodeWebSocketRelaySocketFactory: RootModules["createNodeWebSocketRelaySocketFactory"];
   };
-  const trayTypes = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_types.js"))) as {
+  const trayTypes = (await import(distUrl("os", "messenger", "desktop", "tray", "fedos_desktop_tray_types.js"))) as {
     fedosDesktopTrayMenuItems: RootModules["fedosDesktopTrayMenuItems"];
   };
   return {

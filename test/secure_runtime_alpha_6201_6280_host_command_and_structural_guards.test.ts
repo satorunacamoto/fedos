@@ -19,8 +19,8 @@ import { fileURLToPath } from "node:url";
 import { validateFedosDesktopHostCommand } from "../src/desktop/host_boundary/fedos_desktop_host_command.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PRESENTATION_DIR = join(REPO_ROOT, "src", "desktop", "presentation", "safety_center");
-const RENDERER_DIR = join(REPO_ROOT, "src", "desktop", "renderer", "safety_center");
+const PRESENTATION_DIR = join(REPO_ROOT, "src", "os", "messenger", "desktop", "presentation", "safety_center");
+const RENDERER_DIR = join(REPO_ROOT, "src", "os", "messenger", "desktop", "renderer", "safety_center");
 
 /** Strips `/** ... *\/` block comments and `//` line comments -- several of this Arc's own doc comments explicitly NAME a forbidden pattern to state its ABSENCE (mirrors `secure_runtime_alpha_5641_5720_structural_no_live_wire_guards.test.ts`'s own established discipline exactly, non-circular). */
 function stripComments(source: string): string {
@@ -151,13 +151,13 @@ describe("Secure Runtime Alpha 6201-6280 -- structural guards over src/desktop/p
   });
 
   it("17. only ONE Shell/Boundary/Renderer/Bridge class exists in this whole codebase (unchanged by this Arc) -- confirms no second owner was created", () => {
-    const shellSource = readFileSync(join(REPO_ROOT, "src", "desktop", "shell", "fedos_desktop_application_shell.ts"), "utf8") as string;
+    const shellSource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "shell", "fedos_desktop_application_shell.ts"), "utf8") as string;
     expect((shellSource.match(/class FedosDesktopApplicationShell\b/g) ?? []).length).toBe(1);
-    const boundarySource = readFileSync(join(REPO_ROOT, "src", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.ts"), "utf8") as string;
+    const boundarySource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.ts"), "utf8") as string;
     expect((boundarySource.match(/class FedosDesktopConversationUiPresentationBoundary\b/g) ?? []).length).toBe(1);
-    const rendererAggSource = readFileSync(join(REPO_ROOT, "src", "desktop", "renderer", "fedos_desktop_renderer.ts"), "utf8") as string;
+    const rendererAggSource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "renderer", "fedos_desktop_renderer.ts"), "utf8") as string;
     expect((rendererAggSource.match(/class FedosDesktopRenderer\b/g) ?? []).length).toBe(1);
-    const bridgeSource = readFileSync(join(REPO_ROOT, "src", "desktop", "host_boundary", "fedos_desktop_host_bridge.ts"), "utf8") as string;
+    const bridgeSource = readFileSync(join(REPO_ROOT, "src", "os", "messenger", "desktop", "host_boundary", "fedos_desktop_host_bridge.ts"), "utf8") as string;
     expect((bridgeSource.match(/class FedosDesktopHostBridge\b/g) ?? []).length).toBe(1);
   });
 });

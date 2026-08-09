@@ -118,8 +118,8 @@ describe("Secure Runtime Alpha 6121-6200 -- Phase T structural guards", () => {
 
   it("the identity_transition Presentation/Renderer subtrees import nothing from archive/search/membership/electron", () => {
     const dirs = [
-      join(process.cwd(), "src", "desktop", "presentation", "identity_transition"),
-      join(process.cwd(), "src", "desktop", "renderer", "identity_transition"),
+      join(process.cwd(), "src", "os", "messenger", "desktop", "presentation", "identity_transition"),
+      join(process.cwd(), "src", "os", "messenger", "desktop", "renderer", "identity_transition"),
     ];
     const forbidden = [/\/archive\//, /\/search\//, /fedos_conversation_membership/, /electron/i];
     for (const dir of dirs) {
@@ -137,8 +137,8 @@ describe("Secure Runtime Alpha 6121-6200 -- Phase T structural guards", () => {
 
   it("neither Presentation nor Renderer file performs any cryptographic verification (no @noble import)", () => {
     const dirs = [
-      join(process.cwd(), "src", "desktop", "presentation", "identity_transition"),
-      join(process.cwd(), "src", "desktop", "renderer", "identity_transition"),
+      join(process.cwd(), "src", "os", "messenger", "desktop", "presentation", "identity_transition"),
+      join(process.cwd(), "src", "os", "messenger", "desktop", "renderer", "identity_transition"),
     ];
     for (const dir of dirs) {
       for (const file of collectTsFiles(dir)) {
@@ -149,13 +149,13 @@ describe("Secure Runtime Alpha 6121-6200 -- Phase T structural guards", () => {
   });
 
   it("there is exactly one FedosDesktopApplicationShell, one Presentation Boundary, one Renderer aggregate, and one Host Bridge class in this codebase", () => {
-    const shellFile = readFileSync(join(process.cwd(), "src", "desktop", "shell", "fedos_desktop_application_shell.ts"), "utf8") as string;
+    const shellFile = readFileSync(join(process.cwd(), "src", "os", "messenger", "desktop", "shell", "fedos_desktop_application_shell.ts"), "utf8") as string;
     expect((shellFile.match(/^export class FedosDesktopApplicationShell\b/m) ?? []).length).toBe(1);
-    const boundaryFile = readFileSync(join(process.cwd(), "src", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.ts"), "utf8") as string;
+    const boundaryFile = readFileSync(join(process.cwd(), "src", "os", "messenger", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.ts"), "utf8") as string;
     expect((boundaryFile.match(/^export class FedosDesktopConversationUiPresentationBoundary\b/m) ?? []).length).toBe(1);
-    const rendererFile = readFileSync(join(process.cwd(), "src", "desktop", "renderer", "fedos_desktop_renderer.ts"), "utf8") as string;
+    const rendererFile = readFileSync(join(process.cwd(), "src", "os", "messenger", "desktop", "renderer", "fedos_desktop_renderer.ts"), "utf8") as string;
     expect((rendererFile.match(/^export class FedosDesktopRenderer\b/m) ?? []).length).toBe(1);
-    const bridgeFile = readFileSync(join(process.cwd(), "src", "desktop", "host_boundary", "fedos_desktop_host_bridge.ts"), "utf8") as string;
+    const bridgeFile = readFileSync(join(process.cwd(), "src", "os", "messenger", "desktop", "host_boundary", "fedos_desktop_host_bridge.ts"), "utf8") as string;
     expect((bridgeFile.match(/^export class FedosDesktopHostBridge\b/m) ?? []).length).toBe(1);
   });
 });

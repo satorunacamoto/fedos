@@ -12,7 +12,7 @@ import { FedosDeliveryObservationRepository } from "../src/board/observation/fed
 import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
 import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import source from "../src/desktop/host/fedos_host_delivery_controller.ts?raw";
+import source from "../src/os/messenger/desktop/host/fedos_host_delivery_controller.ts?raw";
 
 class BlockingPublisher implements FedosBoardOutboxPublisher {
   calls = 0;

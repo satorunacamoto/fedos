@@ -12,11 +12,11 @@ import messagesSource from "../src/os/messenger/adapters/nostr/protocol/messages
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosEventDescriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import fedosEventDescriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRelaySource from "../src/desktop/fedos_relay.ts?raw";
+import fedosRelaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 

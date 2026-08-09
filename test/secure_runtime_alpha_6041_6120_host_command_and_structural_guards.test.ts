@@ -116,7 +116,7 @@ describe("Secure Runtime Alpha 6041-6120 -- Phase Q structural guards", () => {
   });
 
   it("14. the Controller never calls a Shell method beyond the deletion-request/device-detail surface (no arbitrary command execution)", () => {
-    const controllerSource = readFileSync(join(dir, "../src/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts"), "utf8") as string;
+    const controllerSource = readFileSync(join(dir, "../src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts"), "utf8") as string;
     const shellCalls = [...controllerSource.matchAll(/this\.#shell\.(\w+)/g)].map((m) => m[1] ?? "");
     const allowed = new Set(["deletionRequestCreate", "deletionRequestListSentForTarget", "deletionRequestAcknowledgementOutcome", "deletionRequestListReceived", "deletionRequestAssessPolicy", "deletionRequestApprove", "deletionRequestReject", "deviceDetail"]);
     for (const call of shellCalls) expect(allowed.has(call)).toBe(true);

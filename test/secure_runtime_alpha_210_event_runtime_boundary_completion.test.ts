@@ -8,9 +8,9 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -18,11 +18,11 @@ import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import descriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import descriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readerSource from "../src/desktop/fedos_event_reader.ts?raw";
+import readerSource from "../src/os/messenger/desktop/fedos_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullEventReaderSource from "../src/desktop/null_event_reader.ts?raw";
+import nullEventReaderSource from "../src/os/messenger/desktop/null_event_reader.ts?raw";
 
 /**
  * Secure Runtime Alpha 210 -- "Event Runtime Boundary Completion":

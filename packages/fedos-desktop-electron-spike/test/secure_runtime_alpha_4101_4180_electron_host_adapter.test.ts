@@ -36,7 +36,7 @@ const mainCjsPath = `${packageDir}/dist/fedos_electron_host_adapter_main.cjs`;
 const preloadCjsPath = `${packageDir}/dist/fedos_electron_host_adapter_preload.cjs`;
 const pageHtmlPath = `${packageDir}/dist/fedos_electron_host_adapter_page.html`;
 const selftestJsPath = `${packageDir}/dist/fedos_electron_host_adapter_selftest.js`;
-const hostBridgeCompiledPath = `${repoRoot}/dist/desktop/host_boundary/fedos_desktop_host_bridge.js`;
+const hostBridgeCompiledPath = `${repoRoot}/dist/os/messenger/desktop/host_boundary/fedos_desktop_host_bridge.js`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
 
 const SELFTEST_MARKER = "FEDOS_ELECTRON_ADAPTER_TEST:";

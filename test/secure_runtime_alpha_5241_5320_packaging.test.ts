@@ -250,7 +250,7 @@ describe("Phase E — package allowlist verification against the real config", (
 
 describe("Phase L — existing schema validators still fail closed on an unsupported version (no migration invented)", () => {
   it("the local profile descriptor codec rejects schemaVersion !== 1", async () => {
-    const mod = await import("../src/desktop/onboarding/fedos_local_profile_descriptor.js");
+    const mod = await import("../src/os/messenger/desktop/onboarding/fedos_local_profile_descriptor.js");
     const malformed = { schemaVersion: 2, profileId: "a".repeat(32), displayLabel: "x", accountPublicIdentity: { authority: "nostr", publicKeyHex: "b".repeat(64) }, localDeviceId: "d", createdAt: 1, lastOpenedAt: 1, sealedMasterSeedRef: "/x", dataDirectoryRoot: "/x", initializationState: "ready", migrationVersion: 1 };
     expect(mod.isWellFormedFedosLocalProfileDescriptorV1(malformed)).toBe(false);
   });

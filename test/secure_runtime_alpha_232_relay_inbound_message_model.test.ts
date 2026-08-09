@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_232_relay_inbound_message_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import messageModelSource from "../src/desktop/fedos_relay_inbound_message.ts?raw";
+import messageModelSource from "../src/os/messenger/desktop/fedos_relay_inbound_message.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 

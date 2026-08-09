@@ -34,9 +34,9 @@ function distUrl(...segments) {
 }
 
 async function loadBetaValueObjects() {
-  const capabilityModule = await import(distUrl("desktop", "beta", "fedos_desktop_beta_capability_manifest.js"));
-  const limitationsModule = await import(distUrl("desktop", "beta", "fedos_desktop_beta_limitations.js"));
-  const releaseConfigModule = await import(distUrl("desktop", "beta", "fedos_desktop_beta_release_configuration.js"));
+  const capabilityModule = await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_capability_manifest.js"));
+  const limitationsModule = await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_limitations.js"));
+  const releaseConfigModule = await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_release_configuration.js"));
   return {
     capabilities: capabilityModule.fedosDesktopBetaCapabilityManifestV1().capabilities,
     limitations: limitationsModule.fedosDesktopBetaLimitationsV1().limitations,

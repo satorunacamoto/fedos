@@ -4,13 +4,13 @@ import { createDesktopApplication } from "../src/desktop/create_desktop_applicat
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_203_null_event_reader_and_desktop_wiring_decision.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullEventReaderSource from "../src/desktop/null_event_reader.ts?raw";
+import nullEventReaderSource from "../src/os/messenger/desktop/null_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullPublicIdentityReaderSource from "../src/desktop/null_public_identity_reader.ts?raw";
+import nullPublicIdentityReaderSource from "../src/os/messenger/desktop/null_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

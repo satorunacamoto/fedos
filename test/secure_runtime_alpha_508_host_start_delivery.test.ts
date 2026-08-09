@@ -3,7 +3,7 @@ import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
 import { DesktopApplication } from "../src/desktop/desktop_application.js";
 import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 
 function makeHost() {
   return new FedosDesktopHost({

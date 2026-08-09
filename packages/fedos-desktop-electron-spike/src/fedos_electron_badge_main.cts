@@ -331,32 +331,32 @@ interface RootModules {
 }
 
 async function loadRootModules(): Promise<RootModules> {
-  const presentation = (await import(distUrl("desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.js"))) as {
+  const presentation = (await import(distUrl("os", "messenger", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.js"))) as {
     createFedosDesktopConversationUiPresentationBoundary: () => BoundaryLike;
   };
-  const registry = (await import(distUrl("desktop", "navigation", "fedos_desktop_conversation_window_registry.js"))) as {
+  const registry = (await import(distUrl("os", "messenger", "desktop", "navigation", "fedos_desktop_conversation_window_registry.js"))) as {
     FedosDesktopConversationWindowRegistry: RootModules["WindowRegistry"];
   };
   const identity = (await import(distUrl("conversation", "construction", "fedos_conversation_creator_identity_authority.js"))) as {
     StaticFedosConversationCreatorIdentityAuthority: RootModules["StaticCreatorIdentityAuthority"];
   };
-  const notification = (await import(distUrl("desktop", "notification", "fedos_desktop_notification_coordinator.js"))) as {
+  const notification = (await import(distUrl("os", "messenger", "notifications", "fedos_desktop_notification_coordinator.js"))) as {
     FedosDesktopNotificationCoordinator: RootModules["NotificationCoordinator"];
   };
-  const tray = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_coordinator.js"))) as { TrayCoordinator: RootModules["TrayCoordinator"] };
-  const trayTypes = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_types.js"))) as {
+  const tray = (await import(distUrl("os", "messenger", "desktop", "tray", "fedos_desktop_tray_coordinator.js"))) as { TrayCoordinator: RootModules["TrayCoordinator"] };
+  const trayTypes = (await import(distUrl("os", "messenger", "desktop", "tray", "fedos_desktop_tray_types.js"))) as {
     fedosDesktopTrayMenuItems: RootModules["fedosDesktopTrayMenuItems"];
   };
-  const background = (await import(distUrl("desktop", "background", "fedos_desktop_background_lifecycle_coordinator.js"))) as {
+  const background = (await import(distUrl("os", "messenger", "desktop", "background", "fedos_desktop_background_lifecycle_coordinator.js"))) as {
     BackgroundLifecycleCoordinator: RootModules["BackgroundLifecycleCoordinator"];
   };
-  const status = (await import(distUrl("desktop", "presentation", "fedos_desktop_notifications_tray_status_view_model.js"))) as {
+  const status = (await import(distUrl("os", "messenger", "desktop", "presentation", "fedos_desktop_notifications_tray_status_view_model.js"))) as {
     FedosDesktopNotificationsTrayStatusViewModel: RootModules["StatusViewModel"];
   };
-  const badge = (await import(distUrl("desktop", "badge", "fedos_desktop_badge_coordinator.js"))) as {
+  const badge = (await import(distUrl("os", "messenger", "desktop", "badge", "fedos_desktop_badge_coordinator.js"))) as {
     FedosDesktopBadgeCoordinator: RootModules["BadgeCoordinator"];
   };
-  const runtimeModule = (await import(distUrl("desktop", "runtime", "fedos_desktop_runtime.js"))) as {
+  const runtimeModule = (await import(distUrl("os", "messenger", "desktop", "runtime", "fedos_desktop_runtime.js"))) as {
     startFedosDesktopRuntime: RootModules["startRawRuntime"];
   };
   const invitation = (await import(distUrl("conversation", "invitation", "fedos_conversation_invitation_token.js"))) as {
@@ -368,7 +368,7 @@ async function loadRootModules(): Promise<RootModules> {
   const deviceSyncEventBridgeModule = (await import(distUrl("device", "sync_events", "fedos_device_sync_event_bridge.js"))) as {
     FedosDeviceSyncEventBridge: RootModules["DeviceSyncEventBridge"];
   };
-  const deviceSyncWiringModule = (await import(distUrl("desktop", "runtime", "fedos_desktop_device_sync_presentation_wiring.js"))) as {
+  const deviceSyncWiringModule = (await import(distUrl("os", "messenger", "desktop", "runtime", "fedos_desktop_device_sync_presentation_wiring.js"))) as {
     FedosDesktopDeviceSyncPresentationWiring: RootModules["DeviceSyncPresentationWiring"];
   };
   return {

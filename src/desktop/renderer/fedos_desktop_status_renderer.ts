@@ -1,23 +1,9 @@
 /**
- * Secure Runtime Alpha 3401-3480 — Status Renderer.
- *
- * Consumes `FedosDesktopRuntimeStatusViewModel` ONLY -- a direct,
- * unreshaped projection of its `.state` (the ViewModel's own
- * `FedosDesktopRuntimeStatusView`, `{runtimeStatus, deviceStatus}`,
- * already presentation-ready).
+ * Shim — physically moved to `src/os/messenger/desktop/renderer/fedos_desktop_status_renderer.ts`
+ * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
+ * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+ * `docs/architecture/MESSENGER-MIGRATION-STAGING.md`). Kept here so any
+ * not-yet-updated importer elsewhere in the repo keeps resolving and
+ * compiling.
  */
-
-import type { FedosDesktopRuntimeStatusViewModel, FedosDesktopRuntimeStatusView } from "../presentation/fedos_desktop_runtime_status_view_model.js";
-import { fedosRenderModel, type FedosDesktopRenderModel } from "./fedos_desktop_render_model.js";
-
-export class FedosDesktopStatusRenderer {
-  readonly #viewModel: FedosDesktopRuntimeStatusViewModel;
-
-  constructor(viewModel: FedosDesktopRuntimeStatusViewModel) {
-    this.#viewModel = viewModel;
-  }
-
-  render(): FedosDesktopRenderModel<FedosDesktopRuntimeStatusView> {
-    return fedosRenderModel(this.#viewModel.state, (data) => data);
-  }
-}
+export * from "../../os/messenger/desktop/renderer/fedos_desktop_status_renderer.js";

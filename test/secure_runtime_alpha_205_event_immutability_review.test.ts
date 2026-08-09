@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_205_event_immutability_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import descriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import descriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readerSource from "../src/desktop/fedos_event_reader.ts?raw";
+import readerSource from "../src/os/messenger/desktop/fedos_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullEventReaderSource from "../src/desktop/null_event_reader.ts?raw";
+import nullEventReaderSource from "../src/os/messenger/desktop/null_event_reader.ts?raw";
 
 /**
  * Secure Runtime Alpha 205 -- "Event Immutability Review": Stage 5 of
@@ -62,7 +62,7 @@ describe("Secure Runtime Alpha 205 -- Event Immutability Review", () => {
   });
 
   it("8. behavioral: the array returned by NullEventReader.readEvents() is a fresh instance on every call, never a shared reference", async () => {
-    const { NullEventReader } = await import("../src/desktop/null_event_reader.js");
+    const { NullEventReader } = await import("../src/os/messenger/desktop/null_event_reader.js");
     const reader = new NullEventReader();
     const first = await reader.readEvents();
     const second = await reader.readEvents();

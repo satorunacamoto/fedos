@@ -54,8 +54,8 @@ const pageHtmlPath = `${packageDir}/dist/fedos_electron_notifications_tray_page.
 const rendererJsPath = `${packageDir}/dist/fedos_electron_notifications_tray_renderer.js`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
 const rootDistNotificationCoordinatorPath = `${repoRoot}/dist/os/messenger/notifications/fedos_desktop_notification_coordinator.js`;
-const rootDistTrayCoordinatorPath = `${repoRoot}/dist/desktop/tray/fedos_desktop_tray_coordinator.js`;
-const rootDistBackgroundLifecyclePath = `${repoRoot}/dist/desktop/background/fedos_desktop_background_lifecycle_coordinator.js`;
+const rootDistTrayCoordinatorPath = `${repoRoot}/dist/os/messenger/desktop/tray/fedos_desktop_tray_coordinator.js`;
+const rootDistBackgroundLifecyclePath = `${repoRoot}/dist/os/messenger/desktop/background/fedos_desktop_background_lifecycle_coordinator.js`;
 
 let spawnedElectronPid: number | undefined;
 function killSpawnedElectronIfAny(): void {

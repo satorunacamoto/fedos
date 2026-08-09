@@ -6,13 +6,13 @@ import packageJsonSource from "../../../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageLockSource from "../../../package-lock.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostPortSource from "../../../src/desktop/host_boundary/fedos_desktop_host_port.ts?raw";
+import hostPortSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_port.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostBridgeSource from "../../../src/desktop/host_boundary/fedos_desktop_host_bridge.ts?raw";
+import hostBridgeSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostCommandSource from "../../../src/desktop/host_boundary/fedos_desktop_host_command.ts?raw";
+import hostCommandSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostResponseSource from "../../../src/desktop/host_boundary/fedos_desktop_host_response.ts?raw";
+import hostResponseSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_response.ts?raw";
 // @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
 

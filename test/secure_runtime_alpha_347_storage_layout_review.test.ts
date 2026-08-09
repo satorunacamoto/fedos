@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_347_storage_layout_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import factorySource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
+import factorySource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 
 function codeOnly(source: string): string {
   return source

@@ -67,7 +67,7 @@ export const FEDOS_RELEASE_SECRET_SCAN_PATTERNS = Object.freeze([
  * does not") is not the same claim as the class being imported or
  * instantiated. Verified directly: `DevelopmentFedosMasterSeedAuthority`
  * the class is defined ONLY in
- * `src/desktop/onboarding/fedos_development_master_seed_authority.ts`,
+ * `src/os/messenger/desktop/onboarding/fedos_development_master_seed_authority.ts`,
  * which `tsconfig.beta-runtime.json` does not compile into `dist/` at all
  * (confirmed absent) -- every staged occurrence of the identifier is
  * inside a comment explaining why that class is NOT used, never a real

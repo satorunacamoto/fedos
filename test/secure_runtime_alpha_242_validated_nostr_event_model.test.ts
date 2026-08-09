@@ -2,19 +2,19 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_242_validated_nostr_event_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatedEventSource from "../src/desktop/fedos_validated_nostr_event.ts?raw";
+import validatedEventSource from "../src/os/messenger/desktop/fedos_validated_nostr_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wireEventSource from "../src/desktop/fedos_nostr_wire_event.ts?raw";
+import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import combinedValidatorSource from "../src/desktop/combined_inbound_event_validator.ts?raw";
+import combinedValidatorSource from "../src/os/messenger/desktop/combined_inbound_event_validator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relayInboundMessageSource from "../src/desktop/fedos_relay_inbound_message.ts?raw";
+import relayInboundMessageSource from "../src/os/messenger/desktop/fedos_relay_inbound_message.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relayInboundParserSource from "../src/desktop/relay_inbound_parser.ts?raw";
+import relayInboundParserSource from "../src/os/messenger/desktop/relay_inbound_parser.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatedSubscriptionAdapterSource from "../src/desktop/validated_subscription_adapter.ts?raw";
+import validatedSubscriptionAdapterSource from "../src/os/messenger/desktop/validated_subscription_adapter.ts?raw";
 
 function codeOnly(source: string): string {
   return source

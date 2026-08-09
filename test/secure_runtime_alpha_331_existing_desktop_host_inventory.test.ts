@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_331_existing_desktop_h
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import indexSource from "../src/os/_legacy_prototype/index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

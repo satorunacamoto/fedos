@@ -16,9 +16,9 @@ import nostrPublicIdentitySourceSource from "../src/os/core/identity/fedos_nostr
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nullSourceSource from "../src/os/core/identity/fedos_null_nostr_public_identity_source.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopReaderSource from "../src/desktop/nostr_public_identity_reader.ts?raw";
+import desktopReaderSource from "../src/os/messenger/desktop/nostr_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

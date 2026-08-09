@@ -5,12 +5,12 @@
     "outDir": "dist"
   },
   "include": [
-    "src/desktop/onboarding/fedos_profile_initialization_coordinator.ts",
-    "src/desktop/onboarding/fedos_local_profile_paths.ts",
-    "src/desktop/onboarding/fedos_local_profile_persistence.ts",
-    "src/desktop/onboarding/fedos_profile_unlock_secret.ts",
-    "src/desktop/production_activation/fedos_production_profile_activation.ts",
-    "src/desktop/production_activation/fedos_production_nostr_signing_authority.ts",
+    "src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts",
+    "src/os/messenger/desktop/onboarding/fedos_local_profile_paths.ts",
+    "src/os/messenger/desktop/onboarding/fedos_local_profile_persistence.ts",
+    "src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.ts",
+    "src/os/messenger/desktop/production_activation/fedos_production_profile_activation.ts",
+    "src/os/messenger/desktop/production_activation/fedos_production_nostr_signing_authority.ts",
     "src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.ts"
   ]
 }

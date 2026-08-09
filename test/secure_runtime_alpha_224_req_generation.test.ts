@@ -4,7 +4,7 @@ import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_224_req_generation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import messagesSource from "../src/desktop/subscription_messages.ts?raw";
+import messagesSource from "../src/os/messenger/desktop/subscription_messages.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 

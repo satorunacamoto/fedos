@@ -38,8 +38,8 @@ const preloadCjsPath = `${packageDir}/dist/fedos_electron_unlock_preload.cjs`;
 const pageHtmlPath = `${packageDir}/dist/fedos_electron_unlock_page.html`;
 const rendererJsPath = `${packageDir}/dist/fedos_electron_unlock_renderer.js`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
-const rootDistCoordinatorPath = `${repoRoot}/dist/desktop/onboarding/fedos_profile_initialization_coordinator.js`;
-const rootDistProductionNostrPath = `${repoRoot}/dist/desktop/production_activation/fedos_production_nostr_signing_authority.js`;
+const rootDistCoordinatorPath = `${repoRoot}/dist/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.js`;
+const rootDistProductionNostrPath = `${repoRoot}/dist/os/messenger/desktop/production_activation/fedos_production_nostr_signing_authority.js`;
 const pkgWasmPath = `${repoRoot}/packages/fedos-core-rust/pkg/fedos_core_rust_bg.wasm`;
 
 const REAL_ARTIFACT_PRESENT = existsSync(pkgWasmPath);

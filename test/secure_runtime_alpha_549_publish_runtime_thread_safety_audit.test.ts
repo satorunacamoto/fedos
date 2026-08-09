@@ -9,7 +9,7 @@ import type { FedosPersistedBoardOutboxRecordV1 } from "../src/board/outbox/fedo
 import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
 import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 
 /**
  * Secure Runtime Alpha 549 -- "Thread Safety Audit": Stage 9 of the

@@ -8,7 +8,7 @@ import serviceSource from "../src/os/core/identity/fedos_identity_service.ts?raw
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import registrySource from "../src/os/core/identity/fedos_identity_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

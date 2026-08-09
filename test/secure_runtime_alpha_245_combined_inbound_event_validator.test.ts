@@ -4,7 +4,7 @@ import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_245_combined_inbound_event_validator.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import combinedValidatorSource from "../src/desktop/combined_inbound_event_validator.ts?raw";
+import combinedValidatorSource from "../src/os/messenger/desktop/combined_inbound_event_validator.ts?raw";
 
 const VALID_EVENT: FedosNostrWireEvent = {
   id: "9e4ed05065d5c5135e3843706956fe07b81c635ea3bd9eeddb9e207e82fd0f1d",

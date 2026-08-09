@@ -4,9 +4,9 @@ import designDocSource from "../docs/secure_runtime_alpha_260_canonical_board_mo
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 import * as identifiers from "../src/board/fedos_board_identifiers.js";
 import * as source from "../src/board/fedos_board_source.js";
 import * as author from "../src/board/fedos_board_author.js";

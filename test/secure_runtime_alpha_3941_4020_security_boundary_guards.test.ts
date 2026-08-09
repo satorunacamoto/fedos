@@ -14,19 +14,19 @@ import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error see above.
-import screenSource from "../src/desktop/presentation/device_management/fedos_device_management_screen.ts?raw";
+import screenSource from "../src/os/messenger/desktop/presentation/device_management/fedos_device_management_screen.ts?raw";
 // @ts-expect-error see above.
-import navigationStateSource from "../src/desktop/presentation/device_management/fedos_device_management_navigation_state.ts?raw";
+import navigationStateSource from "../src/os/messenger/desktop/presentation/device_management/fedos_device_management_navigation_state.ts?raw";
 // @ts-expect-error see above.
-import presentationLimitsSource from "../src/desktop/presentation/device_management/fedos_device_management_presentation_limits.ts?raw";
+import presentationLimitsSource from "../src/os/messenger/desktop/presentation/device_management/fedos_device_management_presentation_limits.ts?raw";
 // @ts-expect-error see above.
-import screenModelSource from "../src/desktop/presentation/device_management/fedos_device_management_screen_model.ts?raw";
+import screenModelSource from "../src/os/messenger/desktop/presentation/device_management/fedos_device_management_screen_model.ts?raw";
 // @ts-expect-error see above.
-import controllerSource from "../src/desktop/presentation/device_management/fedos_device_management_controller.ts?raw";
+import controllerSource from "../src/os/messenger/desktop/presentation/device_management/fedos_device_management_controller.ts?raw";
 // @ts-expect-error see above.
-import rendererSource from "../src/desktop/renderer/device_management/fedos_device_management_renderer.ts?raw";
+import rendererSource from "../src/os/messenger/desktop/renderer/device_management/fedos_device_management_renderer.ts?raw";
 // @ts-expect-error see above.
-import actionDescriptorSource from "../src/desktop/renderer/device_management/fedos_device_management_action_descriptor.ts?raw";
+import actionDescriptorSource from "../src/os/messenger/desktop/renderer/device_management/fedos_device_management_action_descriptor.ts?raw";
 
 const PRESENTATION_LAYER_SOURCES: readonly string[] = [screenSource, navigationStateSource, presentationLimitsSource, screenModelSource, controllerSource];
 const RENDERER_LAYER_SOURCES: readonly string[] = [rendererSource, actionDescriptorSource];

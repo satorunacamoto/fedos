@@ -31,7 +31,7 @@ describe("Secure Runtime Alpha 509 -- Host.stopDelivery()", () => {
 
   it("Host.stop()'s own body is untouched -- it does not reference delivery at all", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const hostSource = (await import("../src/desktop/host/fedos_desktop_host.ts?raw")).default as string;
+    const hostSource = (await import("../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw")).default as string;
     const stopBody = (hostSource.match(/async stop\(\): Promise<void> \{([\s\S]*?)\n  \}/) ?? [])[1] ?? "";
     expect(stopBody.length).toBeGreaterThan(0);
     expect(stopBody).not.toMatch(/[Dd]elivery/);

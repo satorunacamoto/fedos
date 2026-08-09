@@ -3,13 +3,13 @@ import { StaticNostrPublicIdentitySource } from "../src/desktop/static_nostr_pub
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_108_static_public_identity_source.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import staticSourceSource from "../src/desktop/static_nostr_public_identity_source.ts?raw";
+import staticSourceSource from "../src/os/messenger/desktop/static_nostr_public_identity_source.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublicIdentityReaderSource from "../src/desktop/nostr_public_identity_reader.ts?raw";
+import nostrPublicIdentityReaderSource from "../src/os/messenger/desktop/nostr_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nullSourceSource from "../src/os/core/identity/fedos_null_nostr_public_identity_source.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

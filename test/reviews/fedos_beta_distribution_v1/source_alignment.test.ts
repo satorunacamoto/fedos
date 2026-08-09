@@ -14,19 +14,19 @@ import electronBuilderBetaConfigSource from "../../../packages/fedos-desktop-ele
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import betaMainSource from "../../../packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import releaseConfigurationSource from "../../../src/desktop/beta/fedos_desktop_beta_release_configuration.ts?raw";
+import releaseConfigurationSource from "../../../src/os/messenger/desktop/beta/fedos_desktop_beta_release_configuration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import limitationsSource from "../../../src/desktop/beta/fedos_desktop_beta_limitations.ts?raw";
+import limitationsSource from "../../../src/os/messenger/desktop/beta/fedos_desktop_beta_limitations.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmManifestSource from "../../../src/desktop/production_activation/fedos_production_wasm_artifact_manifest.ts?raw";
+import wasmManifestSource from "../../../src/os/messenger/desktop/production_activation/fedos_production_wasm_artifact_manifest.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import generateWasmManifestScriptSource from "../../../scripts/generate_wasm_artifact_manifest.mjs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import profileDescriptorSource from "../../../src/desktop/onboarding/fedos_local_profile_descriptor.ts?raw";
+import profileDescriptorSource from "../../../src/os/messenger/desktop/onboarding/fedos_local_profile_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import settingsCodecSource from "../../../src/os/core/settings/fedos_settings_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import coordinatorSource from "../../../src/desktop/onboarding/fedos_profile_initialization_coordinator.ts?raw";
+import coordinatorSource from "../../../src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import gitignoreSource from "../../../.gitignore?raw";
 

@@ -117,7 +117,7 @@ describe("Secure Runtime Alpha 590 -- Four-Protocol Verification", () => {
 
   it("hydration never reads target.protocol -- structurally confirmed, not just behaviorally", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const hydrationSource = (await import("../src/desktop/host/fedos_delivery_recovery_hydration.ts?raw")).default as string;
+    const hydrationSource = (await import("../src/os/messenger/desktop/host/fedos_delivery_recovery_hydration.ts?raw")).default as string;
     const codeOnly = hydrationSource
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))

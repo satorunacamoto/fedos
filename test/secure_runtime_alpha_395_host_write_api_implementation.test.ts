@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_395_host_write_api_imp
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 
 import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
 import { DesktopApplication } from "../src/desktop/desktop_application.js";

@@ -1,32 +1,9 @@
 /**
- * Secure Runtime Alpha 3401-3480 — Search Renderer.
- *
- * Consumes `FedosDesktopSearchViewModel` ONLY. `query` is always the
- * ViewModel's own CURRENT query text (even before/independent of a
- * `search()` call) so a future UI can render the input box's own value;
- * `results` is the last real search's own render model.
+ * Shim — physically moved to `src/os/messenger/desktop/renderer/fedos_desktop_search_renderer.ts`
+ * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
+ * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+ * `docs/architecture/MESSENGER-MIGRATION-STAGING.md`). Kept here so any
+ * not-yet-updated importer elsewhere in the repo keeps resolving and
+ * compiling.
  */
-
-import type { FedosDesktopSearchViewModel } from "../presentation/fedos_desktop_search_view_model.js";
-import type { FedosContentAccessorSearchHit } from "../content_accessor/fedos_desktop_conversation_content_accessor_result.js";
-import { fedosRenderModel, fedosRenderList, type FedosDesktopRenderModel, type FedosDesktopRenderList } from "./fedos_desktop_render_model.js";
-
-export interface FedosDesktopSearchRenderModel {
-  readonly query: string;
-  readonly results: FedosDesktopRenderModel<FedosDesktopRenderList<FedosContentAccessorSearchHit>>;
-}
-
-export class FedosDesktopSearchRenderer {
-  readonly #viewModel: FedosDesktopSearchViewModel;
-
-  constructor(viewModel: FedosDesktopSearchViewModel) {
-    this.#viewModel = viewModel;
-  }
-
-  render(): FedosDesktopSearchRenderModel {
-    return Object.freeze({
-      query: this.#viewModel.query,
-      results: fedosRenderModel(this.#viewModel.state, (items) => fedosRenderList(items)),
-    });
-  }
-}
+export * from "../../os/messenger/desktop/renderer/fedos_desktop_search_renderer.js";

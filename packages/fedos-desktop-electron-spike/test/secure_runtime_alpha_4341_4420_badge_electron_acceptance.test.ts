@@ -49,8 +49,8 @@ const preloadCjsPath = `${packageDir}/dist/fedos_electron_badge_preload.cjs`;
 const pageHtmlPath = `${packageDir}/dist/fedos_electron_badge_page.html`;
 const rendererJsPath = `${packageDir}/dist/fedos_electron_badge_renderer.js`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
-const rootDistBadgeCoordinatorPath = `${repoRoot}/dist/desktop/badge/fedos_desktop_badge_coordinator.js`;
-const rootDistRuntimePath = `${repoRoot}/dist/desktop/runtime/fedos_desktop_runtime.js`;
+const rootDistBadgeCoordinatorPath = `${repoRoot}/dist/os/messenger/desktop/badge/fedos_desktop_badge_coordinator.js`;
+const rootDistRuntimePath = `${repoRoot}/dist/os/messenger/desktop/runtime/fedos_desktop_runtime.js`;
 
 let spawnedElectronPid: number | undefined;
 function killSpawnedElectronIfAny(): void {
