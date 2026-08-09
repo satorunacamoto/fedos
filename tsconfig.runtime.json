@@ -8,7 +8,7 @@
     "src/desktop/runtime/run_fedos_desktop_runtime.ts",
     "src/desktop/navigation/fedos_desktop_conversation_window_registry.ts",
     "src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.ts",
-    "src/desktop/notification/fedos_desktop_notification_coordinator.ts",
+    "src/os/messenger/notifications/fedos_desktop_notification_coordinator.ts",
     "src/desktop/tray/fedos_desktop_tray_coordinator.ts",
     "src/desktop/background/fedos_desktop_background_lifecycle_coordinator.ts",
     "src/desktop/presentation/fedos_desktop_notifications_tray_status_view_model.ts",

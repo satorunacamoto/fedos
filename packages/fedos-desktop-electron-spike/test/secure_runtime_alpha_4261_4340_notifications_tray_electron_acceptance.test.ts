@@ -53,7 +53,7 @@ const preloadCjsPath = `${packageDir}/dist/fedos_electron_notifications_tray_pre
 const pageHtmlPath = `${packageDir}/dist/fedos_electron_notifications_tray_page.html`;
 const rendererJsPath = `${packageDir}/dist/fedos_electron_notifications_tray_renderer.js`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
-const rootDistNotificationCoordinatorPath = `${repoRoot}/dist/desktop/notification/fedos_desktop_notification_coordinator.js`;
+const rootDistNotificationCoordinatorPath = `${repoRoot}/dist/os/messenger/notifications/fedos_desktop_notification_coordinator.js`;
 const rootDistTrayCoordinatorPath = `${repoRoot}/dist/desktop/tray/fedos_desktop_tray_coordinator.js`;
 const rootDistBackgroundLifecyclePath = `${repoRoot}/dist/desktop/background/fedos_desktop_background_lifecycle_coordinator.js`;
 

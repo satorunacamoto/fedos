@@ -2,10 +2,11 @@
  * OS Capability Modularization — `NotificationPort` adapter.
  *
  * Implements `NotificationPort` (`../../core/ports/notification_port.js`,
- * owned by a concurrent agent in this same arc) by delegating to the real,
- * unmoved `FedosDesktopNotificationCoordinator`
- * (`../../../desktop/notification/fedos_desktop_notification_coordinator.js`
- * — the LIVE notification coordinator; NOT the dormant top-level
+ * owned by a concurrent agent in this same arc) by delegating to the real
+ * `FedosDesktopNotificationCoordinator`
+ * (`../notifications/fedos_desktop_notification_coordinator.js`
+ * — the LIVE notification coordinator, physically moved here by Stage 5 of
+ * the FedOS Messenger migration; NOT the dormant top-level
  * `src/notification/`, which is unrelated and out of this arc's scope).
  *
  * IMPORTANT SHAPE MISMATCH, handled deliberately rather than papered over:
@@ -33,8 +34,8 @@
  */
 
 import type { NotificationMeta, NotificationPort } from "../../core/ports/notification_port.js";
-import type { FedosDesktopNotificationCoordinator } from "../../../desktop/notification/fedos_desktop_notification_coordinator.js";
-import { FEDOS_DESKTOP_NOTIFICATION_KINDS, type FedosDesktopNotificationKind } from "../../../desktop/notification/fedos_desktop_notification_types.js";
+import type { FedosDesktopNotificationCoordinator } from "../notifications/fedos_desktop_notification_coordinator.js";
+import { FEDOS_DESKTOP_NOTIFICATION_KINDS, type FedosDesktopNotificationKind } from "../notifications/fedos_desktop_notification_types.js";
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(FEDOS_DESKTOP_NOTIFICATION_KINDS);
 
