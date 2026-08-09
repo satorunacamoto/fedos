@@ -15,7 +15,7 @@ export type FedosDeletionRecipientSuppliedLocalOutcome = "completed" | "partiall
 export interface FedosPersistedDeletionRecipientDecisionRecordV1 {
   readonly schemaVersion: 1;
   readonly requestId: string;
-  readonly decisionState: import("../../../../conversation/deletion_request/fedos_deletion_recipient_decision_state.js").FedosDeletionRecipientDecisionState;
+  readonly decisionState: import("./fedos_deletion_recipient_decision_state.js").FedosDeletionRecipientDecisionState;
   /** Mirrors `b3b3a6d`'s own `FedosDeletionExecutionTerminalStatus` verbatim — never invents a fourth value. `null` until a caller EXPLICITLY supplies one (never set by this Arc's own automatic evaluation). */
   readonly suppliedLocalOutcome: FedosDeletionRecipientSuppliedLocalOutcome | null;
   readonly recordedAt: number;

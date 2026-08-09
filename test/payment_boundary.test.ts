@@ -87,7 +87,11 @@ describe("PlaceholderPaymentProvider", () => {
   it("accepts a policy-clean request as accepted_placeholder", async () => {
     const provider = new PlaceholderPaymentProvider();
     const decision = await provider.requestPayment(request());
-    expect(decision).toEqual({
+    // paymentId is an opaque, provider-assigned identity (BTCPay-readiness) --
+    // asserted separately rather than pinned to an exact string.
+    expect(typeof decision.paymentId).toBe("string");
+    expect(decision.paymentId?.length).toBeGreaterThan(0);
+    expect(decision).toMatchObject({
       allowed: true,
       status: "accepted_placeholder",
       rail: "manual_placeholder",

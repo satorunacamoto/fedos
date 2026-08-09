@@ -45,12 +45,22 @@ export type PaymentRail =
 /**
  * Coarse outcome/state of a payment request or the provider itself. No
  * secret, card, wallet, or invoice/checkout data is exposed at any state.
+ *
+ * `expired`/`refunded` were added for BTCPay-readiness (Compatibility
+ * Facade Reduction + Package Extraction Readiness arc) — a real
+ * invoice-based rail can genuinely expire before payment, or a settled
+ * payment can be refunded after the fact. Neither implies THIS boundary
+ * ever verified a settlement; see `PaymentEvidence` below for the
+ * separate, explicit "was this actually settled" concept a real provider
+ * would report via `observePayment`/`ingestCallback`.
  */
 export type PaymentStatus =
   | "unavailable" // no payment backend is configured (the no-op default)
   | "pending" // recorded as awaiting a future (not-yet-implemented) step
   | "accepted_placeholder" // PLACEHOLDER: passed policy — NOTHING was charged/settled
   | "rejected" // policy denied the request (e.g. bad amount, sensitive metadata)
+  | "expired" // the request/invoice's validity window elapsed before settlement
+  | "refunded" // a previously-settled payment was reversed
   | "error"; // an attempt could not be served; recorded as state, never thrown
 
 /**
@@ -83,6 +93,20 @@ export interface PaymentRequest {
   readonly metadata?: Readonly<Record<string, string>>;
   /** Unix timestamp (seconds) the request was built, when known. */
   readonly createdAt?: number;
+  /**
+   * Caller-supplied dedup key (BTCPay-readiness). A provider MUST treat two
+   * requests with the same `idempotencyKey` as the same logical request —
+   * e.g. return the existing decision/payment rather than minting a second
+   * invoice. Opaque, non-secret; the caller mints it (a UUID, a purchase
+   * attempt id), never the provider.
+   */
+  readonly idempotencyKey?: string;
+  /**
+   * Unix timestamp (seconds) after which the request/invoice is no longer
+   * payable (BTCPay-readiness). Optional — a provider without an expiry
+   * concept (e.g. `manual_placeholder`) may ignore it.
+   */
+  readonly expiresAt?: number;
 }
 
 /**
@@ -101,6 +125,18 @@ export interface PaymentDecision {
   readonly productId: string;
   /** Opaque public pubkey of the would-be buyer, when known. Not a secret. */
   readonly buyerPubkey?: string;
+  /**
+   * Opaque provider-assigned identity for this payment/invoice
+   * (BTCPay-readiness). Nothing to key a later `observePayment` call
+   * against existed before this field — without it, a real invoice-based
+   * rail has nowhere to put its invoice id. `undefined` when the decision
+   * carries no addressable payment (e.g. `rejected`/`unavailable`).
+   */
+  readonly paymentId?: string;
+  /** Echoed back from the request, when the caller supplied one. */
+  readonly idempotencyKey?: string;
+  /** Carried through from the request, or set by the provider if it owns expiry. */
+  readonly expiresAt?: number;
 }
 
 /** Coarse, non-sensitive read of whether a provider is present/ready. */
@@ -110,12 +146,49 @@ export interface PaymentProviderStatus {
 }
 
 /**
+ * The settled/terminal-state read of a payment, distinct from
+ * `PaymentDecision` (BTCPay-readiness). A `PaymentDecision` is the answer to
+ * "may/did this request go through the policy gate" at REQUEST time;
+ * `PaymentEvidence` is the answer to "what is the current real-world state
+ * of a specific, already-identified payment" at OBSERVATION time — the
+ * concept a real rail's status-poll or webhook ultimately produces. Kept as
+ * a separate type deliberately: conflating the two would force every
+ * `PaymentDecision` consumer to also handle terminal/webhook-only states,
+ * and would blur "policy said yes" with "money actually moved" — the exact
+ * conflation this boundary's own guardrails have always forbidden.
+ */
+export interface PaymentEvidence {
+  readonly paymentId: string;
+  readonly productId: string;
+  /** Unix timestamp (seconds) this evidence was observed/ingested. */
+  readonly observedAt: number;
+  /**
+   * Deliberately NOT the same union as `PaymentStatus` — evidence only ever
+   * reports a TERMINAL or settlement-adjacent state, never `pending`/
+   * `accepted_placeholder` (those are request-time-only concepts).
+   */
+  readonly status: "settled" | "expired" | "refunded" | "error";
+  /** Non-sensitive explanation. Never echoes secret/card/wallet content. */
+  readonly reason: string;
+}
+
+/**
  * The payment seam. Implementations MUST NOT charge a card, open a Lightning
  * channel/invoice, build a checkout session, contact a wallet, or issue a
- * `fetch`. `requestPayment` never throws — it resolves to a `PaymentDecision`
- * (including `rejected`/`error`). An `accepted_placeholder` decision means
- * only "policy-clean", never "paid". Constructing an implementation does
- * nothing.
+ * `fetch`. Every method is total and non-throwing — outcomes (including
+ * `rejected`/`error`/a malformed callback) are reported as data, never
+ * thrown. An `accepted_placeholder` decision means only "policy-clean",
+ * never "paid". Constructing an implementation does nothing.
+ *
+ * BTCPay-readiness (Compatibility Facade Reduction + Package Extraction
+ * Readiness arc): widened from a single-call request/decision seam to cover
+ * the full lifecycle a real invoice-based rail needs — status observation,
+ * webhook/callback ingestion, and optional cancel/refund. No BTCPay-specific
+ * type (`BTCPayInvoice`/`BTCPayStore`/`BTCPayWebhook` or similar) appears
+ * here or anywhere in `os/commerce/payment/` — a future BTCPay adapter
+ * normalizes BTCPay's own wire shapes into this domain-neutral contract
+ * from inside its own reserved `payment/adapters/btcpay/` directory,
+ * exactly the same pattern already enforced for Nostr in `os/commerce/catalog/adapters/nostr/`.
  */
 export interface PaymentProvider {
   /** Current coarse status (pure read). */
@@ -125,9 +198,42 @@ export interface PaymentProvider {
   /**
    * Ask to accept payment for a request. Charges NOTHING in this stage.
    * Evaluates the request against the payment policy and returns a decision;
-   * never throws and never mutates the request.
+   * never throws and never mutates the request. Idempotent when
+   * `request.idempotencyKey` is supplied and reused — a provider MUST
+   * return the existing decision rather than minting a second payment.
    */
   requestPayment(request: PaymentRequest): Promise<PaymentDecision>;
+  /**
+   * Poll the current real-world state of a previously-identified payment
+   * (BTCPay-readiness — the status-polling gap a single-call `requestPayment`
+   * cannot cover). Never throws; an unknown `paymentId` resolves to a
+   * `PaymentEvidence` with `status: "error"`, not a rejected promise.
+   */
+  observePayment(paymentId: string): Promise<PaymentEvidence>;
+  /**
+   * Normalize an inbound provider callback/webhook payload into
+   * `PaymentEvidence` (BTCPay-readiness). Returns `null` for a payload the
+   * provider does not recognize or cannot parse — a malformed/foreign
+   * callback is data, never a thrown error. Implementations MUST verify any
+   * callback signature/HMAC themselves before returning non-null evidence;
+   * this contract does not model the verification step itself (rail-specific).
+   */
+  ingestCallback(payload: unknown): Promise<PaymentEvidence | null>;
+  /**
+   * Cancel a payment BEFORE settlement (BTCPay-readiness, optional — not
+   * every rail has a cancellable pre-settlement window, e.g.
+   * `manual_placeholder`). Deliberately a DIFFERENT method from any future
+   * refund concept: cancellation prevents a payment that hasn't happened
+   * yet; refund reverses one that has. Never throws.
+   */
+  cancelPayment?(paymentId: string): Promise<PaymentDecision>;
+  /**
+   * Refund a previously-settled payment (BTCPay-readiness, optional, kept
+   * semantically separate from `cancelPayment` per the guardrail above).
+   * Resolves to the resulting `PaymentEvidence` (`status: "refunded"` on
+   * success). Never throws.
+   */
+  refundPayment?(paymentId: string): Promise<PaymentEvidence>;
 }
 
 /** Every placeholder rail name (for mapping/documentation helpers). */

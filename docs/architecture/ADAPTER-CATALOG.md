@@ -26,12 +26,28 @@ shims (`src/conversation/...`, `src/desktop/notification/...`) — repointed
 this pass (see `FACTORY-PORT-COMPLETION-PLAN.md`'s execution record for
 the full internal-import sweep).
 
-### Safe Noop defaults (`src/os/messenger/adapters/noop_messenger_ports.ts`, new this pass)
+### Safe Noop defaults (`src/os/messenger/adapters/noop_messenger_ports.ts`)
 
-`NoopMessagingPort`, `NoopConversationPort`, `NoopNotificationPort` — every
-method total, never throws, zero external contact. Exist so
+`NoopMessagingPort`, `NoopConversationPort`, `NoopNotificationPort`, and
+`NoopTransportPort` (added Compatibility Facade Reduction + Package
+Extraction Readiness + Remaining Architecture Debt Closure arc, Agent P) —
+every method total, never throws, zero external contact. Exist so
 `createMessenger()` (`src/os/messenger/create_messenger.ts`) has a
 genuinely safe default for any Port a caller omits.
+
+### `TransportPort` adapter (`src/os/messenger/adapters/nostr_transport_adapter.ts`, Agent P this arc)
+
+| Adapter | Implements | Delegates to (real, stable entry points only) | Notes |
+|---|---|---|---|
+| `NostrTransportAdapter` | `TransportPort` (`send`/`subscribe`/`connect`/`disconnect`/`status`) | `RelayPublisher` (`adapters/nostr/protocol/publish.ts`) for write, `RelayAdapter` (`adapters/nostr/protocol/relay.ts`) for read — both STABLE interfaces this adapter is handed a concrete implementation of, never `ws_relay.ts`/`FedosRelay`/`FedosConversationRelaySet` directly (Agent N concurrency note, this arc). | Never chooses a Nostr `kind`, never signs, never decides public-vs-private — all delegated to an injected `NostrTransportEventSource` the composition root supplies. `subscribe()` is honestly poll-based (`RelayAdapter.query()` has no push primitive), gated on `connect()`'s logical "armed" flag since neither `RelayPublisher` nor `RelayAdapter` exposes a real persistent-socket state to this adapter. `pollOnce()` (test-only) mirrors `dispatchInbound()`'s "test-callable escape hatch" precedent. |
+
+Proven against `TransportPort` two ways: type-level `implements` plus a
+runtime shape/behavior check against hand-built `RelayPublisher`/
+`RelayAdapter`/`NostrTransportEventSource` doubles
+(`test/architecture_boundary_adapter_port_shapes.test.ts`, 9 new tests),
+and a from-scratch `FakeTransportPortAdapter` worked example proving
+`createMessenger({ transport: fake })` constructs and is usable
+(`test/example_fake_transport_adapter.test.ts`, 4 new tests).
 
 ### `SealingAuthorityPort` implementers (Agent S, this arc's earlier phase)
 
@@ -96,7 +112,7 @@ keeps passing without silently widening what commerce may import.
 | BTCPay payment rail adapter | `src/os/commerce/payment/adapters/btcpay/` (directory exists, 0 `.ts` files) | **RESERVED.** No BTCPay SDK dependency installed anywhere in this repo (same enforced check). `PaymentRail`'s `"lightning_placeholder"` etc. are labels of future intent only — see `src/os/commerce/payment/types.ts`'s own header. |
 | Contacts capability | `src/os/messenger/contacts/` (`README.md` only) | **RESERVED / NOT IMPLEMENTED.** |
 | Onion/Tor transport | `src/os/messenger/onion/` (`README.md` only) | **RESERVED / NOT IMPLEMENTED.** Per prior arc findings (see this repo's own memory of "onion corpus is 6,050 lines of zero code" from an earlier review), no working onion-routing code exists anywhere reachable from the shipped app. |
-| `TransportPort` (a pluggable, non-Nostr messaging transport) | Does not exist anywhere in `src/os/core/ports/` | **NOT IMPLEMENTED, NOT ATTEMPTED THIS PASS.** `createMessenger()` (this pass) deliberately does NOT add one — see that file's own header for the full honest scope statement. The real messaging pipeline stays hard-wired to Nostr-shaped delivery internals. |
+| `TransportPort` | `src/os/core/ports/transport_port.ts` | **IMPLEMENTED** (Compatibility Facade Reduction + Package Extraction Readiness + Remaining Architecture Debt Closure arc, Agent P) — see that file's own header for the design, `src/os/messenger/adapters/nostr_transport_adapter.ts` for a real Nostr adapter (`NostrTransportAdapter`), and `createMessenger()`'s own header for what `transport` is (and is not yet) wired to: the Port and a real adapter exist and are independently usable/testable, but the real messaging pipeline (`FedosConversationDirectMessagingCoordinator`) still does NOT consume it — it stays hard-wired to its own Nostr-shaped delivery internals. Moved out of the table below into the "Real, implemented adapters" section. |
 | `LocalAIProvider` | `src/os/core/ports/local_ai_provider.ts` (interface only) | **RESERVED / NOT IMPLEMENTED.** Zero implementations anywhere in the repo. |
 
 ## Framework-neutral, NON-`os/core`-Port adapter (for disambiguation)

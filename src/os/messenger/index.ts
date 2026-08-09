@@ -7,13 +7,15 @@
  * needs:
  *   - `createMessenger()`/`Messenger`/`MessengerDependencies` — the public
  *     composition entrypoint added this pass (`./create_messenger.js`;
- *     see that file's own header for its `TransportPort`/`storage` scope
- *     limitations).
- *   - The three real Port adapters (`FedosMessenger*PortAdapter`) and
- *     their dependency shapes — for a composition root that wants to wire
- *     REAL coordinator-backed behavior into `createMessenger()` rather
- *     than accept the Noop defaults.
- *   - The three `Noop*Port` safe defaults — for a caller that wants to
+ *     see that file's own header for its `transport`/`storage` scope
+ *     details).
+ *   - The four real Port adapters (`FedosMessenger*PortAdapter` plus
+ *     `NostrTransportAdapter`, added Compatibility Facade Reduction +
+ *     Package Extraction Readiness + Remaining Architecture Debt Closure
+ *     arc, Agent P) and their dependency shapes — for a composition root
+ *     that wants to wire REAL coordinator/relay-backed behavior into
+ *     `createMessenger()` rather than accept the Noop defaults.
+ *   - The four `Noop*Port` safe defaults — for a caller that wants to
  *     construct one explicitly (e.g. in a test) rather than relying on
  *     `createMessenger()`'s own default-resolution.
  *
@@ -46,5 +48,15 @@ export {
   type FedosMessengerConversationPortAdapterDependencies,
 } from "./adapters/conversation_port_adapter.js";
 export { FedosMessengerNotificationPortAdapter } from "./adapters/notification_port_adapter.js";
+export {
+  NostrTransportAdapter,
+  type NostrTransportAdapterOptions,
+  type NostrTransportEventSource,
+} from "./adapters/nostr_transport_adapter.js";
 
-export { NoopMessagingPort, NoopConversationPort, NoopNotificationPort } from "./adapters/noop_messenger_ports.js";
+export {
+  NoopMessagingPort,
+  NoopConversationPort,
+  NoopNotificationPort,
+  NoopTransportPort,
+} from "./adapters/noop_messenger_ports.js";

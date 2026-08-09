@@ -45,8 +45,27 @@ describe("Secure Runtime Alpha 233 -- NIP-01 Wire Parser", () => {
     expect(codeOnly).not.toMatch(/schnorr|sha256|NobleSignatureVerifier|verifyEventId/);
   });
 
-  it("4. structural: no reference to src/nostr/* or src/sign/* anywhere in this file", () => {
-    expect(parserSource).not.toMatch(/from ".*\/(nostr|sign)\//);
+  it("4. structural: no reference to legacy/pre-consolidation Nostr crypto or quarantined legacy code", () => {
+    // This guardrail originally forbade ANY `/nostr/`-or-`/sign/`-path-segment
+    // import, back when the repo's only Nostr code lived at the flat
+    // `src/nostr/`/`src/sign/` paths (pre-Messenger-migration) this file was
+    // deliberately kept independent from. Both flat paths were physically
+    // migrated away (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`) and no
+    // longer exist on disk; the canonical Nostr protocol code now lives at
+    // `src/os/messenger/adapters/nostr/protocol/`, which legitimately
+    // contains a `/nostr/` path segment. A same-repo `/nostr/` substring
+    // match is therefore no longer a meaningful signal — the Nostr
+    // Consolidation Plan's own Step 5 re-verified this file's `parseWireEvent`
+    // as a byte-for-byte duplicate of `protocol/event.ts`'s `isNostrEvent`
+    // and switched it to import (and delegate to) that canonical function
+    // instead of re-implementing the same structural checks a second time.
+    // The real invariant this guardrail protects — no reach into
+    // quarantined legacy code, no re-mixing crypto/signature verification
+    // into this pure structural parser (crypto symbols are already checked
+    // by test 3 above) — is what survives, re-expressed against paths that
+    // still exist.
+    expect(parserSource).not.toMatch(/from ".*\/_legacy_prototype\//);
+    expect(parserSource).not.toMatch(/from ".*\/(noble_signature|signature|crypto)\.js"/);
   });
 
   it("5. the design doc cross-references Alpha 232, Alpha 234, Alpha 231, and Alpha 235", () => {

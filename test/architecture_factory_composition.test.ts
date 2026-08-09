@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { createMessenger, type Messenger } from "../src/os/messenger/create_messenger.js";
 import { createCommerce, type Commerce } from "../src/os/commerce/create_commerce.js";
-import { NoopMessagingPort, NoopConversationPort, NoopNotificationPort } from "../src/os/messenger/adapters/noop_messenger_ports.js";
+import {
+  NoopMessagingPort,
+  NoopConversationPort,
+  NoopNotificationPort,
+  NoopTransportPort,
+} from "../src/os/messenger/adapters/noop_messenger_ports.js";
 import { NoopPaymentProvider } from "../src/os/commerce/payment/noop_payment.js";
 import { NoopMarketplaceProvider } from "../src/os/commerce/marketplace/noop_marketplace.js";
 import { InMemoryProductDirectory } from "../src/os/commerce/catalog/directory.js";
@@ -38,6 +43,7 @@ describe("createMessenger()", () => {
     expect(messenger.messaging).toBeInstanceOf(NoopMessagingPort);
     expect(messenger.conversations).toBeInstanceOf(NoopConversationPort);
     expect(messenger.notifications).toBeInstanceOf(NoopNotificationPort);
+    expect(messenger.transport).toBeInstanceOf(NoopTransportPort);
   });
 
   it("every method on the default-constructed Messenger is callable without throwing", async () => {
@@ -78,18 +84,37 @@ describe("createMessenger()", () => {
     expect(readiness).toBeNull();
 
     expect(() => messenger.notifications.notify("title", "body", { kind: "conversation-message" })).not.toThrow();
+
+    const connectStatus = await messenger.transport.connect();
+    expect(connectStatus).toBe("disconnected"); // Noop never actually connects.
+    const transportSendResult = await messenger.transport.send("peer-1", new Uint8Array([1, 2, 3]));
+    expect(transportSendResult).toEqual({ sent: false, reason: "not-connected" });
+    const transportUnsubscribe = messenger.transport.subscribe("peer-1", () => {});
+    expect(typeof transportUnsubscribe).toBe("function");
+    transportUnsubscribe();
+    await messenger.transport.disconnect();
   });
 
-  it("accepts explicitly-injected real Port instances instead of defaulting", () => {
+  it("accepts explicitly-injected real Port instances instead of defaulting, including transport", () => {
     const messaging = new NoopMessagingPort();
     const conversations = new NoopConversationPort();
     const notifications = new NoopNotificationPort();
+    const transport = new NoopTransportPort();
 
-    const messenger = createMessenger({ messaging, conversations, notifications });
+    const messenger = createMessenger({ messaging, conversations, notifications, transport });
 
     expect(messenger.messaging).toBe(messaging);
     expect(messenger.conversations).toBe(conversations);
     expect(messenger.notifications).toBe(notifications);
+    expect(messenger.transport).toBe(transport);
+  });
+
+  it("omitting transport still constructs successfully with the Noop default -- backward compatible with every pre-existing createMessenger() call site", () => {
+    const messaging = new NoopMessagingPort();
+    const messenger = createMessenger({ messaging });
+
+    expect(messenger.messaging).toBe(messaging);
+    expect(messenger.transport).toBeInstanceOf(NoopTransportPort);
   });
 });
 

@@ -76,6 +76,8 @@ function spyRuntime(): { runtime: AppRuntime; calls: SpyCallCounts } {
       calls.requestPayment += 1;
       return base.paymentProvider.requestPayment(request);
     },
+    observePayment: (paymentId: string) => base.paymentProvider.observePayment(paymentId),
+    ingestCallback: (payload: unknown) => base.paymentProvider.ingestCallback(payload),
   };
 
   const relayPublisher = {

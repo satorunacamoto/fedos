@@ -1,7 +1,9 @@
 /**
- * OS Capability Modularization — Factory/Port Completion pass. Safe,
- * zero-external-contact default implementations of the three widened
- * `os/core/ports/*` Messenger ports.
+ * OS Capability Modularization — Factory/Port Completion pass, extended by
+ * the Compatibility Facade Reduction + Package Extraction Readiness +
+ * Remaining Architecture Debt Closure arc (Agent P) to add
+ * `NoopTransportPort`. Safe, zero-external-contact default implementations
+ * of the four `os/core/ports/*` Messenger ports.
  *
  * Mirrors this codebase's own established `Noop*` convention
  * (`NoopPaymentProvider`, `NoopMarketplaceProvider`,
@@ -43,6 +45,14 @@ import type {
   Unsubscribe,
 } from "../../core/ports/messaging_port.js";
 import type { NotificationMeta, NotificationPort } from "../../core/ports/notification_port.js";
+import type {
+  TransportConnectionStatus,
+  TransportEndpointRef,
+  TransportHandler,
+  TransportPort,
+  TransportSendResult,
+  TransportUnsubscribe,
+} from "../../core/ports/transport_port.js";
 
 /**
  * Permanently "no backend configured": every send/read fails closed with
@@ -109,5 +119,35 @@ export class NoopConversationPort
 export class NoopNotificationPort implements NotificationPort {
   notify(_title: string, _body: string, _meta?: NotificationMeta): void {
     // Intentionally does nothing.
+  }
+}
+
+/**
+ * Permanently "no backend configured": `connect()` always resolves
+ * `"disconnected"` (never actually connects), `send()` always fails
+ * closed with `"not-connected"`, and `subscribe()` registers a handler
+ * that is never called and returns a working, callable unsubscribe.
+ * Contacts no relay/socket of any kind — constructing and using an
+ * instance is always safe.
+ */
+export class NoopTransportPort implements TransportPort {
+  async connect(): Promise<TransportConnectionStatus> {
+    return "disconnected";
+  }
+
+  async disconnect(): Promise<void> {
+    // Intentionally does nothing -- never connected in the first place.
+  }
+
+  status(): TransportConnectionStatus {
+    return "disconnected";
+  }
+
+  async send(_destination: TransportEndpointRef, _payload: Uint8Array): Promise<TransportSendResult> {
+    return { sent: false, reason: "not-connected" };
+  }
+
+  subscribe(_destination: TransportEndpointRef, _handler: TransportHandler): TransportUnsubscribe {
+    return () => {};
   }
 }

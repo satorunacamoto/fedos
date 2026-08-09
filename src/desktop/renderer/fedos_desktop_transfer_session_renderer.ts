@@ -1,4 +1,5 @@
 /**
+ * @deprecated Compatibility shim -- import from "../../os/messenger/desktop/renderer/fedos_desktop_transfer_session_renderer.js" instead. See docs/architecture/COMPATIBILITY-FACADE-LIFECYCLE.md.
  * Shim — physically moved to `src/os/messenger/desktop/renderer/fedos_desktop_transfer_session_renderer.ts`
  * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
  * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and

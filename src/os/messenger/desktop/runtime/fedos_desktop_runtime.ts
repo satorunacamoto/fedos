@@ -250,7 +250,7 @@ import { AppendOnlyFedosDeviceRegistryPersistence } from "../../device/persisten
 import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
 import { PersistedFedosDeviceTrustAuthority } from "../../device/persistence/persisted_fedos_device_trust_authority.js";
 import { UnavailableFedosDeviceRegistrationAuthority } from "../../device/unavailable_fedos_device_registration_authority.js";
-import { FedosSyncState } from "../../../../sync/fedos_sync_state.js";
+import { FedosSyncState } from "../../sync/fedos_sync_state.js";
 import { FedosDeviceTrustRuntime } from "./fedos_device_trust_runtime.js";
 
 // Secure Runtime Alpha 3801-3880 (Device Sync Operational Status and
@@ -280,9 +280,9 @@ import type { FedosDeviceBindingChallengeReplayPersistence } from "../../device/
 import { AppendOnlyFedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/append_only_fedos_device_binding_challenge_replay_persistence.js";
 import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../../device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
 import { FedosDevicePairingFacade } from "./fedos_device_pairing_facade.js";
-import type { FedosSyncJournalPersistence } from "../../../../sync/persistence/fedos_sync_journal_persistence.js";
-import { AppendOnlyFedosSyncJournalPersistence } from "../../../../sync/persistence/append_only_fedos_sync_journal_persistence.js";
-import { InMemoryFedosSyncJournalPersistence } from "../../../../sync/persistence/in_memory_fedos_sync_journal_persistence.js";
+import type { FedosSyncJournalPersistence } from "../../sync/persistence/fedos_sync_journal_persistence.js";
+import { AppendOnlyFedosSyncJournalPersistence } from "../../sync/persistence/append_only_fedos_sync_journal_persistence.js";
+import { InMemoryFedosSyncJournalPersistence } from "../../sync/persistence/in_memory_fedos_sync_journal_persistence.js";
 // Secure Runtime Alpha 6521-6600 (FedOS Desktop Beta Production Runtime
 // Configuration Unification Arc) -- every import below this comment is
 // ADDITIVE ONLY, closing the gap this Arc's own mission names: production

@@ -1,22 +1,28 @@
 import { describe, it, expect } from "vitest";
+// Compatibility Facade Reduction + Package Extraction Readiness arc: these
+// `?raw` imports now point at the real (moved) source under
+// `os/messenger/sync/` -- `../src/sync/*.ts` are one-line
+// `export * from "../os/messenger/sync/*.js";` shims as of this arc, so a
+// `?raw` import of the OLD path would only see the shim's own one line, not
+// the class/interface bodies these structural guards inspect.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deviceBindingSource from "../src/sync/fedos_sync_device_binding.ts?raw";
+import deviceBindingSource from "../src/os/messenger/sync/fedos_sync_device_binding.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deviceRegistrySource from "../src/sync/fedos_sync_device_registry.ts?raw";
+import deviceRegistrySource from "../src/os/messenger/sync/fedos_sync_device_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import journalSource from "../src/sync/fedos_sync_journal.ts?raw";
+import journalSource from "../src/os/messenger/sync/fedos_sync_journal.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cursorSource from "../src/sync/fedos_sync_cursor.ts?raw";
+import cursorSource from "../src/os/messenger/sync/fedos_sync_cursor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conflictSource from "../src/sync/fedos_sync_conflict.ts?raw";
+import conflictSource from "../src/os/messenger/sync/fedos_sync_conflict.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import pendingChangesSource from "../src/sync/fedos_sync_pending_changes.ts?raw";
+import pendingChangesSource from "../src/os/messenger/sync/fedos_sync_pending_changes.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import queueSource from "../src/sync/fedos_sync_queue.ts?raw";
+import queueSource from "../src/os/messenger/sync/fedos_sync_queue.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recoverySource from "../src/sync/fedos_sync_recovery.ts?raw";
+import recoverySource from "../src/os/messenger/sync/fedos_sync_recovery.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import stateSource from "../src/sync/fedos_sync_state.ts?raw";
+import stateSource from "../src/os/messenger/sync/fedos_sync_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 

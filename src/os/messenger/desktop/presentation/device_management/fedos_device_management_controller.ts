@@ -28,7 +28,6 @@
  * timer of any kind exists anywhere in this file.
  */
 
-import type { FedosDesktopConversationUiPresentationBoundary } from "../fedos_desktop_conversation_ui_presentation_boundary.js";
 import type { FedosDesktopDeviceInventoryViewModel } from "../fedos_desktop_device_inventory_view_model.js";
 import type { FedosDesktopDeviceSyncStatusViewModel } from "../fedos_desktop_device_sync_status_view_model.js";
 import type { FedosDesktopSyncScheduleViewModel } from "../fedos_desktop_sync_schedule_view_model.js";
@@ -78,6 +77,38 @@ import {
   FEDOS_DEVICE_MANAGEMENT_MAX_CONFLICTS_RENDERED,
 } from "./fedos_device_management_presentation_limits.js";
 
+/**
+ * The narrow slice of `FedosDesktopConversationUiPresentationBoundary`
+ * (`../fedos_desktop_conversation_ui_presentation_boundary.ts`) this
+ * controller's own constructor actually reads — the six already-existing
+ * Device Sync ViewModels it composes, nothing else (this file's own header
+ * already states it "calls NOTHING beyond those ViewModels' own already-
+ * public getters/actions").
+ *
+ * Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+ * reduction (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`,
+ * `test/architecture_cycle_detector.test.ts`) — this Port-shaped type
+ * replaces a direct `import type` of the full
+ * `FedosDesktopConversationUiPresentationBoundary`, which closed a 2-file
+ * type-only SCC with it (the boundary constructs this controller — a
+ * real, value-level edge — while this controller's constructor parameter
+ * type referenced the boundary right back). `FedosDesktopConversationUiPresentationBoundary`
+ * satisfies this interface structurally (it declares these exact six
+ * fields at these exact types) — the ONE real call site,
+ * `new FedosDeviceManagementController(this)` in the boundary's own
+ * constructor, needed no change. This is a Port-contract relocation, not
+ * a mega-types dumping ground: every field here is a genuinely-composed
+ * ViewModel this controller already imports and uses by name.
+ */
+export interface FedosDeviceManagementControllerBoundary {
+  readonly deviceInventory: FedosDesktopDeviceInventoryViewModel;
+  readonly deviceSyncStatus: FedosDesktopDeviceSyncStatusViewModel;
+  readonly syncSchedule: FedosDesktopSyncScheduleViewModel;
+  readonly transferSession: FedosDesktopTransferSessionViewModel;
+  readonly syncConflict: FedosDesktopSyncConflictViewModel;
+  readonly devicePairing: FedosDesktopDevicePairingViewModel;
+}
+
 export class FedosDeviceManagementController {
   readonly navigation = new FedosDeviceManagementNavigationState();
   readonly #deviceInventory: FedosDesktopDeviceInventoryViewModel;
@@ -91,7 +122,7 @@ export class FedosDeviceManagementController {
   #triggerInFlight = false;
   #revokeInFlight = false;
 
-  constructor(boundary: FedosDesktopConversationUiPresentationBoundary) {
+  constructor(boundary: FedosDeviceManagementControllerBoundary) {
     this.#deviceInventory = boundary.deviceInventory;
     this.#deviceSyncStatus = boundary.deviceSyncStatus;
     this.#syncSchedule = boundary.syncSchedule;

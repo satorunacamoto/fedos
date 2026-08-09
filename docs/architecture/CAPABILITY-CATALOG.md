@@ -115,7 +115,7 @@ explicitly inert scaffolding — see their own **Status** cell).
 |---|---|
 | Purpose | Inert, pre-pivot-prototype-derived scaffolding for a future digital-goods/marketplace capability — product catalog, payment-request policy boundary, marketplace listing boundary, creator trust/entitlement shapes. |
 | Layer | Domain capability (scaffolding-only today). |
-| Public API | `src/os/commerce/index.ts` (barrel, added this pass) — `createCommerce()`/`Commerce`/`CommerceDependencies`, catalog/payment/marketplace types + their real Noop/InMemory implementations. `creator/`, `support/` NOT re-exported (see barrel header). |
+| Public API | `src/os/commerce/index.ts` (barrel, added the prior arc) — `createCommerce()`/`Commerce`/`CommerceDependencies`, catalog/payment/marketplace types + their real Noop/InMemory implementations. `PaymentEvidence` added to the barrel's payment exports (Compatibility Facade Reduction + Package Extraction Readiness + Remaining Architecture Debt Closure arc, Agent F) — `PaymentProvider` was widened to a full BTCPay-readiness lifecycle this same arc (Agent P: `observePayment`/`ingestCallback`/optional `cancelPayment`/`refundPayment`, all returning/consuming `PaymentEvidence`), and the barrel had no way to name that type. `creator/`, `support/` NOT re-exported (see barrel header). |
 | Depends on | `os/core` (nothing today — no real Port dependency exists yet; `createCommerce()` accepts none). Architecturally forbidden from depending on `os/messenger` (enforced) and from leaking a Telegram/BTCPay SDK specifier outside its own reserved adapter directory (enforced, currently trivial — no such SDK installed). |
 | Ports consumed | None currently wired (the plan's speculative `{ payments, messaging, storage }` shape does not match real code — see `create_commerce.ts`'s own header for why `messaging`/`storage` were NOT added). |
 | Ports provided | None (commerce does not implement any `os/core/ports/*` Port). |
@@ -129,7 +129,7 @@ explicitly inert scaffolding — see their own **Status** cell).
 
 | Field | Value |
 |---|---|
-| Purpose | `catalog`: `Product`/`PurchaseGrant` model + `InMemoryProductDirectory`. `payment`: `PaymentProvider` seam + `NoopPaymentProvider`/`PlaceholderPaymentProvider` + pure bridge functions. `marketplace`: protocol-neutral listing seam + `NoopMarketplaceProvider`. `creator`: profile/trust/entitlement/reputation shapes (pure policy functions, no real verification). `support`: reserved Telegram ticketing seam. |
+| Purpose | `catalog`: `Product`/`PurchaseGrant` model + `InMemoryProductDirectory`. `payment`: `PaymentProvider` seam (widened to a full BTCPay-readiness lifecycle this arc — `getStatus`/`getCapabilities`/`requestPayment` plus `observePayment`/`ingestCallback`/optional `cancelPayment`/`refundPayment`, and the new `PaymentEvidence` terminal-state type, distinct from request-time `PaymentDecision`) + `NoopPaymentProvider`/`PlaceholderPaymentProvider` (both updated to implement the widened interface) + pure bridge functions. `marketplace`: protocol-neutral listing seam + `NoopMarketplaceProvider`. `creator`: profile/trust/entitlement/reputation shapes (pure policy functions, no real verification). `support`: reserved Telegram ticketing seam. |
 | Layer | Domain sub-buckets (all inert scaffolding per the parent row). |
 | Public API | `catalog`/`payment`/`marketplace` re-exported via `os/commerce/index.ts`; `creator`/`support` are not. |
 | Depends on | Each other minimally (`payment/commerce_bridge.ts` depends on `catalog/types.ts`). |

@@ -1,4 +1,5 @@
 /**
+ * @deprecated Compatibility shim -- import from "../os/messenger/desktop/static_nostr_public_identity_source.js" instead. See docs/architecture/COMPATIBILITY-FACADE-LIFECYCLE.md.
  * Shim — physically moved to `src/os/messenger/desktop/static_nostr_public_identity_source.ts`
  * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
  * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and

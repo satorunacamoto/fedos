@@ -66,16 +66,16 @@ import {
 import {
   reviewFedosSyncRecordForJournal,
   type FedosSyncAllowedRecordType,
-} from "../../../../sync/fedos_sync_record_allowlist.js";
+} from "../../sync/fedos_sync_record_allowlist.js";
 import {
   FedosSyncState,
   type FedosSyncApplyResult,
   type FedosSyncLocalChangeInput,
-} from "../../../../sync/fedos_sync_state.js";
-import type { FedosSyncCursor } from "../../../../sync/fedos_sync_cursor.js";
-import type { FedosSyncDeviceBinding } from "../../../../sync/fedos_sync_device_binding.js";
-import type { FedosSyncJournalAppendResult, FedosSyncJournalEntryV1 } from "../../../../sync/fedos_sync_journal.js";
-import type { FedosSyncRecoverySnapshotV1 } from "../../../../sync/fedos_sync_recovery.js";
+} from "../../sync/fedos_sync_state.js";
+import type { FedosSyncCursor } from "../../sync/fedos_sync_cursor.js";
+import type { FedosSyncDeviceBinding } from "../../sync/fedos_sync_device_binding.js";
+import type { FedosSyncJournalAppendResult, FedosSyncJournalEntryV1 } from "../../sync/fedos_sync_journal.js";
+import type { FedosSyncRecoverySnapshotV1 } from "../../sync/fedos_sync_recovery.js";
 
 export type FedosSyncChangeRejectedReason = "device-not-trusted" | "record-type-not-allowed";
 

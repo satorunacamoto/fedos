@@ -33,8 +33,8 @@
  * (genuinely concurrent, valid-but-conflicting contributions).
  */
 
-import type { FedosSyncConflictKind } from "../../../../sync/fedos_sync_conflict.js";
-import { reviewFedosSyncRecordForJournal } from "../../../../sync/fedos_sync_record_allowlist.js";
+import type { FedosSyncConflictKind } from "../../sync/fedos_sync_conflict.js";
+import { reviewFedosSyncRecordForJournal } from "../../sync/fedos_sync_record_allowlist.js";
 import type { FedosDeviceTrustState } from "../fedos_device_binding.js";
 
 export type FedosDeviceSyncConflictKind =

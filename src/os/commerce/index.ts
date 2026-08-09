@@ -60,6 +60,13 @@ export type {
   PaymentRail,
   PaymentStatus,
   PaymentCapability,
+  // `PaymentEvidence` added (Compatibility Facade Reduction + Package
+  // Extraction Readiness + Remaining Architecture Debt Closure arc,
+  // Agent F) -- `PaymentProvider.observePayment()`/`ingestCallback()`
+  // (Agent P's BTCPay-readiness widening) both return/consume it; a
+  // barrel consumer implementing or calling either method needs the type
+  // in scope, so it belongs alongside `PaymentProvider` itself.
+  PaymentEvidence,
 } from "./payment/types.js";
 export { NoopPaymentProvider, PlaceholderPaymentProvider } from "./payment/noop_payment.js";
 

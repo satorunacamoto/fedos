@@ -1,6 +1,10 @@
 /**
  * Stage 107 — Storage backend implementations.
  *
+ * RETIRED reserved seam (see `./types.ts`'s header and `./README.md` for
+ * this arc's final disposition) — kept as working, tested code; will not
+ * be wired to a real backend or repurposed for real Messenger persistence.
+ *
  * Two safe defaults for the `StorageBackend` seam (see `./types.js`). NEITHER
  * calls the Google Drive API, opens a Nostr relay WebSocket, touches SQLite,
  * a Bluetooth/Wi-Fi mesh, or an IPFS gateway, performs file IO, or issues a

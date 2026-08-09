@@ -35,9 +35,9 @@
  * for complete transparency.
  */
 
-import { FedosSyncState, type FedosSyncApplyResult } from "../../../../sync/fedos_sync_state.js";
-import type { FedosSyncJournalEntryV1 } from "../../../../sync/fedos_sync_journal.js";
-import type { FedosSyncConflictKind } from "../../../../sync/fedos_sync_conflict.js";
+import { FedosSyncState, type FedosSyncApplyResult } from "../../sync/fedos_sync_state.js";
+import type { FedosSyncJournalEntryV1 } from "../../sync/fedos_sync_journal.js";
+import type { FedosSyncConflictKind } from "../../sync/fedos_sync_conflict.js";
 import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import { classifyFedosDeviceSyncConflict, type FedosDeviceSyncConflictKind } from "./fedos_device_sync_conflict.js";
 import { planFedosDeviceSyncResolution, type FedosDeviceSyncResolutionDecision } from "./fedos_device_sync_conflict_authority.js";

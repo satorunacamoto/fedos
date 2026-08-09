@@ -198,7 +198,13 @@ describe("FedOS Runtime initializeCrypto Prototype reaches the Crypto Loader Fac
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(57);
+    // Secure Runtime Alpha 050-052 later added a 57th, fedos_runtime_identity.ts;
+    // the Nostr Consolidation Plan, Step 5 / architecture cycle detector
+    // baseline reduction later added a 58th and 59th,
+    // fedos_internal_rust_call_shape.ts and fedos_crypto_loader_backend_kind.ts
+    // (see each file's own header) -- all later, separate exceptions, same
+    // reasoning as the chain named in this test's own title.
+    expect(Object.keys(files).length).toBe(59);
   });
 
   it("14. repeated calls stay identical, and multiple independent runtimes agree", () => {

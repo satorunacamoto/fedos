@@ -10,6 +10,14 @@ import type {
   SendResult,
   Unsubscribe,
 } from "../src/os/core/ports/messaging_port.js";
+import type {
+  TransportConnectionStatus,
+  TransportEndpointRef,
+  TransportHandler,
+  TransportPort,
+  TransportSendResult,
+  TransportUnsubscribe,
+} from "../src/os/core/ports/transport_port.js";
 import { createMessenger } from "../src/os/messenger/create_messenger.js";
 
 /**
@@ -22,6 +30,19 @@ import { createMessenger } from "../src/os/messenger/create_messenger.js";
  *
  * This is example/test code only — `FakeTransportMessagingAdapter` is not
  * used anywhere outside this file and adds no new external dependency.
+ *
+ * NAMING NOTE (Compatibility Facade Reduction + Package Extraction
+ * Readiness + Remaining Architecture Debt Closure arc, Agent P): despite
+ * this file's name, `FakeTransportMessagingAdapter` above implements
+ * `MessagingPort`, NOT the real `TransportPort`
+ * (`../src/os/core/ports/transport_port.ts`) that Port name now names —
+ * `TransportPort` did not exist when this file was first written (its own
+ * `FakeInMemoryTransport` is just an internal implementation detail, never
+ * exposed through a `TransportPort`-shaped surface). The second worked
+ * example below, `FakeTransportPortAdapter`, is the one that actually
+ * implements `TransportPort` and is what a reader following
+ * `docs/architecture/ADDING-AN-ADAPTER.md` for a NEW transport backend
+ * should model their own adapter on.
  */
 
 /** A tiny in-memory "transport" — just a Map from conversationId to an ordered message list. Not a real transport. */
@@ -136,5 +157,118 @@ describe("worked example: FakeTransportMessagingAdapter", () => {
     const messenger = createMessenger({ messaging: new FakeTransportMessagingAdapter(new FakeInMemoryTransport()) });
     const result = await messenger.messaging.read("c1", "nonexistent");
     expect(result).toEqual({ ok: false, reason: "not-found" });
+  });
+});
+
+/**
+ * WORKED EXAMPLE #2 (Agent P, this arc): a minimal, from-scratch
+ * `TransportPort` implementation over an in-memory fake — no relay, no
+ * socket, no real network — following the exact same three-step pipeline
+ * as the `MessagingPort` example above, but for the Port that pipeline
+ * models: connect/disconnect/status, send, and a poll/push-agnostic
+ * subscribe with a working cancel handle.
+ */
+class FakeTransportPortAdapter implements TransportPort {
+  readonly #inboxes = new Map<TransportEndpointRef, Uint8Array[]>();
+  readonly #handlers = new Map<TransportEndpointRef, Set<TransportHandler>>();
+  #status: TransportConnectionStatus = "disconnected";
+  #nextId = 1;
+
+  async connect(): Promise<TransportConnectionStatus> {
+    this.#status = "connected";
+    return this.#status;
+  }
+
+  async disconnect(): Promise<void> {
+    this.#status = "disconnected";
+  }
+
+  status(): TransportConnectionStatus {
+    return this.#status;
+  }
+
+  async send(destination: TransportEndpointRef, payload: Uint8Array): Promise<TransportSendResult> {
+    if (this.#status !== "connected") {
+      return { sent: false, reason: "not-connected" };
+    }
+    if (typeof destination !== "string" || destination.length === 0) {
+      return { sent: false, reason: "invalid-destination" };
+    }
+    const messageId = `fake-transport-${this.#nextId++}`;
+    const list = this.#inboxes.get(destination) ?? [];
+    list.push(payload);
+    this.#inboxes.set(destination, list);
+    // A real adapter would notify live subscribers here too; this fake
+    // stays deliberately simple and requires a caller to `deliver()`
+    // explicitly (see below) to simulate an inbound message arriving.
+    return { sent: true, messageId };
+  }
+
+  subscribe(destination: TransportEndpointRef, handler: TransportHandler): TransportUnsubscribe {
+    const set = this.#handlers.get(destination) ?? new Set<TransportHandler>();
+    set.add(handler);
+    this.#handlers.set(destination, set);
+    return () => {
+      this.#handlers.get(destination)?.delete(handler);
+    };
+  }
+
+  /** Test-only helper: simulates an inbound message arriving for `destination`, firing every registered handler. */
+  deliver(destination: TransportEndpointRef, payload: Uint8Array): void {
+    const messageId = `fake-transport-inbound-${this.#nextId++}`;
+    for (const handler of this.#handlers.get(destination) ?? []) {
+      handler({ id: messageId, payload, receivedAtMs: Date.now() });
+    }
+  }
+}
+
+describe("worked example: FakeTransportPortAdapter (TransportPort)", () => {
+  it("STEP 1 -- satisfies TransportPort directly, without any factory involved", async () => {
+    const adapter = new FakeTransportPortAdapter();
+    expect(adapter.status()).toBe("disconnected");
+
+    const disconnectedResult = await adapter.send("peer-1", new TextEncoder().encode("hi"));
+    expect(disconnectedResult).toEqual({ sent: false, reason: "not-connected" });
+
+    await adapter.connect();
+    expect(adapter.status()).toBe("connected");
+
+    const sendResult = await adapter.send("peer-1", new TextEncoder().encode("hi"));
+    expect(sendResult.sent).toBe(true);
+  });
+
+  it("STEP 2 -- factory injection: createMessenger({ transport: adapter }) uses the real adapter, not the Noop default", async () => {
+    const adapter = new FakeTransportPortAdapter();
+    const messenger = createMessenger({ transport: adapter });
+
+    expect(messenger.transport).toBe(adapter);
+  });
+
+  it("STEP 3 -- capability test: connect -> subscribe -> deliver -> send round trip through the injected Messenger, and unsubscribe stops delivery", async () => {
+    const adapter = new FakeTransportPortAdapter();
+    const messenger = createMessenger({ transport: adapter });
+
+    await messenger.transport.connect();
+
+    const received: Uint8Array[] = [];
+    const unsubscribe = messenger.transport.subscribe("peer-1", (message) => received.push(message.payload));
+
+    adapter.deliver("peer-1", new TextEncoder().encode("incoming"));
+    expect(received).toHaveLength(1);
+    expect(new TextDecoder().decode(received[0])).toBe("incoming");
+
+    unsubscribe();
+    adapter.deliver("peer-1", new TextEncoder().encode("after unsubscribe"));
+    expect(received).toHaveLength(1); // unsubscribed -- no second delivery.
+
+    const sendResult = await messenger.transport.send("peer-1", new TextEncoder().encode("outgoing"));
+    expect(sendResult.sent).toBe(true);
+  });
+
+  it("STEP 3b -- createMessenger() with zero arguments defaults transport to a safe Noop that always fails closed, never throws", async () => {
+    const messenger = createMessenger();
+    const result = await messenger.transport.send("peer-1", new TextEncoder().encode("hi"));
+    expect(result).toEqual({ sent: false, reason: "not-connected" });
+    expect(messenger.transport.status()).toBe("disconnected");
   });
 });

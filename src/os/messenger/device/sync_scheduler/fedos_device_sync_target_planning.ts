@@ -22,7 +22,7 @@
 
 import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
-import type { FedosSyncState } from "../../../../sync/fedos_sync_state.js";
+import type { FedosSyncState } from "../../sync/fedos_sync_state.js";
 import type { FedosDeviceSyncResourceLimits } from "./fedos_device_sync_resource_limits.js";
 
 export interface FedosDeviceSyncTargetPlan {

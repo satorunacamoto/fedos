@@ -255,6 +255,14 @@ describe("renderRuntimeComponentStatus / renderRuntimeStatusSection / renderRunt
         calls.push("requestPayment");
         return runtime.paymentProvider.requestPayment(request);
       },
+      observePayment(paymentId: string) {
+        calls.push("observePayment");
+        return runtime.paymentProvider.observePayment(paymentId);
+      },
+      ingestCallback(payload: unknown) {
+        calls.push("ingestCallback");
+        return runtime.paymentProvider.ingestCallback(payload);
+      },
     };
     const view = buildRuntimeStatusView({ ...runtime, paymentProvider: spiedPayment });
     renderRuntimeStatusPage(view);

@@ -2,13 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 import type { MessagingPort } from "../src/os/core/ports/messaging_port.js";
 import type { ConversationPort } from "../src/os/core/ports/conversation_port.js";
 import type { NotificationPort } from "../src/os/core/ports/notification_port.js";
+import type { TransportPort } from "../src/os/core/ports/transport_port.js";
 import { FedosMessengerMessagingPortAdapter } from "../src/os/messenger/adapters/messaging_port_adapter.js";
 import { FedosMessengerConversationPortAdapter } from "../src/os/messenger/adapters/conversation_port_adapter.js";
 import { FedosMessengerNotificationPortAdapter } from "../src/os/messenger/adapters/notification_port_adapter.js";
+import { NostrTransportAdapter, type NostrTransportEventSource } from "../src/os/messenger/adapters/nostr_transport_adapter.js";
 import type { FedosConversationDirectMessagingCoordinator } from "../src/os/messenger/conversations/messaging/fedos_conversation_direct_messaging_coordinator.js";
 import type { FedosPrivateConversationConstructionCoordinator } from "../src/os/messenger/conversations/construction/fedos_private_conversation_construction_coordinator.js";
 import type { FedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_authority.js";
 import type { FedosDesktopNotificationCoordinator } from "../src/os/messenger/notifications/fedos_desktop_notification_coordinator.js";
+import type { RelayPublisher, PublishResult } from "../src/os/messenger/adapters/nostr/protocol/publish.js";
+import type { RelayAdapter, NostrFilter } from "../src/os/messenger/adapters/nostr/protocol/relay.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 /**
  * OS Capability Modularization — Port-shape check for the three
@@ -53,6 +58,7 @@ import type { FedosDesktopNotificationCoordinator } from "../src/os/messenger/no
 function assertMessagingPortShape(_port: MessagingPort): void {}
 function assertConversationPortShape(_port: ConversationPort): void {}
 function assertNotificationPortShape(_port: NotificationPort): void {}
+function assertTransportPortShape(_port: TransportPort): void {}
 
 describe("MessagingPort adapter", () => {
   it("satisfies the MessagingPort shape (type-level, via the class's own `implements` clause)", () => {
@@ -437,5 +443,178 @@ describe("NotificationPort adapter", () => {
     adapter.notify("title", "body", { kind: "not-a-real-kind" });
 
     expect(fakeCoordinator.notify).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * TransportPort adapter (Compatibility Facade Reduction + Package
+ * Extraction Readiness + Remaining Architecture Debt Closure arc, Agent
+ * P) — mirrors the three describe blocks above's own pattern: a
+ * type-level `implements` check plus behavior assertions against minimal
+ * hand-built doubles for `RelayPublisher`/`RelayAdapter`/
+ * `NostrTransportEventSource`, the three real dependencies
+ * `NostrTransportAdapter` delegates to. Unlike the three coordinators
+ * above, none of these three doubles need an `as unknown as` cast — they
+ * are plain interfaces with no `#private` fields, so a structurally-shaped
+ * object literal genuinely satisfies each one.
+ */
+const SAMPLE_EVENT: NostrEvent = {
+  id: "event-1",
+  pubkey: "a".repeat(64),
+  created_at: 1_700_000_000,
+  kind: 1,
+  tags: [],
+  content: "irrelevant -- this adapter never reads content directly",
+  sig: "b".repeat(128),
+};
+
+describe("TransportPort adapter (NostrTransportAdapter)", () => {
+  it("satisfies the TransportPort shape (type-level, via the class's own `implements` clause)", () => {
+    const publisher: RelayPublisher = { publish: vi.fn(async (): Promise<PublishResult> => ({ eventId: "e1", accepted: true, message: "" })) };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn(async (): Promise<NostrEvent[]> => []) };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(async () => SAMPLE_EVENT),
+      decodeInboundEvent: vi.fn(async () => null),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+    assertTransportPortShape(adapter);
+    expect(typeof adapter.connect).toBe("function");
+    expect(typeof adapter.disconnect).toBe("function");
+    expect(typeof adapter.status).toBe("function");
+    expect(typeof adapter.send).toBe("function");
+    expect(typeof adapter.subscribe).toBe("function");
+  });
+
+  it("status() starts disconnected; send() fails closed with not-connected before connect()", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn() };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn() };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(),
+      decodeInboundEvent: vi.fn(),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+
+    expect(adapter.status()).toBe("disconnected");
+    const result = await adapter.send("nostr:abc123", new TextEncoder().encode("hi"));
+    expect(result).toEqual({ sent: false, reason: "not-connected" });
+    expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  it("connect() flips status to connected; send() then delegates to eventSource.prepareOutboundEvent() and publisher.publish(), mapping an accepted result to sent:true", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn(async (): Promise<PublishResult> => ({ eventId: "event-1", accepted: true, message: "" })) };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn() };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(async () => SAMPLE_EVENT),
+      decodeInboundEvent: vi.fn(),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+
+    const status = await adapter.connect();
+    expect(status).toBe("connected");
+
+    const result = await adapter.send("nostr:abc123", new TextEncoder().encode("hi"));
+    expect(eventSource.prepareOutboundEvent).toHaveBeenCalledWith("nostr:abc123", expect.any(Uint8Array));
+    expect(publisher.publish).toHaveBeenCalledWith(SAMPLE_EVENT);
+    expect(result).toEqual({ sent: true, messageId: "event-1" });
+  });
+
+  it("send() maps eventSource.prepareOutboundEvent() returning null to invalid-destination, never calling publisher.publish()", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn() };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn() };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(async () => null),
+      decodeInboundEvent: vi.fn(),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+    await adapter.connect();
+
+    const result = await adapter.send("nostr:unroutable", new TextEncoder().encode("hi"));
+
+    expect(result).toEqual({ sent: false, reason: "invalid-destination" });
+    expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  it("send() maps a not-accepted PublishResult to rejected/later, never throws", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn(async (): Promise<PublishResult> => ({ eventId: "event-1", accepted: false, message: "relay closed before OK" })) };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn() };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(async () => SAMPLE_EVENT),
+      decodeInboundEvent: vi.fn(),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+    await adapter.connect();
+
+    const result = await adapter.send("nostr:abc123", new TextEncoder().encode("hi"));
+
+    expect(result).toEqual({ sent: false, reason: "rejected", retryPolicy: "later" });
+  });
+
+  it("subscribe()/pollOnce() form a working, unsubscribable local registry over relayAdapter.query() + eventSource.decodeInboundEvent(), deduplicating by event id", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn() };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn(async (): Promise<NostrEvent[]> => [SAMPLE_EVENT]) };
+    const decoded = new TextEncoder().encode("inbound payload");
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(),
+      decodeInboundEvent: vi.fn(async () => decoded),
+      filterFor: vi.fn((): NostrFilter => ({ authors: ["abc123"] })),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+    await adapter.connect();
+
+    const received: Uint8Array[] = [];
+    const unsubscribe = adapter.subscribe("nostr:abc123", (message) => received.push(message.payload));
+
+    await adapter.pollOnce("nostr:abc123");
+    expect(relayAdapter.query).toHaveBeenCalledWith([{ authors: ["abc123"] }]);
+    expect(received).toHaveLength(1);
+    expect(received[0]).toBe(decoded);
+
+    // Same event id again -- deduplicated, handler not called a second time.
+    await adapter.pollOnce("nostr:abc123");
+    expect(received).toHaveLength(1);
+
+    unsubscribe();
+    await adapter.pollOnce("nostr:abc123"); // no-op: no longer subscribed.
+    expect(received).toHaveLength(1);
+  });
+
+  it("decodeInboundEvent() returning null (not addressed to us / undecodable) is silently skipped, never dispatched", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn() };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn(async (): Promise<NostrEvent[]> => [SAMPLE_EVENT]) };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(),
+      decodeInboundEvent: vi.fn(async () => null),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+    await adapter.connect();
+
+    const received: unknown[] = [];
+    adapter.subscribe("nostr:abc123", (message) => received.push(message));
+    await adapter.pollOnce("nostr:abc123");
+
+    expect(received).toHaveLength(0);
+  });
+
+  it("disconnect() flips status back to disconnected; a subsequent send() fails closed again", async () => {
+    const publisher: RelayPublisher = { publish: vi.fn(async (): Promise<PublishResult> => ({ eventId: "event-1", accepted: true, message: "" })) };
+    const relayAdapter: RelayAdapter = { url: "wss://example.invalid", query: vi.fn() };
+    const eventSource: NostrTransportEventSource = {
+      prepareOutboundEvent: vi.fn(async () => SAMPLE_EVENT),
+      decodeInboundEvent: vi.fn(),
+      filterFor: vi.fn((): NostrFilter => ({})),
+    };
+    const adapter = new NostrTransportAdapter({ publisher, relayAdapter, eventSource });
+    await adapter.connect();
+    await adapter.disconnect();
+
+    expect(adapter.status()).toBe("disconnected");
+    const result = await adapter.send("nostr:abc123", new TextEncoder().encode("hi"));
+    expect(result).toEqual({ sent: false, reason: "not-connected" });
   });
 });

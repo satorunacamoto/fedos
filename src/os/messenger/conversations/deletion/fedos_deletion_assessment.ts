@@ -33,7 +33,7 @@ import {
   fedosConversationArchiveCliNodeFileSystem,
   type FedosConversationArchiveCliFileSystem,
 } from "../archive_cli/fedos_conversation_archive_cli_file_system.js";
-import type { FedosSyncDeviceRegistry } from "../../../../sync/fedos_sync_device_registry.js";
+import type { FedosSyncDeviceRegistry } from "../../sync/fedos_sync_device_registry.js";
 import type { FedosConversationMembershipAuthority } from "../membership/fedos_conversation_membership_authority.js";
 import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 

@@ -171,7 +171,21 @@ describe("Private Conversation Search V1 runtime audit -- source alignment (cent
   });
 
   it("8. [Alpha 2581-2620 update] FedosConversationSearchIndexDependencies is now the SAME Pick of draftPersistence/membershipAuthority, additively intersected with a new, narrow retentionAuthority dependency", () => {
-    expect(indexSource as string).toMatch(/Pick<\s*\n?\s*FedosConversationRuntimeDependencies,\s*\n?\s*"draftPersistence" \| "membershipAuthority"\s*\n?\s*>\s*&\s*\{/);
+    // Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+    // reduction (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`,
+    // `test/architecture_cycle_detector.test.ts`) -- this Pick's SOURCE type
+    // changed from `FedosConversationRuntimeDependencies`
+    // (`../runtime/fedos_conversation_runtime.ts`) to the LOWER-level
+    // `FedosPrivateConversationConstructionCoordinatorDependencies`
+    // (`../construction/fedos_private_conversation_construction_coordinator.ts`),
+    // which is where `draftPersistence`/`membershipAuthority` are actually
+    // declared and always were -- `FedosConversationRuntimeDependencies` is a
+    // structural intersection that does not redeclare either field, so this
+    // is a zero-behavior-change redirect to the type's true owner (breaking a
+    // 5-file type-only import cycle that used to close back through
+    // `fedos_conversation_runtime.ts`), not a design change. The resolved
+    // shape asserted below is unchanged.
+    expect(indexSource as string).toMatch(/Pick<\s*\n?\s*FedosPrivateConversationConstructionCoordinatorDependencies,\s*\n?\s*"draftPersistence" \| "membershipAuthority"\s*\n?\s*>\s*&\s*\{/);
     expect(indexSource as string).toMatch(/readonly retentionAuthority: FedosConversationSearchRetentionAuthorityDependency/);
   });
 

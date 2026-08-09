@@ -42,7 +42,7 @@
 import type { FedosDeviceSyncSchedulePersistence } from "./persistence/fedos_device_sync_schedule_persistence.js";
 import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
-import type { FedosSyncState } from "../../../../sync/fedos_sync_state.js";
+import type { FedosSyncState } from "../../sync/fedos_sync_state.js";
 import { planFedosDeviceSyncTargets } from "./fedos_device_sync_target_planning.js";
 import {
   classifyFedosDeviceSyncRetryDirective,

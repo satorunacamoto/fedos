@@ -118,7 +118,7 @@ describe("Private Message Envelope V1 review -- crypto boundary invariants", () 
   });
 
   it("10. InMemoryVaultBoundary.unlock() derives no key -- behavioral, confirms the placeholder truly derives nothing", async () => {
-    const { InMemoryVaultBoundary } = await import("../../../src/vault/memory_vault.js");
+    const { InMemoryVaultBoundary } = await import("../../../src/os/core/vault/memory_vault.js");
     const vault = new InMemoryVaultBoundary();
     const decision = await vault.unlock({ kind: "passphrase" });
     expect(decision.allowed).toBe(true);
@@ -133,7 +133,7 @@ describe("Private Message Envelope V1 review -- crypto boundary invariants", () 
   });
 
   it("12. NoopVaultBoundary is permanently unavailable and never unlocks -- behavioral", async () => {
-    const { NoopVaultBoundary } = await import("../../../src/vault/noop_vault.js");
+    const { NoopVaultBoundary } = await import("../../../src/os/core/vault/noop_vault.js");
     const vault = new NoopVaultBoundary();
     expect(vault.getState()).toBe("unavailable");
     expect(vault.isUnlocked()).toBe(false);

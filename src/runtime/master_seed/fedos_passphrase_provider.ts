@@ -2,4 +2,5 @@
 // `src/os/core/vault/wasm/fedos_passphrase_provider.ts`. This shim
 // preserves every existing import of this old path. See
 // `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md`.
+// @deprecated Compatibility shim -- import from "../../os/core/vault/wasm/fedos_passphrase_provider.js" instead. See docs/architecture/COMPATIBILITY-FACADE-LIFECYCLE.md.
 export * from "../../os/core/vault/wasm/fedos_passphrase_provider.js";

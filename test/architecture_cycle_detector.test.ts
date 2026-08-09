@@ -39,51 +39,82 @@ interface CycleSccSummary {
  * itself defined) was fixed this arc by extracting the class to its own
  * leaf file (`placeholder_core.ts`) — see that commit's own file headers.
  *
- * What remains (6 SCCs, all in the FULL graph only, none of them survive on
- * the RUNTIME-ONLY graph) are TYPE-ONLY compile-time cycles: pairs/groups of
- * files whose only mutual reference is an `import type` (fully erased at
- * emit, e.g. two mutually-recursive interfaces describing a tree-shaped
- * value like "an Archive Bundle may contain a Group Section which may
- * contain child Archive Bundles"). These are idiomatic, common in typed
- * languages, and carry zero runtime coupling — NOT the same severity class
- * as a real cycle, so this test tracks them with a raised, but still
- * explicit and CI-enforced, ceiling rather than forcing an artificial
- * type-file split that would only serve this metric.
+ * What remains (1 SCC, in the FULL graph only, does not survive on the
+ * RUNTIME-ONLY graph) is a TYPE-ONLY compile-time cycle: a pair of files
+ * whose only mutual reference is an `import type` (fully erased at emit).
+ * This is idiomatic, common in typed languages, and carries zero runtime
+ * coupling — NOT the same severity class as a real cycle, so this test
+ * tracks it with a raised, but still explicit and CI-enforced, ceiling
+ * rather than forcing an artificial type-file split that would only serve
+ * this metric.
  *
- * The 6 accepted full-graph-only (type-only) SCCs, each still routed partly
- * through a migration-era compatibility shim (the OLD `src/conversation/**`
- * etc. path, which just `export * from`s the NEW `src/os/messenger/**`
- * file) on at least one edge:
+ * The 1 accepted full-graph-only (type-only) SCC:
  *   1. `conversations/archive/{fedos_conversation_archive_bundle,
- *      fedos_conversation_archive_group_section}.ts` (+ 2 old-path shims) —
- *      a bundle may embed a group section; a group section lists child
- *      bundles. Mutually-recursive TYPE ONLY (both files say so in their own
- *      header: "This file defines a TYPE ONLY").
- *   2. `conversations/{deletion,deletion_request,runtime,search}/*.ts` (+ 4
- *      old-path shims) — the conversation runtime facade, its deletion/
- *      deletion-request coordinators, and the search index cross-reference
- *      each other's TYPES for parameter/return shapes; every edge that
- *      closes the loop is `import type`.
- *   3. `src/sync/fedos_sync_journal.ts` <-> `src/sync/persistence/
- *      fedos_sync_journal_persistence.ts` — the journal's own persisted
- *      record type and the journal class reference each other by type only.
- *   4. `src/os/messenger/desktop/presentation/{fedos_desktop_conversation_
- *      ui_presentation_boundary,device_management/fedos_device_management_
- *      controller}.ts` — the presentation boundary constructs the device
- *      management controller (a real, value-level edge) but the controller
- *      only references the boundary's TYPE back.
- *   5. `src/runtime/{fedos_rust_invocation_adapter,
- *      fedos_internal_rust_call}.ts` — one direction is a real function
- *      call, the other is a type-only back-reference.
- *   6. `src/runtime/fedos_crypto_{backend_resolver,backend_interface,
- *      loader_backend}.ts` — a 3-file group; the loop-closing edge is
- *      type-only.
+ *      fedos_conversation_archive_group_section}.ts` — a bundle may embed
+ *      a group section; a group section lists child bundles.
+ *      Mutually-recursive TYPE ONLY (both files say so in their own
+ *      header: "This file defines a TYPE ONLY"). Left deliberately alone:
+ *      this is a genuinely tree-shaped value (a bundle containing a
+ *      section which itself lists parent-shaped bundles) — the two
+ *      interfaces legitimately reference each other, and forcing them
+ *      apart (e.g. into a hand-rolled recursive union, or splitting the
+ *      Group Section's own `childConversations` field into a separate,
+ *      parallel type) would make the shape harder to read for zero
+ *      runtime benefit, exactly the kind of hack this baseline exists to
+ *      avoid manufacturing.
  *
- * None of these 6 involves `src/os/_legacy_prototype/` — legacy is excluded
- * from this baseline count for a documented reason below, but even with it
- * INCLUDED the SCC count is unchanged (verified: legacy's real edges into
- * `os/commerce` and into Nostr are all one-directional at the file level —
- * no legacy file is reachable back from anything it depends on).
+ * Nostr Consolidation Plan, Step 5 (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`)
+ * — this baseline WAS 6; five of the original six were fixed by this
+ * pass, each via a small, dedicated, single-purpose type-extraction file
+ * (never a mega-types dumping ground), moving exactly the field(s) that
+ * closed each loop out of the file at the "wrong" end of the cycle and
+ * leaving everything else untouched:
+ *   - `conversations/{deletion,deletion_request,runtime,search}/*.ts` (was
+ *     a 5-file group) — `fedos_conversation_search_index.ts` used to Pick
+ *     `draftPersistence`/`membershipAuthority` from
+ *     `FedosConversationRuntimeDependencies`
+ *     (`conversations/runtime/fedos_conversation_runtime.ts`); both fields
+ *     are, and always were, declared on the LOWER-level
+ *     `FedosPrivateConversationConstructionCoordinatorDependencies`
+ *     (`conversations/construction/fedos_private_conversation_construction_coordinator.ts`),
+ *     so the Pick now sources from there instead — a zero-behavior-change
+ *     redirect to the type's true owner, not an extraction.
+ *   - `src/os/messenger/sync/fedos_sync_journal.ts` <-> `.../persistence/
+ *     fedos_sync_journal_persistence.ts` — `FedosSyncChangeKind`/
+ *     `FedosSyncJournalEntryV1` extracted to a new
+ *     `fedos_sync_journal_entry.ts`; both files now depend on that leaf
+ *     instead of on each other for the type.
+ *   - `src/os/messenger/desktop/presentation/{fedos_desktop_conversation_
+ *     ui_presentation_boundary,device_management/fedos_device_management_
+ *     controller}.ts` — the controller's constructor parameter narrowed
+ *     from the full presentation-boundary type to a local, Port-shaped
+ *     `FedosDeviceManagementControllerBoundary` interface naming only the
+ *     six ViewModel fields it actually reads; the boundary satisfies it
+ *     structurally, so the one real call site needed no change.
+ *   - `src/runtime/{fedos_rust_invocation_adapter,fedos_internal_rust_call}.ts`
+ *     — `FedosInternalRustCall`/`FedosInternalRustCallKind` extracted to a
+ *     new `fedos_internal_rust_call_shape.ts`.
+ *   - `src/runtime/fedos_crypto_{backend_resolver,backend_interface,
+ *     loader_backend}.ts` (was a 3-file group) — `FedosCryptoLoaderBackendKind`
+ *     extracted to a new `fedos_crypto_loader_backend_kind.ts`.
+ * Every extraction file's own header explains the specific cycle it
+ * broke and why the extraction is a genuine shared-type-contract move,
+ * not a metric-only dodge; each original file re-exports the moved
+ * name(s) unchanged, so no existing consumer needed a call-site change.
+ * Investigated but NOT merged: the two relay/socket implementations
+ * (`protocol/ws_relay.ts` vs `desktop/websocket_relay.ts`) remain
+ * separate — see `NOSTR-CONSOLIDATION-PLAN.md`'s own updated Step 5
+ * record for the relay/socket-layer findings (a real, byte-identical
+ * duplicate NIP-01 event-structural-validation function WAS found and
+ * consolidated, in `desktop/relay_inbound_parser.ts`, independently of
+ * this SCC work).
+ *
+ * None of the remaining SCC involves `src/os/_legacy_prototype/` — legacy
+ * is excluded from this baseline count for a documented reason below, but
+ * even with it INCLUDED the SCC count is unchanged (verified: legacy's
+ * real edges into `os/commerce` and into Nostr are all one-directional at
+ * the file level — no legacy file is reachable back from anything it
+ * depends on).
  */
 
 const REPO_ROOT = process.cwd();
@@ -92,7 +123,7 @@ const REPO_ROOT = process.cwd();
 // this fails CI — a genuinely new SCC (whether type-only or real) must be
 // investigated and either fixed or deliberately added to this file's own
 // documentation (and the ceiling bumped) by whoever's change caused it.
-const ACCEPTED_FULL_GRAPH_SCC_BASELINE = 6;
+const ACCEPTED_FULL_GRAPH_SCC_BASELINE = 1;
 
 // The runtime-only graph is held to a hard 0 — this is the actual "no
 // circular dependency" bar a shipped, executing program is judged against.

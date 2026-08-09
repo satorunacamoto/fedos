@@ -105,6 +105,14 @@ describe("Stage 46 — Payment provider runtime env selection", () => {
           productId: request.productId,
         };
       },
+      observePayment: async (paymentId: string) => ({
+        paymentId,
+        productId: "",
+        observedAt: 0,
+        status: "error" as const,
+        reason: "not called",
+      }),
+      ingestCallback: async () => null,
     };
     const rt = createRuntime(undefined, { paymentProvider: spy });
     expect(rt.paymentProvider).toBe(spy);

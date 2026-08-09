@@ -4,8 +4,11 @@
  *
  * `os/core` in this repo's own Ports-and-Adapters framing (see
  * `docs/architecture/OS-CAPABILITY-BOUNDARIES.md`) is genuinely public as
- * the five PORT CONTRACTS other capabilities depend on — those are the
- * ONLY things re-exported here.
+ * the PORT CONTRACTS other capabilities depend on — those are the ONLY
+ * things re-exported here. `TransportPort` added (Compatibility Facade
+ * Reduction + Package Extraction Readiness + Remaining Architecture Debt
+ * Closure arc, Agent P) — see `./ports/transport_port.ts`'s own header
+ * for the design.
  *
  * DELIBERATELY NOT RE-EXPORTED: `identity/`, `crypto/`, `settings/`,
  * `storage/`, `vault/` (including `vault/wasm/`). These directories hold
@@ -69,3 +72,19 @@ export type { NotificationMeta, NotificationPort } from "./ports/notification_po
 export type { SealingAuthorityPort } from "./ports/sealing_authority_port.js";
 
 export type { LocalAIContext, LocalAIProvider } from "./ports/local_ai_provider.js";
+
+export type {
+  TransportEndpointRef,
+  TransportMessageId,
+  TransportMessage,
+  TransportSendFailureReason,
+  TransportRetryPolicy,
+  TransportSendResult,
+  TransportConnectionStatus,
+  TransportHandler,
+  TransportUnsubscribe,
+  TransportLifecyclePort,
+  TransportSendPort,
+  TransportSubscribePort,
+  TransportPort,
+} from "./ports/transport_port.js";

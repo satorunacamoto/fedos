@@ -1,4 +1,5 @@
 /**
+ * @deprecated Compatibility shim -- import from "../os/messenger/desktop/subscription_messages.js" instead. See docs/architecture/COMPATIBILITY-FACADE-LIFECYCLE.md.
  * Shim — physically moved to `src/os/messenger/desktop/subscription_messages.ts`
  * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
  * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and

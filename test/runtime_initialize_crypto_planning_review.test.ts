@@ -155,7 +155,7 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
       "fedos_wasm_toolchain.ts",
     ].sort();
 
-    expect(names.length).toBe(57);
+    expect(names.length).toBe(59);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts.
     // Stage 1005 (Secure Runtime Alpha 010) adds a THIRD, separate,
@@ -186,6 +186,10 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
     // exception -- fedos_runtime_identity.ts, the Identity Layer's own
     // internal Runtime wiring (FedosRuntimeIdentity), held internally by
     // create_runtime.ts and never exposed on AppRuntime.
+    // Nostr Consolidation Plan, Step 5 / architecture cycle detector
+    // baseline reduction adds a SIXTEENTH and SEVENTEENTH, separate,
+    // later exception -- fedos_internal_rust_call_shape.ts and
+    // fedos_crypto_loader_backend_kind.ts, see each file's own header.
     expect(names).toEqual(
       [
         ...knownNames,
@@ -204,6 +208,8 @@ describe("FedOS initializeCrypto Planning Review, stocktake only, no new layer, 
         "fedos_runtime_storage_backend_windows_dpapi.ts",
         "fedos_runtime_platform_authority.ts",
         "fedos_runtime_identity.ts",
+        "fedos_internal_rust_call_shape.ts",
+        "fedos_crypto_loader_backend_kind.ts",
       ].sort(),
     );
   });

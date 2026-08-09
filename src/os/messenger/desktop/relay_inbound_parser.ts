@@ -59,50 +59,69 @@
  *     and NO signature check of any kind.
  *   - NO reference to `src/nostr/*` or `src/sign/*` anywhere in this
  *     file (idiom-only reuse, confirmed by Alpha 231's own inventory).
+ *     Both were the flat, pre-Messenger-migration paths this guardrail
+ *     originally named; neither exists on disk any more (see the note
+ *     below) — the ONE import this file now carries beyond its own
+ *     siblings resolves to the current, canonical, post-migration
+ *     location, which this guardrail's own original intent (no reach
+ *     into the legacy relay stack, no re-mixing crypto verification in
+ *     here) does not forbid.
+ *
+ * Nostr Consolidation Plan, Step 5 (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`)
+ * — re-verified this file's own `parseWireEvent` helper against
+ * `protocol/event.ts`'s `validateEventStructure`/`isNostrEvent` (the
+ * canonical, protocol-layer NIP-01 structural-validation function) and
+ * found them a byte-for-byte functional duplicate: identical `HEX_64`/
+ * `HEX_128` regexes, identical `isRecord`/"array of string arrays" tag
+ * check, identical per-field checks in the identical order. This was
+ * two independent implementations of the SAME mechanism ("is this
+ * unknown value structurally a NIP-01 event") that happened to target
+ * two types the repo, at the time, considered different
+ * (`FedosNostrWireEvent` vs `NostrEvent`). Since the Plan's own Step 1
+ * already unified those two types into one (`FedosNostrWireEvent` is
+ * now a type-alias re-export of `NostrEvent`,
+ * `desktop/fedos_nostr_wire_event.ts`), the duplicate validation logic
+ * had no remaining justification — `parseWireEvent` below now DELEGATES
+ * to `isNostrEvent` (`adapters/nostr/protocol/event.ts`) instead of
+ * re-implementing it, removing this file's own `HEX_128`/`isRecord`/
+ * `isStringArrayArray` helpers entirely (`HEX_64` stays — it is still
+ * used below by the unrelated `OK` message's `eventId` check, which has
+ * no protocol-layer equivalent to delegate to). This is the ONE genuine
+ * "same mechanism, independently duplicated" instance this
+ * consolidation pass found across the two relay/socket implementations;
+ * the connection-lifecycle/retry/backoff/subscription-multiplexing/
+ * shutdown mechanisms themselves were investigated and found to have NO
+ * real duplication — `protocol/ws_relay.ts` is a one-shot, self-closing
+ * REQ/EOSE/CLOSE query object with no persistent connection or
+ * retry/backoff of any kind, while `WebSocketRelay` (`websocket_relay.ts`)
+ * is a persistent, multiplexed connection object that also implements
+ * no retry/backoff/reconnect (its own header states "No Relay Pool, no
+ * automatic reconnect" plainly) — there is no second implementation of
+ * either mechanism to consolidate against.
  */
 
 import type {
   FedosRelayInboundMessage,
 } from "./fedos_relay_inbound_message.js";
 import type { FedosNostrWireEvent } from "./fedos_nostr_wire_event.js";
+import { isNostrEvent } from "../adapters/nostr/protocol/event.js";
 
 const HEX_64 = /^[0-9a-f]{64}$/;
-const HEX_128 = /^[0-9a-f]{128}$/;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isStringArrayArray(value: unknown): value is string[][] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (tag) => Array.isArray(tag) && tag.every((t) => typeof t === "string"),
-    )
-  );
-}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-/** Structurally validates and narrows an inbound EVENT payload. Returns `null` if malformed. */
+/**
+ * Structurally validates and narrows an inbound EVENT payload. Returns
+ * `null` if malformed. Delegates to the canonical protocol-layer
+ * `isNostrEvent` (see this file's own header) rather than
+ * re-implementing NIP-01 structural validation a second time —
+ * `FedosNostrWireEvent` and `NostrEvent` are now the same type, so no
+ * conversion or narrowing gap exists at this boundary.
+ */
 function parseWireEvent(value: unknown): FedosNostrWireEvent | null {
-  if (!isRecord(value)) return null;
-
-  const { id, pubkey, created_at, kind, tags, content, sig } = value;
-
-  if (typeof id !== "string" || !HEX_64.test(id)) return null;
-  if (typeof pubkey !== "string" || !HEX_64.test(pubkey)) return null;
-  if (typeof created_at !== "number" || !Number.isInteger(created_at) || created_at < 0) {
-    return null;
-  }
-  if (typeof kind !== "number" || !Number.isInteger(kind) || kind < 0) return null;
-  if (!isStringArrayArray(tags)) return null;
-  if (typeof content !== "string") return null;
-  if (typeof sig !== "string" || !HEX_128.test(sig)) return null;
-
-  return { id, pubkey, created_at, kind, tags, content, sig };
+  return isNostrEvent(value) ? value : null;
 }
 
 /**

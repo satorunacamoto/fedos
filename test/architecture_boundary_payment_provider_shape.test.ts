@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type {
   PaymentCapability,
   PaymentDecision,
+  PaymentEvidence,
   PaymentProvider,
   PaymentProviderStatus,
   PaymentRequest,
@@ -60,7 +61,15 @@ class MinimalFakePaymentProvider implements PaymentProvider {
     if (!this.#available) {
       return { allowed: false, status: "unavailable", rail: request.rail, reason: "fake provider not configured", productId: request.productId };
     }
-    return { allowed: true, status: "accepted_placeholder", rail: request.rail, reason: "fake accept", productId: request.productId };
+    return { allowed: true, status: "accepted_placeholder", rail: request.rail, reason: "fake accept", productId: request.productId, paymentId: "fake-payment-1" };
+  }
+
+  async observePayment(paymentId: string): Promise<PaymentEvidence> {
+    return { paymentId, productId: "product-1", observedAt: 0, status: "settled", reason: "fake observe" };
+  }
+
+  async ingestCallback(): Promise<PaymentEvidence | null> {
+    return null;
   }
 }
 

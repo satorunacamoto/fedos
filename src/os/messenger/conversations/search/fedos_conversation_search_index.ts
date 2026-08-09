@@ -162,7 +162,7 @@ import type { FedosConversationMessageEnvelope } from "../envelope/fedos_convers
 import type { FedosConversationParticipantReference } from "../membership/fedos_conversation_participant_reference.js";
 import type { FedosPrivateConversationMode } from "../construction/fedos_private_conversation_id.js";
 import type { FedosConversationArchiveBundleV1 } from "../archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationRuntimeDependencies } from "../runtime/fedos_conversation_runtime.js";
+import type { FedosPrivateConversationConstructionCoordinatorDependencies } from "../construction/fedos_private_conversation_construction_coordinator.js";
 import type { FedosPayloadRetentionAuthority } from "../retention/fedos_payload_retention_authority.js";
 import type { FedosConversationPayloadId } from "../payload_storage/fedos_conversation_payload_id.js";
 import { deserializeFedosConversationMessageEnvelope } from "../envelope/persistence/fedos_conversation_message_envelope_codec.js";
@@ -186,9 +186,38 @@ import {
  */
 export type FedosConversationSearchRetentionAuthorityDependency = Pick<FedosPayloadRetentionAuthority, "evaluatePayloadAccess">;
 
-/** The concrete "Reuse Conversation Runtime" tie-in, PLUS (Alpha 2581–2620) the narrow Retention Authority gate — see this file's own header. */
+/**
+ * The concrete "Reuse Conversation Runtime" tie-in, PLUS (Alpha 2581–2620)
+ * the narrow Retention Authority gate — see this file's own header.
+ *
+ * Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+ * reduction (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`,
+ * `test/architecture_cycle_detector.test.ts`) — this Pick used to source
+ * `draftPersistence`/`membershipAuthority` from
+ * `FedosConversationRuntimeDependencies` (`../runtime/fedos_conversation_runtime.ts`),
+ * which closed a 5-file type-only SCC together with this file, the
+ * deletion-request inbound coordinator, and the deletion execution
+ * coordinator (`fedos_conversation_runtime.ts` -> ...deletion request/
+ * execution... -> `fedos_conversation_search_index.ts` -> back to
+ * `fedos_conversation_runtime.ts`, every closing edge type-only). Both
+ * fields are, and always were, declared directly on the LOWER-level
+ * `FedosPrivateConversationConstructionCoordinatorDependencies`
+ * (`../construction/fedos_private_conversation_construction_coordinator.ts`)
+ * — `FedosConversationRuntimeDependencies` is a structural intersection
+ * (`FedosPrivateConversationConstructionCoordinatorDependencies & {...}`)
+ * that does not redeclare either field, so `Pick<...,
+ * "draftPersistence" | "membershipAuthority">` resolves to the IDENTICAL
+ * shape whichever of the two types it is picked from. Sourcing directly
+ * from the lower-level type — the file that actually owns these two
+ * fields, rather than the higher-level Runtime type that merely inherits
+ * them — is a zero-behavior-change fix, not a redesign: this file's own
+ * "reuse the real shape, never a same-shaped lookalike" discipline is
+ * unchanged, it now reuses the shape from its true source instead of a
+ * downstream re-export of it. This removes the file's only edge into
+ * `runtime/`, breaking the cycle without an artificial shared-types file.
+ */
 export type FedosConversationSearchIndexDependencies = Pick<
-  FedosConversationRuntimeDependencies,
+  FedosPrivateConversationConstructionCoordinatorDependencies,
   "draftPersistence" | "membershipAuthority"
 > & {
   readonly retentionAuthority: FedosConversationSearchRetentionAuthorityDependency;

@@ -26,6 +26,14 @@ class SpyPaymentProvider implements PaymentProvider {
     this.calls.push(request);
     return this.#inner.requestPayment(request);
   }
+
+  observePayment(paymentId: string) {
+    return this.#inner.observePayment(paymentId);
+  }
+
+  ingestCallback(payload: unknown) {
+    return this.#inner.ingestCallback(payload);
+  }
 }
 
 describe("Stage 47 — product purchase preview uses runtime provider in preview-only mode", () => {

@@ -101,6 +101,15 @@ unedited below except where marked, so the delta is visible.
 **Deferred (this pass did not attempt):**
 - A real `TransportPort` and the Nostr-transport rewiring behind it — per
   this plan's own "genuinely new design work, not a refactor" framing.
+  **UPDATE (Compatibility Facade Reduction + Package Extraction Readiness +
+  Remaining Architecture Debt Closure arc, Agent P):** the Port
+  (`src/os/core/ports/transport_port.ts`) and a real Nostr adapter
+  (`src/os/messenger/adapters/nostr_transport_adapter.ts`) now exist, and
+  `createMessenger()` accepts an optional `transport` dependency — see
+  `docs/architecture/ADAPTER-CATALOG.md`'s own updated entry. The
+  "Nostr-transport rewiring" half of this bullet is STILL deferred: the
+  real messaging pipeline does not yet consume the injected `transport`
+  for its own delivery — that remains separate, larger work.
 - `PaymentProvider`'s own redesign (invoice identity, status polling,
   webhooks, idempotency, refund/expiry).
 - `StorageBackend`'s placeholder-vs-real disposition (still reserved, per

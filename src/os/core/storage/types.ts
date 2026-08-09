@@ -1,13 +1,48 @@
 /**
  * Stage 107 — Storage backend boundary (types only).
  *
- * A MINIMAL, future-facing seam for pluggable storage backends, so the
- * Python v8.6 host's Google Drive coupling can eventually be replaced by a
- * real backend (a Nostr relay, local SQLite, a local mesh, IPFS, or an
- * external service) selected behind this same interface — without the rest
- * of the app depending on any concrete backend. This file defines shapes
- * ONLY — it performs no real storage, no network call, no file IO, and
- * connects to no cryptography.
+ * FINAL DISPOSITION (Compatibility Facade Reduction + Package Extraction
+ * Readiness arc — decided and executed, not just re-documented): RETIRED AS
+ * A RESERVED, NEVER-TO-BE-ADOPTED SEAM. Traced repo-wide, this type's only
+ * consumers are `src/os/_legacy_prototype/runtime/` (dead, pre-pivot code
+ * with no deploy path — see that directory's own README) and this seam's
+ * own test coverage; it has zero live production consumers and never has.
+ *
+ * More importantly, it is STRUCTURALLY the wrong shape for this
+ * codebase's one real generic-persistence need. Every real Messenger
+ * persistence backend (`os/messenger/conversations/<feature>/persistence/`,
+ * `os/messenger/device/persistence/`, `os/messenger/board/persistence/`,
+ * `os/messenger/sync/persistence/`) stores actual ciphertext bytes in an
+ * append-only, domain-shaped record (a conversation archive entry, a sync
+ * journal entry, ...). This interface's own guardrail below — "OPAQUE,
+ * non-secret labels ONLY — never raw bytes" — makes that impossible by
+ * design: `NoopStorageBackend`/`PlaceholderStorageBackend` (`./noop_storage.ts`)
+ * cannot even in principle be extended to store a byte without violating
+ * the contract itself. This is not a wiring gap; adopting this seam for
+ * real persistence would require redesigning it into a different
+ * interface, not implementing the one that already exists.
+ *
+ * DECISION: kept as real, working, tested TypeScript (deleting it would
+ * discard that with no compensating benefit — its only cost is being
+ * unused, not being wrong to keep), but it will NOT become real messenger
+ * persistence, will NOT be wired to a Google Drive/Nostr relay/SQLite/mesh/
+ * IPFS backend, and will NOT be the basis for a future generic
+ * `AppendOnlyPersistence<T>` primitive (that primitive, if built, needs a
+ * bytes-carrying contract this one deliberately forbids, and belongs to
+ * whichever capability's persistence-triad duplication it consolidates —
+ * see `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md` for the
+ * consolidation opportunity this seam was once hoped, incorrectly, to
+ * satisfy). If a future arc needs real generic persistence, design a new
+ * contract for it; do not repurpose this one.
+ *
+ * Original scope (unchanged, historical): a MINIMAL, future-facing seam
+ * for pluggable storage backends, so the Python v8.6 host's Google Drive
+ * coupling could eventually be replaced by a real backend (a Nostr relay,
+ * local SQLite, a local mesh, IPFS, or an external service) selected
+ * behind this same interface — without the rest of the app depending on
+ * any concrete backend. This file defines shapes ONLY — it performs no
+ * real storage, no network call, no file IO, and connects to no
+ * cryptography.
  *
  * HARD GUARDRAILS (see the design notes):
  *   - NO Google Drive API, NO Nostr relay connection, NO SQLite, NO

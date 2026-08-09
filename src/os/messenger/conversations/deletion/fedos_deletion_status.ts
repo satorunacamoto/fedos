@@ -73,7 +73,7 @@ export function isFedosDeletionStatus(value: unknown): value is FedosDeletionSta
  * these, one per target this Arc actually assessed.
  */
 export interface FedosDeletionStatusObservation {
-  readonly target: import("../../../../conversation/deletion/fedos_deletion_target.js").FedosDeletionTarget;
+  readonly target: import("./fedos_deletion_target.js").FedosDeletionTarget;
   readonly status: FedosDeletionStatus;
 }
 

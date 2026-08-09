@@ -23,6 +23,7 @@
 import type {
   PaymentCapability,
   PaymentDecision,
+  PaymentEvidence,
   PaymentProvider,
   PaymentProviderStatus,
   PaymentRequest,
@@ -154,6 +155,21 @@ export class NoopPaymentProvider implements PaymentProvider {
       "no payment backend is configured (nothing charged)",
     );
   }
+
+  async observePayment(paymentId: string): Promise<PaymentEvidence> {
+    return {
+      paymentId,
+      productId: "",
+      observedAt: Math.floor(Date.now() / 1000),
+      status: "error",
+      reason: "no payment backend is configured",
+    };
+  }
+
+  async ingestCallback(): Promise<PaymentEvidence | null> {
+    // No backend present -> never recognizes a callback.
+    return null;
+  }
 }
 
 /**
@@ -163,8 +179,19 @@ export class NoopPaymentProvider implements PaymentProvider {
  * invoice, builds no checkout URL, and issues no `fetch`. An
  * `accepted_placeholder` result means the request is policy-clean, NOT that
  * a payment was received.
+ *
+ * BTCPay-readiness (Compatibility Facade Reduction + Package Extraction
+ * Readiness arc): also models `observePayment`/`ingestCallback`/
+ * `cancelPayment`/`refundPayment` against a purely in-memory ledger — proof
+ * the widened `PaymentProvider` contract is genuinely implementable end to
+ * end, not just typed. Nothing here ever contacts a network or a rail; the
+ * "ledger" is a `Map` that exists only for the lifetime of this instance.
  */
 export class PlaceholderPaymentProvider implements PaymentProvider {
+  #ledger = new Map<string, { productId: string; status: PaymentDecision["status"]; expiresAt?: number }>();
+  #nextId = 0;
+  #idempotency = new Map<string, string>(); // idempotencyKey -> paymentId
+
   constructor() {
     // Does nothing: no rail, wallet, or checkout session is contacted.
   }
@@ -196,11 +223,127 @@ export class PlaceholderPaymentProvider implements PaymentProvider {
         "request metadata contains a sensitive key or value",
       );
     }
-    return decision(
-      request,
-      "accepted_placeholder",
-      true,
-      "request is policy-clean (placeholder acceptance — nothing was charged)",
-    );
+
+    // Idempotency: a repeated key returns the SAME paymentId's current decision,
+    // never mints a second placeholder payment.
+    if (request.idempotencyKey !== undefined) {
+      const existingId = this.#idempotency.get(request.idempotencyKey);
+      if (existingId !== undefined) {
+        const existing = this.#ledger.get(existingId);
+        return {
+          ...decision(request, existing?.status ?? "accepted_placeholder", true, "idempotent replay — same payment as the original request"),
+          paymentId: existingId,
+          idempotencyKey: request.idempotencyKey,
+          ...(existing?.expiresAt !== undefined ? { expiresAt: existing.expiresAt } : {}),
+        };
+      }
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (request.expiresAt !== undefined && request.expiresAt <= now) {
+      return decision(request, "expired", false, "request's expiresAt is already in the past");
+    }
+
+    const paymentId = `placeholder-payment-${(this.#nextId += 1)}`;
+    this.#ledger.set(paymentId, {
+      productId: request.productId,
+      status: "accepted_placeholder",
+      ...(request.expiresAt !== undefined ? { expiresAt: request.expiresAt } : {}),
+    });
+    if (request.idempotencyKey !== undefined) {
+      this.#idempotency.set(request.idempotencyKey, paymentId);
+    }
+
+    return {
+      ...decision(
+        request,
+        "accepted_placeholder",
+        true,
+        "request is policy-clean (placeholder acceptance — nothing was charged)",
+      ),
+      paymentId,
+      ...(request.idempotencyKey !== undefined ? { idempotencyKey: request.idempotencyKey } : {}),
+      ...(request.expiresAt !== undefined ? { expiresAt: request.expiresAt } : {}),
+    };
+  }
+
+  async observePayment(paymentId: string): Promise<PaymentEvidence> {
+    const now = Math.floor(Date.now() / 1000);
+    const entry = this.#ledger.get(paymentId);
+    if (entry === undefined) {
+      return { paymentId, productId: "", observedAt: now, status: "error", reason: "unknown paymentId" };
+    }
+    if (entry.expiresAt !== undefined && entry.expiresAt <= now && entry.status === "accepted_placeholder") {
+      entry.status = "expired";
+    }
+    const evidenceStatus: PaymentEvidence["status"] =
+      entry.status === "accepted_placeholder" ? "settled" : entry.status === "rejected" || entry.status === "unavailable" ? "error" : entry.status === "expired" ? "expired" : entry.status === "refunded" ? "refunded" : "error";
+    return {
+      paymentId,
+      productId: entry.productId,
+      observedAt: now,
+      status: evidenceStatus,
+      reason: `placeholder ledger state: ${entry.status}`,
+    };
+  }
+
+  /**
+   * Recognizes exactly one payload shape: `{ paymentId: string; event: "settled"|"expired"|"refunded" }`.
+   * Anything else (wrong shape, unknown paymentId, unrecognized event) returns
+   * `null` rather than throwing — a malformed/foreign callback is data, not an error.
+   */
+  async ingestCallback(payload: unknown): Promise<PaymentEvidence | null> {
+    if (typeof payload !== "object" || payload === null) return null;
+    const candidate = payload as { paymentId?: unknown; event?: unknown };
+    if (typeof candidate.paymentId !== "string" || typeof candidate.event !== "string") return null;
+    if (!["settled", "expired", "refunded"].includes(candidate.event)) return null;
+
+    const entry = this.#ledger.get(candidate.paymentId);
+    if (entry === undefined) return null;
+
+    if (candidate.event === "settled") entry.status = "accepted_placeholder";
+    if (candidate.event === "expired") entry.status = "expired";
+    if (candidate.event === "refunded") entry.status = "refunded";
+
+    return this.observePayment(candidate.paymentId);
+  }
+
+  async cancelPayment(paymentId: string): Promise<PaymentDecision> {
+    const entry = this.#ledger.get(paymentId);
+    if (entry === undefined) {
+      return {
+        allowed: false,
+        status: "error",
+        rail: "manual_placeholder",
+        reason: "unknown paymentId",
+        productId: "",
+        paymentId,
+      };
+    }
+    entry.status = "rejected";
+    return {
+      allowed: true,
+      status: "rejected",
+      rail: "manual_placeholder",
+      reason: "cancelled before settlement (placeholder — nothing was ever charged)",
+      productId: entry.productId,
+      paymentId,
+    };
+  }
+
+  async refundPayment(paymentId: string): Promise<PaymentEvidence> {
+    const now = Math.floor(Date.now() / 1000);
+    const entry = this.#ledger.get(paymentId);
+    if (entry === undefined) {
+      return { paymentId, productId: "", observedAt: now, status: "error", reason: "unknown paymentId" };
+    }
+    entry.status = "refunded";
+    return {
+      paymentId,
+      productId: entry.productId,
+      observedAt: now,
+      status: "refunded",
+      reason: "placeholder refund (nothing was ever actually charged, so nothing is actually reversed)",
+    };
   }
 }
