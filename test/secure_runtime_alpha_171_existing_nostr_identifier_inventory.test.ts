@@ -12,11 +12,11 @@ import nostrTypesSource from "../src/nostr/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nostrCryptoSource from "../src/nostr/crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrIdentityProviderSource from "../src/identity/fedos_nostr_identity_provider.ts?raw";
+import nostrIdentityProviderSource from "../src/os/core/identity/fedos_nostr_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 171 -- "Existing Nostr Identifier / Bech32

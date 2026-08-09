@@ -3,9 +3,9 @@ import {
   getSpaceTags,
   eventMatchesSpace,
   classifyEventToSpaces,
-} from "../src/community/classify.js";
+} from "../src/os/_legacy_prototype/community/classify.js";
 import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
-import type { CommunitySpace, Space } from "../src/community/types.js";
+import type { CommunitySpace, Space } from "../src/os/_legacy_prototype/community/types.js";
 
 function event(tags: NostrTag[]): NostrEvent {
   return {

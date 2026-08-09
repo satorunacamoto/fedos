@@ -3,8 +3,8 @@ import {
   D1MetadataIndex,
   type D1LikeDatabase,
   type D1LikePreparedStatement,
-} from "../src/indexer/d1_index.js";
-import type { IndexedEvent } from "../src/indexer/types.js";
+} from "../src/os/_legacy_prototype/indexer/d1_index.js";
+import type { IndexedEvent } from "../src/os/_legacy_prototype/indexer/types.js";
 
 interface Recorded {
   sql: string;

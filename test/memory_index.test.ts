@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryMetadataIndex } from "../src/indexer/memory_index.js";
-import type { IndexedEvent } from "../src/indexer/types.js";
+import { InMemoryMetadataIndex } from "../src/os/_legacy_prototype/indexer/memory_index.js";
+import type { IndexedEvent } from "../src/os/_legacy_prototype/indexer/types.js";
 
 function idxEvent(overrides: Partial<IndexedEvent> = {}): IndexedEvent {
   return {

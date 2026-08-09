@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NoopMarketplaceProvider } from "../src/marketplace/noop_marketplace.js";
-import { MARKETPLACE_ITEM_KINDS } from "../src/marketplace/types.js";
+import { NoopMarketplaceProvider } from "../src/os/commerce/marketplace/noop_marketplace.js";
+import { MARKETPLACE_ITEM_KINDS } from "../src/os/commerce/marketplace/types.js";
 import type {
   MarketplaceListDecision,
   MarketplaceListingDescriptor,
@@ -8,16 +8,16 @@ import type {
   MarketplacePurchaseDecision,
   MarketplacePurchaseRequest,
   MarketplaceStatus,
-} from "../src/marketplace/types.js";
-import { createRuntime, selectMarketplaceProvider } from "../src/runtime/create_runtime.js";
+} from "../src/os/commerce/marketplace/types.js";
+import { createRuntime, selectMarketplaceProvider } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import marketplaceTypesSource from "../src/marketplace/types.ts?raw";
+import marketplaceTypesSource from "../src/os/commerce/marketplace/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopMarketplaceSource from "../src/marketplace/noop_marketplace.ts?raw";
+import noopMarketplaceSource from "../src/os/commerce/marketplace/noop_marketplace.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const marketplaceSources = [marketplaceTypesSource, noopMarketplaceSource].join("\n");
 

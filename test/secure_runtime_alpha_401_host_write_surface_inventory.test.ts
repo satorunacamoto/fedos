@@ -8,7 +8,7 @@ import serviceSource from "../src/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import queryTypesSource from "../src/board/query/fedos_board_query_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 401 -- "Existing Host Write Surface Inventory":

@@ -3,9 +3,9 @@ import {
   MeshKVAssetCache,
   MockMeshKVClient,
   type MeshKVClient,
-} from "../src/asset/meshkv_asset_cache.js";
-import { createAssetKey } from "../src/asset/policy.js";
-import type { AssetMetadata, CachedAsset } from "../src/asset/types.js";
+} from "../src/os/_legacy_prototype/asset/meshkv_asset_cache.js";
+import { createAssetKey } from "../src/os/_legacy_prototype/asset/policy.js";
+import type { AssetMetadata, CachedAsset } from "../src/os/_legacy_prototype/asset/types.js";
 
 function bytes(text: string): ArrayBuffer {
   return new TextEncoder().encode(text).buffer;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { createRuntime, selectStorageBackend } from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
+import { createRuntime, selectStorageBackend } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
 import { NoopStorageBackend, PlaceholderStorageBackend } from "../src/storage/noop_storage.js";
 import type {
   StorageBackend,
@@ -10,11 +10,11 @@ import type {
   StorageRef,
 } from "../src/storage/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 
 const runtimeSources = [runtimeSource, runtimeTypesSource].join("\n");
 

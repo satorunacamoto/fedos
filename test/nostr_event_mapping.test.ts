@@ -4,22 +4,22 @@ import {
   marketplaceListingToNostrCandidate,
   moderationSignalToNostrCandidate,
   socialEventToNostrCandidate,
-} from "../src/federation/nostr_mapping.js";
-import { NOSTR_EVENT_CANDIDATE_KINDS } from "../src/federation/types.js";
-import type { ModerationSignalInput } from "../src/federation/types.js";
-import type { SocialEventDescriptor } from "../src/social/event.js";
-import type { BoardDescriptor } from "../src/social/board.js";
-import type { MarketplaceListingDescriptor } from "../src/marketplace/types.js";
+} from "../src/os/_legacy_prototype/federation/nostr_mapping.js";
+import { NOSTR_EVENT_CANDIDATE_KINDS } from "../src/os/_legacy_prototype/federation/types.js";
+import type { ModerationSignalInput } from "../src/os/_legacy_prototype/federation/types.js";
+import type { SocialEventDescriptor } from "../src/os/_legacy_prototype/social/event.js";
+import type { BoardDescriptor } from "../src/os/_legacy_prototype/social/board.js";
+import type { MarketplaceListingDescriptor } from "../src/os/commerce/marketplace/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrMappingSource from "../src/federation/nostr_mapping.ts?raw";
+import nostrMappingSource from "../src/os/_legacy_prototype/federation/nostr_mapping.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import federationTypesSource from "../src/federation/types.ts?raw";
+import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const mappingSources = [nostrMappingSource, federationTypesSource].join("\n");
 const runtimeSources = [runtimeSource, runtimeTypesSource].join("\n");

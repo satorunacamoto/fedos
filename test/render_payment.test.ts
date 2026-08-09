@@ -3,11 +3,11 @@ import {
   renderPaymentDecision,
   renderPurchasePreview,
   renderPurchaseUnavailable,
-} from "../src/render/payment.js";
-import { canRequestPaymentForProduct, productToPaymentRequest } from "../src/payment/commerce_bridge.js";
-import { PlaceholderPaymentProvider } from "../src/payment/noop_payment.js";
-import type { PaymentDecision } from "../src/payment/types.js";
-import type { Product } from "../src/commerce/types.js";
+} from "../src/os/_legacy_prototype/render/payment.js";
+import { canRequestPaymentForProduct, productToPaymentRequest } from "../src/os/commerce/payment/commerce_bridge.js";
+import { PlaceholderPaymentProvider } from "../src/os/commerce/payment/noop_payment.js";
+import type { PaymentDecision } from "../src/os/commerce/payment/types.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
 
 const BUYER = "b".repeat(64);
 

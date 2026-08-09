@@ -3,16 +3,16 @@ import {
   createRuntime,
   selectPaymentProvider,
   resolvePaymentDefaultRail,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
-import { NoopPaymentProvider, PlaceholderPaymentProvider } from "../src/payment/noop_payment.js";
-import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/payment/types.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
+import { NoopPaymentProvider, PlaceholderPaymentProvider } from "../src/os/commerce/payment/noop_payment.js";
+import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/os/commerce/payment/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 
 const runtimeSources = [runtimeSource, runtimeTypesSource].join("\n");
 

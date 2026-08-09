@@ -24,7 +24,7 @@ import generateWasmManifestScriptSource from "../../../scripts/generate_wasm_art
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import profileDescriptorSource from "../../../src/desktop/onboarding/fedos_local_profile_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import settingsCodecSource from "../../../src/settings/fedos_settings_codec.ts?raw";
+import settingsCodecSource from "../../../src/os/core/settings/fedos_settings_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import coordinatorSource from "../../../src/desktop/onboarding/fedos_profile_initialization_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

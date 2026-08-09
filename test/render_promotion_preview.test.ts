@@ -3,13 +3,13 @@ import {
   renderMockPromotionPreview,
   renderPromotionCandidatePreview,
   renderPromotionDecisionPreview,
-} from "../src/render/promotion.js";
-import { resolvePlacement } from "../src/promotion/policy.js";
+} from "../src/os/_legacy_prototype/render/promotion.js";
+import { resolvePlacement } from "../src/os/_legacy_prototype/promotion/policy.js";
 import type {
   PromotionCandidate,
   PromotionDecision,
-} from "../src/promotion/types.js";
-import { handleRequest, isPromotionPreviewEnabled } from "../src/worker.js";
+} from "../src/os/_legacy_prototype/promotion/types.js";
+import { handleRequest, isPromotionPreviewEnabled } from "../src/os/_legacy_prototype/worker.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
@@ -17,7 +17,7 @@ import type {
   WebSocketFactory,
 } from "../src/nostr/ws_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /** A scripted socket that answers REQ with an immediate EOSE (no events). */
 function eoseFactory(): WebSocketFactory {

@@ -4,22 +4,22 @@ import {
   PROTOCOL_ADAPTER_CAPABILITIES,
   getProtocolAdapterCapabilities,
   canProtocolAdapterSupport,
-} from "../src/federation/capability_matrix.js";
+} from "../src/os/_legacy_prototype/federation/capability_matrix.js";
 import {
   renderCreatorDashboardPreview,
   renderCreatorDashboardPreviewPage,
   SAMPLE_CREATOR_DASHBOARDS,
-} from "../src/render/creator_dashboard_preview.js";
+} from "../src/os/_legacy_prototype/render/creator_dashboard_preview.js";
 import {
   handleRequest,
   isCreatorDashboardPreviewEnabled,
-} from "../src/worker.js";
+} from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityMatrixSource from "../src/federation/capability_matrix.ts?raw";
+import capabilityMatrixSource from "../src/os/_legacy_prototype/federation/capability_matrix.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import dashboardPreviewSource from "../src/render/creator_dashboard_preview.ts?raw";
+import dashboardPreviewSource from "../src/os/_legacy_prototype/render/creator_dashboard_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const boundarySources = [capabilityMatrixSource, dashboardPreviewSource].join("\n");
 

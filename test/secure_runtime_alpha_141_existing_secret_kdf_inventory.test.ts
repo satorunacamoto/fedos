@@ -8,15 +8,15 @@ import vaultCryptoIdentitySource from "../docs/vault_crypto_identity.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cryptoTestVectorsSource from "../docs/crypto_test_vectors.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nostrCryptoSource from "../src/nostr/crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nostrPublishSource from "../src/nostr/publish.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrIdentityProviderSource from "../src/identity/fedos_nostr_identity_provider.ts?raw";
+import nostrIdentityProviderSource from "../src/os/core/identity/fedos_nostr_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recoveryPolicySource from "../src/identity/recovery_policy.ts?raw";
+import recoveryPolicySource from "../src/os/core/identity/recovery_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -24,9 +24,9 @@ import createDesktopApplicationSource from "../src/desktop/create_desktop_applic
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

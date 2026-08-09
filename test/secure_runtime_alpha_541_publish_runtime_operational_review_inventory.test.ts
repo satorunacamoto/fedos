@@ -6,7 +6,7 @@ import boardReaderSource from "../src/board/repository/fedos_board_reader.ts?raw
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardServiceSource from "../src/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

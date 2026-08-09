@@ -8,16 +8,16 @@ import {
 import { cryptoCapabilitiesToVaultCapabilities } from "../src/crypto/vault_bridge.js";
 // Crypto sources as strings: prove no XOR / no AEAD-library import lives here.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cryptoTypesSource from "../src/crypto/types.ts?raw";
+import cryptoTypesSource from "../src/os/core/crypto/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopCryptoSource from "../src/crypto/noop_crypto.ts?raw";
+import noopCryptoSource from "../src/os/core/crypto/noop_crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import vaultBridgeSource from "../src/crypto/vault_bridge.ts?raw";
+import vaultBridgeSource from "../src/os/core/crypto/vault_bridge.ts?raw";
 // Runtime / Worker sources: prove the crypto core is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const cryptoSources = [cryptoTypesSource, noopCryptoSource, vaultBridgeSource].join(
   "\n",

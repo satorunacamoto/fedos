@@ -10,7 +10,7 @@ import repositorySource from "../src/board/repository/fedos_board_repository.ts?
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import persistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
 import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";

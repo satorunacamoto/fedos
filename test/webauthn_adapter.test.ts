@@ -8,12 +8,12 @@ import {
 } from "../src/identity/webauthn_adapter.js";
 // Adapter source as a string: prove no browser-credential API / crypto import.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import webauthnAdapterSource from "../src/identity/webauthn_adapter.ts?raw";
+import webauthnAdapterSource from "../src/os/core/identity/webauthn_adapter.ts?raw";
 // Runtime / Worker sources: prove the WebAuthn adapter is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Stage 60 — WebAuthn / Passkey provider adapter skeleton tests.

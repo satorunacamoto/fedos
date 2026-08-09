@@ -6,7 +6,7 @@ import ciphertextStorageSource from "../src/runtime/fedos_runtime_ciphertext_sto
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageBackendSource from "../src/runtime/fedos_runtime_storage_backend.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import d1IndexSource from "../src/indexer/d1_index.ts?raw";
+import d1IndexSource from "../src/os/_legacy_prototype/indexer/d1_index.ts?raw";
 
 /**
  * Secure Runtime Alpha 311 -- "Existing Board Persistence Inventory":

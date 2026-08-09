@@ -12,7 +12,7 @@ import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw"
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 151 -- "Protocol Root Handle": Stage 1 of the

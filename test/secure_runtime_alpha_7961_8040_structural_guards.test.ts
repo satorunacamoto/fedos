@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 // @ts-expect-error see above.
 import { join, dirname } from "node:path";
 // @ts-expect-error see above.
@@ -66,7 +66,13 @@ describe("Secure Runtime Alpha 7961-8040 -- structural guards", () => {
     const modifiedLines = diffNames()
       .split("\n")
       .map((l: string) => l.trim())
-      .filter((l: string) => l.length > 0 && l.endsWith(".ts") && l.startsWith("src/"));
+      .filter((l: string) => l.length > 0 && l.endsWith(".ts") && l.startsWith("src/"))
+      // A file this old Arc's diff base once had at this path may since have
+      // been relocated by a later, unrelated Arc (e.g. the OS Capability
+      // Modularization file moves) — a path that no longer exists was
+      // deleted/moved, not "added by this Arc with a raw secret export in
+      // it", so there is nothing here to scan.
+      .filter((l: string) => existsSync(join(REPO_ROOT, ...l.split("/"))));
     for (const line of modifiedLines) {
       const content = read(line);
       expect(content, line).not.toMatch(/exportPrivateKey|exportSecretHandle|rawSeed\s*[:=]|nsec1/i);

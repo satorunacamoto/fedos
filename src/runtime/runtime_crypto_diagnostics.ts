@@ -822,8 +822,8 @@ import { evaluateRuntimeCryptoActivation } from "./runtime_crypto_activation_pol
 import type { RuntimeCryptoProviderName } from "./runtime_crypto_config.js";
 import { getRuntimeCryptoConfig } from "./runtime_crypto_config.js";
 import { FEDOS_RUNTIME_CRYPTO_PROVIDER_NAME } from "./runtime_crypto_registry.js";
-import type { RuntimeInitializeCryptoReason } from "./types.js";
-import { createRuntimeInitializeCryptoResult } from "./create_runtime.js";
+import type { RuntimeInitializeCryptoReason } from "../os/_legacy_prototype/runtime/types.js";
+import { createRuntimeInitializeCryptoResult } from "../os/_legacy_prototype/runtime/create_runtime.js";
 
 /**
  * A non-sensitive, display-only readiness label for a `RuntimeCryptoProvider`

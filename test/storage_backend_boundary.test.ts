@@ -12,15 +12,15 @@ import type { StoragePacket, StorageRef } from "../src/storage/types.js";
 import { STORAGE_BACKEND_KINDS } from "../src/storage/types.js";
 // Source-level checks: prove no real backend import and no runtime/worker auto-wire.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../src/storage/types.ts?raw";
+import storageTypesSource from "../src/os/core/storage/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storagePolicySource from "../src/storage/policy.ts?raw";
+import storagePolicySource from "../src/os/core/storage/policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopStorageSource from "../src/storage/noop_storage.ts?raw";
+import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const storageSources = [storageTypesSource, storagePolicySource, noopStorageSource].join("\n");
 

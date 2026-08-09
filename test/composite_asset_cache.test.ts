@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   CompositeAssetCache,
   type AssetCacheLayer,
-} from "../src/asset/composite_asset_cache.js";
-import { InMemoryAssetCache } from "../src/asset/memory_asset_cache.js";
-import { createAssetKey } from "../src/asset/policy.js";
-import type { AssetCache, AssetKey, AssetMetadata, CachedAsset } from "../src/asset/types.js";
+} from "../src/os/_legacy_prototype/asset/composite_asset_cache.js";
+import { InMemoryAssetCache } from "../src/os/_legacy_prototype/asset/memory_asset_cache.js";
+import { createAssetKey } from "../src/os/_legacy_prototype/asset/policy.js";
+import type { AssetCache, AssetKey, AssetMetadata, CachedAsset } from "../src/os/_legacy_prototype/asset/types.js";
 
 function bytes(text: string): ArrayBuffer {
   return new TextEncoder().encode(text).buffer;

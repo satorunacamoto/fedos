@@ -4,10 +4,10 @@ import {
   renderDirectorySection,
   renderUnifiedDirectory,
   type UnifiedDirectoryView,
-} from "../src/render/directory.js";
-import type { Space } from "../src/community/types.js";
-import type { Product } from "../src/commerce/types.js";
-import type { ChatRoom } from "../src/chat/types.js";
+} from "../src/os/_legacy_prototype/render/directory.js";
+import type { Space } from "../src/os/_legacy_prototype/community/types.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
+import type { ChatRoom } from "../src/os/_legacy_prototype/chat/types.js";
 
 const OWNER = "a".repeat(64);
 

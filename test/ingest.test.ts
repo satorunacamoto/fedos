@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ingestRawEvents, dedupeById } from "../src/ingest/ingest.js";
+import { ingestRawEvents, dedupeById } from "../src/os/_legacy_prototype/ingest/ingest.js";
 import {
   InMemoryRelayAdapter,
   eventMatchesFilter,

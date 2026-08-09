@@ -16,7 +16,7 @@ import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 161 -- "Existing secp256k1 / Nostr Key Inventory":

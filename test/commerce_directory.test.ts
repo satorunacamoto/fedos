@@ -5,8 +5,8 @@ import {
   getProductAssets,
   listViewableProducts,
   type ProductAsset,
-} from "../src/commerce/directory.js";
-import type { Product, PurchaseGrant } from "../src/commerce/types.js";
+} from "../src/os/commerce/catalog/directory.js";
+import type { Product, PurchaseGrant } from "../src/os/commerce/catalog/types.js";
 
 const CREATOR = "f".repeat(64);
 const BUYER = "1".repeat(64);

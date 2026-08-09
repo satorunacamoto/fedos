@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   createRuntime,
   selectWebAuthnProvider,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
 import {
   NoopWebAuthnProvider,
   PlaceholderWebAuthnProvider,
@@ -11,15 +11,15 @@ import {
   type WebAuthnProvider,
   type WebAuthnReport,
 } from "../src/identity/webauthn_adapter.js";
-import { buildRuntimeStatusView } from "../src/render/runtime_status.js";
+import { buildRuntimeStatusView } from "../src/os/_legacy_prototype/render/runtime_status.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import statusSource from "../src/render/runtime_status.ts?raw";
+import statusSource from "../src/os/_legacy_prototype/render/runtime_status.ts?raw";
 
 describe("Stage 62 — WebAuthn provider runtime env selection (disabled by default)", () => {
   it("1. no env -> NoopWebAuthnProvider", () => {

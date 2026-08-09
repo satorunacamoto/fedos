@@ -11,9 +11,9 @@ import keyDocSource from "../docs/public_key_boundary.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import versioningDocSource from "../docs/public_boundary_versioning.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 
 /**

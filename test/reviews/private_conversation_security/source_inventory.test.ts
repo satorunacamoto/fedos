@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync } from "node:fs";
 import { NoopCryptoProvider } from "../../../src/crypto/noop_crypto.js";
-import { canProtocolAdapterSupport } from "../../../src/federation/capability_matrix.js";
+import { canProtocolAdapterSupport } from "../../../src/os/_legacy_prototype/federation/capability_matrix.js";
 import { validateFedosBoardPost } from "../../../src/board/fedos_board_post_validator.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardPostSource from "../../../src/board/fedos_board_post.ts?raw";
@@ -17,7 +17,7 @@ import appendOnlyBoardSource from "../../../src/board/persistence/append_only_fe
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import appendOnlyOutboxSource from "../../../src/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import chatTypesSource from "../../../src/chat/types.ts?raw";
+import chatTypesSource from "../../../src/os/_legacy_prototype/chat/types.ts?raw";
 
 /**
  * Private Conversation Security, Storage & Capability Boundary Review --

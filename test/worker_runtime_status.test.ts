@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
-import worker, { handleRequest } from "../src/worker.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
-import type { AppRuntime } from "../src/runtime/types.js";
-import type { AssetCache, AssetKey, CachedAsset } from "../src/asset/types.js";
-import type { PromotionDecision, PromotionRequest } from "../src/promotion/types.js";
-import type { PromotionProvider, RecommendationProvider } from "../src/promotion/adapter.js";
+import worker, { handleRequest } from "../src/os/_legacy_prototype/worker.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { AppRuntime } from "../src/os/_legacy_prototype/runtime/types.js";
+import type { AssetCache, AssetKey, CachedAsset } from "../src/os/_legacy_prototype/asset/types.js";
+import type { PromotionDecision, PromotionRequest } from "../src/os/_legacy_prototype/promotion/types.js";
+import type { PromotionProvider, RecommendationProvider } from "../src/os/_legacy_prototype/promotion/adapter.js";
 import type {
   NotificationBridge,
   NotificationDecision,
   NotificationPayload,
 } from "../src/notification/types.js";
-import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/payment/types.js";
+import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/os/commerce/payment/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 interface SpyCallCounts {
   assetCacheGet: number;

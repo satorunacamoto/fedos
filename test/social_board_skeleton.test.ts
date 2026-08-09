@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { SOCIAL_EVENT_KINDS, SOCIAL_VISIBILITIES } from "../src/social/event.js";
-import type { SocialEventDescriptor } from "../src/social/event.js";
-import { BOARD_KINDS } from "../src/social/board.js";
-import type { BoardDescriptor, CategoryLabel, TopicLabel } from "../src/social/board.js";
+import { SOCIAL_EVENT_KINDS, SOCIAL_VISIBILITIES } from "../src/os/_legacy_prototype/social/event.js";
+import type { SocialEventDescriptor } from "../src/os/_legacy_prototype/social/event.js";
+import { BOARD_KINDS } from "../src/os/_legacy_prototype/social/board.js";
+import type { BoardDescriptor, CategoryLabel, TopicLabel } from "../src/os/_legacy_prototype/social/board.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import socialEventSource from "../src/social/event.ts?raw";
+import socialEventSource from "../src/os/_legacy_prototype/social/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import socialBoardSource from "../src/social/board.ts?raw";
+import socialBoardSource from "../src/os/_legacy_prototype/social/board.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const socialSources = [socialEventSource, socialBoardSource].join("\n");
 const runtimeSources = [runtimeSource, runtimeTypesSource].join("\n");

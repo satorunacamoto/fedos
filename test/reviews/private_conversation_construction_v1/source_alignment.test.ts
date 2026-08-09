@@ -30,7 +30,7 @@ import payloadStorageSource from "../../../src/conversation/payload_storage/fedo
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardRuntimeSource from "../../../src/board/runtime/fedos_board_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopCryptoSource from "../../../src/crypto/noop_crypto.ts?raw";
+import noopCryptoSource from "../../../src/os/core/crypto/noop_crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeCryptoProviderSource from "../../../src/runtime/fedos_runtime_crypto_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

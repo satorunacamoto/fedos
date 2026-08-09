@@ -22,11 +22,11 @@ import randomBytesServiceSource from "../src/runtime/fedos_runtime_random_bytes.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -224,7 +224,7 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
   });
 
   it("19. initializeCrypto()'s own return value is confirmed byte-for-byte unchanged by an ACTUAL call", async () => {
-    const { createRuntimeInitializeCryptoResult } = await import("../src/runtime/create_runtime.js");
+    const { createRuntimeInitializeCryptoResult } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const decision = createRuntimeInitializeCryptoResult();
     expect(decision).toEqual({ allowed: false, initialized: false, reason: "PrototypeDisabled" });
   });
@@ -261,7 +261,7 @@ describe("Secure Runtime Alpha 017 Ciphertext Wire Format Decision -- review/dec
   });
 
   it("21. createRuntime()'s assembled AppRuntime still exposes the same six fields this decision found -- exportCiphertext/importCiphertext were later added by Stage 1011 (Secure Runtime Alpha 018), executing this decision's own contract", async () => {
-    const { createRuntime } = await import("../src/runtime/create_runtime.js");
+    const { createRuntime } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const runtime = createRuntime();
     expect(typeof runtime.initializeCrypto).toBe("function");
     expect(typeof runtime.runtimeCapabilities).toBe("function");

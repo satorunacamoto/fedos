@@ -3,9 +3,9 @@ import {
   buildThreads,
   getReplyTarget,
   getRootTarget,
-} from "../src/thread/thread.js";
+} from "../src/os/_legacy_prototype/thread/thread.js";
 import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
-import type { IngestedEvent } from "../src/ingest/types.js";
+import type { IngestedEvent } from "../src/os/_legacy_prototype/ingest/types.js";
 
 const HEX128 = "b".repeat(128);
 

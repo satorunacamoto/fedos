@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { handleRequest } from "../src/worker.js";
-import { NoopPaymentProvider, PlaceholderPaymentProvider } from "../src/payment/noop_payment.js";
-import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/payment/types.js";
+import { handleRequest } from "../src/os/_legacy_prototype/worker.js";
+import { NoopPaymentProvider, PlaceholderPaymentProvider } from "../src/os/commerce/payment/noop_payment.js";
+import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/os/commerce/payment/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /** A PaymentProvider that records every requestPayment() call. */
 class SpyPaymentProvider implements PaymentProvider {

@@ -13,8 +13,8 @@
  * expected to run `validateBeforePublish` (and any policy check) first.
  */
 
-import type { SignedNostrEvent } from "../sign/types.js";
-import { isSignedEventLike } from "../sign/validate.js";
+import type { SignedNostrEvent } from "../os/_legacy_prototype/sign/types.js";
+import { isSignedEventLike } from "../os/_legacy_prototype/sign/validate.js";
 import type { SignatureVerifier } from "./signature.js";
 import type { RelaySocketLike, WebSocketFactory } from "./ws_relay.js";
 

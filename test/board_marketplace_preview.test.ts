@@ -3,41 +3,41 @@ import {
   renderBoardPreview,
   renderBoardPreviewPage,
   SAMPLE_BOARDS,
-} from "../src/render/board_preview.js";
-import type { BoardDescriptor } from "../src/social/board.js";
+} from "../src/os/_legacy_prototype/render/board_preview.js";
+import type { BoardDescriptor } from "../src/os/_legacy_prototype/social/board.js";
 import {
   renderMarketplaceListingPreview,
   renderMarketplacePreviewPage,
   SAMPLE_LISTINGS,
-} from "../src/render/marketplace_preview.js";
-import type { MarketplaceListingDescriptor } from "../src/marketplace/types.js";
+} from "../src/os/_legacy_prototype/render/marketplace_preview.js";
+import type { MarketplaceListingDescriptor } from "../src/os/commerce/marketplace/types.js";
 import {
   BOARD_INTERACTION_INTENT_KINDS,
   reviewBoardInteractionIntent,
   sanitizeBoardInteractionIntentMetadata,
-} from "../src/social/intent.js";
-import type { BoardInteractionIntentDescriptor } from "../src/social/intent.js";
+} from "../src/os/_legacy_prototype/social/intent.js";
+import type { BoardInteractionIntentDescriptor } from "../src/os/_legacy_prototype/social/intent.js";
 import {
   MARKETPLACE_INTENT_KINDS,
   reviewMarketplaceIntent,
   sanitizeMarketplaceIntentMetadata,
-} from "../src/marketplace/intent.js";
-import type { MarketplaceIntentDescriptor } from "../src/marketplace/intent.js";
+} from "../src/os/commerce/marketplace/intent.js";
+import type { MarketplaceIntentDescriptor } from "../src/os/commerce/marketplace/intent.js";
 import {
   handleRequest,
   isBoardPreviewEnabled,
   isMarketplacePreviewEnabled,
-} from "../src/worker.js";
+} from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPreviewSource from "../src/render/board_preview.ts?raw";
+import boardPreviewSource from "../src/os/_legacy_prototype/render/board_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import marketplacePreviewSource from "../src/render/marketplace_preview.ts?raw";
+import marketplacePreviewSource from "../src/os/_legacy_prototype/render/marketplace_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import socialIntentSource from "../src/social/intent.ts?raw";
+import socialIntentSource from "../src/os/_legacy_prototype/social/intent.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import marketplaceIntentSource from "../src/marketplace/intent.ts?raw";
+import marketplaceIntentSource from "../src/os/commerce/marketplace/intent.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const previewSources = [boardPreviewSource, marketplacePreviewSource].join("\n");
 const intentSources = [socialIntentSource, marketplaceIntentSource].join("\n");

@@ -22,20 +22,20 @@ import {
   SAMPLE_DEVICE_TRUST,
   SAMPLE_SESSION_REQUESTS,
   SAMPLE_RECOVERY_REQUESTS,
-} from "../src/render/device_preview.js";
-import { handleRequest, isDevicePreviewEnabled } from "../src/worker.js";
+} from "../src/os/_legacy_prototype/render/device_preview.js";
+import { handleRequest, isDevicePreviewEnabled } from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deviceRegistrationSource from "../src/identity/device_registration.ts?raw";
+import deviceRegistrationSource from "../src/os/core/identity/device_registration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deviceTrustSource from "../src/identity/device_trust.ts?raw";
+import deviceTrustSource from "../src/os/core/identity/device_trust.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionBoundarySource from "../src/identity/session_boundary.ts?raw";
+import sessionBoundarySource from "../src/os/core/identity/session_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recoveryPolicySource from "../src/identity/recovery_policy.ts?raw";
+import recoveryPolicySource from "../src/os/core/identity/recovery_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import devicePreviewSource from "../src/render/device_preview.ts?raw";
+import devicePreviewSource from "../src/os/_legacy_prototype/render/device_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import deviceIdentityDoc from "../docs/device_identity_boundary.md?raw";
 

@@ -3,9 +3,9 @@ import { generateAeadKey } from "../../../src/runtime/fedos_runtime_aead_key_gen
 import { encrypt } from "../../../src/runtime/fedos_runtime_encrypt.js";
 import { decrypt } from "../../../src/runtime/fedos_runtime_decrypt.js";
 import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../../../src/runtime/fedos_runtime_ciphertext_storage.js";
-import { canProtocolAdapterSupport, type ProtocolAdapterKind } from "../../../src/federation/capability_matrix.js";
-import { canRead, canPost } from "../../../src/community/policy.js";
-import type { CommunitySpace } from "../../../src/community/types.js";
+import { canProtocolAdapterSupport, type ProtocolAdapterKind } from "../../../src/os/_legacy_prototype/federation/capability_matrix.js";
+import { canRead, canPost } from "../../../src/os/_legacy_prototype/community/policy.js";
+import type { CommunitySpace } from "../../../src/os/_legacy_prototype/community/types.js";
 import { FedosDesktopHost } from "../../../src/desktop/host/fedos_desktop_host.js";
 import { DesktopApplication } from "../../../src/desktop/desktop_application.js";
 import { InMemoryFedosBoardPersistence } from "../../../src/board/persistence/in_memory_fedos_board_persistence.js";

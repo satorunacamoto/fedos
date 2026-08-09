@@ -12,15 +12,15 @@ import createDesktopApplicationSource from "../src/desktop/create_desktop_applic
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nostrPublicIdentityReaderSource from "../src/desktop/nostr_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopIdentityProviderSource from "../src/identity/fedos_noop_identity_provider.ts?raw";
+import noopIdentityProviderSource from "../src/os/core/identity/fedos_noop_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 104 -- "Null Reader": Stage 4 of the Public

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   isSignedEventLike,
   assertSignerPubkeyMatches,
-} from "../src/sign/validate.js";
-import type { SignedNostrEvent } from "../src/sign/types.js";
+} from "../src/os/_legacy_prototype/sign/validate.js";
+import type { SignedNostrEvent } from "../src/os/_legacy_prototype/sign/types.js";
 
 function signed(overrides: Partial<SignedNostrEvent> = {}): SignedNostrEvent {
   return {

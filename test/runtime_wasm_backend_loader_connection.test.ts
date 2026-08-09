@@ -12,7 +12,7 @@ import { FedosWasmLoaderSkeleton, createFedosWasmLoader } from "../src/runtime/f
 import { createCryptoBackendInterface } from "../src/runtime/fedos_crypto_backend_interface.js";
 import { createCryptoLoaderBackend } from "../src/runtime/fedos_crypto_loader_backend.js";
 import { createCryptoLoaderFacade, initializeCrypto } from "../src/runtime/fedos_crypto_loader_facade.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { createExplicitCryptoInitialization } from "../src/runtime/fedos_explicit_crypto_initialization.js";
 import { createDynamicLoaderDevApproval } from "../src/runtime/fedos_dynamic_loader_dev_approval.js";
 import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
@@ -28,9 +28,9 @@ import wasmBackendSource from "../src/runtime/fedos_wasm_backend.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

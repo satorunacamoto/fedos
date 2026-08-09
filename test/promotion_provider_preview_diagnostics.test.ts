@@ -3,18 +3,18 @@ import {
   buildPromotionPreviewDiagnostic,
   renderPromotionPreviewDiagnostic,
   renderProviderPromotionCandidatePreview,
-} from "../src/render/promotion.js";
-import type { PromotionPreviewDiagnosticView } from "../src/render/promotion.js";
-import { handleRequest } from "../src/worker.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
-import type { AppRuntime } from "../src/runtime/types.js";
+} from "../src/os/_legacy_prototype/render/promotion.js";
+import type { PromotionPreviewDiagnosticView } from "../src/os/_legacy_prototype/render/promotion.js";
+import { handleRequest } from "../src/os/_legacy_prototype/worker.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { AppRuntime } from "../src/os/_legacy_prototype/runtime/types.js";
 import type {
   PromotionCandidate,
   PromotionDecision,
   PromotionRequest,
-} from "../src/promotion/types.js";
-import type { PromotionInvocationDecision } from "../src/promotion/invocation.js";
-import type { PromotionProvider } from "../src/promotion/adapter.js";
+} from "../src/os/_legacy_prototype/promotion/types.js";
+import type { PromotionInvocationDecision } from "../src/os/_legacy_prototype/promotion/invocation.js";
+import type { PromotionProvider } from "../src/os/_legacy_prototype/promotion/adapter.js";
 
 const PLACEMENT = { type: "product_sidebar", context: "product", label: "Product sidebar" } as const;
 

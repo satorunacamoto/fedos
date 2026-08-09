@@ -12,12 +12,12 @@ import {
   chatEventToNotification,
   productEventToNotification,
   spaceEventToNotification,
-} from "../src/notification/bridge.js";
+} from "../src/os/_legacy_prototype/notification/bridge.js";
 import type { NotificationPayload } from "../src/notification/types.js";
-import type { ChatMessage, ChatRoom } from "../src/chat/types.js";
+import type { ChatMessage, ChatRoom } from "../src/os/_legacy_prototype/chat/types.js";
 import type { NostrEvent } from "../src/nostr/types.js";
-import { SAMPLE_SPACES } from "../src/community/sample_spaces.js";
-import { SAMPLE_PRODUCTS } from "../src/commerce/sample_products.js";
+import { SAMPLE_SPACES } from "../src/os/_legacy_prototype/community/sample_spaces.js";
+import { SAMPLE_PRODUCTS } from "../src/os/commerce/catalog/sample_products.js";
 // Notification sources as strings: prove no transport import and no send/fetch call.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import notificationTypesSource from "../src/notification/types.ts?raw";
@@ -26,12 +26,12 @@ import notificationPolicySource from "../src/notification/policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import noopNotificationSource from "../src/notification/noop_notification.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import notificationBridgeSource from "../src/notification/bridge.ts?raw";
+import notificationBridgeSource from "../src/os/_legacy_prototype/notification/bridge.ts?raw";
 // Runtime / Worker sources: prove the notification layer is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const notificationSources = [
   notificationTypesSource,

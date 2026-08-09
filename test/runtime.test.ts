@@ -8,28 +8,28 @@ import {
   selectRelayPublisher,
   selectSignatureVerifier,
   selectSpaceDirectory,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
-import { InMemoryAssetCache } from "../src/asset/memory_asset_cache.js";
-import { CompositeAssetCache } from "../src/asset/composite_asset_cache.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
+import { InMemoryAssetCache } from "../src/os/_legacy_prototype/asset/memory_asset_cache.js";
+import { CompositeAssetCache } from "../src/os/_legacy_prototype/asset/composite_asset_cache.js";
 import {
   MeshKVAssetCache,
   MockMeshKVClient,
-} from "../src/asset/meshkv_asset_cache.js";
-import { MockR2Bucket, R2AssetCache } from "../src/asset/r2_asset_cache.js";
-import { InMemoryEventCache } from "../src/cache/event_cache.js";
-import { KvEventCache, type KvLikeNamespace } from "../src/cache/kv_event_cache.js";
-import { InMemorySpaceDirectory } from "../src/community/directory.js";
-import { D1SpaceDirectory } from "../src/community/d1_directory.js";
-import { InMemoryMetadataIndex } from "../src/indexer/memory_index.js";
-import { D1MetadataIndex, type D1LikeDatabase, type D1LikePreparedStatement } from "../src/indexer/d1_index.js";
+} from "../src/os/_legacy_prototype/asset/meshkv_asset_cache.js";
+import { MockR2Bucket, R2AssetCache } from "../src/os/_legacy_prototype/asset/r2_asset_cache.js";
+import { InMemoryEventCache } from "../src/os/_legacy_prototype/cache/event_cache.js";
+import { KvEventCache, type KvLikeNamespace } from "../src/os/_legacy_prototype/cache/kv_event_cache.js";
+import { InMemorySpaceDirectory } from "../src/os/_legacy_prototype/community/directory.js";
+import { D1SpaceDirectory } from "../src/os/_legacy_prototype/community/d1_directory.js";
+import { InMemoryMetadataIndex } from "../src/os/_legacy_prototype/indexer/memory_index.js";
+import { D1MetadataIndex, type D1LikeDatabase, type D1LikePreparedStatement } from "../src/os/_legacy_prototype/indexer/d1_index.js";
 import { NobleSignatureVerifier } from "../src/nostr/noble_signature.js";
 import { MockRelayPublisher } from "../src/nostr/publish.js";
 import {
   MockPromotionProvider,
   MockRecommendationProvider,
-} from "../src/promotion/adapter.js";
-import { EdgeRecPromotionProvider, type EdgeRecFetchLike } from "../src/promotion/edge_rec_adapter.js";
+} from "../src/os/_legacy_prototype/promotion/adapter.js";
+import { EdgeRecPromotionProvider, type EdgeRecFetchLike } from "../src/os/_legacy_prototype/promotion/edge_rec_adapter.js";
 
 class FakeKv implements KvLikeNamespace {
   async get(): Promise<string | null> {

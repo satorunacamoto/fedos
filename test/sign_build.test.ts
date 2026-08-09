@@ -4,8 +4,8 @@ import {
   buildReplyTags,
   buildSpaceTags,
   prepareSpacePost,
-} from "../src/sign/build.js";
-import type { CommunitySpace } from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/sign/build.js";
+import type { CommunitySpace } from "../src/os/_legacy_prototype/community/types.js";
 
 const PUB = "a".repeat(64);
 const STRANGER = "stranger".padEnd(64, "0");

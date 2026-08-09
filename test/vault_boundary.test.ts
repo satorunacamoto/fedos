@@ -4,9 +4,9 @@ import { InMemoryVaultBoundary } from "../src/vault/memory_vault.js";
 import type { VaultUnlockRequest } from "../src/vault/types.js";
 // Runtime / Worker sources as strings: prove the vault is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Stage 33 — Vault boundary tests.

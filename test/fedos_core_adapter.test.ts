@@ -17,11 +17,11 @@ import pkgIndexSource from "../packages/fedos-core-rust/src/index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import pkgTypesSource from "../packages/fedos-core-rust/src/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterSource from "../src/crypto/fedos_core_adapter.ts?raw";
+import adapterSource from "../src/os/core/crypto/fedos_core_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /** A FedOS core whose every method throws — proves the adapter never leaks it. */
 class ThrowingFedosCore implements FedosCoreCrypto {

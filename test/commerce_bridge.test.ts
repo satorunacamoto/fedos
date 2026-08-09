@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   canPromoteProductInSpace,
-  productFromEvent,
   productFromSpace,
-} from "../src/commerce/bridge.js";
-import type { CommunitySpace, GroupSpace } from "../src/community/types.js";
+} from "../src/os/commerce/catalog/bridge.js";
+import { productFromEvent } from "../src/os/commerce/catalog/adapters/nostr/bridge.js";
+import type { CommunitySpace, GroupSpace } from "../src/os/_legacy_prototype/community/types.js";
 import type { NostrEvent } from "../src/nostr/types.js";
 
 const OWNER = "a".repeat(64);

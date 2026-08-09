@@ -3,14 +3,14 @@ import {
   buildPayloadDiagnostics,
   renderPayloadDiagnostics,
   renderPayloadDiagnosticsFromPreview,
-} from "../src/render/payload_diagnostics.js";
+} from "../src/os/_legacy_prototype/render/payload_diagnostics.js";
 import type { PayloadPreviewDescriptor } from "../src/storage/encrypted_payload.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import diagnosticsSource from "../src/render/payload_diagnostics.ts?raw";
+import diagnosticsSource from "../src/os/_legacy_prototype/render/payload_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 function descriptor(overrides: Partial<PayloadPreviewDescriptor> = {}): PayloadPreviewDescriptor {
   return {

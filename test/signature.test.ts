@@ -3,7 +3,7 @@ import {
   NoopSignatureVerifier,
   RejectAllSignatureVerifier,
 } from "../src/nostr/signature.js";
-import { ingestRawEvents } from "../src/ingest/ingest.js";
+import { ingestRawEvents } from "../src/os/_legacy_prototype/ingest/ingest.js";
 import type { NostrEvent } from "../src/nostr/types.js";
 
 function validEvent(idChar = "1"): NostrEvent {

@@ -2,22 +2,22 @@ import { describe, it, expect } from "vitest";
 import {
   ENTITLEMENT_KINDS,
   NoopEntitlementProvider,
-} from "../src/creator/entitlement.js";
+} from "../src/os/commerce/creator/entitlement.js";
 import type {
   EntitlementCheckRequest,
   EntitlementDecision,
   EntitlementProvider,
-} from "../src/creator/entitlement.js";
+} from "../src/os/commerce/creator/entitlement.js";
 import {
   createRuntime,
   selectCreatorEntitlementProvider,
-} from "../src/runtime/create_runtime.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import entitlementSource from "../src/creator/entitlement.ts?raw";
+import entitlementSource from "../src/os/commerce/creator/entitlement.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const cleanRequest: EntitlementCheckRequest = {
   kind: "digital_access_placeholder",

@@ -14,16 +14,16 @@ import {
 // Identity provider sources as strings: prove no OAuth/JWT/WebAuthn import and
 // type-only vault/passkey imports.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerTypesSource from "../src/identity/provider_types.ts?raw";
+import providerTypesSource from "../src/os/core/identity/provider_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerBoundarySource from "../src/identity/provider_boundary.ts?raw";
+import providerBoundarySource from "../src/os/core/identity/provider_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerBridgeSource from "../src/identity/provider_bridge.ts?raw";
+import providerBridgeSource from "../src/os/core/identity/provider_bridge.ts?raw";
 // Runtime / Worker sources: prove the provider layer is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const providerSources = [
   providerTypesSource,

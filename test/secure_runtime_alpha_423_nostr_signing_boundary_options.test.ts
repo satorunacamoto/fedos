@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_423_nostr_signing_boundary_options.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nip07Source from "../src/sign/nip07.ts?raw";
+import nip07Source from "../src/os/_legacy_prototype/sign/nip07.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.

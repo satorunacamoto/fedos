@@ -2,18 +2,18 @@ import { describe, it, expect } from "vitest";
 import {
   summarizeQueueStatusPreview,
   type QueueStatusPreview,
-} from "../src/federation/queue_status_preview.js";
-import { PROTOCOL_ADAPTER_KINDS } from "../src/federation/capability_matrix.js";
-import type { OutboundQueueItemDescriptor } from "../src/federation/outbound_queue.js";
+} from "../src/os/_legacy_prototype/federation/queue_status_preview.js";
+import { PROTOCOL_ADAPTER_KINDS } from "../src/os/_legacy_prototype/federation/capability_matrix.js";
+import type { OutboundQueueItemDescriptor } from "../src/os/_legacy_prototype/federation/outbound_queue.js";
 import {
   renderQueueStatusPreviewPage,
   SAMPLE_QUEUE_ITEMS,
-} from "../src/render/queue_preview.js";
-import { handleRequest, isQueuePreviewEnabled } from "../src/worker.js";
+} from "../src/os/_legacy_prototype/render/queue_preview.js";
+import { handleRequest, isQueuePreviewEnabled } from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import queueStatusPreviewSource from "../src/federation/queue_status_preview.ts?raw";
+import queueStatusPreviewSource from "../src/os/_legacy_prototype/federation/queue_status_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import queuePreviewRenderSource from "../src/render/queue_preview.ts?raw";
+import queuePreviewRenderSource from "../src/os/_legacy_prototype/render/queue_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import blueskyDoc from "../docs/bluesky_adapter_planning.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -21,7 +21,7 @@ import threadsDoc from "../docs/threads_adapter_planning.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import rssDoc from "../docs/rss_adapter_planning.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const boundarySources = [queueStatusPreviewSource, queuePreviewRenderSource].join("\n");
 

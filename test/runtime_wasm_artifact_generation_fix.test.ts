@@ -18,9 +18,9 @@ import fixDocSource from "../docs/runtime_wasm_artifact_generation_fix.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import observationDocSource from "../docs/runtime_wasm_artifact_observation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Stage 465–472 — "FedOS WASM artifact generation fix": resolves the

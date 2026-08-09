@@ -9,14 +9,14 @@ import { NobleSignatureVerifier } from "../src/nostr/noble_signature.js";
 import {
   canPublishToSpace,
   preparePublishDecision,
-} from "../src/sign/publish_flow.js";
+} from "../src/os/_legacy_prototype/sign/publish_flow.js";
 import type {
   RelaySocketEvent,
   RelaySocketEventType,
   RelaySocketLike,
 } from "../src/nostr/ws_relay.js";
-import type { SignedNostrEvent } from "../src/sign/types.js";
-import type { ChannelSpace, CommunitySpace } from "../src/community/types.js";
+import type { SignedNostrEvent } from "../src/os/_legacy_prototype/sign/types.js";
+import type { ChannelSpace, CommunitySpace } from "../src/os/_legacy_prototype/community/types.js";
 
 /**
  * Known-good NIP-01 event (same @noble vector used by noble_signature.test.ts;

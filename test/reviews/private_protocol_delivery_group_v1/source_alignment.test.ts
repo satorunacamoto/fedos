@@ -22,9 +22,9 @@ import deliveryObservationSource from "../../../src/board/observation/fedos_deli
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import transitionGraphSource from "../../../src/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityMatrixSource from "../../../src/federation/nostr_mapping.ts?raw";
+import capabilityMatrixSource from "../../../src/os/_legacy_prototype/federation/nostr_mapping.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedCapabilityMatrixSource from "../../../src/federation/capability_matrix.ts?raw";
+import fedCapabilityMatrixSource from "../../../src/os/_legacy_prototype/federation/capability_matrix.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
 

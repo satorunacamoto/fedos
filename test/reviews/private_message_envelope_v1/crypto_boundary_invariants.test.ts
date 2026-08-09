@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync, readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cryptoTypesSource from "../../../src/crypto/types.ts?raw";
+import cryptoTypesSource from "../../../src/os/core/crypto/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopCryptoSource from "../../../src/crypto/noop_crypto.ts?raw";
+import noopCryptoSource from "../../../src/os/core/crypto/noop_crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import vaultBridgeSource from "../../../src/crypto/vault_bridge.ts?raw";
+import vaultBridgeSource from "../../../src/os/core/crypto/vault_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import masterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -14,11 +14,11 @@ import sealedEnvelopeSource from "../../../src/runtime/master_seed/fedos_sealed_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmMasterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_wasm_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import vaultTypesSource from "../../../src/vault/types.ts?raw";
+import vaultTypesSource from "../../../src/os/core/vault/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import memoryVaultSource from "../../../src/vault/memory_vault.ts?raw";
+import memoryVaultSource from "../../../src/os/core/vault/memory_vault.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopVaultSource from "../../../src/vault/noop_vault.ts?raw";
+import noopVaultSource from "../../../src/os/core/vault/noop_vault.ts?raw";
 
 /**
  * Private Message Envelope and Encryption Activation V1 review --

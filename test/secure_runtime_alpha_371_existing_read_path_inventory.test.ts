@@ -10,7 +10,7 @@ import indexSource from "../src/board/repository/fedos_board_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import repositorySource from "../src/board/repository/fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import threadQuerySource from "../src/query/thread_query.ts?raw";
+import threadQuerySource from "../src/os/_legacy_prototype/query/thread_query.ts?raw";
 
 /**
  * Secure Runtime Alpha 371 -- "Existing Read Path Inventory": Stage 1

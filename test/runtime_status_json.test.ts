@@ -3,8 +3,8 @@ import {
   buildRuntimeStatusView,
   renderRuntimeStatusJson,
   serializeRuntimeStatusView,
-} from "../src/render/runtime_status.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
+} from "../src/os/_legacy_prototype/render/runtime_status.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 
 describe("serializeRuntimeStatusView", () => {
   it("1. returns the runtime mode", () => {

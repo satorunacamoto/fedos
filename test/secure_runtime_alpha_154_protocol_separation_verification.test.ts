@@ -12,7 +12,7 @@ import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw"
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 function masterRootModuleText(): string {
   return (libRsSource.match(/\/\/\/ Stage 1012 \(Secure Runtime Alpha 146\)[\s\S]*?\n\/\/\/ Stage 87/) ?? [])[0] ?? "";

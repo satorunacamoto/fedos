@@ -4,10 +4,10 @@ import {
   findSpaceById,
   listReadableSpaces,
   filterEventsForSpace,
-} from "../src/community/directory.js";
-import type { CommunitySpace, GroupSpace, Space } from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/community/directory.js";
+import type { CommunitySpace, GroupSpace, Space } from "../src/os/_legacy_prototype/community/types.js";
 import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
-import type { IngestedEvent } from "../src/ingest/types.js";
+import type { IngestedEvent } from "../src/os/_legacy_prototype/ingest/types.js";
 
 const MEMBER = "member".padEnd(64, "0");
 const STRANGER = "stranger".padEnd(64, "0");

@@ -3,19 +3,19 @@ import {
   createRuntime,
   selectAssetCache,
   selectMeshKVClient,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
 // Worker source as a string for a static "no MeshKV auto-wire" check.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
-import { InMemoryAssetCache } from "../src/asset/memory_asset_cache.js";
-import { CompositeAssetCache } from "../src/asset/composite_asset_cache.js";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
+import { InMemoryAssetCache } from "../src/os/_legacy_prototype/asset/memory_asset_cache.js";
+import { CompositeAssetCache } from "../src/os/_legacy_prototype/asset/composite_asset_cache.js";
 import {
   MeshKVAssetCache,
   MockMeshKVClient,
-} from "../src/asset/meshkv_asset_cache.js";
-import { MeshKVBrowserClient } from "../src/asset/meshkv_browser_client.js";
-import { MockR2Bucket } from "../src/asset/r2_asset_cache.js";
+} from "../src/os/_legacy_prototype/asset/meshkv_asset_cache.js";
+import { MeshKVBrowserClient } from "../src/os/_legacy_prototype/asset/meshkv_browser_client.js";
+import { MockR2Bucket } from "../src/os/_legacy_prototype/asset/r2_asset_cache.js";
 import type { MeshKVApi } from "../packages/meshkv/src/index.js";
 
 /**

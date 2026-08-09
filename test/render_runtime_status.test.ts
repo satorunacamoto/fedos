@@ -4,11 +4,11 @@ import {
   renderRuntimeComponentStatus,
   renderRuntimeStatusPage,
   renderRuntimeStatusSection,
-} from "../src/render/runtime_status.js";
-import type { RuntimeStatusView } from "../src/render/runtime_status.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
-import type { AssetCache, AssetKey, CachedAsset } from "../src/asset/types.js";
-import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/payment/types.js";
+} from "../src/os/_legacy_prototype/render/runtime_status.js";
+import type { RuntimeStatusView } from "../src/os/_legacy_prototype/render/runtime_status.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { AssetCache, AssetKey, CachedAsset } from "../src/os/_legacy_prototype/asset/types.js";
+import type { PaymentDecision, PaymentProvider, PaymentRequest } from "../src/os/commerce/payment/types.js";
 
 describe("buildRuntimeStatusView", () => {
   it("builds a view from a real runtime (flat components, backward compatible)", () => {

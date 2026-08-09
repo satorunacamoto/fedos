@@ -3,8 +3,8 @@ import {
   classifyEventToProducts,
   eventMatchesProduct,
   getProductTags,
-} from "../src/commerce/classify.js";
-import type { Product } from "../src/commerce/types.js";
+} from "../src/os/commerce/catalog/adapters/nostr/classify.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
 import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
 
 function event(tags: NostrTag[]): NostrEvent {

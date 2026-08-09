@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   MockR2Bucket,
   R2AssetCache,
-} from "../src/asset/r2_asset_cache.js";
-import { createAssetKey } from "../src/asset/policy.js";
-import type { AssetMetadata, CachedAsset } from "../src/asset/types.js";
+} from "../src/os/_legacy_prototype/asset/r2_asset_cache.js";
+import { createAssetKey } from "../src/os/_legacy_prototype/asset/policy.js";
+import type { AssetMetadata, CachedAsset } from "../src/os/_legacy_prototype/asset/types.js";
 
 function bytes(text: string): ArrayBuffer {
   return new TextEncoder().encode(text).buffer;

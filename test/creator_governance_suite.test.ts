@@ -3,43 +3,43 @@ import {
   CREATOR_APPEAL_KINDS,
   reviewCreatorAppeal,
   isSensitiveCreatorAppealValue,
-} from "../src/creator/appeal.js";
-import type { CreatorAppealDescriptor } from "../src/creator/appeal.js";
+} from "../src/os/commerce/creator/appeal.js";
+import type { CreatorAppealDescriptor } from "../src/os/commerce/creator/appeal.js";
 import {
   CREATOR_REPUTATION_LABELS,
   reviewReputationSignal,
-} from "../src/creator/reputation.js";
-import type { ReputationSignalDescriptor } from "../src/creator/reputation.js";
+} from "../src/os/commerce/creator/reputation.js";
+import type { ReputationSignalDescriptor } from "../src/os/commerce/creator/reputation.js";
 import {
   SUBSCRIPTION_POLICY_KINDS,
   reviewSubscriptionPolicyTarget,
-} from "../src/creator/subscription_policy.js";
-import type { SubscriptionPolicyTargetInput } from "../src/creator/subscription_policy.js";
+} from "../src/os/commerce/creator/subscription_policy.js";
+import type { SubscriptionPolicyTargetInput } from "../src/os/commerce/creator/subscription_policy.js";
 import {
   COMMUNITY_TREASURY_CATEGORY_KINDS,
   reviewCommunityTreasuryDisclosure,
-} from "../src/community/treasury_policy.js";
-import type { CommunityTreasuryDisclosureRequest } from "../src/community/treasury_policy.js";
+} from "../src/os/_legacy_prototype/community/treasury_policy.js";
+import type { CommunityTreasuryDisclosureRequest } from "../src/os/_legacy_prototype/community/treasury_policy.js";
 import {
   renderCreatorGovernancePreviewPage,
   SAMPLE_CREATOR_APPEALS,
   SAMPLE_REPUTATION_SIGNALS,
   SAMPLE_SUBSCRIPTION_TARGETS,
   SAMPLE_TREASURY_REQUESTS,
-} from "../src/render/creator_governance_preview.js";
-import { handleRequest, isCreatorGovernancePreviewEnabled } from "../src/worker.js";
+} from "../src/os/_legacy_prototype/render/creator_governance_preview.js";
+import { handleRequest, isCreatorGovernancePreviewEnabled } from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appealSource from "../src/creator/appeal.ts?raw";
+import appealSource from "../src/os/commerce/creator/appeal.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import reputationSource from "../src/creator/reputation.ts?raw";
+import reputationSource from "../src/os/commerce/creator/reputation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import subscriptionPolicySource from "../src/creator/subscription_policy.ts?raw";
+import subscriptionPolicySource from "../src/os/commerce/creator/subscription_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import treasuryPolicySource from "../src/community/treasury_policy.ts?raw";
+import treasuryPolicySource from "../src/os/_legacy_prototype/community/treasury_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import previewSource from "../src/render/creator_governance_preview.ts?raw";
+import previewSource from "../src/os/_legacy_prototype/render/creator_governance_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const boundarySources = [
   appealSource,
