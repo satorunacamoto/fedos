@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conversationRecordSource from "../../../src/conversation/fedos_conversation_record.ts?raw";
+import conversationRecordSource from "../../../src/os/messenger/conversations/fedos_conversation_record.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conversationRecordValidatorSource from "../../../src/conversation/fedos_conversation_record_validator.ts?raw";
+import conversationRecordValidatorSource from "../../../src/os/messenger/conversations/fedos_conversation_record_validator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conversationIdSource from "../../../src/conversation/fedos_conversation_id.ts?raw";
+import conversationIdSource from "../../../src/os/messenger/conversations/fedos_conversation_id.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import conversationModeSource from "../../../src/board/runtime/policy/fedos_conversation_mode.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -12,21 +12,21 @@ import conversationPolicySource from "../../../src/board/runtime/policy/fedos_co
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import conversationPolicyAuthoritySource from "../../../src/board/runtime/policy/fedos_conversation_policy_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import membershipAuthoritySource from "../../../src/conversation/membership/fedos_conversation_membership_authority.ts?raw";
+import membershipAuthoritySource from "../../../src/os/messenger/conversations/membership/fedos_conversation_membership_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import membershipTransitionSource from "../../../src/conversation/membership/fedos_conversation_membership_transition.ts?raw";
+import membershipTransitionSource from "../../../src/os/messenger/conversations/membership/fedos_conversation_membership_transition.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityDescriptorSource from "../../../src/conversation/capability/fedos_conversation_capability_descriptor.ts?raw";
+import capabilityDescriptorSource from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityIssuerSource from "../../../src/conversation/capability/fedos_conversation_capability_issuer_authority.ts?raw";
+import capabilityIssuerSource from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_issuer_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import bearerSecretSource from "../../../src/conversation/capability/fedos_conversation_capability_bearer_secret.ts?raw";
+import bearerSecretSource from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_bearer_secret.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import redemptionCoordinatorSource from "../../../src/conversation/capability/coordination/fedos_conversation_durable_redemption_coordinator.ts?raw";
+import redemptionCoordinatorSource from "../../../src/os/messenger/conversations/capability/coordination/fedos_conversation_durable_redemption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import retentionAuthoritySource from "../../../src/conversation/retention/fedos_payload_retention_authority.ts?raw";
+import retentionAuthoritySource from "../../../src/os/messenger/conversations/retention/fedos_payload_retention_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import payloadStorageSource from "../../../src/conversation/payload_storage/fedos_conversation_payload_storage.ts?raw";
+import payloadStorageSource from "../../../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardRuntimeSource from "../../../src/board/runtime/fedos_board_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import descriptorSource from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor.ts?raw";
+import descriptorSource from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor.ts?raw";
 import {
   validateFedosConversationPayloadDescriptor,
   type FedosConversationPayloadDescriptorInput,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recordSource from "../src/conversation/fedos_conversation_record.ts?raw";
+import recordSource from "../src/os/messenger/conversations/fedos_conversation_record.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import modeSource from "../src/board/runtime/policy/fedos_conversation_mode.ts?raw";
 

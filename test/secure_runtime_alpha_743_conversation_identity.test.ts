@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import implementationSource from "../src/conversation/fedos_conversation_id.ts?raw";
+import implementationSource from "../src/os/messenger/conversations/fedos_conversation_id.ts?raw";
 import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
 import { toFedosBoardId } from "../src/board/fedos_board_identifiers.js";
 import { toFedosThreadId } from "../src/board/fedos_board_identifiers.js";

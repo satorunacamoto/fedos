@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import implementationSource from "../src/conversation/persistence/append_only_fedos_conversation_persistence.ts?raw";
+import implementationSource from "../src/os/messenger/conversations/persistence/append_only_fedos_conversation_persistence.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync, mkdtempSync, rmSync, appendFileSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.

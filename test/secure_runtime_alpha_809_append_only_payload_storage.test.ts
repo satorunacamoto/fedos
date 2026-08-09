@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { Buffer } from "node:buffer";
 import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlyImplementationSource from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.ts?raw";
+import appendOnlyImplementationSource from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.ts?raw";
 import {
   serializeFedosConversationPayload,
   deserializeFedosConversationPayload,

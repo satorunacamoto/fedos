@@ -2,17 +2,17 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import envelopeSource from "../../../src/conversation/envelope/fedos_conversation_message_envelope.ts?raw";
+import envelopeSource from "../../../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptionCoordinatorSource from "../../../src/conversation/encryption/fedos_conversation_encryption_coordinator.ts?raw";
+import encryptionCoordinatorSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptionCoordinatorSource from "../../../src/conversation/encryption/fedos_conversation_decryption_coordinator.ts?raw";
+import decryptionCoordinatorSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_decryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantResolverSource from "../../../src/conversation/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
+import participantResolverSource from "../../../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import counterpartyResolverSource from "../../../src/conversation/encryption/identity/fedos_conversation_counterparty_public_key_resolver.ts?raw";
+import counterpartyResolverSource from "../../../src/os/messenger/conversations/encryption/identity/fedos_conversation_counterparty_public_key_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import lifecycleStateSource from "../../../src/conversation/construction/fedos_conversation_lifecycle_state.ts?raw";
+import lifecycleStateSource from "../../../src/os/messenger/conversations/construction/fedos_conversation_lifecycle_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import boardOutboxTypesSource from "../../../src/board/outbox/fedos_board_outbox_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

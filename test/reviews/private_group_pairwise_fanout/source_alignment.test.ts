@@ -2,23 +2,23 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationCoordinatorSource from "../../../src/conversation/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
+import activationCoordinatorSource from "../../../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationResultSource from "../../../src/conversation/activation/fedos_conversation_direct_activation_result.ts?raw";
+import activationResultSource from "../../../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationRecordSource from "../../../src/conversation/activation/fedos_persisted_conversation_activation_v1.ts?raw";
+import activationRecordSource from "../../../src/os/messenger/conversations/activation/fedos_persisted_conversation_activation_v1.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activeLookupSource from "../../../src/conversation/activation/fedos_conversation_active_lookup.ts?raw";
+import activeLookupSource from "../../../src/os/messenger/conversations/activation/fedos_conversation_active_lookup.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import messagingCoordinatorSource from "../../../src/conversation/messaging/fedos_conversation_direct_messaging_coordinator.ts?raw";
+import messagingCoordinatorSource from "../../../src/os/messenger/conversations/messaging/fedos_conversation_direct_messaging_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sendResultSource from "../../../src/conversation/messaging/fedos_conversation_direct_message_send_result.ts?raw";
+import sendResultSource from "../../../src/os/messenger/conversations/messaging/fedos_conversation_direct_message_send_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantResolverSource from "../../../src/conversation/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
+import participantResolverSource from "../../../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import retentionAuthoritySource from "../../../src/conversation/retention/fedos_payload_retention_authority.ts?raw";
+import retentionAuthoritySource from "../../../src/os/messenger/conversations/retention/fedos_payload_retention_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityDescriptorSource from "../../../src/conversation/capability/fedos_conversation_capability_descriptor.ts?raw";
+import capabilityDescriptorSource from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
 

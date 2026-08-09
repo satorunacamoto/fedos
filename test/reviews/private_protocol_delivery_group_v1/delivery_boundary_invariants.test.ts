@@ -10,7 +10,7 @@ import eligibilityTypesSource from "../../../src/board/runtime/eligibility/fedos
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import retryReasonCodecSource from "../../../src/board/observation/fedos_delivery_retry_reason_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptionCoordinatorSource from "../../../src/conversation/encryption/fedos_conversation_encryption_coordinator.ts?raw";
+import encryptionCoordinatorSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import outboundPublishResultSource from "../../../src/board/publish/fedos_outbound_publish_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

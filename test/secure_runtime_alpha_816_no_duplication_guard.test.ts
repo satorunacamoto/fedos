@@ -6,7 +6,7 @@ import { join } from "node:path";
 // @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conversationRecordSource from "../src/conversation/fedos_conversation_record.ts?raw";
+import conversationRecordSource from "../src/os/messenger/conversations/fedos_conversation_record.ts?raw";
 
 /**
  * Secure Runtime Alpha 816 ("No Conversation Record Duplication Guard")

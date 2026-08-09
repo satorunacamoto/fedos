@@ -2,17 +2,17 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import membershipReadinessSource from "../../../src/conversation/encryption/fedos_conversation_membership_readiness.ts?raw";
+import membershipReadinessSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_membership_readiness.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import membershipTransitionSource from "../../../src/conversation/membership/fedos_conversation_membership_transition.ts?raw";
+import membershipTransitionSource from "../../../src/os/messenger/conversations/membership/fedos_conversation_membership_transition.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityDescriptorSource from "../../../src/conversation/capability/fedos_conversation_capability_descriptor.ts?raw";
+import capabilityDescriptorSource from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantResolverSource from "../../../src/conversation/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
+import participantResolverSource from "../../../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import conversationKeyRustSource from "../../../packages/fedos-core-rust/src/crypto/conversation_key.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeAssemblySource from "../../../src/conversation/runtime/fedos_conversation_runtime_assembly.ts?raw";
+import runtimeAssemblySource from "../../../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.ts?raw";
 
 /**
  * Private Protocol Delivery and Group Encryption V1 review -- group

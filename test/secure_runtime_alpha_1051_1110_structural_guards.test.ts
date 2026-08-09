@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopRuntimeSource from "../src/desktop/runtime/fedos_desktop_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conversationRuntimeSource from "../src/conversation/runtime/fedos_conversation_runtime.ts?raw";
+import conversationRuntimeSource from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import assemblySource from "../src/conversation/runtime/fedos_conversation_runtime_assembly.ts?raw";
+import assemblySource from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 

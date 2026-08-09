@@ -11,21 +11,21 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationCoordinatorSource from "../src/conversation/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
+import activationCoordinatorSource from "../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptionCoordinatorSource from "../src/conversation/encryption/fedos_conversation_encryption_coordinator.ts?raw";
+import encryptionCoordinatorSource from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptionCoordinatorSource from "../src/conversation/encryption/fedos_conversation_decryption_coordinator.ts?raw";
+import decryptionCoordinatorSource from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantResolverSource from "../src/conversation/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
+import participantResolverSource from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupGenerationSource from "../src/conversation/group/fedos_group_generation.ts?raw";
+import groupGenerationSource from "../src/os/messenger/conversations/group/fedos_group_generation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupDirectPathSource from "../src/conversation/group/fedos_group_direct_path.ts?raw";
+import groupDirectPathSource from "../src/os/messenger/conversations/group/fedos_group_direct_path.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupMessageSource from "../src/conversation/group/fedos_group_message.ts?raw";
+import groupMessageSource from "../src/os/messenger/conversations/group/fedos_group_message.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupFanoutDeliverySource from "../src/conversation/group/fedos_group_fanout_delivery.ts?raw";
+import groupFanoutDeliverySource from "../src/os/messenger/conversations/group/fedos_group_fanout_delivery.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 
