@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import source from "../src/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
+import source from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
 
 describe("Secure Runtime Alpha 455 -- FedosNostrBoardPublisher Interface", () => {
   it("exports exactly FedosNostrBoardPublishEntry and FedosNostrBoardPublisher", () => {

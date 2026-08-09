@@ -2,21 +2,21 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardRuntimeSource from "../../../src/board/runtime/fedos_board_runtime.ts?raw";
+import boardRuntimeSource from "../../../src/os/messenger/board/runtime/fedos_board_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import eligibilityEvaluatorSource from "../../../src/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.ts?raw";
+import eligibilityEvaluatorSource from "../../../src/os/messenger/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import eligibilityTypesSource from "../../../src/board/runtime/eligibility/fedos_outbound_eligibility_types.ts?raw";
+import eligibilityTypesSource from "../../../src/os/messenger/board/runtime/eligibility/fedos_outbound_eligibility_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import retryReasonCodecSource from "../../../src/board/observation/fedos_delivery_retry_reason_codec.ts?raw";
+import retryReasonCodecSource from "../../../src/os/messenger/board/observation/fedos_delivery_retry_reason_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import encryptionCoordinatorSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboundPublishResultSource from "../../../src/board/publish/fedos_outbound_publish_result.ts?raw";
+import outboundPublishResultSource from "../../../src/os/messenger/board/publish/fedos_outbound_publish_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublishResultMappingSource from "../../../src/board/publish/nostr/fedos_nostr_publish_result_to_outbound_publish_result.ts?raw";
+import nostrPublishResultMappingSource from "../../../src/os/messenger/board/publish/nostr/fedos_nostr_publish_result_to_outbound_publish_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relayOkCorrelatedPublisherSource from "../../../src/board/publish/nostr/fedos_relay_ok_correlated_nostr_board_publisher.ts?raw";
+import relayOkCorrelatedPublisherSource from "../../../src/os/messenger/board/publish/nostr/fedos_relay_ok_correlated_nostr_board_publisher.ts?raw";
 
 /**
  * Private Protocol Delivery and Group Encryption V1 review -- delivery

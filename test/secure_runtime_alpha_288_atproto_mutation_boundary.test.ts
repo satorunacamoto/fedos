@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_288_atproto_mutation_boundary.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import mutationBoundarySource from "../src/board/atproto/fedos_atproto_mutation_boundary.ts?raw";
+import mutationBoundarySource from "../src/os/messenger/board/atproto/fedos_atproto_mutation_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/atproto/fedos_atproto_board_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModelSource from "../src/board/atproto/fedos_validated_atproto_post.ts?raw";
+import postModelSource from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 import {
   FEDOS_ATPROTO_OBSERVED_RECORD_EVENT_KINDS,
   type FedosAtprotoRecordObservation,

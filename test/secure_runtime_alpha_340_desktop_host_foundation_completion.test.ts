@@ -10,17 +10,17 @@ import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw"
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPersistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
+import boardPersistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hydrationSource from "../src/board/persistence/fedos_board_hydration.ts?raw";
+import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrAdapterSource from "../src/board/fedos_board_nostr_adapter.ts?raw";
+import nostrAdapterSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activityPubAdapterSource from "../src/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
+import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import atprotoAdapterSource from "../src/board/atproto/fedos_atproto_board_adapter.ts?raw";
+import atprotoAdapterSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionAdapterSource from "../src/board/session/fedos_session_board_adapter.ts?raw";
+import sessionAdapterSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
 
 import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
 import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";

@@ -6,9 +6,9 @@ import { FedosValidatingDeliveryObservationRepository } from "../src/board/obser
 import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
 import { makeFedosDeliveryAttemptSubjectId } from "../src/board/observation/fedos_delivery_attempt_subject_id.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import transitionGraphSource from "../src/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
+import transitionGraphSource from "../src/os/messenger/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatorSource from "../src/board/observation/fedos_delivery_observation_write_validator.ts?raw";
+import validatorSource from "../src/os/messenger/board/observation/fedos_delivery_observation_write_validator.ts?raw";
 
 function makePipeline() {
   const repository = new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence());

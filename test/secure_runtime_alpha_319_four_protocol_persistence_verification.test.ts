@@ -2,17 +2,17 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_319_four_protocol_persistence_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recordSource from "../src/board/persistence/fedos_persisted_board_post_v1.ts?raw";
+import recordSource from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import codecSource from "../src/board/persistence/fedos_board_post_codec.ts?raw";
+import codecSource from "../src/os/messenger/board/persistence/fedos_board_post_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import portSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
+import portSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inMemoryPersistenceSource from "../src/board/persistence/in_memory_fedos_board_persistence.ts?raw";
+import inMemoryPersistenceSource from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistedRepositorySource from "../src/board/persistence/persisted_fedos_board_repository.ts?raw";
+import persistedRepositorySource from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hydrationSource from "../src/board/persistence/fedos_board_hydration.ts?raw";
+import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
 
 import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
 import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";

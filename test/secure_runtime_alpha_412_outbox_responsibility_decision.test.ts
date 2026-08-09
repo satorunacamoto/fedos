@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_412_outbox_responsibility_decision.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 
 /**
  * Secure Runtime Alpha 412 -- "Outbox Responsibility Decision": Stage 2

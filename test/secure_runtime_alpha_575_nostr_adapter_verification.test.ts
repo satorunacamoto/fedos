@@ -13,7 +13,7 @@ import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fe
 import { FedosDeliveryRetryQuery } from "../src/board/observation/fedos_delivery_retry_query.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 
 /**
  * Secure Runtime Alpha 575 -- "Nostr Adapter Verification": Stage 15

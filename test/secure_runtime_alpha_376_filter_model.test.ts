@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_376_filter_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import querySource from "../src/board/query/fedos_board_query.ts?raw";
+import querySource from "../src/os/messenger/board/query/fedos_board_query.ts?raw";
 
 import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
 import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";

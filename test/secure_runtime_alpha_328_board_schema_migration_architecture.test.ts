@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_328_board_schema_migration_architecture.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recordSource from "../src/board/persistence/fedos_persisted_board_post_v1.ts?raw";
+import recordSource from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import codecSource from "../src/board/persistence/fedos_board_post_codec.ts?raw";
+import codecSource from "../src/os/messenger/board/persistence/fedos_board_post_codec.ts?raw";
 
 /**
  * Secure Runtime Alpha 328 -- "Board Schema and Migration Architecture":

@@ -11,13 +11,13 @@ import { FedosRelayNostrBoardPublisher } from "../src/board/publish/nostr/fedos_
 import { NullRelay } from "../src/desktop/null_relay.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxObservationSource from "../src/board/outbox/fedos_board_outbox_observation.ts?raw";
+import outboxObservationSource from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxPublisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import outboxPublisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deliveryObservationSource from "../src/board/observation/fedos_delivery_observation.ts?raw";
+import deliveryObservationSource from "../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 
 describe("Secure Runtime Alpha 497 -- Scheduler Contract Rewiring", () => {
   it("structural: FedosPublishScheduler's own public method set is unchanged (start/stop/tick/isRunning/observationLog)", () => {

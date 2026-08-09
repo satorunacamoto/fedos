@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_276_activitypub_thread_reply_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
 import {
   mapValidatedActivityPubPostToBoardPostInput,
   validateActivityPubBoardPost,

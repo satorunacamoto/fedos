@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conversionSource from "../src/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.ts?raw";
+import conversionSource from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import interfaceSource from "../src/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
+import interfaceSource from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publisherSource from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
+import publisherSource from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import relaySource from "../src/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

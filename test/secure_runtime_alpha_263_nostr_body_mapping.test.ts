@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_263_nostr_body_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/fedos_board_nostr_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 import { mapValidatedNostrEventToBoardPostInput, validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
 import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
 import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";

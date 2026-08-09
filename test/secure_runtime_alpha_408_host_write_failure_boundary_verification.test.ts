@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_408_host_write_failure_boundary_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import queryTypesSource from "../src/board/query/fedos_board_query_types.ts?raw";
+import queryTypesSource from "../src/os/messenger/board/query/fedos_board_query_types.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.

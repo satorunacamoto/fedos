@@ -10,11 +10,11 @@ import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import repositorySource from "../src/board/repository/fedos_board_repository.ts?raw";
+import repositorySource from "../src/os/messenger/board/repository/fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
+import persistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.

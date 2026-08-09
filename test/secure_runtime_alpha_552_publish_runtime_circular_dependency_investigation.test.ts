@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardIdentifiersSource from "../src/board/fedos_board_identifiers.ts?raw";
+import boardIdentifiersSource from "../src/os/messenger/board/fedos_board_identifiers.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardAuthorSource from "../src/board/fedos_board_author.ts?raw";
+import boardAuthorSource from "../src/os/messenger/board/fedos_board_author.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardSourceSource from "../src/board/fedos_board_source.ts?raw";
+import boardSourceSource from "../src/os/messenger/board/fedos_board_source.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardModerationSource from "../src/board/fedos_board_moderation.ts?raw";
+import boardModerationSource from "../src/os/messenger/board/fedos_board_moderation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardReaderSource from "../src/board/repository/fedos_board_reader.ts?raw";
+import boardReaderSource from "../src/os/messenger/board/repository/fedos_board_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardServiceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import boardServiceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 
 function importTargets(source: string): string[] {
   return [...source.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]!);

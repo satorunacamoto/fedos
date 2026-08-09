@@ -6,7 +6,7 @@ import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board
 import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import source from "../src/board/publish/nostr/fedos_nostr_board_publisher_adapter.ts?raw";
+import source from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher_adapter.ts?raw";
 
 class FakeNostrPublisher implements FedosNostrBoardPublisher {
   result = true;

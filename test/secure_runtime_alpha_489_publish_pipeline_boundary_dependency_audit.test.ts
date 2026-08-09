@@ -1,22 +1,22 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxTypesSource from "../src/board/outbox/fedos_board_outbox_types.ts?raw";
+import outboxTypesSource from "../src/os/messenger/board/outbox/fedos_board_outbox_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxPersistenceSource from "../src/board/outbox/fedos_board_outbox_persistence.ts?raw";
+import outboxPersistenceSource from "../src/os/messenger/board/outbox/fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxCodecSource from "../src/board/outbox/fedos_board_outbox_codec.ts?raw";
+import outboxCodecSource from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationTypeSource from "../src/board/observation/fedos_delivery_observation.ts?raw";
+import observationTypeSource from "../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationCodecSource from "../src/board/observation/fedos_delivery_observation_codec.ts?raw";
+import observationCodecSource from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationPersistenceSource from "../src/board/observation/fedos_delivery_observation_persistence.ts?raw";
+import observationPersistenceSource from "../src/os/messenger/board/observation/fedos_delivery_observation_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationInMemorySource from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.ts?raw";
+import observationInMemorySource from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationRepositorySource from "../src/board/observation/fedos_delivery_observation_repository.ts?raw";
+import observationRepositorySource from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationQuerySource from "../src/board/observation/fedos_delivery_observation_query.ts?raw";
+import observationQuerySource from "../src/os/messenger/board/observation/fedos_delivery_observation_query.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

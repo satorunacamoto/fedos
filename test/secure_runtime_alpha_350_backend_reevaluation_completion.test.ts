@@ -10,7 +10,7 @@ import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPersistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
+import boardPersistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 
 import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
 import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";

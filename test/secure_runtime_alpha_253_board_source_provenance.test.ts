@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_253_board_source_provenance.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sourceModuleSource from "../src/board/fedos_board_source.ts?raw";
+import sourceModuleSource from "../src/os/messenger/board/fedos_board_source.ts?raw";
 import {
   FEDOS_BOARD_SOURCE_PROTOCOLS,
   isFedosBoardSourceProtocol,

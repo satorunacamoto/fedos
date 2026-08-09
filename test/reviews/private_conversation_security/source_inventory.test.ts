@@ -5,17 +5,17 @@ import { NoopCryptoProvider } from "../../../src/crypto/noop_crypto.js";
 import { canProtocolAdapterSupport } from "../../../src/os/_legacy_prototype/federation/capability_matrix.js";
 import { validateFedosBoardPost } from "../../../src/board/fedos_board_post_validator.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../../../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../../../src/os/messenger/board/fedos_board_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmLoaderSource from "../../../src/runtime/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identifiersSource from "../../../src/board/fedos_board_identifiers.ts?raw";
+import identifiersSource from "../../../src/os/messenger/board/fedos_board_identifiers.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionAdapterSource from "../../../src/board/session/fedos_session_board_adapter.ts?raw";
+import sessionAdapterSource from "../../../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlyBoardSource from "../../../src/board/persistence/append_only_fedos_board_persistence.ts?raw";
+import appendOnlyBoardSource from "../../../src/os/messenger/board/persistence/append_only_fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlyOutboxSource from "../../../src/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
+import appendOnlyOutboxSource from "../../../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import chatTypesSource from "../../../src/os/_legacy_prototype/chat/types.ts?raw";
 

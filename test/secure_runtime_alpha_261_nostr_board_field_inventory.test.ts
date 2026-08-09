@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_261_nostr_board_field_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import validatedEventSource from "../src/desktop/fedos_validated_nostr_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModuleSource from "../src/board/fedos_board_post.ts?raw";
+import postModuleSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 
 /**
  * Secure Runtime Alpha 261 -- "Nostr Board Field Inventory": Stage 1 of

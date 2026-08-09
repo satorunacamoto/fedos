@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardServiceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import boardServiceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hydrationSource from "../src/board/persistence/fedos_board_hydration.ts?raw";
+import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistedRepositorySource from "../src/board/persistence/persisted_fedos_board_repository.ts?raw";
+import persistedRepositorySource from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

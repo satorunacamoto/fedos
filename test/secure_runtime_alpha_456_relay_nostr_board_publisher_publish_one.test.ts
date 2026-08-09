@@ -14,7 +14,7 @@ import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_ou
 import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
 import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import source from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
+import source from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
 
 const postId = toFedosBoardPostId("post-1")!;
 const nostrIntent = createFedosBoardOutboxIntent(postId, { protocol: "nostr", destination: null }, 1_700_000_000)!;

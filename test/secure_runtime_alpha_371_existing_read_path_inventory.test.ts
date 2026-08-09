@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_371_existing_read_path_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import feedSource from "../src/board/repository/fedos_board_feed.ts?raw";
+import feedSource from "../src/os/messenger/board/repository/fedos_board_feed.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import indexSource from "../src/board/repository/fedos_board_index.ts?raw";
+import indexSource from "../src/os/messenger/board/repository/fedos_board_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import repositorySource from "../src/board/repository/fedos_board_repository.ts?raw";
+import repositorySource from "../src/os/messenger/board/repository/fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import threadQuerySource from "../src/os/_legacy_prototype/query/thread_query.ts?raw";
 

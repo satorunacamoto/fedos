@@ -7,11 +7,11 @@ import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createHostSource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlyOutboxSource from "../src/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
+import appendOnlyOutboxSource from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 
 /**
  * Publish Pipeline Host Ownership Review -- current-state verification.

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_255_canonical_board_post_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModuleSource from "../src/board/fedos_board_post.ts?raw";
+import postModuleSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
 
 function codeOnly(source: string): string {

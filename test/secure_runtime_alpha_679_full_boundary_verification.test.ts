@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardRuntimeSource from "../src/board/runtime/fedos_board_runtime.ts?raw";
+import boardRuntimeSource from "../src/os/messenger/board/runtime/fedos_board_runtime.ts?raw";
 // @ts-expect-error see above.
-import authorAuthoritySource from "../src/board/runtime/identity/fedos_desktop_public_author_authority.ts?raw";
+import authorAuthoritySource from "../src/os/messenger/board/runtime/identity/fedos_desktop_public_author_authority.ts?raw";
 // @ts-expect-error see above.
-import anonymousAuthoritySource from "../src/board/runtime/identity/anonymous_local_public_author_authority.ts?raw";
+import anonymousAuthoritySource from "../src/os/messenger/board/runtime/identity/anonymous_local_public_author_authority.ts?raw";
 // @ts-expect-error see above.
-import policyAuthoritySource from "../src/board/runtime/policy/fedos_conversation_policy_authority.ts?raw";
+import policyAuthoritySource from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy_authority.ts?raw";
 // @ts-expect-error see above.
-import policySource from "../src/board/runtime/policy/fedos_conversation_policy.ts?raw";
+import policySource from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy.ts?raw";
 // @ts-expect-error see above.
-import eligibilityEvaluatorSource from "../src/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.ts?raw";
+import eligibilityEvaluatorSource from "../src/os/messenger/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.ts?raw";
 // @ts-expect-error see above.
 import desktopRuntimeSource from "../src/desktop/runtime/fedos_desktop_runtime.ts?raw";
 // @ts-expect-error see above.

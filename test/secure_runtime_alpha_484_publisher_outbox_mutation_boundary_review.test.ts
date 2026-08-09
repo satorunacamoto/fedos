@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import genericPublisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import genericPublisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublisherInterfaceSource from "../src/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
+import nostrPublisherInterfaceSource from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublisherImplSource from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
+import nostrPublisherImplSource from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

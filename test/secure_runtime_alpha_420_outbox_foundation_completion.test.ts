@@ -2,15 +2,15 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_420_outbox_foundation_completion.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import typesSource from "../src/board/outbox/fedos_board_outbox_types.ts?raw";
+import typesSource from "../src/os/messenger/board/outbox/fedos_board_outbox_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import codecSource from "../src/board/outbox/fedos_board_outbox_codec.ts?raw";
+import codecSource from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistenceSource from "../src/board/outbox/fedos_board_outbox_persistence.ts?raw";
+import persistenceSource from "../src/os/messenger/board/outbox/fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inMemorySource from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.ts?raw";
+import inMemorySource from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlySource from "../src/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
+import appendOnlySource from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 

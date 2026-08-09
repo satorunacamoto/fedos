@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_366_compaction_architecture_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import implementationSource from "../src/board/persistence/append_only_fedos_board_persistence.ts?raw";
+import implementationSource from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistedRecordSource from "../src/board/persistence/fedos_persisted_board_post_v1.ts?raw";
+import persistedRecordSource from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.ts?raw";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");

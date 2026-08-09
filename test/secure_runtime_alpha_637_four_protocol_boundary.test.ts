@@ -8,7 +8,7 @@ import type { FedosBoardRuntimeIdGenerator } from "../src/board/runtime/fedos_bo
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
 import type { FedosBoardSourceProtocol } from "../src/board/fedos_board_source.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/board/runtime/fedos_board_runtime.ts?raw";
+import runtimeSource from "../src/os/messenger/board/runtime/fedos_board_runtime.ts?raw";
 
 function fixedIdGenerator(...ids: string[]): FedosBoardRuntimeIdGenerator {
   let i = 0;

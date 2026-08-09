@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_395_host_write_api_implementation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 

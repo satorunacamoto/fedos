@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_268_nostr_adapter_boundary_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/fedos_board_nostr_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 
 /**
  * Secure Runtime Alpha 268 -- "Nostr Adapter Boundary Review": Stage 8

@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_479_scope_and_security_regression_guards.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import publisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationSource from "../src/board/outbox/fedos_board_outbox_observation.ts?raw";
+import observationSource from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 
 function importedFromSpecifiers(source: string): string[] {
   return [...source.matchAll(/from\s+"([^"]+)";/g)].map((match) => match[1]!);

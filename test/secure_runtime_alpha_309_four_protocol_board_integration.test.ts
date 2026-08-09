@@ -2,17 +2,17 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_309_four_protocol_board_integration.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import repositorySource from "../src/board/repository/fedos_board_repository.ts?raw";
+import repositorySource from "../src/os/messenger/board/repository/fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inMemoryRepositorySource from "../src/board/repository/in_memory_fedos_board_repository.ts?raw";
+import inMemoryRepositorySource from "../src/os/messenger/board/repository/in_memory_fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sourceIndexSource from "../src/board/repository/fedos_board_source_index.ts?raw";
+import sourceIndexSource from "../src/os/messenger/board/repository/fedos_board_source_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardIndexSource from "../src/board/repository/fedos_board_index.ts?raw";
+import boardIndexSource from "../src/os/messenger/board/repository/fedos_board_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import feedSource from "../src/board/repository/fedos_board_feed.ts?raw";
+import feedSource from "../src/os/messenger/board/repository/fedos_board_feed.ts?raw";
 
 import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
 import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";

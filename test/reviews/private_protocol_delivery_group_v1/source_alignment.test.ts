@@ -14,13 +14,13 @@ import counterpartyResolverSource from "../../../src/os/messenger/conversations/
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import lifecycleStateSource from "../../../src/os/messenger/conversations/construction/fedos_conversation_lifecycle_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardOutboxTypesSource from "../../../src/board/outbox/fedos_board_outbox_types.ts?raw";
+import boardOutboxTypesSource from "../../../src/os/messenger/board/outbox/fedos_board_outbox_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboundPublishResultSource from "../../../src/board/publish/fedos_outbound_publish_result.ts?raw";
+import outboundPublishResultSource from "../../../src/os/messenger/board/publish/fedos_outbound_publish_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deliveryObservationSource from "../../../src/board/observation/fedos_delivery_observation.ts?raw";
+import deliveryObservationSource from "../../../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import transitionGraphSource from "../../../src/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
+import transitionGraphSource from "../../../src/os/messenger/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import capabilityMatrixSource from "../../../src/os/_legacy_prototype/federation/nostr_mapping.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

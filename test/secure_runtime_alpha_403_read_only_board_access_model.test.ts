@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_403_read_only_board_access_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readerSource from "../src/board/repository/fedos_board_reader.ts?raw";
+import readerSource from "../src/os/messenger/board/repository/fedos_board_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/board/repository/fedos_board_service.ts?raw";
+import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 
 import { FedosBoardServiceReader, type FedosBoardReader } from "../src/board/repository/fedos_board_reader.js";
 import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";

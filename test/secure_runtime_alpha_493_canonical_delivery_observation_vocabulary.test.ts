@@ -4,9 +4,9 @@ import { existsSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_493_canonical_delivery_observation_vocabulary.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deliveryObservationSource from "../src/board/observation/fedos_delivery_observation.ts?raw";
+import deliveryObservationSource from "../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxObservationSource from "../src/board/outbox/fedos_board_outbox_observation.ts?raw";
+import outboxObservationSource from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.ts?raw";
 
 describe("Secure Runtime Alpha 493 -- Canonical Delivery Observation Vocabulary", () => {
   it("FedosDeliveryObservation remains byte-for-byte the Alpha 462 shape (adopted, not edited)", () => {

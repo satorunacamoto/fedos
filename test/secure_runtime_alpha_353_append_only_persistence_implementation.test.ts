@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_353_append_only_persistence_implementation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import implementationSource from "../src/board/persistence/append_only_fedos_board_persistence.ts?raw";
+import implementationSource from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.

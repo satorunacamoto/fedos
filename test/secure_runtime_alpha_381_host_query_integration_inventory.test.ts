@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_381_host_query_integra
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import querySource from "../src/board/query/fedos_board_query.ts?raw";
+import querySource from "../src/os/messenger/board/query/fedos_board_query.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.

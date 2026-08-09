@@ -6,7 +6,7 @@ import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_ou
 import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
 import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 
 /**
  * Secure Runtime Alpha 551 -- "Retry Semantics Audit": Stage 11 of the

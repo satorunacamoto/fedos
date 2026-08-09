@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_252_canonical_board_identifiers.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identifiersSource from "../src/board/fedos_board_identifiers.ts?raw";
+import identifiersSource from "../src/os/messenger/board/fedos_board_identifiers.ts?raw";
 import {
   toFedosBoardId,
   toFedosThreadId,

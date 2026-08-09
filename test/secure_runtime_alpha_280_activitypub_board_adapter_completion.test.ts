@@ -12,7 +12,7 @@ import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runt
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrAdapterSource from "../src/board/fedos_board_nostr_adapter.ts?raw";
+import nostrAdapterSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 import * as activityPubAdapter from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
 import * as mutationBoundary from "../src/board/activitypub/fedos_activitypub_mutation_boundary.js";
 import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";

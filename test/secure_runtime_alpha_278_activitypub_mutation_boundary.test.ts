@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_278_activitypub_mutation_boundary.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import mutationBoundarySource from "../src/board/activitypub/fedos_activitypub_mutation_boundary.ts?raw";
+import mutationBoundarySource from "../src/os/messenger/board/activitypub/fedos_activitypub_mutation_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModelSource from "../src/board/activitypub/fedos_validated_activitypub_post.ts?raw";
+import postModelSource from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 import {
   FEDOS_ACTIVITYPUB_OBSERVED_MUTATION_KINDS,
   type FedosActivityPubMutationObservation,
