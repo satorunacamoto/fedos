@@ -188,7 +188,7 @@ aes-gcm = { version = "0.10.3", default-features = false, features = ["aes", "al
 # `getrandom`'s own `Cargo.toml`, not a dependency this crate adds. Native
 # targets are unaffected: `wasm_js` is a no-op unless both the feature AND
 # the `--cfg` flag are in effect for a `wasm32*` target.
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
 
 # `sha2` (RustCrypto, MIT OR Apache-2.0) — PROMOTED from `[dev-dependencies]`
 # to `[dependencies]` in Stage 147 (the only `Cargo.toml` change in this
