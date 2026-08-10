@@ -160,7 +160,7 @@ argon2 = { version = "0.5.3", default-features = false }
 # `chacha20poly1305` (Stage 74) and `argon2` (Stage 84). Wired to the NIST
 # vectors ONLY inside a `#[cfg(test)]`-only module (Stage 101) — NOT
 # imported/used anywhere in src/lib.rs's PRODUCTION code.
-aes-gcm = { version = "0.10.3", default-features = false, features = ["aes", "alloc"] }
+aes-gcm = { version = "0.11.0", default-features = false, features = ["aes", "alloc"] }
 
 # `getrandom` (rust-random project, Apache-2.0 OR MIT) — the minimal CSPRNG
 # entropy source a future, explicitly-reviewed stage would implement
