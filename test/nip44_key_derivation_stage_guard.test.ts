@@ -27,6 +27,7 @@ import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 198–201 — "NIP-44 key-derivation half": `ConversationKey` (Stage
@@ -240,8 +241,7 @@ describe("NIP-44 conversation/message key derivation (Stage 198-201, updated Sta
 
   it("16. package.json is unchanged — still 2 production dependencies, no secp256k1/k256/elliptic-curve library", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("17. no serialization change: no serde derive on ConversationKey/MessageKey/their Decision types", () => {

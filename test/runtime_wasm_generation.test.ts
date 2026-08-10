@@ -30,6 +30,7 @@ import generationDocSource from "../docs/runtime_wasm_generation.md?raw";
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 449–456 — "first WASM Artifact GENERATION planning": now that
@@ -112,7 +113,7 @@ describe("FedOS WASM generation planning, nothing generated, fail-closed everywh
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. packages/fedos-core-rust/.gitignore ignores the fixed pkg/ output directory", () => {

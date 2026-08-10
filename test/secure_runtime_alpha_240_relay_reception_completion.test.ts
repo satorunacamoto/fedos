@@ -29,6 +29,7 @@ import legacyWsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_
 import legacyPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
   "create_runtime.ts": createRuntimeSource,
@@ -117,7 +118,7 @@ describe("Secure Runtime Alpha 240 -- Relay Message Reception Completion", () =>
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("9. structural: relay_inbound_parser.ts performs no cryptographic verification of any kind", () => {

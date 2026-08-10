@@ -13,6 +13,7 @@ import * as author from "../src/os/messenger/board/fedos_board_author.js";
 import * as post from "../src/os/messenger/board/fedos_board_post.js";
 import * as validator from "../src/os/messenger/board/fedos_board_post_validator.js";
 import * as moderation from "../src/os/messenger/board/fedos_board_moderation.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 260 -- "Canonical Board Model Completion":
@@ -67,7 +68,7 @@ describe("Secure Runtime Alpha 260 -- Canonical Board Model Completion", () => {
 
   it("6. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. Regression: the frozen Relay/WebSocket transport layer carries zero reference to src/board/", () => {

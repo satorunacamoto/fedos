@@ -17,6 +17,7 @@ import relaySetSource from "../src/os/messenger/adapters/nostr/transport/relay/f
 import inboundSubscriptionSource from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_inbound_subscription.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /** Import-statement-shaped patterns only -- this arc's own doc comments legitimately NAME Tor/onion/ActivityPub/AT-Protocol as explicit exclusions (the SAME "No Worker, Ontology, p2p/" guardrail-prose convention `fedos_desktop_runtime.ts`'s own header already uses), so a blind whole-file text scan would flag its own guardrail comments. Mirrors the Alpha 1051-1110 guard's own `/from ["'].*\/p2p\//` import-only pattern. */
 const FORBIDDEN_IMPORT_PATTERNS = [
@@ -46,7 +47,7 @@ describe("Secure Runtime Alpha 1471-1540 -- Private Transport Structural Guards"
 
   it("3. no new production dependency was introduced by this arc -- still exactly @noble/curves and @noble/hashes", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("4. package.json's own scripts carry no entry point added by THIS arc -- genuinely stale otherwise (updated per later Arcs' own 'update historical exact-shape tests only when genuinely stale' instruction, e.g. Alpha 4101-4180): the Electron Build Spike/Node Type Isolation/Electron Host Adapter Arcs legitimately added their own entry points well after this arc's own scope closed.", () => {

@@ -9,6 +9,7 @@ import nostrTypesSource from "../src/os/messenger/adapters/nostr/protocol/types.
 import nostrEventSource from "../src/os/messenger/adapters/nostr/protocol/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 187 -- "Future Event Builder Compatibility
@@ -89,6 +90,6 @@ describe("Secure Runtime Alpha 187 -- Future Event Builder Compatibility Review"
   it("11. Regression: package.json is untouched", () => {
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_187/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

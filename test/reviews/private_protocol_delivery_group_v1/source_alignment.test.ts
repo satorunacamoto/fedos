@@ -27,6 +27,7 @@ import capabilityMatrixSource from "../../../src/os/_legacy_prototype/federation
 import fedCapabilityMatrixSource from "../../../src/os/_legacy_prototype/federation/capability_matrix.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Protocol Delivery and Group Encryption V1 review -- source
@@ -243,6 +244,6 @@ describe("Private Protocol Delivery and Group Encryption V1 review -- source ali
 
   it("19. package.json still carries exactly two production dependencies -- no new dependency introduced by this review", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });

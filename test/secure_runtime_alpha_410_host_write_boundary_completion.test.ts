@@ -25,6 +25,7 @@ import { DesktopApplication } from "../src/os/messenger/desktop/desktop_applicat
 import { AppendOnlyFedosBoardPersistence } from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.js";
 import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 let dir: string | undefined;
 afterEach(() => {
@@ -95,7 +96,7 @@ describe("Secure Runtime Alpha 410 -- Host Write Boundary Completion", () => {
 
   it("5. Regression: package.json dependency count remains unchanged at 2, no bin field", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

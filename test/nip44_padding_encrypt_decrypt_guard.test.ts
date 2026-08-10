@@ -31,6 +31,7 @@ import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 202–208 — "NIP-44 pad/encrypt/decrypt/authentication half":
@@ -198,8 +199,7 @@ describe("NIP-44 padding/encrypt/decrypt/authentication (Stage 202-208)", () => 
 
   it("15. package.json is unchanged — still 2 production dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("16. no serialization change: no serde derive on any of the four new files' Decision/output types", () => {

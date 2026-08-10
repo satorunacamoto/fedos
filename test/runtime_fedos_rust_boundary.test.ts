@@ -39,6 +39,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import rustBoundaryDocSource from "../docs/runtime_fedos_rust_boundary.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 329–336 — "Private Rust Boundary (Blocked before Rust Crypto)":
@@ -173,7 +174,7 @@ describe("FedOS private Rust boundary, blocked before Rust crypto (Stage 329-336
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("18. public API unchanged -- FedosRuntimeCryptoProvider still satisfies RuntimeCryptoProvider exactly", async () => {

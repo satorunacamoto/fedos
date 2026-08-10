@@ -13,6 +13,7 @@ import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runt
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 import * as adapter from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
 import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 270 -- "Nostr Canonical Board Adapter
@@ -61,7 +62,7 @@ describe("Secure Runtime Alpha 270 -- Nostr Canonical Board Adapter Completion",
 
   it("6. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. Regression: Relay, Runtime, and Worker carry zero reference to src/board/ or the new adapter", () => {

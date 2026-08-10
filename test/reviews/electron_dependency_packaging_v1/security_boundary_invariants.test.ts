@@ -13,6 +13,7 @@ import hostCommandSource from "../../../src/os/messenger/desktop/host_boundary/f
 import hostResponseSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_response.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostPortSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_port.ts?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Electron Dependency and Desktop Packaging V1 review -- security boundary
@@ -79,7 +80,7 @@ describe("Electron Dependency and Desktop Packaging V1 review -- no production c
 
   it("5. no new dependency was introduced -- package.json still carries exactly two production dependencies", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });
 

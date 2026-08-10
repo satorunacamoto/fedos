@@ -17,6 +17,7 @@ import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_bo
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 import type { FedosBoardId, FedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");
@@ -85,7 +86,7 @@ describe("Secure Runtime Alpha 380 -- Canonical Board Query Foundation Completio
 
   it("7. Regression: package.json dependency count remains unchanged at 2, no bin field", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

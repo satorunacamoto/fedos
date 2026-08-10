@@ -21,6 +21,7 @@ import retentionAuthoritySource from "../../../src/os/messenger/conversations/re
 import capabilityDescriptorSource from "../../../src/os/messenger/conversations/capability/fedos_conversation_capability_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Group Pairwise Fanout review -- source alignment. Verifies,
@@ -223,6 +224,6 @@ describe("Private Group Pairwise Fanout review -- source alignment (base commit 
 
   it("18. package.json still carries exactly two production dependencies -- no new dependency introduced by this review", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });

@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_409_outbound_publish_r
 import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 409 -- "Outbound Publish Readiness Review":
@@ -56,7 +57,7 @@ describe("Secure Runtime Alpha 409 -- Outbound Publish Readiness Review", () => 
 
   it("8. Regression: package.json dependency count remains unchanged at 2, no new dependency for a future publisher", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("9. the design doc cross-references Alpha 408, Alpha 393, and Alpha 307", () => {

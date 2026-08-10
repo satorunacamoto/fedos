@@ -36,6 +36,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 353–360 — "Internal Rust Call Planning (Blocked before
@@ -158,7 +159,7 @@ describe("FedOS internal Rust call planning, blocked before invocation (Stage 35
 
   it("17. package.json is unchanged -- exactly 2 dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("18. Rust pub fn count is unchanged -- 27", () => {

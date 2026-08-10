@@ -13,6 +13,7 @@ import desktopApplicationSource from "../src/os/messenger/desktop/desktop_applic
 import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 173 -- "Nostr Public Identifier Encoder": Stage 3
@@ -135,6 +136,6 @@ describe("Secure Runtime Alpha 173 -- Nostr Public Identifier Encoder", () => {
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_173/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_173/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

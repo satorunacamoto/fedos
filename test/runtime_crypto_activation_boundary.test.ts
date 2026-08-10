@@ -48,6 +48,7 @@ import messageKeySource from "../packages/fedos-core-rust/src/crypto/message_key
 import nip44WirePayloadSource from "../packages/fedos-core-rust/src/crypto/nip44_wire_payload.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import activationDocSource from "../docs/runtime_crypto_activation.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 257–264 — "Runtime Opt-in Crypto Bridge (Non-Operational)":
@@ -408,8 +409,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("17. AppRuntime.crypto/RuntimeOverrides.runtimeCryptoProvider are wired exactly once, and runtime_status.ts's twelve-component list is unaffected", () => {

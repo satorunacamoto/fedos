@@ -41,6 +41,7 @@ import packageJsonSource from "../package.json?raw";
 import executionReviewDocSource from "../docs/runtime_fedos_rust_execution_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import approvalChecklistDocSource from "../docs/runtime_fedos_execution_approval_checklist.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 345–352 — "Private Rust Execution Review (Blocked before
@@ -166,7 +167,7 @@ describe("FedOS private Rust execution review, blocked before crypto (Stage 345-
 
   it("17. package.json is unchanged -- exactly 2 dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("18. Rust pub fn count is unchanged -- 27", () => {

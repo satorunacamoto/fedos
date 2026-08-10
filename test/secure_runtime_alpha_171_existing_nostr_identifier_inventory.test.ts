@@ -17,6 +17,7 @@ import nostrIdentityProviderSource from "../src/os/core/identity/fedos_nostr_ide
 import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 171 -- "Existing Nostr Identifier / Bech32
@@ -87,7 +88,7 @@ describe("Secure Runtime Alpha 171 -- Existing Nostr Identifier Inventory", () =
 
   it("9. structural: package.json declares exactly two dependencies, no bech32/scure package", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {})).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   // ---------------------------------------------------------------------

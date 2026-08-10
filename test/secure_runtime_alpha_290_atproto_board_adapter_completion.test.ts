@@ -18,6 +18,7 @@ import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedo
 import * as atprotoAdapter from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
 import * as mutationBoundary from "../src/os/messenger/board/atproto/fedos_atproto_mutation_boundary.js";
 import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 290 -- "AT Protocol Canonical Board Adapter
@@ -68,7 +69,7 @@ describe("Secure Runtime Alpha 290 -- AT Protocol Canonical Board Adapter Comple
 
   it("7. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("8. Regression: Relay, Runtime, and Worker carry zero reference to src/board/atproto/", () => {

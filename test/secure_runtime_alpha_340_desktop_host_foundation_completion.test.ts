@@ -25,6 +25,7 @@ import sessionAdapterSource from "../src/os/messenger/board/session/fedos_sessio
 import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
 import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
 import type { FedosDesktopHostState } from "../src/os/messenger/desktop/host/fedos_desktop_host_state.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 340 -- "Desktop Host Foundation Completion":
@@ -65,7 +66,7 @@ describe("Secure Runtime Alpha 340 -- Desktop Host Foundation Completion", () =>
 
   it("5. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

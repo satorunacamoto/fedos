@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_343_sqlite_review.md?r
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import tsconfigSource from "../tsconfig.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");
@@ -52,7 +53,7 @@ describe("Secure Runtime Alpha 343 -- SQLite Review", () => {
 
   it("5. Regression: package.json dependency count remains unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc names both real Node-SQLite paths and rejects committing to either this Arc", () => {

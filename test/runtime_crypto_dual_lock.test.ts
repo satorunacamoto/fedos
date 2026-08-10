@@ -33,6 +33,7 @@ import packageJsonSource from "../package.json?raw";
 import activationPolicyDocSource from "../docs/runtime_crypto_activation_policy.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import threatModelDocSource from "../docs/runtime_crypto_threat_model.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 297–304 — "Dual-Lock Activation Gate": Lock #2
@@ -278,7 +279,7 @@ describe("Runtime/Worker crypto dual-lock activation gate (Stage 297-304)", () =
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("17. docs record the dual-lock model and the fail-closed guarantee under both locks", () => {

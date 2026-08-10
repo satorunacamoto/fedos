@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_182_nostr_signature_ha
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 182 -- "FedosNostrSignatureHandle": Stage 2 of
@@ -123,6 +124,6 @@ describe("Secure Runtime Alpha 182 -- FedosNostrSignatureHandle", () => {
   it("11. Regression: package.json is untouched -- zero new npm dependency, this is a Rust-only Stage", () => {
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_182/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

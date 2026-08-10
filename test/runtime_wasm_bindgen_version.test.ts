@@ -25,6 +25,7 @@ import packageJsonSource from "../package.json?raw";
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 473–480 — "FedOS wasm-bindgen CLI/crate version alignment":
@@ -68,7 +69,7 @@ describe("FedOS wasm-bindgen CLI/crate version alignment, first real JS glue, fa
 
   it("3. no package.json dependency was added -- still 2 production dependencies, no wasm-bindgen/wasm-pack entry", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
     expect(Object.keys(allDeps)).not.toContain("wasm-bindgen");
     expect(Object.keys(allDeps)).not.toContain("wasm-pack");

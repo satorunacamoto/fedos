@@ -25,6 +25,7 @@ import nostrIdentityProviderSource from "../src/os/core/identity/fedos_nostr_ide
 import identityDescriptorSource from "../src/os/core/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopReaderSource from "../src/os/messenger/desktop/nostr_public_identity_reader.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 180 -- "Nostr Public Identifier Runtime
@@ -215,7 +216,7 @@ describe("Secure Runtime Alpha 180 -- Nostr Public Identifier Runtime Boundary C
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

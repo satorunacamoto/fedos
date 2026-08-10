@@ -9,6 +9,7 @@ import conversationRuntimeSource from "../src/os/messenger/conversations/runtime
 import assemblySource from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 1051-1110 ("Conversation Runtime Consolidation
@@ -53,7 +54,7 @@ describe("Secure Runtime Alpha 1051-1110 -- Conversation Runtime Consolidation S
 
   it("6. no new production dependency was introduced by this consolidation -- still exactly two", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("7. this Arc's own file added no p2p/ import anywhere in the two Runtime modules it touched", () => {

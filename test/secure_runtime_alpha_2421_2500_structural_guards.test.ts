@@ -25,6 +25,7 @@ import recoverySource from "../src/os/messenger/sync/fedos_sync_recovery.ts?raw"
 import stateSource from "../src/os/messenger/sync/fedos_sync_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const ALL_SYNC_SOURCES: readonly string[] = [
   deviceBindingSource,
@@ -81,7 +82,7 @@ describe("Secure Runtime Alpha 2421-2500 -- Multi Device Sync Structural Guards"
 
   it("6. no new production dependency was introduced by this arc -- still exactly @noble/curves and @noble/hashes", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("7. package.json's own scripts carry no entry point added by THIS arc -- genuinely stale otherwise (updated per later Arcs' own 'update historical exact-shape tests only when genuinely stale' instruction, e.g. Alpha 4101-4180): the Electron Build Spike/Node Type Isolation/Electron Host Adapter Arcs (Alpha 3881-3940/4021-4100/4101-4180) legitimately added their own build/start/typecheck entry points well after this Arc's own scope closed. This Arc's own original protection -- no entry point THIS Arc itself would have added is present -- is preserved by asserting the CURRENT real, closed list rather than a frozen pre-Electron snapshot.", () => {

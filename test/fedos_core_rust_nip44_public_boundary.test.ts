@@ -41,6 +41,7 @@ import runtimeCryptoBridgeDocSource from "../docs/runtime_crypto_bridge.md?raw";
 import nostrDmBridgeDocSource from "../docs/nostr_dm_bridge.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44WireRoadmapSource from "../docs/nip44_wire_implementation_roadmap.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 241–248 — "public NIP-44 wire boundary planning + skeleton":
@@ -135,8 +136,7 @@ describe("NIP-44 public wire boundary: planning + skeleton (Stage 241-248)", () 
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("8. capability_matrix/diagnostics are unchanged in shape — still sixteen capabilities, no public-boundary row added there", () => {

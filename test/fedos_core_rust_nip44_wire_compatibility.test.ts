@@ -45,6 +45,7 @@ import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 209–213 — "NIP-44 compatibility gap clarification + wire-compatible
@@ -244,8 +245,7 @@ describe("NIP-44 wire compatibility gap clarification + wire skeleton (Stage 209
 
   it("16. package.json is unchanged — still 2 production dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("17. no serialization change: no serde derive anywhere in nip44_wire.rs", () => {

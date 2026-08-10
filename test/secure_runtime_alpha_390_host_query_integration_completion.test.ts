@@ -24,6 +24,7 @@ import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop
 import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
 import { AppendOnlyFedosBoardPersistence } from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.js";
 import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");
@@ -77,7 +78,7 @@ describe("Secure Runtime Alpha 390 -- Host Query Integration Completion", () => 
 
   it("5. Regression: package.json dependency count remains unchanged at 2, no bin field", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

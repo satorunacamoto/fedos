@@ -31,6 +31,7 @@ import legacyRelaySource from "../src/os/messenger/adapters/nostr/protocol/relay
 import legacyWsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import legacyPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 220 -- "Relay Foundation Completion": Stage 10,
@@ -105,7 +106,7 @@ describe("Secure Runtime Alpha 220 -- Relay Foundation Completion", () => {
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("9. structural: FedosRelay's shape at this Arc's own closing state contains url/connect/disconnect/isConnected/publish, in that order (Alpha 226, a later Arc, additively appends subscribe/unsubscribe exactly as this Stage's own §3 next-Arc recommendation anticipated)", () => {

@@ -36,15 +36,18 @@
     "start:electron-badge": "npm run start:badge --prefix packages/fedos-desktop-electron-spike",
     "start:electron-unlock": "npm run start:unlock --prefix packages/fedos-desktop-electron-spike",
     "start:electron-settings": "npm run start:settings --prefix packages/fedos-desktop-electron-spike",
-    "start:electron-beta": "npm run start:beta --prefix packages/fedos-desktop-electron-spike"
+    "start:electron-beta": "npm run start:beta --prefix packages/fedos-desktop-electron-spike",
+    "trust:issuer": "tsc -p tsconfig.trust-issuer.json && node scripts/fedos_trust_issuer_cli.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",
+    "@types/qrcode": "^1.5.6",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.2.0"
+    "@noble/hashes": "^2.2.0",
+    "qrcode": "^1.5.4"
   }
 }

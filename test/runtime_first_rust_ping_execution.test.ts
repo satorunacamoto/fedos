@@ -24,6 +24,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 377–384 — "The First Minimal Rust 'Invocation': Ping Executes
@@ -199,7 +200,7 @@ describe("The first Rust ping 'execution', fail-closed everywhere else (Stage 37
 
   it("21. package.json is unchanged -- exactly 2 dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("22. Rust public API is unchanged -- pub fn count still 27", () => {

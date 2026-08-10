@@ -29,6 +29,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function codeOnlyLines(source: string): string {
   return source
@@ -336,7 +337,7 @@ describe("Secure Runtime Alpha 085 -- Identity Bootstrap Observation Framework C
 
   it("27. Regression: package.json still declares exactly two dependencies and no bin field, unaffected by this Stage", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

@@ -33,6 +33,7 @@ import sigVerifierSource from "../src/os/messenger/desktop/nostr_signature_verif
 import combinedValidatorSource from "../src/os/messenger/desktop/combined_inbound_event_validator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import adapterSource from "../src/os/messenger/desktop/validated_subscription_adapter.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
   "create_runtime.ts": createRuntimeSource,
@@ -146,7 +147,7 @@ describe("Secure Runtime Alpha 250 -- Inbound Validation Completion", () => {
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("10. structural: none of the five Arc-owned files reference src/nostr/* or src/sign/*", () => {

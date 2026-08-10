@@ -23,6 +23,7 @@ import descriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor
 import readerSource from "../src/os/messenger/desktop/fedos_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nullEventReaderSource from "../src/os/messenger/desktop/null_event_reader.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 210 -- "Event Runtime Boundary Completion":
@@ -102,7 +103,7 @@ describe("Secure Runtime Alpha 210 -- Event Runtime Boundary Completion", () => 
     expect(prodDepsSection).not.toMatch(/^serde/m);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

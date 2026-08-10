@@ -8,10 +8,10 @@ This is a factual inventory of what dependencies declare about their own
 licensing, deterministically re-derived from a real install and from
 `cargo metadata` (a standard Cargo built-in — no new tool was installed to
 produce this file). It makes **no decision** about this repository's own
-license — see `LICENSE_STATUS.md` for that (currently: **not yet
-selected — HUMAN INPUT REQUIRED**, see `ARCHITECTURE.md`/`ROADMAP.md`).
+license — see `LICENSE_STATUS.md` for that (currently: **MPL-2.0**,
+decided; see `LICENSE_STATUS.md` for the full decision record).
 
-Generated at: 2026-07-25T15:00:56.538Z
+Generated at: 2026-08-10T02:44:39.155Z
 
 ## npm dependencies (root + packages/fedos-desktop-electron-spike)
 
@@ -71,11 +71,12 @@ Generated at: 2026-07-25T15:00:56.538Z
 - tar@7.5.20
 - yallist@5.0.0
 
-### ISC (35 packages)
+### ISC (41 packages)
 
 - @isaacs/fs-minipass@4.0.1
 - abbrev@4.0.0
 - at-least-node@1.0.0
+- cliui@6.0.0
 - cliui@8.0.1
 - fs.realpath@1.0.0
 - get-caller-file@2.0.5
@@ -94,22 +95,27 @@ Generated at: 2026-07-25T15:00:56.538Z
 - once@1.4.0
 - picocolors@1.1.1
 - proc-log@6.1.0
+- require-main-filename@2.0.0
 - rimraf@2.6.3
 - semver@5.7.2
 - semver@6.3.1
 - semver@7.7.4
 - semver@7.8.5
+- set-blocking@2.0.0
 - siginfo@2.0.0
 - signal-exit@3.0.7
+- which-module@2.0.1
 - which@2.0.2
 - which@5.0.0
 - which@6.0.1
 - wrappy@1.0.2
+- y18n@4.0.3
 - y18n@5.0.8
 - yallist@4.0.0
+- yargs-parser@18.1.3
 - yargs-parser@21.1.1
 
-### MIT (239 packages)
+### MIT (255 packages)
 
 - @electron/asar@3.4.1
 - @electron/fuses@1.8.0
@@ -140,6 +146,8 @@ Generated at: 2026-07-25T15:00:56.538Z
 - @types/keyv@3.1.4
 - @types/ms@2.1.0
 - @types/node@24.13.3
+- @types/node@26.2.0
+- @types/qrcode@1.5.6
 - @types/responselike@1.0.3
 - @vitest/expect@2.1.9
 - @vitest/mocker@2.1.9
@@ -174,6 +182,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - cacheable-lookup@5.0.4
 - cacheable-request@7.0.4
 - call-bind-apply-helpers@1.0.2
+- camelcase@5.3.1
 - chai@5.3.3
 - chalk@4.1.2
 - check-error@2.1.3
@@ -192,6 +201,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - cross-dirname@0.1.0
 - cross-spawn@7.0.6
 - debug@4.4.3
+- decamelize@1.2.0
 - decompress-response@6.0.0
 - deep-eql@5.0.2
 - defer-to-connect@2.0.1
@@ -199,6 +209,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - define-properties@1.2.1
 - delayed-stream@1.0.0
 - detect-node@2.1.0
+- dijkstrajs@1.0.3
 - dir-compare@4.2.0
 - dmg-builder@26.15.3
 - dunder-proto@1.0.1
@@ -224,6 +235,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - estree-walker@3.0.3
 - fast-deep-equal@3.1.3
 - fdir@6.5.0
+- find-up@4.1.0
 - form-data@4.0.6
 - fs-extra@10.1.0
 - fs-extra@11.3.1
@@ -259,6 +271,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - jsonfile@6.2.1
 - keyv@4.5.4
 - lazy-val@1.0.5
+- locate-path@5.0.0
 - lodash@4.18.1
 - loupe@3.2.1
 - lowercase-keys@2.0.0
@@ -282,7 +295,11 @@ Generated at: 2026-07-25T15:00:56.538Z
 - normalize-url@6.1.0
 - object-keys@1.1.1
 - p-cancelable@2.1.1
+- p-limit@2.3.0
 - p-limit@3.1.0
+- p-locate@4.1.0
+- p-try@2.2.0
+- path-exists@4.0.0
 - path-is-absolute@1.0.1
 - path-key@3.1.1
 - pathe@1.1.2
@@ -290,6 +307,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - pe-library@0.4.1
 - picomatch@4.0.5
 - plist@3.1.0
+- pngjs@5.0.0
 - postcss@8.5.20
 - postject@1.0.0-alpha.6
 - process-nextick-args@2.0.1
@@ -299,6 +317,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - pump@3.0.4
 - pvtsutils@1.3.6
 - pvutils@1.1.5
+- qrcode@1.5.4
 - quick-lru@5.1.1
 - read-binary-file-arch@1.0.6
 - readable-stream@2.3.8
@@ -335,6 +354,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - tmp-promise@3.0.3
 - tmp@0.2.7
 - undici-types@7.18.2
+- undici-types@8.3.0
 - undici@6.27.0
 - undici@7.28.0
 - universalify@0.1.2
@@ -346,8 +366,10 @@ Generated at: 2026-07-25T15:00:56.538Z
 - vitest@2.1.9
 - webcrypto-core@1.9.2
 - why-is-node-running@2.3.0
+- wrap-ansi@6.2.0
 - wrap-ansi@7.0.0
 - xmlbuilder@15.1.1
+- yargs@15.4.1
 - yargs@17.7.3
 - yocto-queue@0.1.0
 
@@ -435,11 +457,11 @@ Generated at: 2026-07-25T15:00:56.538Z
 - hex@0.4.3
 - hkdf@0.13.0
 - hmac@0.13.0
-- hybrid-array@0.4.13
+- hybrid-array@0.4.14
 - inout@0.1.4
 - inout@0.2.2
 - itoa@1.0.18
-- js-sys@0.3.103
+- js-sys@0.3.104
 - libc@0.2.189
 - once_cell@1.21.4
 - opaque-debug@0.3.1
@@ -458,10 +480,10 @@ Generated at: 2026-07-25T15:00:56.538Z
 - typenum@1.20.1
 - universal-hash@0.5.1
 - universal-hash@0.6.1
-- wasm-bindgen-macro-support@0.2.126
-- wasm-bindgen-macro@0.2.126
-- wasm-bindgen-shared@0.2.126
-- wasm-bindgen@0.2.126
+- wasm-bindgen-macro-support@0.2.127
+- wasm-bindgen-macro@0.2.127
+- wasm-bindgen-shared@0.2.127
+- wasm-bindgen@0.2.127
 
 ### MIT OR Apache-2.0 OR LGPL-2.1-or-later (1 crate)
 
@@ -473,7 +495,7 @@ Generated at: 2026-07-25T15:00:56.538Z
 - group@0.13.0
 - version_check@0.9.5
 
-### UNSPECIFIED (1 crate)
+### MPL-2.0 (1 crate)
 
 - fedos-core-rust@0.0.0
 

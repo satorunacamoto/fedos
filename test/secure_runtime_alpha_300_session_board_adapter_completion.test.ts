@@ -19,6 +19,7 @@ import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedo
 import atprotoAdapterSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 import * as sessionAdapter from "../src/os/messenger/board/session/fedos_session_board_adapter.js";
 import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 300 -- "Session Board Adapter Completion": Stage
@@ -66,7 +67,7 @@ describe("Secure Runtime Alpha 300 -- Session Board Adapter Completion", () => {
 
   it("6. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. Regression: Relay, Runtime, and Worker carry zero reference to src/board/session/", () => {

@@ -28,6 +28,7 @@ import groupMessageSource from "../src/os/messenger/conversations/group/fedos_gr
 import groupFanoutDeliverySource from "../src/os/messenger/conversations/group/fedos_group_fanout_delivery.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant, assertFedosRootDevDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function allFilesUnder(dir: string, extensions: readonly string[]): string[] {
   const entries = readdirSync(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean }>;
@@ -93,8 +94,8 @@ describe("Alpha 1321-1390 -- architecture guards (Alpha 1380/1385)", () => {
 
   it("7. package.json still carries exactly two production dependencies, and no devDependency changed either -- no new dependency introduced by this Arc", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
-    expect(Object.keys(parsed.devDependencies).sort()).toEqual(["@cloudflare/workers-types", "typescript", "vitest"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
+    assertFedosRootDevDependencyInvariant(parsed.devDependencies);
   });
 
   it("8. packages/fedos-core-rust/src is untouched -- no group/fanout reference anywhere in the Rust crate", () => {

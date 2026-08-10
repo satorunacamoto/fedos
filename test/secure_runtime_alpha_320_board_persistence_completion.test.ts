@@ -37,6 +37,7 @@ import * as hydrationModule from "../src/os/messenger/board/persistence/fedos_bo
 import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
 import { FedosBoardFeed } from "../src/os/messenger/board/repository/fedos_board_feed.js";
 import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 320 -- "Canonical Board Persistence Boundary
@@ -101,7 +102,7 @@ describe("Secure Runtime Alpha 320 -- Canonical Board Persistence Boundary Compl
 
   it("6. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. Regression: Relay, Runtime, and Worker carry zero reference to src/board/persistence/", () => {

@@ -36,6 +36,7 @@ import syncScheduleRendererSource from "../src/os/messenger/desktop/renderer/fed
 import transferSessionRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_transfer_session_renderer.ts?raw";
 // @ts-expect-error see above.
 import syncConflictRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_sync_conflict_renderer.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const DEVICE_SYNC_VIEW_MODEL_SOURCES: readonly string[] = [
   deviceInventoryVmSource,
@@ -123,7 +124,7 @@ describe("Secure Runtime Alpha 3801-3880 -- Phase K: layering guards", () => {
 describe("Secure Runtime Alpha 3801-3880 -- Phase K: dependency/scope guards", () => {
   it("9. no new npm dependency was introduced -- package.json still carries exactly two production dependencies", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("10. no Electron/React/Vue/Svelte/Tauri reference anywhere in this Arc's own new files", () => {

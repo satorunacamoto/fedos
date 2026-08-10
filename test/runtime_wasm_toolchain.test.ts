@@ -43,6 +43,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 417–424 introduced a standalone, unwired `FedosWasmToolchain`
@@ -285,7 +286,7 @@ describe("FedOS WASM toolchain readiness, minimal real preflight, fail-closed (S
 
   it("14. package.json dependencies are unchanged (2), no wasm-bindgen/wasm-pack dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
     expect(Object.keys(allDeps)).not.toContain("wasm-pack");
     expect(Object.keys(allDeps)).not.toContain("wasm-bindgen");

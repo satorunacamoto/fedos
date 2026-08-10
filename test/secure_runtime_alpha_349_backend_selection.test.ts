@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_349_backend_selection.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");
@@ -47,7 +48,7 @@ describe("Secure Runtime Alpha 349 -- Backend Selection", () => {
 
   it("5. Regression: no backend implementation exists -- package.json dependency count remains unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc explicitly states SQLite is not foreclosed, naming it the anticipated migration destination", () => {

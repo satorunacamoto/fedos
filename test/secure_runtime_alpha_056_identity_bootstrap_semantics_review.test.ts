@@ -35,6 +35,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RUNTIME_MODES: readonly RuntimeMode[] = ["test", "local", "cloudflare"];
 
@@ -357,7 +358,7 @@ describe("Secure Runtime Alpha 056 -- Identity Bootstrap Semantics Review, revie
 
   it("37. Regression: package.json still declares exactly two dependencies, unaffected by this review Stage", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("38. Regression: no fedos_*.ts file was added or removed by this Stage -- still exactly 57 under src/runtime/ and exactly 24 under src/identity/", () => {

@@ -15,6 +15,7 @@ import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.
 import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 241 -- "Existing Inbound Validation Inventory":
@@ -112,6 +113,6 @@ describe("Secure Runtime Alpha 241 -- Existing Inbound Validation Inventory", ()
 
   it("14. Regression: package.json dependency count remains unchanged at 2 -- no new Cargo/npm dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

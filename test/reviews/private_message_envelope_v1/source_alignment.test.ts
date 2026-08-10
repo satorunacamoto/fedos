@@ -29,6 +29,7 @@ import chatTypesSource from "../../../src/os/_legacy_prototype/chat/types.ts?raw
 import masterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Message Envelope and Encryption Activation V1 review --
@@ -221,6 +222,6 @@ describe("Private Message Envelope V1 review -- source alignment (master reality
 
   it("22. package.json still carries exactly two production dependencies -- no new dependency introduced by this review", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });

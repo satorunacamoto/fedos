@@ -17,6 +17,7 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const PRE_EXISTING_PUB_FN_NAMES = [
   "fedos_core_status",
@@ -143,7 +144,7 @@ describe("FedOS Rust version() export -- one #[wasm_bindgen] fn, 28 pub fn total
 
   it("9. package.json dependencies remain unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("10. src/runtime/fedos_wasm_loader.ts was untouched by THIS stage's own scope (Stage 986) -- a real module.version() call was later added by Stage 993, Prototype EXECUTION Phase 012, see test/runtime_wasm_loader_dev_only_rust_version_call_execution.test.ts -- still seven Plan interfaces", () => {

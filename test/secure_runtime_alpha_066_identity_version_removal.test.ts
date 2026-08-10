@@ -37,6 +37,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 import type { RuntimeMode } from "../src/os/_legacy_prototype/runtime/types.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 
@@ -442,7 +443,7 @@ describe("Secure Runtime Alpha 066 -- Identity Version Removal", () => {
 
   it("32. Regression: package.json still declares exactly two dependencies and no bin/main/exports field, unaffected by this Stage", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

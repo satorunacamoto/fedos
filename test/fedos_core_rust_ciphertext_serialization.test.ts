@@ -24,6 +24,7 @@ import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 186–188 — "Ciphertext serialization implementation in Rust +
@@ -271,8 +272,7 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
 
   it("16. package.json is unchanged — no new dependency, still 2 production dependencies, no base64/CBOR library", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     for (const dep of Object.keys(pkg.dependencies ?? {})) {
       expect(dep.toLowerCase()).not.toMatch(/base64|cbor|msgpack/);
     }

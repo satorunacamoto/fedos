@@ -31,6 +31,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import packageJsonSource from "../package.json?raw";
 import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { FedosRuntimeIdentity } from "../src/runtime/fedos_runtime_identity.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function codeOnlyLines(source: string): string {
   return source
@@ -318,7 +319,7 @@ describe("Secure Runtime Alpha 086 -- Desktop Integration Boundary Review", () =
 
   it("24. Regression: package.json still declares exactly two dependencies and no bin field, unaffected by this Stage", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

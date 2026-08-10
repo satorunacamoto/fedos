@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_196_event_foundation_v
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const ALL_SEVENTEEN_TESTS = [
   "new_nostr_event_internal_succeeds_for_a_real_public_key",
@@ -123,6 +124,6 @@ describe("Secure Runtime Alpha 196 -- Nostr Event Foundation Verification", () =
   it("11. Regression: package.json is untouched -- zero new npm dependency, this is a Rust-only Stage", () => {
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_196/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

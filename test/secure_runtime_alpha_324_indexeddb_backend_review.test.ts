@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_324_indexeddb_backend_
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import vitestConfigSource from "../vitest.config.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 324 -- "Candidate B: IndexedDB Backend Review":
@@ -38,7 +39,7 @@ describe("Secure Runtime Alpha 324 -- Candidate B: IndexedDB Backend Review", ()
 
   it("5. Regression: package.json dependency count remains unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc distinguishes the wire schemaVersion from IndexedDB's own DB-version integer", () => {

@@ -20,6 +20,7 @@ import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 182–185 — "Ciphertext serialization format decision + TypeScript
@@ -181,8 +182,7 @@ describe("Encrypted payload descriptor boundary (Stage 182–185)", () => {
 
   it("13. package.json is unchanged — no new dependency, still 2 production dependencies, no base64/serialization library", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     for (const dep of Object.keys(pkg.dependencies ?? {})) {
       expect(dep.toLowerCase()).not.toMatch(/base64|cbor|msgpack/);
     }

@@ -52,6 +52,7 @@ import packageJsonSource from "../package.json?raw";
 import runtimeWorkerBridgeDocSource from "../docs/runtime_worker_crypto_bridge.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmBoundaryDocSource from "../docs/fedos_wasm_boundary.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 249–256 — "Runtime Crypto Boundary Foundation":
@@ -249,8 +250,7 @@ describe("Runtime crypto boundary foundation (Stage 249-256)", () => {
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("14. both Worker/WASM planning docs exist and state their respective non-goals", () => {

@@ -17,6 +17,7 @@ import desktopRuntimeSource from "../src/os/messenger/desktop/runtime/fedos_desk
 import runtimeConfigSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
+import { assertFedosRootDependencyInvariant, assertFedosRootDevDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const ARC_SOURCE_FILES: Record<string, string> = {
   "fedos_board_runtime.ts": boardRuntimeSource as string,
@@ -87,9 +88,8 @@ describe("Secure Runtime Alpha 679 -- Full Boundary Verification", () => {
 
   it("5. no new dependency -- package.json dependency/devDependency counts unchanged (2 production, 3 dev)", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8") as string);
-    expect(Object.keys(packageJson.dependencies)).toHaveLength(2);
-    expect(Object.keys(packageJson.devDependencies)).toHaveLength(3);
-    expect(Object.keys(packageJson.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(packageJson.dependencies);
+    assertFedosRootDevDependencyInvariant(packageJson.devDependencies);
   });
 
   it("6. Cargo.toml is untouched by this Arc -- no Rust change", () => {

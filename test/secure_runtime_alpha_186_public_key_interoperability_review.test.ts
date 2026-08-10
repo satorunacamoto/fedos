@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_186_public_key_interop
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 186 -- "Interoperability with
@@ -116,6 +117,6 @@ describe("Secure Runtime Alpha 186 -- Interoperability with FedosNostrPublicKeyH
   it("13. Regression: package.json is untouched", () => {
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_186/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

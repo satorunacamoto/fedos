@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_271_existing_activityp
 import htmlRenderSource from "../src/os/_legacy_prototype/render/html.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 271 -- "Existing ActivityPub / Mastodon
@@ -32,8 +33,7 @@ describe("Secure Runtime Alpha 271 -- Existing ActivityPub / Mastodon Inventory"
 
   it("4. structural: package.json carries no HTML/ActivityPub-related dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    const deps = Object.keys(pkg.dependencies ?? {});
-    expect(deps).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("5. the design doc confirms no ActivityPub code, no HTTP signature verification, and no Actor resolution exist", () => {

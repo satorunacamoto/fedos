@@ -37,6 +37,7 @@ import federationTypesSource from "../src/os/_legacy_prototype/federation/types.
 import nip44WireNonceGenDocSource from "../docs/nip44_wire_nonce_generation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44WirePayloadBuilderDocSource from "../docs/nip44_wire_payload_builder.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 224–228 — NIP-44 v2 wire-compatible implementation building
@@ -214,8 +215,7 @@ describe("NIP-44 wire nonce generation + payload skeleton + diagnostics (Stage 2
 
   it("14. package.json is unchanged — still 2 production dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("15. no serialization change: no serde derive in any of the three new files' production code", () => {

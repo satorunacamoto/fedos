@@ -16,6 +16,7 @@ import nostrAdapterSource from "../src/os/messenger/board/fedos_board_nostr_adap
 import * as activityPubAdapter from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
 import * as mutationBoundary from "../src/os/messenger/board/activitypub/fedos_activitypub_mutation_boundary.js";
 import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 280 -- "ActivityPub Canonical Board Adapter
@@ -65,7 +66,7 @@ describe("Secure Runtime Alpha 280 -- ActivityPub Canonical Board Adapter Comple
 
   it("7. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("8. Regression: Relay, Runtime, and Worker carry zero reference to src/board/activitypub/", () => {

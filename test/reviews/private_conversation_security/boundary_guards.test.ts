@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Conversation Security, Storage & Capability Boundary Review --
@@ -71,7 +72,7 @@ describe("Private Conversation Security Review -- boundary guards", () => {
 
   it("3. package.json still carries exactly two production dependencies -- no new dependency introduced", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("4. all 21 required docs exist under docs/reviews/private_conversation_security/, named exactly as specified, no Alpha number anywhere in the filename", () => {

@@ -42,6 +42,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import activationBoundaryDocSource from "../docs/runtime_worker_activation_boundary.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 273–280 — "Worker Opt-in Gate Foundation":
@@ -338,8 +339,7 @@ describe("Worker crypto opt-in gate, foundation only (Stage 273-280)", () => {
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("17. Stage 281-284: FEDOS_CRYPTO_PROVIDER=fedos is recorded as configuredProvider but effectiveProvider/buildWorkerCryptoProvider stay placeholder", () => {

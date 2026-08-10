@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Canonical Conversation Foundation V1 review -- boundary invariants.
@@ -72,7 +73,7 @@ describe("Conversation Foundation V1 review -- boundary invariants", () => {
 
   it("3. package.json still carries exactly two production dependencies -- no new dependency introduced", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("4. all 16 required docs exist under docs/reviews/conversation_foundation_v1/, named exactly as specified, no Alpha number anywhere in the filename", () => {

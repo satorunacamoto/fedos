@@ -19,6 +19,7 @@ import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RELAY_SYMBOLS = ["FedosRelay", "NullRelay", "WebSocketRelay", "FedosRelaySocket", "FedosRelaySocketFactory"];
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
@@ -64,7 +65,7 @@ describe("Secure Runtime Alpha 218 -- Relay Boundary Review", () => {
 
   it("5. structural: package.json dependency count remains 2 -- unchanged across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc's own §5 records the five-symbol/five-file grep with zero matches", () => {
