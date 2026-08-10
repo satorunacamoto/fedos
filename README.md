@@ -1,39 +1,48 @@
-# FedOS Desktop
+# FedOS
 
-**An end-to-end encrypted direct-message client for Windows, built on
-Nostr (NIP-17).**
+**A local-first, privacy-oriented toolkit for messaging, commerce,
+pseudonymous identity, signed credentials, QR proofs, and
+offline-verifiable trust — built in the open, on Nostr.**
 
-FedOS is a focused secure messenger: 1:1 private conversations, and the
-things a real messenger needs around them — search, archive, multiple
-devices, identity replacement, signed deletion. It is not a social
-client, not a feed reader, and not a group chat.
+[![CI](https://github.com/satorunacamoto/fedos/actions/workflows/ci.yml/badge.svg)](https://github.com/satorunacamoto/fedos/actions/workflows/ci.yml)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](LICENSE)
 
-> ## ⚠ Closed Pilot — experimental, unaudited software
->
-> FedOS is in a small **Closed Pilot**. It is **not** a public beta and
-> **not** a finished product.
->
-> - **No independent security audit has ever been performed.** The
->   cryptography has been reviewed only by its own authors.
-> - **Windows artifacts are unsigned.** There is no Authenticode
->   signature, so **SmartScreen will likely warn you** when you run the
->   installer. That warning is legitimate and expected.
-> - **Back up anything you care about**, outside FedOS. Data loss during
->   the pilot is possible.
-> - **Do not use this build for irreplaceable secrets or high-risk
->   operational work.** If disclosure of a message would seriously harm
->   you or someone else, use something audited instead.
->
-> Read [`docs/pilot/KNOWN_RISKS.md`](docs/pilot/KNOWN_RISKS.md) before
-> installing.
+> ⚠ **Experimental, unaudited software.** FedOS Desktop — the one
+> application actually shipped from this repository — is in a small
+> **Closed Pilot**, not a public beta or a finished product. **No
+> independent security audit has ever been performed.** Windows
+> artifacts are unsigned, so SmartScreen will likely warn you. Do not
+> use it for irreplaceable secrets or high-risk operational work. Full
+> detail: [`docs/pilot/KNOWN_RISKS.md`](docs/pilot/KNOWN_RISKS.md).
 
-This repository has no public remote and nothing from it is published
-anywhere else — every path below is relative to this repository, not a
-hosted URL.
+## What it is
 
----
+FedOS is **local-first** and **fully open source (MPL-2.0)**, in full,
+unconditionally — there is nothing paywalled or crippled about the OSS
+tree. There is **no mandatory FedOS server or API**: messaging runs over
+Nostr relays you choose, and every Trust artifact (a signed credential,
+entitlement, or QR proof) verifies entirely offline, on your own
+machine, with no network call anywhere in that verification path.
 
-## Current capabilities
+- **Messenger** — a real, shipped, end-to-end encrypted 1:1 messenger
+  over Nostr **NIP-17**. This is **FedOS Desktop**, the one application
+  in this repository you can actually install and run today.
+- **Trust** — signed envelopes, pseudonymous credentials,
+  proof-of-possession, capability grants, and offline-verifiable
+  subscription entitlements and contract-artifact proofs, all
+  verifiable without a network call. See ["Trust / Signed
+  QR"](#trust--signed-qr) below.
+- **Commerce** and **Core** — real, tested code that lives in this
+  repository (see "What works today" just below) but is **not yet
+  wired into the shipped desktop app**.
+
+**FedOS Desktop Messenger is the one shipped product; Core, Messenger,
+Commerce, and Trust are the repository's underlying capabilities, at
+different readiness levels.** Don't assume Commerce or Trust are
+reachable from the app you install just because their code exists here
+— "What works today" states exactly what's wired to what.
+
+## What works today
 
 FedOS's source is organized into four capabilities under `src/os/`, at
 very different stages of readiness. Read this before assuming any
@@ -88,12 +97,26 @@ The one real, runnable entry point today is a standalone CLI:
 
 ---
 
-## Install
+## Architecture
 
-Full detail — including pilot-participant install steps, SmartScreen
-handling, and checksum verification — is in [`BUILDING.md`](BUILDING.md)
-and [`docs/pilot/INSTALLATION.md`](docs/pilot/INSTALLATION.md). To build
-from source, the essential commands:
+[`ARCHITECTURE.md`](ARCHITECTURE.md) has the full system design,
+trust-boundary map, and primitive inventory for the shipped product.
+[`docs/architecture/`](docs/architecture/) holds the deeper design
+documents, including
+[`docs/architecture/TRUST-MODEL.md`](docs/architecture/TRUST-MODEL.md),
+[`docs/architecture/OFFLINE-MONETIZATION-MODEL.md`](docs/architecture/OFFLINE-MONETIZATION-MODEL.md),
+and
+[`docs/architecture/CAPABILITY-MAP.md`](docs/architecture/CAPABILITY-MAP.md).
+
+## Quick start
+
+Build from source, run the packaged app, and confirm the test suite is
+green. This is the condensed path — full detail, including
+pilot-participant install steps, SmartScreen handling, and checksum
+verification, is in [`BUILDING.md`](BUILDING.md) and
+[`docs/pilot/INSTALLATION.md`](docs/pilot/INSTALLATION.md).
+
+### Install
 
 ```sh
 npm ci                       # install from lockfile
@@ -103,7 +126,7 @@ npm run build:wasm           # Rust -> WebAssembly core
 Pinned toolchain: **Node 24.x**, **npm 11.12.1**, **Rust 1.95.0**
 (`rust-toolchain.toml`), **wasm-bindgen 0.2.126**.
 
-## Run
+### Run
 
 ```sh
 npm run release:electron-beta   # unsigned installer + portable ZIP
@@ -115,7 +138,7 @@ the `build:beta-runtime` → `build --prefix packages/fedos-desktop-electron-spi
 → `start:electron-beta` sequence, including a known footgun around
 browser-context renderer files and the two-pass `tsc` build.
 
-## Test
+### Test
 
 ```sh
 npm run test:current
@@ -162,7 +185,24 @@ result, read [`BUILDING.md`](BUILDING.md)'s "single most common false
 regression" section — the compiled Rust/WASM core is not committed, and
 without it real-crypto suites silently skip rather than fail.
 
-## Verify a credential or QR
+## Trust / Signed QR
+
+FedOS's Trust capability (`src/os/trust/`) is a standalone, offline,
+signed-artifact toolkit — usable today via its own CLI even though it
+isn't yet wired into the desktop app (see "What works today" above). It
+covers: `SignedEnvelope`s, pseudonymous credentials, proof-of-possession,
+capability grants, offline-verifiable subscription entitlements, signed
+QR encode/decode, and contract-artifact proofs. Every one of these
+verifies **entirely locally, with no network call** — see
+`test/trust_*.test.ts` and
+[`docs/architecture/TRUST-MODEL.md`](docs/architecture/TRUST-MODEL.md).
+
+**FedOS Official is one optional issuer, not a universal root of
+trust.** A verifier chooses which issuer key(s) to trust; nothing about
+FedOS's design privileges FedOS Official's key over anyone else's
+self-run issuer.
+
+### Verify a credential or QR
 
 Every signed artifact FedOS's Trust capability produces — a subscription
 entitlement, a pseudonymous credential, a proof-of-possession response —
@@ -174,7 +214,7 @@ end. For the subscriber-facing walkthrough of importing and verifying a
 FedOS Official-issued entitlement specifically (file or QR), see
 [`docs/user/SUBSCRIPTION-ENTITLEMENT.md`](docs/user/SUBSCRIPTION-ENTITLEMENT.md).
 
-## Create your own issuer
+### Create your own issuer
 
 Anyone can run their own issuer — for themselves, their household, their
 company, or their community — using the same offline signer tooling
@@ -196,22 +236,21 @@ or similar) — see `docs/architecture/TRUST-MODEL.md`'s "Official issuer
 key boundary" section for exactly what's public and what must never leave
 your own device.
 
-## How the FedOS Official subscription works
+### How the FedOS Official subscription works
 
-FedOS is OSS, in full, unconditionally. Self-signing your own credentials
-and entitlements, and running your own issuer for yourself or your
-community, is the complete product — not a trial, not a crippled tier.
-None of that requires payment, an account, or FedOS Official's
-involvement in any way.
+FedOS itself is OSS, in full, unconditionally. **Anyone may self-sign or
+operate an issuer** — self-signing your own credentials and entitlements,
+and running your own issuer for yourself or your community, is the
+complete product, not a trial or a crippled tier, and requires no
+payment, account, or FedOS Official involvement whatsoever.
 
-**FedOS Official is one optional issuer** a verifier may additionally
-choose to trust. It offers a paid, optional subscription: a signed
-`fedos.subscription.v1` envelope for a stated set of scopes and a stated
-validity period, issued by a human operator running an offline CLI after
-manually confirming payment — no activation server, no recurring network
-check after import, no hardware fingerprint, and no usage-quota
-enforcement (hard usage quotas cannot be securely enforced in a
-serverless, offline-verifiable model — see
+**An optional FedOS Official entitlement may be offered separately**: a
+signed `fedos.subscription.v1` envelope for a stated set of scopes and a
+stated validity period, issued by a human operator running an offline
+CLI after manually confirming payment — no activation server, no
+recurring network check after import, no hardware fingerprint, and no
+usage-quota enforcement (hard usage quotas cannot be securely enforced in
+a serverless, offline-verifiable model — see
 [`docs/architecture/OFFLINE-MONETIZATION-MODEL.md`](docs/architecture/OFFLINE-MONETIZATION-MODEL.md)
 for why, and the time/scope-bounded entitlements this design uses
 instead).
@@ -226,6 +265,15 @@ defined once, canonically, in `docs/architecture/TRUST-MODEL.md`
 (`FEDOS_OFFICIAL_ENTITLEMENT_MEANING_STATEMENT`) — see that document and
 `docs/architecture/OFFLINE-MONETIZATION-MODEL.md` for the full design.
 
+## Contributing
+
+Contributions are welcome — [`CONTRIBUTING.md`](CONTRIBUTING.md) covers
+licensing (MPL-2.0, inbound=outbound, no CLA/DCO), where to send what
+(security reports go through GitHub Private Vulnerability Reporting,
+never a public Issue or PR — see [`SECURITY.md`](SECURITY.md)), and how
+to get a change accepted. Ordinary bugs and feature ideas are public
+Issues; questions and design discussion are Discussions.
+
 ## No mandatory FedOS server
 
 **There is no FedOS server or API that this software requires you to
@@ -235,17 +283,6 @@ human running an offline CLI, not a hosted activation service. Every one
 of FedOS's free features works completely and indefinitely with zero
 dependency on FedOS Official, or any server FedOS's maintainers operate,
 ever being reachable.
-
-## Architecture
-
-[`ARCHITECTURE.md`](ARCHITECTURE.md) has the full system design,
-trust-boundary map, and primitive inventory for the shipped product.
-[`docs/architecture/`](docs/architecture/) holds the deeper design
-documents, including
-[`docs/architecture/TRUST-MODEL.md`](docs/architecture/TRUST-MODEL.md),
-[`docs/architecture/OFFLINE-MONETIZATION-MODEL.md`](docs/architecture/OFFLINE-MONETIZATION-MODEL.md),
-and
-[`docs/architecture/CAPABILITY-MAP.md`](docs/architecture/CAPABILITY-MAP.md).
 
 ## License
 
@@ -385,7 +422,7 @@ deletion, and the Safety Center.
 honestly publish have not been captured against the current build, and a
 stale screenshot is worse than none.*
 
-## Quick start
+## First run walkthrough (Messenger)
 
 1. Install, or build and launch, the app.
 2. **Create a profile** and choose a passphrase. Write it down somewhere
@@ -429,7 +466,7 @@ hybrid architecture. That vision is **not** what ships today; the
 project narrowed deliberately to a single well-scoped problem: private
 1:1 messaging that works. What remained of the original vision's
 commerce-shaped ideas now lives, unwired, as `src/os/commerce/` (see
-"Current capabilities" above) rather than being deleted outright.
+"What works today" above) rather than being deleted outright.
 
 - The original prototype's own technical reference — including its
   now-obsolete security section, which describes an entirely different,
