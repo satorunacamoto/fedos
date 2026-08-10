@@ -452,6 +452,32 @@ Walkthroughs for each feature live in the
 | [`LICENSE_STATUS.md`](LICENSE_STATUS.md) | Licensing decision record |
 | [`docs/pilot/`](docs/pilot/) | The Closed Pilot package |
 | [`docs/ALPHA_HISTORY.md`](docs/ALPHA_HISTORY.md) | Append-only development chronology |
+| [`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](docs/commerce/FEDOS-COMMERCE-END-TO-END.md) | Code-audited answer to "what happens when someone buys something with FedOS?" (short answer today: nothing — see below) |
+
+## How a purchase flows through FedOS
+
+A `src/os/commerce/` domain and a `src/os/trust/` capability both exist as real,
+tested TypeScript — but neither is wired into the shipping Desktop app today.
+There is no product screen, no order, no payment rail, and no QR/credential
+handoff reachable from the running product:
+
+```
+Customer          FedOS Desktop (shipping)      Commerce domain
+   |                       |                      (os/commerce)
+   | look for a product -> |  no product screen    real code,
+   |                       |  exists (ABSENT)       zero callers
+   |                                                outside tests
+```
+
+This was verified by code inspection, not inferred from intent. Full detail,
+including per-flow file:line citations, a tabletop simulation, a gap table,
+and the recommended next bounded implementation arc:
+[`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](docs/commerce/FEDOS-COMMERCE-END-TO-END.md)
+· [`COMMERCE-E2E-SWIMLANE.md`](docs/architecture/COMMERCE-E2E-SWIMLANE.md)
+· [`CUSTOMER-COMMERCE-FLOW.md`](docs/architecture/CUSTOMER-COMMERCE-FLOW.md)
+· [`MERCHANT-COMMERCE-FLOW.md`](docs/architecture/MERCHANT-COMMERCE-FLOW.md)
+· [`PAYMENT-FLOW.md`](docs/architecture/PAYMENT-FLOW.md)
+· [`PRODUCT-SURFACE-AUDIT.md`](docs/commerce/PRODUCT-SURFACE-AUDIT.md)
 
 ## Roadmap
 
