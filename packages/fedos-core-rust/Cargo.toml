@@ -260,7 +260,7 @@ sha2 = "0.11.0"
 # first-adoption stage. No ECDH function, no conversation-key derivation,
 # no NIP-44 code of any kind exists yet — see
 # `docs/nip44_dependency_adoption.md` (updated) for the full record.
-k256 = { version = "0.13", default-features = false, features = ["arithmetic", "schnorr"] }
+k256 = { version = "0.14", default-features = false, features = ["arithmetic", "schnorr"] }
 
 # `wasm-bindgen` (rustwasm project, MIT OR Apache-2.0) — Prototype EXECUTION
 # Phase 009's own, single, explicitly-reviewed adoption, per
