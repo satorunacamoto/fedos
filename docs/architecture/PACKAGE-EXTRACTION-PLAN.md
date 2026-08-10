@@ -1,29 +1,42 @@
 # FedOS — Package Extraction Plan
 
-Status: written this arc (Compatibility Facade Reduction + Package
-Extraction Readiness + Remaining Architecture Debt Closure, Agent P, Half
-B). Pure software architecture, no legal/compliance content. Answers one
-question with a real, automatable measurement, not prose: **if
-`src/os/core`, `src/os/messenger`, and `src/os/commerce` were physically
-moved into their own npm packages today, exactly what would break, and by
-how much?** No files were moved. No `package.json` was created. This is
-design + measurement only.
+Status: written by the Compatibility Facade Reduction + Package
+Extraction Readiness + Remaining Architecture Debt Closure arc (Agent P,
+Half B); **UPDATED by the Runtime Ownership Extraction + Package
+Readiness Closure arc**, which executed Root Cause A (below) — the one
+piece of real design/migration work this doc's own original "What READY
+would require" section named as step 1 and explicitly deferred. Pure
+software architecture, no legal/compliance content. Answers one question
+with a real, automatable measurement, not prose: **if `src/os/core`,
+`src/os/messenger`, and `src/os/commerce` were physically moved into
+their own npm packages today, exactly what would break, and by how
+much?** Physical moves NOW HAVE happened for Root Cause A's 19-file live
+closure (see `docs/architecture/RUNTIME-OWNERSHIP-MAP.md`); no
+`packages/*` npm package itself was created — this remains design +
+measurement for the actual workspace split.
 
-## Verdict: **PARTIAL — one root ready, three are not, exact blocker count below**
+## Verdict: **NEARLY READY — one root ready, one fully closed this arc, two carry a single documented design-decision blocker each**
 
 | Root | Own files | Extraction-ready? |
 |---|---|---|
-| `apps/desktop-electron-spike` (`packages/fedos-desktop-electron-spike/src`) | 27 | **YES** — 0 blockers |
-| `os/core` | 55 | NO — 3 blockers |
-| `os/commerce` | 22 | NO — 7 blockers |
-| `os/messenger` | 785 | NO — 38 blockers |
+| `apps/desktop-electron-spike` (`packages/fedos-desktop-electron-spike/src`) | 27 | **YES** — 0 blockers (unchanged) |
+| `os/messenger` | 787 | **YES** — 0 blockers (was 38; closed this arc) |
+| `os/core` | 74 | NO — 1 blocker (was 3; Root Cause B, needs real npm workspaces) |
+| `os/commerce` | 26 | NO — 2 blockers (was 7; Root Cause D's sanctioned `NostrEvent` carve-out, an open design decision) |
 
-**PACKAGE EXTRACTION BLOCKERS: 48**
+**PACKAGE EXTRACTION BLOCKERS: 3** (was 48 as originally measured by this
+doc, 46 as freshly re-measured at the start of the Runtime Ownership
+Extraction arc — 2 of the original 48 had already been fixed by an
+intervening commit).
 
-Not a symmetric "everything's equally unready" finding: the blockers cluster
-into a small number of ROOT CAUSES (below), not 48 independent problems.
-Fixing the top root cause alone (`src/runtime/`) would resolve 41 of the 48
-(85%).
+The dominant root cause (Root Cause A, `src/runtime/`) is now **fully
+closed** — see "Root cause A — RESOLVED" below. The 2 remaining root
+causes (B and D) were always flagged by this doc as genuine design
+decisions for a future extraction arc to make, not mechanical gaps; that
+recommendation still stands and neither was attempted this pass. `os/core`
+grew from 55 to 74 own files (the 19-file live closure moved in) and
+`os/commerce` grew from 22 to 26 (the 4 new vendored files from Root
+Cause D's mechanical fix, below).
 
 ## Method — real, automatable, reused, not invented fresh
 
@@ -118,7 +131,27 @@ blocker count never SILENTLY grows past the baseline measured this pass
 
 ## Root causes (4), not 48 independent problems
 
-### Root cause A — `src/runtime/` (78 files, NEVER migrated) is a hidden shared dependency of BOTH `os/core` and `os/messenger`
+### Root cause A — `src/runtime/` (78 files, NEVER migrated) is a hidden shared dependency of BOTH `os/core` and `os/messenger` — **RESOLVED, Runtime Ownership Extraction Arc**
+
+**Resolution**: option (b) below (split `src/runtime/`, not move it whole)
+was the one actually executed, refined by direct evidence rather than
+guessed. Of the 78 files, only a **19-file live closure** — the real
+transitive dependency graph of the production `fedos_wasm_loader.ts`
+(103 importers) plus the 4 AEAD ciphertext functions and
+`fedos_runtime_identity.ts` — needed to move to resolve every real
+package-extraction blocker; verified via `grep -n "^import"` on every
+file in the chain, not assumed. All 19 moved to `src/os/core/vault/wasm/`
+(18 files) and `src/os/core/identity/` (`fedos_runtime_identity.ts` — its
+content is 100% `os/core/identity/*` imports, resolving THIS document's
+own "may be Messenger-shaped" speculation in favor of Core). The
+remaining 54 files are genuinely dead scaffolding (zero live
+reachability, independently verified) and were deliberately left in
+place — see `docs/architecture/RUNTIME-OWNERSHIP-MAP.md` for the full
+78-file classification and the exact evidence. **RUNTIME-CAUSED
+PACKAGE-EXTRACTION BLOCKERS: 0** (was 36 of the original 46/48).
+
+The historical analysis below (as this doc originally found it) is kept
+for the record.
 
 `src/runtime/` is not a compatibility shim (unlike `src/crypto/`,
 `src/identity/`, `src/settings/`, `src/storage/`, `src/vault/`,
@@ -180,36 +213,49 @@ resolution requires once `os/core` is its own package with its own
 `node_modules`. Trivial to fix once workspaces are set up — listed as a
 manifest dependency below, not a structural redesign.
 
-### Root cause C — a small number of files still hold OLD-location imports the prior "811 of 811 shims repointed" sweep did not (and structurally could not) catch
+### Root cause C — a small number of files still hold OLD-location imports the prior "811 of 811 shims repointed" sweep did not (and structurally could not) catch — **RESOLVED, all 4**
 
 `FACTORY-PORT-COMPLETION-PLAN.md`'s own execution record describes a sweep
 of every *known-at-the-time* old-path import, repointing 811 of 811 to
-canonical `os/**` locations. This scan found 4 the sweep did not catch:
-1 in `src/notification/` (a REAL, never-migrated directory — not a shim;
-distinct from Root Cause A only in size: 3 files, not 78), 2 into
-`src/conversation/deletion*` shims, and 1 into
-`src/desktop/beta/fedos_desktop_beta_capability_manifest.ts` — the last of
-which is, per this session's own start-of-conversation git status, a file
-under ACTIVE concurrent modification by other work in this same arc
-right now, meaning this specific blocker's exact resolution may already be
-in flux and should be re-measured (re-run the scan script) before treating
-it as fixed or unfixed. None of these 4 are large; unlike Root Cause A they
-are individually trivial one-import repoints, not a design question.
+canonical `os/**` locations. This scan originally found 4 the sweep did
+not catch: 1 in `src/notification/`, 2 into `src/conversation/deletion*`
+shims, and 1 into
+`src/desktop/beta/fedos_desktop_beta_capability_manifest.ts`. **All 4 now
+fixed**: the 2 `src/conversation/deletion*` ones were fixed by a commit
+prior to the Runtime Ownership Extraction arc's own start (already gone
+by the time that arc re-measured, 48→46); that arc fixed the remaining 2
+— `fedos_desktop_beta_capability_manifest.ts` physically moved to
+`src/os/messenger/desktop/beta/` (the concurrent-modification risk this
+doc flagged did not materialize inside that arc's own isolated worktree,
+independently re-verified before acting), and
+`src/notification/policy.ts`'s one pure helper
+(`isSensitiveNotificationField`) forked into a local, independently-owned
+copy inside `os/messenger` rather than accepting the live cross-root
+import — see `docs/architecture/RUNTIME-OWNERSHIP-EXTRACTION-FINAL-VALIDATION.md`.
 
-### Root cause D — `os/commerce`'s two SANCTIONED-but-still-blocking edges into `os/messenger`, and its FIVE edges into dead `_legacy_prototype` code
+### Root cause D — `os/commerce`'s two SANCTIONED-but-still-blocking edges into `os/messenger` (still open), and its FIVE edges into dead `_legacy_prototype` code (**RESOLVED**)
 
-Both already covered above under the `os/commerce` results table. Neither
-is large in file count, but both represent a genuine PRE-DECISION this doc
-does not make on this pass's own authority: does `@fedos/commerce` accept
-`@fedos/messenger` as a real dependency (simplest, but couples two
-capabilities the whole Ports-and-Adapters design exists to keep apart), or
-does the `NostrEvent`/raw-event-shape concept move into `@fedos/core` (more
-architecturally correct, but `os/core`'s own boundary test / design
-discipline currently forbids ANY protocol-specific type — see
-`transport_port.ts`'s own header, this same arc's Half A, for exactly this
-tension already documented for a different Port)? Recommended: defer to
-whichever arc actually executes the extraction; flagged here, not decided
-here. The five `_legacy_prototype` edges have a cheaper fix: cut them
+The five `_legacy_prototype` edges are fixed: the Runtime Ownership
+Extraction arc vendored the small `AssetMetadata`/`canCacheAsset`/
+`Space`/`canPost` types+policy `asset_preview.ts`/`bridge.ts`/`directory.ts`
+actually used into 4 new local files
+(`src/os/commerce/catalog/{asset_cache_types,asset_cache_policy,space_types,space_policy}.ts`,
+verbatim copies at fork time) rather than deleting the dead-code paths
+outright — preserves existing test coverage and behavior with zero
+functional change while cutting the cross-root import; `_legacy_prototype`
+itself untouched.
+
+The two SANCTIONED `NostrEvent` edges are still open — both already
+covered above under the `os/commerce` results table, and both represent a
+genuine PRE-DECISION this doc does not make on its own authority: does
+`@fedos/commerce` accept `@fedos/messenger` as a real dependency (simplest,
+but couples two capabilities the whole Ports-and-Adapters design exists to
+keep apart), or does the `NostrEvent`/raw-event-shape concept move into
+`@fedos/core` (more architecturally correct, but `os/core`'s own boundary
+test / design discipline currently forbids ANY protocol-specific type —
+see `transport_port.ts`'s own header for exactly this tension already
+documented for a different Port)? Recommended, still: defer to whichever
+arc actually executes the extraction; flagged here, not decided here.
 (delete or replace the sample-data/asset-preview code paths that reach
 there) since `_legacy_prototype` has no deploy path already.
 
@@ -384,25 +430,32 @@ in parallel, then the Electron app.
 
 ## What "READY" would require, in order
 
-1. Resolve Root Cause A (`src/runtime/`, 78 files, 34 of the 38
-   `os/messenger` blockers and 2 of the 3 `os/core` blockers) — the
-   single highest-leverage fix. Real design work, not mechanical.
-2. Fix Root Cause C's 4 stray old-path imports (`src/notification/policy.ts`,
-   2x `src/conversation/deletion*`, 1x `src/desktop/beta/...`) — mechanical
-   repoints, re-verify the beta-capability-manifest one is still live
-   first given the concurrent edit noted above.
-3. Rewire Root Cause B (`os/core/crypto/fedos_core_adapter.ts`) to import
+1. ~~Resolve Root Cause A~~ — **DONE, Runtime Ownership Extraction arc.**
+   36 of 46 blockers closed in one motion; `os/messenger`'s virtual
+   package now PASSES.
+2. ~~Fix Root Cause C's 4 stray old-path imports~~ — **DONE**, all 4
+   (2 by an intervening commit before this arc started, 2 by this arc).
+3. ~~Decide Root Cause D's 5 `_legacy_prototype` edges~~ — **DONE**
+   (cut, via vendoring — see above). The `os/commerce` ↔ `NostrEvent`
+   SANCTIONED-edge question is a SEPARATE, still-open part of Root Cause
+   D — see below.
+4. Rewire Root Cause B (`os/core/crypto/fedos_core_adapter.ts`) to import
    `@nostr-window/fedos-core-rust` by package name — mechanical, and only
    meaningful once real npm workspaces exist (today there is one root
    `package.json`, not a workspace `package.json` array, so this can't be
-   tested end-to-end without ALSO doing that setup work, itself out of
-   scope for this pass).
-4. Decide Root Cause D's `os/commerce` ↔ `NostrEvent` question, and either
-   cut or accept the 5 `_legacy_prototype` edges.
-5. Re-run `node scripts/package_extraction_boundary_scan.mjs` and confirm
+   tested end-to-end without ALSO doing that setup work). **Still open.**
+5. Decide Root Cause D's remaining `os/commerce` ↔ `NostrEvent` question
+   (2 sanctioned edges). **Still open**, deliberately — a genuine design
+   decision, not this arc's call to make.
+6. Re-run `node scripts/package_extraction_boundary_scan.mjs` and confirm
    `PACKAGE EXTRACTION BLOCKERS: 0` before attempting a real
-   `npm init --workspace` split.
+   `npm init --workspace` split. **Currently measures 3** (down from 48
+   originally / 46 as re-measured) — steps 4 and 5 above are the only two
+   remaining before this hits 0.
 
-None of the above was attempted this pass — per this arc's own scope
-("design work for a doc... no real package split this arc"), Half B's job
-was measurement, not remediation.
+Steps 1-3 were executed by the Runtime Ownership Extraction + Package
+Readiness Closure arc. Steps 4-5 remain genuine open design decisions for
+a future arc — per that arc's own scope, it did not attempt either (no
+npm workspace setup, no `os/commerce`/`NostrEvent` architectural
+decision), consistent with this document's own original recommendation
+to defer both to whichever arc actually executes the real package split.

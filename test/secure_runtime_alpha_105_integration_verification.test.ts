@@ -20,7 +20,7 @@ import nostrPublicIdentityReaderSource from "../src/os/messenger/desktop/nostr_p
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nullPublicIdentityReaderSource from "../src/os/messenger/desktop/null_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import identityProviderResolverSource from "../src/os/core/identity/fedos_identity_provider_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -32,13 +32,13 @@ import storageServiceSource from "../src/runtime/fedos_runtime_ciphertext_storag
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageBackendSource from "../src/runtime/fedos_runtime_storage_backend.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import exportServiceSource from "../src/runtime/fedos_runtime_export_ciphertext.ts?raw";
+import exportServiceSource from "../src/os/core/vault/wasm/fedos_runtime_export_ciphertext.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import importServiceSource from "../src/runtime/fedos_runtime_import_ciphertext.ts?raw";
+import importServiceSource from "../src/os/core/vault/wasm/fedos_runtime_import_ciphertext.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptServiceSource from "../src/runtime/fedos_runtime_encrypt.ts?raw";
+import encryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_encrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptServiceSource from "../src/runtime/fedos_runtime_decrypt.ts?raw";
+import decryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_decrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -46,7 +46,7 @@ import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

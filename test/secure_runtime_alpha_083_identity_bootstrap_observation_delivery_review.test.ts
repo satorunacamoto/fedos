@@ -9,7 +9,7 @@ import designDocSource from "../docs/secure_runtime_alpha_083_identity_bootstrap
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import alpha082DocSource from "../docs/secure_runtime_alpha_082_identity_bootstrap_observation_event_lifecycle_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

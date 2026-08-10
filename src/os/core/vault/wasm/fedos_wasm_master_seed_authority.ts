@@ -42,7 +42,7 @@ import {
   type FedosWasmLoaderNip44WireDecryptExecution,
   type FedosMasterSeedAuthorityHandle,
   type AeadKeyHandle,
-} from "../../../../runtime/fedos_wasm_loader.js";
+} from "./fedos_wasm_loader.js";
 import type { FedosMasterSeedAuthority } from "./fedos_master_seed_authority.js";
 import type { SealingAuthorityPort } from "../../ports/sealing_authority_port.js";
 import {

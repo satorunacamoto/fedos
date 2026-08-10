@@ -12,9 +12,9 @@ import publicCryptoOpaqueHandlesDocSource from "../docs/public_crypto_opaque_han
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import keyBoundaryDecisionDocSource from "../docs/secure_runtime_alpha_012_key_boundary_decision.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptServiceSource from "../src/runtime/fedos_runtime_decrypt.ts?raw";
+import decryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_decrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptServiceSource from "../src/runtime/fedos_runtime_encrypt.ts?raw";
+import encryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_encrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import keyGenerationServiceSource from "../src/runtime/fedos_runtime_aead_key_generation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -28,7 +28,7 @@ import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

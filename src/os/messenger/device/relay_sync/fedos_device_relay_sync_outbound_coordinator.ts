@@ -31,7 +31,7 @@ import {
   type FedosDeviceTransferPackageV1,
 } from "../transfer/fedos_device_transfer_package.js";
 import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
-import type { AeadAlgorithm } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAlgorithm } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import {
   FedosSecureRandomDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeNonceGenerator,

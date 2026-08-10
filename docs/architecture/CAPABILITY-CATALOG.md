@@ -24,7 +24,7 @@ explicitly inert scaffolding — see their own **Status** cell).
 | Depends on | Nothing outside `os/core` itself (no relative import resolves into `os/messenger` or `os/commerce` — enforced). |
 | Ports consumed | None (core is the layer that DEFINES Ports, not one that consumes another domain's). |
 | Ports provided | `MessagingPort`, `ConversationPort`, `NotificationPort` (`src/os/core/ports/*.ts`, widened this pass), `SealingAuthorityPort` (Agent S, this arc), `LocalAIProvider` (interface only, zero implementations anywhere). |
-| State owned | None directly by the Ports themselves (pure interfaces). `identity/`, `settings/`, `vault/`, `storage/`, `crypto/` subdirectories hold concrete state-owning classes, but most have zero production consumers (see each subdirectory's own doc comments) — `os/core/vault/wasm/` (Agent S's move) is the one exception with real production consumers (the Messenger ratchet runtimes, via `SealingAuthorityPort`). |
+| State owned | None directly by the Ports themselves (pure interfaces). `identity/`, `settings/`, `vault/`, `storage/`, `crypto/` subdirectories hold concrete state-owning classes, but most have zero production consumers (see each subdirectory's own doc comments) — `os/core/vault/wasm/` is the significant exception: `master_seed/`'s prior move (real production consumers, the Messenger ratchet runtimes, via `SealingAuthorityPort`) plus the Runtime Ownership Extraction Arc's 19-file live closure from `src/runtime/` (`fedos_wasm_loader.ts` — the production dev-gated WASM artifact loader, 103 importers — plus its AEAD encrypt/decrypt/export/import-ciphertext wrappers and 13 further transitive dependency files; `fedos_runtime_identity.ts` moved to `os/core/identity/` instead, content-verified Core-shaped). This closed the dominant package-extraction root cause (`docs/architecture/PACKAGE-EXTRACTION-PLAN.md`'s "Root Cause A") — see `docs/architecture/RUNTIME-OWNERSHIP-MAP.md`. |
 | Adapters | None live inside `os/core` itself — adapters implementing its Ports live in `os/messenger` (`FedosMessenger*PortAdapter`) and `os/core/vault/wasm/` (`FedosWasmMasterSeedAuthority` implements `SealingAuthorityPort`). |
 | Standalone? | Yes — `test/architecture_boundary_core.test.ts` (2 tests, passing). |
 | Tests | `test/architecture_boundary_core.test.ts`, `test/architecture_boundary_adapter_port_shapes.test.ts` (Port-shape checks), `test/architecture_boundary_payment_provider_shape.test.ts` (adjacent — see commerce), plus scattered `identity`/`settings`/`vault` unit tests. |
@@ -144,10 +144,10 @@ explicitly inert scaffolding — see their own **Status** cell).
 
 | Field | Value |
 |---|---|
-| Purpose | Dead, quarantined pre-pivot ("nostr-window") code with no deploy path — kept only because `os/commerce/catalog` still references its `AssetMetadata` type. |
+| Purpose | Dead, quarantined pre-pivot ("nostr-window") code with no deploy path. Previously kept alive by 5 real `os/commerce/catalog` imports (`AssetMetadata`/`canCacheAsset`/`Space`/`canPost` types+policy) — the Runtime Ownership Extraction Arc (Root Cause D) vendored those into `os/commerce/catalog/{asset_cache_types,asset_cache_policy,space_types,space_policy}.ts` and cut all 5 edges (verified: `grep -rn "_legacy_prototype" src/os/commerce/` now returns only doc-comment mentions of the fork's own provenance, zero real imports) — this directory now has ZERO live incoming edges from anywhere in the shippable tree. |
 | Layer | Legacy (excluded from the shippable product). |
 | Public API | None — no barrel, not intended for external use. |
-| Depends on | Nothing outside itself and (one direction only) into `os/commerce` (verified: no reverse edge — `test/architecture_cycle_detector.test.ts`'s own "no SCC contains any file under `os/_legacy_prototype/`" assertion). |
+| Depends on | Nothing outside itself (verified: no reverse edge — `test/architecture_cycle_detector.test.ts`'s own "no SCC contains any file under `os/_legacy_prototype/`" assertion). No longer has any incoming dependency from `os/commerce` either, as of the Runtime Ownership Extraction Arc — see above. |
 | Ports consumed / provided | None. |
 | State owned | None reachable. |
 | Adapters | None. |

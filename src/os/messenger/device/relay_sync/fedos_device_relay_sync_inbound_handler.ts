@@ -46,7 +46,7 @@ import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device
 import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
 import type { FedosDeviceSyncPackageEncryptionAuthority } from "../sync_package/fedos_device_sync_package_encryption.js";
 import type { FedosDeviceTransferCoordinator } from "../transfer/fedos_device_transfer_coordinator.js";
-import type { AeadAlgorithm } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAlgorithm } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import {
   extractFedosDeviceTransferPackageFromWirePayload,
   isFedosDeviceRelaySyncWirePayloadExpired,

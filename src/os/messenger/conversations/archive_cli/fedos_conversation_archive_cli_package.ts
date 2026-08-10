@@ -27,7 +27,7 @@
  */
 
 import type { FedosConversationArchiveManifestV1 } from "../archive/fedos_conversation_archive_manifest.js";
-import type { AeadCiphertextWire } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadCiphertextWire } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 
 export const FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION = 1 as const;
 

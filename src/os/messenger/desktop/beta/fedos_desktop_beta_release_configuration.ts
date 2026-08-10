@@ -18,16 +18,20 @@
  * freeze in this environment.
  */
 
-// NOT migrated with the rest of this directory: fedos_desktop_beta_capability_manifest.ts
-// has an unrelated, uncommitted, in-progress edit from a different arc on this branch
-// (a Closed Pilot capability-status honesty revision) that predates this migration and
-// was deliberately left untouched at its original path rather than folded into this
-// commit -- see the Messenger migration Stage 6 commit message. Reconcile this import
-// once that other work lands.
+// Migrated by the Runtime Ownership Extraction Arc (Root Cause C) in this
+// isolated worktree, checked out clean from commit 77bd3b86. NOTE: at the
+// time this arc ran, the repo's primary worktree held a separate,
+// unrelated, uncommitted in-progress edit to
+// fedos_desktop_beta_capability_manifest.ts (a Closed Pilot
+// capability-status honesty revision) at its OLD path -- that edit predates
+// and is untouched by this move. Reconcile at merge time: this file's
+// content now lives at
+// src/os/messenger/desktop/beta/fedos_desktop_beta_capability_manifest.ts,
+// with a compatibility shim left at the old src/desktop/beta/ path.
 import {
   fedosDesktopBetaCapabilityManifestV1,
   type FedosDesktopBetaCapabilityManifestV1,
-} from "../../../../desktop/beta/fedos_desktop_beta_capability_manifest.js";
+} from "./fedos_desktop_beta_capability_manifest.js";
 
 export interface FedosDesktopBetaReleaseConfigurationV1 {
   readonly configVersion: 1;

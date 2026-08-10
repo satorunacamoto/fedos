@@ -46,7 +46,7 @@ import {
   isWellFormedSealedMasterSeedEnvelopeV1Json,
   type FedosSealedMasterSeedEnvelopeV1,
 } from "../../../core/vault/wasm/fedos_sealed_master_seed_envelope.js";
-import type { AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadKeyHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 
 function computeVerifier(saltHex: string, passphrase: Uint8Array): string {
   // One-way: sha256(saltBytes || passphraseBytes). Non-secret output; never reversible to the passphrase.

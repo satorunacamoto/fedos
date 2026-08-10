@@ -43,9 +43,9 @@
  *     this chain collapses to `{ outcome: "failed" }`.
  */
 
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
-import { decrypt as runtimeDecrypt } from "../../../../runtime/fedos_runtime_decrypt.js";
-import { importCiphertext as runtimeImportCiphertext } from "../../../../runtime/fedos_runtime_import_ciphertext.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
+import { decrypt as runtimeDecrypt } from "../../../core/vault/wasm/fedos_runtime_decrypt.js";
+import { importCiphertext as runtimeImportCiphertext } from "../../../core/vault/wasm/fedos_runtime_import_ciphertext.js";
 import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   encodeFedosConversationEnvelopeAssociatedData,

@@ -19,9 +19,9 @@ import explicitInitDocSource from "../docs/runtime_explicit_crypto_initializatio
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import explicitInitSource from "../src/runtime/fedos_explicit_crypto_initialization.ts?raw";
+import explicitInitSource from "../src/os/core/vault/wasm/fedos_explicit_crypto_initialization.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import devApprovalSource from "../src/runtime/fedos_dynamic_loader_dev_approval.ts?raw";
+import devApprovalSource from "../src/os/core/vault/wasm/fedos_dynamic_loader_dev_approval.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

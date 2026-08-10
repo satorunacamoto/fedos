@@ -16,7 +16,7 @@ import loaderDocSource from "../docs/runtime_wasm_loader.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import loaderSkeletonSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import loaderSkeletonSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

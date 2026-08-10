@@ -55,9 +55,9 @@
  *     injected boundary collapses to `{ outcome: "failed" }`.
  */
 
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
-import { encrypt as runtimeEncrypt } from "../../../../runtime/fedos_runtime_encrypt.js";
-import { exportCiphertext as runtimeExportCiphertext } from "../../../../runtime/fedos_runtime_export_ciphertext.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
+import { encrypt as runtimeEncrypt } from "../../../core/vault/wasm/fedos_runtime_encrypt.js";
+import { exportCiphertext as runtimeExportCiphertext } from "../../../core/vault/wasm/fedos_runtime_export_ciphertext.js";
 import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import { encodeFedosConversationEnvelopeAssociatedData } from "../envelope/fedos_conversation_envelope_associated_data.js";
 import type {

@@ -22,7 +22,7 @@ import dpapiBackendSource from "../src/runtime/fedos_runtime_storage_backend_win
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageResolverSource from "../src/runtime/fedos_runtime_storage_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import modeAuthoritySource from "../src/runtime/fedos_runtime_mode_authority.ts?raw";
+import modeAuthoritySource from "../src/os/core/vault/wasm/fedos_runtime_mode_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import platformAuthoritySource from "../src/runtime/fedos_runtime_platform_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -32,7 +32,7 @@ import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runt
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -259,7 +259,7 @@
  *     any `AppRuntime` field.
  */
 
-import { FedosRuntimeIdentity } from "../../../runtime/fedos_runtime_identity.js";
+import { FedosRuntimeIdentity } from "../../core/identity/fedos_runtime_identity.js";
 import { resolveNostrPublicIdentitySource } from "../../core/identity/fedos_nostr_public_identity_source_resolver.js";
 import type { FedosNostrPublicIdentitySnapshot } from "../../core/identity/fedos_nostr_public_identity_source.js";
 import type { FedosIdentityDescriptor } from "../../core/identity/fedos_identity_descriptor.js";

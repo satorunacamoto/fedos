@@ -19,9 +19,9 @@ import staticImportPlanDocSource from "../docs/runtime_wasm_static_import_plan.m
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import staticImportPlanSource from "../src/runtime/fedos_wasm_static_import_plan.ts?raw";
+import staticImportPlanSource from "../src/os/core/vault/wasm/fedos_wasm_static_import_plan.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import importPolicySource from "../src/runtime/fedos_wasm_loader_import_policy.ts?raw";
+import importPolicySource from "../src/os/core/vault/wasm/fedos_wasm_loader_import_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

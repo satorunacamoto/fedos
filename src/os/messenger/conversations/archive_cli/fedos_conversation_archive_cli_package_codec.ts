@@ -30,7 +30,7 @@ import type {
   FedosConversationArchiveCliPackageV1,
 } from "./fedos_conversation_archive_cli_package.js";
 import { FEDOS_CONVERSATION_ARCHIVE_CLI_PACKAGE_FORMAT_VERSION } from "./fedos_conversation_archive_cli_package.js";
-import type { AeadCiphertextWire } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadCiphertextWire } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 
 const PACKAGE_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set(["formatVersion", "manifest", "ciphertext"]);
 const MULTI_PACKAGE_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set(["formatVersion", "packages"]);

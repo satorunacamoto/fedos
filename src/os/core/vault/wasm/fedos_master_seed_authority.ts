@@ -22,7 +22,7 @@
  * `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md`.
  */
 import type { FedosSealedMasterSeedEnvelopeV1 } from "./fedos_sealed_master_seed_envelope.js";
-import type { AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadKeyHandle } from "./fedos_wasm_loader.js";
 
 export interface FedosMasterSeedAuthority {
   isAvailable(): Promise<boolean>;

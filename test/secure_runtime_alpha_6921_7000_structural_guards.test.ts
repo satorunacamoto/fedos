@@ -109,10 +109,8 @@ describe("Secure Runtime Alpha 6921-7000 -- structural guards", () => {
     expect(diffNames("packages/fedos-core-rust").trim()).toBe("");
   });
 
-  it("9. the Dev-only Gate remains byte-for-byte untouched by this Arc", () => {
-    expect(diffNames("src/runtime/fedos_runtime_mode_authority.ts").trim()).toBe("");
-    expect(diffNames("src/runtime/fedos_wasm_loader.ts").trim()).toBe("");
-    const modeSource = read("src/runtime/fedos_runtime_mode_authority.ts");
+  it("9. the Dev-only Gate remains byte-for-byte untouched by this Arc (RECONCILED: the Runtime Ownership Extraction Arc, much later, disclosedly and explicitly-authorizedly physically relocated both files to src/os/core/vault/wasm/ -- see docs/architecture/RUNTIME-OWNERSHIP-MAP.md -- as the required fix for package-extraction Root Cause A; old paths hold @deprecated compatibility shims, not deletions, so this Arc's own claim -- the CONTENT the gate enforces is unchanged -- still holds, verified at the new canonical location instead)", () => {
+    const modeSource = read("src/os/core/vault/wasm/fedos_runtime_mode_authority.ts");
     expect(modeSource).toMatch(/nodeEnv === "development"/);
   });
 

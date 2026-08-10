@@ -10,7 +10,7 @@
  * precedent.
  */
 
-import type { AeadCiphertextWire } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadCiphertextWire } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import {
   isWellFormedFedosDeviceSyncPackageManifestV1,
   type FedosDeviceSyncPackageManifestV1,

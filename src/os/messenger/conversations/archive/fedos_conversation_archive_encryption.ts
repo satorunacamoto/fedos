@@ -62,11 +62,11 @@
  *     Cloud, No Sync, No GUI).
  */
 
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
-import { encrypt as runtimeEncrypt } from "../../../../runtime/fedos_runtime_encrypt.js";
-import { decrypt as runtimeDecrypt } from "../../../../runtime/fedos_runtime_decrypt.js";
-import { exportCiphertext as runtimeExportCiphertext } from "../../../../runtime/fedos_runtime_export_ciphertext.js";
-import { importCiphertext as runtimeImportCiphertext } from "../../../../runtime/fedos_runtime_import_ciphertext.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
+import { encrypt as runtimeEncrypt } from "../../../core/vault/wasm/fedos_runtime_encrypt.js";
+import { decrypt as runtimeDecrypt } from "../../../core/vault/wasm/fedos_runtime_decrypt.js";
+import { exportCiphertext as runtimeExportCiphertext } from "../../../core/vault/wasm/fedos_runtime_export_ciphertext.js";
+import { importCiphertext as runtimeImportCiphertext } from "../../../core/vault/wasm/fedos_runtime_import_ciphertext.js";
 import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import type { FedosConversationEnvelopeEncryptionSuite } from "../envelope/fedos_conversation_message_envelope.js";
 import type { FedosConversationArchiveBundleV1 } from "./fedos_conversation_archive_bundle.js";

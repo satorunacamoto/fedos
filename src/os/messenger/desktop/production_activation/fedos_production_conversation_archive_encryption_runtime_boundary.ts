@@ -35,7 +35,7 @@
  * combined adapter over the identical accessor methods, never a second,
  * divergent handle source.
  */
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import type { FedosConversationArchiveEncryptionRuntimeBoundary } from "../../conversations/archive/fedos_conversation_archive_encryption.js";
 import type { FedosProductionConversationAeadHandleSource } from "./fedos_production_conversation_encryption_runtime_boundary.js";
 

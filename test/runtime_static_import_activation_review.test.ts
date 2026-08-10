@@ -20,9 +20,9 @@ import activationReviewDocSource from "../docs/runtime_static_import_activation_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationReviewSource from "../src/runtime/fedos_static_import_activation_review.ts?raw";
+import activationReviewSource from "../src/os/core/vault/wasm/fedos_static_import_activation_review.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import presenceSource from "../src/runtime/fedos_generated_artifact_presence.ts?raw";
+import presenceSource from "../src/os/core/vault/wasm/fedos_generated_artifact_presence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

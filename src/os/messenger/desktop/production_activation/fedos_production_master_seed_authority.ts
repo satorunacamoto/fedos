@@ -34,7 +34,7 @@
  * Wiring Arc, `8a33045e`).
  */
 
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import {
   toSealedMasterSeedEnvelopeV1,

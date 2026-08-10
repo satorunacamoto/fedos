@@ -28,7 +28,7 @@
  * `deserialize_aead_ciphertext` Rust exports every dev-only Runtime
  * Service call ultimately reaches too. No new cryptography.
  */
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import type { FedosConversationEncryptionRuntimeBoundary } from "../../conversations/encryption/fedos_wasm_conversation_encryption_authority.js";
 import type { FedosConversationDecryptionRuntimeBoundary } from "../../conversations/encryption/fedos_wasm_conversation_decryption_authority.js";
 

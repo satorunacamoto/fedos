@@ -20,9 +20,9 @@ import distributionPolicyDocSource from "../docs/runtime_generated_artifact_dist
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import distributionSource from "../src/runtime/fedos_generated_artifact_distribution.ts?raw";
+import distributionSource from "../src/os/core/vault/wasm/fedos_generated_artifact_distribution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationReviewSource from "../src/runtime/fedos_static_import_activation_review.ts?raw";
+import activationReviewSource from "../src/os/core/vault/wasm/fedos_static_import_activation_review.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoGitignoreSource from "../packages/fedos-core-rust/.gitignore?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

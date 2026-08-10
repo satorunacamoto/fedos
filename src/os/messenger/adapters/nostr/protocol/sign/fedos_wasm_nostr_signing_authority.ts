@@ -24,8 +24,8 @@
 import type {
   FedosWasmLoaderNostrPublicIdentityExecution,
   FedosWasmLoaderNostrSignEventExecution,
-} from "../../../../../../runtime/fedos_wasm_loader.js";
-import { FedosWasmLoaderSkeleton } from "../../../../../../runtime/fedos_wasm_loader.js";
+} from "../../../../../core/vault/wasm/fedos_wasm_loader.js";
+import { FedosWasmLoaderSkeleton } from "../../../../../core/vault/wasm/fedos_wasm_loader.js";
 import { FedosWasmMasterSeedAuthority } from "../../../../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import type { NostrEvent } from "../types.js";
 import {

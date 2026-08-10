@@ -18,9 +18,9 @@ import readinessDocSource from "../docs/runtime_wasm_static_import_readiness.md?
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readinessSource from "../src/runtime/fedos_wasm_static_import_readiness.ts?raw";
+import readinessSource from "../src/os/core/vault/wasm/fedos_wasm_static_import_readiness.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import reviewSource from "../src/runtime/fedos_wasm_static_import_review.ts?raw";
+import reviewSource from "../src/os/core/vault/wasm/fedos_wasm_static_import_review.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -10,7 +10,7 @@ import alpha113DocSource from "../docs/secure_runtime_alpha_113_identity_flow_re
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import alpha114DocSource from "../docs/secure_runtime_alpha_114_single_source_of_truth_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

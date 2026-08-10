@@ -13,8 +13,8 @@
  * STATUS: inert scaffolding, not reachable from the shipped Electron app.
  */
 
-import { canPost } from "../../_legacy_prototype/community/policy.js";
-import type { Space } from "../../_legacy_prototype/community/types.js";
+import { canPost } from "./space_policy.js";
+import type { Space } from "./space_types.js";
 import { canEditProduct } from "./policy.js";
 import type {
   AccessDecision,

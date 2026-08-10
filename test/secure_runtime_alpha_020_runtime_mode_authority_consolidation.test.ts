@@ -16,9 +16,9 @@ import designDocSource from "../docs/secure_runtime_alpha_020_runtime_mode_autho
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import triggerReviewDocSource from "../docs/secure_runtime_alpha_006_mode_authority_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import modeAuthoritySource from "../src/runtime/fedos_runtime_mode_authority.ts?raw";
+import modeAuthoritySource from "../src/os/core/vault/wasm/fedos_runtime_mode_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

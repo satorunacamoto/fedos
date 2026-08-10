@@ -12,7 +12,7 @@
  * STATUS: inert scaffolding, not reachable from the shipped Electron app.
  */
 
-import type { AssetMetadata } from "../../_legacy_prototype/asset/types.js";
+import type { AssetMetadata } from "./asset_cache_types.js";
 import { canViewProduct } from "./policy.js";
 import type { Product, PurchaseGrant } from "./types.js";
 

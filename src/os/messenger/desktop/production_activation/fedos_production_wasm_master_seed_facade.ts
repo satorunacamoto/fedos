@@ -17,7 +17,7 @@
  * not widen every caller.
  */
 
-import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAadDomain, AeadAlgorithm, AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle, FedosMasterSeedAuthorityHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 
 /**
  * Secure Runtime Alpha 7161-7240 — deliberately duplicated (not

@@ -19,16 +19,23 @@
  * — it has no desktop/Electron/OS-notification-tray concept anywhere in it,
  * and nothing under `src/desktop/` may depend on it structurally. This file
  * intentionally mirrors its ONE proven safety idea — "coarse, non-sensitive
- * signal only, never real content" — and reuses its pure
- * `isSensitiveNotificationField` policy helper (`../../../notification/policy.js`)
- * for `detail` validation, rather than reinventing that check. It does NOT
- * reuse `NotificationChannel`/`NotificationPayload`/`NotificationBridge`
- * (those model EXTERNAL channels this Arc never touches) and does NOT
- * import `src/notification/bridge.ts` or `types.ts`. The two boundaries
- * remain independent: this one is OS-level desktop notification tray
- * output (Electron `Notification`, Phase E); that one is a future external
- * push bridge. A future Arc MAY choose to fan this boundary's own events
- * out to that one — this Arc does not, and names no such wiring.
+ * signal only, never real content" — via a LOCAL, independently-owned copy
+ * of its pure `isSensitiveNotificationField` helper
+ * (`./fedos_desktop_notification_field_sensitivity.js`, forked from
+ * `src/notification/policy.ts` by the Runtime Ownership Extraction Arc,
+ * Root Cause C — see `docs/architecture/PACKAGE-EXTRACTION-PLAN.md` — since
+ * a live cross-root import into a bare, non-package `src/notification/`
+ * directory was a genuine package-extraction blocker, and this file's own
+ * "DELIBERATELY UNRELATED, never merged" framing already argued against
+ * sharing one implementation between two boundaries this file itself calls
+ * independent). It does NOT reuse `NotificationChannel`/`NotificationPayload`/
+ * `NotificationBridge` (those model EXTERNAL channels this Arc never
+ * touches) and does NOT import `src/notification/bridge.ts` or `types.ts`.
+ * The two boundaries remain independent: this one is OS-level desktop
+ * notification tray output (Electron `Notification`, Phase E); that one is
+ * a future external push bridge. A future Arc MAY choose to fan this
+ * boundary's own events out to that one — this Arc does not, and names no
+ * such wiring.
  *
  * HARD GUARDRAILS (Phase B "Fail Closed"):
  *   - `validateFedosDesktopNotificationRequest` fails closed to `null` for
@@ -40,8 +47,7 @@
  *     by a caller.
  */
 
-// eslint-disable-next-line no-restricted-imports -- deliberate, narrow reuse of one PURE policy helper; see this file's own header, "RELATIONSHIP TO src/notification/".
-import { isSensitiveNotificationField } from "../../../notification/policy.js";
+import { isSensitiveNotificationField } from "./fedos_desktop_notification_field_sensitivity.js";
 
 export type FedosDesktopNotificationKind =
   | "conversation-message"

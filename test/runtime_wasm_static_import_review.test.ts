@@ -23,9 +23,9 @@ import safetyReviewDocSource from "../docs/runtime_wasm_static_import_safety_rev
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import reviewSource from "../src/runtime/fedos_wasm_static_import_review.ts?raw";
+import reviewSource from "../src/os/core/vault/wasm/fedos_wasm_static_import_review.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import staticImportPlanSource from "../src/runtime/fedos_wasm_static_import_plan.ts?raw";
+import staticImportPlanSource from "../src/os/core/vault/wasm/fedos_wasm_static_import_plan.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoGitignoreSource from "../packages/fedos-core-rust/.gitignore?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

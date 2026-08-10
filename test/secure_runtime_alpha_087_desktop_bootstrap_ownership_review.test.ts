@@ -4,7 +4,7 @@ import designDocSource from "../docs/secure_runtime_alpha_087_desktop_bootstrap_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import alpha086DocSource from "../docs/secure_runtime_alpha_086_desktop_integration_boundary_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

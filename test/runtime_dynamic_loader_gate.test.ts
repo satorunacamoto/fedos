@@ -18,9 +18,9 @@ import gateDocSource from "../docs/runtime_dynamic_loader_gate.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import gateSource from "../src/runtime/fedos_dynamic_loader_gate.ts?raw";
+import gateSource from "../src/os/core/vault/wasm/fedos_dynamic_loader_gate.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import loaderStrategySource from "../src/runtime/fedos_build_time_loader_strategy.ts?raw";
+import loaderStrategySource from "../src/os/core/vault/wasm/fedos_build_time_loader_strategy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

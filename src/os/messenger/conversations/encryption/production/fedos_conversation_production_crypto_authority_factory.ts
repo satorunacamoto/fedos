@@ -42,7 +42,7 @@
  * provider message, never a stack trace.
  */
 
-import { FedosWasmLoaderSkeleton } from "../../../../../runtime/fedos_wasm_loader.js";
+import { FedosWasmLoaderSkeleton } from "../../../../core/vault/wasm/fedos_wasm_loader.js";
 import { FedosWasmMasterSeedAuthority } from "../../../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import type { FedosMasterSeedAuthority } from "../../../../core/vault/wasm/fedos_master_seed_authority.js";
 import type { FedosSealedMasterSeedEnvelopePersistence } from "../../../../core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";

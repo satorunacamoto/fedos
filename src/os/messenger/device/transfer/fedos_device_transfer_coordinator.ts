@@ -38,7 +38,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import type { FedosDeviceBindingAccountRef } from "../fedos_device_binding.js";
 import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import type { FedosDeviceSigningKeypair } from "../crypto/fedos_device_signing_keypair.js";
-import type { AeadAlgorithm } from "../../../../runtime/fedos_wasm_loader.js";
+import type { AeadAlgorithm } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import type { FedosDeviceSyncSessionV1 } from "../sync_session/fedos_device_sync_session.js";
 import type { FedosDeviceSyncPackageEncryptionAuthority } from "../sync_package/fedos_device_sync_package_encryption.js";
 import {

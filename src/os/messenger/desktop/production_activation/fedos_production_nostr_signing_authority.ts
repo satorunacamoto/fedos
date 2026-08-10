@@ -30,7 +30,7 @@
  * secret byte, and never signs in TypeScript.
  */
 
-import type { FedosMasterSeedAuthorityHandle } from "../../../../runtime/fedos_wasm_loader.js";
+import type { FedosMasterSeedAuthorityHandle } from "../../../core/vault/wasm/fedos_wasm_loader.js";
 import type { FedosNostrWireEvent } from "../fedos_nostr_wire_event.js";
 import {
   freezeFedosNostrUnsignedEventRequest,
