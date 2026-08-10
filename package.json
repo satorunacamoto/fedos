@@ -41,10 +41,10 @@
     "trust:issuer": "tsc -p tsconfig.trust-issuer.json && node scripts/fedos_trust_issuer_cli.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.0.0",
+    "@cloudflare/workers-types": "^5.20260804.1",
     "@types/qrcode": "^1.5.6",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",
