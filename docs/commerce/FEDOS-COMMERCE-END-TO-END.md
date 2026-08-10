@@ -5,15 +5,35 @@
 
 ---
 
-## The one-sentence answer
+## Phase 1 update (post-audit, additive — does not rewrite the audit below)
 
-**Today, nothing happens — FedOS Desktop is a 1:1 end-to-end-encrypted messenger (Nostr NIP-17 + Double Ratchet) with no reachable commerce capability at all; a well-typed, well-tested Commerce domain and a separate, real Trust capability both exist in the source tree, but neither is wired into the shipping application.**
+**Commerce Reachable Catalog + Product Surface Phase 1 has landed.** The narrative below (§1–§11) is the original audit, pinned to commit `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`, and is left intact as a faithful historical snapshot. What has actually changed since:
+
+```
+ACTUAL CUSTOMER FLOW:   PARTIAL       (was: ABSENT)
+CUSTOMER PRODUCT UI:    IMPLEMENTED   (was: ABSENT)
+PRODUCT IMAGES:         YES — minimal image support   (was: ABSENT)
+ACTUAL ORDER FLOW:      ABSENT        (unchanged)
+ACTUAL PAYMENT FLOW:    ABSENT        (unchanged)
+QR COMMERCE:            NOT WIRED     (unchanged)
+TRUST COMMERCE:         NOT WIRED     (unchanged)
+```
+
+A customer can now: open FedOS Desktop → click **Commerce** in the nav (next to Conversations) → see a real 3-product demo catalog (title, price, merchant, safe thumbnail/fallback) → open a product → see full Product Detail (description, price, merchant, media or safe fallback, an explicit **"Ordering not available yet"** notice — never a fake working Buy button) → return to Commerce or to Conversations. This is real, IPC-backed, exercised against the actual `os/commerce` domain's `listViewableProducts()` — not a mock. See `docs/architecture/COMMERCE-E2E-SWIMLANE.md`'s "Phase 1 update" section for the sequence diagram, and `docs/commerce/evidence/` for screenshots of the real packaged app.
+
+**Still true, unchanged by this arc:** no Order type exists, no payment rail is wired, `PlaceholderPaymentProvider.ingestCallback()` remains unreachable (now with an explicit regression test proving it), Commerce↔Trust wiring is still zero, and QR still has no commerce meaning. §1 below ("no product to discover") now describes the *pre-Phase-1* state only — see the Phase 1 update above for the current customer view.
 
 ---
 
-## 1. Customer view
+## The one-sentence answer
 
-A customer opens FedOS Desktop and sees exactly six things: Conversations, Search, Archive, Devices, Safety Center, Settings. There is no product to discover, nothing to buy, no order to place, no payment to make, and nothing to receive. This isn't a partially-built flow with a broken step in the middle — there is no first step. See [CUSTOMER-COMMERCE-FLOW.md](../architecture/CUSTOMER-COMMERCE-FLOW.md).
+**As of the original audit, nothing happened — FedOS Desktop was a 1:1 end-to-end-encrypted messenger (Nostr NIP-17 + Double Ratchet) with no reachable commerce capability at all; a well-typed, well-tested Commerce domain and a separate, real Trust capability both existed in the source tree, but neither was wired into the shipping application. Phase 1 (above) has since made read-only product discovery real — everything else in this sentence remains true.**
+
+---
+
+## 1. Customer view (as of the original audit — see "Phase 1 update" above for the current state)
+
+A customer opened FedOS Desktop and saw exactly six things: Conversations, Search, Archive, Devices, Safety Center, Settings. There was no product to discover, nothing to buy, no order to place, no payment to make, and nothing to receive. This wasn't a partially-built flow with a broken step in the middle — there was no first step. See [CUSTOMER-COMMERCE-FLOW.md](../architecture/CUSTOMER-COMMERCE-FLOW.md).
 
 ## 2. Merchant view
 
@@ -109,7 +129,9 @@ This is a design note for a future arc, not a plan already underway.
 
 ## Recommended Next Implementation Arc (one, bounded)
 
-**"Commerce Composition Root Wiring, Phase 1: reachable read-only catalog."** Scope: wire `createCommerce()` into `loadRootModules()`, add exactly one new IPC channel family (`fedos-commerce:*`) exposing `listViewableProducts()` read-only, and add exactly one new UI screen (product list + detail, no buy button yet). Deliberately excludes Order, Payment, Trust wiring, and media — those are separate, larger, and riskier arcs that depend on this one landing safely first (per [COMMERCE-GAP-CLASSIFICATION.md](COMMERCE-GAP-CLASSIFICATION.md), gaps #1–#2 are the narrowest, lowest-risk P0s, and everything else depends on them). This keeps the first arc's blast radius small: no money, no signatures, no new external dependency — just making the already-real, already-tested catalog *visible* for the first time.
+**DONE** — "Commerce Composition Root Wiring, Phase 1: reachable read-only catalog" (as scoped below) landed via the Commerce Reachable Catalog + Product Surface Phase 1 arc; see the "Phase 1 update" section at the top of this document. Original scope statement, preserved for the record: wire `createCommerce()` into `loadRootModules()`, add exactly one new IPC channel family (`fedos-app:commerce-*`) exposing `listViewableProducts()` read-only, and add exactly one new UI screen (product list + detail, no buy button yet). Deliberately excluded Order, Payment, Trust wiring, and media beyond a minimal image slice — those remain separate, larger, riskier follow-on arcs (per [COMMERCE-GAP-CLASSIFICATION.md](COMMERCE-GAP-CLASSIFICATION.md) and `docs/commerce/COMMERCE-IMPLEMENTATION-ROADMAP.md`'s recommended build order).
+
+**Next recommended arc:** Merchant Product Creation / Editing (see `docs/commerce/COMMERCE-IMPLEMENTATION-ROADMAP.md` step 2) — still local-only, no network requirement.
 
 ---
 

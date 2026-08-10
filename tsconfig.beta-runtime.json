@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src"
   },
   "include": [
     "src/os/messenger/desktop/beta/fedos_desktop_beta_application_assembly.ts",
@@ -33,6 +34,10 @@
     "src/os/messenger/desktop/settings/fedos_desktop_settings_application_ports.ts",
     "src/os/messenger/desktop/settings/fedos_desktop_settings_application_host_bridge.ts",
     "src/os/messenger/desktop/websocket_relay.ts",
-    "src/os/messenger/desktop/node_websocket_relay_socket_factory.ts"
+    "src/os/messenger/desktop/node_websocket_relay_socket_factory.ts",
+    "src/os/commerce/index.ts",
+    "src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.ts",
+    "src/desktop/beta/fedos_desktop_beta_capability_manifest.ts",
+    "src/device/sync_events/fedos_device_sync_event_bridge.ts"
   ]
 }

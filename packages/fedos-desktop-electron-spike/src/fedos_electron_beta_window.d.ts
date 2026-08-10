@@ -107,6 +107,46 @@ interface FedosAppCommandResult {
   readonly [key: string]: unknown;
 }
 
+/** Commerce Reachable Catalog + Product Surface Phase 1 — one catalog row. */
+interface FedosCommerceCatalogListItem {
+  readonly id: string;
+  readonly title: string;
+  readonly priceCents: number;
+  readonly currency: string;
+  readonly merchantLabel: string;
+  readonly status: string;
+  readonly hasImage: boolean;
+}
+
+interface FedosCommerceCatalogListResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly products?: readonly FedosCommerceCatalogListItem[];
+}
+
+interface FedosCommerceProductMedia {
+  readonly dataUri: string;
+  readonly mimeType: string;
+  readonly altText: string;
+}
+
+interface FedosCommerceProductDetail {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly priceCents: number;
+  readonly currency: string;
+  readonly merchantLabel: string;
+  readonly status: string;
+  readonly media: FedosCommerceProductMedia | null;
+}
+
+interface FedosCommerceProductDetailResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly product?: FedosCommerceProductDetail;
+}
+
 interface FedosAppBridge {
   readonly conversationsList: () => Promise<FedosAppCommandResult>;
   readonly conversationOpen: (conversationId: string) => Promise<FedosAppCommandResult>;
@@ -146,6 +186,9 @@ interface FedosAppBridge {
   readonly safetyCenterOverview: () => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
   readonly relayStatus: () => Promise<FedosAppCommandResult>;
+  /** Commerce Reachable Catalog + Product Surface Phase 1 — read-only. */
+  readonly commerceCatalogList: () => Promise<FedosCommerceCatalogListResult>;
+  readonly commerceProductDetail: (productId: string) => Promise<FedosCommerceProductDetailResult>;
 }
 
 interface Window {

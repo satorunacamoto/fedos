@@ -2,6 +2,22 @@
 
 **Audited commit:** `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`.
 
+## Phase 1 update (post-audit, additive)
+
+The Commerce Reachable Catalog + Product Surface Phase 1 arc has since shipped a real, reachable Catalog + Product Detail screen and a minimal image slice. This changes §6 and the "CURRENT vs MINIMUM" table's Title/description/price/Merchant/Primary image rows below — those sections are left unmodified as the original audited snapshot; the current facts are:
+
+```
+CUSTOMER PRODUCT UI:   IMPLEMENTED   (was: ABSENT)
+PRODUCT IMAGES:        YES — minimal image support (image only; video/sample still ABSENT)
+```
+
+- The shipping renderer now has **seven** screens (Conversations, **Commerce**, Search, Archive, Devices, Safety Center, Settings), not six.
+- Product Detail renders: title, description, price, merchant (resolved to a display label, not a raw pubkey), status, and media (a real image or a safe initials fallback) — see the updated §6 table below.
+- Media is **not** a new field on the canonical `Product`/`AssetMetadata` domain types (§1/§2 below remain accurate and unchanged) — it is assembled at the Electron composition-root layer from a small, package-local demo dataset (`fedos_electron_beta_commerce_demo_catalog.ts`), deliberately keeping `src/os/commerce/**` untouched. A future arc may promote this into the domain layer proper (see `docs/architecture/COMMERCE-MEDIA-STORAGE.md`'s `ProductMedia` design).
+- Buy action, Order, Payment, Delivery/QR/credential rows in the "MINIMUM Useful" table remain exactly ABSENT — Phase 1 is deliberately read-only discovery only.
+
+---
+
 ## 1. Product/Catalog type — full field inventory
 
 Canonical definition: `src/os/commerce/catalog/types.ts:33-52`.
@@ -92,21 +108,23 @@ Self-described (lines 1-13) as *"fixed sample products + grants + asset metadata
 
 ## 6. Product page reality — inventory of what's rendered
 
+**As of the original audit (superseded for the rows marked below — see "Phase 1 update" at the top of this document):**
+
 | Field | Present in shipping UI? |
 |---|---|
-| Title | ABSENT — no product detail screen exists at all |
-| Price | ABSENT |
-| Merchant | ABSENT |
-| Description | ABSENT |
-| Images | ABSENT |
-| Video | ABSENT |
-| Inventory | ABSENT (also absent from the `Product` type itself) |
-| Terms | ABSENT (also absent from the `Product` type itself) |
-| Buy button | ABSENT |
-| QR | ABSENT (QR exists only in `os/trust/qr/`, unrelated to any product page) |
-| Order state | ABSENT (no Order concept exists) |
+| Title | ~~ABSENT~~ **IMPLEMENTED** (Phase 1) |
+| Price | ~~ABSENT~~ **IMPLEMENTED** (Phase 1) |
+| Merchant | ~~ABSENT~~ **IMPLEMENTED** (Phase 1 — resolved display label) |
+| Description | ~~ABSENT~~ **IMPLEMENTED** (Phase 1) |
+| Images | ~~ABSENT~~ **YES — minimal image support** (Phase 1; image only, with a safe fallback when absent) |
+| Video | ABSENT (unchanged — explicitly out of Phase 1 scope) |
+| Inventory | ABSENT (also absent from the `Product` type itself; unchanged) |
+| Terms | ABSENT (also absent from the `Product` type itself; unchanged) |
+| Buy button | ABSENT (unchanged, deliberately — Phase 1 shows an explicit "Ordering not available yet" notice, never a fake working button) |
+| QR | ABSENT (unchanged; QR exists only in `os/trust/qr/`, unrelated to any product page) |
+| Order state | ABSENT (unchanged; no Order concept exists) |
 
-The shipping renderer (`packages/fedos-desktop-electron-spike/src/fedos_electron_beta_page.html`) has six screens total — Conversations, Search, Archive, Devices, Safety Center, Settings — none commerce-related (Agent U, full enumeration).
+The shipping renderer (`packages/fedos-desktop-electron-spike/src/fedos_electron_beta_page.html`) originally had six screens total — Conversations, Search, Archive, Devices, Safety Center, Settings, none commerce-related. **It now has seven**: Commerce (Catalog + Product Detail) was added by Phase 1, reachable from the same nav bar as Conversations.
 
 A dead, non-Electron render function exists at `src/os/_legacy_prototype/render/product.ts` — a pure server-side HTML-string builder for a defunct Cloudflare Workers prototype, with no deploy path (`_legacy_prototype/README.md`: no wrangler config, no CI job builds it). It explicitly documents itself as having "NO destination link, NO buy/checkout/payment affordance, and NO download."
 

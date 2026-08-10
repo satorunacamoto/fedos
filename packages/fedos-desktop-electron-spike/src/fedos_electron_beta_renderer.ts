@@ -34,6 +34,8 @@ type ScreenName =
 type AppScreenName =
   | "conversations"
   | "chat"
+  | "commerce"
+  | "commerce-detail"
   | "search"
   | "archive"
   | "devices"
@@ -211,6 +213,8 @@ function showAppScreen(name: AppScreenName): void {
   const navMap: Partial<Record<AppScreenName, string>> = {
     conversations: "nav-conversations",
     chat: "nav-conversations",
+    commerce: "nav-commerce",
+    "commerce-detail": "nav-commerce",
     search: "nav-search",
     archive: "nav-archive",
     devices: "nav-devices",
@@ -480,6 +484,148 @@ async function onChatSend(): Promise<void> {
   } finally {
     setBusy(false, "chat-send");
   }
+}
+
+// ---------------------------------------------------------------------
+// Commerce Reachable Catalog + Product Surface Phase 1.
+//
+// Read-only. No ordering/payment/delivery/Trust/QR wiring — see the
+// disabled "Ordering not available yet" pill in the HTML, never a fake
+// working Buy button.
+//
+// Media safety: this renderer treats every `dataUri` it receives from
+// `window.fedosApp.commerceCatalogList()`/`commerceProductDetail()` as
+// UNTRUSTED, exactly like any other IPC response. Rendering never uses
+// `innerHTML`, never navigates the renderer, and the ONE allowed image
+// mechanism (`isSafeCommerceImageDataUri`) accepts only an exact
+// `data:image/png;base64,` prefix — no `javascript:`, no `file://`, no
+// `data:image/svg+xml` (SVG-as-image script-execution ambiguity, never
+// risked), no `https:`/remote scheme of any kind. A rejected or failing
+// image always falls back to the same safe initials placeholder used for
+// products with no media at all — a broken/malicious image can never
+// crash or blank either screen.
+// ---------------------------------------------------------------------
+
+let commerceCatalogCache: readonly FedosCommerceCatalogListItem[] = [];
+
+/** The ONLY scheme this renderer will ever hand to an `<img src>` — see this section's own header. */
+function isSafeCommerceImageDataUri(value: string): boolean {
+  return value.startsWith("data:image/png;base64,") && value.length > "data:image/png;base64,".length;
+}
+
+function commerceProductInitials(title: string): string {
+  const words = title.trim().split(/\s+/).filter((w) => w.length > 0);
+  const letters = words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "");
+  return letters.join("") || "?";
+}
+
+/** Builds either a safe `<img>` (validated data: URI, with an onerror fallback) or the initials placeholder — used by both the catalog list and product detail. */
+function buildCommerceMediaElement(
+  media: { readonly dataUri: string; readonly altText: string } | null,
+  title: string,
+  imgClass: string,
+  fallbackClass: string,
+): HTMLElement {
+  if (media !== null && isSafeCommerceImageDataUri(media.dataUri)) {
+    const img = document.createElement("img");
+    img.className = imgClass;
+    img.src = media.dataUri;
+    img.alt = media.altText;
+    img.addEventListener("error", () => {
+      const fallback = document.createElement("div");
+      fallback.className = fallbackClass;
+      fallback.textContent = commerceProductInitials(title);
+      img.replaceWith(fallback);
+    });
+    return img;
+  }
+  const fallback = document.createElement("div");
+  fallback.className = fallbackClass;
+  fallback.textContent = commerceProductInitials(title);
+  return fallback;
+}
+
+function formatCommercePrice(priceCents: number, currency: string): string {
+  return `${(priceCents / 100).toFixed(2)} ${currency}`;
+}
+
+function renderCommerceCatalogList(): void {
+  const list = byId("commerce-catalog-list");
+  list.textContent = "";
+  if (commerceCatalogCache.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No products available.";
+    list.appendChild(li);
+    return;
+  }
+  for (const product of commerceCatalogCache) {
+    const li = document.createElement("li");
+    // Catalog rows never carry the real media dataUri (only `hasImage`) —
+    // the list view intentionally shows the safe fallback for every row;
+    // the real image loads only on Product Detail, keeping the catalog
+    // response small and avoiding rendering N untrusted images at once.
+    li.appendChild(buildCommerceMediaElement(null, product.title, "commerce-thumb", "commerce-thumb-fallback"));
+    const title = document.createElement("div");
+    title.textContent = product.title;
+    li.appendChild(title);
+    const price = document.createElement("div");
+    price.className = "commerce-price";
+    price.textContent = formatCommercePrice(product.priceCents, product.currency);
+    li.appendChild(price);
+    const merchant = document.createElement("div");
+    merchant.className = "muted field";
+    merchant.textContent = product.merchantLabel;
+    li.appendChild(merchant);
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.textContent = "View";
+    openBtn.setAttribute("aria-label", `View ${product.title}`);
+    openBtn.addEventListener("click", () => void openCommerceProduct(product.id));
+    li.appendChild(openBtn);
+    list.appendChild(li);
+  }
+}
+
+async function refreshCommerceCatalogList(): Promise<void> {
+  clearError("commerce-error");
+  const result = await window.fedosApp.commerceCatalogList();
+  if (result.outcome !== "ok") {
+    showError("commerce-error", result);
+    commerceCatalogCache = [];
+    renderCommerceCatalogList();
+    return;
+  }
+  commerceCatalogCache = result.products ?? [];
+  renderCommerceCatalogList();
+}
+
+async function openCommerceProduct(productId: string): Promise<void> {
+  showAppScreen("commerce-detail");
+  clearError("commerce-detail-error");
+  byId("commerce-detail-title").textContent = "Loading…";
+  byId("commerce-detail-media-area").textContent = "";
+  byId("commerce-detail-price").textContent = "";
+  byId("commerce-detail-merchant").textContent = "";
+  byId("commerce-detail-status").textContent = "";
+  byId("commerce-detail-description").textContent = "";
+  const result = await window.fedosApp.commerceProductDetail(productId);
+  if (result.outcome !== "ok" || result.product === undefined) {
+    byId("commerce-detail-title").textContent = "Product";
+    showError("commerce-detail-error", result);
+    return;
+  }
+  renderCommerceProductDetail(result.product);
+}
+
+function renderCommerceProductDetail(product: FedosCommerceProductDetail): void {
+  byId("commerce-detail-title").textContent = product.title;
+  const mediaArea = byId("commerce-detail-media-area");
+  mediaArea.textContent = "";
+  mediaArea.appendChild(buildCommerceMediaElement(product.media, product.title, "commerce-detail-media", "commerce-detail-media-fallback"));
+  byId("commerce-detail-price").textContent = formatCommercePrice(product.priceCents, product.currency);
+  byId("commerce-detail-merchant").textContent = `Sold by ${product.merchantLabel}`;
+  byId("commerce-detail-status").textContent = `Status: ${product.status}`;
+  byId("commerce-detail-description").textContent = product.description;
 }
 
 // ---------------------------------------------------------------------
@@ -1752,6 +1898,10 @@ byId<HTMLButtonElement>("nav-conversations").addEventListener("click", () => {
   showAppScreen("conversations");
   void refreshConversationsList();
 });
+byId<HTMLButtonElement>("nav-commerce").addEventListener("click", () => {
+  showAppScreen("commerce");
+  void refreshCommerceCatalogList();
+});
 byId<HTMLButtonElement>("nav-search").addEventListener("click", () => showAppScreen("search"));
 byId<HTMLButtonElement>("nav-archive").addEventListener("click", () => {
   showAppScreen("archive");
@@ -1784,6 +1934,12 @@ byId<HTMLButtonElement>("chat-back").addEventListener("click", () => {
   void refreshConversationsList();
 });
 byId<HTMLButtonElement>("chat-send").addEventListener("click", () => void onChatSend());
+
+// Commerce.
+byId<HTMLButtonElement>("commerce-detail-back").addEventListener("click", () => {
+  showAppScreen("commerce");
+  void refreshCommerceCatalogList();
+});
 
 // Search.
 byId<HTMLButtonElement>("search-submit").addEventListener("click", () => void onSearchSubmit());

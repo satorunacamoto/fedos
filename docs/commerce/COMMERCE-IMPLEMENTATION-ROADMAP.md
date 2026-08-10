@@ -25,7 +25,7 @@ The E2E audit (`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`) and swimlane (`docs
 
 Unchanged from, and consistent with, the E2E audit's own recommendation (`FEDOS-COMMERCE-END-TO-END.md`, "Recommended Next Implementation Arc") plus this arc's additions layered on top:
 
-1. **Commerce Reachable Catalog + Product Surface Phase 1** (read-only catalog + product detail, `local` network profile only, zero Nostr/IPFS/Tor) — the audit's own recommended next arc; see `docs/commerce/COMMERCE-GAP-CLASSIFICATION.md` gaps #1–#2 as the narrowest, lowest-risk P0s. **This is the very next arc, executed immediately after this design arc.**
+1. **Commerce Reachable Catalog + Product Surface Phase 1** (read-only catalog + product detail, `local` network profile only, zero Nostr/IPFS/Tor) — the audit's own recommended next arc; closed `docs/commerce/COMMERCE-GAP-CLASSIFICATION.md` gaps #1–#2 (P0). **DONE — landed immediately after this design arc.** See `docs/architecture/COMMERCE-E2E-SWIMLANE.md`'s "Phase 1 update" and `docs/commerce/evidence/` for the real packaged-app verification.
 2. **Merchant listing UI** (create/manage products, still `local` profile) — depends on #1's catalog rendering path existing.
 3. **Minimal media (image only, `LocalMediaStore` adapter only, no IPFS yet)** — depends on #1's catalog rendering path; can land alongside or shortly after #1.
 4. **Order type + lifecycle** (still no network requirement) — depends on #1/#2.
