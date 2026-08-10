@@ -14,6 +14,7 @@
     "typecheck:electron": "npm run typecheck --prefix packages/fedos-desktop-electron-spike",
     "typecheck": "npm run typecheck:core && npm run typecheck:electron",
     "test": "vitest run",
+    "test:current": "vitest run --config vitest.current.config.ts",
     "test:watch": "vitest",
     "build:wasm": "cargo build --manifest-path packages/fedos-core-rust/Cargo.toml --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir packages/fedos-core-rust/pkg packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
     "build:wasm:manifest": "node scripts/generate_wasm_artifact_manifest.mjs",

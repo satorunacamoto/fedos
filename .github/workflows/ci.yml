@@ -1,0 +1,74 @@
+name: CI
+
+# Minimum green gates for the public OSS repo. Everything here must be
+# runnable with zero network credentials, zero external network access, and
+# no private keys/accounts (no Official private issuer key, no Telegram/
+# BTCPay real accounts). See docs/release/TEST-SURFACES.md for what
+# "test:current" covers and why typecheck is intentionally not gated here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to keep the free/OSS Actions
+# minutes budget sane.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-current:
+    name: Current supported test surface (architecture + trust + current)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Covers, in one green gate:
+      #   - test/architecture_*.test.ts (structural boundaries + the
+      #     Tarjan-SCC cycle detector)
+      #   - test/trust_*.test.ts (the Trust capability's own suite)
+      #   - the rest of the current-supported os/commerce + os/messenger +
+      #     os/core adjacent surface
+      # See docs/release/TEST-SURFACES.md for the full selection rationale
+      # and the exact file/test counts (132 files / 1902 tests, confirmed
+      # green at the time this workflow was authored).
+      - name: Run current supported test surface
+        run: npm run test:current
+
+  release-surface-verify:
+    name: OSS release surface verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Verifies the public OSS release surface (license headers, no
+      # private-key material, no non-OSS-safe references, etc.). See
+      # scripts/release/verify_oss_release.mjs.
+      - name: Verify OSS release surface
+        run: node scripts/release/verify_oss_release.mjs
+
+# Intentionally NOT gated in this workflow: `npm run typecheck` /
+# `npm run typecheck:core`. As of this workflow being authored,
+# typecheck:core has pre-existing errors (841, unrelated to this arc's
+# scope) and this repo has no existing "no new errors vs. a committed
+# baseline" tracking mechanism. Gating on "zero errors" would make CI
+# permanently red for reasons no single PR caused, and inventing a
+# baseline-tracking script under time pressure would be dishonest scaffolding
+# rather than a real gate. See docs/release/TEST-SURFACES.md. A future arc
+# that wants a typecheck gate should build the baseline mechanism
+# deliberately, not retrofit it here.

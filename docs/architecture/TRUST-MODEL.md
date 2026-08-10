@@ -248,6 +248,44 @@ change, not a network dependency. This preserves the offline-verifiable
 property described in the sections above: verification never requires
 contacting anything, before or after a compromise event.
 
+## Official issuer key boundary: what is public, what is private
+
+Stated plainly and as two labeled lists, because "FedOS Official" is the
+one issuer this arc ships a named constant for, and precision here
+prevents an operational mistake no amount of code review can undo once a
+private key has touched the wrong disk.
+
+**PUBLIC** — safe to commit to this repository, publish on a website,
+print in documentation, or hand to any verifier:
+
+- The FedOS Official issuer identifier (`FEDOS_OFFICIAL_ISSUER_ID`,
+  `"fedos-official"`, in `src/os/trust/policy/fedos_trust_official_issuer_profile.ts`).
+- FedOS Official's public key(s) (`publicKeyHex`), once generated.
+- FedOS Official's `keyId`(s) for each of those keys.
+- The verification policy an application ships or a user configures
+  (`FedosTrustPolicy`, built via `createFedosOfficialTrustedIssuer()`) —
+  this is local configuration data naming which public keys to trust, not
+  a secret.
+
+**PRIVATE** — must never appear in this repository, in any commit, in any
+issue or pull request, in any log, or in any synced/versioned storage:
+
+- The FedOS Official signing private key.
+
+This repository contains **no hardcoded FedOS Official public key and no
+FedOS Official private key material anywhere, and never will** — this is
+the same fact stated from the rotation angle in "Issuer key rotation"
+above. Operationally, that means the **production private key must be
+generated outside this repository, and outside OneDrive, Dropbox, Google
+Drive, or any other cloud-synced or version-controlled path.** Generating
+or storing it inside any such location risks the secret being silently
+replicated into a cloud provider's storage, a sync history, or a git
+history the moment it touches disk there — regardless of whether it is
+ever explicitly committed or shared. Generate it, and keep it, only on a
+machine and a path outside all such sync/versioning surfaces. See
+`docs/operations/OFFLINE-ISSUER-RUNBOOK.md`'s "One-time setup" section for
+the exact operational procedure this maps to.
+
 ## What does not exist yet
 
 - No revocation-list *protocol* — the design above relies on time-bounded

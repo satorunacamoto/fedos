@@ -10,8 +10,9 @@ assumed" evidence discipline.
 
 Every "full regression" number in this document comes from an **exact
 FAIL-line-set diff** against a real, complete run of the pristine
-`693cfdcc` baseline (run in full, `OS-worktrees/runtime-ownership-extraction`,
-untouched by this arc) — not from grepping for keywords or assuming a
+`693cfdcc` baseline (run in full, in a separate dedicated worktree checked
+out at that exact commit, untouched by this arc) — not from grepping for
+keywords or assuming a
 failure is "probably pre-existing" because it doesn't mention Trust. Four
 full 1198→1198-file candidate runs were executed over the course of this
 arc (each ~300-380s, `--pool=forks --poolOptions.forks.minForks=1
@@ -240,9 +241,9 @@ Per arc brief §66, kept strictly separate:
 
 ## Worktree state
 
-`OS-worktrees/fedos-trust-oss-release` (branch
-`arc/fedos-trust-offline-monetization-oss-release`), created fresh off
-`693cfdcc` at the start of this arc to avoid disturbing the shared main
-working directory (found already checked out to an unrelated branch with
-unrelated uncommitted work from a concurrent session). **CLEAN** at
-CandidateHead `e6b2386a` — `git status --short` returns 0 lines.
+A dedicated worktree (branch `arc/fedos-trust-offline-monetization-oss-release`),
+created fresh off `693cfdcc` at the start of this arc to avoid disturbing
+the shared main working directory (found already checked out to an
+unrelated branch with unrelated uncommitted work from a concurrent
+session). **CLEAN** at CandidateHead `e6b2386a` — `git status --short`
+returns 0 lines.
