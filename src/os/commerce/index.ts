@@ -30,6 +30,19 @@
  * to touch a raw Nostr event — internal wiring detail, not public
  * surface).
  *
+ * Merchant Product CRUD + Product Media + MediaStore Port arc adds:
+ *   - `ProductRepositoryPort`/`LocalProductRepository` (merchant CRUD;
+ *     `LocalProductRepository` also satisfies `ProductDirectory`, so it
+ *     can be handed straight to `createCommerce({ catalog })`).
+ *   - `ProductMedia`/`ProductMediaRepositoryPort`/
+ *     `LocalProductMediaRepository` (media records per product).
+ *   - `MediaStorePort`/`LocalMediaStore` (content-addressed media bytes).
+ *   - `product_media_content_address.js`/`product_media_encryption.js`/
+ *     `safe_media_reference.js`/`product_media_playback.js` — deliberately
+ *     NOT barreled (narrow, task-specific helpers); import them directly
+ *     by path, matching how `./catalog/policy.js` itself is not barreled
+ *     either.
+ *
  * BOUNDARY CHECK (re-verify after any future edit to this file): `os/commerce`
  * must never import `os/messenger` (old or new location), and no
  * Telegram/BTCPay SDK specifier may leak outside its own reserved adapter
@@ -51,6 +64,39 @@ export {
   type ProductAsset,
 } from "./catalog/directory.js";
 export type { Product, ProductKind, ProductStatus, ProductVisibility, PurchaseGrant, PurchaseGrantSource } from "./catalog/types.js";
+
+export { LocalProductRepository } from "./catalog/local_product_repository.js";
+export type {
+  ProductRepositoryPort,
+  CreateProductInput,
+  UpdateProductInput,
+  ProductRepositoryMutationResult,
+} from "./catalog/product_repository_port.js";
+export { generateFedosProductId, generateFedosProductMediaId } from "./catalog/product_id.js";
+
+export { LocalProductMediaRepository } from "./catalog/local_product_media_repository.js";
+export type {
+  ProductMediaRepositoryPort,
+  AddProductMediaInput,
+  ProductMediaRepositoryMutationResult,
+} from "./catalog/product_media_repository_port.js";
+export { validateProductMedia } from "./catalog/product_media_types.js";
+export type {
+  ProductMedia,
+  ProductMediaRole,
+  ProductMediaClassification,
+  ProductMediaChecksumSubject,
+  ProductMediaValidationDecision,
+} from "./catalog/product_media_types.js";
+
+export { LocalMediaStore } from "./catalog/local_media_store.js";
+export type {
+  MediaStorePort,
+  MediaObject,
+  MediaObjectMetadata,
+  MediaStorePutRequest,
+  MediaStorePutResult,
+} from "./catalog/media_store_port.js";
 
 export type {
   PaymentProvider,
