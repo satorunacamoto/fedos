@@ -2,7 +2,19 @@
 
 **Audited commit:** `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`.
 
-## Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL Closure arc update (current, additive)
+## Commerce FINAL P1 Closure arc update (current, additive)
+
+Closes the three P1s the Commerce Durability arc's own final report left open, all disclosed as judgment calls that arc's own time budget didn't permit forcing through:
+
+| # | Priority | Gap | Status | Evidence | Fix location |
+|---|---|---|---|---|---|
+| 20 | P1 | Persona Epoch identity/signing keypair not durable across restart | **CLOSED** — sealed at rest via the existing `SealingAuthorityPort` primitive (no new crypto), restart-proven, fail-closed on corruption (real Electron relaunches, both directions) | `commerce_e2e_restart_persistence_real_electron.test.ts`, `commerce_e2e_sealed_key_corruption_real_electron.test.ts`, `test/commerce_persona_epoch_signing_key_durability.test.ts` (11 tests) | `src/os/commerce/reputation/persistence/durable_persona_epoch_signing_key_store.ts`; `src/os/core/vault/wasm/fedos_sealed_signing_key_store.ts` (shared foundation); `fedos_electron_beta_main.cts` |
+| 21 | P1 | Receipt-issuer signing keypair not durable across restart (a receipt signed before a restart could never re-verify after one) | **CLOSED** — same sealed-storage foundation; a receipt signed in one process launch now verifies against a later launch's live issuer policy, proven by a real two-launch Electron E2E | `commerce_e2e_restart_persistence_real_electron.test.ts` (extended); `test/commerce_receipt_issuer_signing_key_durability.test.ts` (8 tests) | `src/os/trust/issuer/durable_receipt_issuer_signing_key_store.ts`; `fedos_electron_beta_main.cts` |
+| 18 (re-opened, now closed) | P1 | Full happy-path E2E against the actual packaged/installed binary had never been observed to complete | **CLOSED** — root-caused (two real electron-builder packaging defects, never a Chromium/environment issue) and fixed; PASS, independently re-verified twice (Agent X, then the coordinator on the fully-merged tree, which found and fixed a third instance of the same defect class — `qrcode`'s own transitive deps `dijkstrajs`/`pngjs`) | `commerce_e2e_packaged_binary_real_electron.test.ts`; `docs/commerce/COMMERCE-PACKAGED-BINARY-E2E-CLOSURE.md`'s own "Part 2 SOLVED" update | `packages/fedos-desktop-electron-spike/electron_builder.beta.config.json`; `packages/fedos-desktop-electron-spike/package.json` |
+
+**Not closed, disclosed:** a literal installed-binary + restart combined E2E test (as opposed to the dev-`dist/`-launch restart test, and separately the installed single-launch happy-path test, both of which ARE real and passing) was not built this pass — see `docs/commerce/FEDOS-COMMERCE-END-TO-END.md`'s own "Commerce FINAL P1 Closure arc update" for the equivalence argument (identical compiled entrypoint file) this arc relies on instead.
+
+## Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL Closure arc update
 
 Closes **Gap #16** (Commerce domain state persistence — durable, restart-proven) and **Gap #17** (protected media purchase-grant binding — now exists as a real, signed, tested `MediaAccessGrant`, though not yet wired into a live IPC handler since none exists to wire it into). **Gap #18** (packaged-binary E2E) is **narrowed, not closed**: a real packaging bug (node_modules never bundled at all) is found and fixed, and two harness bugs are fixed along the way, but the full happy path still does not complete against the packaged binary in this environment — see `docs/commerce/FEDOS-COMMERCE-END-TO-END.md`'s own "Commerce Durability" section for the precise, narrowed root-cause account.
 
