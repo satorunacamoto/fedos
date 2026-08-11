@@ -85,3 +85,13 @@ Only in the Messenger domain (`StorageBackend`, local disk, encrypted conversati
 Only Messenger ↔ Nostr relay(s), for message transport. **Zero network calls occur anywhere in `os/commerce` or `os/trust`** (Trust's CLI is local-process only; nothing in either domain imports `fetch`, a socket library, or an external SDK).
 
 **BACKSIDE DATAFLOW: PASS** (faithfully shows the near-total absence of live wiring, which is the actual state of the system — nothing here should be read as describing a functioning backend, because none exists for commerce).
+
+---
+
+## Commerce FINAL Closure Mega-Arc update (current, additive)
+
+**No longer accurate, further from the "Commerce E2E Completion arc update" section above:** "Commerce ↔ Trust: none exists" was already corrected to a one-directional receipt-issuance wiring; there is now a SECOND, independent Commerce → Reputation seam (`issueTradeCompletionAttestation()`, wired into order completion) and a THIRD, independent Commerce → Nostr seam (`CommerceNostrEventPortImpl`, wired into product publish/unpublish, gated by `NetworkProfile` defaulting to `"local-only"`). "Zero network calls occur anywhere in `os/commerce`" is **no longer true** — a real network call (to a Nostr relay) now occurs from `os/commerce`, but only when the operator has explicitly moved the network profile away from its `"local-only"` default; the default posture is still zero outbound network contact from Commerce.
+
+**Newly confirmed by direct code reading this pass (not previously stated in this document):** the "Where persistence happens" section above ("Commerce persists nothing") was already updated once (Commerce E2E Completion arc: "process-lifetime-only... persistence"). This pass confirms that characterization is complete and exhaustive — `LocalProductRepository`/`LocalOrderRepository`/`LocalDeliveryRepository`/`LocalPersonaEpochRegistry`/`LocalTradeCompletionAttestationStore` are ALL `Map`-backed, in-process, with zero disk read/write anywhere in `fedos_electron_beta_main.cts`'s `commerceState()`/`commerceReputationState()` — a FedOS Desktop Beta restart returns every one of these to empty. Protected media (`IpfsMediaStore`) is the one partial exception: content itself is content-addressed and stored via whatever `MediaStorePort` transport is injected (in-memory `FakeIpfsTransport` in tests; no real transport wired into the shipping composition root this pass), so media, too, does not survive a restart in the current build.
+
+**BACKSIDE DATAFLOW (Commerce FINAL Closure Mega-Arc): PASS**, with the restart-persistence gap now stated at full scope (see `docs/commerce/COMMERCE-GAP-CLASSIFICATION.md` gap #16).

@@ -162,3 +162,43 @@ Verified against the real packaged Beta Electron binary (not code inspection alo
 **Corrections to "What is entirely absent" above (§ preceding, now historical):** Order, Order/merchant management UI, Commerce↔Trust wiring, and delivery are no longer absent — see the diagram and evidence above. The real payment rail line remains accurate (`payment/adapters/btcpay/` is still a reserved empty directory) — "PAID" is real and reachable, but only via the TEST/LOCAL simulator shown above, by this arc's own explicit design constraint, never a real payment rail.
 
 **E2E DIAGRAM (Commerce E2E Completion arc): PASS.**
+
+---
+
+## Commerce FINAL Closure Mega-Arc update — Reputation + Nostr publish steps added to the completed flow
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant CFedOS as Customer FedOS
+    participant Main as Electron main (composition root)
+    participant Order as Order domain
+    participant Rep as Reputation (LocalPersonaEpochRegistry +<br/>LocalTradeCompletionAttestationStore, IN-MEMORY)
+    participant Nostr as Nostr relay<br/>(only if NetworkProfile != local-only)
+    actor Merchant
+
+    Note over Main: Everything from the prior diagram (create..complete..receipt) still applies unchanged.
+
+    Merchant->>CFedOS: Publish product
+    CFedOS->>Main: fedos-app:commerce-product-publish
+    Main->>Nostr: publishCommerceNostrProductEventNonFatal()<br/>-- best-effort, gated by NetworkProfile (default "local-only" = never sent)
+    Nostr-->>Main: ok | transport-error (never fatal to the local publish)
+
+    Customer->>CFedOS: Complete Order (as in the prior diagram)
+    CFedOS->>Main: commerce-order-complete
+    Main->>Order: applyOrderAction({type:"complete"})
+    Order-->>Main: status "completed"
+    Main->>Rep: issueTradeCompletionAttestationsForCompletedOrderNonFatal()<br/>-- gated on order.status==="completed", real OrderRepository lookup only
+    Rep-->>Main: signed TradeCompletionAttestation (both sides, independently)
+    Note over Rep: process-lifetime only -- an app restart<br/>loses every PersonaEpoch and attestation.
+
+    Customer->>CFedOS: View Seller Reputation panel
+    CFedOS->>Main: fedos-app:commerce-persona-board-query
+    Main->>Rep: queryPersonaBoardView() -- PUBLIC disclosure layer only
+    Rep-->>Main: bounded, no raw order/payment data
+    Main-->>CFedOS: Persona Board view renders
+```
+
+**What changed:** Reputation attestation issuance and Nostr publish are both now real, reachable steps in the completed flow — but Reputation state does not survive a restart (in-memory only, disclosed), and Nostr publish is a no-op by default (NetworkProfile defaults to `"local-only"`, never silently reaches a real relay). See `docs/commerce/COMMERCE-E2E-COMPLETION-FINAL-REPORT.md`'s "Commerce FINAL Closure Mega-Arc update" for full evidence.
+
+**E2E DIAGRAM (Commerce FINAL Closure Mega-Arc): PASS, with the restart-persistence and default-off-Nostr caveats stated above.**

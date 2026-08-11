@@ -67,3 +67,13 @@ stateDiagram-v2
 | Delivery | **Yes** — `applyDeliveryAction()`, actor-kind + identity checked | **REAL, GUARDED** (Commerce E2E Completion arc) |
 
 **STATE MACHINES: Order and Delivery now REAL and GUARDED; Product unchanged (IMPLICIT); Payment is IMPLICIT/unguarded in the original dormant provider, with a separate real, guarded, TEST/LOCAL-only path now also reachable.** See the update note at the top of this document.
+
+---
+
+## Commerce FINAL Closure Mega-Arc update (current, additive)
+
+**Reputation attestation is not itself a state machine on a mutable record** (no `TradeCompletionAttestation`, once issued, is ever transitioned to a different state — it is issue-once, verify-many), but it is a real, guarded GATE keyed to Order's own state: `issueTradeCompletionAttestation()` (`src/os/commerce/reputation/reputation_issuance.ts`) accepts only an `orderId`, looks it up through a real `OrderRepository`, and rejects with `order_not_completed` unless `order.status === "completed"` — the identical terminal state `applyOrderAction({type:"complete"})` produces above. A second gate (`unauthorized_attestor`) requires the attesting pubkey to match the order's own buyer/seller side; a third (`duplicate_attestation`) prevents a second attestation by the same attestor for the same order, even with a fresh random salt. All three gates are real, tested, and independent of the UI. See `test/commerce_reputation_issuance.test.ts`.
+
+**PersonaEpoch validity is itself a small time-windowed state check**, not a transition machine: `isPersonaEpochCurrentlyValid(epoch, atTimeUnixSeconds)` is `true` strictly inside `[validFrom, validUntil)` (with a small, explicit clock-skew tolerance), `false` otherwise — an attestation signed while an epoch was valid remains verifiably `VALID` after the epoch later expires (verification is independent of epoch *currency*, only epoch *validity at signing time* matters), but a NEW attestation attempt under an already-expired epoch is correctly rejected. Epoch rollover (`buildEpochCarryOverStatement`) is a one-directional, predecessor-signed, explicitly-linkable-if-used statement — never a silent identity carry-over. See `test/commerce_reputation_persona_epoch.test.ts` / `test/commerce_reputation_issuance.test.ts`'s own "epoch rollover" and "OLD EPOCH" describe blocks.
+
+**STATE MACHINES (Commerce FINAL Closure Mega-Arc): Order/Delivery unchanged (REAL, GUARDED); Reputation issuance is a real, guarded GATE on Order's own terminal state, not a machine of its own; PersonaEpoch validity is a real, tested time-window check.**

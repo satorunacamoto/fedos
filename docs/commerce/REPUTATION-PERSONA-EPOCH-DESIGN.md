@@ -28,6 +28,21 @@ See `test/commerce_reputation_signing.test.ts` and
 evidence (tamper/wrong-signer/duplicate/self-rating/expired-epoch/rollover/
 Sybil-documentation cases).
 
+**POST-INTEGRATION VERIFICATION (Commerce FINAL Closure Mega-Arc, final
+validation pass):** this status header remains accurate. Independently
+re-confirmed by direct code reading of the Electron composition root
+(`fedos_electron_beta_main.cts`'s `commerceReputationState()`): the
+integration wiring described above is real — `issueTradeCompletionAttestation()`
+is genuinely called on order completion, and a real `fedos-app:commerce-persona-board-query`
+IPC channel exposes the PUBLIC disclosure layer only. One fact worth
+stating explicitly here, not just in the E2E docs: `LocalPersonaEpochRegistry`
+and `LocalTradeCompletionAttestationStore` are both plain in-process `Map`s
+with zero disk persistence — every `PersonaEpoch` and every issued
+attestation is lost on the next FedOS Desktop Beta restart. This is the
+same process-lifetime posture the rest of the Commerce domain (Order/
+Delivery/Product) already has in this build; see
+`docs/commerce/COMMERCE-GAP-CLASSIFICATION.md` gap #16.
+
 **Original status at design time: DESIGN + TYPE-ONLY SCAFFOLDING. Nothing described here is wired into `createCommerce()`, `loadRootModules()`, or any shipping UI.** Every claim below about "what exists today" was verified by direct code inspection at this design's own base commit, `13a8852b` ("Merge Commerce Reachable Catalog Phase 1 (+ E2E audit) into Commerce E2E Completion arc base"), on `arc/fedos-commerce-e2e-completion-agent-r`. See [FEDOS-COMMERCE-END-TO-END.md](FEDOS-COMMERCE-END-TO-END.md) and [COMMERCE-GAP-CLASSIFICATION.md](COMMERCE-GAP-CLASSIFICATION.md) for the audit this design responds to (Gap #8 "Commerce↔Trust zero wiring" and Gap #13 "QR unused in commerce").
 
 ## What this design produces

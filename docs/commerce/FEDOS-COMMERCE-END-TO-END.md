@@ -28,6 +28,24 @@ A merchant can now, through the real shipping UI, create and publish a product; 
 
 ---
 
+## Commerce FINAL Closure Mega-Arc update (current, additive — does not rewrite the Commerce E2E Completion account above)
+
+Verified at CandidateHead `7e0d9f0a9611792dea6cfcaf077bb37528575bf1` (validation-fix CandidateHead `b447dfcc899b6c713606f36f02351bc566636e3e`), against a fresh worktree build (`npm run test:current`: 162 files / 2463 passed + 3 skipped / 0 fail; `cargo test --offline`: 649/650, 1 pre-existing unrelated failure; OSS release verifier 8/8; `npm run package:beta` PASS):
+
+```
+REPUTATION/PERSONA:     REAL, WIRED into the composition root   (was: DESIGN ONLY)
+NOSTR COMMERCE EVENTS:  REAL, WIRED, default-off (NetworkProfile "local-only")   (was: BACKEND-READY, NOT WIRED)
+PROTECTED MEDIA CRYPTO: REAL DEFAULT COMPOSITION (fails closed, no plaintext fallback)   (was: PASS primitive/adapter, PARTIAL composition)
+PACKAGED-BINARY E2E:    Install+launch+OS identity PROVEN; full 67-step happy path PARTIAL (host-contention-limited, not a code defect)   (was: NOT PROVEN)
+COMMERCE DOMAIN STATE:  Confirmed process-lifetime, in-memory-only END TO END (Product/Order/Delivery/Payment ledger AND Reputation/Persona) — a FedOS Desktop Beta restart loses all of it. New finding this pass, via direct code reading of commerceState()/commerceReputationState() in fedos_electron_beta_main.cts.
+```
+
+A merchant's product now also carries a live **Seller Reputation** panel (Product Detail screen) fed by a real, signed `TradeCompletionAttestation` issued automatically when either counterparty completes a real order — never a bare claim, gated on the real `OrderRepository` reporting `"completed"`. A merchant's product publish/unpublish now best-effort announces over Nostr when the (default-off) network profile allows it, verified end-to-end (publish → real relay → a second read-model instance, idempotent, replay-safe, wrong-signer-rejecting) by `test/commerce_inbound_event_bridge.test.ts`. Product media, when present, now flows through a real AEAD-encrypted-at-rest path by default (`WasmProductMediaEncryption`/`WasmProductMediaDecryption`), refusing to store or return anything without a real unlocked Master Seed Authority — no code path anywhere silently falls back to plaintext.
+
+**Still true, unchanged by this arc:** no real payment rail; no purchase-grant-to-media-key binding; no IPC yet exposes protected-media `put()`/`get()` to the UI. **Newly true, disclosed by this pass, not previously stated at this scope:** the entire Commerce domain — not just Reputation — is in-memory-only; nothing in the current composition root reads any commerce state back from disk on startup. See `docs/commerce/COMMERCE-E2E-COMPLETION-FINAL-REPORT.md`'s own "Commerce FINAL Closure Mega-Arc update" for the full evidence table, cross-capability authority spot-check (8/8 PASS), and failure-tabletop classification.
+
+---
+
 ## Phase 1 update (post-audit, additive — does not rewrite the audit below)
 
 **Commerce Reachable Catalog + Product Surface Phase 1 has landed.** The narrative below (§1–§11) is the original audit, pinned to commit `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`, and is left intact as a faithful historical snapshot. What has actually changed since:

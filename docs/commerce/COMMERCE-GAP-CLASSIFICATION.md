@@ -2,6 +2,20 @@
 
 **Audited commit:** `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`.
 
+## Commerce FINAL Closure Mega-Arc update (current, additive)
+
+Verified at CandidateHead `7e0d9f0a9611792dea6cfcaf077bb37528575bf1` / `b447dfcc899b6c713606f36f02351bc566636e3e`. This arc closes **Gap #9's remaining media follow-up** (protected media crypto is now the real default composition, fails closed) and adds real coverage for two capabilities this table never tracked as gaps because they postdate it: **Reputation/Persona attestation** (now real and wired — see `docs/commerce/REPUTATION-PERSONA-EPOCH-DESIGN.md`) and **Nostr Commerce publication** (now real and wired, default-off via `NetworkProfile`).
+
+**Gap #4 (real payment rail)** and **Gap #5 (unauthenticated `PlaceholderPaymentProvider.ingestCallback()`)** remain unchanged and open — untouched by this arc, exactly as before.
+
+**New gap, not previously tracked in this table:** the entire Commerce domain state (Product/Order/Delivery/Payment ledger, and now Reputation/Persona) is process-lifetime, in-memory-only in the shipped composition root — confirmed by direct code reading of `commerceState()`/`commerceReputationState()` in `fedos_electron_beta_main.cts` during this validation pass. A FedOS Desktop Beta restart silently loses every product, order, delivery, payment, and reputation record created since the last launch. Classified **P1** (core journey incomplete for a real pilot user, but no authority/security guarantee is weakened — every guarantee this table and the cross-capability spot-check assert holds true within a single process lifetime).
+
+| # | Priority | Gap | Evidence | Current code location | Minimal fix | Scope |
+|---|---|---|---|---|---|---|
+| 16 | P1 | Commerce domain state (Product/Order/Delivery/Payment/Reputation) is process-lifetime in-memory only; a restart loses everything | Direct code reading, `commerceState()`/`commerceReputationState()`, `fedos_electron_beta_main.cts`; no disk-backed repository implementation exists for any of `LocalProductRepository`/`LocalOrderRepository`/`LocalDeliveryRepository`/`LocalPersonaEpochRegistry`/`LocalTradeCompletionAttestationStore` | `packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts` (`commerceState()`, `commerceReputationState()`); `src/os/commerce/order/local_order_repository.ts` and siblings | Add a `StorageBackend`-backed repository implementation for each `Local*Repository`/`Local*Registry`/`Local*Store`, mirroring the Messenger domain's own append-only persistence pattern, and load state from disk on `commerceState()`'s first construction each launch | L |
+| 17 | P1 | No purchase-grant-to-media-key binding exists; no IPC exposes protected-media `put()`/`get()` | `docs/commerce/COMMERCE-E2E-COMPLETION-FINAL-REPORT.md`'s own Agent M account | `src/os/commerce/catalog/ipfs_media_store.ts`, composition root | Design and wire a Commerce→Media Port that only grants a decryption key to a buyer with a real, verified completed-order/entitlement | M |
+| 18 | P1 | Full happy-path E2E against the actual packaged/installed binary (not the dev-`dist/`-launch form) has never been observed to complete | `packages/fedos-desktop-electron-spike/test/commerce_e2e_packaged_binary_real_electron.test.ts`; `docs/commerce/evidence/commerce_e2e_packaged_binary/packaged_binary_e2e_evidence.md` | Test infrastructure only, not product code | Re-run in isolation on an idle host to obtain a clean completion, or raise the in-app UI-script's own internal timeout/checkpoint granularity so a slow-but-progressing run can be distinguished from a hung one | S (infra only) |
+
 ## Commerce E2E Completion arc update (current, additive)
 
 The Commerce E2E Completion arc closed **Gap #3** (Order), **Gap #6** (merchant UI: create/edit/publish/incoming-orders/accept/reject/fulfill), **Gap #7** (delivery/fulfillment — a real `DeliveryRecord` state machine, not `DigitalAsset`), **Gap #8** (Commerce↔Trust wiring — a real signed `TradeReceiptProof` issued on order completion), **Gap #12** (customer order/receipt UI), and **Gap #13** (QR now carries a real signed trade receipt). Verified end-to-end via `commerce_e2e_full_happy_path_real_electron.test.ts` against the real packaged app, not code inspection alone — see `docs/commerce/FEDOS-COMMERCE-END-TO-END.md`'s own "Commerce E2E Completion arc update" for the full account, including three real composition-root bugs this run found and fixed.
@@ -44,3 +58,5 @@ P0 = flow cannot safely work at all. P1 = core user journey incomplete. P2 = usa
 - **P3 (future enhancement): 3**
 
 No gap in this table represents a silent omission on the audit's part — every row cites the exact code location and evidence found by the four research agents. Nothing here should be read as a commitment to build; see [FEDOS-COMMERCE-END-TO-END.md](FEDOS-COMMERCE-END-TO-END.md) §Recommended Next Arc for the one bounded next step this audit recommends.
+
+**Note (Commerce FINAL Closure Mega-Arc):** the counts above describe only the original #1–#15 table and are left as the historical snapshot they are; they do not include #3/#6/#7/#8/#12/#13's later closures (see the "Commerce E2E Completion arc update" section above this table) or the three new gaps (#16–#18) this pass adds.
