@@ -315,6 +315,91 @@ describe("merchant authority", () => {
   });
 });
 
+describe("self-dealing — a customer may never be their own order's seller", () => {
+  it("18. same actor pubkey as buyer and seller is REJECTED at creation with code \"self_dealing\"", () => {
+    const result = createOrder(
+      { id: "order-self", productId: "product-1", sellerPubkey: CUSTOMER, unitPriceCents: 500, currency: "USD" },
+      CUSTOMER_ACTOR,
+      NOW,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("self_dealing");
+  });
+
+  it("19. a legitimate distinct buyer/seller pair still succeeds (no false positive)", () => {
+    const result = createOrder(
+      { id: "order-legit", productId: "product-1", sellerPubkey: MERCHANT, unitPriceCents: 500, currency: "USD" },
+      CUSTOMER_ACTOR,
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.order.buyerPubkey).toBe(CUSTOMER);
+      expect(result.order.sellerPubkey).toBe(MERCHANT);
+    }
+  });
+
+  it("20. the check is unconditional — there is no caller-suppliable role/flag on the actor or input that bypasses it", () => {
+    // OrderActor has exactly two fields (`kind`, `pubkey`) and CreateOrderInput
+    // carries no role/flag of its own — there is nothing to spoof. This test
+    // forges an actor with an extra, unrecognized property (simulating a
+    // caller from some hypothetical "UI role" trying to smuggle in a flag
+    // the state machine might trust) and confirms it changes nothing: the
+    // self-dealing gate still fires purely off `actor.pubkey === input.sellerPubkey`.
+    const forgedActor = { kind: "customer", pubkey: CUSTOMER, role: "trusted-merchant-ui" } as unknown as OrderActor;
+    const result = createOrder(
+      { id: "order-spoof", productId: "product-1", sellerPubkey: CUSTOMER, unitPriceCents: 500, currency: "USD" },
+      forgedActor,
+      NOW,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("self_dealing");
+  });
+
+  it("21. case-variant hex is NOT caught by this check — documented, pre-existing repo-wide convention, not a new gap", () => {
+    // This codebase's pubkey comparisons (this file's own `isActorIdentityAuthorized`,
+    // `local_order_repository.ts`, `delivery_state_machine.ts`,
+    // `reputation_issuance.ts`) all use plain `===` with no case/encoding
+    // normalization anywhere — Nostr pubkeys are canonically lowercase hex
+    // secp256k1 keys, so a genuine same-identity case mismatch is not a
+    // realistic vector in practice (every real caller in this codebase
+    // already produces/consumes lowercase hex consistently; a mismatched
+    // case would already break every OTHER identity check in this file,
+    // e.g. `isActorIdentityAuthorized`, long before self-dealing became a
+    // concern). This test documents that an uppercase variant of the same
+    // underlying pubkey is treated as a DIFFERENT string and therefore is
+    // NOT rejected as self-dealing — consistent with, not a regression
+    // introduced by, this fix.
+    // CUSTOMER/MERCHANT above are all-digit strings ("1"/"f" repeated), which
+    // have no case to vary — a digit-only string is unchanged by
+    // `.toUpperCase()`, so this needs its own actor pubkey containing actual
+    // hex letters to exercise case variance at all.
+    const lowerHexActor: OrderActor = { kind: "customer", pubkey: "a".repeat(64) };
+    const upperHexSeller = "a".repeat(64).toUpperCase();
+    const result = createOrder(
+      { id: "order-case", productId: "product-1", sellerPubkey: upperHexSeller, unitPriceCents: 500, currency: "USD" },
+      lowerHexActor,
+      NOW,
+    );
+    expect(result.ok).toBe(true); // documents current (pre-existing convention) behavior, not an endorsement
+  });
+
+  it("22. two different legitimate personas/pubkeys still work correctly (no over-broad rejection)", () => {
+    const first = createOrder(
+      { id: "order-a", productId: "product-1", sellerPubkey: MERCHANT, unitPriceCents: 500, currency: "USD" },
+      CUSTOMER_ACTOR,
+      NOW,
+    );
+    const second = createOrder(
+      { id: "order-b", productId: "product-2", sellerPubkey: OTHER_MERCHANT, unitPriceCents: 750, currency: "USD" },
+      { kind: "customer", pubkey: OTHER_CUSTOMER },
+      NOW,
+    );
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+  });
+});
+
 describe("complete authority", () => {
   it("17. either the order's own buyer or seller may complete; an unrelated pubkey may not", () => {
     const delivered = advance(freshOrder(), [

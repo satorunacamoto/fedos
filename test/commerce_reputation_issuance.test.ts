@@ -191,7 +191,32 @@ describe("commerce reputation: issueTradeCompletionAttestation — real gating",
   });
 
   it("SELF-RATING (defensive, order-level): rejects a self-dealing order (buyer === seller)", () => {
-    driveOrderToCompleted(orderRepository, "order-self", { buyerPubkey: SELLER, sellerPubkey: SELLER });
+    // `createOrder()` itself now rejects self-dealing at creation (the
+    // "self_dealing" gate in `order_state_machine.ts`), so a self-dealing
+    // "completed" Order can no longer be produced through the real state
+    // machine at all — `driveOrderToCompleted(..., { buyerPubkey: SELLER,
+    // sellerPubkey: SELLER })` would now throw at its own `createOrder`
+    // step. This test hand-constructs the Order object directly and saves
+    // it straight into the repository, bypassing `createOrder`/
+    // `applyOrderAction` entirely, purely to prove Gate #2 below is genuine
+    // defense-in-depth against a self-dealing row reaching the repository
+    // through some OTHER path (a future bug, a different repository
+    // implementation, migrated/legacy data) — not something any real caller
+    // going through this codebase's own state machine can produce anymore.
+    const selfDealingOrder: Order = {
+      id: "order-self",
+      productId: "product-1",
+      buyerPubkey: SELLER,
+      sellerPubkey: SELLER,
+      status: "completed",
+      quantity: 1,
+      unitPriceCents: 500,
+      currency: "USD",
+      createdAt: NOW,
+      updatedAt: NOW,
+      history: [{ from: null, to: "created", action: "create", actorKind: "customer", at: NOW }],
+    };
+    orderRepository.save(selfDealingOrder);
     const result = issueTradeCompletionAttestation(
       { orderRepository, store },
       buyerRequest("order-self", { attestorRealPubkey: SELLER }),

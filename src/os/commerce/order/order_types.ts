@@ -251,7 +251,20 @@ export type OrderRejectionCode =
   | "unauthorized_actor"
   | "evidence_mismatch"
   | "evidence_not_settled"
-  | "invalid_input";
+  | "invalid_input"
+  /**
+   * `createOrder()` rejects when the acting customer's own `actor.pubkey`
+   * equals `input.sellerPubkey` — a buyer can never be the seller of their
+   * own order. Compared with plain string equality (`===`), matching the
+   * pubkey-comparison convention already used everywhere else in this
+   * codebase (`isActorIdentityAuthorized` below, `local_order_repository.ts`'s
+   * `listByBuyer`/`listBySeller`, `delivery_state_machine.ts`,
+   * `reputation_issuance.ts`'s own `order.buyerPubkey === order.sellerPubkey`
+   * defensive gate) — no normalization/case-folding is applied anywhere in
+   * this repository, so none is invented here either. See
+   * `order_state_machine.ts`'s `createOrder()` for the enforcement site.
+   */
+  | "self_dealing";
 
 export type OrderTransitionResult =
   | { readonly ok: true; readonly order: Order }

@@ -131,6 +131,20 @@ export function createOrder(input: CreateOrderInput, actor: OrderActor, now: num
   if (input.id.length === 0) return fail("invalid_input", "id must be non-empty");
   if (input.productId.length === 0) return fail("invalid_input", "productId must be non-empty");
   if (input.sellerPubkey.length === 0) return fail("invalid_input", "sellerPubkey must be non-empty");
+  // Self-dealing gate: the acting customer may never be the order's own
+  // seller. Plain string equality — same convention this file's own
+  // `isActorIdentityAuthorized` uses for every other pubkey comparison
+  // (also matched by `local_order_repository.ts`, `delivery_state_machine.ts`,
+  // and `reputation_issuance.ts`'s own defensive `buyerPubkey ===
+  // sellerPubkey` check downstream of this function); no case/encoding
+  // normalization is applied anywhere else in this codebase for pubkeys,
+  // so none is invented here. This check is unconditional — there is no
+  // caller-suppliable "role" flag anywhere on `OrderActor`/`CreateOrderInput`
+  // that could be used to bypass it; the only inputs are the authenticated
+  // actor's own pubkey and the seller pubkey the caller is requesting.
+  if (actor.pubkey === input.sellerPubkey) {
+    return fail("self_dealing", "a customer may not create an order naming themselves as the seller");
+  }
   if (input.unitPriceCents < 0) return fail("invalid_input", "unitPriceCents must be non-negative");
   const quantity = input.quantity ?? 1;
   if (!Number.isInteger(quantity) || quantity < 1) {
