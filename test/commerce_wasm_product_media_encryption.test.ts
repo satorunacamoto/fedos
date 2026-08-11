@@ -21,15 +21,17 @@ import type { AeadCiphertextHandle, AeadKeyHandle } from "../src/os/core/vault/w
  * `test/secure_runtime_alpha_869_resolve_conversation_key_wiring.test.ts`
  * already uses for `FedosWasmMasterSeedAuthority` itself, one layer down.
  *
- * A REAL end-to-end round trip (real WASM authority + real `encrypt()`/
- * `exportCiphertext()`) would additionally require a built
- * `packages/fedos-core-rust/pkg/fedos_core_rust_bg.wasm` artifact. This
- * worktree has none (confirmed below, not assumed) — building it is the
- * coordinator's territory (avoids concurrent Cargo builds colliding with
- * other agents' worktrees), so no such test is added here. If a future
- * run of this suite finds the artifact present, the `it.skipIf` below
- * documents exactly what is skipped and why, rather than silently doing
- * nothing.
+ * Test 13 is a REAL end-to-end round trip (real WASM authority + real
+ * `encrypt()`/`exportCiphertext()`), conditioned on a built
+ * `packages/fedos-core-rust/pkg/fedos_core_rust_bg.wasm` artifact being
+ * present (`REAL_WASM_ARTIFACT_PRESENT` below) — self-skips with a clear
+ * label when absent, rather than silently doing nothing. Coordinator
+ * integration-gate note: this test also reproduces the real boot sequence
+ * (`planLoad()` -> `attemptDevOnlyJsGlueImport()` -> `attemptDevOnlyWasmInitialization()`,
+ * plus a `NODE_ENV=development` stub) a real caller performs once at app
+ * startup — `createFedosWasmMasterSeedAuthority()` alone is not enough,
+ * since it constructs a fresh, un-booted loader. See test 13's own inline
+ * comment for the full account.
  */
 
 const REAL_WASM_ARTIFACT_PRESENT = existsSync(
@@ -183,22 +185,50 @@ describe("WasmProductMediaEncryption", () => {
   it.skipIf(!REAL_WASM_ARTIFACT_PRESENT)(
     "13. [only runs if packages/fedos-core-rust/pkg/fedos_core_rust_bg.wasm exists] real WASM + a real, freshly-generated Master Seed round-trips a genuine ciphertext",
     async () => {
-      const { createFedosWasmMasterSeedAuthority } = await import(
+      // Coordinator fix: the real boot sequence a production caller performs
+      // once at app startup (never inside `FedosWasmMasterSeedAuthority`
+      // itself) must be reproduced explicitly here — mirrors
+      // `test/secure_runtime_alpha_5401_5480_real_vertical_slice.test.ts`'s
+      // own established `primedWasmMasterSeedAuthority()`/`withDevelopmentNodeEnv()`
+      // pattern exactly, rather than inventing a new one: `planLoad()`
+      // (populates the artifact-check/dev-gate/import-readiness fields as a
+      // side effect) -> `attemptDevOnlyJsGlueImport()` -> `attemptDevOnlyWasmInitialization()`
+      // -- only then does `FedosWasmMasterSeedAuthority`'s own construct step
+      // see every precondition satisfied. The dev-only gate additionally
+      // requires `process.env.NODE_ENV === "development"` specifically (not
+      // vitest's own ambient value) — stubbed for the duration of this one
+      // test only, restored after, same as the established sibling test.
+      const { FedosWasmLoaderSkeleton } = await import("../src/os/core/vault/wasm/fedos_wasm_loader.js");
+      const { FedosWasmMasterSeedAuthority } = await import(
         "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js"
       );
-      const authority = createFedosWasmMasterSeedAuthority();
-      const generated = await authority.generate();
-      expect(generated).toBe(true);
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "development";
+      try {
+        const loader = new FedosWasmLoaderSkeleton();
+        loader.planLoad();
+        const importResult = await loader.attemptDevOnlyJsGlueImport();
+        expect(importResult.succeeded, JSON.stringify(importResult)).toBe(true);
+        const wasmInit = await loader.attemptDevOnlyWasmInitialization();
+        expect(wasmInit.succeeded, JSON.stringify(wasmInit)).toBe(true);
 
-      const adapter = new WasmProductMediaEncryption(authority); // no injected deps -- the real Runtime Service path
-      const result = await adapter.encrypt(PLAINTEXT);
+        const authority = new FedosWasmMasterSeedAuthority(loader);
+        const generated = await authority.generate();
+        expect(generated).toBe(true);
 
-      expect(result).not.toBeNull();
-      expect(result).toBeInstanceOf(Uint8Array);
-      expect(Buffer.from(result as Uint8Array).equals(Buffer.from(PLAINTEXT))).toBe(false);
-      // The wire text is valid UTF-8 JSON carrying the CommerceMedia domain label somewhere in its envelope.
-      const wireText = new TextDecoder().decode(result as Uint8Array);
-      expect(() => JSON.parse(wireText)).not.toThrow();
+        const adapter = new WasmProductMediaEncryption(authority); // no injected deps -- the real Runtime Service path
+        const result = await adapter.encrypt(PLAINTEXT);
+
+        expect(result).not.toBeNull();
+        expect(result).toBeInstanceOf(Uint8Array);
+        expect(Buffer.from(result as Uint8Array).equals(Buffer.from(PLAINTEXT))).toBe(false);
+        // The wire text is valid UTF-8 JSON carrying the CommerceMedia domain label somewhere in its envelope.
+        const wireText = new TextDecoder().decode(result as Uint8Array);
+        expect(() => JSON.parse(wireText)).not.toThrow();
+      } finally {
+        if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = originalNodeEnv;
+      }
     },
   );
 });

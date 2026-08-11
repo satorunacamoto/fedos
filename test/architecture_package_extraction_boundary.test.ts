@@ -55,9 +55,26 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     expect(appBlockers).toEqual([]);
   });
 
-  it("does not regress past the currently-measured blocker baseline (3, down from 46 -- Runtime Ownership Extraction Arc) -- a new violation must update this number deliberately, never silently", () => {
+  it("does not regress past the currently-measured blocker baseline (7, up from 3 -- Commerce E2E Completion arc, Wave B -- a new violation must update this number deliberately, never silently)", () => {
+    // Commerce E2E Completion arc, Wave B: 4 new, DELIBERATE, reviewed blockers on
+    // top of the pre-existing 3 (os/core -> packages/fedos-core-rust; the two
+    // pre-existing catalog/adapters/nostr/{bridge,classify}.ts -> os/messenger
+    // imports) -- every one of the 4 new ones is the SAME kind of already-reviewed,
+    // narrowly-scoped adapter-directory exception the pre-existing 2 already
+    // established, not a new category of leak:
+    //   - catalog/adapters/nostr/commerce_event_bridge.ts (Agent N) -> os/messenger's
+    //     Nostr protocol layer, 3 import sites -- lives in the SAME
+    //     NOSTR_ADAPTER_DIR (`test/architecture_boundary_commerce.test.ts`) the two
+    //     pre-existing files already use; extends, does not widen, that allowlist.
+    //   - receipt/commerce_trust_receipt_adapter.ts (Agent T) -> src/os/trust/index.js,
+    //     1 import site -- the ONE reviewed Commerce->Trust seam Agent R's own Wave A
+    //     design explicitly named as the future integration point (Gap #8,
+    //     docs/commerce/COMMERCE-GAP-CLASSIFICATION.md); `test/architecture_boundary_commerce.test.ts`
+    //     does not forbid this direction today (confirmed, re-verified independently
+    //     by both Agent R and Agent T), and `test/architecture_boundary_trust.test.ts`
+    //     only forbids the opposite direction.
     const { blockers } = runScan();
-    expect(blockers.length).toBeLessThanOrEqual(3);
+    expect(blockers.length).toBeLessThanOrEqual(7);
   });
 
   it("every blocker belongs to one of the three os/* roots (never the already-clean Electron app)", () => {
