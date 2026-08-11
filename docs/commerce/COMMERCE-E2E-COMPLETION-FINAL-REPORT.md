@@ -64,7 +64,7 @@ Separately, the full `vitest.electron-spike.config.ts` suite (which sweeps in ev
 
 ## EVIDENCEHEAD
 
-**EVIDENCEHEAD:** `827af8157790df4cd4fbf2e5746b04aa51eff909` (this document's own commit — see the commit that adds this file for the final hash).
+**EVIDENCEHEAD:** `b91238b5b19506161401f57b11f62ca93dca8cdc` (the commit that adds this document to `arc/fedos-commerce-e2e-completion`).
 
 ---
 
