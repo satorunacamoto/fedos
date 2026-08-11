@@ -38,3 +38,12 @@ export {
   type FedosTrustIssuerSignEntitlementResult,
   type FedosTrustPolicyFileShape,
 } from "./fedos_trust_issuer_cli_core.js";
+
+/** FedOS Commerce FINAL P1 Closure (Agent K2) — durable sealed-at-rest custody for the demo Commerce Receipt-issuer keypair. A DIFFERENT, additive path from the offline-issuer file-secret provider above; see that file's own module header. */
+export {
+  COMMERCE_RECEIPT_ISSUER_SIGNING_KEY_PURPOSE,
+  COMMERCE_RECEIPT_ISSUER_KEY_ID,
+  resolveReceiptIssuerSigningKeypair,
+  type ResolveReceiptIssuerSigningKeypairOutcome,
+  DurableSealedSigningKeyStore,
+} from "./durable_receipt_issuer_signing_key_store.js";

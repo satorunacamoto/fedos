@@ -191,6 +191,11 @@ export {
   type FedosTrustIssuerIdentity,
   type FedosTrustIssuerSignEntitlementResult,
   type FedosTrustPolicyFileShape,
+  COMMERCE_RECEIPT_ISSUER_SIGNING_KEY_PURPOSE,
+  COMMERCE_RECEIPT_ISSUER_KEY_ID,
+  resolveReceiptIssuerSigningKeypair,
+  type ResolveReceiptIssuerSigningKeypairOutcome,
+  DurableSealedSigningKeyStore,
 } from "./issuer/index.js";
 
 // ---------------------------------------------------------------------------

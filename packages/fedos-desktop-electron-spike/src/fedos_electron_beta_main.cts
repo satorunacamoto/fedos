@@ -376,6 +376,19 @@ interface MasterSeedAuthorityLike {
   ): Promise<Uint8Array | null>;
 }
 /**
+ * FedOS Commerce FINAL P1 Closure (Agent K2) -- narrows
+ * `ResolveReceiptIssuerSigningKeypairOutcome`
+ * (`src/os/trust/issuer/durable_receipt_issuer_signing_key_store.ts`) to
+ * exactly what `commerceReceiptSigningState()` below reads; the real
+ * function returns a richer type (a full `FedosTrustSigningKeypair` opaque
+ * handle), this interface only narrows it to the `publicKeyHex` accessor
+ * this file needs, granting no new capability.
+ */
+type ReceiptIssuerSigningKeyResolution =
+  | { readonly outcome: "restored" | "created"; readonly keypair: { readonly publicKeyHex: string }; readonly generation: number }
+  | { readonly outcome: "sealing-unavailable" }
+  | { readonly outcome: "corrupted"; readonly reason: string };
+/**
  * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- structural mirror
  * of `FedosNostrSigningAuthority` (`src/os/messenger/adapters/nostr/protocol/sign/`),
  * satisfied at runtime by the SAME `FedosProductionNostrSigningAuthority`
@@ -684,10 +697,23 @@ interface RootModules {
    * keypair and a verification policy). Loaded exactly like `Commerce`
    * above -- compiled `dist/`, dynamic `import()`. This is the ONLY
    * `os/trust` surface this main process touches.
+   *
+   * FedOS Commerce FINAL P1 Closure (Agent K2) -- extended (never replaced)
+   * with the durable sealed-signing-key-store wiring
+   * (`src/os/trust/issuer/durable_receipt_issuer_signing_key_store.ts`)
+   * `commerceReceiptSigningState()` below now uses to make the Receipt-issuer
+   * keypair survive a restart, instead of regenerating in lockstep with its
+   * policy every process launch.
    */
   readonly Trust: {
     readonly FedosTrustSigningKeypair: { readonly generate: () => { readonly publicKeyHex: string } };
     readonly createSingleIssuerFedosTrustPolicy: (options: { readonly issuerId: string; readonly keys: readonly { readonly keyId: string; readonly publicKeyHex: string }[] }) => unknown;
+    readonly DurableSealedSigningKeyStore: new (filePath: string) => unknown;
+    readonly resolveReceiptIssuerSigningKeypair: (
+      masterSeedAuthority: MasterSeedAuthorityLike | null,
+      store: unknown,
+      issuerId: string,
+    ) => Promise<ReceiptIssuerSigningKeyResolution>;
   };
   /**
    * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
@@ -1083,6 +1109,8 @@ async function loadRootModules(): Promise<RootModules> {
   const trust = (await import(distUrl("os", "trust", "index.js"))) as {
     FedosTrustSigningKeypair: RootModules["Trust"]["FedosTrustSigningKeypair"];
     createSingleIssuerFedosTrustPolicy: RootModules["Trust"]["createSingleIssuerFedosTrustPolicy"];
+    DurableSealedSigningKeyStore: RootModules["Trust"]["DurableSealedSigningKeyStore"];
+    resolveReceiptIssuerSigningKeypair: RootModules["Trust"]["resolveReceiptIssuerSigningKeypair"];
   };
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's own
   // scoped reputation barrel (`os/commerce/reputation/index.js`), loaded
@@ -1173,6 +1201,8 @@ async function loadRootModules(): Promise<RootModules> {
     Trust: {
       FedosTrustSigningKeypair: trust.FedosTrustSigningKeypair,
       createSingleIssuerFedosTrustPolicy: trust.createSingleIssuerFedosTrustPolicy,
+      DurableSealedSigningKeyStore: trust.DurableSealedSigningKeyStore,
+      resolveReceiptIssuerSigningKeypair: trust.resolveReceiptIssuerSigningKeypair,
     },
     Reputation: {
       LocalPersonaEpochRegistry: reputation.LocalPersonaEpochRegistry,
@@ -1253,6 +1283,16 @@ let commercePaymentLedger: CommercePaymentLedgerLike | null = null;
 let commerceDeliveryRepo: CommerceDeliveryRepositoryLike | null = null;
 let commerceReceiptKeypair: { readonly publicKeyHex: string } | null = null;
 let commerceReceiptPolicy: unknown = null;
+/**
+ * FedOS Commerce FINAL P1 Closure (Agent K2) -- set (once, permanently) the
+ * first time `commerceReceiptSigningState()` observes a `"corrupted"`
+ * resolution (tampered sealed record / wrong Master Seed binding / a
+ * freshly-minted key that failed to seal). Once set, EVERY subsequent call
+ * in this process keeps returning the SAME corrupted outcome -- this
+ * process never silently retries into a fresh, discontinuous replacement
+ * identity.
+ */
+let commerceReceiptSigningCorruptedReason: string | null = null;
 const COMMERCE_RECEIPT_ISSUER_ID = "fedos-commerce-e2e-demo-merchant";
 
 /**
@@ -1310,7 +1350,7 @@ function commerceState(): {
 }
 
 /**
- * Commerce E2E Completion arc (coordinator) -- lazily generates ONE
+ * Commerce E2E Completion arc (coordinator) -- lazily resolves ONE
  * process-lifetime Trust signing keypair standing in for "the merchant's"
  * receipt-issuing identity, plus the matching single-issuer verification
  * policy. Scoping decision, documented: a real product would derive this
@@ -1318,17 +1358,78 @@ function commerceState(): {
  * per-merchant Trust identity concept exists yet); this local-only demo
  * keypair is sufficient to prove the real sign -> QR -> verify pipeline
  * end to end without inventing that larger design here.
+ *
+ * FedOS Commerce FINAL P1 Closure (Agent K2) -- previously this keypair
+ * (and the policy built from it) both regenerated FRESH, in lockstep, every
+ * process launch, via `m.Trust.FedosTrustSigningKeypair.generate()` --
+ * exactly why a receipt signed before a restart could never verify against
+ * the policy built after one. Now resolved via the durable, sealed-at-rest
+ * `resolveReceiptIssuerSigningKeypair()`
+ * (`src/os/trust/issuer/durable_receipt_issuer_signing_key_store.ts`), so
+ * `commerceReceiptPolicy` is built from the SAME persisted `publicKeyHex`
+ * every restart -- the actual fix. See that module's own header for the
+ * full "reuse the shared sealed-signing-key-store foundation" design and
+ * KEY ORIGIN decision (CSPRNG-random, sealed at rest, never derived from
+ * the Master Seed).
+ *
+ * Three outcomes from resolution:
+ *   - `"restored"`/`"created"`: the normal, durable path -- ok.
+ *   - `"sealing-unavailable"` (no unlocked Master Seed Authority yet, e.g.
+ *     no profile ever unlocked in this process): GRACEFUL DEGRADATION, not
+ *     a hard failure -- falls back to the EXACT PRE-EXISTING
+ *     in-memory-only behavior (`FedosTrustSigningKeypair.generate()`,
+ *     unsealed, process-lifetime only). A receipt signed under this
+ *     fallback will not verify after a restart -- an inherent limitation of
+ *     "no durable secret storage was ever unlocked in this process", not a
+ *     new regression this closure introduces.
+ *   - `"corrupted"` (tampered sealed record / wrong Master Seed binding /
+ *     a freshly-minted key that failed to seal): NEVER silently minted a
+ *     replacement issuer identity here -- that would make every
+ *     already-issued receipt permanently unverifiable while looking like
+ *     nothing went wrong. Surfaced as `"issuer-identity-corrupted"` and
+ *     cached in `commerceReceiptSigningCorruptedReason` so this process
+ *     keeps failing the SAME way on every subsequent call, never a silent
+ *     retry into a discontinuous key. The caller
+ *     (`handleCommerceReceiptIssue`) turns this into a structured
+ *     `{outcome:"rejected", reason}` IPC result, the SAME convention every
+ *     other `handleCommerce*` error path already uses.
  */
-function commerceReceiptSigningState(): { readonly issuerId: string; readonly keypair: { readonly publicKeyHex: string }; readonly policy: unknown } {
+async function commerceReceiptSigningState(): Promise<
+  | { readonly outcome: "ok"; readonly issuerId: string; readonly keypair: { readonly publicKeyHex: string }; readonly policy: unknown }
+  | { readonly outcome: "issuer-identity-corrupted"; readonly reason: string }
+> {
   const m = requireModules();
+  if (commerceReceiptSigningCorruptedReason !== null) {
+    return { outcome: "issuer-identity-corrupted", reason: commerceReceiptSigningCorruptedReason };
+  }
   if (commerceReceiptKeypair === null) {
-    commerceReceiptKeypair = m.Trust.FedosTrustSigningKeypair.generate();
+    const filePath = commerceDurableFilePath("receipt_issuer_signing_keys");
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    let store: unknown;
+    try {
+      store = new m.Trust.DurableSealedSigningKeyStore(filePath);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "receipt issuer signing key store failed to load";
+      commerceReceiptSigningCorruptedReason = reason;
+      return { outcome: "issuer-identity-corrupted", reason };
+    }
+    const resolution = await m.Trust.resolveReceiptIssuerSigningKeypair(activeMasterSeedAuthority, store, COMMERCE_RECEIPT_ISSUER_ID);
+    if (resolution.outcome === "corrupted") {
+      commerceReceiptSigningCorruptedReason = resolution.reason;
+      return { outcome: "issuer-identity-corrupted", reason: resolution.reason };
+    }
+    if (resolution.outcome === "sealing-unavailable") {
+      // Graceful degradation -- EXACT pre-existing in-memory-only behavior.
+      commerceReceiptKeypair = m.Trust.FedosTrustSigningKeypair.generate();
+    } else {
+      commerceReceiptKeypair = resolution.keypair;
+    }
     commerceReceiptPolicy = m.Trust.createSingleIssuerFedosTrustPolicy({
       issuerId: COMMERCE_RECEIPT_ISSUER_ID,
       keys: [{ keyId: commerceReceiptKeypair.publicKeyHex, publicKeyHex: commerceReceiptKeypair.publicKeyHex }],
     });
   }
-  return { issuerId: COMMERCE_RECEIPT_ISSUER_ID, keypair: commerceReceiptKeypair, policy: commerceReceiptPolicy };
+  return { outcome: "ok", issuerId: COMMERCE_RECEIPT_ISSUER_ID, keypair: commerceReceiptKeypair, policy: commerceReceiptPolicy };
 }
 
 // ---------------------------------------------------------------------
@@ -3131,7 +3232,11 @@ async function handleCommerceReceiptIssue(payload: unknown) {
 
   const m = requireModules();
   const now = Math.floor(Date.now() / 1000);
-  const { issuerId, keypair, policy } = commerceReceiptSigningState();
+  const signingState = await commerceReceiptSigningState();
+  if (signingState.outcome === "issuer-identity-corrupted") {
+    return { outcome: "rejected", reason: `receipt issuer identity is corrupted and cannot safely issue new receipts: ${signingState.reason}` };
+  }
+  const { issuerId, keypair, policy } = signingState;
   const payloadRecord = {
     kind: "trade_completion" as const,
     orderId: order.id,
