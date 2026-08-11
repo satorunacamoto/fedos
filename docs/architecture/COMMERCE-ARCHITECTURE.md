@@ -5,21 +5,32 @@ arc's move of the commerce-shaped subset of a pre-pivot prototype into
 `src/os/commerce/`. Pure software architecture — no legal/compliance/
 regulatory content.
 
-## What "Commerce" is today: inert scaffolding
+## What "Commerce" is today: reachable end-to-end (as of the Commerce E2E Completion arc)
 
-`src/os/commerce/` is **not a live product capability**. It is the
-commerce-shaped subset of a pre-pivot prototype ("nostr-window," a
-Reddit-style window into Nostr) that has been given a real, forward-looking
-home instead of being scattered across top-level `src/` directories or
-quarantined alongside the rest of that prototype's genuinely dead code
-(`src/os/_legacy_prototype/`). Nothing here has been redesigned or
-newly implemented as part of this move — it is a relocation only.
+**This section describes the state at the time of the "OS Capability
+Modularization" arc that moved commerce code into `src/os/commerce/`; it
+is now superseded and kept for historical context.** `src/os/commerce/`
+started as the commerce-shaped subset of a pre-pivot prototype
+("nostr-window," a Reddit-style window into Nostr) that had been given a
+real, forward-looking home instead of being scattered across top-level
+`src/` directories or quarantined alongside the rest of that prototype's
+genuinely dead code (`src/os/_legacy_prototype/`) — a relocation only, at
+that time.
 
-It is not reachable from the shipped FedOS Desktop Electron app: none of
-its routes, pages, or providers run in the shipped product, and it is not
-included by any of the app's packaging tsconfigs (`tsconfig.runtime.json`,
-`tsconfig.beta-runtime.json`, `tsconfig.host-bridge.json`,
-`tsconfig.settings-host-bridge.json`, `tsconfig.unlock-runtime.json`).
+Later arcs (see the Commerce E2E Completion arc and
+[`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](../commerce/FEDOS-COMMERCE-END-TO-END.md))
+built real `order/`, `delivery/`, `payment/local_simulator.ts`,
+`reputation/`, `events/`, and `receipt/` modules on top of this relocated
+base, and wired a real Order → TEST/LOCAL payment → Delivery → signed
+Trust receipt vertical slice into the shipped FedOS Desktop Electron app's
+IPC surface and composition root
+(`packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts`).
+Commerce is therefore **reachable from the shipped app today** for that
+slice. Still not wired: a real payment rail (e.g. BTCPay), Nostr
+publication of Commerce events (backend-ready, not activated), and
+pseudonymous reputation/persona attestation's UI surface. See the
+top-level [`README.md`](../../README.md)'s "Commerce" section for the
+current authoritative summary.
 
 ## The four subdirectories
 
@@ -69,13 +80,16 @@ adapter directory.
 
 ## What does not exist yet
 
-No **Order**, **Support** (ticketing), **Delivery**, or **Seller State**
-concept is defined anywhere in this capability. A `PurchaseGrant`
-(`catalog/types.ts`) records only the *result* of an already-decided
-external entitlement (a manual gift, a settled payment, a promo) — it is
-not an order, and there is no fulfillment, delivery, refund, or seller-side
-state machine modeled anywhere. Designing any of those is future work with
-no committed shape yet.
+**Superseded, see the update note above:** `order/` and `delivery/` now
+define real, guarded state machines, so the original claim below that
+neither existed is stale. `PurchaseGrant` (`catalog/types.ts`) is a
+separate, older concept unaffected by that — it still only records the
+*result* of an already-decided external entitlement (a manual gift, a
+settled payment, a promo), not an order.
+
+**Support** (ticketing) and a general **Seller State** concept beyond what
+`order/`/`delivery/` already model do not exist anywhere in this
+capability yet; designing either is future work with no committed shape.
 
 ## Dependency rule: Commerce → Port ← Messenger Adapter
 

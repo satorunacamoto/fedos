@@ -128,6 +128,32 @@ New-Item -ItemType Junction -Path "new-worktree/node_modules" -Target "sibling-w
 New-Item -ItemType Junction -Path "new-worktree/packages/fedos-desktop-electron-spike/node_modules" -Target "sibling-worktree/packages/fedos-desktop-electron-spike/node_modules"
 ```
 
+**This technique is FORBIDDEN for release/package validation** (`npm run
+release:beta`, `npm run package:beta`, `npm run package:electron-spike`, or
+any manual `electron-builder` invocation you intend to treat as a real
+signal). A junctioned `node_modules` is a directory some OTHER worktree
+owns and can mutate at any moment; its content is whatever that sibling
+last happened to install, not what THIS worktree's own
+`package.json`/`package-lock.json` declare. This is not a hypothetical
+risk — it is exactly the mechanism a real investigation traced two silent
+packaging defects to (missing `qrcode`, `@noble/curves`, `dijkstrajs`,
+`pngjs` from a shipped `app.asar`, both caused by the shared/junctioned
+`node_modules` drifting out from under the packaging run — see
+`docs/commerce/evidence/commerce_e2e_packaged_binary/packaged_binary_bootstrap_investigation_2026-08-12_agent_x_p1.md`,
+section "0. Two real, disclosed, PRE-EXISTING environmental defects").
+**Release/package validation must run from a worktree whose
+`node_modules` (root and `packages/fedos-desktop-electron-spike/`) were
+produced by that worktree's own `npm ci`.** A cheap, mechanical guard
+enforces this: `node scripts/release/guard_no_junctioned_node_modules.mjs`
+runs automatically as the first step of `npm run release:beta` (inside
+`build_release.mjs`) and as an npm `pre`-hook on `npm run package` /
+`npm run package:beta`, and refuses to proceed (non-zero exit) if either
+`node_modules` is missing or is a junction/symlink. It deliberately does
+NOT hash-verify every installed package against the lockfile — that would
+be a much larger integrity-checking system; the cheap identity check
+(real vs. junctioned) closes the specific, real failure mode above without
+that scope.
+
 ## Running tests
 
 ```
@@ -158,23 +184,27 @@ The real, single, deterministic sequence
 (`packages/fedos-desktop-electron-spike/scripts/build_release.mjs`, run
 via `npm run release:beta --prefix packages/fedos-desktop-electron-spike`):
 
-1. Verify a clean working tree (dirty-tree public artifacts are refused).
-2. Verify the electron-builder package allowlist config.
-3. Build the root `beta-runtime` `dist/` graph.
-4. Build the Electron package (main/preload/renderer/static assets — the
+1. Verify `node_modules` integrity — real, standalone directories this
+   worktree's own `npm ci` produced, never a junction/symlink shared with
+   another worktree (see "Fresh-worktree node_modules without a full `npm
+   install`" above for why this matters specifically for a release build).
+2. Verify a clean working tree (dirty-tree public artifacts are refused).
+3. Verify the electron-builder package allowlist config.
+4. Build the root `beta-runtime` `dist/` graph.
+5. Build the Electron package (main/preload/renderer/static assets — the
    two-pass `tsc` sequence above).
-5. Run `electron-builder` (NSIS installer + portable ZIP), via the
+6. Run `electron-builder` (NSIS installer + portable ZIP), via the
    existing package.json-snapshot/restore-protected wrapper script.
-6. Generate the release manifest (`release-manifest.v1.json` — records
+7. Generate the release manifest (`release-manifest.v1.json` — records
    git commit, WASM artifact sha256, per-artifact sha256/size, unsigned
    status, supported schema versions).
-7. Generate release checksums (`SHA256SUMS.txt`).
-8. Verify the release checksums (re-derived independently, not merely
-   re-read from step 6/7's own output).
-9. Scan the staging inputs for prohibited content (secrets, unexpected
-   paths) — note: this scans staging INPUTS, not the compressed NSIS/ZIP
-   containers themselves; it cannot prove total secret absence inside
-   the compressed artifacts.
+8. Generate release checksums (`SHA256SUMS.txt`).
+9. Verify the release checksums (re-derived independently, not merely
+   re-read from step 7/8's own output).
+10. Scan the staging inputs for prohibited content (secrets, unexpected
+    paths) — note: this scans staging INPUTS, not the compressed NSIS/ZIP
+    containers themselves; it cannot prove total secret absence inside
+    the compressed artifacts.
 
 **Precondition this script does not itself check:** `packages/fedos-core-rust/pkg/`
 must already exist (built per the section above) before running this

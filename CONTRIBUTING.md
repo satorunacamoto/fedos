@@ -106,7 +106,12 @@ history.
    master-landing or release-branch operation.
 5. Set up `node_modules` via a directory junction from a sibling
    worktree with a matching `package-lock.json` rather than a full
-   `npm install` — see `BUILDING.md`.
+   `npm install` — see `BUILDING.md`. **Exception: never do this for
+   release/package validation** (`npm run release:beta`/`package:beta`/
+   `package:electron-spike`) — that must run from a worktree with its own
+   `npm ci`-installed `node_modules`; a guard script enforces this
+   automatically (`scripts/release/guard_no_junctioned_node_modules.mjs`,
+   see `BUILDING.md`'s "Release pipeline" section for why).
 
 ## During an Arc
 
