@@ -174,7 +174,7 @@ Agent X checked the one thing no prior arc had: the hung packaged-binary PID's o
 
 ### Full validation suite (this pass, run sequentially on the fully-merged tree)
 
-- Targeted lane re-verification: 21 files / 445 tests / 0 fail (107 from K1+K2's new sealed-key durability suites + adjacent Reputation/Trust/architecture-boundary suites re-run against the merged tree, all passing; plus 8 real-Electron restart/corruption tests, plus 1 real-Electron packaged-binary happy-path test).
+- Targeted lane re-verification: 10 files / 116 tests / 0 fail (7 files / 107 tests: K1's and K2's new sealed-key durability suites, run together with adjacent Reputation/Trust/architecture-boundary suites against the merged tree; plus 2 real-Electron test files / 8 tests for restart persistence + corruption fail-closed; plus 1 real-Electron packaged-binary happy-path test).
 - `npm run test:current`: **164 files / 2484 passed + 6 skipped (2490 total) / 0 fail**.
 - OSS release verifier: **8/8 PASS**.
 - `npm run typecheck:core` / `npm run typecheck:electron`: **PASS**, zero errors attributable to any file this arc touched (one real regression — Agent X's `@ts-expect-error` suppressions in two `os/trust` files broke `typecheck:electron` under its own `tsconfig.test.json` program, which has `@types/node` visible unlike the root program `typecheck:core` uses — found and fixed by the coordinator, switched to `@ts-ignore` matching the identical fix Agent T independently made to the shared foundation file for the same reason).
@@ -192,7 +192,7 @@ The `qrcode` npm package was found genuinely absent from this shared environment
 ### Final validation
 
 ```
-TARGETED TESTS:        445/445
+TARGETED TESTS:        116/116
 PUBLIC TEST:            164 files / 2484 tests / 0 fail (6 skipped)
 LOAD FAILURES:          0
 OSS VERIFIER:           PASS (8/8)
