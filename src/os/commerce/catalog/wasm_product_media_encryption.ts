@@ -76,6 +76,7 @@
  */
 
 import type { FedosMasterSeedAuthority } from "../../core/vault/wasm/fedos_master_seed_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../../core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import { encrypt as runtimeEncrypt } from "../../core/vault/wasm/fedos_runtime_encrypt.js";
 import { exportCiphertext as runtimeExportCiphertext } from "../../core/vault/wasm/fedos_runtime_export_ciphertext.js";
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../../core/vault/wasm/fedos_wasm_loader.js";
@@ -108,17 +109,52 @@ const DEFAULT_DEPS: WasmProductMediaEncryptionDeps = {
 /**
  * The REAL `ProductMediaEncryptionPort` adapter — see this file's own
  * header for the full account (bridge choice, fail-closed cases,
- * testability). Never used as a default anywhere outside this arc's own
- * composition; `UnavailableProductMediaEncryption`
- * (`./product_media_encryption.ts`) remains the Port's own safe default
- * until a caller deliberately constructs and injects this class with a
- * real, unlocked `FedosMasterSeedAuthority`.
+ * testability).
+ *
+ * Commerce FINAL Closure arc (Agent M) — `authority` now defaults to a
+ * FRESH `new FedosWasmMasterSeedAuthority()` when omitted, mirroring this
+ * codebase's own established "accept an optional Authority; default to
+ * constructing a real one" convention exactly
+ * (`fedos_wasm_nostr_signing_authority.ts:112`'s
+ * `masterSeedAuthority ?? new FedosWasmMasterSeedAuthority()`,
+ * `fedos_nostr_nip17_v1_wire_adapter.ts:84`'s identical pattern). This is
+ * `./ipfs_media_store.ts`'s own DEFAULT `ProductMediaEncryptionPort` as of
+ * this arc (see that file's own header) — replacing
+ * `UnavailableProductMediaEncryption` as the thing a caller gets when they
+ * do not explicitly pass an `encryption` argument at all.
+ *
+ * IMPORTANT: a freshly-constructed, no-argument
+ * `FedosWasmMasterSeedAuthority` holds NO Master Seed (nothing is ever
+ * auto-generated or auto-restored on construction — see that class's own
+ * header) and is a SEPARATE instance from whatever Master Seed Authority a
+ * real running app may already have unlocked elsewhere. So this
+ * zero-argument default, in practice, behaves EXACTLY like
+ * `UnavailableProductMediaEncryption` (`resolveCommerceMediaKey()` fails
+ * closed to `null` on an authority that was never constructed through the
+ * real boot sequence / never had `generate()`/`restoreSealed()` called on
+ * it) UNTIL a real composition root deliberately constructs
+ * `new WasmProductMediaEncryption(theAppsSharedMasterSeedAuthority)` with
+ * the SAME, already-unlocked `FedosMasterSeedAuthority` instance the rest
+ * of the app uses (mirroring
+ * `fedos_conversation_production_crypto_authority_factory.ts`'s own
+ * "one Master Seed Authority instance, shared across every Authority that
+ * needs it" pattern) — that explicit wiring is the coordinator's own
+ * composition-root responsibility, not something this file can safely do
+ * on its own (constructing/unlocking a SEPARATE Master Seed here would be
+ * exactly the kind of "invent a parallel key" mistake this arc's own
+ * brief warns against). Never a plaintext downgrade either way: whether
+ * the authority in use is real-and-unlocked, real-and-empty, or the
+ * zero-arg default, `encrypt()` below still only ever returns real
+ * ciphertext or `null` — never plaintext.
  */
 export class WasmProductMediaEncryption implements ProductMediaEncryptionPort {
   readonly #authority: FedosMasterSeedAuthority;
   readonly #deps: WasmProductMediaEncryptionDeps;
 
-  constructor(authority: FedosMasterSeedAuthority, deps: WasmProductMediaEncryptionDeps = DEFAULT_DEPS) {
+  constructor(
+    authority: FedosMasterSeedAuthority = new FedosWasmMasterSeedAuthority(),
+    deps: WasmProductMediaEncryptionDeps = DEFAULT_DEPS,
+  ) {
     this.#authority = authority;
     this.#deps = deps;
   }
