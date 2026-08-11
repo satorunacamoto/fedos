@@ -29,7 +29,17 @@
  *     feasible.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
+// FedOS Commerce FINAL P1 Closure (coordinator) -- `@ts-ignore`, not this
+// repo's usual `@ts-expect-error`: this file is now also type-checked under
+// `packages/fedos-desktop-electron-spike/tsconfig.test.json`, which declares
+// `"types": ["node"]` (unlike the repo-root tsconfig `typecheck:core` uses),
+// so under THAT program `@types/node` is ambiently visible and an
+// `@ts-expect-error` here would itself error as "unused". `@ts-ignore`
+// tolerates being unnecessary in exactly that context while still
+// suppressing the real "no type declarations" error under `typecheck:core`'s
+// own program, where `@types/node` is not visible. Same fix, same rationale,
+// as `src/os/core/vault/wasm/fedos_sealed_signing_key_store.ts`.
+// @ts-ignore `node:fs` has no type declarations without `@types/node` in some of this repo's tsconfigs (see comment above).
 import { readFileSync } from "node:fs";
 import { parseFedosTrustIssuerSecretFromFileStorage } from "./fedos_trust_issuer_keypair.js";
 
@@ -52,7 +62,7 @@ export class FedosTrustIssuerEnvFileSecretProvider implements FedosTrustIssuerSe
   }
 
   loadSecretKeyBytes(): Uint8Array {
-    // @ts-expect-error `process` has no type declarations without `@types/node` in this project's tsconfig.
+    // @ts-ignore `process` has no type declarations without `@types/node` in some of this repo's tsconfigs (see this file's import-line comment above).
     const keyFilePath = process.env[this.#envVarName];
     if (keyFilePath === undefined || keyFilePath.length === 0) {
       throw new Error(

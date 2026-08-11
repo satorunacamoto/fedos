@@ -76,7 +76,17 @@ export function encodeFedosTrustEnvelopeToQrText<TPayload>(
   envelope: FedosTrustSignedEnvelope<TPayload>,
 ): string {
   const json = JSON.stringify(envelope);
-  // @ts-expect-error `Buffer` has no type declarations without `@types/node` in this project's tsconfig.
+  // FedOS Commerce FINAL P1 Closure (coordinator) -- `@ts-ignore`, not this
+  // repo's usual `@ts-expect-error`: this file is now also type-checked under
+  // `packages/fedos-desktop-electron-spike/tsconfig.test.json`, which
+  // declares `"types": ["node"]` (unlike the repo-root tsconfig
+  // `typecheck:core` uses), so under THAT program `@types/node` is ambiently
+  // visible and an `@ts-expect-error` here would itself error as "unused".
+  // `@ts-ignore` tolerates being unnecessary in exactly that context while
+  // still suppressing the real "no type declarations" error under
+  // `typecheck:core`'s own program, where `@types/node` is not visible. Same
+  // fix, same rationale, as `src/os/core/vault/wasm/fedos_sealed_signing_key_store.ts`.
+  // @ts-ignore `Buffer` has no type declarations without `@types/node` in some of this repo's tsconfigs (see comment above).
   const encoded = Buffer.from(json, "utf8").toString("base64url");
   return `${FEDOS_TRUST_QR_TEXT_PREFIX}${encoded}`;
 }
@@ -163,7 +173,17 @@ export function decodeFedosTrustEnvelopeFromQrText(
 
   let decodedJsonText: string;
   try {
-    // @ts-expect-error `Buffer` has no type declarations without `@types/node` in this project's tsconfig.
+    // FedOS Commerce FINAL P1 Closure (coordinator) -- `@ts-ignore`, not this
+  // repo's usual `@ts-expect-error`: this file is now also type-checked under
+  // `packages/fedos-desktop-electron-spike/tsconfig.test.json`, which
+  // declares `"types": ["node"]` (unlike the repo-root tsconfig
+  // `typecheck:core` uses), so under THAT program `@types/node` is ambiently
+  // visible and an `@ts-expect-error` here would itself error as "unused".
+  // `@ts-ignore` tolerates being unnecessary in exactly that context while
+  // still suppressing the real "no type declarations" error under
+  // `typecheck:core`'s own program, where `@types/node` is not visible. Same
+  // fix, same rationale, as `src/os/core/vault/wasm/fedos_sealed_signing_key_store.ts`.
+  // @ts-ignore `Buffer` has no type declarations without `@types/node` in some of this repo's tsconfigs (see comment above).
     decodedJsonText = Buffer.from(encoded, "base64url").toString("utf8");
   } catch {
     return { error: "malformed-base64" };
