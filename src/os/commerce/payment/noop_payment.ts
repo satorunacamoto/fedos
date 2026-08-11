@@ -24,10 +24,12 @@ import type {
   PaymentCapability,
   PaymentDecision,
   PaymentEvidence,
+  PaymentEvidenceProvenance,
   PaymentProvider,
   PaymentProviderStatus,
   PaymentRequest,
 } from "./types.js";
+import { verifyHmacSha256Hex } from "./callback_verification.js";
 
 /**
  * Substrings that mark a metadata VALUE as sensitive (case-insensitive).
@@ -129,6 +131,7 @@ function decision(
     reason,
     productId: request.productId,
     ...(request.buyerPubkey !== undefined ? { buyerPubkey: request.buyerPubkey } : {}),
+    ...(request.orderId !== undefined ? { orderId: request.orderId } : {}),
   };
 }
 
@@ -172,6 +175,22 @@ export class NoopPaymentProvider implements PaymentProvider {
   }
 }
 
+/** Constructor options for `PlaceholderPaymentProvider` (Payment Hardening, Gap #5). */
+export interface PlaceholderPaymentProviderOptions {
+  /**
+   * OPTIONAL HMAC-SHA256 shared secret. When supplied, `ingestCallback()`
+   * REQUIRES a valid signature (see this class's own header for the exact
+   * scheme) and rejects (`null`) anything unsigned or forged. When omitted
+   * (the default), `ingestCallback()` keeps its original unauthenticated
+   * dev/test behavior, but tags every evidence it returns
+   * `verification: { source: "provider_unverified" }` so it can never be
+   * mistaken for real settlement proof downstream. Never a real secret —
+   * this class contacts no rail and stores nothing outside this instance's
+   * memory.
+   */
+  readonly callbackSecret?: string;
+}
+
 /**
  * A dev/test provider that models the decision flow WITHOUT charging. It
  * rejects a negative amount or metadata that looks like a card/wallet/secret;
@@ -186,14 +205,44 @@ export class NoopPaymentProvider implements PaymentProvider {
  * the widened `PaymentProvider` contract is genuinely implementable end to
  * end, not just typed. Nothing here ever contacts a network or a rail; the
  * "ledger" is a `Map` that exists only for the lifetime of this instance.
+ *
+ * Payment Hardening (Commerce E2E Completion arc, Agent P — closes
+ * `docs/commerce/COMMERCE-GAP-CLASSIFICATION.md` Gap #5):
+ * `ingestCallback()` used to accept ANY `{paymentId, event}` payload with
+ * zero authentication and flip the ledger accordingly — a raw forged
+ * callback could reach `"accepted_placeholder"`. It now:
+ *
+ *   1. Optionally supports REAL HMAC-SHA256 verification: construct with
+ *      `{ callbackSecret }` and `ingestCallback()` will REQUIRE a valid
+ *      lowercase-hex `signature` field (HMAC-SHA256 over
+ *      `${paymentId}:${event}`, keyed by `callbackSecret`,
+ *      `./callback_verification.ts`) — an unsigned or forged callback is
+ *      rejected (`null`), the ledger is left untouched, and accepted
+ *      evidence is tagged `verification: { source: "provider_verified" }`.
+ *   2. When constructed with NO `callbackSecret` (the default — matches
+ *      this class's original, pre-hardening behavior exactly, so existing
+ *      callers/tests are unaffected), `ingestCallback()` still accepts an
+ *      unsigned payload, but every piece of evidence it returns is now
+ *      explicitly tagged `verification: { source: "provider_unverified",
+ *      authoritative: false }`. `payment/state_machine.ts` allowlists ONLY
+ *      `"provider_verified"`/`"test_simulator"` evidence for a real
+ *      settlement transition — so even in this default, unauthenticated
+ *      mode, calling `ingestCallback()` can mutate THIS instance's own
+ *      internal ledger (as it always could, and as
+ *      `test/architecture_payment_provider_btcpay_readiness.test.ts` still
+ *      exercises directly), but it is now structurally UNABLE to cause a
+ *      real PAID-equivalent transition anywhere downstream — see
+ *      `test/commerce_payment_callback_hardening.test.ts`.
  */
 export class PlaceholderPaymentProvider implements PaymentProvider {
   #ledger = new Map<string, { productId: string; status: PaymentDecision["status"]; expiresAt?: number }>();
   #nextId = 0;
   #idempotency = new Map<string, string>(); // idempotencyKey -> paymentId
+  #callbackSecret: string | undefined;
 
-  constructor() {
+  constructor(options: PlaceholderPaymentProviderOptions = {}) {
     // Does nothing: no rail, wallet, or checkout session is contacted.
+    this.#callbackSecret = options.callbackSecret;
   }
 
   getStatus(): PaymentProviderStatus {
@@ -284,19 +333,56 @@ export class PlaceholderPaymentProvider implements PaymentProvider {
       observedAt: now,
       status: evidenceStatus,
       reason: `placeholder ledger state: ${entry.status}`,
+      // A poll of this in-memory ledger is never itself an authenticated
+      // read of a real rail (there is no real rail behind it) — always tag
+      // "provider_unverified", regardless of how the ledger got here. Only
+      // the specific `ingestCallback()` invocation that verified a
+      // signature is allowed to hand out `"provider_verified"` evidence —
+      // see this class's own header (Payment Hardening, Gap #5).
+      verification: { source: "provider_unverified", authoritative: false, provider: "placeholder" },
     };
   }
 
   /**
-   * Recognizes exactly one payload shape: `{ paymentId: string; event: "settled"|"expired"|"refunded" }`.
-   * Anything else (wrong shape, unknown paymentId, unrecognized event) returns
-   * `null` rather than throwing — a malformed/foreign callback is data, not an error.
+   * Recognizes exactly one payload shape:
+   * `{ paymentId: string; event: "settled"|"expired"|"refunded"; signature?: string }`.
+   * Anything else (wrong shape, unknown paymentId, unrecognized event)
+   * returns `null` rather than throwing — a malformed/foreign callback is
+   * data, not an error.
+   *
+   * Payment Hardening (Gap #5): when this instance was constructed with a
+   * `callbackSecret`, `signature` MUST be a valid lowercase-hex
+   * HMAC-SHA256 over `${paymentId}:${event}` keyed by that secret — an
+   * unsigned or forged callback is rejected (`null`), and the ledger is
+   * left completely untouched. When no `callbackSecret` was configured
+   * (the default), behavior is unchanged from before this hardening pass
+   * — but the returned evidence is tagged `"provider_unverified"`, never
+   * `"provider_verified"`.
    */
   async ingestCallback(payload: unknown): Promise<PaymentEvidence | null> {
     if (typeof payload !== "object" || payload === null) return null;
-    const candidate = payload as { paymentId?: unknown; event?: unknown };
+    const candidate = payload as { paymentId?: unknown; event?: unknown; signature?: unknown };
     if (typeof candidate.paymentId !== "string" || typeof candidate.event !== "string") return null;
     if (!["settled", "expired", "refunded"].includes(candidate.event)) return null;
+
+    let provenance: PaymentEvidenceProvenance;
+    if (this.#callbackSecret !== undefined) {
+      // Hardened mode: a signature is REQUIRED and MUST verify. Reject
+      // BEFORE touching the ledger — a forged/unsigned callback must never
+      // be able to mutate state, even transiently.
+      if (typeof candidate.signature !== "string") return null;
+      const message = `${candidate.paymentId}:${candidate.event}`;
+      const valid = await verifyHmacSha256Hex(this.#callbackSecret, message, candidate.signature);
+      if (!valid) return null;
+      provenance = {
+        source: "provider_verified",
+        authoritative: true,
+        provider: "placeholder",
+        verifiedAt: Math.floor(Date.now() / 1000),
+      };
+    } else {
+      provenance = { source: "provider_unverified", authoritative: false, provider: "placeholder" };
+    }
 
     const entry = this.#ledger.get(candidate.paymentId);
     if (entry === undefined) return null;
@@ -305,7 +391,8 @@ export class PlaceholderPaymentProvider implements PaymentProvider {
     if (candidate.event === "expired") entry.status = "expired";
     if (candidate.event === "refunded") entry.status = "refunded";
 
-    return this.observePayment(candidate.paymentId);
+    const evidence = await this.observePayment(candidate.paymentId);
+    return { ...evidence, verification: provenance };
   }
 
   async cancelPayment(paymentId: string): Promise<PaymentDecision> {
@@ -344,6 +431,7 @@ export class PlaceholderPaymentProvider implements PaymentProvider {
       observedAt: now,
       status: "refunded",
       reason: "placeholder refund (nothing was ever actually charged, so nothing is actually reversed)",
+      verification: { source: "provider_unverified", authoritative: false, provider: "placeholder" },
     };
   }
 }
