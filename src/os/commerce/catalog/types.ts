@@ -49,6 +49,20 @@ export interface Product {
   readonly linkedEventIds: readonly string[];
   /** Ids of the `DigitalAsset`s that back this product. */
   readonly assetIds: readonly string[];
+  /**
+   * Merchant Product CRUD + Product Media + MediaStore Port arc (Gap #10).
+   * Optional in-stock count, display/policy metadata only — mirrors
+   * `priceCents`'s own "no charging" discipline: nothing in this layer
+   * decrements it. `undefined` means "not tracked" (unlimited/unknown),
+   * distinct from `0` ("tracked, currently out of stock").
+   *
+   * TODO(Order integration, Agent O's lane): once an `Order` concept
+   * exists, wire a decrement-on-confirmed-grant seam. No `Order` type
+   * exists yet anywhere in this codebase (see `src/os/commerce/README.md`)
+   * so no decrement path is implemented here — inventing one now would
+   * mean guessing at Order's shape instead of consuming a real one.
+   */
+  readonly stock?: number;
 }
 
 /**
