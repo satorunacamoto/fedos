@@ -101,6 +101,20 @@ export { LocalTradeCompletionAttestationStore } from "./trade_completion_attesta
 // second attestation" survive a restart.
 export { DurableTradeCompletionAttestationStore } from "./persistence/durable_trade_completion_attestation_store.js";
 
+// FedOS Commerce FINAL P1 Closure (Agent K1) -- durable, sealed-at-rest
+// custody for the Persona Epoch signing keypair itself (closes the OTHER
+// half of the restart-durability gap `DurablePersonaEpochRegistry` above
+// does not cover -- that registry persists the `PersonaEpoch` domain
+// object, this persists the actual signing key material, sealed).
+export {
+  COMMERCE_PERSONA_EPOCH_SIGNING_KEY_PURPOSE,
+  DurableSealedSigningKeyStore,
+  resolvePersonaEpochSigningKeypair,
+  sealNextGenerationPersonaEpochSigningKeypair,
+  type PersonaEpochSigningKeySealingAuthorityLike,
+  type PersonaEpochSigningKeyResolveResult,
+} from "./persistence/durable_persona_epoch_signing_key_store.js";
+
 export {
   buildReputationAttestationSummary,
   issueTradeCompletionAttestation,

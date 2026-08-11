@@ -721,6 +721,19 @@ interface RootModules {
       store: CommerceTradeCompletionAttestationStoreLike,
       asOf: number,
     ) => CommercePersonaBoardQueryResultLike | undefined;
+    /** Commerce FINAL P1 Closure (Agent K1) -- restart-durable, sealed-at-rest
+     * custody for the Persona Epoch signing keypair; see that module's own
+     * header for the full design. */
+    readonly generatePersonaEpochId: () => string;
+    readonly DurableSealedSigningKeyStore: new (filePath: string) => CommerceSealedSigningKeyStoreLike;
+    readonly resolvePersonaEpochSigningKeypair: (
+      masterSeedAuthority: MasterSeedAuthorityLike | null,
+      store: CommerceSealedSigningKeyStoreLike,
+      subjectId: string,
+      createIfAbsent: boolean,
+      candidateEpochIdForFreshKey: string,
+      nowUnixSeconds: number,
+    ) => Promise<CommercePersonaEpochSigningKeyResolveResultLike>;
   };
   /**
    * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent M's real
@@ -964,6 +977,23 @@ interface CommercePersonaBoardQueryResultLike {
     readonly rejectedSignatureAttestations: number;
   };
 }
+/**
+ * FedOS Commerce FINAL P1 Closure (Agent K1) -- structural mirrors of
+ * `os/commerce/reputation/persistence/durable_persona_epoch_signing_key_store.ts`'s
+ * real shapes. `CommerceSealedSigningKeyStoreLike` is deliberately an
+ * opaque marker type -- this file never calls any method on it directly
+ * (all store access happens inside `resolvePersonaEpochSigningKeypair`/
+ * `sealNextGenerationPersonaEpochSigningKeypair`), it only constructs one
+ * and passes it through.
+ */
+type CommerceSealedSigningKeyStoreLike = { readonly __fedosSealedSigningKeyStoreOpaqueBrand?: never };
+interface CommercePersonaEpochSigningKeyResolveResultLike {
+  readonly outcome: "restored" | "created" | "not-found" | "sealing-unavailable" | "seal-failed" | "corrupted";
+  readonly keypair?: CommercePersonaEpochSigningKeypairLike;
+  readonly generation?: number;
+  readonly epochId?: string;
+  readonly reason?: string;
+}
 
 /**
  * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- structural mirror
@@ -1095,6 +1125,9 @@ async function loadRootModules(): Promise<RootModules> {
     createPersonaEpoch: RootModules["Reputation"]["createPersonaEpoch"];
     issueTradeCompletionAttestation: RootModules["Reputation"]["issueTradeCompletionAttestation"];
     queryPersonaBoardView: RootModules["Reputation"]["queryPersonaBoardView"];
+    generatePersonaEpochId: RootModules["Reputation"]["generatePersonaEpochId"];
+    DurableSealedSigningKeyStore: RootModules["Reputation"]["DurableSealedSigningKeyStore"];
+    resolvePersonaEpochSigningKeypair: RootModules["Reputation"]["resolvePersonaEpochSigningKeypair"];
   };
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent M's real
   // media adapters, now barreled from `os/commerce/index.js` (the SAME
@@ -1182,6 +1215,9 @@ async function loadRootModules(): Promise<RootModules> {
       createPersonaEpoch: reputation.createPersonaEpoch,
       issueTradeCompletionAttestation: reputation.issueTradeCompletionAttestation,
       queryPersonaBoardView: reputation.queryPersonaBoardView,
+      generatePersonaEpochId: reputation.generatePersonaEpochId,
+      DurableSealedSigningKeyStore: reputation.DurableSealedSigningKeyStore,
+      resolvePersonaEpochSigningKeypair: reputation.resolvePersonaEpochSigningKeypair,
     },
     Media: {
       IpfsMediaStore: commerceMedia.IpfsMediaStore,
@@ -1346,34 +1382,50 @@ function commerceReceiptSigningState(): { readonly issuerId: string; readonly ke
 // left inconsistent: it is this coordinator's real-pubkey -> PersonaEpoch
 // identity-minting CACHE, and it also holds each epoch's live
 // `PersonaEpochSigningKeypair` (a raw secp256k1 secret key). Persisting
-// that keypair safely needs a sealed/encrypted-at-rest key store (the
+// that keypair safely needed a sealed/encrypted-at-rest key store (the
 // same class of primitive `FedosMasterSeedAuthority`'s own sealed-secret
-// storage already provides elsewhere in this codebase) -- inventing that
-// wiring under this arc's own time budget, for a secret key, is exactly
-// the kind of judgment call this arc's mandate says to disclose rather
-// than force through. Net effect after a real restart: past attestations
-// remain durable and query-able BY EPOCH ID, and cannot be duplicated,
-// but resolving "this real pubkey's persona epoch" via
-// `commercePersonaEpochForPubkey()` mints a FRESH, unlinked epoch rather
-// than resuming the pre-restart one -- a real, bounded, disclosed gap,
-// not a regression this arc introduced (this mapping was equally
-// in-memory-only before this arc too).
+// storage already provides elsewhere in this codebase) -- FedOS Commerce
+// FINAL P1 Closure (Agent K1) closes that gap: `commercePersonaEpochForPubkey()`
+// below now ALSO tries the durable, sealed-at-rest
+// `os/commerce/reputation/persistence/durable_persona_epoch_signing_key_store.ts`
+// before ever minting a fresh (unsealed, process-lifetime-only) keypair, so
+// a real restart resumes the SAME persona epoch for a real pubkey that
+// already had one, rather than silently minting an unlinked replacement.
+// `commercePersonaEpochByPubkey` remains a process-lifetime IN-MEMORY
+// CACHE in front of that durable truth (fast path for repeat lookups
+// within one process run), never the sole source of truth anymore. When no
+// unlocked Master Seed Authority is currently available (or the seal
+// attempt itself fails), this falls back to the EXACT PRE-EXISTING
+// in-memory-only behavior -- graceful degradation, never a hard failure
+// (see the function body's own comments for the "sealing-unavailable" /
+// "seal-failed" branch). A `"corrupted"` sealed record (tampered
+// ciphertext, wrong Master Seed) is NEVER silently treated as absent-and-
+// safe-to-replace -- it is logged loudly and the lookup returns `undefined`
+// rather than fabricating a working identity.
 //
 // PSEUDONYM MAPPING: `os/commerce/reputation`'s own domain layer
 // deliberately holds no mapping from a real pubkey to a `PersonaEpoch`
 // (`persona_epoch_registry.ts`'s own header) -- that binding is this
 // coordinator's job. `commercePersonaEpochByPubkey` below is that mapping,
-// scoped to this demo/pilot build: ONE persona epoch is lazily minted per
-// real pubkey the first time it is needed (either by an order completing,
-// or by an explicit Persona Board query for a pubkey that already has
-// one), never re-derived from key material -- exactly the "free to
-// generate, no Sybil resistance" property `attestation_types.ts`'s own
-// header documents and warns a UI must never contradict.
+// scoped to this demo/pilot build: ONE persona epoch is lazily minted (and,
+// as of this closure, durably sealed) per real pubkey the first time it is
+// needed (either by an order completing, or by an explicit Persona Board
+// query for a pubkey that already has one), never re-derived from key
+// material -- exactly the "free to generate, no Sybil resistance" property
+// `attestation_types.ts`'s own header documents and warns a UI must never
+// contradict. Sealing changes WHERE the key lives (durable vs. process-
+// lifetime), never how it is generated or what it proves.
 // ---------------------------------------------------------------------
 
 let commercePersonaEpochRegistry: CommercePersonaEpochRegistryLike | null = null;
 let commerceAttestationStore: CommerceTradeCompletionAttestationStoreLike | null = null;
-/** real pubkey -> that pubkey's own lazily-minted Persona Epoch + signing keypair. */
+/** FedOS Commerce FINAL P1 Closure (Agent K1) -- the durable, sealed-at-rest
+ * signing-key store `commercePersonaEpochForPubkey()` reads/writes through
+ * `resolvePersonaEpochSigningKeypair()`; never accessed with any other
+ * method directly from this file (see `CommerceSealedSigningKeyStoreLike`'s
+ * own doc comment). */
+let commercePersonaEpochSigningKeyStore: CommerceSealedSigningKeyStoreLike | null = null;
+/** real pubkey -> that pubkey's own lazily-minted Persona Epoch + signing keypair -- an IN-PROCESS CACHE in front of the durable sealed store, not the sole source of truth (see this section's own header comment). */
 const commercePersonaEpochByPubkey = new Map<
   string,
   { readonly epoch: CommercePersonaEpochLike; readonly keypair: CommercePersonaEpochSigningKeypairLike }
@@ -1381,7 +1433,11 @@ const commercePersonaEpochByPubkey = new Map<
 /** A Persona Epoch's validity window -- one year, chosen as a reasonable pilot-scale default; not itself a Reputation domain-layer decision (see `persona_epoch.ts`'s own validity-window shape, which takes any caller-supplied window). */
 const COMMERCE_PERSONA_EPOCH_VALIDITY_SECONDS = 60 * 60 * 24 * 365;
 
-function commerceReputationState(): { readonly registry: CommercePersonaEpochRegistryLike; readonly store: CommerceTradeCompletionAttestationStoreLike } {
+function commerceReputationState(): {
+  readonly registry: CommercePersonaEpochRegistryLike;
+  readonly store: CommerceTradeCompletionAttestationStoreLike;
+  readonly signingKeyStore: CommerceSealedSigningKeyStoreLike;
+} {
   const m = requireModules();
   fs.mkdirSync(path.dirname(commerceDurableFilePath("persona_epochs")), { recursive: true });
   if (commercePersonaEpochRegistry === null) {
@@ -1390,29 +1446,114 @@ function commerceReputationState(): { readonly registry: CommercePersonaEpochReg
   if (commerceAttestationStore === null) {
     commerceAttestationStore = new m.Reputation.DurableTradeCompletionAttestationStore(commerceDurableFilePath("trade_attestations"));
   }
-  return { registry: commercePersonaEpochRegistry, store: commerceAttestationStore };
+  if (commercePersonaEpochSigningKeyStore === null) {
+    commercePersonaEpochSigningKeyStore = new m.Reputation.DurableSealedSigningKeyStore(commerceDurableFilePath("persona_epoch_signing_keys"));
+  }
+  return { registry: commercePersonaEpochRegistry, store: commerceAttestationStore, signingKeyStore: commercePersonaEpochSigningKeyStore };
 }
 
 /**
- * Looks up (or, when `createIfAbsent`, lazily mints and registers) the
- * Persona Epoch standing in for `realPubkey`. Returns `undefined` when
+ * Looks up (or, when `createIfAbsent`, lazily mints, seals, and registers)
+ * the Persona Epoch standing in for `realPubkey`. Returns `undefined` when
  * absent and `createIfAbsent` is `false` -- the read-only Persona Board
  * query path (`handleCommercePersonaBoardQuery`) never fabricates a
  * "no history yet" epoch just because someone asked about it; only a real
  * completed order (`issueReputationAttestationsForCompletedOrderNonFatal`)
  * mints one.
+ *
+ * FedOS Commerce FINAL P1 Closure (Agent K1): now ALWAYS tries the durable,
+ * sealed-at-rest signing-key store BEFORE giving up (`createIfAbsent:
+ * false`) or minting a brand-new, unsealed epoch (`createIfAbsent: true`)
+ * -- restart durability for BOTH read and create paths, see this section's
+ * own header comment.
  */
-function commercePersonaEpochForPubkey(
+async function commercePersonaEpochForPubkey(
   realPubkey: string,
   createIfAbsent: boolean,
-): { readonly epoch: CommercePersonaEpochLike; readonly keypair: CommercePersonaEpochSigningKeypairLike } | undefined {
+): Promise<{ readonly epoch: CommercePersonaEpochLike; readonly keypair: CommercePersonaEpochSigningKeypairLike } | undefined> {
   const existing = commercePersonaEpochByPubkey.get(realPubkey);
   if (existing !== undefined) return existing;
-  if (!createIfAbsent) return undefined;
+
   const m = requireModules();
+  const { registry, signingKeyStore } = commerceReputationState();
   const now = Math.floor(Date.now() / 1000);
+  // Cheap to generate even when it may go unused (restore succeeds, or
+  // createIfAbsent is false) -- see `durable_persona_epoch_signing_key_store.ts`'s
+  // own header, "MINTING ORDER", for why this must be decided before the
+  // resolve call rather than inside it.
+  const candidateEpochId = m.Reputation.generatePersonaEpochId();
+
+  const resolved = await m.Reputation.resolvePersonaEpochSigningKeypair(
+    activeMasterSeedAuthority,
+    signingKeyStore,
+    realPubkey,
+    createIfAbsent,
+    candidateEpochId,
+    now,
+  );
+
+  if (resolved.outcome === "not-found") {
+    // Only reachable when createIfAbsent was false -- ordinary absent
+    // state, matches the pre-existing "nothing minted yet" behavior
+    // exactly (no log, no side effect).
+    return undefined;
+  }
+
+  if (resolved.outcome === "corrupted") {
+    // NEVER silently mint a replacement identity here (arc mandate) --
+    // loud, non-fatal: log and report "not found" to the caller, the same
+    // shape as every other "can't produce a working identity" case below.
+    console.error(
+      `fedos-beta: commerce persona epoch signing key for a real pubkey failed to restore (corrupted/tampered -- refusing to fabricate a replacement identity): ${resolved.reason}`,
+    );
+    return undefined;
+  }
+
+  if (resolved.outcome === "restored") {
+    const epoch = registry.findById(resolved.epochId as string);
+    if (epoch === undefined) {
+      // Cross-store inconsistency: a sealed signing key exists for this
+      // pubkey but the durable PersonaEpochRegistry has no matching
+      // epochId. Same "never fabricate a replacement identity" discipline
+      // as the "corrupted" branch above.
+      console.error(
+        `fedos-beta: commerce persona epoch signing key restored for a real pubkey but epochId "${String(resolved.epochId)}" is not registered in the durable PersonaEpochRegistry (corrupted cross-store state) -- refusing to fabricate a replacement identity.`,
+      );
+      return undefined;
+    }
+    const entry = { epoch, keypair: resolved.keypair as CommercePersonaEpochSigningKeypairLike };
+    commercePersonaEpochByPubkey.set(realPubkey, entry);
+    return entry;
+  }
+
+  if (resolved.outcome === "created") {
+    // Sealing succeeded -- build + register the REAL PersonaEpoch domain
+    // object around the SAME keypair that was just sealed (never a
+    // separately-generated one; see `durable_persona_epoch_signing_key_store.ts`'s
+    // own header, "MINTING ORDER", for why `m.Reputation.createPersonaEpoch()`
+    // itself is not used on this path).
+    const epoch: CommercePersonaEpochLike = {
+      epochId: resolved.epochId as string,
+      epochKeyPublicHex: (resolved.keypair as CommercePersonaEpochSigningKeypairLike).publicKeyHex,
+      validFrom: now,
+      validUntil: now + COMMERCE_PERSONA_EPOCH_VALIDITY_SECONDS,
+    };
+    registry.register(epoch);
+    const entry = { epoch, keypair: resolved.keypair as CommercePersonaEpochSigningKeypairLike };
+    commercePersonaEpochByPubkey.set(realPubkey, entry);
+    return entry;
+  }
+
+  // resolved.outcome is "sealing-unavailable" or "seal-failed" -- graceful
+  // degradation, NOT a regression: never mint anything on a read-only
+  // query (createIfAbsent === false must behave exactly like "not-found").
+  if (!createIfAbsent) return undefined;
+  // Fall back to the EXACT pre-existing in-memory-only behavior (mint an
+  // unsealed, process-lifetime-only epoch+keypair) so Commerce never
+  // hard-fails just because no profile is currently unlocked or a seal
+  // attempt failed.
   const created = m.Reputation.createPersonaEpoch(now, now + COMMERCE_PERSONA_EPOCH_VALIDITY_SECONDS);
-  commerceReputationState().registry.register(created.epoch);
+  registry.register(created.epoch);
   const entry = { epoch: created.epoch, keypair: created.keypair };
   commercePersonaEpochByPubkey.set(realPubkey, entry);
   return entry;
@@ -1449,8 +1590,8 @@ async function issueReputationAttestationsForCompletedOrderNonFatal(order: Comme
     const m = requireModules();
     const state = commerceState();
     const { store } = commerceReputationState();
-    const buyer = commercePersonaEpochForPubkey(order.buyerPubkey, true);
-    const seller = commercePersonaEpochForPubkey(order.sellerPubkey, true);
+    const buyer = await commercePersonaEpochForPubkey(order.buyerPubkey, true);
+    const seller = await commercePersonaEpochForPubkey(order.sellerPubkey, true);
     if (buyer === undefined || seller === undefined) return;
     const product = state.products.get(order.productId);
     const category = commerceReputationCategoryForProductKind(product?.kind ?? "other");
@@ -3082,7 +3223,7 @@ async function handleCommerceOrderComplete(payload: unknown) {
 async function handleCommercePersonaBoardQuery(payload: unknown) {
   const subjectPubkey = (payload as { subjectPubkey?: unknown } | null)?.subjectPubkey;
   if (!isBoundedString(subjectPubkey, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed subjectPubkey" };
-  const entry = commercePersonaEpochForPubkey(subjectPubkey, false);
+  const entry = await commercePersonaEpochForPubkey(subjectPubkey, false);
   if (entry === undefined) return { outcome: "not-found", reason: "no persona/reputation history on record for this pubkey yet" };
   const m = requireModules();
   const { registry, store } = commerceReputationState();
