@@ -11,7 +11,9 @@
   "dependencies": {
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "dijkstrajs": "^1.0.1",
+    "pngjs": "^5.0.0"
   },
   "scripts": {
     "ensure-electron-binary": "node scripts/ensure_electron_binary.mjs",

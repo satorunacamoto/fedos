@@ -17,6 +17,8 @@
     "dist/fedos_electron_beta_commerce_demo_media.js",
     "package.json",
     "node_modules/**/*",
+    "node_modules/dijkstrajs/**/*",
+    "node_modules/pngjs/**/*",
     "!**/*.map",
     "!src/**/*",
     "!test/**/*"
