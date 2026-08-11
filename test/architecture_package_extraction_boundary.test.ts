@@ -55,7 +55,7 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     expect(appBlockers).toEqual([]);
   });
 
-  it("does not regress past the currently-measured blocker baseline (7, up from 3 -- Commerce E2E Completion arc, Wave B -- a new violation must update this number deliberately, never silently)", () => {
+  it("does not regress past the currently-measured blocker baseline (10, up from 7 -- Commerce FINAL Closure Mega-Arc, Agent N -- a new violation must update this number deliberately, never silently)", () => {
     // Commerce E2E Completion arc, Wave B: 4 new, DELIBERATE, reviewed blockers on
     // top of the pre-existing 3 (os/core -> packages/fedos-core-rust; the two
     // pre-existing catalog/adapters/nostr/{bridge,classify}.ts -> os/messenger
@@ -73,8 +73,22 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     //     does not forbid this direction today (confirmed, re-verified independently
     //     by both Agent R and Agent T), and `test/architecture_boundary_trust.test.ts`
     //     only forbids the opposite direction.
+    //
+    // Commerce FINAL Closure Mega-Arc (Agent N): 3 more new, DELIBERATE,
+    // reviewed blockers on top of the prior 7 -- the SUBSCRIBE/inbound
+    // counterpart of the existing outbound bridge:
+    //   - catalog/adapters/nostr/commerce_inbound_event_bridge.ts (Agent N) ->
+    //     os/messenger's Nostr protocol layer, 3 import sites (`event.js`'s
+    //     `isNostrEvent`, `noble_signature.js`'s `NobleSignatureVerifier`,
+    //     `signature.js`'s `SignatureVerifier` type) -- lives in the SAME
+    //     NOSTR_ADAPTER_DIR the outbound `commerce_event_bridge.ts` already
+    //     uses; same narrowly-scoped exception, not a new category of leak.
+    //     This file performs real signature verification on inbound Commerce
+    //     Nostr events (`../../../events/commerce_nostr_event_read_model.ts`'s
+    //     own input) -- it is the read-side of the SAME adapter boundary the
+    //     write-side blockers above already crossed.
     const { blockers } = runScan();
-    expect(blockers.length).toBeLessThanOrEqual(7);
+    expect(blockers.length).toBeLessThanOrEqual(10);
   });
 
   it("every blocker belongs to one of the three os/* roots (never the already-clean Electron app)", () => {
