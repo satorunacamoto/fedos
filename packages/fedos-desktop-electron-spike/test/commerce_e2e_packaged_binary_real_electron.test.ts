@@ -57,6 +57,27 @@
  * either). If this test is flaky or times out, re-run it in isolation
  * on an otherwise-idle machine before treating a failure as a product
  * regression.
+ *
+ * FedOS Commerce FINAL Closure (Agent X, harness-hardening investigation
+ * phase, subsequent session): the ORIGINAL version of this suite's
+ * wait-for-exit step only checked the disk-based step/checkpoint log ONCE,
+ * at the very end -- it could not tell "still making progress, just slow
+ * under host contention" apart from "genuinely hung" while a run was
+ * actually in flight, and left nothing behind for a future reader to
+ * correlate a slow/failed run against host conditions after the fact.
+ * `sampleHostTelemetry()`/`readLastCheckpoint()`/`countUiStepLines()` and
+ * the periodic sampler in the `it()` body below close that gap: every
+ * ~15 seconds while waiting for the packaged binary to exit, this suite now
+ * reads the already-written checkpoint/step-log lines (no new checkpoint
+ * labels added -- the existing `host-started`/`ui-script-iife-start`/
+ * `ui-script-have-window-isLoadingMainFrame=...`/`ui-script-page-loaded`
+ * labels already distinguish coarse app-level startup from CDP/window
+ * readiness) and fresh, read-only host CPU/memory/process-count telemetry,
+ * appending both to a new, additive evidence file
+ * (`packaged_binary_e2e_host_telemetry_timeline.md`, never overwriting or
+ * replacing `packaged_binary_e2e_evidence.md`'s own write). This is a
+ * test-harness-only, read-only diagnostic addition: no timeout was raised
+ * or lowered, no assertion was weakened, and no product code path changed.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, spawnSync, execFileSync } from "node:child_process";
@@ -117,6 +138,103 @@ function queryVersionInfo(exePath: string): VersionInfo {
   return powershellJson<VersionInfo>(
     `(Get-Item -LiteralPath ${JSON.stringify(exePath)}).VersionInfo | Select-Object ProductName,FileVersion,ProductVersion | ConvertTo-Json -Compress`,
   );
+}
+
+/**
+ * FedOS Commerce FINAL Closure (Agent X, harness-hardening investigation
+ * phase) -- Part 2 of `docs/commerce/COMMERCE-PACKAGED-BINARY-E2E-CLOSURE.md`
+ * was left "disclosed, not root-caused": repeated live runs correlated the
+ * packaged binary's dramatically slow/non-completing startup with severe,
+ * independently-measured host memory pressure (free RAM observed falling
+ * from 1.36 GB to 0.70 GB of 15.18 GB total, 280+ concurrent processes from
+ * sibling worktrees), but a prior run of this exact suite only ever
+ * measured elapsed TOTAL time and checked the step log ONCE, at the very
+ * end (`exitCode`'s own `await`) -- it could not tell "still making
+ * progress, just slow under real host contention" apart from "genuinely
+ * hung" while the run was actually in flight, nor could it tell a future
+ * reader which explanation applied after the fact. This function (read-only
+ * inventory only, same discipline as `queryWin32Process`/`queryVersionInfo`
+ * above) gives the periodic sampler below a fresh host-contention reading
+ * on each poll -- never invoked outside this test file, never on a real
+ * production launch.
+ */
+interface HostTelemetrySample {
+  readonly totalProcesses: number;
+  readonly nodeCount: number;
+  readonly electronCount: number;
+  readonly cargoCount: number;
+  readonly freeMemMB: number;
+  readonly totalMemMB: number;
+  readonly avgCpuLoadPercent: number | null;
+}
+
+function sampleHostTelemetry(): HostTelemetrySample | null {
+  try {
+    return powershellJson<HostTelemetrySample>(
+      "$os = Get-CimInstance Win32_OperatingSystem; " +
+        "$cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average; " +
+        "$procs = Get-CimInstance Win32_Process; " +
+        "[PSCustomObject]@{ " +
+        "totalProcesses = $procs.Count; " +
+        "nodeCount = ($procs | Where-Object { $_.Name -eq 'node.exe' }).Count; " +
+        "electronCount = ($procs | Where-Object { $_.Name -like '*lectron*' -or $_.Name -like '*FedOS*' }).Count; " +
+        "cargoCount = ($procs | Where-Object { $_.Name -eq 'cargo.exe' -or $_.Name -eq 'rustc.exe' }).Count; " +
+        "freeMemMB = [math]::Round($os.FreePhysicalMemory/1024,2); " +
+        "totalMemMB = [math]::Round($os.TotalVisibleMemorySize/1024,2); " +
+        "avgCpuLoadPercent = $cpu.Average " +
+        "} | ConvertTo-Json -Compress",
+    );
+  } catch {
+    // Best-effort diagnostic only -- a failed telemetry sample must never
+    // fail or mask the real test assertion.
+    return null;
+  }
+}
+
+/**
+ * Reads the SAME disk-based step log the packaged binary itself writes
+ * (`FEDOS_BETA_UI_STEP_LOG_FILE`, see `fedos_electron_beta_main.cts`'s own
+ * doc comment) and returns the most recent
+ * `FEDOS_ELECTRON_BETA_CHECKPOINT:<label>:<timestamp>` lifecycle line, if
+ * any -- these ALREADY distinguish coarse app-level phases (`host-started`)
+ * from CDP/window readiness (`ui-script-have-window-isLoadingMainFrame=...`,
+ * `ui-script-page-loaded`) from the ui-script loop actually starting
+ * (`ui-script-iife-start`); this function adds no new checkpoint labels, it
+ * only lets a still-running harness read the ones already written so far,
+ * repeatedly, instead of only after the process exits.
+ */
+function readLastCheckpoint(stepLogFile: string): { readonly label: string; readonly timestampMs: number } | null {
+  if (!existsSync(stepLogFile)) return null;
+  let raw: string;
+  try {
+    raw = readFileSync(stepLogFile, "utf8");
+  } catch {
+    return null;
+  }
+  const marker = "FEDOS_ELECTRON_BETA_CHECKPOINT:";
+  let last: { label: string; timestampMs: number } | null = null;
+  for (const line of raw.split("\n")) {
+    if (!line.startsWith(marker)) continue;
+    const rest = line.slice(marker.length);
+    const sep = rest.lastIndexOf(":");
+    if (sep === -1) continue;
+    const timestampMs = Number(rest.slice(sep + 1));
+    if (!Number.isFinite(timestampMs)) continue;
+    last = { label: rest.slice(0, sep), timestampMs };
+  }
+  return last;
+}
+
+/** Counts `FEDOS_ELECTRON_BETA_UI_STEP_JSON:` lines written so far -- a coarse, always-available "how far into the 68-step script did it get" progress signal, independent of the checkpoint lines above. */
+function countUiStepLines(stepLogFile: string): number {
+  if (!existsSync(stepLogFile)) return 0;
+  try {
+    return readFileSync(stepLogFile, "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("FEDOS_ELECTRON_BETA_UI_STEP_JSON:")).length;
+  } catch {
+    return 0;
+  }
 }
 
 // Same synthetic demo pubkeys `fedos_electron_beta_renderer.ts`'s own
@@ -432,6 +550,73 @@ realSuite("FedOS Commerce End-to-End -- REAL electron-builder-packaged Beta bina
         }
       }
 
+      // FedOS Commerce FINAL Closure (Agent X, harness-hardening
+      // investigation phase) -- periodic host-telemetry + checkpoint-
+      // freshness sampler, ADDITIVE to the pre-existing single-shot
+      // wait-for-exit below (never replaces it, never affects the
+      // timeout/kill/assertion behavior). Every `POLL_INTERVAL_MS` while
+      // waiting for the packaged binary to exit, this samples (1) the most
+      // recent lifecycle checkpoint the binary itself has written to disk
+      // and how long ago that was (distinguishes "still progressing, just
+      // slow" from "genuinely stalled" -- the exact diagnostic gap Part 2
+      // of `docs/commerce/COMMERCE-PACKAGED-BINARY-E2E-CLOSURE.md` left
+      // open: that arc's own runs only ever checked the step log ONCE, at
+      // the very end), (2) how many `ui-script` step lines have landed so
+      // far, and (3) fresh host CPU/memory/process-count telemetry (same
+      // read-only `Win32_Process`/`Win32_OperatingSystem` inventory
+      // technique as `queryWin32Process` above). Written to its own,
+      // additive evidence file (never touches
+      // `packaged_binary_e2e_evidence.md`'s own write) so a future run's
+      // slowness/hang can be correlated against host contention after the
+      // fact instead of guessed at. Purely a test-harness diagnostic --
+      // reads already-written disk files and read-only OS process
+      // inventory; issues no commands to the packaged binary and changes
+      // no product code path.
+      const telemetryTimelinePath = join(evidenceDir, "packaged_binary_e2e_host_telemetry_timeline.md");
+      const runStartMs = Date.now();
+      function telemetryLine(): string {
+        const elapsedS = Math.round((Date.now() - runStartMs) / 1000);
+        const lastCheckpoint = readLastCheckpoint(stepLogFile);
+        const sinceLastCheckpointS = lastCheckpoint === null ? null : Math.round((Date.now() - lastCheckpoint.timestampMs) / 1000);
+        const stepLinesSoFar = countUiStepLines(stepLogFile);
+        const telemetry = sampleHostTelemetry();
+        return (
+          `t+${elapsedS}s | lastCheckpoint=${lastCheckpoint === null ? "NONE" : lastCheckpoint.label}` +
+          ` | secondsSinceLastCheckpoint=${sinceLastCheckpointS === null ? "n/a" : String(sinceLastCheckpointS)}` +
+          ` | uiStepLinesSoFar=${stepLinesSoFar}` +
+          ` | totalProcesses=${telemetry?.totalProcesses ?? "?"} | node=${telemetry?.nodeCount ?? "?"} | electron=${telemetry?.electronCount ?? "?"} | cargo=${telemetry?.cargoCount ?? "?"}` +
+          ` | freeMemMB=${telemetry?.freeMemMB ?? "?"} | totalMemMB=${telemetry?.totalMemMB ?? "?"} | avgCpuLoad%=${telemetry?.avgCpuLoadPercent ?? "?"}`
+        );
+      }
+      try {
+        mkdirSync(evidenceDir, { recursive: true });
+        writeFileSync(
+          telemetryTimelinePath,
+          [
+            "# Commerce E2E packaged binary -- host telemetry timeline (this run, generated by commerce_e2e_packaged_binary_real_electron.test.ts)",
+            "",
+            `Generated: ${new Date().toISOString()}`,
+            "",
+            "Sampled every ~15s while waiting for the packaged binary to exit, correlating the disk-based lifecycle checkpoint/step-log progress against fresh host CPU/memory/process-count telemetry -- lets a future reader distinguish host contention from a genuine product hang without guessing.",
+            "",
+            "```",
+            telemetryLine(),
+          ].join("\n") + "\n",
+        );
+      } catch {
+        /* evidence writing is best-effort, never masks a real test failure */
+      }
+      const POLL_INTERVAL_MS = 15000;
+      const pollTimer = setInterval(() => {
+        const line = telemetryLine();
+        record(`telemetry-sample: ${line}`);
+        try {
+          appendFileSync(telemetryTimelinePath, line + "\n");
+        } catch {
+          /* best-effort only */
+        }
+      }, POLL_INTERVAL_MS);
+
       const exitCode = await new Promise<number | null>((resolve) => {
         const timer = setTimeout(() => {
           try {
@@ -442,9 +627,15 @@ realSuite("FedOS Commerce End-to-End -- REAL electron-builder-packaged Beta bina
         }, 240000);
         child.once("exit", (code) => {
           clearTimeout(timer);
+          clearInterval(pollTimer);
           resolve(code);
         });
       });
+      try {
+        appendFileSync(telemetryTimelinePath, telemetryLine() + "\n```\n");
+      } catch {
+        /* best-effort only */
+      }
       record(`packaged binary process exit code: ${String(exitCode)}`);
 
       expect(existsSync(stepLogFile), "the packaged binary must have written the disk-based step log (proves AUTOTEST ui-script actually ran to completion, not just that the process launched)").toBe(true);
