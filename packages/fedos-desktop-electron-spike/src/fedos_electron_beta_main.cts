@@ -2897,7 +2897,7 @@ app.whenReady().then(async () => {
       }
       try {
         const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
-        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number; readonly targetSelector?: string }> = JSON.parse(scriptRaw);
+        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy" | "screenshot"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number; readonly targetSelector?: string }> = JSON.parse(scriptRaw);
         for (let i = 0; i < script.length; i++) {
           const step = script[i]!;
           if (step.action === "wait") {
@@ -2946,6 +2946,44 @@ app.whenReady().then(async () => {
             result = await window.webContents.executeJavaScript(
               `(() => { const src = document.querySelector(${JSON.stringify(selector)}); const dst = document.querySelector(${JSON.stringify(targetSelector)}); if (!src || !dst) return { outcome: "not-found" }; const v = ${as === "text" ? "src.textContent" : "src.value"}; dst.value = v; dst.dispatchEvent(new Event("input", { bubbles: true })); return { outcome: "ok", value: v }; })()`,
             );
+          } else if (step.action === "screenshot") {
+            // Commerce E2E Completion arc -- captures a real PNG of the
+            // CURRENT window contents via Electron's own `capturePage()`
+            // (real compositor output, not a DOM serialization/mock).
+            // Fails closed (never silently no-ops) on two independent
+            // conditions: (1) no `FEDOS_ELECTRON_BETA_SCREENSHOT_DIR` env
+            // var configured (mirrors every other `FEDOS_ELECTRON_BETA_*`
+            // override's own opt-in-only posture -- an ordinary launch,
+            // and every OTHER `ui-script` run that doesn't need
+            // screenshots, never writes to disk), and (2) `step.value`
+            // (the filename stem) failing a bounded, allowlisted-charset
+            // check -- never an arbitrary path from the script (no `..`,
+            // no path separators, no absolute path), even though this
+            // harness is already gated behind `AUTOTEST_MODE`/test-only
+            // use, matching this file's own "fail closed, never trust an
+            // input's shape" discipline elsewhere.
+            const screenshotDir = process.env.FEDOS_ELECTRON_BETA_SCREENSHOT_DIR ?? "";
+            const stem = step.value ?? "";
+            if (screenshotDir.length === 0) {
+              result = { outcome: "unavailable", reason: "FEDOS_ELECTRON_BETA_SCREENSHOT_DIR not configured" };
+            } else if (!/^[a-zA-Z0-9_-]{1,80}$/.test(stem)) {
+              result = { outcome: "invalid-input", reason: "screenshot filename stem must match ^[a-zA-Z0-9_-]{1,80}$" };
+            } else {
+              // An optional `selector` scrolls that element into view first
+              // (`capturePage()` only ever captures the current, possibly
+              // scrolled, viewport -- never the full document) -- best
+              // effort, never fails the step if the element is absent.
+              if (selector.length > 0) {
+                await window.webContents.executeJavaScript(
+                  `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (el) el.scrollIntoView({ block: "start" }); })()`,
+                );
+              }
+              const image = await window.webContents.capturePage();
+              const outPath = path.join(screenshotDir, `${stem}.png`);
+              fs.mkdirSync(screenshotDir, { recursive: true });
+              fs.writeFileSync(outPath, image.toPNG());
+              result = { outcome: "ok", value: outPath };
+            }
           } else if (step.action === "readGlobal") {
             // Secure Runtime Alpha 8121-8200 -- Security Finding 1
             // (`6873d24f`): reads `typeof window[<selector>]` for a small,
