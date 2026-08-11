@@ -108,9 +108,29 @@ function sha256OfFile(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-/** Runs a PowerShell command and parses its stdout as JSON. Read-only inventory calls only (process/version metadata) — never touches secrets. */
+/**
+ * Runs a PowerShell command and parses its stdout as JSON. Read-only inventory calls only (process/version metadata) — never touches secrets.
+ *
+ * Commerce Durability arc (coordinator, live-run finding) — Windows
+ * PowerShell 5.1's console output defaults to the SYSTEM codepage (e.g.
+ * CP932 on a Japanese-locale Windows install), never UTF-8, unless told
+ * otherwise. This repo's own checkout path contains real non-ASCII
+ * (Japanese) directory names (`OneDrive - 公立諏訪東京理科大学\デスクトップ`),
+ * so any script output containing that path — `Win32_Process.ExecutablePath`
+ * chief among them — came back as U+FFFD replacement characters once
+ * decoded as `encoding: "utf8"` below, corrupting THIS test's own
+ * `ExecutablePath`/version-info identity checks (live-reproduced:
+ * `queryWin32Process()`'s `ExecutablePath` failed a case-insensitive
+ * string-equality check against the known-correct, UTF-8-safe
+ * `launchExePath` Node.js itself computed, purely due to this encoding
+ * mismatch — not a real identity mismatch). Forcing
+ * `[Console]::OutputEncoding` to UTF-8 as the first statement of every
+ * script this function runs makes PowerShell's own stdout bytes match
+ * what `execFileSync` is told to decode them as.
+ */
 function powershellJson<T>(script: string): T {
-  const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8" });
+  const utf8SafeScript = `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${script}`;
+  const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", utf8SafeScript], { encoding: "utf8" });
   return JSON.parse(out) as T;
 }
 
