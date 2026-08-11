@@ -32,15 +32,21 @@ machine, with no network call anywhere in that verification path.
   subscription entitlements and contract-artifact proofs, all
   verifiable without a network call. See ["Trust / Signed
   QR"](#trust--signed-qr) below.
-- **Commerce** and **Core** — real, tested code that lives in this
-  repository (see "What works today" just below) but is **not yet
-  wired into the shipped desktop app**.
+- **Commerce** — a real Order → TEST/LOCAL payment → Delivery → signed
+  Trust receipt vertical slice, reachable from the shipped desktop app
+  (see ["How a purchase flows through FedOS"](#how-a-purchase-flows-through-fedos)
+  below). No real payment rail, Nostr publication, or reputation/persona
+  attestation is wired yet.
+- **Core** — real, tested code that lives in this repository (see "What
+  works today" just below) but some of it (`storage/`, `vault/`) is
+  **not yet wired into the shipped desktop app**.
 
-**FedOS Desktop Messenger is the one shipped product; Core, Messenger,
-Commerce, and Trust are the repository's underlying capabilities, at
-different readiness levels.** Don't assume Commerce or Trust are
-reachable from the app you install just because their code exists here
-— "What works today" states exactly what's wired to what.
+**FedOS Desktop Messenger is the one shipped product with the broadest
+surface; Core, Messenger, Commerce, and Trust are the repository's
+underlying capabilities, at different readiness levels.** Don't assume
+every corner of Commerce or Trust is reachable from the app you install
+just because their code exists here — "What works today" states exactly
+what's wired to what.
 
 ## What works today
 
@@ -73,14 +79,22 @@ Electron app.
 
 ### Commerce (`src/os/commerce/`)
 
-Real code — a product catalog, a `PaymentProvider` seam with two
-no-charge implementations, a protocol-neutral marketplace/creator model —
-carried forward from FedOS's pre-pivot prototype (`"nostr-window"`).
-**Not reachable from the shipped FedOS Desktop app:** none of it is wired
-into the packaged Electron app's runtime, IPC surface, or build tsconfigs.
-It is inert scaffolding, not a stub — the code is real and exists to give
-this prototype-era capability a proper home, but nothing in the product
-you install calls it. See `src/os/commerce/README.md`.
+Real code, and — as of the Commerce E2E Completion arc — **reachable end-to-end
+from the shipped FedOS Desktop app**: a merchant can create and publish a
+product; a customer can discover it, order, and submit; the merchant
+accepts; the customer pays via a TEST/LOCAL payment simulator (never real
+money — no real payment rail is wired); the merchant fulfills, creating a
+real Delivery record; the customer acknowledges real receipt; either party
+completes the order; and a real signed, QR-encoded Trust receipt is issued
+and independently re-verified. Every authoritative state transition
+(`"paid"`, `"delivered"`) requires re-verified evidence from this
+process's own local simulator or the buyer's own acknowledgment — never a
+bare UI claim. See [`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](docs/commerce/FEDOS-COMMERCE-END-TO-END.md)
+and `src/os/commerce/README.md`. Reputation/persona attestation remains
+design-only scaffolding, not wired; the Nostr commerce event/data-plane
+adapter is real and tested but deliberately not activated in the
+composition root this pass — Nostr publication of Commerce events remains
+optional.
 
 ### Trust (`src/os/trust/`)
 
@@ -89,9 +103,12 @@ entitlements, pseudonymous credentials, proof-of-possession, capability
 grants, contract-artifact proofs, and signed-QR encode/decode, all local
 and offline with no network calls anywhere in the directory (see
 `test/trust_*.test.ts`, `test/architecture_boundary_trust.test.ts`).
-**Also not reachable from the packaged Electron app** — nothing in the
-app's entry tsconfigs or its runtime composition root references it yet.
-The one real, runnable entry point today is a standalone CLI:
+**Now reachable from the packaged Electron app for one narrow purpose**:
+issuing and verifying a signed Commerce trade receipt on order completion
+(Commerce → Trust, one direction only — Trust itself still never imports
+Commerce, enforced by `test/architecture_boundary_trust.test.ts`). Every
+other Trust capability (credentials, entitlements, capability grants,
+contract-artifact proofs) remains reachable only via the standalone CLI:
 `npm run trust:issuer -- <subcommand>`. See `src/os/trust/README.md` and
 [`docs/architecture/TRUST-MODEL.md`](docs/architecture/TRUST-MODEL.md).
 
@@ -452,32 +469,51 @@ Walkthroughs for each feature live in the
 | [`LICENSE_STATUS.md`](LICENSE_STATUS.md) | Licensing decision record |
 | [`docs/pilot/`](docs/pilot/) | The Closed Pilot package |
 | [`docs/ALPHA_HISTORY.md`](docs/ALPHA_HISTORY.md) | Append-only development chronology |
-| [`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](docs/commerce/FEDOS-COMMERCE-END-TO-END.md) | Code-audited answer to "what happens when someone buys something with FedOS?" (short answer today: nothing — see below) |
+| [`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](docs/commerce/FEDOS-COMMERCE-END-TO-END.md) | Code-audited + real-Electron-verified answer to "what happens when someone buys something with FedOS?" (short answer today: a real, locally-verified Order → TEST/LOCAL payment → Delivery → signed receipt flow — see below) |
 
 ## How a purchase flows through FedOS
 
-A `src/os/commerce/` domain and a `src/os/trust/` capability both exist as real,
-tested TypeScript — but neither is wired into the shipping Desktop app today.
-There is no product screen, no order, no payment rail, and no QR/credential
-handoff reachable from the running product:
+A real, locally-verifiable Commerce vertical slice is reachable from the
+shipping Desktop app today (Commerce E2E Completion arc). No real money
+ever moves — payment is a TEST/LOCAL simulator only, and no real payment
+rail (e.g. BTCPay) is wired:
 
 ```
-Customer          FedOS Desktop (shipping)      Commerce domain
-   |                       |                      (os/commerce)
-   | look for a product -> |  no product screen    real code,
-   |                       |  exists (ABSENT)       zero callers
-   |                                                outside tests
+Customer                 FedOS Desktop (shipping)              Merchant
+
+Create Order  --------->  Order: created -> submitted
+                                                    <---------  Accept
+                           Order: accepted
+Request + Simulate
+Payment  -------------->  Order: paid
+  (TEST/LOCAL only, never a bare UI claim --
+   re-verified against this process's own
+   local deterministic simulator)
+                                                    <---------  Mark Fulfilling
+                           Order: fulfilling, real Delivery record created
+I Received This  ------>  Delivery + Order: delivered
+  (buyer's own recipient-acknowledgment evidence --
+   a bare merchant claim can never reach this state)
+Complete Order  -------->  Order: completed
+Issue Signed Receipt --->  real signed, QR-encoded Trust receipt,
+                            independently re-verified VALID
 ```
 
-This was verified by code inspection, not inferred from intent. Full detail,
-including per-flow file:line citations, a tabletop simulation, a gap table,
-and the recommended next bounded implementation arc:
+Verified against the real packaged Electron app, real WASM crypto, and a
+real Argon2 profile unlock — not a mock, and not code inspection alone
+— by `packages/fedos-desktop-electron-spike/test/commerce_e2e_full_happy_path_real_electron.test.ts`.
+Screenshots of every step: [`docs/commerce/evidence/commerce_e2e_completion/`](docs/commerce/evidence/commerce_e2e_completion/).
+
+**Still not wired:** a real payment rail (e.g. BTCPay), Nostr publication
+of Commerce events (backend-ready, not activated), and pseudonymous
+reputation/persona attestation (design-only scaffolding). Full detail,
+including per-flow diagrams, the three real bugs this arc's own real
+end-to-end run found and fixed, and honest gap classification:
 [`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](docs/commerce/FEDOS-COMMERCE-END-TO-END.md)
 · [`COMMERCE-E2E-SWIMLANE.md`](docs/architecture/COMMERCE-E2E-SWIMLANE.md)
-· [`CUSTOMER-COMMERCE-FLOW.md`](docs/architecture/CUSTOMER-COMMERCE-FLOW.md)
-· [`MERCHANT-COMMERCE-FLOW.md`](docs/architecture/MERCHANT-COMMERCE-FLOW.md)
-· [`PAYMENT-FLOW.md`](docs/architecture/PAYMENT-FLOW.md)
-· [`PRODUCT-SURFACE-AUDIT.md`](docs/commerce/PRODUCT-SURFACE-AUDIT.md)
+· [`COMMERCE-STATE-MACHINES.md`](docs/architecture/COMMERCE-STATE-MACHINES.md)
+· [`COMMERCE-GAP-CLASSIFICATION.md`](docs/commerce/COMMERCE-GAP-CLASSIFICATION.md)
+· [`COMMERCE-IMPLEMENTATION-ROADMAP.md`](docs/commerce/COMMERCE-IMPLEMENTATION-ROADMAP.md)
 
 ## Roadmap
 

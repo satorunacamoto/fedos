@@ -16,6 +16,10 @@ PRODUCT IMAGES:        YES — minimal image support (image only; video/sample s
 - Media is **not** a new field on the canonical `Product`/`AssetMetadata` domain types (§1/§2 below remain accurate and unchanged) — it is assembled at the Electron composition-root layer from a small, package-local demo dataset (`fedos_electron_beta_commerce_demo_catalog.ts`), deliberately keeping `src/os/commerce/**` untouched. A future arc may promote this into the domain layer proper (see `docs/architecture/COMMERCE-MEDIA-STORAGE.md`'s `ProductMedia` design).
 - Buy action, Order, Payment, Delivery/QR/credential rows in the "MINIMUM Useful" table remain exactly ABSENT — Phase 1 is deliberately read-only discovery only.
 
+## Commerce E2E Completion arc update (current, additive)
+
+The "Buy action, Order, Payment, Delivery/QR/credential rows... remain exactly ABSENT" line above is now historical, not current — see `docs/commerce/FEDOS-COMMERCE-END-TO-END.md`'s "Commerce E2E Completion arc update" for the full account: a real Order/Payment/Delivery/Trust-receipt flow now exists end-to-end. This document's own subject — the `Product`/media type surface itself (§1–§6 below) — is materially unchanged by that arc EXCEPT for one addition: a real, tested Rust/WASM `CommerceMedia` AEAD/HKDF domain now exists (`resolve_commerce_media_key()`, isolated from every other crypto domain) with a real, tested `ProductMediaEncryptionPort` adapter consuming it (`WasmProductMediaEncryption`), though the default composition (`ipfs_media_store.ts`) still wires the safe `UnavailableProductMediaEncryption` fallback rather than the new adapter. Media is still not a field on the canonical `Product` domain type itself (§1/§2 below remain accurate).
+
 ---
 
 ## 1. Product/Catalog type — full field inventory

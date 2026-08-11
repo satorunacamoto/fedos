@@ -93,3 +93,72 @@ sequenceDiagram
 **What changed vs. the original diagram above:** `loadRootModules()` now dynamically imports the real `os/commerce` barrel (`src/os/commerce/index.ts`, newly added to `tsconfig.beta-runtime.json`'s build allowlist) and calls the SAME real `listViewableProducts()` the original diagram already showed as "solid (implemented)" — the difference is this call is now reachable from the real Electron main process and IPC surface, not only from `test/commerce_*.test.ts`. `productToPaymentRequest()` / `paymentDecisionToGrant()` / the Payment lane are untouched — Phase 1 never imports or constructs a `PaymentProvider` of any kind (see `docs/commerce/PRODUCT-SURFACE-AUDIT.md`'s Phase 1 regression guard).
 
 **CUSTOMER DISCOVERY (Catalog → Product Detail): IMPLEMENTED.**
+
+## Commerce E2E Completion arc update — the full flow is now IMPLEMENTED
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant CFedOS as Customer FedOS
+    participant Main as Electron main (composition root)
+    participant Order as Order domain
+    participant Payment as DeterministicLocalPaymentProvider<br/>(TEST/LOCAL, never real money)
+    participant Delivery as Delivery domain
+    participant Trust as Trust (os/trust)
+    actor Merchant
+
+    Customer->>CFedOS: Create Order (chosen product)
+    CFedOS->>Main: fedos-app:commerce-order-create
+    Main->>Order: createOrder() — actor.kind="customer" required
+    Order-->>Main: {ok:true, order} — status "created"
+    Main-->>CFedOS: order DTO
+
+    Customer->>CFedOS: Submit
+    CFedOS->>Main: commerce-order-submit
+    Main->>Order: applyOrderAction({type:"submit"})
+    Order-->>Main: status "submitted"
+
+    Merchant->>CFedOS: Accept (merchant "acting as")
+    CFedOS->>Main: commerce-order-accept
+    Main->>Order: applyOrderAction({type:"accept"}, actor.kind="merchant")
+    Order-->>Main: status "accepted"
+
+    Customer->>CFedOS: Request + Simulate Payment
+    CFedOS->>Main: commerce-payment-request, then commerce-payment-simulate
+    Main->>Payment: simulateSettlement() — this process's own simulator ONLY
+    Payment-->>Main: PaymentEvidence
+    Main->>Order: applyOrderAction({type:"confirm_payment"},<br/>actor.kind="payment_evidence" — NEVER a bare claim)
+    Order-->>Main: status "paid"
+
+    Merchant->>CFedOS: Mark Fulfilling
+    CFedOS->>Main: commerce-order-fulfill
+    Main->>Order: applyOrderAction({type:"fulfill"})
+    Order-->>Main: status "fulfilling"
+    Main->>Delivery: createDelivery() + applyDeliveryAction({type:"start_fulfillment"})<br/>actor.pubkey === sellerPubkey required
+    Delivery-->>Main: status "fulfilling"
+
+    Customer->>CFedOS: I Received This
+    CFedOS->>Main: commerce-delivery-acknowledge-receipt
+    Main->>Delivery: applyDeliveryAction({type:"confirm_delivery"},<br/>actor.kind="delivery_evidence", verification.authoritative=true)
+    Delivery-->>Main: status "delivered"
+    Main->>Order: applyOrderAction({type:"confirm_delivery"})
+    Order-->>Main: status "delivered" — ONLY via this recipient-acknowledgment path
+
+    Customer->>CFedOS: Complete Order
+    CFedOS->>Main: commerce-order-complete
+    Main->>Order: applyOrderAction({type:"complete"})
+    Order-->>Main: status "completed"
+
+    Customer->>CFedOS: Issue Signed Receipt
+    CFedOS->>Main: commerce-receipt-issue
+    Main->>Trust: issueSignedTradeReceiptProof() — real SignedEnvelope
+    Trust-->>Main: envelope
+    Main->>Main: encodeCommerceReceiptProofToQrText()<br/>then decode + verifySignedTradeReceiptProof() BEFORE responding
+    Main-->>CFedOS: qrText, verifyStatus "VALID"
+```
+
+Verified against the real packaged Beta Electron binary (not code inspection alone) via `packages/fedos-desktop-electron-spike/test/commerce_e2e_full_happy_path_real_electron.test.ts` — 67 scripted UI steps, real WASM master seed generation, real Argon2 unlock. Screenshots of every stage: `docs/commerce/evidence/commerce_e2e_completion/`.
+
+**Corrections to "What is entirely absent" above (§ preceding, now historical):** Order, Order/merchant management UI, Commerce↔Trust wiring, and delivery are no longer absent — see the diagram and evidence above. The real payment rail line remains accurate (`payment/adapters/btcpay/` is still a reserved empty directory) — "PAID" is real and reachable, but only via the TEST/LOCAL simulator shown above, by this arc's own explicit design constraint, never a real payment rail.
+
+**E2E DIAGRAM (Commerce E2E Completion arc): PASS.**

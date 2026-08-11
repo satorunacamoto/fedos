@@ -2,6 +2,12 @@
 
 **Audited commit:** `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`.
 
+## Commerce E2E Completion arc update (current, additive)
+
+**The layer model and per-transition table below describe the ORIGINAL, now-historical state — most rows are stale.** `loadRootModules()` now DOES import `os/commerce` and `os/trust` (real dynamic imports, `fedos_electron_beta_main.cts`); a real `fedos-app:commerce-*` IPC family exists (21 channels: catalog, merchant product CRUD, order create/submit/accept/reject/cancel/fulfill, payment request/simulate, delivery status/acknowledge, order complete, receipt issue); Order and Delivery are real guarded state machines (see `COMMERCE-STATE-MACHINES.md`'s own update); a real Commerce→Trust wiring issues a signed `TradeReceiptProof` on order completion. See `COMMERCE-E2E-SWIMLANE.md`'s own "Commerce E2E Completion arc update" for the full current sequence diagram, and `docs/commerce/FEDOS-COMMERCE-END-TO-END.md` for the complete account including three real composition-root bugs this arc's own real-Electron test run found and fixed.
+
+**Still accurate, unchanged:** Commerce still makes zero network calls of its own (`os/commerce` has no `fetch`/socket/external SDK dependency); the real payment settlement path is a local, in-process `DeterministicLocalPaymentProvider`, never a network call to a real payment rail; Trust's own signature verification code, and the boundary test guarding it (`test/architecture_boundary_trust.test.ts`), are both unchanged — that test only ever forbade the `os/trust → os/commerce` direction (Trust must not depend on Commerce), so the new, real, one-directional `os/commerce → os/trust` receipt-issuance wiring this arc adds was never something that test could have caught, and needed no update. **No longer accurate:** "Commerce persists nothing" — `LocalOrderRepository`/`LocalDeliveryRepository`/`LocalProductRepository` are real, if process-lifetime-only (in-memory, not yet backed by `StorageBackend`), persistence for Order/Delivery/Product; "Commerce ↔ Trust: none exists" — a real, narrow, one-directional (Commerce → Trust, receipt-issuance only, never the reverse) wiring now exists.
+
 > Nothing in `src/os/commerce/` or `src/os/trust/` is a "backend" in the network-service sense — both are local, in-process TypeScript libraries. This document is careful not to imply a server exists where there is only a local module.
 
 ## Layer model

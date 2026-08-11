@@ -5,6 +5,29 @@
 
 ---
 
+## Commerce E2E Completion arc update (current, additive — does not rewrite the audit or Phase 1 update below)
+
+**A full, real, locally-verifiable Commerce vertical slice now exists end-to-end.** Verified as of commit `7dac8718` (`arc/fedos-commerce-e2e-completion`) via real Electron process execution (`packages/fedos-desktop-electron-spike/test/commerce_e2e_full_happy_path_real_electron.test.ts`), not code inspection alone:
+
+```
+ACTUAL CUSTOMER FLOW:   REAL, END-TO-END   (was: PARTIAL, discovery-only)
+ACTUAL ORDER FLOW:      REAL               (was: ABSENT)
+ACTUAL PAYMENT FLOW:    REAL (TEST/LOCAL simulator, never real money)  (was: ABSENT)
+DELIVERY/FULFILLMENT:   REAL               (was: ABSENT — DigitalAsset dead code)
+QR / TRUST RECEIPT:     REAL, WIRED, VERIFIED   (was: NOT WIRED)
+REPUTATION/PERSONA:     DESIGN ONLY (type-only scaffolding, unwired)   (unchanged)
+NOSTR COMMERCE EVENTS:  BACKEND-READY, DELIBERATELY NOT WIRED into the Electron composition root (Nostr publication remains optional)
+PROTECTED MEDIA CRYPTO: REAL (Rust/WASM `CommerceMedia` AEAD/HKDF domain), adapter wiring still a follow-up
+```
+
+A merchant can now, through the real shipping UI, create and publish a product; a customer can discover it, place a real Order, submit it; the merchant accepts; the customer requests and simulates a TEST/LOCAL payment (never real money — `DeterministicLocalPaymentProvider`, never a bare UI claim: the "PAID" banner reads *"confirmed by this device's local deterministic payment simulator, never by a bare customer/merchant claim"*); the merchant fulfills, which creates a real `DeliveryRecord`; the customer acknowledges real receipt (the ONLY thing that can move a Delivery/Order to `"delivered"` — a self-asserted merchant claim can reach `"fulfilling"` but never further); either party completes the order; and a real signed `TradeReceiptProof` is issued via `os/trust`'s real `SignedEnvelope` primitives, QR-encoded, and independently re-verified `VALID` server-side before the renderer ever sees it. See `docs/commerce/evidence/commerce_e2e_completion/` for real screenshots of every step, and the test file above for the automated, assertion-backed equivalent (67 scripted UI steps against the real packaged binary).
+
+**Three real defects were found and fixed only by this real end-to-end run** — none were visible to any unit or structural test, because none of them called through the exact composition-root comparison where the bug lived: the Electron composition root (`fedos_electron_beta_main.cts`) checked `result.outcome !== "transitioned"` against Order/Delivery domain transition results, but those domain functions have never had an `outcome` field — they discriminate on a boolean `ok` (a distinct, correct `outcome`-shaped result genuinely exists one layer over, on `PaymentSettlementLedger.apply()`, and the Order/Delivery checks were apparently generalized from that by mistake). Every real order-create/order-action/payment-confirm/delivery-acknowledge/order-complete call was therefore always falling into its own `"rejected"` branch — Commerce was 100% unreachable end-to-end despite 100% of unit/structural tests passing. A second, related gap: the Delivery-side merchant actions (`createDelivery`, `start_fulfillment`, `acknowledge`) require `actor.pubkey` to match the record's own buyer/seller pubkey, but the composition root's own calls omitted it, so Delivery records were silently never created. All three are fixed (see that commit's own message for the full account) and are now covered by the new E2E test so this class of drift cannot silently return.
+
+**Still true, unchanged by this arc:** Reputation/Persona attestation is design-only type scaffolding (`src/os/commerce/reputation/`, self-declared "DESIGN + TYPE-ONLY SCAFFOLDING" in its own header) — no coordinator wiring exists yet, and no UI surface exists for it. The Nostr Commerce event/data-plane adapter (`src/os/commerce/events/`) is real, tested code with a real fake-transport test double, but is deliberately not barreled into `src/os/commerce/index.ts` nor imported by the Electron composition root this pass — Nostr publication of Commerce events remains optional, matching this arc's own brief. Protected product-media encryption has a real, tested Rust/WASM `CommerceMedia` AEAD/HKDF domain (`resolve_commerce_media_key()`, isolated from every other domain, round-trip proven at the public WASM boundary) and a real, tested `ProductMediaEncryptionPort` implementation consuming it (`WasmProductMediaEncryption`, `catalog/wasm_product_media_encryption.ts`) — but `ipfs_media_store.ts`'s own default composition still wires the safe fallback, `UnavailableProductMediaEncryption`, not `WasmProductMediaEncryption`. The crypto primitive and its adapter are both ready; only the final "use it by default" composition step is a disclosed follow-up.
+
+---
+
 ## Phase 1 update (post-audit, additive — does not rewrite the audit below)
 
 **Commerce Reachable Catalog + Product Surface Phase 1 has landed.** The narrative below (§1–§11) is the original audit, pinned to commit `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`, and is left intact as a faithful historical snapshot. What has actually changed since:

@@ -6,6 +6,12 @@ Status: living document, updated by each Commerce arc. This revision folds in th
 
 Audited baseline: `db53a64282484c8884417ee5d060030646efb730` (FedOS Commerce E2E audit).
 
+## Commerce E2E Completion arc update (current, additive)
+
+Roadmap items **#2** (Merchant listing UI), **#4** (Order type + lifecycle), and **#5** (Trust↔Commerce wiring, delivery-gated evidence) are **DONE** — landed together as one real, locally-verifiable vertical slice (`arc/fedos-commerce-e2e-completion`), verified against the real packaged Electron app, not just unit-tested. See `docs/commerce/FEDOS-COMMERCE-END-TO-END.md`'s "Commerce E2E Completion arc update" for the full account. Item **#3** ("Minimal media, image only") was already DONE by Phase 1; the Rust/WASM `CommerceMedia` AEAD/HKDF domain this arc added is a superset (real encryption primitive, not just rendering), with the `WasmProductMediaEncryption` adapter implemented and tested but not yet the default composition.
+
+Item **#6** (real payment rail, e.g. BTCPay) remains open **by design** — this arc's own brief explicitly excludes real payment rails/real money; the "PAID" state is real and reachable, but only via a `DeterministicLocalPaymentProvider` gated `{ acknowledgeTestOnly: true }` and refusing `runtimeProfile: "production"`. Item **#7** (Nostr event plane opt-in) is **BACKEND-READY, NOT ACTIVATED**: a real, tested `src/os/commerce/events/` adapter with a fake-transport test double exists, but is deliberately not barreled into `src/os/commerce/index.ts` nor imported by the Electron composition root this pass — activating it (extending the signing authority's event-kind allowlist, per this item's own original note) remains a separate future arc. Item **#9** (pseudonymous reputation) now has its stated dependency (#6, trade completion to attest to) satisfied, but remains **DESIGN-ONLY, TYPE-SCAFFOLDING** (`src/os/commerce/reputation/`, self-declared in its own file headers) — no coordinator wiring, no UI, not started this arc. Item **#10** (Tor transport profile) is unchanged.
+
 ## 1. Reconciliation with the existing E2E audit's 6 flow stages
 
 The E2E audit (`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`) and swimlane (`docs/architecture/COMMERCE-E2E-SWIMLANE.md`) describe the flow as six stages. This arc's decentralized/serverless design does **not** implement any of them — it only determines how a *future* implementation of each stage could optionally use Nostr/IPFS/Tor without violating existing boundaries. Per-stage impact:

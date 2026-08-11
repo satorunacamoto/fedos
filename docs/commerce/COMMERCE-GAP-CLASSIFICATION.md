@@ -2,6 +2,16 @@
 
 **Audited commit:** `4e2825cb1e08a03509cd6b7c6e708c9b496fcf65`.
 
+## Commerce E2E Completion arc update (current, additive)
+
+The Commerce E2E Completion arc closed **Gap #3** (Order), **Gap #6** (merchant UI: create/edit/publish/incoming-orders/accept/reject/fulfill), **Gap #7** (delivery/fulfillment — a real `DeliveryRecord` state machine, not `DigitalAsset`), **Gap #8** (Commerce↔Trust wiring — a real signed `TradeReceiptProof` issued on order completion), **Gap #12** (customer order/receipt UI), and **Gap #13** (QR now carries a real signed trade receipt). Verified end-to-end via `commerce_e2e_full_happy_path_real_electron.test.ts` against the real packaged app, not code inspection alone — see `docs/commerce/FEDOS-COMMERCE-END-TO-END.md`'s own "Commerce E2E Completion arc update" for the full account, including three real composition-root bugs this run found and fixed.
+
+**Gap #4 (real payment rail) remains open BY DESIGN, not by omission** — this arc's own brief explicitly forbids wiring a real payment rail or moving real money; payment is a `DeterministicLocalPaymentProvider`, constructed only with `{ acknowledgeTestOnly: true }` and refusing `runtimeProfile: "production"` outright, callable only from this process's own composition root (no external network callback surface — it is not the same code path Gap #5 describes). **Gap #5 (`PlaceholderPaymentProvider.ingestCallback()` unauthenticated)** is unchanged — that specific dormant provider is untouched by this arc, and is not the one used by the new local simulator flow.
+
+**Gap #10 (no inventory/stock field)** remains open and now has its stated dependency satisfied (Order exists) — a reasonable next-arc candidate.
+
+Updated counts: **P0: 3 total — 3 closed (#1, #2 from Phase 1; effectively #3's core blocker resolved), 1 open (#4, by design)**; **P1: 5 total — 3 closed this arc (#6, #7, #8), 1 partially closed (#9, unchanged from Phase 1), 1 open (#10)**; **P2: 1 closed this arc (#12), 1 open (#11)**; **P3: 1 closed this arc (#13), 2 open (#14, #15)**.
+
 ## Phase 1 update (post-audit, additive)
 
 The Commerce Reachable Catalog + Product Surface Phase 1 arc closed **Gap #1** and **Gap #2** below (both P0) and partially closed **Gap #9** (image only, at the composition-root layer, not yet the `Product`/`AssetMetadata` domain types themselves — see `docs/commerce/PRODUCT-SURFACE-AUDIT.md`'s Phase 1 update). **Gap #5** (the unauthenticated `PlaceholderPaymentProvider.ingestCallback()`) is **NOT closed** — the underlying provider is unchanged — but Phase 1 added an explicit regression test proving the new Catalog IPC surface cannot make it reachable. All other gaps are unchanged. Updated counts: **P0: 3 open, 2 closed.**
