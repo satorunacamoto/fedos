@@ -76,6 +76,7 @@ export function encodeFedosTrustEnvelopeToQrText<TPayload>(
   envelope: FedosTrustSignedEnvelope<TPayload>,
 ): string {
   const json = JSON.stringify(envelope);
+  // @ts-expect-error `Buffer` has no type declarations without `@types/node` in this project's tsconfig.
   const encoded = Buffer.from(json, "utf8").toString("base64url");
   return `${FEDOS_TRUST_QR_TEXT_PREFIX}${encoded}`;
 }
@@ -162,6 +163,7 @@ export function decodeFedosTrustEnvelopeFromQrText(
 
   let decodedJsonText: string;
   try {
+    // @ts-expect-error `Buffer` has no type declarations without `@types/node` in this project's tsconfig.
     decodedJsonText = Buffer.from(encoded, "base64url").toString("utf8");
   } catch {
     return { error: "malformed-base64" };

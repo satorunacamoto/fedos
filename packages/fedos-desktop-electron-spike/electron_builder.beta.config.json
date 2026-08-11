@@ -10,6 +10,11 @@
     "dist/fedos_electron_beta_preload.cjs",
     "dist/fedos_electron_beta_renderer.js",
     "dist/fedos_electron_beta_page.html",
+    "dist/fedos_electron_notification_adapter.js",
+    "dist/fedos_electron_badge_adapter.js",
+    "dist/fedos_electron_tray_adapter.js",
+    "dist/fedos_electron_beta_commerce_demo_catalog.js",
+    "dist/fedos_electron_beta_commerce_demo_media.js",
     "package.json",
     "node_modules/**/*",
     "!**/*.map",
@@ -22,6 +27,11 @@
   },
   "extraFiles": [
     { "from": "../../dist", "to": "dist" },
+    {
+      "from": "../../node_modules",
+      "to": "dist/node_modules",
+      "filter": ["**/*", "!typescript/**/*", "!vitest/**/*", "!@cloudflare/**/*", "!@types/**/*", "!.bin/**/*", "!.package-lock.json"]
+    },
     { "from": "../../LICENSE", "to": "LICENSE.txt" },
     { "from": "../../THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
   ],

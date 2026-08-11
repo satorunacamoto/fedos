@@ -29,6 +29,7 @@
  *     feasible.
  */
 
+// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
 import { parseFedosTrustIssuerSecretFromFileStorage } from "./fedos_trust_issuer_keypair.js";
 
@@ -51,6 +52,7 @@ export class FedosTrustIssuerEnvFileSecretProvider implements FedosTrustIssuerSe
   }
 
   loadSecretKeyBytes(): Uint8Array {
+    // @ts-expect-error `process` has no type declarations without `@types/node` in this project's tsconfig.
     const keyFilePath = process.env[this.#envVarName];
     if (keyFilePath === undefined || keyFilePath.length === 0) {
       throw new Error(
